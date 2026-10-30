@@ -68,7 +68,7 @@ fun EditKeyboardLayout(
     shadowShapeRadius: Dp = 8.dp,
     modifier: Modifier = Modifier,
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f, rows = EDITOR_ROWS.toFloat(), horizontalInset = 4.dp, verticalInset = bottomPaddingDp.dp) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f, rows = 3f, horizontalInset = 4.dp, verticalInset = bottomPaddingDp.dp) { bodyModifier ->
     var selecting by remember { mutableStateOf(false) }
     val latestAction by rememberUpdatedState(onAction)
     // 离开面板只清本地锚点，复制等操作后仍可保留宿主中的选区。
@@ -82,7 +82,7 @@ fun EditKeyboardLayout(
             .padding(horizontal = 2.dp)) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val cellWidth = maxWidth / 5
-                val cellHeight = maxHeight / EDITOR_ROWS
+                val cellHeight = maxHeight / 3
                 // Fill the space between the outer action columns, or the panel height.
                 // In near-square panels the corner labels can become the tighter limit.
                 val availableDiameter = minOf(cellWidth * 3, maxHeight)
@@ -108,8 +108,7 @@ fun EditKeyboardLayout(
                 val shiftY = (cellHeight.value / 2 - cornerHalfHeight - cornerMargin)
                     .coerceIn(0f, cellHeight.value * .15f)
                 val clearX = (cellWidth.value + shiftX - cornerHalfWidth).coerceAtLeast(0f)
-                // 角键在首行和末行，竖直方向离圆心 (行数 - 1) / 2 格。
-                val clearY = (cellHeight.value * (EDITOR_ROWS - 1) / 2 + shiftY - cornerHalfHeight).coerceAtLeast(0f)
+                val clearY = (cellHeight.value + shiftY - cornerHalfHeight).coerceAtLeast(0f)
                 val cornerSafeDiameter = (2 * (hypot(clearX, clearY) - cornerInset)).coerceAtLeast(0f).dp
                 val padDiameter = minOf(availableDiameter, cornerSafeDiameter)
                 // 编辑盘自成一格：按 pad 自己的格尺寸算度量（不套主体键宽上限/gutter）
@@ -127,10 +126,10 @@ fun EditKeyboardLayout(
                         "cut" -> Icons.Default.ContentCut to "剪切"
                         "copy" -> Icons.Default.ContentCopy to "复制"
                         "paste" -> Icons.Default.ContentPaste to "粘贴"
-                        "line_start" -> Icons.Default.FirstPage to "行首"
-                        "line_end" -> Icons.Default.LastPage to "行尾"
-                        "home" -> Icons.Default.VerticalAlignTop to "段首"
-                        "end" -> Icons.Default.VerticalAlignBottom to "段尾"
+                        "line_start" -> Icons.Default.KeyboardDoubleArrowLeft to "行首"
+                        "line_end" -> Icons.Default.KeyboardDoubleArrowRight to "行尾"
+                        "home" -> Icons.Default.FirstPage to "段首"
+                        "end" -> Icons.Default.LastPage to "段尾"
                         "up" -> Icons.Default.KeyboardArrowUp to "向上"
                         "down" -> Icons.Default.KeyboardArrowDown to "向下"
                         "left" -> Icons.Default.KeyboardArrowLeft to "向左"
@@ -170,12 +169,12 @@ fun EditKeyboardLayout(
                 }
                 CompositionLocalProvider(LocalKeyboardKeyVisualMetrics provides padMetrics,
                     LocalKeyboardKeyContentScale provides glyphScale) {
-                    // 左列剪贴板操作，右列删除/撤销/重做/回车；圆盘四角上行首行尾、下段首段尾。
+                    // 行首/行尾在圆盘左右两侧，只在圆盘两边留得出位置时出现（平板、横屏）；手机按原设计不放。
+                    val sideWidth = 1.5f * cellWidth.value - padDiameter.value / 2 - 2 * inset.value
                     val rows = listOf(
-                        listOf("select_all", "line_start", "", "line_end", "delete"),
-                        listOf("cut", "", "", "", "undo"),
-                        listOf("copy", "", "", "", "redo"),
-                        listOf("paste", "home", "", "end", "enter"))
+                        listOf("undo", "home", "", "end", "delete"),
+                        listOf("redo", "line_start", "", "line_end", "select_all"),
+                        listOf("cut", "copy", "", "paste", "enter"))
                     Column(Modifier.fillMaxSize().testTag("editor-grid")) {
                         rows.forEachIndexed { rowIndex, row ->
                             Row(Modifier.weight(1f).fillMaxWidth()) {
@@ -183,11 +182,15 @@ fun EditKeyboardLayout(
                                     val cellModifier = Modifier.weight(1f).fillMaxHeight()
                                     if (command.isEmpty()) Spacer(cellModifier)
                                     else if (columnIndex == 0 || columnIndex == 4) key(command, cellModifier)
+                                    else if (rowIndex == 1 && sideWidth < EDITOR_SIDE_MIN_WIDTH * fontScale.coerceAtLeast(1f)) Spacer(cellModifier)
                                     else {
                                         val circleX = (2.5f - columnIndex) * cellWidth.value
-                                        val circleY = (EDITOR_ROWS / 2f - rowIndex) * cellHeight.value
+                                        val circleY = (1.5f - rowIndex) * cellHeight.value
                                         val contentScale = glyphScale.coerceAtMost(1.15f)
-                                        val offset = editorCornerContentOffset(cellWidth.value, cellHeight.value,
+                                        // 两侧键的内容居中在圆盘外露出的那一段里。
+                                        val offset = if (rowIndex == 1) Offset((if (columnIndex == 1) -1f else 1f) *
+                                            (cellWidth.value / 2 - inset.value - sideWidth / 2), 0f)
+                                        else editorCornerContentOffset(cellWidth.value, cellHeight.value,
                                             circleX, circleY, padDiameter.value / 2 + inset.value,
                                             maxOf(12f, 10f * fontScale) * contentScale,
                                             (11f + 6f * fontScale) * contentScale, maxOf(8f, inset.value + 2f))
@@ -222,7 +225,8 @@ fun EditKeyboardLayout(
     }
 }
 
-private const val EDITOR_ROWS = 4
+/** 圆盘两侧至少露出这么宽才放行首/行尾，放得下图标和两个字。 */
+private const val EDITOR_SIDE_MIN_WIDTH = 44f
 
 /** Keep labels centred in the usable part of a corner, clear of the circle and outer edge. */
 internal fun editorCornerContentOffset(width: Float, height: Float, circleX: Float, circleY: Float,

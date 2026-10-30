@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
@@ -88,7 +89,7 @@ class EditKeyboardLayoutTest {
             }
             initialAvailableDiameter = availableDiameter
             initialPad = pad.width; initialCentre = centre.width
-            val corners = listOf("行首", "行尾", "段首", "段尾")
+            val corners = listOf("段首", "段尾", "复制", "粘贴")
             for (label in corners) {
                 val key = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
                 val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
@@ -97,7 +98,7 @@ class EditKeyboardLayoutTest {
                 val dy = (kotlin.math.abs(content.center.y - pad.center.y) - content.height / 2).coerceAtLeast(0f)
                 assertTrue("$label clear of circle", dx * dx + dy * dy > pad.width * pad.width / 4)
             }
-            for (row in listOf(listOf("全选", "行首", "行尾", "删除"), listOf("粘贴", "段首", "段尾", "回车"))) {
+            for (row in listOf(listOf("撤销", "段首", "段尾", "删除"), listOf("剪切", "复制", "粘贴", "回车"))) {
                 val keys = row.map { rule.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot }
                 keys.forEach { assertEquals(keys.first().top, it.top, 1f); assertEquals(keys.first().bottom, it.bottom, 1f) }
             }
@@ -117,7 +118,7 @@ class EditKeyboardLayoutTest {
             val grid = rule.onNodeWithTag("editor-grid", true).fetchSemanticsNode().boundsInRoot
             assertTrue("$width x $height font=$font stays within the available dimensions",
                 controls.width <= minOf(grid.width * 3f / 5f, grid.height) + 1f)
-            for (label in listOf("行首", "行尾", "段首", "段尾")) {
+            for (label in listOf("段首", "段尾", "复制", "粘贴")) {
                 val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
                 val dx = (kotlin.math.abs(content.center.x - pad.center.x) - content.width / 2).coerceAtLeast(0f)
                 val dy = (kotlin.math.abs(content.center.y - pad.center.y) - content.height / 2).coerceAtLeast(0f)
@@ -131,7 +132,7 @@ class EditKeyboardLayoutTest {
         setPanel()
         for ((width, height) in listOf(280.dp to 140.dp, 320.dp to 144.dp, 400.dp to 144.dp, 640.dp to 140.dp)) {
             rule.runOnIdle { panelWidth.value = width; panelHeight.value = height }
-            for (label in listOf("行首", "行尾", "段首", "段尾")) {
+            for (label in listOf("段首", "段尾", "复制", "粘贴")) {
                 val key = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
                 val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
                 val margin = minOf(content.left - key.left, key.right - content.right,
@@ -142,7 +143,7 @@ class EditKeyboardLayoutTest {
                 }
             }
         }
-        rule.runOnIdle { assertEquals(List(4) { listOf("line_start", "line_end", "home", "end") }.flatten(), actions) }
+        rule.runOnIdle { assertEquals(List(4) { listOf("home", "end", "copy", "paste") }.flatten(), actions) }
     }
 
     @Test fun exportMinimumAndMaximumHeightPreviews() {
@@ -163,8 +164,6 @@ class EditKeyboardLayoutTest {
         rule.onNodeWithContentDescription("选择").performClick()
         rule.onNodeWithContentDescription("段首").performClick()
         rule.onNodeWithContentDescription("段尾").performClick()
-        rule.onNodeWithContentDescription("行首").performClick()
-        rule.onNodeWithContentDescription("行尾").performClick()
         // A sector's bounding-box centre belongs to Select, not to the arrow.
         rule.onNodeWithContentDescription("向左").performTouchInput {
             click(Offset(width / 6f, height / 2f))
@@ -172,8 +171,7 @@ class EditKeyboardLayoutTest {
         rule.onNodeWithContentDescription("取消选择").performClick()
         rule.onNodeWithContentDescription("段首").performClick()
         rule.runOnIdle {
-            assertEquals(listOf("select_begin", "select_paragraph_start", "select_paragraph_end",
-                "select_line_start", "select_line_end", "select_arrow_left", "select_end", "home"), actions)
+            assertEquals(listOf("select_begin", "select_paragraph_start", "select_paragraph_end", "select_arrow_left", "select_end", "home"), actions)
         }
     }
 
@@ -229,4 +227,29 @@ class EditKeyboardLayoutTest {
             }
         } finally { rule.runOnIdle { VisualStyles.current = previousStyle } }
     }
+
+    @Test fun lineKeysAppearBesideTheDiscOnlyWhenThereIsRoom() {
+        setPanel()
+        // 手机宽度：圆盘占满中间三列，两侧不放行首/行尾，保持原设计。
+        rule.runOnIdle { panelWidth.value = 400.dp; panelHeight.value = 230.dp }
+        assertEquals(0, rule.onAllNodesWithContentDescription("行首").fetchSemanticsNodes().size)
+        assertEquals(0, rule.onAllNodesWithContentDescription("行尾").fetchSemanticsNodes().size)
+        // 平板宽度：圆盘受高度限制，两侧露出的空位放行首/行尾，内容不压圆盘。
+        rule.runOnIdle { panelWidth.value = 930.dp; panelHeight.value = 344.dp }
+        val pad = rule.onNodeWithTag("editor-direction-pad", true).fetchSemanticsNode().boundsInRoot
+        for (label in listOf("行首", "行尾")) {
+            val key = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
+            val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
+            assertTrue("$label inside its cell", content.left > key.left && content.right < key.right)
+            val dx = (kotlin.math.abs(content.center.x - pad.center.x) - content.width / 2).coerceAtLeast(0f)
+            val dy = (kotlin.math.abs(content.center.y - pad.center.y) - content.height / 2).coerceAtLeast(0f)
+            assertTrue("$label clear of circle", dx * dx + dy * dy > pad.width * pad.width / 4)
+            assertEquals("$label vertically centred beside the disc", pad.center.y, content.center.y, 1f)
+        }
+        rule.onNodeWithTag("editor-label-行首", true).performClick()
+        rule.onNodeWithContentDescription("选择").performClick()
+        rule.onNodeWithTag("editor-label-行尾", true).performClick()
+        rule.runOnIdle { assertEquals(listOf("line_start", "select_begin", "select_line_end"), actions) }
+    }
+
 }
