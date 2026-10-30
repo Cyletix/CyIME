@@ -678,8 +678,8 @@ class Packager(ad.Delivery):
         path = artifact["path"]
         if ad.digest(Path(path)) != artifact["sha256"]:
             raise DeliveryError("安装包在构建后被改动。")
-        command = f"& {ad.ps_quote(self.signer)} verify --print-certs {ad.ps_quote(path)}; exit $LASTEXITCODE"
-        self.r.run([self.ps, "-NoProfile", "-NonInteractive", "-Command", command])
+        command = f"& {ad.ps_quote(self.signer)} verify --verbose --min-sdk-version 23 --print-certs {ad.ps_quote(path)}; exit $LASTEXITCODE"
+        ad.check_signature_schemes(self.r.run([self.ps, "-NoProfile", "-NonInteractive", "-Command", command]))
         badging = self.r.run([self.aapt, "dump", "badging", path])
         match = re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", badging)
         if not match or match.groups() != (ad.PACKAGE, str(self.code), self.version):
