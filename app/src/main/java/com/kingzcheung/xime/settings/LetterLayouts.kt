@@ -6,11 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * One letter arrangement per language for input typed letter by letter: English direct input and
- * Japanese romaji. The choices are the letter layouts Chinese pinyin offers (QWJRTK, Cyletix10,
- * Colemak and the user's own), and rows, names, swipe positions and moved-letter colours all come
- * from that same [CustomKeyboardLayout]. Layouts with merged keys are left out: a two-letter key
- * cannot type one letter directly, and romaji has no decoder that splits it.
+ * One letter arrangement per language for input typed letter by letter: English direct input,
+ * Japanese romaji and Chinese double pinyin (every double-pinyin scheme shares the Chinese choice;
+ * pinyin itself carries its layout in the schema). The choices are the letter layouts Chinese pinyin
+ * offers (QWJRTK, Cyletix10, Colemak and the user's own), and rows, names, swipe positions and
+ * moved-letter colours all come from that same [CustomKeyboardLayout]. Layouts with merged keys are
+ * left out: a two-letter key cannot type one letter directly, and romaji and double pinyin have no
+ * decoder that splits it (double pinyin types merged keys on its 14-key versions instead).
  */
 object LetterLayouts {
     private const val PREFIX = "letter_layout_"
@@ -18,7 +20,8 @@ object LetterLayouts {
 
     fun appliesTo(language: InputLanguage, scheme: InputScheme): Boolean =
         language == InputLanguage.ENGLISH && scheme == InputScheme.DIRECT ||
-            language == InputLanguage.JAPANESE && scheme == InputScheme.ROMAJI
+            language == InputLanguage.JAPANESE && scheme == InputScheme.ROMAJI ||
+            language == InputLanguage.CHINESE && scheme == InputScheme.DOUBLE_PINYIN
 
     fun typable(layout: CustomKeyboardLayout): Boolean = layout.mergedGroups.isEmpty()
 

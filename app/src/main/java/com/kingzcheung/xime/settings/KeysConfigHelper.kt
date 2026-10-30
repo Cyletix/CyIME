@@ -736,14 +736,16 @@ object KeysConfigHelper {
             _zhRows = arranged?.typingRows() ?: _mergedRows[section] ?: DEFAULT_ZH_ROWS
             _keyGestureConfig.value = arranged?.gestures(gestures) ?: gestures
         } else {
-            _zhRows = _zhRowsBase
-            _keyGestureConfig.value = _keyGestureConfigZhBase
+            // Double pinyin types on the arrangement chosen for it (QWJRTK, Colemak, the user's own …); pinyin has none.
+            val arranged = letterLayout(schemaId, false)
+            _zhRows = arranged?.typingRows() ?: _zhRowsBase
+            _keyGestureConfig.value = arranged?.gestures(_keyGestureConfigZhBase) ?: _keyGestureConfigZhBase
         }
     }
 
     /**
      * The letter layout the keyboard is typing on: a Chinese layout schema, or the arrangement chosen
-     * for English / Japanese romaji ([LetterLayouts]). null is the plain 26/14 keys of the section.
+     * for English / Japanese romaji / double pinyin ([LetterLayouts]). null is the plain 26/14 keys of the section.
      */
     fun letterLayout(schemaId: String, isAsciiMode: Boolean): CustomKeyboardLayout? =
         CustomKeyboardLayouts.find(InputProfiles.current(schemaId, isAsciiMode).layout.id)
