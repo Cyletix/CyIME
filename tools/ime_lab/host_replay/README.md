@@ -82,3 +82,15 @@ deletes and new keys, capitals/digits/punctuation inside pinyin, separators, spa
 or Enter followed by new keys. It fails on a thrown error, a code left after a clear, new keys that
 join an old code, or backspace that cannot empty the code. It drives the engine the way the app
 calls it, not the Kotlin keyboard code. 2026-10-23, seed 20261023 × 150 rounds: 15690 steps, none.
+
+`LayoutSyncProbe.java` (library dir, a fresh user directory listing `rime_ice`, `t9_pinyin` and
+`pinyin_14jian`, mode `all` or `rank`) checks that nine and 14 keys keep up with 26 keys. `all`: a
+nine-key flick letter (`nativeT9FixLetter`, what a flick sends while a code is open) joins the code and
+fixes that position instead of clearing it, and more digits continue the same code; custom phrases reach
+nine keys and 14 keys through the keyed copies the app writes (`custom_phrase_t9`: digits,
+`custom_phrase_k14`: pair capitals plus the letters); a candidate in `cyime-hidden-candidates.txt` stays
+hidden on 14 keys; and the must-pass ranking list typed with pair capitals. `rank`: only the ranking list
+and the hidden-candidate line, for comparing a 14-key schema before and after a change. 2026-10-30, without
+the grammar file: the four flick cases, all 12 phrase lookups and the hidden check pass; the 11 ranking
+words are first both with the old schema (no filters) and with `cyime_candidate_policy` + `uniquifier`, the
+only difference being that the hidden 童话 is no longer offered.

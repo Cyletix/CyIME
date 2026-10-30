@@ -18,6 +18,7 @@ public final class RimeEngine {
     public native void nativeT9ClearComposition(int mode);
     public native boolean nativeT9SelectPinyinDirect(String pinyin, int digitLength);
     public native boolean nativeT9SelectCandidate(String pinyin, String text, int textLength);
+    public native boolean nativeT9FixLetter(String letter);
     public native int nativeT9RefinementState();
     public native boolean nativeRefineT9Sentences();
     public native String nativeT9ScoringStatus();
