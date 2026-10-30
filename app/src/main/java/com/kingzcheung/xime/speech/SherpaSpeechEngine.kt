@@ -4,6 +4,9 @@ import android.content.Context
 import com.k2fsa.sherpa.onnx.*
 import java.io.File
 
+/** 0.25 s; X-ASR fails below 1440 samples (see [SherpaSpeechEngine.createXasr]). */
+private const val XASR_MIN_SAMPLES = 4000
+
 /** Official sherpa-onnx 1.13.8, matching ASRInput. Each recognizer has one owning worker. */
 internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManager.Selection) : LocalSpeechEngine {
     private var online: OnlineRecognizer? = null
@@ -144,10 +147,11 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     }
     override fun refinePunctuated(samples: FloatArray): String {
         if (japanese) return refine(samples)
-        val recognizer = selection.finalizerDir?.let { dir -> finalizer ?: createXasr(dir).also { finalizer = it } } ?: refiner()
+        val xasr = selection.finalizerDir?.let { dir -> finalizer ?: createXasr(dir).also { finalizer = it } }
+        val recognizer = xasr ?: refiner()
         val s = recognizer.createStream()
         try {
-            s.acceptWaveform(samples, 16000)
+            s.acceptWaveform(if (xasr != null && samples.size < XASR_MIN_SAMPLES) samples.copyOf(XASR_MIN_SAMPLES) else samples, 16000)
             recognizer.decode(s)
             val result = recognizer.getResult(s)
             return cleanSenseVoiceText(result.text, result.lang, keepMarks = true)
@@ -212,6 +216,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     }
     // The X-ASR int8 export aborts in its encoder (Reshape) on inputs of 40.2 s or more (2026-10-30 scan,
     // 25–48 s in 0.16 s steps; none below). Whole-sentence regions stop at 30 s and re-read blocks at 28 s.
+    // It also fails (Conv input shape) below 1440 samples, so shorter input is padded with silence.
     private fun createXasr(dir: File) = OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = OfflineModelConfig(
         transducer = OfflineTransducerModelConfig(requireFile(dir, "encoder-epoch-99-avg-1.int8.onnx"),
             requireFile(dir, "decoder-epoch-99-avg-1.onnx"), requireFile(dir, "joiner-epoch-99-avg-1.int8.onnx")),
