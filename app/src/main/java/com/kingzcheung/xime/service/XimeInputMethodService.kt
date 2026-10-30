@@ -1147,6 +1147,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 面板打开时记录的输入框选区起止（上屏前恢复以替换原选区）。 */
     private var toolPanelSelection: Pair<Int, Int>? = null
+    /** 打开面板时的输入框身份；换了输入框，面板结果不再上屏。 */
+    private var toolPanelAdmission: Long? = null
 
     /** 面板生成轮询任务（流式生成期间持续刷新候选）。 */
     private var toolPanelPollJob: Job? = null
@@ -1184,24 +1186,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             )
         }
         toolPanelSelection = readCurrentSelection()
+        toolPanelAdmission = inputReadiness.ticket()
         val contextText = collectToolPanelContext()
         val pluginName = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.name ?: pluginId
         val display = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.capabilities?.tool?.display
-        val pluginState = (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)
-            ?.getPanelState(contextText)
-        val prefill = pluginState?.inputText?.takeIf { it.isNotBlank() } ?: contextText
+        val epoch = uiState.value.toolPanelRequestEpoch + 1
         uiState.value = uiState.value.copy(
             toolPanelVisible = true,
             toolPanelInputFocused = display != ToolResult.PASSIVE,
             toolPanelPluginId = pluginId,
             toolPanelTitle = pluginName,
-            toolPanelPrefillText = prefill,
-            toolPanelItems = pluginState?.items ?: emptyList(),
+            toolPanelPrefillText = contextText,
+            toolPanelItems = emptyList(),
             toolPanelDisplay = display?.name,
-            toolPanelUiNodes = pluginState?.ui,
-            toolPanelRequestEpoch = uiState.value.toolPanelRequestEpoch + 1,
+            toolPanelUiNodes = null,
+            toolPanelRequestEpoch = epoch,
             enterKeyText = if (display == ToolResult.PASSIVE) "发送" else "生成",
         )
         if (display == ToolResult.PASSIVE) {
@@ -1209,8 +1210,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             keyboardViewModel.showOverlay(OverlayRoute.ToolPanel)
         } else {
             ToolPanelEditTextHolder.editText?.let { et ->
-                et.setText(prefill)
-                et.setSelection(prefill.length)
+                et.setText(contextText)
+                et.setSelection(contextText.length)
+            }
+        }
+        // 插件的初始面板状态在后台取（审计 F08：以前在主线程同步等插件，慢插件冻住整个键盘）。
+        serviceScope.launch(Dispatchers.IO) {
+            val pluginState = runCatching {
+                (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)?.getPanelState(contextText)
+            }.getOrNull() ?: return@launch
+            withContext(Dispatchers.Main) {
+                if (uiState.value.toolPanelRequestEpoch != epoch || !uiState.value.toolPanelVisible) return@withContext
+                // 只在用户还没改过预填时换成插件给的预填（面板会把输入框改回 toolPanelPrefillText）。
+                val editor = ToolPanelEditTextHolder.editText
+                val untouched = editor == null || editor.text?.toString() == contextText
+                val prefill = pluginState.inputText.takeIf { it.isNotBlank() && untouched } ?: uiState.value.toolPanelPrefillText
+                uiState.value = uiState.value.copy(
+                    toolPanelPrefillText = prefill,
+                    toolPanelItems = pluginState.items,
+                    toolPanelUiNodes = pluginState.ui,
+                )
+                if (display != ToolResult.PASSIVE && untouched && editor != null && prefill != contextText) {
+                    editor.setText(prefill)
+                    editor.setSelection(prefill.length)
+                }
             }
         }
     }
@@ -1327,6 +1350,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     internal fun closeToolPanel() {        toolPanelSelection = null
+        toolPanelAdmission = null
         stopToolPanelPoll()
         // 面板相关 Overlay 页面（ToolPanel 纯展示页）开着时联动关闭
         val page = keyboardViewModel.page.value
@@ -1355,12 +1379,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 直接经 InputConnection 提交，不走 commitText 重定向（避免注入回面板输入框）。
      */
     internal fun commitToolPanelItem(text: String) {
+        // 面板打开后输入框换过（restartInput 不经 onFinishInput 也算）：旧选区属于旧正文，不能覆盖新正文（审计 F08）。
+        val admission = toolPanelAdmission
+        val ic = currentInputConnection
+        if (ic == null || admission == null || !inputReadiness.accepts(admission)) {
+            closeToolPanel()
+            return
+        }
         val pluginId = uiState.value.toolPanelPluginId
         val itemId = uiState.value.toolPanelItems.firstOrNull { it.text == text }?.id ?: text
         serviceScope.launch(Dispatchers.IO) {
             (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)?.onPanelItemClick(itemId)
         }
-        val ic = currentInputConnection ?: return
         toolPanelSelection?.let { (start, end) ->
             runCatching { ic.setSelection(start, end) }
         }

@@ -397,8 +397,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             )
                         }
                     }
+                    // 排在上面写入拼音的 post 之后：生成要带上最后这段还没上屏的编码（审计 F08）。
                     if (service.uiState.value.clipboardSearchVisible) service.mainHandler.post { service.submitClipboardSearch() }
-                    else service.triggerToolPanelGenerate()
+                    else service.mainHandler.post {
+                        if (service.inputReadiness.accepts(admission)) service.triggerToolPanelGenerate()
+                    }
                     return
                 }
                 "delete" -> {
