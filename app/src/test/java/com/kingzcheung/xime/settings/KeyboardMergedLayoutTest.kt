@@ -208,6 +208,7 @@ class KeyboardMergedLayoutTest {
         assertEquals("t9", bindings["t9_pinyin"])
         assertEquals("t9", bindings["t9"])
         assertEquals("t9", bindings["wanxiang_t9"])
+        assertEquals("t9", bindings["t9_flypy"])
         assertEquals("stroke", bindings["stroke"])
         assertEquals("handwriting", bindings["handwriting"])
     }
