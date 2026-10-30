@@ -64,7 +64,10 @@ class OfflineEditionTest {
             assertEquals(profile.predictionModel, SettingsPreferences.getPredictionSelectedModel(fresh))
             assertTrue(SettingsPreferences.isSttEnabled(fresh))
             assertTrue(SettingsPreferences.isSttUseLocal(fresh))
-            assertFalse(SettingsPreferences.isSttKeepEngineAlive(fresh))
+            // 新装是「性能与省电 → 自动」：语音常驻与否跟本机档位那一组走。
+            val tier = com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.classify(hardware)
+            assertEquals(com.kingzcheung.xime.settings.PerformanceProfile.presets.getValue(tier).speechEngineIdleMinutes == 0,
+                SettingsPreferences.isSttKeepEngineAlive(fresh))
             DeviceDefaults.initialize(fresh)
             assertEquals(glow, prefs.getBoolean("key_glow_enabled", !glow))
             SettingsPreferences.setSmartPredictionEnabled(fresh, false)

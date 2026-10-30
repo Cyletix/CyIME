@@ -30,4 +30,22 @@ class PerformanceProfileTest {
             assertTrue(it.toString(), engine == 0 || it.speechRefinerIdleMinutes in 1..engine)
         }
     }
+
+    @Test fun autoHoldsOnlyWhileTheValuesAreStillTheDetectedTier() {
+        val high = PerformanceProfile.presets.getValue(PerformanceTier.HIGH)
+        assertTrue(PerformanceProfile.isAuto(true, high, PerformanceTier.HIGH))
+        // Glow switched off on the 按键效果 page: the page shows 自定义, not 自动.
+        assertFalse(PerformanceProfile.isAuto(true, high.copy(keyGlow = false), PerformanceTier.HIGH))
+        assertFalse(PerformanceProfile.isAuto(true, PerformanceProfile.presets.getValue(PerformanceTier.LOW), PerformanceTier.HIGH))
+        assertFalse(PerformanceProfile.isAuto(false, high, PerformanceTier.HIGH))
+    }
+
+    @Test fun firstRunKeyEffectsAreTheSameTierPreset() {
+        listOf(device, device.copy(totalMemoryBytes = 6 * gib), device.copy(totalMemoryBytes = 3 * gib)).forEach {
+            val preset = PerformanceProfile.presets.getValue(PerformanceTiers.classify(it))
+            val effects = com.kingzcheung.xime.runtime.adaptation.DeviceKeyEffectDefaults.choose(it)
+            assertEquals(it.toString(), preset.keyAnimation, effects.animation)
+            assertEquals(it.toString(), preset.keyGlow, effects.glow)
+        }
+    }
 }

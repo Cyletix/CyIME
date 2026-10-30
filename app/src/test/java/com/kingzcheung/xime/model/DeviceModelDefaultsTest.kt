@@ -149,6 +149,11 @@ class DeviceModelDefaultsTest {
             assertEquals(profile.predictionModel, SettingsPreferences.getPredictionSelectedModel(context))
             assertEquals(profile.voiceModel, AsrModelManager(context).getSelectedModelId())
             assertEquals(profile.tier.name, stores.values()[DeviceDefaults.TIER])
+            // A fresh install starts on 性能与省电 → 自动, so that page does not show 自定义 nobody chose.
+            val performance = com.kingzcheung.xime.settings.PerformanceProfile.presets.getValue(
+                com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.classify(hardware))
+            assertEquals(true, stores.values()["performance_profile_auto"])
+            assertEquals(performance, com.kingzcheung.xime.settings.PerformanceProfile.read(context))
             assertEquals(hardware.maxCpuKHz, stores.values()["device_initial_max_cpu_khz"])
             assertFalse(stores.values().containsKey("prediction_selected_model"))
             assertFalse(stores.values("asr_model").containsKey("selected_model"))

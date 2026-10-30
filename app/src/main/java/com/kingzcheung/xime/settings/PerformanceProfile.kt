@@ -42,7 +42,15 @@ object PerformanceProfile {
     fun matching(settings: PerformanceSettings): PerformanceTier? =
         presets.entries.firstOrNull { it.value == settings }?.key
 
-    fun isAuto(context: Context): Boolean = SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_AUTO, false)
+    /**
+     * “自动”只在当前值仍是本机档位那一组时成立：在「按键效果」里单独改了动效、炫光，或别处改了语音释放，
+     * 页面就显示“自定义”，不会一边勾着自动一边用着另一组值。
+     */
+    fun isAuto(context: Context): Boolean = isAuto(
+        SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_AUTO, false), read(context), detectedTier(context))
+
+    fun isAuto(chosenAuto: Boolean, settings: PerformanceSettings, detected: PerformanceTier): Boolean =
+        chosenAuto && matching(settings) == detected
 
     fun detectedTier(context: Context): PerformanceTier = PerformanceTiers.classify(DeviceCapabilityProbe.read(context))
 
@@ -63,6 +71,19 @@ object PerformanceProfile {
     fun applyCustom(context: Context, settings: PerformanceSettings) {
         write(context, settings)
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(KEY_AUTO, false).apply()
+    }
+
+    /**
+     * 新装默认就是“自动”：按键效果本来就按同一档位初始化（[com.kingzcheung.xime.runtime.adaptation.DeviceKeyEffectDefaults]），
+     * 语音释放也写同一档，否则新装就显示“自定义”，好像用户改过。
+     */
+    internal fun writeFirstRunAuto(editor: android.content.SharedPreferences.Editor, tier: PerformanceTier) {
+        val settings = checkNotNull(presets[tier])
+        // 动效、炫光由 DeviceDefaults 按 DeviceKeyEffectDefaults 写，与这一档相同（PerformanceProfileTest 检查）。
+        editor.putInt(SettingsPreferences.KEY_STT_REFINER_IDLE_MINUTES, settings.speechRefinerIdleMinutes)
+            .putInt(SettingsPreferences.KEY_STT_ENGINE_IDLE_MINUTES, settings.speechEngineIdleMinutes)
+            .putBoolean(SettingsPreferences.KEY_STT_KEEP_ENGINE_ALIVE, settings.speechEngineIdleMinutes == 0)
+            .putBoolean(KEY_AUTO, true)
     }
 
     private fun write(context: Context, settings: PerformanceSettings) {
