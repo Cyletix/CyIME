@@ -358,8 +358,8 @@ class RoundThreeImeTest {
             rule.onNodeWithContentDescription("编辑").assertIsDisplayed().performClick()
             rule.waitUntil(10_000) { rule.onAllNodesWithContentDescription("向上").fetchSemanticsNodes().isNotEmpty() }
             val up = rule.onNodeWithContentDescription("向上").fetchSemanticsNode().boundsInRoot
-            val lineStart = rule.onNodeWithContentDescription("行首").fetchSemanticsNode().boundsInRoot
-            assertTrue("行首在圆盘左上角", lineStart.center.x < up.center.x && lineStart.center.y < up.center.y)
+            val home = rule.onNodeWithContentDescription("段首").fetchSemanticsNode().boundsInRoot
+            assertEquals("首行保持中心对齐（四角缩小视觉区域，保留触控范围）", home.center.y, up.center.y, 1f)
             rule.onAllNodesWithContentDescription("返回").assertCountEquals(1)
             rule.onAllNodesWithContentDescription("返回键盘").assertCountEquals(0)
             val topBack = rule.onNodeWithContentDescription("返回").fetchSemanticsNode().boundsInRoot
