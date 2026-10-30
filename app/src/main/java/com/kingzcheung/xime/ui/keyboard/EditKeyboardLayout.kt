@@ -93,7 +93,12 @@ fun EditKeyboardLayout(
                     columns = 5f,
                     rows = 3f,
                     verticalInsetDp = 0f,
-                )
+                ).let { metrics ->
+                    // 键缝有固定上限，平板格子大了就显得窄；按格子短边保持手机上的缝隙比例，手机仍是原值。
+                    val proportional = EDITOR_GAP_FRACTION / 2f * minOf(metrics.cellWidthDp, metrics.cellHeightDp)
+                    metrics.copy(insetX = metrics.insetX?.let { maxOf(it, proportional) },
+                        insetY = metrics.insetY?.let { maxOf(it, proportional) })
+                }
                 val cornerInset = metricsFor(availableDiameter).insetX ?: 2f
                 val cornerScale = KeyboardKeyMetrics.contentScale(
                     cellWidth.value * .92f, availableDiameter.value / 3 * .92f).coerceAtMost(1.15f)
@@ -227,6 +232,9 @@ fun EditKeyboardLayout(
 
 /** 圆盘两侧至少露出这么宽才放行首/行尾，放得下图标和两个字。 */
 private const val EDITOR_SIDE_MIN_WIDTH = 44f
+
+/** 手机上键缝约为格子短边的 15%；更大的格子按这个比例放宽。 */
+private const val EDITOR_GAP_FRACTION = 0.15f
 
 /** Keep labels centred in the usable part of a corner, clear of the circle and outer edge. */
 internal fun editorCornerContentOffset(width: Float, height: Float, circleX: Float, circleY: Float,
