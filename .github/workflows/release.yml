@@ -127,7 +127,10 @@ jobs:
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
           for apk in app/build/outputs/apk/distribution/CyIME-*.apk; do
-            "$APKSIGNER" verify --print-certs "$apk" >/dev/null
+            OUT=$("$APKSIGNER" verify --verbose --print-certs "$apk")
+            # vivo OriginOS rejects APKs without a v1 (JAR) signature as 「安装包缺乏开发者证书」.
+            echo "$OUT" | grep -q 'Verified using v1 scheme (JAR signing): true'
+            echo "$OUT" | grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true'
             echo "Verified: $apk"
           done
 
