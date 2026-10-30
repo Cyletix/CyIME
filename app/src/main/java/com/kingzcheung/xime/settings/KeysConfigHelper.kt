@@ -689,10 +689,11 @@ object KeysConfigHelper {
 
     /** 查询方案声明的键盘 section（任意类型，含代码布局），未声明返回 null。 */
     fun boundSectionForSchema(schemaId: String): String? = _schemaSectionBindings[schemaId]
+        ?: "t9".takeIf { DoublePinyinSchemes.isT9(schemaId) }
 
     /** 查询方案绑定的代码布局 section（t9 九键 / stroke 笔画），未绑定返回 null。 */
     fun codeLayoutForSchema(schemaId: String): String? =
-        _schemaSectionBindings[schemaId]?.takeIf { it in CODE_LAYOUT_SECTIONS }
+        boundSectionForSchema(schemaId)?.takeIf { it in CODE_LAYOUT_SECTIONS }
 
     /**
      * 仅供单测：清空方案绑定缓存。

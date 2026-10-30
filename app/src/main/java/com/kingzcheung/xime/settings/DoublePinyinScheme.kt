@@ -111,6 +111,114 @@ data class DoublePinyinScheme(
         return "$GENERATED_MARK$id\n$text"
     }
 
+    /**
+     * 九键版本：每个音节的两个双拼键换成所在的数字键（如小鹤 zhong = vs → 87）。
+     * 只用 Rime 的拼写运算和词库，不开九键拼音的整句解码与左侧拼音栏（它们按全拼计算）。
+     * 词库、学习记录与 26 键双拼共用 rime_ice。
+     */
+    fun t9Schema(): String {
+        require(this == FLYPY || valid())
+        val t9 = t9Id(id)
+        val algebra = algebra() + T9_DIGITS.map { (letters, digit) -> "derive/[$letters]/$digit/" }
+        return """
+            |$GENERATED_MARK$t9
+            |schema:
+            |  schema_id: $t9
+            |  language: zh
+            |  input_scheme: double_pinyin
+            |  name: ${org.json.JSONObject.quote(name + "九键")}
+            |  version: "1"
+            |  description: |
+            |    CyIME 双拼方案（由键位表生成）的九键版本：每个字按它的两个双拼键所在的数字键输入。
+            |  dependencies:
+            |    - cyime_t9_english
+            |
+            |switches:
+            |  - name: ascii_mode
+            |    reset: 0
+            |    states: [ 中文, 西文 ]
+            |  - name: full_shape
+            |    states: [ 半角, 全角 ]
+            |  - name: ascii_punct
+            |    reset: 0
+            |    states: [ 。，, ．， ]
+            |
+            |engine:
+            |  processors:
+            |    - t9_processor
+            |    - ascii_composer
+            |    - recognizer
+            |    - key_binder
+            |    - speller
+            |    - punctuator
+            |    - selector
+            |    - navigator
+            |    - express_editor
+            |  segmentors:
+            |    - ascii_segmentor
+            |    - matcher
+            |    - abc_segmentor
+            |    - punct_segmentor
+            |    - fallback_segmentor
+            |  translators:
+            |    - punct_translator
+            |    - script_translator
+            |    - t9_english_translator@t9_english
+            |  filters:
+            |    - cyime_candidate_policy
+            |    - t9_filter
+            |    - uniquifier
+            |
+            |speller:
+            |  alphabet: zyxwvutsrqponmlkjihgfedcba9876543210
+            |  initials: zyxwvutsrqponmlkjihgfedcba9876543210
+            |  delimiter: " '"
+            |  algebra:
+            |${algebra.joinToString("") { "    - \"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n" }}
+            |translator:
+            |  dictionary: rime_ice
+            |  prism: $t9
+            |  max_homophones: 32
+            |  spelling_hints: 100
+            |  always_show_comments: true
+            |  comment_format: []
+            |
+            |t9:
+            |  # 左侧拼音栏和整句解码按全拼的数字计算，双拼九键不用；候选上方按双拼两键一字显示拼音。
+            |  left_panel_mode: none
+            |  double_pinyin: true
+            |  isDisplayOriginalPreedit: false
+            |
+            |cyime:
+            |  candidate_policy: true
+            |
+            |punctuator:
+            |  import_preset: default
+            |
+            |recognizer:
+            |  patterns:
+            |    punct: "^/([0-9]|10|[A-Za-z]*?)${'$'}"
+            |
+            |key_binder:
+            |  bindings:
+            |    - { when: has_menu, accept: 1, send: apostrophe }
+            |
+            |editor:
+            |  bindings:
+            |    space: confirm
+            |
+            |t9_english:
+            |  dictionary: cyime_t9_english
+            |  enable_completion: false
+            |  enable_sentence: false
+            |  enable_user_dict: true
+            |  initial_quality: 0.2
+            |  comment_format: []
+            |  digit_suffixes: false
+            |  completion_limit: 3
+            |""".trimMargin()
+    }
+
     /** 换掉 [section] 段里 [key] 列表的全部条目（含其间的注释行）。 */
     private fun replaceList(text: String, section: String, key: String, items: List<String>): String {
         val block = Regex("(?ms)^$section:\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(text) ?: error("小鹤双拼方案缺少 $section 段")
@@ -167,6 +275,11 @@ data class DoublePinyinScheme(
         private fun String.upperCircled() = map { it.upperCircled() }.joinToString("")
         private fun String.lowerCircled() = map { LOWER_CIRCLED[it - 'a'] }.joinToString("")
         fun cnEnName(id: String) = "cn_en_$id"
+        const val T9_SUFFIX = "_t9"
+        fun t9Id(id: String) = id + T9_SUFFIX
+        /** 九键的字母分组，与中文九键 t9_pinyin 的拼写运算相同。 */
+        private val T9_DIGITS = listOf("abc" to 2, "def" to 3, "ghi" to 4, "jkl" to 5, "mno" to 6, "pqrs" to 7,
+            "tuv" to 8, "wxyz" to 9)
 
         /** 词库里的音节，按常用程度排列（雾凇拼音 8105 字表的字频合计）。 */
         val SYLLABLES: List<String> = (

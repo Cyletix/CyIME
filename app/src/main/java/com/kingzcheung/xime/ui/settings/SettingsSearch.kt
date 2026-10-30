@@ -127,7 +127,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 输入 › 语言与方案
         SettingsSearchEntry("语言键切换方式", languages, "languages", "语言键 切换语言 中英切换 循环切换 指定语言 英文 地球键 点按语言键"),
         page("已安装的方案", languages, SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序 方案资源"),
-        page("双拼方案", languages, SettingsRoutes.DoublePinyin, "双拼 自定义双拼 首道双拼 小鹤双拼 键位 韵母 零声母 新建 编辑"),
+        page("双拼方案", languages, SettingsRoutes.DoublePinyin, "双拼 自定义双拼 首道双拼 小鹤双拼 九键双拼 键位 韵母 零声母 新建 编辑"),
         // 输入 › 键盘布局
         page("26 键", layouts, qwerty, "26键 全键盘 全拼 qwerty 邻键纠错 滑行输入"),
         page("九键与 14 键", layouts, nine, "九键 9键 14键 拂动 假名 触发距离"),

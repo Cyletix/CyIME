@@ -236,3 +236,25 @@ TEST(T9PreeditConverterTest, DoesNotInventTrailingLetters) {
     EXPECT_EQ(T9ConvertPreedit("746", "shou"), "sho");
     EXPECT_EQ(T9ConvertPreedit("7468", "shou"), "shou");
 }
+
+// ── 双拼九键（t9/double_pinyin）：两键一字 ──
+
+TEST(T9DoublePinyinPreeditTest, TwoKeysPerSyllable) {
+    // 小鹤 zhong guo = vs go → 87 46
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("87 46", "zhong guo"), "zhong guo");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("87'46", "zhōng guó"), "zhong guo");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("8746", "zhong guo"), "zhongguo");
+}
+
+TEST(T9DoublePinyinPreeditTest, SingleKeyShowsInitial) {
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("87 4", "zhong guo"), "zhong g");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("8", "zhong"), "zh");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("2", "an"), "a");
+}
+
+TEST(T9DoublePinyinPreeditTest, KeepsCommittedTextAndUncoveredKeys) {
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("中46", "guo"), "中guo");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("874656", "zhong guo"), "zhongguo56");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("8378", ""), "8378");
+    EXPECT_EQ(rime::T9ConvertDoublePinyinPreedit("8378", "~s"), "8378");
+}
