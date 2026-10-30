@@ -1712,22 +1712,36 @@ object KeysConfigHelper {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
         val normalized = key.lowercase()
         val profile = InputProfiles.current(_activeSchemaId, isAsciiMode)
-        // 中文 14 键按键配自己的一套角标（FourteenKeySymbols），不借 26 键单个字母的。
-        // Shift 或分体把双字母键拆成单字母时，两个字母都沿用原来那个键的角标，符号位置不跟着变。
-        if (profile.layout == InputLayout.MERGED14 && profile.language == InputLanguage.CHINESE) {
-            val owner = FourteenKeySymbols.keyOf(normalized)
-            val symbols = FourteenKeySymbols.apply(owner, config[owner], symbolOverridesK14)
-            return if (owner == normalized) symbols
+        if (profile.language !in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)) return config[normalized]
+        val custom = letterLayout(_activeSchemaId, isAsciiMode)
+        // 所有字母布局的角标都由下面两条规则出，不再各布局各配一套（用户 10-30：模式太多难免疏忽，统一）。
+        return when (profile.layout.kind) {
+            // 单字母键：角标跟着位置走。换了字母排列或用自建布局，同一格还是 26 键那一格的上下角标，符号设置页改的也是这一格。
+            LayoutKind.ALPHABETIC -> {
+                // 排列里的分号键本身就是符号，不带角标；它占的那一格给了被挤开的字母（见 positionLetter）。
+                if (custom != null && normalized == ";" && custom.hasSemicolon())
+                    return config[normalized]?.copy(swipeUp = null, swipeDown = null)
+                val owner = custom?.positionLetter(normalized) ?: normalized
+                QwertySwipeSymbols.apply(owner, config[normalized], if (isAsciiMode) symbolOverridesEn else symbolOverridesZh,
+                    (if (isAsciiMode) symbolCustomEn else symbolCustomZh)[owner], isAsciiMode)
+            }
+            // 合并键（14/17/18 键、自建双字母布局）：按键的读顺序用同一张表（MergedKeySymbols），14 键可在设置页改。
+            // Shift 或分体把双字母键拆成单字母时，两个字母都沿用原来那个键的角标，符号位置不跟着变。
+            LayoutKind.MERGED -> {
+                if (profile.language != InputLanguage.CHINESE) return config[normalized]
+                val fourteen = profile.layout == InputLayout.MERGED14
+                val keys = if (fourteen) FourteenKeySymbols.keys
+                    else _zhRows.flatten().filter { cell -> cell.isNotEmpty() && cell.all { it in 'a'..'z' } }
+                val owner = MergedKeySymbols.ownerOf(keys, normalized)
+                if (owner !in keys) return config[normalized]
+                // 自建布局的手势表按旧的位置填过 swipe，不算用户写的；内置 14/17/18 键只认 xime.custom.yaml 写的。
+                val configured = config[owner]?.let { if (custom != null) it.copy(swipeUp = null, swipeDown = null) else it }
+                val symbols = MergedKeySymbols.apply(keys, owner, configured, if (fourteen) symbolOverridesK14 else emptyMap())
+                if (owner == normalized) symbols
                 else (config[normalized] ?: KeyGestureConfig()).copy(swipeUp = symbols?.swipeUp, swipeDown = symbols?.swipeDown)
+            }
+            else -> config[normalized]
         }
-        if (profile.layout.kind != LayoutKind.ALPHABETIC ||
-            profile.language !in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)) return config[normalized]
-        // Rearranged custom layouts bind digits to physical positions. Keep those
-        // generated gestures unless the user explicitly edits a symbol in the panel.
-        val customGesture = (if (isAsciiMode) symbolCustomEn else symbolCustomZh)[normalized]
-            ?: config[normalized].takeIf { letterLayout(_activeSchemaId, isAsciiMode) != null }
-        return QwertySwipeSymbols.apply(normalized, config[normalized],
-            if (isAsciiMode) symbolOverridesEn else symbolOverridesZh, customGesture, isAsciiMode)
     }
 
     fun getKeyDisplayLabel(key: String, isAsciiMode: Boolean = false, isShifted: Boolean = false): String {

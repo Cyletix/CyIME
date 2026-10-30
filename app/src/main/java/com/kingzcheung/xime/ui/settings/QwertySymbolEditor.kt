@@ -118,8 +118,9 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                 style = MaterialTheme.typography.bodySmall)
             Text(if (fourteen) "14 键全拼、双拼共用这一套，按整个键改：前两排上方是 1-0、下方是半角符号，" +
                     "第三排上下都是中文标点。这里写什么就输入什么，不随全角／半角变化。"
-                else if (english) "英文26键有自己的一套半角符号，点「恢复预设」还原。"
-                else "全拼、双拼等中文26键共用这一套：上方默认是数字和常用全角符号，下方是半角符号。" +
+                else if (english) "英文26键有自己的一套半角符号，换了字母排列也按位置用这一套，点「恢复预设」还原。"
+                else "全拼、双拼等中文26键共用这一套，换了字母排列（Cyletix10、Colemak 等）也按位置用这一套：" +
+                    "上方默认是数字和常用全角符号，下方是半角符号。" +
                     "这里写什么就输入什么，不随全角／半角变化；只有空格两边的逗号句号跟着全角／半角走。",
                 style = MaterialTheme.typography.bodySmall)
             val boardRows = if (fourteen) FourteenKeySymbols.rows
