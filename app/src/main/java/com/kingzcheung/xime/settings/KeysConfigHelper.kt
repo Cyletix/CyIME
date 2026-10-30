@@ -736,7 +736,7 @@ object KeysConfigHelper {
             _zhRows = arranged?.typingRows() ?: _mergedRows[section] ?: DEFAULT_ZH_ROWS
             _keyGestureConfig.value = arranged?.gestures(gestures) ?: gestures
         } else {
-            // Double pinyin types on the arrangement chosen for it (QWJRTK, Colemak, the user's own …); pinyin has none.
+            // Double pinyin and code tables type on the arrangement chosen for them (QWJRTK, Colemak, the user's own …); pinyin has none.
             val arranged = letterLayout(schemaId, false)
             _zhRows = arranged?.typingRows() ?: _zhRowsBase
             _keyGestureConfig.value = arranged?.gestures(_keyGestureConfigZhBase) ?: _keyGestureConfigZhBase

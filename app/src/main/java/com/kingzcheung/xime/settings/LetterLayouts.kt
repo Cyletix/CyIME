@@ -7,8 +7,8 @@ import androidx.compose.runtime.setValue
 
 /**
  * One letter arrangement per language for input typed letter by letter: English direct input,
- * Japanese romaji and Chinese double pinyin (every double-pinyin scheme shares the Chinese choice;
- * pinyin itself carries its layout in the schema). The choices are the letter layouts Chinese pinyin
+ * Japanese romaji, and Chinese double pinyin and code tables (五笔 and imported tables such as 音形
+ * share the Chinese choice; pinyin itself carries its layout in the schema). The choices are the letter layouts Chinese pinyin
  * offers (QWJRTK, Cyletix10, Colemak and the user's own), and rows, names, swipe positions and
  * moved-letter colours all come from that same [CustomKeyboardLayout]. Layouts with merged keys are
  * left out: a two-letter key cannot type one letter directly, and romaji and double pinyin have no
@@ -21,7 +21,10 @@ object LetterLayouts {
     fun appliesTo(language: InputLanguage, scheme: InputScheme): Boolean =
         language == InputLanguage.ENGLISH && scheme == InputScheme.DIRECT ||
             language == InputLanguage.JAPANESE && scheme == InputScheme.ROMAJI ||
-            language == InputLanguage.CHINESE && scheme == InputScheme.DOUBLE_PINYIN
+            language == InputLanguage.CHINESE && scheme in LETTER_CODED_CHINESE
+
+    /** Chinese schemes typed letter by letter on 26 keys besides pinyin: double pinyin and code tables (五笔、音形等导入的码表). */
+    private val LETTER_CODED_CHINESE = setOf(InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN, InputScheme.EXTERNAL)
 
     fun typable(layout: CustomKeyboardLayout): Boolean = layout.mergedGroups.isEmpty()
 
