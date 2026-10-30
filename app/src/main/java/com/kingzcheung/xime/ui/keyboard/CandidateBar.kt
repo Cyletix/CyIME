@@ -106,6 +106,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
@@ -342,7 +348,7 @@ fun CandidateBar(
     val showPreedit = showPreeditPreview && showInputTextRow && preeditText.isNotEmpty() &&
         (!showInputBoxStyle || onEditPreedit != null)
     // 分体时工具栏和候选栏也分到中缝两侧；剪贴板预览与自动填充建议仍是整条。
-    // 拼音在栏内候选前面，靠左，落在中缝左侧。
+    // 编码预览浮在栏上方，不受中缝裁剪影响。
     val splitGap = LocalSplitKeyboardGap.current
     val splitGapX = splitGap?.gapX()?.takeIf {
         state !is CandidateBarState.ClipboardDisplay && inlineSuggestions.isEmpty()
@@ -374,6 +380,10 @@ fun CandidateBar(
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
     ) {
+        if (showPreedit) {
+            PreeditPreview(preeditText, protectedVisuals, onEditPreedit)
+        }
+
         if (state is CandidateBarState.ClipboardDisplay) {
             ClipboardPreviewBar(state.candidates, protectedVisuals, callbacks, iconButtonContainer, state.image)
             return@Column
@@ -409,14 +419,6 @@ fun CandidateBar(
             if (showCompositionCancel) {
                 KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入",
                     restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
-                Spacer(Modifier.width(4.dp))
-            }
-            // 拼音放在候选栏里、候选前面：浮在键盘上方会压住应用底部输入框的按钮（用户 10-30）。
-            // 限宽，长拼音在框内滚到最新的音节。
-            if (showPreedit) {
-                PreeditLabel(preeditText, protectedVisuals, onEditPreedit,
-                    Modifier.widthIn(max = if (toolbarRowWidth > 0.dp) toolbarRowWidth * 0.35f else 120.dp)
-                        .height(PreeditStyle.SurfaceHeight), followTextTail = true)
                 Spacer(Modifier.width(4.dp))
             }
             if (showLeftIcon) {
@@ -980,6 +982,83 @@ private fun CandidateExpansionButton(
         Icon(Icons.Default.KeyboardArrowUp,
             contentDescription = if (expanded) "返回键盘" else "展开候选词",
             tint = foreground, modifier = Modifier.size(24.dp).rotate(rotation))
+    }
+}
+
+/** 非聚焦窗口提供真实触控区域，点击编码不会抢走宿主编辑框焦点。 */
+@Composable
+private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?) {
+    val density = LocalDensity.current
+    // 放大后的候选栏里 dp 变大了，按屏宽限宽要换回同样的像素宽度。
+    val screenWidth = (LocalConfiguration.current.screenWidthDp / LocalCandidateBarScale.current).dp
+    val margin = with(density) { 4.dp.roundToPx() }
+    val gap = with(density) { 2.dp.roundToPx() }
+    val rotation = LocalFloatingKeyboardRotation.current
+    if (isFloatingRotated(rotation)) {
+        RotatedPreeditPreview(text, visuals, onEdit, rotation, gap, screenWidth)
+        return
+    }
+    // 气泡贴着键盘左边（用户 10-20 要求恢复）：不跟光标，所有应用位置一样。
+    val positionProvider = remember(margin, gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
+                layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+                return IntOffset(
+                    anchorBounds.left.coerceIn(margin,
+                        (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)),
+                    (anchorBounds.top - popupContentSize.height - gap).coerceIn(0,
+                        (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
+                )
+            }
+        }
+    }
+    Popup(popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, dismissOnBackPress = false,
+            dismissOnClickOutside = false, clippingEnabled = true)) {
+        PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
+            .height(44.dp).padding(vertical = 6.dp)
+        )
+    }
+}
+
+/**
+ * 悬浮键盘转过时的拼音气泡：仍贴在候选栏左上方，但跟键盘一起倾斜。
+ * Popup 的锚点是转过后的候选栏原点，气泡中心按同一角度转到窗口坐标；窗口取转后的外接框，里面再把气泡转过去。
+ */
+@Composable
+private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?,
+    rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp) {
+    val labelSize = remember { IntArray(2) }
+    val positionProvider = remember(rotation, gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
+                layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+                val (cx, cy) = rotatePoint(labelSize[0] / 2f, -(labelSize[1] / 2f + gap), 0f, 0f, rotation)
+                return IntOffset((anchorBounds.left + cx - popupContentSize.width / 2f).roundToInt(),
+                    (anchorBounds.top + cy - popupContentSize.height / 2f).roundToInt())
+            }
+        }
+    }
+    Popup(popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, dismissOnBackPress = false,
+            dismissOnClickOutside = false, clippingEnabled = false)) {
+        Box(Modifier.layout { measurable, _ ->
+            val placeable = measurable.measure(androidx.compose.ui.unit.Constraints())
+            labelSize[0] = placeable.width
+            labelSize[1] = placeable.height
+            val c = kotlin.math.abs(kotlin.math.cos(Math.toRadians(rotation.toDouble()))).toFloat()
+            val s = kotlin.math.abs(kotlin.math.sin(Math.toRadians(rotation.toDouble()))).toFloat()
+            val boxWidth = kotlin.math.ceil(placeable.width * c + placeable.height * s).toInt().coerceAtLeast(1)
+            val boxHeight = kotlin.math.ceil(placeable.width * s + placeable.height * c).toInt().coerceAtLeast(1)
+            layout(boxWidth, boxHeight) {
+                placeable.placeWithLayer((boxWidth - placeable.width) / 2, (boxHeight - placeable.height) / 2) {
+                    rotationZ = rotation
+                }
+            }
+        }) {
+            PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
+                .height(44.dp).padding(vertical = 6.dp))
+        }
     }
 }
 
