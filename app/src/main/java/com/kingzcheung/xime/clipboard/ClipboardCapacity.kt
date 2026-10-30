@@ -18,6 +18,14 @@ internal object ClipboardCapacity {
      */
     const val ROW_BYTES = 2 * 1024 * 1024 - 64 * 1024
 
+    /**
+     * Copies received from another device have their own room, outside [CEILING_BYTES]: the oldest
+     * received copy makes way for a new one, so they never push out or block this phone's own copies
+     * or fixed records (user 2026-10-30). Same numbers as CyIME for Windows.
+     */
+    const val DEVICE_COUNT = 100
+    const val DEVICE_BYTES = 1L * 1024 * 1024
+
     fun capacity(freeDiskBytes: Long): Long = minOf(CEILING_BYTES, (freeDiskBytes * DISK_SHARE).toLong())
 
     /** Bytes one record costs: its text and its search key, as stored (UTF-8). */

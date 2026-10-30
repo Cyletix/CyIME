@@ -160,15 +160,45 @@ interface ClipboardDao {
      * text; a fixed record keeps its text. A new one is added. One record per text remains. True when added.
      */
     @Transaction
-    suspend fun upsert(text: String, now: Long, searchKey: String = ""): Boolean {
+    suspend fun upsert(text: String, now: Long, searchKey: String = "", fromDevice: Boolean = false): Boolean {
         val existing = findSameText(text)
         val keep = when {
-            existing == null -> insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey))
+            existing == null -> insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey, fromDevice = fromDevice))
             !existing.isPinned && existing.text != text -> existing.id.also { replaceCopiedText(it, text, searchKey, now) }
             else -> existing.id.also { refreshCopiedItem(it, now) }
         }
+        // Copied here again: a received record becomes this device's own. A received copy of text
+        // already here only moves it up.
+        if (existing != null && existing.fromDevice && !fromDevice) setFromDevice(keep, false)
         deleteHistoryCopies(text, keep)
         return existing == null
+    }
+
+    @Query("UPDATE clipboard_entries SET fromDevice = :fromDevice WHERE id = :id")
+    suspend fun setFromDevice(id: Long, fromDevice: Boolean)
+
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE fromDevice = 1 AND isPinned = 0 AND isQuickSend = 0")
+    suspend fun countReceived(): Int
+
+    @Query("SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + length(searchKey)), 0) FROM clipboard_entries " +
+        "WHERE fromDevice = 1 AND isPinned = 0 AND isQuickSend = 0")
+    suspend fun receivedBytes(): Long
+
+    @Query("DELETE FROM clipboard_entries WHERE id IN (SELECT id FROM clipboard_entries " +
+        "WHERE fromDevice = 1 AND isPinned = 0 AND isQuickSend = 0 ORDER BY timestamp ASC, id ASC LIMIT :limit)")
+    suspend fun deleteOldestReceived(limit: Int)
+
+    /**
+     * A copy received from another device. Received records that are not fixed keep their own room
+     * ([maxCount] records, [maxBytes]); only the oldest of them make way, never this device's own
+     * copies or fixed records. True when added.
+     */
+    @Transaction
+    suspend fun addReceived(text: String, now: Long, searchKey: String, maxCount: Int, maxBytes: Long): Boolean {
+        val added = upsert(text, now, searchKey, fromDevice = true)
+        countReceived().let { if (it > maxCount) deleteOldestReceived(it - maxCount) }
+        while (receivedBytes() > maxBytes && countReceived() > 0) deleteOldestReceived(1)
+        return added
     }
 
     /**
@@ -187,8 +217,12 @@ interface ClipboardDao {
         return id
     }
 
-    /** Bytes of text and search keys stored (fixed and history), re-read whenever records change. */
-    @Query("SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + length(searchKey)), 0) FROM clipboard_entries WHERE isQuickSend = 0")
+    /**
+     * Bytes of text and search keys stored (fixed and history), re-read whenever records change.
+     * Received records that are not fixed have their own room and are not counted here.
+     */
+    @Query("SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + length(searchKey)), 0) FROM clipboard_entries " +
+        "WHERE isQuickSend = 0 AND (fromDevice = 0 OR isPinned = 1)")
     fun observeStoredBytes(): Flow<Long>
 
     suspend fun insertPinnedText(text: String, code: String, now: Long, searchKey: String = ""): Long =

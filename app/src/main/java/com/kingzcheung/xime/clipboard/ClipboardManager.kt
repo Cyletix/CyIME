@@ -53,6 +53,8 @@ class ClipboardManager private constructor(private val context: Context) {
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
         private const val KEY_HISTORY_DEDUPED = "history_deduped_v1"
         private const val INTERNAL_IMAGE_CLIP_LABEL = "cyime_image"
+        /** Label of text written by clipboard sync, so history files it as received from another device. */
+        internal const val RECEIVED_CLIP_LABEL = "cyime_received"
         /** 短信验证码只用一次：自动复制 10 分钟后从候选栏和系统剪贴板删掉。 */
         internal const val SMS_CODE_LIFETIME_MS = 10 * 60_000L
 
@@ -132,7 +134,7 @@ class ClipboardManager private constructor(private val context: Context) {
                         return
                     }
                     _verificationCode.value = null
-                    if (!private) addItem(text)
+                    if (!private) addItem(text, fromDevice = clipData.description.label == RECEIVED_CLIP_LABEL)
                     return
                 }
             }
@@ -424,15 +426,24 @@ class ClipboardManager private constructor(private val context: Context) {
         // Singleton — no cleanup needed.
     }
 
-    fun addItem(text: String) {
+    fun addItem(text: String, fromDevice: Boolean = false) {
         if (text.isBlank()) return
         scope.launch {
             clipboardPinsReady.await()
             if (!ClipboardCapacity.fitsRow(text)) return@launch
             val key = searchKey(text)
-            // A copy already in history only moves up and needs no room; a full history saves nothing new.
-            if (dao.findSameText(text) == null && !hasRoomFor(text, key)) return@launch
-            dao.upsert(text, System.currentTimeMillis(), key)
+            val now = System.currentTimeMillis()
+            if (fromDevice) {
+                // Received copies keep their own room and never push out or block this phone's own.
+                dao.addReceived(text, now, key, ClipboardCapacity.DEVICE_COUNT, ClipboardCapacity.DEVICE_BYTES)
+            } else {
+                // A copy already in history only moves up and needs no room; a full history saves nothing new.
+                // A received record copied again here becomes this phone's own and needs room like a new one.
+                val same = dao.findSameText(text)
+                val needsRoom = same == null || (same.fromDevice && !same.isPinned)
+                if (needsRoom && !hasRoomFor(text, key)) return@launch
+                dao.upsert(text, now, key)
+            }
             _clipboardChanged.emit(
                 ClipboardItem(
                     text = text,
@@ -544,6 +555,11 @@ class ClipboardManager private constructor(private val context: Context) {
     fun copyToSystemClipboard(text: String) {
         val clip = ClipData.newPlainText("kime_clipboard", text)
         androidClipboardManager.setPrimaryClip(clip)
+    }
+
+    /** Text arriving from a paired device: the same as a copy, but filed as received in history. */
+    fun copyReceivedToSystemClipboard(text: String) {
+        androidClipboardManager.setPrimaryClip(ClipData.newPlainText(RECEIVED_CLIP_LABEL, text))
     }
 
     fun copyImageUriToSystemClipboard(image: ClipboardImage) {

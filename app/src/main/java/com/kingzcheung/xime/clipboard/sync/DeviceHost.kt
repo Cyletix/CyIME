@@ -323,7 +323,7 @@ object DeviceHost {
             method == "PUT" && path == "/api/clipboard" -> {
                 val incoming = WindowsPairingProtocol.profile(JSONObject(body.toString(Charsets.UTF_8)))
                 if (incoming.size > MAX_TEXT) return Response(413)
-                runBlocking(Dispatchers.Main) { ClipboardManager.getInstance(context).copyToSystemClipboard(incoming.text) }
+                runBlocking(Dispatchers.Main) { ClipboardManager.getInstance(context).copyReceivedToSystemClipboard(incoming.text) }
                 Response(200, json(incoming), incoming.hash)
             }
             else -> Response(404)

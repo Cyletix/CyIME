@@ -13,7 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 
 @Database(
     entities = [ClipboardEntry::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class ClipboardDatabase : RoomDatabase() {
@@ -58,6 +58,15 @@ abstract class ClipboardDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 → v6：新增 fromDevice 列（别的设备同步来的记录另算容量）；已有记录都算本机复制。 */
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    "ALTER TABLE clipboard_entries ADD COLUMN fromDevice INTEGER NOT NULL DEFAULT 0"
+                ).use { it.step() }
+            }
+        }
+
         @Volatile
         private var instance: ClipboardDatabase? = null
 
@@ -69,7 +78,7 @@ abstract class ClipboardDatabase : RoomDatabase() {
                 )
                     .setDriver(AndroidSQLiteDriver())
                     .setQueryCoroutineContext(Dispatchers.IO)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also { instance = it }
             }
