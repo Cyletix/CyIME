@@ -23,6 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
+import com.kingzcheung.xime.ui.settings.DictionaryEmptyLine
+import com.kingzcheung.xime.ui.settings.SettingsListRow
+import com.kingzcheung.xime.ui.settings.SettingsNote
+import com.kingzcheung.xime.ui.settings.SettingsRowDivider
 import com.kingzcheung.xime.ui.settings.SettingsSection
 import com.kingzcheung.xime.ui.settings.settingsVerticalScroll
 import androidx.compose.runtime.*
@@ -141,35 +147,33 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface)
             )
+        },
+        floatingActionButton = {
+            if (id == null) FloatingActionButton(onClick = { if (!busy) edit(CustomKeyboardLayout.fresh()) },
+                containerColor = MaterialTheme.colorScheme.primary) {
+                Icon(Icons.Default.Add, contentDescription = "新建布局", tint = MaterialTheme.colorScheme.onPrimary)
+            }
         }
     ) { paddingValues ->
     Column(Modifier.fillMaxSize().padding(paddingValues).imePadding().settingsVerticalScroll()
         .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (id == null) {
-            OutlinedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("26键", style = MaterialTheme.typography.titleMedium)
-                        Text("固定字母排列 · 各输入方案共用符号", style = MaterialTheme.typography.bodySmall)
-                    }
+            // 和词库、已安装的方案同一套：分组卡片、一行一项、次要操作收进「更多」、新建用右下角的 +。
+            SettingsSection(title = "按键符号") {
+                SettingsListRow("26键", "固定字母排列 · 各输入方案共用符号") {
                     TextButton(onClick = { symbols = true }) { Text("编辑符号") }
                 }
             }
-            Text("按键布局：调整字母排列，保留词库和功能键；中文启用的字母布局，英文和日文罗马字也能选。")
-            Button(onClick = { edit(CustomKeyboardLayout.fresh()) }, enabled = !busy) { Text("新建布局") }
-            layouts.forEach { layout ->
-                OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text(layout.name, style = MaterialTheme.typography.titleMedium)
-                        Text("${layout.typingRows().sumOf { it.size }}个按键 · ${layout.movedLetters().size}个字母改位", style = MaterialTheme.typography.bodySmall)
-                        Row {
-                            TextButton(onClick = { edit(layout) }, enabled = !busy) { Text("编辑") }
-                            TextButton(onClick = { edit(layout.copy(id = CustomKeyboardLayout.fresh().id, name = (layout.name.take(27) + " 副本"))) }, enabled = !busy) { Text("复制") }
-                            TextButton(onClick = { deleteId = layout.id }, enabled = !busy) { Text("删除") }
-                        }
-                    }
+            SettingsSection(title = "我的布局") {
+                if (layouts.isEmpty()) DictionaryEmptyLine("还没有自定义布局，点 + 新建")
+                layouts.forEachIndexed { index, layout ->
+                    if (index > 0) SettingsRowDivider()
+                    CustomLayoutRow(layout, enabled = !busy, onEdit = { edit(layout) },
+                        onCopy = { edit(layout.copy(id = CustomKeyboardLayout.fresh().id, name = (layout.name.take(27) + " 副本"))) },
+                        onDelete = { deleteId = layout.id })
                 }
             }
+            SettingsNote("按键布局：调整字母排列，保留词库和功能键；中文启用的字母布局，英文和日文罗马字也能选。")
         } else {
             SettingsSection(title = "方案名称") {
             OutlinedTextField(value = name, onValueChange = { name = it.take(32) }, label = { Text("方案名称") },
@@ -220,7 +224,8 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                 }
             }) { Text(if (busy) "保存中…" else "保存方案") }
         }
-        if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium)
+        if (message.isNotBlank()) SettingsNote(message)
+        if (id == null) Spacer(Modifier.height(72.dp))
     }
     }
     if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("放弃未保存的修改？") },
@@ -236,6 +241,25 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                 busy = false
             }
         }) { Text("删除") } }, dismissButton = { TextButton(onClick = { deleteId = null }) { Text("取消") } }) }
+}
+
+/** 布局管理里的一个布局：点整行编辑，复制和删除在「更多」里，和词库页的一行一样。 */
+@Composable
+private fun CustomLayoutRow(layout: CustomKeyboardLayout, enabled: Boolean,
+    onEdit: () -> Unit, onCopy: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    SettingsListRow(layout.name, "${layout.typingRows().sumOf { it.size }}个按键 · ${layout.movedLetters().size}个字母改位",
+        Modifier.clickable(enabled = enabled, onClick = onEdit)) {
+        Box {
+            IconButton(onClick = { menu = true }, enabled = enabled) { Icon(Icons.Default.MoreVert, "更多") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("编辑") }, onClick = { menu = false; onEdit() })
+                DropdownMenuItem(text = { Text("复制") }, onClick = { menu = false; onCopy() })
+                DropdownMenuItem(text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                    onClick = { menu = false; onDelete() })
+            }
+        }
+    }
 }
 
 @Composable

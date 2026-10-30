@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,9 +51,10 @@ internal fun DictionaryLookupPanel() {
         }
     }
     val listState = rememberLazyListState()
-    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
         item {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(value = word, onValueChange = { word = it }, placeholder = { Text("输入要查的词") },
                     singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { search() }), modifier = Modifier.weight(1f))
@@ -61,10 +62,12 @@ internal fun DictionaryLookupPanel() {
                     modifier = Modifier.padding(start = 8.dp)) { Text("查") }
             }
         }
-        if (searching) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp)) }
+        if (searching) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 16.dp)) }
         result?.let { (target, hits) ->
             if (hits.isEmpty()) item { DictionaryEmptyLine("词库里没有“$target”") }
-            items(hits) { hit -> DictionaryListRow(hit.source, hit.codes.joinToString("；")) }
+            itemsIndexed(hits) { row, hit ->
+                SettingsGroupRow(row, hits.size) { SettingsListRow(hit.source, hit.codes.joinToString("；")) }
+            }
         }
     }
 }

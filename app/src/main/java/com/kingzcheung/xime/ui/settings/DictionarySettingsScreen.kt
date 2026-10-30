@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,7 +55,7 @@ import com.kingzcheung.xime.viewmodel.CustomPhraseViewModel
 /**
  * 词库：我的短语（打编码出固定短语）、导入词库（下载/导入、开关、删除）、删掉的候选（旧版本藏起来的词）、
  * 查词（一个词在内置词库、导入词库、我的短语里有没有，编码是什么）。四个标签同一种排法：顶部一个输入框，
- * 下面一行一条，不放说明段落。短语对所有键盘通用。
+ * 下面一行一条，连成和其他设置页一样的卡片（SettingsGroupRow），不放说明段落。短语对所有键盘通用。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,21 +118,6 @@ internal fun DictionarySearchField(value: String, onValueChange: (String) -> Uni
         singleLine = true, modifier = modifier)
 }
 
-/** One line of a tab's list: a title, a grey second line, and its controls on the right. */
-@Composable
-internal fun DictionaryListRow(title: String, detail: String, modifier: Modifier = Modifier,
-                               trailing: @Composable () -> Unit = {}) {
-    Row(modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        trailing()
-    }
-}
-
 /** A tab with nothing to list: one plain line in the middle. */
 @Composable
 internal fun DictionaryEmptyLine(text: String) {
@@ -148,10 +132,11 @@ private fun CustomPhraseTabContent(
     uiState: CustomPhraseUiState,
 ) {
     val listState = rememberLazyListState()
-    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp)) {
         item {
             DictionarySearchField(uiState.searchQuery, viewModel::setSearchQuery, "搜索短语或编码",
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                Modifier.fillMaxWidth().padding(bottom = 12.dp))
         }
         when {
             uiState.isLoading -> item {
@@ -159,14 +144,16 @@ private fun CustomPhraseTabContent(
             }
             uiState.entries.isEmpty() -> item { DictionaryEmptyLine("还没有短语，点 + 添加") }
             uiState.filteredEntries.isEmpty() -> item { DictionaryEmptyLine("没有找到") }
-            else -> itemsIndexed(uiState.filteredEntries, key = { i, _ -> "cp_$i" }) { _, entry ->
+            else -> itemsIndexed(uiState.filteredEntries, key = { i, _ -> "cp_$i" }) { row, entry ->
                 // filteredEntries is a view of entries; edit and delete act on the entry's own position.
                 val index = uiState.entries.indexOf(entry)
-                DictionaryListRow(entry.word, entry.code,
-                    Modifier.clickable { viewModel.setEditing(index, entry); viewModel.showEditDialog() }) {
-                    IconButton(onClick = { viewModel.deleteEntry(index) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "删除${entry.word}",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                SettingsGroupRow(row, uiState.filteredEntries.size) {
+                    SettingsListRow(entry.word, entry.code,
+                        Modifier.clickable { viewModel.setEditing(index, entry); viewModel.showEditDialog() }) {
+                        IconButton(onClick = { viewModel.deleteEntry(index) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "删除${entry.word}",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }

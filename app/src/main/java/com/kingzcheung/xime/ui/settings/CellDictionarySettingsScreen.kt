@@ -5,7 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -106,9 +106,10 @@ fun CellDictionarySettingsPanel(
         }
     }) { padding ->
         val listState = rememberLazyListState()
-        LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
             item {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("搜索词库") },
                         singleLine = true, modifier = Modifier.weight(1f))
                     TextButton(onClick = onImport, enabled = !state.busy, modifier = Modifier.padding(start = 8.dp)) {
@@ -118,7 +119,7 @@ fun CellDictionarySettingsPanel(
             }
             // 导入认哪些文件：一行写出扩展名，点开看怎么导入和每种格式的示例。
             item {
-                Row(Modifier.fillMaxWidth().clickable { showGuide = true }.padding(start = 16.dp, end = 4.dp)
+                Row(Modifier.fillMaxWidth().clickable { showGuide = true }.padding(start = 4.dp)
                     .testTag("cell-dictionary-import-hint"), verticalAlignment = Alignment.CenterVertically) {
                     Text("可导入 .scel、.txt、.dict.yaml、.json 词库", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
@@ -126,30 +127,29 @@ fun CellDictionarySettingsPanel(
                 }
             }
             state.message?.let { message -> item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Column(Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
                     if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Text(message, style = MaterialTheme.typography.bodySmall,
                         color = if (state.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                 }
             } }
             if (rows.isEmpty()) item {
-                Text("没有找到词库", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                DictionaryEmptyLine("没有找到词库")
             }
             rows.forEach { (category, items) ->
-                item(key = "header-$category") {
-                    Text(category, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp))
-                }
-                items(items, key = { it.id }) { item ->
-                    DictionaryRow(item, item.id in dictionaries.selected, item.id in dictionaries.applied, state.busy,
-                        onSelect = { onSelect(item.id, it) }, onDownload = { item.offer?.let(onDownload) },
-                        onSource = item.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } },
-                        onRemove = if (item.id in builtinIds) null else ({ onRemove(item.id) }))
+                item(key = "header-$category") { SettingsGroupTitle(category, Modifier.padding(top = 8.dp)) }
+                itemsIndexed(items, key = { _, item -> item.id }) { row, item ->
+                    SettingsGroupRow(row, items.size) {
+                        DictionaryRow(item, item.id in dictionaries.selected, item.id in dictionaries.applied, state.busy,
+                            onSelect = { onSelect(item.id, it) }, onDownload = { item.offer?.let(onDownload) },
+                            onSource = item.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } },
+                            onRemove = if (item.id in builtinIds) null else ({ onRemove(item.id) }))
+                    }
                 }
             }
             item {
                 TextButton(onClick = { onSource(CellDictionaryCatalog.SOURCE_URL) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Text("到搜狗词库网站找更多")
                 }
             }
@@ -191,12 +191,7 @@ private fun DictionaryRow(
     }
     // Delete only what is not in use: switch it off and apply first.
     val removable = installed != null && onRemove != null && !selected && !applied
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(item.name, style = MaterialTheme.typography.bodyLarge)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    SettingsListRow(item.name, detail) {
         if (installed != null) Switch(checked = selected, onCheckedChange = onSelect, enabled = !busy,
             modifier = Modifier.semantics { contentDescription = "启用${item.name}" })
         else TextButton(onClick = onDownload, enabled = !busy) { Text("下载") }
