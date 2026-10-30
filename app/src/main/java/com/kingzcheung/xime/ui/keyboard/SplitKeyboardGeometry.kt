@@ -178,12 +178,22 @@ internal class SplitKeyboardGap {
         onChanged?.invoke()
     }
 
+    /** 中缝用键盘底色填满：仍分两侧排布，但不挖空、不让出触摸、玻璃整块。 */
+    var filled by mutableStateOf(false)
+        private set
+
+    fun updateFilled(value: Boolean) {
+        if (filled == value) return
+        filled = value
+        onChanged?.invoke()
+    }
+
     /**
      * 中缝矩形：各行缝的公共部分，两半因此是两块矩形面板（键在面板内照常错位）。
      * 上沿补到键区顶边，下沿补到 [bottom]（卡片底边，含底部留白）。
      */
     fun hole(bottom: Float): Rect? {
-        if (!exposed || rows.isEmpty()) return null
+        if (!exposed || filled || rows.isEmpty()) return null
         val all = rows.values
         val left = all.maxOf { it.left }
         val right = all.minOf { it.right }

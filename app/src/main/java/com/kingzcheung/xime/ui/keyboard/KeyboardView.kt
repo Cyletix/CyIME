@@ -283,7 +283,10 @@ fun KeyboardView(
     val splitKeyboardGap = LocalSplitKeyboardGap.current ?: remember { SplitKeyboardGap() }
     val splitGapPreview = remember(resizeActive) { mutableStateOf<Float?>(null) }
     // 面板或展开候选盖住字母键盘时，不能在它们上面挖出中缝。
-    SideEffect { splitKeyboardGap.updateExposed(!(candidatePageExpanded || overlayVisible)) }
+    SideEffect {
+        splitKeyboardGap.updateExposed(!(candidatePageExpanded || overlayVisible))
+        splitKeyboardGap.updateFilled(inputPreferences.fillBlankAreas)
+    }
     val keyboardLayerOpacity = state.keyboardOpacity
     val previewModifier = if (resizeOverlay != null && !state.isFloatingMode) Modifier.graphicsLayer {
         alpha = keyboardLayerOpacity

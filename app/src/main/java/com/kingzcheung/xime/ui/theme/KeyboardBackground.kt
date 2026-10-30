@@ -219,6 +219,41 @@ fun Modifier.keyboardBackgroundBelowCard(
     }
 }
 
+/**
+ * 固定卡片窄于整宽时两侧的留空（设置「填满留空处」打开时）：只在卡片那一段高度里铺满整宽。
+ * 渐变沿卡片同一条线延伸；图片没有卡片以外的部分，两侧铺主题底色（与导航条两侧相同）；
+ * 纯色和毛玻璃照卡片的画法，毛玻璃的模糊由服务另开两侧的模糊窗口。
+ * [card] 是卡片在窗口里的位置；还没量到时什么也不画。
+ */
+@Composable
+fun Modifier.keyboardBackgroundBesideCard(
+    background: BackgroundConfig?,
+    isDark: Boolean,
+    fallbackColor: Color,
+    card: () -> Rect?,
+    frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences(isDark).frostedGlass,
+): Modifier {
+    var origin by remember { mutableStateOf<Offset?>(null) }
+    val gradient = background?.takeIf { !frostedGlass.enabled && it.type == "gradient" }?.let { gradientColors(it, isDark) }
+    val image = !frostedGlass.enabled && background?.type == "image"
+    fun frame(): Rect? = origin?.let { o -> card()?.takeIf { it.width > 0f && it.height > 0f }?.translate(-o.x, -o.y) }
+    val band = onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
+        val f = frame() ?: return@drawWithContent
+        clipRect(0f, f.top, size.width, f.bottom) {
+            when {
+                gradient != null -> {
+                    val (start, end) = gradientLine(background!!, f)
+                    drawRect(Brush.linearGradient(gradient, start, end), size = size)
+                }
+                image -> drawRect(fallbackColor)
+                else -> this@drawWithContent.drawContent()
+            }
+        }
+    }
+    return if (gradient != null || image) band
+        else band.keyboardBackground(background, isDark, fallbackColor, frostedGlass)
+}
+
 private fun gradientColors(background: BackgroundConfig, isDark: Boolean): List<Color>? =
     (if (isDark) background.colorsDark ?: background.colors else background.colors)
         ?.takeIf { it.size >= 2 }?.map { Color(0xFF000000 or it) }

@@ -137,6 +137,11 @@ private fun LayoutDisplayPage(
                         "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
                         checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    val filled = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().fillBlankAreas
+                    SettingsToggleItem(Icons.TwoTone.Keyboard, "填满留空处",
+                        "分体中缝和固定键盘两侧的空白用键盘背景铺满，遮住后面的应用；关闭时镂空，透出后面的内容。",
+                        checked = filled, onCheckedChange = { SettingsPreferences.setKeyboardBlankFilled(context, it) })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingsItem(Icons.TwoTone.Tune, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
                         "高度、宽度、悬浮与分体、透明度，打开键盘菜单里同一个调节面板",
                         onClick = { onOpenLayout(SettingsRoutes.KeyboardResize) }, showArrow = true)
