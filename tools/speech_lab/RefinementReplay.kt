@@ -54,6 +54,8 @@ fun main(args: Array<String>) {
             val single = mode.startsWith("single")
             // "refinement-whole": the 整句定稿 setting (production cap, 1 s streaming pause).
             val whole = mode == "refinement-whole"
+            val pauses = mutableListOf<Int>()
+            var fed = 0
             segmenter = SpeechSegmenter(detector, if (single) 12000 else if (whole) WHOLE_SENTENCE_MAX_SEGMENT_MS else 6000,
                 { id, audio ->
                     if (id != lastId) { lastId = id; count = 0 }
@@ -65,12 +67,20 @@ fun main(args: Array<String>) {
                     val parts = exchange("END\t$boundary\t${encode(audio)}").split('|')
                     first.update(id, decode(parts[0]), boundary)
                     second.update(id, cleanSenseVoiceText(decode(parts[1]), keepMarks = whole), boundary)
+                    if (whole && boundary == SpeechBoundary.PAUSE) pauses.add(fed)
                 }, minimumPauseMs = if (mode == "single") 0 else if (whole) 1000 else if (mode.contains("-pause")) mode.substringAfter("-pause").toInt() else 600,
                 useEnergyPause = false, resetDetectorOnPause = true)
-            for (offset in pcm.indices step 1600) segmenter.accept(pcm.copyOfRange(offset, minOf(offset + 1600, pcm.size)))
+            for (offset in pcm.indices step 1600) { fed = minOf(offset + 1600, pcm.size); segmenter.accept(pcm.copyOfRange(offset, fed)) }
             segmenter.finishInput()
+            // 整句定稿 end of input: the whole raw recording, cut like LocalSpeechSession, read once more.
+            val reread = if (whole) SpeechTranscript(keepMarks = true).let { t ->
+                wholeSessionChunks(pcm.size, pauses).forEachIndexed { i, (a, b) ->
+                    t.update(i.toLong(), cleanSenseVoiceText(decode(exchange("REREAD\t${encode(pcm.copyOfRange(a, b))}")), keepMarks = true), SpeechBoundary.PAUSE)
+                }
+                t.text()
+            } else null
             fun text(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
-            exchange("DONE\t${text(first.text())}\t${text(second.text())}")
+            exchange("DONE\t${text(first.text())}\t${text(reread?.ifEmpty { null } ?: second.text())}")
         }
     }
 }

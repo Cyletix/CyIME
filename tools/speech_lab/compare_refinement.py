@@ -40,6 +40,10 @@ def main():
     if a.language=='zh':
         first=so.OnlineRecognizer.from_paraformer(encoder=str(para/'encoder.int8.onnx'),decoder=str(para/'decoder.int8.onnx'),tokens=str(para/'tokens.txt'),num_threads=1,enable_endpoint_detection=False)
         second=so.OfflineRecognizer.from_sense_voice(model=str(sense/'model.int8.onnx'),tokens=str(sense/'tokens.txt'),language='zh',use_itn=True,num_threads=1)
+        # 整句定稿 with the optional X-ASR model (CYIME_REPLAY_FINALIZER=<model dir>), as SherpaSpeechEngine loads it.
+        if os.environ.get('CYIME_REPLAY_FINALIZER'):
+            x=Path(os.environ['CYIME_REPLAY_FINALIZER'])
+            second=so.OfflineRecognizer.from_transducer(encoder=str(x/'encoder-epoch-99-avg-1.int8.onnx'),decoder=str(x/'decoder-epoch-99-avg-1.onnx'),joiner=str(x/'joiner-epoch-99-avg-1.int8.onnx'),tokens=str(x/'tokens.txt'),num_threads=2)
     else:
         folder=Path('D:/models/ASRInput/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01')
         recognizers={mode:so.OfflineRecognizer.from_transducer(**{name:str(folder/(name+'-epoch-99-avg-1'+suffix)) for name in ['encoder','decoder','joiner']},tokens=str(folder/'tokens.txt'),num_threads=2) for mode,suffix in [('int8','.int8.onnx'),('fp32','.onnx')]}
@@ -75,6 +79,9 @@ def main():
                 elif op=='VAD':
                     detector.accept_waveform(unpack(parts[1]));reply=str(int(detector.is_speech_detected()))
                     while not detector.empty():detector.pop()
+                elif op=='REREAD':
+                    s=second.create_stream();s.accept_waveform(16000,unpack(parts[1]));second.decode_stream(s)
+                    reply=pack('' if 'nospeech' in s.result.lang.lower() else s.result.text);del s
                 elif op=='RESET':detector.reset()
                 elif op=='AUDIO':
                     if stream is None:stream=first.create_stream()
