@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -63,6 +65,7 @@ fun CellDictionarySettingsPanel(
     embedded: Boolean = false,
 ) {
     var confirmLarge by remember { mutableStateOf(false) }
+    var showGuide by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     val dictionaries = state.dictionaries
     val installed = dictionaries.installed.associateBy { it.id }
@@ -113,6 +116,15 @@ fun CellDictionarySettingsPanel(
                     }
                 }
             }
+            // 导入认哪些文件：一行写出扩展名，点开看怎么导入和每种格式的示例。
+            item {
+                Row(Modifier.fillMaxWidth().clickable { showGuide = true }.padding(start = 16.dp, end = 4.dp)
+                    .testTag("cell-dictionary-import-hint"), verticalAlignment = Alignment.CenterVertically) {
+                    Text("可导入 .scel、.txt、.dict.yaml、.json 词库", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showGuide = true }) { Text("格式与示例") }
+                }
+            }
             state.message?.let { message -> item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -143,6 +155,7 @@ fun CellDictionarySettingsPanel(
             }
         }
     }
+    if (showGuide) CellDictionaryImportGuide(onDismiss = { showGuide = false }, onImport = onImport)
     if (confirmLarge) {
         AlertDialog(onDismissRequest = { confirmLarge = false },
             title = { Text("词库较多") },

@@ -58,7 +58,8 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
             .use(ScelDictionary::readBounded)
         val entry = store.install(bytes)
         store.select(entry.id, true)
-        "已导入「${entry.name}」，点「应用更改」后生效"
+        val skipped = if (entry.skipped > 0) "，跳过 ${entry.skipped} 行（单字或没有拼音）" else ""
+        "已导入「${entry.name}」${entry.count + entry.english} 个词$skipped，点「应用更改」后生效"
     }
 
     fun select(id: String, selected: Boolean) = work("保存选择…") {
