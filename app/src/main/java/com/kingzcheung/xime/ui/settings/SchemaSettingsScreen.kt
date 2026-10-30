@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.twotone.CloudDownload
-import androidx.compose.material.icons.twotone.Computer
 import androidx.compose.material.icons.twotone.DriveFolderUpload
 import androidx.compose.material.icons.twotone.Storefront
 import androidx.compose.material3.AlertDialog
@@ -133,7 +132,6 @@ fun SchemaSettingsContent(
         viewModel.importCompleted.collect { localViewModel.loadLocalPackages() }
     }
     var showMenu by remember { mutableStateOf(false) }
-    var showWirelessSheet by remember { mutableStateOf(false) }
     var showUrlDialog by remember { mutableStateOf(false) }
     var urlInput by remember { mutableStateOf("") }
     var wasDownloading by remember { mutableStateOf(false) }
@@ -205,16 +203,6 @@ fun SchemaSettingsContent(
             pendingImportAction = action
             showImportWarning = true
         }
-    }
-
-    if (showWirelessSheet) {
-        WirelessImportSheet(
-            onDismiss = {
-                showWirelessSheet = false
-                viewModel.refresh()
-            },
-            onRefresh = { viewModel.refresh() }
-        )
     }
 
     if (showUrlDialog) {
@@ -470,13 +458,6 @@ fun SchemaSettingsContent(
                                 }
                             )
                             CompactMenuDivider()
-                            CompactMenuRow(
-                                label = "浏览器导入", icon = Icons.TwoTone.Computer,
-                                onClick = {
-                                    showMenu = false
-                                    requireImportWarning { showWirelessSheet = true }
-                                }
-                            )
                             CompactMenuRow(
                                 label = "网络导入", icon = Icons.TwoTone.CloudDownload,
                                 onClick = {
