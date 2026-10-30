@@ -37,6 +37,7 @@ enum class FormulaDelimiter(val label: String, val open: String, val close: Stri
 }
 
 enum class SpaceHoldAction(val label: String) {
+    /** VOICE_TOGGLE 行为是按住说话、松手结束（10-30 起）；名字「语音开关」不改。 */
     CURSOR("移动光标"), REPEAT("连续空格"), VOICE_TOGGLE("语音开关")
 }
 
@@ -244,6 +245,8 @@ data class KeyboardInputActions(
     val onCursorModeChange: ((Boolean) -> Unit)? = null,
     val onVoiceModeChange: ((Boolean) -> Unit)? = null,
     val onVoiceToggle: (() -> Unit)? = null,
+    /** 按住空格说话松手：还在听写就结束并上屏，没开起来就什么都不做（不能像 [onVoiceToggle] 那样反过来开麦）。 */
+    val onVoiceHoldEnd: (() -> Unit)? = null,
     val isSttEnabled: Boolean = false,
     val schemas: List<SchemaInfo> = emptyList(),
     val currentInputModeId: String = "",

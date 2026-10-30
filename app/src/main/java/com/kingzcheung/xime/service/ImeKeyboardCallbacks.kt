@@ -284,6 +284,11 @@ internal fun rememberImeKeyboardCallbacks(
                     service.voiceRecognitionHandler.startRecognition()
                 }
             },
+            onVoiceHoldEnd = {
+                // 按住空格说话松手：结束并上屏。只收尾工具栏同一条语音路径，没开起来（输入框不许语音等）时不开麦。
+                val state = service.uiState.value
+                if (state.isVoiceMode && state.voiceSticky) service.endVoiceSession()
+            },
             onPageDown = { service.keyRouter.pageDown() },
             onPageUp = { service.keyRouter.pageUp() },
             onGlobalCandidateSelect = { globalIndex ->

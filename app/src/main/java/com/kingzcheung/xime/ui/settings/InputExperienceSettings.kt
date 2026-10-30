@@ -154,7 +154,7 @@ internal fun InputExperienceSettings(
             // 触发时长跟着空格当前的长按功能放，标题写明它控制的是哪个功能。
             @Composable fun spaceHoldSlider() {
                 val actionText = when (settings.effectiveSpaceHold) {
-                    SpaceHoldAction.CURSOR -> "移动光标"; SpaceHoldAction.REPEAT -> "连续输入空格"; SpaceHoldAction.VOICE_TOGGLE -> "开关语音"
+                    SpaceHoldAction.CURSOR -> "移动光标"; SpaceHoldAction.REPEAT -> "连续输入空格"; SpaceHoldAction.VOICE_TOGGLE -> "说话"
                 }
                 Column(Modifier.settingsSearchAnchor("长按空格多久开始", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("长按空格多久开始$actionText：${"%.1f".format(settings.cursorHoldSeconds)} 秒")
@@ -200,7 +200,7 @@ internal fun InputExperienceSettings(
             HorizontalDivider()
             Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("长按空格", style = MaterialTheme.typography.titleSmall)
-                Text("语音再次长按结束，也可用工具栏麦克风结束。", style = MaterialTheme.typography.bodySmall)
+                Text("语音开关：按住空格说话，松手结束并上屏。", style = MaterialTheme.typography.bodySmall)
                 if (settings.cursorGesture == CursorGestureMode.SPACE) {
                     Text("现在长按空格用来移动光标。选下面一项后，滑动移动光标改为「${settings.cursorGestureAfterLeavingSpace.label}」。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
