@@ -13,7 +13,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** 首次打开应用时安装默认模型；与市场共用下载器、版本和目录，不另建模型副本。 */
 object DefaultModelInstaller {
@@ -25,6 +28,30 @@ object DefaultModelInstaller {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private fun preferences(context: Context) = context.getSharedPreferences("default_models", Context.MODE_PRIVATE)
+    private const val KEY_ALLOW_METERED = "allow_metered"
+    private val waiting = MutableStateFlow(0L)
+
+    /** 首次默认模型因为当前是移动数据（按流量计费）而没有下载时的总字节数；0 表示没在等。 */
+    val waitingForWifiBytes: StateFlow<Long> = waiting
+
+    /** 用户在提示里点了“用流量下载”：之后首次默认模型在按流量计费的网络上也照常下载。 */
+    fun allowMeteredDownload(context: Context) {
+        preferences(context).edit().putBoolean(KEY_ALLOW_METERED, true).commit()
+        waiting.value = 0L
+        start(context.applicationContext)
+    }
+
+    /** 当前网络按流量计费（移动数据、热点）。没联网时不算，照旧由下载失败重试处理。 */
+    private fun isMetered(context: Context): Boolean = try {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        val capabilities = connectivity.activeNetwork?.let { connectivity.getNetworkCapabilities(it) }
+        capabilities != null && !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    } catch (_: Exception) { false }
+
+    /** 这些默认模型里还没装好的文件一共多大（字节）。 */
+    internal fun missingBytes(context: Context, ids: List<String>): Long = ids.mapNotNull { ModelManager.getModel(it) }
+        .filterNot { ModelManager.isModelDownloaded(context, it) }
+        .sumOf { model -> model.files.sumOf { it.sizeBytes } }
 
     internal fun isHandled(context: Context, id: String): Boolean = preferences(context).getBoolean("handled_$id", false)
 
@@ -71,13 +98,23 @@ object DefaultModelInstaller {
             runCatching { app.getSystemService(ConnectivityManager::class.java)
                 .registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: Network) { start(app) }
+                    // Wi-Fi 接上时可能先报可用、稍后才标成不计流量。
+                    override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                        if (waiting.value > 0 && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) start(app)
+                    }
                 }) }
         }
         if (!started.compareAndSet(false, true)) return
         scope.launch {
             val prefs = preferences(app)
             val pending = requestedModelIds(app).filterNot { isHandled(app, it) }
-            if (pending.isEmpty()) { started.set(false); return@launch }
+            if (pending.isEmpty()) { waiting.value = 0L; started.set(false); return@launch }
+            // 移动数据不自动下几百 MB：等 Wi-Fi（换网时网络回调会再进来），或用户在设置首页确认用流量下载。
+            if (!prefs.getBoolean(KEY_ALLOW_METERED, false) && isMetered(app)) {
+                waiting.value = missingBytes(app, pending)
+                if (waiting.value > 0) { started.set(false); return@launch }
+            }
+            waiting.value = 0L
             try {
                 ModelManager.initialize()
                 repeat(3) { attempt ->

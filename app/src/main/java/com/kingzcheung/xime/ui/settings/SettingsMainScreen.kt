@@ -36,6 +36,7 @@ import androidx.compose.material.icons.twotone.Backup
 import androidx.compose.material.icons.twotone.Ballot
 
 import androidx.compose.material.icons.twotone.Build
+import androidx.compose.material.icons.twotone.CloudDownload
 import androidx.compose.material.icons.twotone.Description
 import androidx.compose.material.icons.twotone.Extension
 import androidx.compose.material.icons.twotone.GraphicEq
@@ -59,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,6 +110,7 @@ fun SettingsMainContent(
             while (true) { entryStatus = readMainEntryStatus(context); kotlinx.coroutines.delay(500) }
         }
     }
+    val waitingModelBytes by com.kingzcheung.xime.model.DefaultModelInstaller.waitingForWifiBytes.collectAsState()
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeBottomDp = with(density) { imeBottomPx.toDp() }
@@ -145,6 +148,18 @@ fun SettingsMainContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item { SettingsSearchField(searchQuery, { searchQuery = it }) }
+            if (waitingModelBytes > 0) item {
+                SettingsSection(title = "模型下载", content = {
+                    SettingsItem(
+                        icon = Icons.TwoTone.CloudDownload,
+                        title = "等连上 Wi-Fi 再下载模型",
+                        subtitle = "语音、联想、手写模型共约 ${formatModelMegabytes(waitingModelBytes)}；现在用的是移动数据，点这里用流量下载",
+                        status = "等 Wi-Fi",
+                        statusTone = SettingsStatusTone.WARNING,
+                        onClick = { com.kingzcheung.xime.model.DefaultModelInstaller.allowMeteredDownload(context) }
+                    )
+                })
+            }
             if (searchQuery.isNotBlank()) item {
                 SettingsSearchResults(searchQuery) { entry ->
                     if (entry.target == SEARCH_TARGET_CUSTOM_LAYOUT) {
@@ -477,3 +492,6 @@ internal fun readMainEntryStatus(context: android.content.Context): MainEntrySta
         sttEnabled = SettingsPreferences.isSttEnabled(context),
     )
 }
+
+/** 下载提示里的大小：和模型管理里写的 MB 一样按 1024 × 1024 字节算，取整。 */
+internal fun formatModelMegabytes(bytes: Long): String = "${(bytes + 524_288) / 1_048_576} MB"
