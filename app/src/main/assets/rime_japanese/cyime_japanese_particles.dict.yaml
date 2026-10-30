@@ -1,0 +1,36 @@
+# Rime dictionary
+# encoding: utf-8
+#
+# CyIME: the particles は/へ/を are pronounced wa/e/o, so learners type them that way.
+# The upstream dictionaries only give their kana spellings (ha/he/wo), so wa never offered は and
+# whole-sentence conversion produced 私わ. Loaded as a translator pack by the Japanese schemas.
+#
+# Weights: the bare particles sit just above the kana entries of the same code (わ/え/お are 80000 in
+# jaroomaji.kana_kigou), so they win in sentences and the kana stays second. Higher weights for を
+# start to break words (oshiete → をシエテ). Compounds copy the Mozc weight of their ha/he spelling.
+
+---
+name: cyime_japanese_particles
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+
+は	wa	82000
+へ	e	80001
+を	o	80001
+では	de wa	67202
+ではない	de wa na i	64486
+には	ni wa	66842
+とは	to wa	66856
+ては	te wa	62633
+からは	ka ra wa	66494
+までは	ma de wa	66352
+よりは	yo ri wa	66215
+それでは	so re de wa	65928
+こんにちは	ko nn ni ti wa	67042
+こんばんは	ko nn ba nn wa	66132
+への	e no	67815
+へと	e to	66826
+へは	e wa	65722
+へも	e mo	65316

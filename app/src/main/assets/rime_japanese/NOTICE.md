@@ -21,3 +21,8 @@ The dictionaries retain their individual original copyright and license headers:
 the upstream schema, with different names/IDs and Japanese mode enabled by
 default, plus full-width parentheses for the phone flick keys. They use the original jaroomaji dictionary and conversion rules.
 The kana touch layout emits the same romanized readings as the QWERTY layout.
+
+`cyime_japanese_particles.dict.yaml` (added 2026-10-30) is CyIME's own table: the
+particles は/へ/を and a few fixed compounds under their pronounced readings (wa/e/o).
+All three schemas, including `jaroomaji.schema.yaml`, load it as a translator pack;
+the upstream dictionaries themselves are not changed.

@@ -201,6 +201,9 @@ speller:
 # # # # # # # # # # # # # # # # # # # #
 translator:
   dictionary: jaroomaji
+  # CyIME: particles typed as pronounced (wa→は, e→へ, o→を); see cyime_japanese_particles.dict.yaml
+  packs:
+    - cyime_japanese_particles
   enable_user_dict: true  # 学習機能ON
   enable_completion: true
   enable_word_completion: true

@@ -28,6 +28,9 @@ object JapaneseSchemas {
         "6e2f68b4754d1a2044b567dae828800c4084d8d0aaaa54eb7d5f11701f939a15",
         "535f00e7e2f08a9a1445f623219afdd87b71bddbfd4d665d83d1793ea282e90f",
         "c5602acc778686861f200d397259d0c93cacc2cbfc98391d33c10471c6cbbbd8",
+        "70f8bc1e14caf75ef402f77cb35a79eb21ec73e3521b5f24882e11475099aa7b",
+        "3b527b454003606458f56d842aa3206cf9cf11e8b76083ea8fb32aaf56a9a5b6",
+        "f5cc54a66cf002e77a6d6be553b11ec300c6f6d5b5fdc075bcb9d91ca96f44cc",
     )
 
     internal fun isPreviousBuiltinSchema(text: String): Boolean {
