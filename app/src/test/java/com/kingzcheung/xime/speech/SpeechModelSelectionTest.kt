@@ -39,4 +39,34 @@ class SpeechModelSelectionTest {
         assertEquals(SpeechModelCatalog.ZIPFORMER_TWO_PASS, SpeechModelSelection.withoutRetiredCorrector("${SpeechModelCatalog.ZIPFORMER}+telespeech-ctc-int8"))
         modes.forEach { assertEquals(it, SpeechModelSelection.withoutRetiredCorrector(it)) }
     }
+
+    /** One rule for the :asr service and the settings page: which model writes the final Chinese text. */
+    @Test fun chineseFinalizerMatchesWhatTheServiceRuns() {
+        val c = SpeechModelCatalog
+        fun final(mode: String, whole: Boolean, xasr: Boolean, chinese: Boolean = true) =
+            SpeechModelSelection.pipeline(mode, chinese, whole, xasr).finalizer
+        assertEquals(c.XASR, final(c.TWO_PASS, whole = true, xasr = true))
+        assertEquals(c.XASR, final(c.ZIPFORMER_TWO_PASS, whole = true, xasr = true))
+        assertEquals(c.SENSEVOICE, final(c.TWO_PASS, whole = false, xasr = true))
+        assertEquals(c.SENSEVOICE, final(c.TWO_PASS, whole = true, xasr = false))
+        // SenseVoice alone (lite default) never hands Chinese to X-ASR, even when it is downloaded.
+        assertEquals(c.SENSEVOICE, final(c.SENSEVOICE, whole = true, xasr = true))
+        assertEquals(c.PARAFORMER, final(c.PARAFORMER, whole = true, xasr = true))
+        // English corrects with SenseVoice; X-ASR is Chinese only.
+        assertEquals(c.SENSEVOICE, final(c.TWO_PASS, whole = true, xasr = true, chinese = false))
+    }
+
+    @Test fun wholeSentenceAppliesOnlyWhereTheSessionUsesIt() {
+        val c = SpeechModelCatalog
+        listOf(c.TWO_PASS, c.ZIPFORMER_TWO_PASS, c.SENSEVOICE).forEach {
+            assertTrue(it, SpeechModelSelection.wholeSentenceApplies(it, chinese = true))
+            assertFalse(it, SpeechModelSelection.wholeSentenceApplies(it, chinese = false))
+        }
+        listOf(c.PARAFORMER, c.ZIPFORMER, c.ZIPFORMER_JA, c.ZIPFORMER_JA_INT8).forEach {
+            assertFalse(it, SpeechModelSelection.wholeSentenceApplies(it, chinese = true))
+        }
+        assertFalse(SpeechModelSelection.pipeline(c.TWO_PASS, chinese = true, wholeSentenceOn = false, xasrReady = true).wholeSentence)
+        assertEquals(c.PARAFORMER, SpeechModelSelection.pipeline(c.TWO_PASS, true, true, false).preview)
+        assertNull(SpeechModelSelection.pipeline(c.SENSEVOICE, true, true, false).preview)
+    }
 }

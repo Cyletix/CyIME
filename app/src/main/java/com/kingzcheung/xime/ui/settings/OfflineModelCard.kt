@@ -45,15 +45,17 @@ internal fun OfflineModelCard() {
         ready = withContext(Dispatchers.IO) {
             SpeechModelSelection.primaryIds.filter { runCatching { manager.selection(it).ready }.getOrDefault(false) }.toSet()
         }
-        xasrReady = withContext(Dispatchers.IO) {
-            runCatching { manager.wholeSentenceFinalizer(manager.selection(SpeechModelCatalog.TWO_PASS)).finalizerDir != null }.getOrDefault(false)
-        }
+        xasrReady = withContext(Dispatchers.IO) { runCatching { manager.isXasrReady() }.getOrDefault(false) }
         // An unchosen SenseVoice default becomes Paraformer + SenseVoice once Paraformer is downloaded.
         InputLanguage.supported.forEach { selected[it] = withContext(Dispatchers.IO) { manager.getSelectedModelId(it) } }
     }
     fun refresh(language: InputLanguage) { selected[language] = manager.getSelectedModelId(language) }
     fun download(id: String) { ModelManager.getModel(id)?.let { ModelManager.downloadModelInBackground(context, it) } }
     val senseReady = SpeechModelCatalog.SENSEVOICE in ready
+    var wholeSentence by remember { mutableStateOf(SettingsPreferences.isSttWholeSentence(context)) }
+    // Every line below reads the same rule as the :asr service, so no two lines disagree about which model runs.
+    fun pipeline(language: InputLanguage) = SpeechModelSelection.pipeline(selected.getValue(language),
+        chinese = language == InputLanguage.CHINESE, wholeSentenceOn = wholeSentence, xasrReady = xasrReady)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SettingsSection(title = "语言 → 主模型") {
             InputLanguage.supported.forEachIndexed { index, language ->
@@ -69,7 +71,10 @@ internal fun OfflineModelCard() {
                             style = MaterialTheme.typography.bodyLarge)
                         Text(buildString {
                             append(speechModelFacts(primary))
-                            if (SpeechModelSelection.hasCorrection(mode)) append(" → SenseVoice 校正")
+                            val pipe = pipeline(language)
+                            if (pipe.finalizer == SpeechModelCatalog.XASR) append(" → X-ASR 整句定稿")
+                            else if (SpeechModelSelection.hasCorrection(mode)) append(" → SenseVoice 校正")
+                            if (pipe.wholeSentence && pipe.finalizer != SpeechModelCatalog.XASR) append(" · 整句定稿")
                             if (primary !in ready || SpeechModelSelection.hasCorrection(mode) && !senseReady) append(" · 待下载")
                         }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -97,18 +102,19 @@ internal fun OfflineModelCard() {
                             Text(when {
                                 !canRefine -> "SenseVoice 已作为主模型，无需再次校正。"
                                 !senseReady && !enabled -> "先下载 SenseVoice 模型，再为主模型启用二次校正。"
+                                enabled && pipeline(language).finalizer == SpeechModelCatalog.XASR ->
+                                    "停顿后复核主模型结果；整句定稿开着、X-ASR 已下载，现在由 X-ASR 代替 SenseVoice 定稿。"
                                 else -> "停顿后由 SenseVoice 复核主模型结果，会增加内存占用和等待时间。"
                             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(checked = enabled, enabled = available, onCheckedChange = null)
                     }
                 }
-                // 整句定稿只改变 SenseVoice 定稿的切法：有语言开着校正，或中文直接用 SenseVoice 时可用。
-                val anyCorrection = listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
-                    .any { SpeechModelSelection.hasCorrection(selected.getValue(it)) }
-                val senseVoiceChinese = selected.getValue(InputLanguage.CHINESE) == SpeechModelCatalog.SENSEVOICE
-                val wholeSentenceAvailable = anyCorrection || senseVoiceChinese
-                var wholeSentence by remember { mutableStateOf(SettingsPreferences.isSttWholeSentence(context)) }
+                // 整句定稿只对中文生效：中文开着校正，或中文直接用 SenseVoice 时可用（英文的校正不受它影响）。
+                val chineseMode = selected.getValue(InputLanguage.CHINESE)
+                val chineseCorrection = SpeechModelSelection.hasCorrection(chineseMode)
+                val senseVoiceChinese = SpeechModelSelection.primary(chineseMode) == SpeechModelCatalog.SENSEVOICE
+                val wholeSentenceAvailable = SpeechModelSelection.wholeSentenceApplies(chineseMode, chinese = true)
                 HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Row(Modifier.fillMaxWidth().settingsSearchAnchor("整句定稿").testTag("speech-whole-sentence")
@@ -119,17 +125,26 @@ internal fun OfflineModelCard() {
                     Column(Modifier.weight(1f)) {
                         Text("整句定稿", style = MaterialTheme.typography.bodyLarge)
                         Text(when {
-                            anyCorrection -> "说完一整句（停顿约 1 秒或点结束）再统一校正一次，保留标点，更准，说完要多等一会儿；关闭时每 6 秒校正一次。"
-                            senseVoiceChinese -> "中文用 SenseVoice 时保留标点，说完（点结束）把整段再识别一次，更准，说完要多等一会儿。"
-                            else -> "先开启上面的 SenseVoice 二次校正。"
+                            chineseCorrection -> "中文说完一整句（停顿约 1 秒或点结束）再统一校正一次，保留标点，更准，说完要多等一会儿；关闭时每 6 秒校正一次。只对中文生效。"
+                            senseVoiceChinese -> "中文用 SenseVoice 时保留标点，说完（点结束）把整段再识别一次，更准，说完要多等一会儿。只对中文生效。"
+                            else -> "只对中文生效：先为中文开启上面的 SenseVoice 二次校正。"
                         },
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (anyCorrection) Text(if (xasrReady) "中文整句定稿使用 X-ASR 模型。" else "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。",
+                        // 定稿模型写的是实际在用的那个：同一个 pipeline()，与上面主模型一行一致。
+                        val finalizerNote = when {
+                            pipeline(InputLanguage.CHINESE).finalizer == SpeechModelCatalog.XASR -> "中文整句定稿使用 X-ASR 模型。"
+                            chineseCorrection && xasrReady -> "X-ASR 已下载；打开整句定稿后中文改用它定稿。"
+                            chineseCorrection -> "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。"
+                            senseVoiceChinese -> "中文整句定稿使用 SenseVoice。X-ASR 只在中文主模型是 Paraformer 或 Zipformer、并开着二次校正时使用" +
+                                if (xasrReady) "，已下载的 X-ASR 现在不用。" else "。"
+                            else -> null
+                        }
+                        if (finalizerNote != null) Text(finalizerNote,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null)
                 }
-                if (anyCorrection && !xasrReady) {
+                if (chineseCorrection && !xasrReady) {
                     ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }
                 }
                 if (!senseReady) {

@@ -122,13 +122,17 @@ class AsrModelManager(private val context: Context) {
         else Selection(mode, info, dir(mode), null, languageId)
     }
 
-    /** X-ASR for 整句定稿, when fully downloaded; Chinese sessions with a streaming preview + SenseVoice only. */
+    /** X-ASR for 整句定稿, when fully downloaded; when it applies is [SpeechModelSelection.xasrFinalizes]. */
     fun wholeSentenceFinalizer(selection: Selection): Selection {
-        if (selection.first == null || selection.secondDir == null || selection.recognitionLanguage != "zh") return selection
-        val info = getAsrModels().firstOrNull { it.id == SpeechModelCatalog.XASR } ?: return selection
+        if (!SpeechModelSelection.xasrFinalizes(selection.mode, selection.recognitionLanguage == "zh", wholeSentenceOn = true)) return selection
+        return if (isXasrReady()) selection.copy(finalizerDir = ModelStorage.getModelDir(context, SpeechModelCatalog.XASR)) else selection
+    }
+
+    /** Every X-ASR file is on disk; the settings page shows the same check the :asr service uses. */
+    fun isXasrReady(): Boolean {
+        val info = getAsrModels().firstOrNull { it.id == SpeechModelCatalog.XASR } ?: return false
         val dir = ModelStorage.getModelDir(context, SpeechModelCatalog.XASR)
-        val complete = info.files.isNotEmpty() && info.files.all { File(dir, it).let { f -> f.isFile && f.length() > 0 } }
-        return if (complete) selection.copy(finalizerDir = dir) else selection
+        return info.files.isNotEmpty() && info.files.all { File(dir, it).let { f -> f.isFile && f.length() > 0 } }
     }
 
     /** Called on the speech worker: model file checks/migration never enter the key path. */

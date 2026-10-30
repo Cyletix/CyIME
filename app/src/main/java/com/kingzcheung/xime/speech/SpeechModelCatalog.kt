@@ -12,7 +12,7 @@ object SpeechModelCatalog {
     const val PARAFORMER = "paraformer-zh-en-int8"
     const val SENSEVOICE = "sensevoice-multilingual-int8"
     const val TWO_PASS = "paraformer-sensevoice"
-    /** 整句定稿的可选模型：X-ASR 中英 Zipformer（离线、自带标点），下载后整句定稿用它代替 SenseVoice。 */
+    /** 整句定稿的可选模型：X-ASR 中英 Zipformer（离线、自带标点）；何时代替 SenseVoice 见 [SpeechModelSelection.xasrFinalizes]。 */
     const val XASR = "xasr-zh-en-punct-int8"
     /** CyIME 自己 Release 里的原样转存（哈希与原站一致）：HuggingFace 和它的国内镜像都下不来时用。 */
     private const val RELEASE = "https://github.com/Cyletix/CyIME/releases/download/models/"
@@ -42,7 +42,7 @@ object SpeechModelCatalog {
                     mirrors = listOf(RELEASE + "paraformer-zh-en-int8-8e40c43232a1-tokens.txt"))
             )))),
         // 2026-10-30 回放：公开口语 CER 6.1 %（SenseVoice 整句 7.2 %），平板外放实测与豆包同为 5.6 %；只用于中文整句定稿。
-        ModelInfo(XASR, "X-ASR · 中英整句定稿", "可选。下载后「整句定稿」改用它：更准、更快，自带标点；只用于中文。", ModelCategory.ASR,
+        ModelInfo(XASR, "X-ASR · 中英整句定稿", "可选。中文主模型是 Paraformer 或 Zipformer、开着 SenseVoice 二次校正和「整句定稿」时，下载后改用它定稿：更准、更快，自带标点；只用于中文。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "2026-06-03", size = "136.4MB",
                 archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03.tar.bz2", sha256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224",
                 files = listOf(
