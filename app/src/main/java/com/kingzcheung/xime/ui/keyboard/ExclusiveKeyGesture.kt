@@ -1,9 +1,10 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -57,8 +58,12 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
 ) = coroutineScope {
     val gestureScope = this
     val horizontalCancelThreshold = 60.dp.toPx()
-    awaitEachGesture {
-        val down = awaitFirstDown()
+    // 快速连打同一个键（小鹤 uu）时两只拇指会交叠：前一下还没抬，后一下已按在同一键上。
+    // 后按下的手指结束前一下（按它当时的位置结算），再接着算自己的一下；不等所有手指抬起，否则这一下被吞。
+    var handover: PointerInputChange? = null
+    awaitPointerEventScope { while (true) {
+        val down = handover ?: awaitNewDown()
+        handover = null
         val actions = currentActions()
         val swipeThreshold = actions.verticalThresholdDp.dp.toPx()
         val horizontalThreshold = actions.horizontalThresholdDp.dp.toPx()
@@ -148,8 +153,12 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                             actions.rightText.takeIf { actions.onRight != null },
                         ) else null))
                 }
-                if (!change.pressed) {
+                // 长按菜单正在选时不换手，保持原来的选择。
+                val nextDown = if (longPressed) null
+                    else event.changes.firstOrNull { it.id != down.id && it.changedToDown() && !it.isConsumed }
+                if (!change.pressed || nextDown != null) {
                     change.consume()
+                    handover = nextDown
                     when {
                         longPressed -> items.getOrNull(selectedIndex)?.let { actions.onLongPressSelect?.invoke(it) }
                         up -> actions.onUp?.invoke(actions.upText.orEmpty())
@@ -176,5 +185,12 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
             actions.onRelease()
             actions.onPreview(SwipeState())
         }
+    } }
+}
+
+/** 这个键上新按下的一根手指；已经结算过、还按着的手指不算。 */
+private suspend fun AwaitPointerEventScope.awaitNewDown(): PointerInputChange {
+    while (true) {
+        awaitPointerEvent().changes.firstOrNull { it.changedToDown() && !it.isConsumed }?.let { return it }
     }
 }
