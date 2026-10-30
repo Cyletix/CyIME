@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -77,6 +79,59 @@ fun SettingsSection(
             Column(Modifier.settingsSearchAnchor(title)
                 .visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), content = content)
         }
+    }
+}
+
+/**
+ * 列表页（词库、布局管理、已安装的方案）的一行：和 [SettingsSection] 同一种底色和圆角。每行单独放进 LazyColumn，
+ * 组里第一行圆上边、最后一行圆下边，中间用和首页一样的细分隔线，几行连起来就是一张卡片，长列表也不用一次排完。
+ */
+@Composable
+internal fun SettingsGroupRow(index: Int, count: Int, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val radius = 12.dp
+    val top = if (index == 0) radius else 0.dp
+    val bottom = if (index >= count - 1) radius else 0.dp
+    Column(modifier.fillMaxWidth()
+        .clip(RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom))
+        .background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        if (index > 0) SettingsRowDivider()
+        content()
+    }
+}
+
+/** 卡片里两行之间的分隔线，和设置首页相同。 */
+@Composable
+internal fun SettingsRowDivider(modifier: Modifier = Modifier) {
+    HorizontalDivider(modifier.padding(start = 16.dp), thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+}
+
+/** 卡片上方的组名，和 [SettingsSection] 的标题同一个样子。 */
+@Composable
+internal fun SettingsGroupTitle(title: String, modifier: Modifier = Modifier) {
+    Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(top = 8.dp, bottom = 8.dp))
+}
+
+/** 卡片下面的一句说明：小字、次要色。提醒色只留给真正的警告。 */
+@Composable
+internal fun SettingsNote(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp))
+}
+
+/** 卡片里的一行：标题、灰色第二行，右边放这一行的开关或按钮。和 [SettingsItem] 同样的字号字重，只是不带图标。 */
+@Composable
+internal fun SettingsListRow(title: String, detail: String, modifier: Modifier = Modifier,
+                             trailing: @Composable () -> Unit = {}) {
+    Row(modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        trailing()
     }
 }
 

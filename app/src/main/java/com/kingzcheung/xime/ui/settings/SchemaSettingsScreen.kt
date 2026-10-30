@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -54,7 +55,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -512,7 +514,8 @@ fun SchemaSettingsContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            TabRow(selectedTabIndex = tabIndex) {
+            // 和词库页同一种标签栏。
+            PrimaryTabRow(selectedTabIndex = tabIndex, containerColor = MaterialTheme.colorScheme.surface) {
                 Tab(
                     selected = tabIndex == 0,
                     onClick = { tabIndex = 0 },
@@ -543,23 +546,15 @@ fun SchemaSettingsContent(
                         if (reorderEnabledModes(context, uiState.allSchemas, enabledIds, englishEnabled, reordered)) modeOrderRevision++
                     }
                     val orderedEnabledIds = dragOrder.order
+                    // 和词库、布局管理同一套：组名 + 连成一张卡片的行 + 卡片下的小字说明（不再用红字）。
                     LazyColumn(
                         state = dragOrder.list,
                         modifier = Modifier.settingsGutterScroll(dragOrder.list)
                             .weight(1f)
                             .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         item {
-                            Text(
-                                text = "已启用的输入组合",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                            )
-                            Text("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言与方案」选择。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            SettingsGroupTitle("已启用的输入组合", Modifier.padding(top = 8.dp))
                         }
 
                         if (orderedEnabledIds.isEmpty()) {
@@ -573,7 +568,7 @@ fun SchemaSettingsContent(
                             }
                         }
 
-                        items(orderedEnabledIds, key = { it }) { id ->
+                        itemsIndexed(orderedEnabledIds, key = { _, id -> id }) { row, id ->
                             val isEnglish = id == InputModes.ENGLISH
                             val schema = if (isEnglish) SchemaMeta(id, "英文") else schemaById.getValue(id)
                             SchemaToggleItem(
@@ -587,17 +582,16 @@ fun SchemaSettingsContent(
                                 isDragging = dragOrder.dragging == id,
                                 isDropTarget = false,
                                 reorderModifier = dragOrderItem(dragOrder, id, orderedEnabledIds.size > 1),
+                                groupIndex = row,
+                                groupSize = orderedEnabledIds.size,
                             )
                         }
 
                         item {
+                            SettingsNote("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言与方案」选择。",
+                                Modifier.padding(top = 4.dp))
+                            SettingsNote("九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「应用方案更改」生效。日常打字不需要定期部署。")
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「应用方案更改」生效。日常打字不需要定期部署。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
                         }
 
                         val disabledSchemas = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas &&
@@ -619,7 +613,7 @@ fun SchemaSettingsContent(
                             }
                         }
 
-                        items(disabledSchemas, key = { it.schemaId }) { schema ->
+                        itemsIndexed(disabledSchemas, key = { _, schema -> schema.schemaId }) { row, schema ->
                             SchemaToggleItem(
                                 schema = schema,
                                 enabled = false,
@@ -627,8 +621,11 @@ fun SchemaSettingsContent(
                                 isCurrent = false,
                                 onToggle = { viewModel.toggleSchema(schema) },
                                 onSelect = { viewModel.selectSchema(schema) },
+                                groupIndex = row,
+                                groupSize = disabledSchemas.size,
                             )
                         }
+                        item { Spacer(Modifier.height(8.dp)) }
                     }
 
                     Button(
@@ -722,29 +719,38 @@ internal fun SchemaToggleItem(
     reorderModifier: Modifier = Modifier,
     isDragging: Boolean = false,
     isDropTarget: Boolean = false,
+    /** 在同一张卡片里的第几行、共几行（见 SettingsGroupRow）；单独一行时四角都圆。正拖着的那行单独浮起、四角圆。 */
+    groupIndex: Int = 0,
+    groupSize: Int = 1,
 ) {
+    val radius = 12.dp
+    val top = if (isDragging || groupIndex == 0) radius else 0.dp
+    val bottom = if (isDragging || groupIndex >= groupSize - 1) radius else 0.dp
+    val groupColor = MaterialTheme.colorScheme.surfaceContainerLow
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("schema-card:${schema.schemaId}")
             .then(reorderModifier)
             .then(if (isBuiltIn) Modifier else Modifier.clickable { if (enabled && isCompiled) onSelect() }),
+        shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
         colors = CardDefaults.cardColors(
             containerColor = if (isDragging)
                 MaterialTheme.colorScheme.secondaryContainer
             else if (isDropTarget)
                 MaterialTheme.colorScheme.primaryContainer
             else if (isCurrent)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f).compositeOver(groupColor)
             else
-                MaterialTheme.colorScheme.surface
+                groupColor
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isDragging) 6.dp else 0.dp),
     ) {
+        if (groupIndex > 0 && !isDragging) SettingsRowDivider()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {

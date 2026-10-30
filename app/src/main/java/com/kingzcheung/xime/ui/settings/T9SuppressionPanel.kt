@@ -2,7 +2,7 @@ package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,12 +43,13 @@ internal fun T9SuppressionPanel() {
         } finally { busy = false }
     }
     val listState = rememberLazyListState()
-    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
-        error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) } }
-        if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp)) }
+    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+        error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 16.dp)) } }
+        if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 16.dp)) }
         if (!busy && words.isEmpty() && error == null) item { DictionaryEmptyLine("没有删掉的候选") }
-        items(words, key = { (word, t9) -> (if (t9) "t9:" else "26:") + word }) { (word, t9) ->
-            DictionaryListRow(word, if (t9) "九键" else "26 键") {
+        itemsIndexed(words, key = { _, (word, t9) -> (if (t9) "t9:" else "26:") + word }) { row, (word, t9) ->
+            SettingsGroupRow(row, words.size) { SettingsListRow(word, if (t9) "九键" else "26 键") {
                 TextButton(enabled = !busy, onClick = {
                     busy = true
                     scope.launch {
@@ -66,7 +67,7 @@ internal fun T9SuppressionPanel() {
                         } finally { busy = false }
                     }
                 }) { Text("放回") }
-            }
+            } }
         }
     }
 }
