@@ -54,6 +54,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(englishMemory)
     val singleSyllable = file("data/cyime_single_syllable.lua")
     inputs.file(singleSyllable)
+    val mixedInput = file("data/cyime_mixed_input.lua")
+    inputs.file(mixedInput)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -184,6 +186,8 @@ val prepareChineseDictionaries by tasks.registering {
         englishMemory.copyTo(File(root, "lua/cyime_en_memory.lua"), overwrite = true)
         // One complete syllable (an, ai, en) keeps its single characters ahead of initial-letter words.
         singleSyllable.copyTo(File(root, "lua/cyime_single_syllable.lua"), overwrite = true)
+        // 中英混输（nihaohello → 你好hello），Rime 选项 cyime_mixed_input 打开才出候选；设置默认关。
+        mixedInput.copyTo(File(root, "lua/cyime_mixed_input.lua"), overwrite = true)
         val corrector = File(root, "lua/corrector.lua")
         val source = corrector.readText()
         val commentGate = "if env.keep_comment then"
@@ -281,7 +285,8 @@ val prepareChineseDictionaries by tasks.registering {
             "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
             .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_acronym_filter",
-                "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory") else sequenceOf(it) }
+                "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory")
+                else if (it == "    - script_translator") sequenceOf(it, "    - lua_translator@*cyime_mixed_input") else sequenceOf(it) }
             .joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +
@@ -320,6 +325,7 @@ val prepareChineseDictionaries by tasks.registering {
             // With CyLM started while Rime builds its sentence most keys find it done; a key waits at most 6 ms.
             "  budget_ms: 6\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
+        check(baseSchema.contains("    - lua_translator@*cyime_mixed_input\n")) { "Upstream rime_ice translator list changed" }
         // The 14-key schema (assets/rime_chinese) repeats these sentence rules; keep them the same list.
         check(file("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText()
             .contains("  sentence_position_final_only: [${particles.joinToString(", ")}]\n")) {
