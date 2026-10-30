@@ -48,6 +48,32 @@ internal const val WHOLE_SENTENCE_MAX_SEGMENT_MS = 28000
 /** 一整句（最长 30 s）在手机上的定稿时间余量；6 s 分段时用引擎自己的 5 s。 */
 internal const val WHOLE_SENTENCE_DECODE_TIMEOUT_MS = 15000L
 
+/**
+ * 整句定稿结束时把这次语音输入的全部原始音频（不经 VAD 筛）再识别一遍：VAD 没打开的轻声、远场和
+ * 噪声里的话也能补回。2026-10-30 回放：按停顿整句 8.33 % → 整段 7.23 %（公开 428 段），
+ * 0 dB 噪声 31.7 → 24.8 %，用户本人录音 7.2 → 2.6 %。超过预算就保留按停顿定稿的文字。
+ */
+internal const val WHOLE_SESSION_BUDGET_MS = 15000L
+/** 整段重识别最多保留 5 分钟原始音频（约 19 MB）；更长的这次输入只用按停顿定稿的文字。 */
+internal const val WHOLE_SESSION_MAX_SAMPLES = 5 * 60 * 16000
+
+/**
+ * Splits [total] samples into blocks of at most [maxSamples] for the end-of-input re-read: each
+ * cut is the last real pause (a region end, from [pauses]) at least 8 s into the block, else a
+ * hard cut at the limit. Blocks are contiguous and cover every sample once.
+ */
+internal fun wholeSessionChunks(total: Int, pauses: List<Int>, maxSamples: Int = WHOLE_SENTENCE_MAX_SEGMENT_MS * 16): List<Pair<Int, Int>> {
+    val chunks = mutableListOf<Pair<Int, Int>>()
+    var start = 0
+    while (total - start > maxSamples) {
+        val cut = pauses.filter { it > start + 8 * 16000 && it <= start + maxSamples }.maxOrNull() ?: (start + maxSamples)
+        chunks.add(start to cut)
+        start = cut
+    }
+    if (total > start) chunks.add(start to total)
+    return chunks
+}
+
 /** 32 ms acoustic frames, 1024 ms pre-roll, adaptive pauses. Every sample is decoded at most once. */
 internal class SpeechSegmenter(
     private val detector: SpeechDetector,

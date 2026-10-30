@@ -270,30 +270,39 @@ class SpeechSegmentationTest {
         for (whole in listOf(false, true)) {
             val engine = RecordingEngine()
             val errors = mutableListOf<String>()
-            val s = LocalSpeechSession(engine, {}, { errors.add(it) }, wholeSentence = whole)
+            val regions = java.util.Collections.synchronizedList(mutableListOf<Int>())
+            val s = LocalSpeechSession(engine, {}, { errors.add(it) }, { _, size, _ -> regions.add(size) }, wholeSentence = whole)
             s.acceptPcm(pcm(160000)); s.acceptPcm(pcm(24000, 0)) // 10 s speech, then a 1.5 s pause
             s.finish()
             assertTrue(errors.isEmpty())
             if (whole) {
-                assertEquals(1, engine.refined.size)
-                assertTrue(engine.refined.single() >= 160000)
+                assertEquals(1, regions.size)
+                assertTrue(regions.single() >= 160000)
+                assertEquals(listOf(regions.single(), 184000), engine.refined.toList()) // the phrase, then the whole input re-read
             } else {
-                assertTrue("off: ${engine.refined}", engine.refined.size >= 2)
-                assertTrue(engine.refined.all { it <= (6000 + 2000) * 16 })
+                assertTrue("off: $regions", regions.size >= 2)
+                assertTrue(regions.all { it <= (6000 + 2000) * 16 })
+                assertEquals(regions.toList(), engine.refined.toList()) // no re-read
             }
         }
     }
 
     @Test fun `whole sentence still cuts continuous speech within the 30 s SenseVoice limit`() {
         val engine = RecordingEngine()
-        val s = LocalSpeechSession(engine, {}, {}, wholeSentence = true)
+        val regions = java.util.Collections.synchronizedList(mutableListOf<Int>())
+        val stops = java.util.Collections.synchronizedList(mutableListOf<Boolean>())
+        val s = LocalSpeechSession(engine, {}, {}, { _, size, b -> regions.add(size); stops.add(b == SpeechBoundary.STOP) }, wholeSentence = true)
         repeat(45) { s.acceptPcm(pcm(16000)) } // 45 s without any pause
         s.finish()
-        assertTrue(engine.refined.toString(), engine.refined.size >= 2)
+        assertTrue(regions.toString(), regions.size >= 2)
         // The hard cut lands on the next 32 ms frame: at most 30 s + 512 samples.
-        assertTrue(engine.refined.toString(), engine.refined.all { it <= (WHOLE_SENTENCE_MAX_SEGMENT_MS + 2000) * 16 + 512 })
-        assertTrue(engine.refined.toString(), engine.refined.first() >= WHOLE_SENTENCE_MAX_SEGMENT_MS * 16)
-        assertEquals(45 * 16000, engine.refined.sum()) // every sample decoded exactly once
+        assertTrue(regions.toString(), regions.all { it <= (WHOLE_SENTENCE_MAX_SEGMENT_MS + 2000) * 16 + 512 })
+        assertTrue(regions.toString(), regions.first() >= WHOLE_SENTENCE_MAX_SEGMENT_MS * 16)
+        assertEquals(45 * 16000, regions.sum()) // every sample decoded exactly once per pass
+        // The end-of-input re-read covers the same samples in blocks of at most 28 s.
+        // The stop region is left to the re-read; earlier regions were each decoded once.
+        val reread = engine.refined.drop(stops.count { !it })
+        assertEquals(45 * 16000, reread.sum()); assertTrue(reread.all { it <= WHOLE_SENTENCE_MAX_SEGMENT_MS * 16 })
     }
 
     @Test fun `whole sentence has no effect without a second pass`() {

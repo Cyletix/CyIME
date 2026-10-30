@@ -64,6 +64,8 @@ internal class LocalSpeechSession(
     private val onRegion: (Long, Int, SpeechBoundary) -> Unit = { _, _, _ -> },
     /** 整句定稿开关；只影响「流式预览 + SenseVoice 校正」组合。 */
     wholeSentence: Boolean = false,
+    /** 结束时整段重识别的时间预算，超出就保留按停顿定稿的文字。 */
+    private val wholeSessionBudgetMs: Long = WHOLE_SESSION_BUDGET_MS,
 ) : ResidentSession {
     private val wholeSentenceActive = wholeSentence && engine.hasRefinement && engine.isStreaming
     /** 整句定稿时保留模型标点（整句的句末不再是切点硬塞的句号）。 */
@@ -89,6 +91,15 @@ internal class LocalSpeechSession(
     private var activeId = 0L
     private val previewAudio = ArrayList<FloatArray>()
     private val previewBusy = AtomicBoolean(false)
+    // 整句定稿：这次语音输入的全部原始音频（不经 VAD 筛）和真停顿的位置，结束时整段再识别一次。
+    private val sessionAudio = ArrayList<FloatArray>()
+    private var sessionSamples = 0
+    private var sessionOverflow = false
+    private val sessionPauses = mutableListOf<Int>()
+    // The re-read runs on the finishing thread after both workers stop: a successor must wait for
+    // it (awaitIdle) before resetting or reusing the engine. Released by finish or cancel.
+    private val wholeLock = Any()
+    private val wholeSettled = java.util.concurrent.CountDownLatch(1)
     private val segmenter: SpeechSegmenter by lazy { SpeechSegmenter(engine.detector(),
         maxSegmentMs = if (wholeSentenceActive) WHOLE_SENTENCE_MAX_SEGMENT_MS else engine.maxSegmentMs,
         onAudio = { id, samples ->
@@ -143,6 +154,10 @@ internal class LocalSpeechSession(
             try {
                 audio.execute {
                     if (!abandoned.get() && !failed.get()) try {
+                        if (wholeSentenceActive && !sessionOverflow) {
+                            if (sessionSamples + samples.size > WHOLE_SESSION_MAX_SAMPLES) { sessionOverflow = true; sessionAudio.clear() }
+                            else { sessionAudio.add(samples); sessionSamples += samples.size }
+                        }
                         segmenter.accept(samples)
                         previewLatestAudio()
                     }
@@ -156,10 +171,15 @@ internal class LocalSpeechSession(
 
     private fun endRegion(id: Long, samples: FloatArray, boundary: SpeechBoundary) {
         synchronized(outputLock) { ended[id] = boundary }
+        // The region ends inside the current capture chunk, after at least 1 s of quiet.
+        if (wholeSentenceActive && boundary == SpeechBoundary.PAUSE) sessionPauses.add(sessionSamples)
         onRegion(id, samples.size, boundary)
         previewAudio.clear()
         val preview = if (engine.isStreaming) engine.finishStream() else ""
         if (engine.isStreaming) publish(id, preview, boundary, confirmed = !engine.hasRefinement)
+        // 整句定稿: the end-of-input re-read covers the last sentence, so the stop region is not decoded twice
+        // (saves up to one 30 s decode of waiting). If the re-read is cancelled or over budget, its preview stays.
+        if (wholeSentenceActive && boundary == SpeechBoundary.STOP && !sessionOverflow) return
         if (engine.hasRefinement || !engine.isStreaming) {
             synchronized(outputLock) { pending.add(id) }
             val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(decodeTimeoutMs)
@@ -199,7 +219,29 @@ internal class LocalSpeechSession(
         }
     }
 
-    override fun finish(): String = finish(decodeTimeoutMs + 2000)
+    override fun finish(): String = finish(decodeTimeoutMs + 2000 + if (wholeSentenceActive) wholeSessionBudgetMs else 0)
+
+    /**
+     * 整句定稿的最后一步：整次输入的原始音频按停顿切成 ≤28 s 的块交给 SenseVoice。只在按停顿定稿都已
+     * 完成后运行（同一线程独占识别器）；被取消、超出预算、出现外文字或识别为空时返回 null，保留原文。
+     */
+    private fun wholeSessionText(deadline: Long): String? = synchronized(wholeLock) {
+        if (abandoned.get() || sessionOverflow || sessionSamples == 0) return null
+        val pcm = FloatArray(sessionSamples)
+        var offset = 0
+        sessionAudio.forEach { it.copyInto(pcm, offset); offset += it.size }
+        val budgetEnd = minOf(deadline, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(wholeSessionBudgetMs))
+        val whole = SpeechTranscript(keepMarks = true)
+        var id = 0L
+        for ((start, end) in wholeSessionChunks(sessionSamples, sessionPauses)) {
+            if (abandoned.get() || failed.get() || System.nanoTime() > budgetEnd) return null
+            val part = engine.refinePunctuated(pcm.copyOfRange(start, end))
+            if (engine.lockedChinese && hasForeignScript(part)) return null
+            whole.update(++id, part, SpeechBoundary.PAUSE)
+        }
+        if (abandoned.get() || System.nanoTime() > budgetEnd) return null
+        return whole.text().ifEmpty { null }
+    }
 
     /** Drains actual audio, then waits only for outstanding work; no artificial stop delay. */
     fun finish(timeoutMs: Long): String {
@@ -221,6 +263,9 @@ internal class LocalSpeechSession(
         val drained = audio.awaitTermination(remaining(), TimeUnit.NANOSECONDS)
         refinement.shutdown()
         val refined = refinement.awaitTermination(remaining(), TimeUnit.NANOSECONDS)
+        val whole = try {
+            if (wholeSentenceActive && drained && refined && !failed.get() && !abandoned.get()) wholeSessionText(deadline) else null
+        } catch (_: Exception) { null } finally { wholeSettled.countDown() }
         synchronized(outputLock) {
             if (!drained || !refined) {
                 pending.forEach { transcript.update(it, "", ended[it]) }
@@ -228,7 +273,8 @@ internal class LocalSpeechSession(
                 fail("语音收尾超时，未完成的预览不会作为最终结果")
             }
             abandoned.set(true)
-            return transcript.text()
+            if (whole != null && whole != previous) onText(whole)
+            return whole ?: transcript.text()
         }
     }
 
@@ -236,10 +282,12 @@ internal class LocalSpeechSession(
         abandoned.set(true)
         synchronized(lifecycle) { accepting = false; audio.queue.clear(); audio.shutdown() }
         refinement.queue.clear(); refinement.shutdown()
+        wholeSettled.countDown()
     }
     override fun awaitIdle() {
         while (!audio.awaitTermination(1, TimeUnit.SECONDS)) { }
         while (!refinement.awaitTermination(1, TimeUnit.SECONDS)) { }
+        if (wholeSentenceActive) { wholeSettled.await(); synchronized(wholeLock) { } }
         // More than one retirement/start waiter may observe termination. A later waiter
         // must neither reset the next session nor leave before the first reset completes.
         synchronized(resetLock) {
