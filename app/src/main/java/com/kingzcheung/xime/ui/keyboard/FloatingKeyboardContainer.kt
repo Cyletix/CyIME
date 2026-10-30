@@ -5,7 +5,12 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -21,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +48,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -49,6 +57,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 
@@ -99,6 +108,19 @@ internal fun FloatingKeyboardContainer(
     previewRotationState: State<Float>? = null,
     /** 非空时固定键盘顶边正中显示小把手，按住往上拉过阻力松手即变悬浮（平板）。 */
     onUndock: (() -> Unit)? = null,
+    /**
+     * 非空时悬浮卡片外四角亮着的角标就是调大小的把手：拖角直接改大小，松手把新的宽高和位置交给宿主保存
+     * （和调节界面确认时同一种保存）。为空时角标只是位置提示。
+     */
+    onCornerResize: ((ResizeGeometry) -> Unit)? = null,
+    /** 拖角时的高宽比保护（和调节界面同一套）；为空只限尺寸上下限。 */
+    cornerResizeAspect: KeyboardAspectLimits? = null,
+    /** 分体键盘两半贴着屏幕两边，拖角只改高度。 */
+    cornerResizeHeightOnly: Boolean = false,
+    /** 点一下亮着的角标（不拖）打开完整的调节界面：透明度、悬浮、分体、旋转都在那里。 */
+    onCornerTap: (() -> Unit)? = null,
+    /** 角标把手热区（窗口坐标）：露在卡片外的部分要并进输入法触摸区。角标没亮时为空表。 */
+    onCornerHandlesPositioned: (List<android.graphics.Rect>) -> Unit = {},
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -178,8 +200,9 @@ internal fun FloatingKeyboardContainer(
 
     val screenHeightDp = availableHeightDp.takeIf { it > 0 } ?: LocalConfiguration.current.screenHeightDp
 
+    var hostOrigin by remember { mutableStateOf(Offset.Zero) }
     BoxWithConstraints(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().onGloballyPositioned { hostOrigin = it.positionInWindow() },
         contentAlignment = Alignment.BottomCenter
     ) {
         val previewWidthDp = previewRect?.let { with(density) { it.width.toDp() } }
@@ -206,7 +229,9 @@ internal fun FloatingKeyboardContainer(
         // 转着的卡片不参与贴底恢复固定：底部本来就允许略出屏，贴底不代表想变回固定。
         val destination = dockTarget?.takeIf { it.widthDp > 0 && it.contentHeightDp > 0 && rotatedRect == null }
             ?.rectInHost(maxWidth.value * density.density, maxHeight.value * density.density, density.density)
-        val cardRect = previewRect ?: baseRect
+        // 拖角调大小时卡片直接按拖出来的矩形摆，松手后宿主保存的新尺寸接上，同一帧换回 baseRect。
+        var cornerRect by remember { mutableStateOf<ResizeRect?>(null) }
+        val cardRect = previewRect ?: cornerRect ?: baseRect
         val cardTotalHeight = with(density) { cardRect.height.toDp() }
         val dragAreaHeight = floatingDragAreaHeightDp(bottomContentPaddingDp,
             bottomKeyClearance?.value ?: 0f, cardTotalHeight.value).dp
@@ -271,6 +296,8 @@ internal fun FloatingKeyboardContainer(
             }
             .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
         // 位置提示角标：卡片外扩一圈，跟卡片一起移动、旋转；调节界面里有自己的边框，不画。
+        // 亮着（含正按着角）时四角也是调大小的把手，见下面的 cornersActive。
+        val cornersLit = highlight.lit || highlight.held
         if (previewRect == null) Box(
             Modifier.align(Alignment.TopStart)
                 .absoluteOffset {
@@ -282,7 +309,8 @@ internal fun FloatingKeyboardContainer(
                     with(density) { cardRect.height.toDp() } + PositionHighlightGap * 2)
                 .graphicsLayer { rotationZ = restingRotation }
                 .keyboardPositionCorners(highlight, highlightColor, highlightGlass)
-                .testTag("floating-position-corners"),
+                .testTag("floating-position-corners")
+                .semantics { stateDescription = if (cornersLit) "lit" else "off" },
         )
         Box(
             modifier = cardPlacement
@@ -384,7 +412,91 @@ internal fun FloatingKeyboardContainer(
                     dockReady = false
                     onDragEnd()
                 },
+                // 点一下拖动条也亮出四角角标：亮着时拖角调大小、点角打开调节界面。
+                onTap = { if (onCornerResize != null && rotatedRect == null) highlight.trigger() },
             )
+        }
+
+        // 四角角标把手：只在角标亮着（或正拖着角）时存在，转着的卡片不调大小。
+        val cornersEnabled = onCornerResize != null && previewRect == null && rotatedRect == null && !isDragging
+        val cornersActive = cornersEnabled && (cornersLit || cornerRect != null)
+        val handleOutsidePx = FLOATING_CORNER_HANDLE_OUTSIDE_DP * density.density
+        val handleInsidePx = FLOATING_CORNER_HANDLE_INSIDE_DP * density.density
+        val currentOnCornerHandles by rememberUpdatedState(onCornerHandlesPositioned)
+        // 拖动中整段手势已经归输入法窗口，触摸区不必每帧跟着改；松手后按新卡片报一次。
+        if (cornerRect == null) {
+            val windowRects = if (!cornersActive) emptyList() else FLOATING_CORNER_HANDLES.mapNotNull { handle ->
+                cardRect.cornerHandleRect(handle, handleOutsidePx, handleInsidePx)?.let {
+                    android.graphics.Rect((hostOrigin.x + it.left).roundToInt(), (hostOrigin.y + it.top).roundToInt(),
+                        (hostOrigin.x + it.right).roundToInt(), (hostOrigin.y + it.bottom).roundToInt())
+                }
+            }
+            SideEffect { currentOnCornerHandles(windowRects) }
+        }
+        DisposableEffect(Unit) { onDispose { currentOnCornerHandles(emptyList()) } }
+        if (cornersActive) {
+            val configuration = LocalConfiguration.current
+            val currentCardRect by rememberUpdatedState(baseRect)
+            val currentOnCornerResize by rememberUpdatedState(onCornerResize)
+            val currentOnCornerTap by rememberUpdatedState(onCornerTap)
+            val currentAspect by rememberUpdatedState(cornerResizeAspect)
+            val currentHeightOnly by rememberUpdatedState(cornerResizeHeightOnly)
+            val hostWidthPx = maxWidth.value * density.density
+            val hostHeightPx = maxHeight.value * density.density
+            val bottomInsetPx = minOffsetY.coerceAtLeast(0) * density.density
+            FLOATING_CORNER_HANDLES.forEach { handle ->
+                // 把手按拖之前的卡片摆，拖动中不跟着卡片走：节点一动，手指在它里面的位移就会被抵消。
+                val box = baseRect.cornerHandleRect(handle, handleOutsidePx, handleInsidePx) ?: return@forEach
+                Box(
+                    Modifier.align(Alignment.TopStart)
+                        .absoluteOffset { IntOffset(box.left.roundToInt(), box.top.roundToInt()) }
+                        .size(with(density) { box.width.toDp() }, with(density) { box.height.toDp() })
+                        .testTag("floating-corner-handle-${handle.name.lowercase()}")
+                        .semantics { contentDescription = "拖动调整键盘大小，点一下打开调节界面" }
+                        .pointerInput(handle, hostWidthPx, hostHeightPx, bottomInsetPx) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                down.consume()
+                                highlight.held = true
+                                val start = currentCardRect
+                                val limits = floatingCornerResizeLimits(start, hostWidthPx, hostHeightPx, bottomInsetPx,
+                                    configuration.screenWidthDp, configuration.screenWidthDp > configuration.screenHeightDp,
+                                    density.density)
+                                var raw = start
+                                var resized = false
+                                var tapped = false
+                                fun step(dx: Float, dy: Float) {
+                                    val (next, shown) = floatingCornerResizeStep(start, raw, handle, dx, dy, limits,
+                                        currentAspect, currentHeightOnly, density.density)
+                                    raw = next
+                                    cornerRect = shown
+                                    resized = true
+                                }
+                                try {
+                                    val slop = awaitTouchSlopOrCancellation(down.id) { change, over ->
+                                        change.consume()
+                                        step(over.x, over.y)
+                                    }
+                                    if (slop != null) {
+                                        drag(slop.id) { change ->
+                                            step(change.positionChange().x, change.positionChange().y)
+                                            change.consume()
+                                        }
+                                    } else {
+                                        tapped = currentEvent.changes.firstOrNull { it.id == down.id }?.pressed == false
+                                    }
+                                } finally {
+                                    val result = cornerRect
+                                    if (resized && result != null) currentOnCornerResize?.invoke(
+                                        result.toGeometry(hostWidthPx, hostHeightPx, limits.dragBarPx, density.density))
+                                    cornerRect = null
+                                    highlight.held = false
+                                    if (tapped) currentOnCornerTap?.invoke() else highlight.trigger()
+                                }
+                            }
+                        },
+                )
+            }
         }
 
     }
@@ -482,8 +594,10 @@ private fun DragBar(
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
+    onTap: () -> Unit = {},
 ) {
     val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnTap by rememberUpdatedState(onTap)
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val currentOnDragCancel by rememberUpdatedState(onDragCancel)
@@ -491,6 +605,14 @@ private fun DragBar(
         modifier = modifier
             .fillMaxWidth()
             .testTag("floating-drag-bar")
+            // 点一下（没拖动）：自己等按下和抬起，不要求按下没被消费，拖动手势先吃掉按下时也认得出点击；
+            // 拖过了触摸阈值时拖动手势会消费移动，这里就不算点击。
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    if (waitForUpOrCancellation() != null) currentOnTap()
+                }
+            }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { currentOnDragStart() },

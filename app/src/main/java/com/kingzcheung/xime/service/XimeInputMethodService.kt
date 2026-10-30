@@ -393,7 +393,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /** 当前布局真正以分体显示（偏好开启且是 26 键字母布局）。 */
-    private fun splitKeyboardActive(state: InputUIState): Boolean =
+    internal fun splitKeyboardActive(state: InputUIState): Boolean =
         SettingsPreferences.isSplitKeyboardEnabled(this) &&
             com.kingzcheung.xime.ui.keyboard.supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode)
 
@@ -439,6 +439,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         set(value) { keyboardReportsChinese = value }
     internal var currentEffectiveKeyboardHeight: Int = 0
     private var floatingCardBounds: android.graphics.Rect? = null
+    /** 悬浮卡片外四角角标把手（亮着时）：露在卡片外的部分也要能按到。 */
+    private var floatingCornerHandleBounds: List<android.graphics.Rect> = emptyList()
     private var fixedCardBounds: android.graphics.Rect? = null
     private var keyboardGlassCard: android.graphics.Rect? = null
     /** 分体中缝（窗口坐标）：触摸区让给宿主，玻璃模糊也避开它。 */
@@ -2246,6 +2248,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         }
                                     }
                                 },
+                                onCornerHandlesPositioned = { rects ->
+                                    if (floatingCornerHandleBounds != rects) {
+                                        floatingCornerHandleBounds = rects
+                                        if (::keyboardContainer.isInitialized) keyboardContainer.requestLayout()
+                                    }
+                                },
                             )
                             }
                            }
@@ -3944,6 +3952,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     touchableRegion.op(it.left.roundToInt(), it.top.roundToInt(),
                         it.right.roundToInt(), it.bottom.roundToInt(), android.graphics.Region.Op.DIFFERENCE)
                 }
+                // 角标亮着时四角把手露在卡片外，那几小块也收触摸；角标淡出后报空表，触摸区回到卡片本身。
+                floatingCornerHandleBounds.forEach { touchableRegion.op(it, android.graphics.Region.Op.UNION) }
             }
         } else {
             // 非浮动模式：窗口全屏，容器物理高度 = Compose 内容总高（含底部留白），

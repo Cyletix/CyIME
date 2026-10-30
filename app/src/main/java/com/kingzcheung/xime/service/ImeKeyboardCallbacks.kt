@@ -8,6 +8,7 @@ import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.util.FileLogger
@@ -382,6 +383,28 @@ internal fun rememberImeKeyboardCallbacks(
                 SettingsPreferences.setFloatingRotation(service, angle, isLandscape)
                 // 卡片矩形可能没变，触摸区却要按新角度重算。
                 service.keyboardContainer.requestLayout()
+            },
+            onFloatingKeyboardResize = { widthDp, heightDp, offsetXDp, bottomOffsetDp ->
+                // 拖亮着的角标松手：和调节界面确认悬浮尺寸同样保存（高度按悬浮高度范围存，宽度和位置按横竖屏存）。
+                // 分体两半贴边占满宽度，不覆盖非分体时的宽度和水平位置。
+                val s = service.uiState.value
+                val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
+                val split = service.splitKeyboardActive(s)
+                val savedHeight = KeyboardHeightProfiles.save(service, true, isLandscape, heightDp, effectiveScreenH)
+                val width = if (split) s.floatingWidthDp else widthDp
+                val offsetX = if (split) s.floatingOffsetX else offsetXDp
+                if (!split) {
+                    SettingsPreferences.setFloatingWidthDp(service, width, isLandscape)
+                    SettingsPreferences.setFloatingOffsetX(service, offsetX, isLandscape)
+                }
+                SettingsPreferences.setFloatingOffsetY(service, bottomOffsetDp, isLandscape)
+                service.uiState.value = service.uiState.value.copy(
+                    keyboardHeightDp = savedHeight,
+                    floatingWidthDp = width,
+                    floatingOffsetX = offsetX,
+                    floatingOffsetY = bottomOffsetDp,
+                )
+                service.refreshKeyboardGeometry()
             },
             onFloatingKeyboardDragEnd = {
                 floatingDragX.reset()

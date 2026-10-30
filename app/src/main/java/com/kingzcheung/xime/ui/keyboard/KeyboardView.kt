@@ -123,6 +123,8 @@ fun KeyboardView(
     inlineSuggestions: List<*> = listOf<Any>(),
     resizeOverlay: (@Composable () -> Unit)? = null,
     onCardPositioned: (left: Int, top: Int, right: Int, bottom: Int) -> Unit = { _: Int, _: Int, _: Int, _: Int -> },
+    /** 悬浮卡片外四角角标把手的热区（窗口坐标），宿主并进触摸区；角标没亮时为空表。 */
+    onCornerHandlesPositioned: (List<android.graphics.Rect>) -> Unit = {},
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     voiceAmplitudeState: State<Float> = remember { mutableFloatStateOf(0f) },
     voiceSpectrumState: State<FloatArray> = remember { mutableStateOf(FloatArray(16)) },
@@ -426,6 +428,15 @@ fun KeyboardView(
         previewRotationState = if (resizeActive && state.isFloatingMode) resizeRotation else null,
         previewRectState = if (resizeActive) resizePreviewRect else null,
         onCardPositioned = onCardPositioned,
+        // 普通悬浮：亮着的四角角标拖动即调大小，点一下打开调节界面。剪贴板搜索临时撑高卡片时不调。
+        onCornerResize = callbacks.onFloatingKeyboardResize?.takeIf {
+            state.isFloatingMode && !resizeActive && !state.clipboardSearchVisible && !state.handwritingExpanded
+        }?.let { save -> { g: ResizeGeometry -> save(g.widthDp, g.heightDp, g.horizontalOffsetDp, g.bottomOffsetDp) } },
+        cornerResizeAspect = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind),
+        cornerResizeHeightOnly = inputPreferences.splitKeyboardEnabled &&
+            supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode),
+        onCornerTap = callbacks.onKeyboardResize,
+        onCornerHandlesPositioned = onCornerHandlesPositioned,
     ) {
         // 候选栏随键盘半速放大：按卡片实际尺寸算，调节尺寸时跟着预览走；剪贴板上拉和搜索时卡片临时变高，不跟。
         val barScaleFrozen = LocalClipboardPanelExpansion.current != null || state.clipboardSearchVisible

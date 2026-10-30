@@ -120,6 +120,8 @@ data class KeyboardCallbacks(
     val onFloatingKeyboardDragEnd: (() -> Unit)? = null,
     /** 调节界面确认：保存新的悬浮旋转角（度）。位置随调节结果一起保存。 */
     val onFloatingKeyboardRotate: ((degrees: Float) -> Unit)? = null,
+    /** 普通悬浮态拖四角角标松手：保存新的悬浮宽高与位置（不经过调节界面）。 */
+    val onFloatingKeyboardResize: ((widthDp: Int, heightDp: Int, offsetXDp: Int, bottomOffsetDp: Int) -> Unit)? = null,
     val onT9ReplaceFullPinyin: ((String) -> Unit)? = null,
     /**
      * 回退最近一次 T9 半提交：清除累积的半提交文本（及输入框中已上屏的文字）。
