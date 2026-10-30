@@ -7,15 +7,16 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * 用户自定义的双拼方案。键位表（custom-double-pinyin.json）是唯一来源，
+ * 首道双拼（内置键位表）和用户自定义的双拼方案（键位表 custom-double-pinyin.json 是唯一来源）。
  * Rime 方案和中英混输词表每次初始化时由已部署的小鹤双拼方案重新生成；不删除词库和学习记录。
  */
 object DoublePinyinSchemes {
     private const val TAG = "DoublePinyinSchemes"
     const val FILE = "custom-double-pinyin.json"
     private const val BASE = "double_pinyin_flypy"
+    private const val SHOUDAO_OFFERED = "double_pinyin_shoudao_offered_v1"
 
-    fun isGenerated(id: String) = isCustom(id)
+    fun isGenerated(id: String) = id == DoublePinyinScheme.SHOUDAO_ID || id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX)
     fun isCustom(id: String) = id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX)
 
     @Volatile private var cached: List<DoublePinyinScheme> = emptyList()
@@ -32,7 +33,7 @@ object DoublePinyinSchemes {
             .filter { it.valid() && isCustom(it.id) }.distinctBy { it.id }.also { cached = it }
     }
 
-    /** 小鹤双拼在前，可以复制成自己的方案。 */
+    /** 小鹤双拼和首道双拼在前，可以复制成自己的方案。 */
     fun all(context: Context): List<DoublePinyinScheme> = DoublePinyinScheme.BUILTINS + load(context)
 
     private fun decode(o: JSONObject): DoublePinyinScheme {
@@ -74,13 +75,28 @@ object DoublePinyinSchemes {
         }
     }
 
-    /** 初始化时调用：小鹤双拼方案随版本更新后，自定义方案跟着更新。 */
+    /** 初始化时调用：小鹤双拼方案随版本更新后，首道和自定义方案跟着更新。 */
     @Synchronized fun install(context: Context, rimeDir: File) {
         if (!File(rimeDir, "$BASE.schema.yaml").isFile) return
-        for (scheme in runCatching { load(context) }.getOrDefault(emptyList())) {
+        for (scheme in listOf(DoublePinyinScheme.SHOUDAO) + runCatching { load(context) }.getOrDefault(emptyList())) {
             try { writeSchema(rimeDir, scheme) }
             catch (e: Exception) { Log.w(TAG, "Cannot generate ${scheme.id}", e) }
         }
+    }
+
+    /** 首道双拼只在升级后加入方案列表一次，排在小鹤双拼后面；之后用户的启停选择不再改动。 */
+    fun offerShoudaoOnce(context: Context, enabled: List<String>): List<String> {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        if (prefs.getBoolean(SHOUDAO_OFFERED, false)) return enabled
+        if (!File(SchemaManager.getRimeDir(context), "${DoublePinyinScheme.SHOUDAO_ID}.schema.yaml").isFile) return enabled
+        val updated = if (DoublePinyinScheme.SHOUDAO_ID in enabled) enabled else {
+            val after = enabled.indexOf(BASE)
+            if (after < 0) enabled + DoublePinyinScheme.SHOUDAO_ID
+            else enabled.take(after + 1) + DoublePinyinScheme.SHOUDAO_ID + enabled.drop(after + 1)
+        }
+        if (updated != enabled) SchemaManager.setEnabledSchemas(context, updated)
+        prefs.edit().putBoolean(SHOUDAO_OFFERED, true).apply()
+        return updated
     }
 
     fun save(context: Context, scheme: DoublePinyinScheme) {

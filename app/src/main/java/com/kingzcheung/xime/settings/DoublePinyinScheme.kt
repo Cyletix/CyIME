@@ -21,7 +21,7 @@ data class DoublePinyinScheme(
         return "$first$key"
     }
 
-    /** 同一编码对应多个音节（如小鹤双拼 lo = lo/luo）；音节按常用程度排列，词库负责区分。 */
+    /** 同一编码对应多个音节（如首道双拼 dk = den/dia）；音节按常用程度排列，词库负责区分。 */
     fun collisions(): Map<String, List<String>> = SYLLABLES.groupBy { code(it) }
         .filterKeys { it != null }.filterValues { it.size > 1 }.mapKeys { it.key!! }
 
@@ -150,8 +150,9 @@ data class DoublePinyinScheme(
 
     companion object {
         const val GENERATED_MARK = "# CyIME 双拼方案生成："
+        const val SHOUDAO_ID = "double_pinyin_shoudao"
         const val CUSTOM_PREFIX = "custom_shuangpin_"
-        private val ID_PATTERN = Regex("${CUSTOM_PREFIX}[a-f0-9]{32}")
+        private val ID_PATTERN = Regex("$SHOUDAO_ID|${CUSTOM_PREFIX}[a-f0-9]{32}")
         val SPECIAL_INITIALS = listOf("zh", "ch", "sh")
         const val PLAIN_INITIALS = "bpmfdtnlgkhjqxrzcsyw"
         /** 按词库拼写列出的韵母；jue 的 ue 与 lüe 的 ve、ju 的 u 与 lü 的 v 分开设置。 */
@@ -198,7 +199,17 @@ data class DoublePinyinScheme(
             mapOf("a" to "aa", "o" to "oo", "e" to "ee", "ai" to "ai", "ei" to "ei", "ao" to "ao", "ou" to "ou",
                 "an" to "an", "en" to "en", "ang" to "ah", "eng" to "eg", "er" to "er"))
 
-        val BUILTINS = listOf(FLYPY)
+        /** 首道双拼：zh→V、ch→I、sh→E，零声母 12 组独立双键（口诀：美尊红票样，娃向团；恳求来年，搜到风怪）。 */
+        val SHOUDAO = DoublePinyinScheme(SHOUDAO_ID, "首道双拼", mapOf("zh" to 'v', "ch" to 'i', "sh" to 'e'),
+            mapOf("a" to 'a', "o" to 'o', "e" to 'e', "i" to 'i', "u" to 'u', "v" to 'v', "ai" to 'l', "ei" to 'm',
+                "ui" to 'v', "ao" to 'd', "ou" to 's', "iu" to 'q', "ie" to 'r', "ue" to 'l', "ve" to 'b', "an" to 'j',
+                "en" to 'k', "in" to 'c', "un" to 'z', "ang" to 'y', "eng" to 'f', "ing" to 'g', "ong" to 'h', "ia" to 'k',
+                "ua" to 'w', "uo" to 'o', "iao" to 'p', "ian" to 'n', "uan" to 't', "iang" to 'x', "uang" to 'x',
+                "iong" to 'h', "uai" to 'g'),
+            mapOf("a" to "aa", "o" to "oo", "e" to "ue", "ai" to "ai", "ei" to "ui", "ao" to "ao", "ou" to "ou",
+                "an" to "an", "en" to "en", "ang" to "ay", "eng" to "uf", "er" to "er"))
+
+        val BUILTINS = listOf(FLYPY, SHOUDAO)
 
         /** 小鹤双拼编码 → 音节；lo 与 luo 同码时取 luo。 */
         private val FLYPY_DECODE: Map<String, String> = HashMap<String, String>().apply {

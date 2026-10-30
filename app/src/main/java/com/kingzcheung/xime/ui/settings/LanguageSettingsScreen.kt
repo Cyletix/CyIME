@@ -130,7 +130,7 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                     SettingsItem(Icons.TwoTone.KeyboardAlt, "已安装的方案",
                         "启停和排序语言、方案与布局的组合，导入方案文件", onClick = onOpenSchemaResources, showArrow = true)
                     SettingsItem(Icons.TwoTone.KeyboardAlt, "双拼方案",
-                        "小鹤双拼的键位，新建和修改自己的双拼方案", onClick = onOpenDoublePinyin, showArrow = true)
+                        "小鹤、首道双拼的键位，新建和修改自己的双拼方案", onClick = onOpenDoublePinyin, showArrow = true)
                 }
             }
             item { if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }
