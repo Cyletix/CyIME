@@ -20,7 +20,7 @@ enum class InputScheme(val id: String, val displayName: String) {
     PINYIN("pinyin", "拼音"), DOUBLE_PINYIN("double_pinyin", "双拼"),
     WUBI("wubi", "五笔"), WUBI_PINYIN("wubi_pinyin", "五笔拼音混输"), STROKE("stroke", "笔画"),
     ROMAJI("romaji", "罗马字"), KANA("kana", "假名"), DIRECT("direct", "直接输入"),
-    EXTERNAL("external", "自定义编码"), ZHUYIN("zhuyin", "注音");
+    EXTERNAL("external", "自定义编码"), ZHUYIN("zhuyin", "注音"), CANGJIE("cangjie", "仓颉");
 
     companion object { fun fromId(id: String): InputScheme? = entries.firstOrNull { it.id == id } }
 }
@@ -89,6 +89,7 @@ object InputProfiles {
         InputScheme.WUBI, InputScheme.WUBI_PINYIN -> "字根编码"
         InputScheme.EXTERNAL -> "自定义编码"
         InputScheme.ZHUYIN -> "ㄓㄨˋㄧㄣ"
+        InputScheme.CANGJIE -> "人戈日口"
     }
     private val descriptions = java.util.concurrent.ConcurrentHashMap<String, InputProfile>()
     @Volatile private var installed: Map<String, InputProfile> = emptyMap()
@@ -138,13 +139,14 @@ object InputProfiles {
             id == "japanese" || id == "jaroomaji" -> InputScheme.ROMAJI
             id == "japanese_kana" -> InputScheme.KANA
             id == "cyime_zhuyin" -> InputScheme.ZHUYIN
+            id == "cyime_cangjie" -> InputScheme.CANGJIE
             else -> InputScheme.EXTERNAL
         }
         val inputLanguage = when {
             id == InputModes.ENGLISH -> InputLanguage.ENGLISH
             inputScheme in setOf(InputScheme.ROMAJI, InputScheme.KANA) -> InputLanguage.JAPANESE
             inputScheme in setOf(InputScheme.PINYIN, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI,
-                InputScheme.WUBI_PINYIN, InputScheme.STROKE, InputScheme.ZHUYIN) || id == "handwriting" -> InputLanguage.CHINESE
+                InputScheme.WUBI_PINYIN, InputScheme.STROKE, InputScheme.ZHUYIN, InputScheme.CANGJIE) || id == "handwriting" -> InputLanguage.CHINESE
             else -> InputLanguage.UNSPECIFIED
         }
         val layout = when {
@@ -175,7 +177,7 @@ object InputProfiles {
 
     /** Actual layout bindings win over built-in defaults, including an explicitly unbound schema. */
     fun resolveLayout(section: String?, custom: CustomKeyboardLayout? = null): InputLayout = when (section) {
-        "qwerty", "qwerty_en", "qwerty_japanese" -> InputLayout(section, "26键", LayoutKind.ALPHABETIC)
+        "qwerty", "qwerty_en", "qwerty_japanese", "qwerty_cangjie" -> InputLayout(section, "26键", LayoutKind.ALPHABETIC)
         "t9" -> InputLayout.T9
         "stroke" -> InputLayout.STROKE
         "handwriting" -> InputLayout.HANDWRITING

@@ -15,3 +15,9 @@ CyIME 构建适配在 `app/build-logic/tasks-chinese.gradle.kts`：接入候选�
 ## 注音（cyime_zhuyin）
 
 `cyime_zhuyin.schema.yaml` 的拼写运算（拼音音节改写成注音、再落到大千键位）照 rime/rime-bopomofo（LGPL-3.0）`zhuyin.yaml` 与 `bopomofo.schema.yaml` 的写法，按雾凇词库的 ü 写法和 CyIME 的键码改写。`cyime_tw.dict.yaml`（台湾词与台湾读音）和 `lua/cyime_zhuyin_tones.lua`（每个字可读的声调）由 `tools/zhuyin/build_cyime_tw.py` 从小麦注音 McBopomofo（MIT）`Source/Data` 的 `BPMFMappings.txt`、`phrase.occ`、`BPMFBase.txt` 生成，提交 `18e2060dd5d0b511753ad79a8fe0d112e944f1af`。
+
+`cyime_t2s.json`（仓颉的繁转简）是同一 OpenCC 提交的 `t2s.json` 去掉 `TSCharactersExt.ocd2` 那一步（标了 may_output_tofu，转出的扩展区简化字手机字体多半显示成方框），并像 `cyime_s2tw.json` 一样写上 segmentation，旧版 OpenCC 也能读；`TSPhrases.ocd2`、`TSCharacters.ocd2` 由同一份源码编出，未修改。
+
+## 仓颉五代（cyime_cangjie）
+
+码表来自 Jackchows/Cangjie5（MIT），构建时下载；方案参照 rime/rime-cangjie 的写法。见 `CANGJIE-NOTICE.md`。

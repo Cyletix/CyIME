@@ -5,13 +5,14 @@ val roots = listOf(
     "rime_ice" to layout.buildDirectory.dir("generated/chinese-assets/rime_ice").get().asFile,
     "rime_chinese" to file("src/main/assets/rime_chinese"),
     "rime_chinese" to layout.buildDirectory.dir("generated/stroke-assets/rime_chinese").get().asFile,
+    "rime_chinese" to layout.buildDirectory.dir("generated/cangjie-assets/rime_chinese").get().asFile,
     "rime_japanese" to layout.buildDirectory.dir("generated/japanese-assets/rime_japanese").get().asFile,
     "rime_japanese" to file("src/main/assets/rime_japanese"),
 )
 // The elder package leaves the Japanese assets out of the APK, so out of the manifest too.
 val elder = providers.gradleProperty("elderEdition").orNull == "true"
 val prepareRimeManifest by tasks.registering {
-    dependsOn("prepareChineseDictionaries", "prepareStrokeDictionary", "prepareJapaneseDictionaries")
+    dependsOn("prepareChineseDictionaries", "prepareStrokeDictionary", "prepareCangjieDictionary", "prepareJapaneseDictionaries")
     inputs.property("elder", elder)
     inputs.files(roots.map { it.second })
     outputs.dir(manifestOutput)
