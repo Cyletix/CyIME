@@ -8,16 +8,31 @@ import kotlin.math.abs
 
 /** 编辑器光标操作不经过 Rime，所有键盘布局使用相同的选择区语义。 */
 internal class EditorCursor {
+    private companion object { const val PENDING_TIMEOUT_MS = 1_000L }
     private var connection: InputConnection? = null
     private var anchor: Int? = null
     private var active: Int? = null
     private var reportedStart: Int? = null
     private var reportedEnd: Int? = null
+    // 活动端在锚点左边时交给宿主的行首/行尾/上下：宿主多半不收反向选区，Shift 会动错一端。
+    // 改为先折叠到活动端、发不带 Shift 的键，等宿主报来新光标位置后再接回锚点。
+    private var pendingAnchor: Int? = null
+    private var pendingFrom: Int = 0
+    private var pendingAt: Long = 0
 
     fun observeSelection(ic: InputConnection, start: Int, end: Int) {
         bind(ic)
         reportedStart = start.takeIf { it >= 0 }
         reportedEnd = end.takeIf { it >= 0 }
+        val anchorBack = pendingAnchor ?: return
+        if (System.currentTimeMillis() - pendingAt > PENDING_TIMEOUT_MS) { pendingAnchor = null; return }
+        // 折叠本身的回报（还在原处）不算；宿主移动后的折叠光标才是新的活动端。
+        if (start != end || start < 0 || start == pendingFrom) return
+        pendingAnchor = null
+        if (runCatching { ic.setSelection(minOf(start, anchorBack), maxOf(start, anchorBack)) }.getOrDefault(false)) {
+            anchor = anchorBack; active = start
+            reportedStart = minOf(start, anchorBack); reportedEnd = maxOf(start, anchorBack)
+        }
     }
 
     fun beginSelection(ic: InputConnection) {
@@ -26,7 +41,7 @@ internal class EditorCursor {
         snapshot(ic)?.let { syncSelection(it) }
     }
 
-    fun resetSelection() { anchor = null; active = null }
+    fun resetSelection() { anchor = null; active = null; pendingAnchor = null }
 
     /** 取消选择保留活动端的位置，反向选择不能误折叠到较大的端点。 */
     fun endSelection(ic: InputConnection) {
@@ -289,8 +304,7 @@ internal class EditorCursor {
             if (selecting) syncSelection(extracted)
             val position = if (selecting) active!! else if (backwards) start else end
             if (guardEdge && atDocumentEdge(ic, position, start, end, backwards)) return false
-            // 宿主从它记录的活动端扩选；先恢复方向，规范化宿主会忽略，不影响结果。
-            if (selecting && active!! < anchor!!) runCatching { ic.setSelection(anchor!!, active!!) }
+            if (selecting && active!! < anchor!!) return moveLeftActiveEnd(ic, key, extracted)
         } else if (guardEdge) {
             val adjacent = runCatching {
                 if (backwards) ic.getTextBeforeCursor(1, 0) else ic.getTextAfterCursor(1, 0)
@@ -298,6 +312,21 @@ internal class EditorCursor {
             if (adjacent.isNullOrEmpty()) return false
         }
         return sendKeyPair(ic, key, selecting)
+    }
+
+    /** 活动端在锚点左边：折叠到活动端，发不带 Shift 的键，宿主报来新位置时由 [observeSelection] 接回锚点。 */
+    private fun moveLeftActiveEnd(ic: InputConnection, key: Int, extracted: ExtractedText): Boolean {
+        val from = active!!
+        val local = from - extracted.startOffset
+        val text = extracted.text
+        // 已在本行（按文本换行）的首/尾时宿主不会动，也就等不到新位置；直接不动，保留选区。
+        if (key == KeyEvent.KEYCODE_MOVE_HOME && (local <= 0 || isParagraphSeparator(text[local - 1]))) return false
+        if (key == KeyEvent.KEYCODE_MOVE_END && local < text.length && isParagraphSeparator(text[local])) return false
+        val anchorBack = anchor!!
+        if (!runCatching { ic.setSelection(from, from) }.getOrDefault(false)) return false
+        pendingAnchor = anchorBack; pendingFrom = from; pendingAt = System.currentTimeMillis()
+        anchor = anchorBack; active = from
+        return sendKeyPair(ic, key, false)
     }
 
     private fun atDocumentEdge(ic: InputConnection, position: Int, start: Int, end: Int, backwards: Boolean): Boolean {
