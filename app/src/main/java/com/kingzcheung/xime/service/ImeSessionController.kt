@@ -5,6 +5,7 @@ import com.kingzcheung.xime.keyboard.underlyingPage
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.rime.buildT9DisplayState
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.isPunctuationWidthSwitch
@@ -14,6 +15,9 @@ import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** CyIME 引擎补丁里的选项：全角默认只换全角标点表；开着时上屏的字母、数字、空格也改成全角（日文全角英数）。 */
+internal const val FULL_SHAPE_ASCII_OPTION = "cyime_full_shape_ascii"
 
 /**
  * 输入会话组合/UI 更新与方案开关。
@@ -467,6 +471,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
      *   uiState 尚未同步，会误判成英文而把中文键盘按半角处理。
      */
     internal fun applyPunctuationWidth(asciiMode: Boolean) {
+        // 中文的全角只管标点：候选里的英文、数字和空格照候选栏显示的半角上屏（GitHub 不会变成 ＧｉｔＨｕｂ）。
+        // 日文的全角英数是常用写法，仍由引擎整段转成全角。
+        val japanese = InputLanguage.forSchema(service.rimeEngine.getCurrentSchema()) == InputLanguage.JAPANESE
+        service.rimeEngine.setOption(FULL_SHAPE_ASCII_OPTION, japanese)
         if (asciiMode) {
             service.rimeEngine.setOption("full_shape", false)
             return
