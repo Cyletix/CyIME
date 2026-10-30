@@ -46,6 +46,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(domainTerms)
     val userFixes = file("data/cyime_user_fixes.tsv")
     inputs.file(userFixes)
+    val removedWords = file("data/cyime_removed_words.txt.gz")
+    inputs.file(removedWords)
     val acronymFilter = file("data/cyime_acronym_filter.lua")
     inputs.file(acronymFilter)
     val englishMemory = file("data/cyime_en_memory.lua")
@@ -141,10 +143,21 @@ val prepareChineseDictionaries by tasks.registering {
         }
         val domainTexts = domainFloors.keys.associateBy { it.substringBefore('\t') }
         val domainPresent = mutableSetOf<String>()
+        // Web phrases that never occur in the subtitle, chat or wiki corpora (2026-10-30: 173,590, mostly from
+        // tencent.dict: 玻璃打砂机, 未满十八岁勿进, 训练家) are dropped: nine-key 600 fresh SMS clauses 397 → 399 right,
+        // 26-key unchanged. List built by D:/CyIME-Data/eval/junk-sweep-20261030 (count_all.py, remove-A.txt).
+        val removed = java.util.zip.GZIPInputStream(removedWords.inputStream()).bufferedReader().useLines { lines ->
+            lines.filter { it.isNotBlank() }.toHashSet()
+        }
         for (name in listOf("base", "ext", "tencent")) {
             val dict = File(root, "cn_dicts/$name.dict.yaml")
+            var header = true
+            val kept = dict.readLines().filter { line ->
+                if (line.trim() == "...") header = false
+                header || line.substringBefore('\t') !in removed
+            }
             var body = false
-            dict.writeText(dict.readLines().joinToString("\n", postfix = "\n") { line ->
+            dict.writeText(kept.joinToString("\n", postfix = "\n") { line ->
                 if (line.trim() == "...") body = true
                 val fields = line.split('\t')
                 // tencent has no code column (text, weight).
