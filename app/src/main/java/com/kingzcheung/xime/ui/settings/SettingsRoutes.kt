@@ -30,4 +30,6 @@ object SettingsRoutes {
     const val ClipboardSync = "clipboard_sync"
     const val Backup = "backup"
     const val RimeFileBrowser = "rime_file_browser"
+    const val KeyboardResize = "keyboard_resize"
+    const val ToolbarArrange = "toolbar_arrange"
 }

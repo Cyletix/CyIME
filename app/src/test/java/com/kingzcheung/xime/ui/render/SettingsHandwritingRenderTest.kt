@@ -63,6 +63,10 @@ class SettingsHandwritingRenderTest {
         "plugins" -> com.kingzcheung.xime.ui.settings.PluginsSettingsContent(onBack = {})
         "extension-plugins" -> com.kingzcheung.xime.ui.settings.MarketHubContent(onBack = {}, initialTab = 2)
         "speech" -> com.kingzcheung.xime.ui.settings.SpeechToTextSettingsContent(onBack = {})
+        "layout" -> com.kingzcheung.xime.ui.settings.LayoutDisplaySettingsContent(onBack = {})
+        "resize" -> com.kingzcheung.xime.ui.settings.KeyboardPanelSettingsContent(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE) {}
+        "arrange" -> com.kingzcheung.xime.ui.settings.KeyboardPanelSettingsContent(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.ARRANGE) {}
+        "smart" -> com.kingzcheung.xime.ui.settings.SmartPredictionSettingsContent(onBack = {})
         else -> KeyEffectSettingsContent(onBack = {})
     }
 

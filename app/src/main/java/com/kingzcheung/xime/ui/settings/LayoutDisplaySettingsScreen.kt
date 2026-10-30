@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Straighten
+import androidx.compose.material.icons.twotone.Padding
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -133,6 +135,14 @@ private fun LayoutDisplayPage(
                     SettingsToggleItem(Icons.TwoTone.Keyboard, "分体键盘",
                         "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
                         checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingsItem(Icons.TwoTone.Tune, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
+                        "高度、宽度、悬浮与分体、透明度，打开键盘菜单里同一个调节面板",
+                        onClick = { onOpenLayout(SettingsRoutes.KeyboardResize) }, showArrow = true)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingsItem(Icons.TwoTone.Padding, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.ARRANGE),
+                        "哪些入口放工具栏、哪些放菜单，以及先后顺序",
+                        onClick = { onOpenLayout(SettingsRoutes.ToolbarArrange) }, showArrow = true)
                 })
             }
             if (page == null) item {

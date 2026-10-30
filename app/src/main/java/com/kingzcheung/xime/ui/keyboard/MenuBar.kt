@@ -4,7 +4,7 @@ import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
@@ -77,6 +77,8 @@ data class MenuItem(
     /** 非空即开关项：开启时反色填充。 */
     val selected: Boolean? = null,
     val toolbarItem: ToolbarButtonItem? = null,
+    /** 长按打开设置里的对应项；没有对应设置时为 null，长按不响应。 */
+    val onLongClick: (() -> Unit)? = null,
 )
 
 data class MenuBarState(
@@ -107,7 +109,7 @@ fun MenuBar(
         val toggle = (action.item as? ToolbarButtonItem.Builtin)?.button in ToolbarButton.TOGGLES
         MenuItem(label = action.item.stateLabel(action.active), action = action.onClick, id = action.item.id,
             currentState = if (toggle) (if (action.active) "已开启" else "已关闭") else null,
-            selected = if (toggle) action.active else null, toolbarItem = action.item)
+            selected = if (toggle) action.active else null, toolbarItem = action.item, onLongClick = action.onLongClick)
     }
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
         modifier.fillMaxWidth().keyboardPanelBackground(state.backgroundColor), preferSinglePage = true) { item, cellModifier ->
@@ -116,6 +118,7 @@ fun MenuBar(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MenuItemButton(
     item: MenuItem,
@@ -133,7 +136,7 @@ fun MenuItemButton(
             .clip(RoundedCornerShape(12.dp))
             .background(fill)
             .visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED)
-            .clickable { item.action() }
+            .combinedClickable(onLongClick = item.onLongClick) { item.action() }
             .semantics {
                 item.currentState?.let { stateDescription = it }
                 item.selected?.let { selected = it }

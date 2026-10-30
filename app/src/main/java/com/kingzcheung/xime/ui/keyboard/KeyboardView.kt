@@ -618,7 +618,14 @@ fun KeyboardView(
                     }
                 })
             }
-            return ToolbarAction(item, active = item is ToolbarButtonItem.Builtin && when (item.button) {
+            val settingsEntry = com.kingzcheung.xime.ui.settings.menuSettingsEntry(item)
+            val openSettings: (() -> Unit)? = settingsEntry?.let { entry -> {
+                toolbarFeedback()
+                com.kingzcheung.xime.ui.settings.SettingsSearchFocus.open(entry)
+                callbacks.onSettingsPage?.invoke(entry.target)
+                viewModel.closeOverlay()
+            } }
+            return ToolbarAction(item, onLongClick = openSettings, active = item is ToolbarButtonItem.Builtin && when (item.button) {
                 ToolbarButton.EDIT -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Edit
                 ToolbarButton.EMOJI -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Emoji
                 ToolbarButton.CLIPBOARD -> (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Clipboard

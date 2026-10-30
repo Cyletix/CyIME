@@ -98,5 +98,7 @@ enum class ToolbarButton(
 data class ToolbarAction(
     val item: ToolbarButtonItem,
     val active: Boolean = false,
+    /** 菜单里长按：打开这一项在设置里的对应页；没有对应设置时为 null。 */
+    val onLongClick: (() -> Unit)? = null,
     val onClick: () -> Unit
 )
