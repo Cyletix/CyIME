@@ -48,6 +48,8 @@ internal fun OfflineModelCard() {
         xasrReady = withContext(Dispatchers.IO) {
             runCatching { manager.wholeSentenceFinalizer(manager.selection(SpeechModelCatalog.TWO_PASS)).finalizerDir != null }.getOrDefault(false)
         }
+        // An unchosen SenseVoice default becomes Paraformer + SenseVoice once Paraformer is downloaded.
+        InputLanguage.supported.forEach { selected[it] = withContext(Dispatchers.IO) { manager.getSelectedModelId(it) } }
     }
     fun refresh(language: InputLanguage) { selected[language] = manager.getSelectedModelId(language) }
     fun download(id: String) { ModelManager.getModel(id)?.let { ModelManager.downloadModelInBackground(context, it) } }
