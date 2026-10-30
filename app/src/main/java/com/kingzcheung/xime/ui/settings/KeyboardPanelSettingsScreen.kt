@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.twotone.AspectRatio
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Padding
-import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -98,7 +98,7 @@ internal fun KeyboardPanelSettingsContent(panel: KeyboardPanelLaunch.Panel, onBa
                 Text(description, style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
                 SettingsItem(
-                    icon = if (panel == KeyboardPanelLaunch.Panel.RESIZE) Icons.TwoTone.Tune else Icons.TwoTone.Padding,
+                    icon = if (panel == KeyboardPanelLaunch.Panel.RESIZE) Icons.TwoTone.AspectRatio else Icons.TwoTone.Padding,
                     title = if (panel == KeyboardPanelLaunch.Panel.RESIZE) "打开键盘调节" else "打开排列面板",
                     subtitle = "需要 CyIME 是当前输入法；面板关掉后可再点这里",
                     onClick = { openCount++ },

@@ -1,9 +1,14 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.twotone.SwapHoriz
+import androidx.compose.material.icons.twotone.OpenWith
+import androidx.compose.material.icons.twotone.SpaceBar
+import androidx.compose.material.icons.twotone.Gesture
+import androidx.compose.material.icons.twotone.Abc
+import androidx.compose.material.icons.twotone.Spellcheck
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,20 +40,20 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             when (category) {
                 LayoutInputCategory.Qwerty -> SettingsSection(title = "26 键输入", content = {
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "邻键纠错",
+                    SettingsToggleItem(Icons.TwoTone.Spellcheck, "邻键纠错",
                         "仅用于中文全拼 26 键；按实际键位补充候选，保留原输入，不用于双拼。",
                         checked = settings.neighborCorrection, onCheckedChange = {
                             settings = settings.copy(neighborCorrection = it); settings.save(context)
                         })
                     HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "中英混输",
+                    SettingsToggleItem(Icons.TwoTone.Abc, "中英混输",
                         "仅用于中文全拼 26 键；拼音里夹着英文词（nihaohello）时首选“你好hello”。本身像拼音的英文词（game、nice）认不出。",
                         checked = settings.mixedInput, onCheckedChange = {
                             settings = settings.copy(mixedInput = it); settings.save(context)
                         })
                     HorizontalDivider()
                     // 「键盘滑动」移光标和滑行冲突：照常显示，被锁时置灰并写明被谁锁（见 InputGestureLocks）。
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "滑行输入",
+                    SettingsToggleItem(Icons.TwoTone.Gesture, "滑行输入",
                         "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
                         checked = settings.glideTyping, onCheckedChange = {
                             settings = settings.copy(glideTyping = it); settings.save(context)
@@ -67,18 +72,18 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         Spacer(Modifier.height(8.dp))
                         SpacePunctuationIllustration(settings.qwertyCommaKey, settings.qwertyPeriodKey)
                     }
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "空格左侧逗号键", "关闭后空格向左加宽。",
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "空格左侧逗号键", "关闭后空格向左加宽。",
                         checked = settings.qwertyCommaKey, onCheckedChange = {
                             settings = settings.copy(qwertyCommaKey = it); settings.save(context)
                         })
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "空格右侧句号键", "开启后空格让出一个键宽。",
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "空格右侧句号键", "开启后空格让出一个键宽。",
                         checked = settings.qwertyPeriodKey, onCheckedChange = {
                             settings = settings.copy(qwertyPeriodKey = it); settings.save(context)
                         })
                 })
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsSection(title = "九键与笔画", content = {
-                        SettingsToggleItem(Icons.TwoTone.Keyboard, "拂动选字母",
+                        SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
                             "左、上、右、下依次输入键上的第 1～4 个字母（7、9 用到下），点按仍是九键输入；" +
                                 "开启后长按输入数字、不再弹出字母菜单，与「长按输入」角标的方式一致。触发距离在下方「滑动触发距离」设置。",
                             checked = settings.t9FlickLetters, onCheckedChange = {
@@ -90,7 +95,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 ?.takeIf { settings.t9FlickLetters }?.message)
                     })
                     SettingsSection(title = "14 键双字母键", content = {
-                        SettingsToggleItem(Icons.TwoTone.Keyboard, "左右滑动选字母",
+                        SettingsToggleItem(Icons.TwoTone.SwapHoriz, "左右滑动选字母",
                             "例如 qw：左滑输入 q，右滑输入 w，松手确认；点按仍使用合并键。适用于拼音和小鹤双拼 14 键。",
                             checked = settings.fourteenLetterSwipe, onCheckedChange = {
                                 settings = settings.copy(fourteenLetterSwipe = it); settings.save(context)
