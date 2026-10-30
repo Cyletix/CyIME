@@ -83,6 +83,12 @@ internal fun offsetAfterCodeKeys(text: String, keys: Int): Int {
     return text.length
 }
 
+/** The reading after its first [keys] keys, keeping its own syllable boundaries. */
+internal fun dropReadingKeys(reading: String, keys: Int): String {
+    val start = offsetAfterCodeKeys(reading.replace(' ', '\''), keys)
+    return reading.drop(start).trimStart(' ', '\'')
+}
+
 /** Preserve confirmed Chinese text and real codes; make Latin syllable spaces visible. */
 internal fun pinyinPreviewText(preedit: String): String = preedit.trim()
     .replace(Regex("(?<=[a-zA-ZüÜ'])\\s+(?=[a-zA-ZüÜ'])"), "'")
