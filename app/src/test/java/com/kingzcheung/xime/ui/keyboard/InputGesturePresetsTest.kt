@@ -17,9 +17,34 @@ class InputGesturePresetsTest {
     @Test fun `changing one governed option turns the preset into custom`() {
         val swipe = InputGesturePreset.SWIPE.applyTo(base)
         assertEquals(InputGesturePreset.CUSTOM, InputGesturePreset.of(swipe.copy(letterLongPressMenu = true)))
-        assertEquals(InputGesturePreset.CUSTOM, InputGesturePreset.of(swipe.copy(reverseSymbolSwipe = true)))
-        // 预设不管的设置（如按键字号）改了不影响。
+        // 预设不管的设置（如按键字号、上下滑反转）改了不影响。
         assertEquals(InputGesturePreset.SWIPE, InputGesturePreset.of(swipe.copy(keyTextScale = 1.3f)))
+        for (preset in InputGesturePreset.presets) {
+            val reversed = preset.applyTo(base.copy(reverseSymbolSwipe = true))
+            assertTrue("${preset.name} keeps reverse", reversed.reverseSymbolSwipe)
+            assertEquals(preset, InputGesturePreset.of(reversed))
+        }
+    }
+
+    /** 实际手势：上角标（九键数字）在 upText 槽位，经方向设置后落到哪个物理方向。 */
+    private fun topSlotDirection(reverse: Boolean): String {
+        val actions = KeyGestureActions("a", {}, {}, {}, {}, upText = "@", downText = "1")
+            .withSymbolSwipeDirection(reverse)
+        return if (actions.upText == "@") "上滑" else { assertEquals("@", actions.downText); "下滑" }
+    }
+
+    @Test fun `preset summaries name the direction the keys actually use`() {
+        for (reverse in listOf(false, true)) {
+            val top = topSlotDirection(reverse)
+            val bottom = if (top == "上滑") "下滑" else "上滑"
+            assertEquals("${top}上角标、${bottom}下角标；九键${top}数字、长按选字母",
+                InputGesturePreset.SWIPE.summary(reverse))
+            assertEquals("长按出上角标、${bottom}下角标；九键长按数字、拂动选字母",
+                InputGesturePreset.LONG_PRESS.summary(reverse))
+        }
+        // 默认不反转：下滑出上角标和九键数字（B 站用户的情况）。
+        assertEquals("下滑上角标、上滑下角标；九键下滑数字、长按选字母", InputGesturePreset.SWIPE.summary(false))
+        assertEquals("上滑上角标、下滑下角标；九键上滑数字、长按选字母", InputGesturePreset.SWIPE.summary(true))
     }
 
     @Test fun `no preset contains a locked combination`() {
