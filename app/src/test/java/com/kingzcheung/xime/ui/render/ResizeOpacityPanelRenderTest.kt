@@ -56,7 +56,8 @@ import java.io.File
  * 在电脑上渲染成一张图（真实 KeyboardView 要加载 rime 原生库，电脑上跑不了）。
  * 只在设置了环境变量 CYIME_RENDER_OUT=<目录> 时出图。可选变量：CYIME_RENDER_TAG（文件名里的标记，默认 after）、
  * CYIME_RENDER_THEMES（默认 soft_blue/light,soft_blue/dark）、CYIME_RENDER_AFTER_DRAG=1 时先把每个滑条拖到 40% 再截，
- * 看调完透明度后外框和四个按钮是否还在。手机宽 411dp 四个变体排一行，平板宽 1200dp 每行一个。
+ * 看调完透明度后外框和四个按钮是否还在。手机宽 411dp 四个变体排一行，再一行小键盘 300dp 和横屏矮键盘 600×250dp
+ * （看控件跟着键盘大小缩放），平板宽 1200dp 每行一个。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "w1700dp-h3000dp-mdpi")
@@ -79,6 +80,8 @@ class ResizeOpacityPanelRenderTest {
         rule.setContent {
             Column(Modifier.background(Color(0xFF808080))) {
                 Row { for ((id, dark, glass) in variants) Variant(411, 300, id, dark, glass) }
+                // 控件跟着键盘大小缩放：小键盘一起缩小，横屏矮键盘不撑出框。
+                Row { for ((id, dark, glass) in variants.take(2)) { Variant(300, 230, id, dark, glass); Variant(600, 250, id, dark, glass) } }
                 for ((id, dark, glass) in variants) Variant(1200, 420, id, dark, glass)
             }
         }
