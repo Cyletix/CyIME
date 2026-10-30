@@ -34,6 +34,12 @@ internal object KeyLatencyProbe {
         var phase = FIRED
         var length = 0
         var engineNanos = 0L
+        // 后台阶段在输入线程上的 CPU 时间和缺页：墙钟远大于 CPU、且有主缺页，说明在等内存换页而不是在算。
+        var cpuStart = 0L
+        var faultStart = LongArray(2)
+        var cpuNanos = -1L
+        var minorFaults = -1L
+        var majorFaults = -1L
         // fired, started, posted, handed, applied, composed, drawn, frame vsync
         val t = LongArray(8)
     }
@@ -123,19 +129,37 @@ internal object KeyLatencyProbe {
     }
 
     /** 队列开始执行这次按键。 */
-    fun started() = advanceFirst(FIRED, STARTED, 1)
+    fun started() = advanceFirst(FIRED, STARTED, 1) {
+        it.cpuStart = android.os.Debug.threadCpuTimeNanos()
+        it.faultStart = threadFaults() ?: LongArray(2) { -1L }
+    }
+
+    /** 本线程的 [次缺页, 主缺页]（/proc/thread-self/stat 第 10、12 项）；读不到为 null。 */
+    private fun threadFaults(): LongArray? = runCatching {
+        val stat = java.io.File("/proc/thread-self/stat").readText()
+        val fields = stat.substring(stat.lastIndexOf(')') + 2).split(' ')
+        longArrayOf(fields[7].toLong(), fields[9].toLong())
+    }.getOrNull()
 
     /** 后台把结果投给主线程；同一按键多次投递取最后一次。 */
     fun posted(compositionLength: Int) {
         if (!enabled) return
         val engine = com.kingzcheung.xime.rime.EngineTimeMeter.current.get()?.get(0) ?: 0L
         val now = System.nanoTime()
+        val cpu = android.os.Debug.threadCpuTimeNanos()
+        val faults = threadFaults()
         synchronized(lock) {
             val probe = probes.lastOrNull { it.phase == STARTED || it.phase == POSTED } ?: return
             probe.phase = POSTED
             probe.t[2] = now
             probe.length = compositionLength
             probe.engineNanos = engine
+            // 同一线程开始、结束才有意义；九键等走别的线程时记 -1。
+            if (probe.cpuStart > 0 && cpu >= probe.cpuStart) probe.cpuNanos = cpu - probe.cpuStart
+            if (faults != null && probe.faultStart[0] >= 0) {
+                probe.minorFaults = faults[0] - probe.faultStart[0]
+                probe.majorFaults = faults[1] - probe.faultStart[1]
+            }
         }
     }
 
@@ -172,7 +196,9 @@ internal object KeyLatencyProbe {
                     "trigger=${if (probe.touchUp) "up" else "down"} at=${probe.touchEvent / 1_000_000} " +
                     "hold=${us(probe.touchEvent - probe.touchDown)} dispatch=${us(probe.touchReceived - probe.touchEvent)} " +
                     "main=${us(t[0] - probe.touchReceived)} queue=${us(t[1] - t[0])} bg=${us(t[2] - t[1])} " +
-                    "engine=${us(probe.engineNanos)} handoff=${us(t[3] - t[2])} apply=${us(t[4] - t[3])} " +
+                    "engine=${us(probe.engineNanos)} bgcpu=${if (probe.cpuNanos < 0) -1 else us(probe.cpuNanos)} " +
+                    "minflt=${probe.minorFaults} majflt=${probe.majorFaults} " +
+                    "handoff=${us(t[3] - t[2])} apply=${us(t[4] - t[3])} " +
                     "vsyncwait=${us(frameStart - t[4])} recompose=${us(t[5] - frameStart)} " +
                     "layoutdraw=${us(t[6] - t[5])} render=${us(done - t[6])} gpu=${us(gpu)} " +
                     "total=${us(done - probe.touchEvent)} dropped=$dropped"
