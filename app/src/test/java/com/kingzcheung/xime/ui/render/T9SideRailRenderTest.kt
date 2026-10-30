@@ -23,7 +23,10 @@ import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
-import com.kingzcheung.xime.ui.keyboard.KeyboardLayout
+import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutScreen
+import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState
+import com.kingzcheung.xime.rime.T9InputController
+import org.mockito.kotlin.doReturn
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardExplicitWidth
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
@@ -61,6 +64,11 @@ class T9SideRailRenderTest {
         var theme by mutableStateOf("soft_blue")
         var dark by mutableStateOf(false)
         var glass by mutableStateOf(false)
+        // 九键只画键盘，不碰 Rime：控制器用桩，左栏停在空闲态的符号列。
+        val t9 = org.mockito.kotlin.mock<T9InputController> {
+            on { leftPanelState } doReturn T9InputController.LeftPanelState.IDLE
+            on { firstOptions } doReturn emptyList()
+        }
         rule.setContent {
             val palette = resolveKeyboardPalette(theme, dark)
             val config = FrostedGlassConfig.defaults(dark, enabled = glass)
@@ -72,9 +80,10 @@ class T9SideRailRenderTest {
                             Color(0xFFF9A825), Color(0xFFC62828), Color(0xFF1565C0)))) else Modifier)
                         .keyboardBackground(KeyboardThemes.getRenderingScheme(theme).keyboardBackground,
                             dark, palette.background, config)) {
-                        KeyboardLayout({}, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
-                            KeyboardUiState(currentSchemaId = "t9_pinyin", themeId = theme, isDarkTheme = dark),
-                            false, Modifier.requiredSize(360.dp, 250.dp))
+                        KeyboardLayoutScreen(keyboardState = KeyboardLayoutState.T9Pinyin,
+                            uiState = KeyboardUiState(currentSchemaId = "t9_pinyin", themeId = theme, isDarkTheme = dark),
+                            viewModel = vm, callbacks = KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
+                            onKeyPress = {}, modifier = Modifier.requiredSize(360.dp, 250.dp), t9Controller = t9)
                     }
                 }
             }
