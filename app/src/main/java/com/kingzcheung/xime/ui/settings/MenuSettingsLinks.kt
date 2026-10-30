@@ -21,6 +21,7 @@ internal val MenuSettingsTitles: Map<ToolbarButton, String> = mapOf(
     ToolbarButton.SOUND to "按键效果",
     ToolbarButton.GLASS to "玻璃效果",
     ToolbarButton.INCOGNITO to "无痕模式",
+    ToolbarButton.TRADITIONAL to "繁体输出",
     ToolbarButton.GLIDE to "滑行输入",
     ToolbarButton.T9_FLICK to "拂动选字母",
     ToolbarButton.FOURTEEN_SWIPE to "左右滑动选字母",
