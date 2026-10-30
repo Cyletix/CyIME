@@ -43,24 +43,61 @@ class QwertySwipeSymbolsTest {
         assertEquals(original, KeysConfigHelper.getKeyGesture("a", false))
     }
 
-    @Test fun fourteenKeyLettersKeepTheirOwn26KeySymbols() {
-        // 14 键：双字母键左半边是第一个字母的角标，右半边按第二个字母单独查；落单的 l、m 和拆开的单字母同理。
+    @Test fun fourteenKeysUseTheirOwnSymbolsPerKey() {
+        // 14 键按键配角标：双字母键整个键一套，不再分左右两半借 26 键字母的（用户 10-30）。
         for (schema in listOf("pinyin_14jian", "double_pinyin_flypy_14jian")) {
             KeysConfigHelper.setActiveKeyboardSchema(schema)
             assertEquals(InputLayout.MERGED14, InputProfiles.current(schema).layout)
-            for (key in listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")) {
-                for (letter in key.map(Char::toString)) {
-                    val gesture = KeysConfigHelper.getKeyGesture(if (letter == key.take(1)) key else letter, false)!!
-                    assertEquals("$schema $key $letter 上", QwertySwipeSymbols.up.getValue(letter), gesture.swipeUp!!.value)
-                    assertEquals("$schema $key $letter 下", QwertySwipeSymbols.down.getValue(letter), gesture.swipeDown!!.value)
-                }
+            for (key in FourteenKeySymbols.keys) {
+                val gesture = KeysConfigHelper.getKeyGesture(key, false)!!
+                assertEquals("$schema $key 上", FourteenKeySymbols.up.getValue(key), gesture.swipeUp!!.value)
+                assertEquals("$schema $key 下", FourteenKeySymbols.down.getValue(key), gesture.swipeDown!!.value)
+                assertEquals(GestureAction.COMMIT, gesture.swipeUp.action)
+                assertEquals(GestureAction.COMMIT, gesture.swipeDown.action)
                 // 点按与长按仍是 14 键自己的配置。
-                assertEquals(key, KeysConfigHelper.getKeyGesture(key, false)!!.tap!!.label)
-                assertNotNull(KeysConfigHelper.getKeyGesture(key, false)!!.longPress)
+                assertEquals(key, gesture.tap!!.label)
+                assertNotNull(gesture.longPress)
+                // Shift 或分体拆开的单字母沿用原来那个键的角标。
+                for (letter in key.map(Char::toString)) {
+                    val single = KeysConfigHelper.getKeyGesture(letter, false)!!
+                    assertEquals("$schema $letter 上", FourteenKeySymbols.up.getValue(key), single.swipeUp!!.value)
+                    assertEquals("$schema $letter 下", FourteenKeySymbols.down.getValue(key), single.swipeDown!!.value)
+                }
             }
             // 空格旁的逗号键不是字母，保持 14 键配置。
             assertEquals("。", KeysConfigHelper.getKeyGesture("'", false)!!.swipeUp!!.label)
         }
+        // 26 键不受影响。
+        KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
+        assertEquals(QwertySwipeSymbols.up.getValue("e"), KeysConfigHelper.getKeyGesture("e", false)!!.swipeUp!!.value)
+    }
+
+    @Test fun fourteenKeyPresetIsDigitsThenSymbols() {
+        assertEquals(listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m"),
+            FourteenKeySymbols.keys)
+        // 前两排上方 1-0；第三排上方 、：！？。
+        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "、", "：", "！", "？"),
+            FourteenKeySymbols.keys.map { FourteenKeySymbols.up.getValue(it) })
+        // 前两排下方半角运算/网址符号，@ # % * 在 Shift+2/3/5/8 的位置，（ ）在 9、0 下；第三排下方 …… ～ 《 》。
+        assertEquals(listOf("+", "@", "#", "/", "%", "-", "_", "*", "（", "）", "……", "～", "《", "》"),
+            FourteenKeySymbols.keys.map { FourteenKeySymbols.down.getValue(it) })
+        // 28 个位置不重复，也不和空格两边的逗号句号重复。
+        val all = FourteenKeySymbols.up.values + FourteenKeySymbols.down.values
+        assertEquals(28, all.toSet().size)
+        assertTrue(all.none { it in setOf("，", "。", ",", ".") })
+    }
+
+    @Test fun fourteenKeyEditorOverridesWinAndEmptyMeansNoSymbol() {
+        val original = KeyGestureConfig(swipeUp = GestureDef(label = "Ω", value = "Ω"))
+        // 自定义 YAML 给这个键写的 swipe_up 顶替预设；设置页的修改又顶替 YAML。
+        assertEquals("Ω", FourteenKeySymbols.apply("qw", original, emptyMap())!!.swipeUp!!.value)
+        assertEquals("★", FourteenKeySymbols.apply("qw", original, mapOf("up.qw" to "★"))!!.swipeUp!!.value)
+        val cleared = FourteenKeySymbols.apply("m", null, mapOf("down.m" to ""))!!.swipeDown!!
+        assertEquals(GestureAction.NONE, cleared.action)
+        assertEquals("w → qw", "qw", FourteenKeySymbols.keyOf("w"))
+        assertEquals("'", FourteenKeySymbols.keyOf("'"))
+        assertEquals("earth", FourteenKeySymbols.keyOf("earth"))
+        assertNull(FourteenKeySymbols.apply("'", null, emptyMap()))
     }
 
     @Test fun presetMatchesEveryRequestedKeyExactly() {

@@ -15,6 +15,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -22,7 +24,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.settings.KeysConfigHelper
-import com.kingzcheung.xime.settings.QwertySwipeSymbols
+import com.kingzcheung.xime.settings.FourteenKeySymbols
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayout
@@ -43,8 +45,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 14 键角标和 26 键同一字母一样：双字母键左右两半各画自己字母的上下角标（er 键左半是 e 的、右半是 r 的），
- * 按在右半下滑，方向盘里是 r 的角标。每组同时出一张 26 键对照图。
+ * 14 键自己的一套角标（FourteenKeySymbols）：每个键只有一组上下角标，前两排上 1-0、下半角符号，第三排中文标点。
+ * 出：平时、er 下拉（上角标 2）、m 上滑（下角标 》）三张，并排一张 26 键对照；最后出符号设置页「中文14键」。
  * 浅、深、纯黑、纯白，玻璃开关，手机/平板宽度。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -52,6 +54,16 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FourteenCornerHintsRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
+
+    private fun shot(out: String, name: String, tag: String) {
+        val body = rule.onNodeWithTag(tag, true).fetchSemanticsNode().boundsInRoot
+        val root = rule.activity.window.decorView
+        val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        rule.runOnIdle { root.draw(android.graphics.Canvas(full)) }
+        val crop = Bitmap.createBitmap(full, body.left.toInt().coerceAtLeast(0), body.top.toInt().coerceAtLeast(0),
+            body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
+        File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 
     @Test fun renderCornerHints() {
         val out = System.getenv("CYIME_RENDER_OUT")
@@ -84,51 +96,61 @@ class FourteenCornerHintsRenderTest {
             }
         }
         File(out!!).mkdirs()
-        fun shot(name: String) {
-            val body = rule.onNodeWithTag("layout-body", true).fetchSemanticsNode().boundsInRoot
-            val root = rule.activity.window.decorView
-            val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
-            rule.runOnIdle { root.draw(android.graphics.Canvas(full)) }
-            val crop = Bitmap.createBitmap(full, body.left.toInt().coerceAtLeast(0), body.top.toInt().coerceAtLeast(0),
-                body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
-            File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        }
         fun shown(text: String) = rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        fun drag(tag: String, pullDown: Boolean, name: String) {
+            val key = rule.onNodeWithTag(tag, true)
+            val h = key.fetchSemanticsNode().boundsInRoot.height
+            key.performTouchInput {
+                down(Offset(this.width / 2f, this.height / 2f))
+                for (step in 1..6) moveTo(Offset(this.width / 2f, this.height / 2f + (if (pullDown) 1 else -1) * h * 0.12f * step))
+            }
+            rule.waitForIdle()
+            shot(out, name, "layout-body")
+            key.performTouchInput { up() }
+            rule.waitForIdle()
+        }
         for ((w, h) in listOf(360 to 240, 800 to 300)) for ((id, isDark) in listOf("soft_blue" to false,
             "soft_blue" to true, "pure_black" to true, "pure_black" to false)) for (g in listOf(false, true)) {
             val name = "${w}-$id-${if (isDark) "dark" else "light"}-${if (g) "glass" else "solid"}"
             KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
             rule.runOnIdle { schema = "rime_ice"; width = w; height = h; theme = id; dark = isDark; glass = g }
             rule.waitForIdle()
-            shot("26-$name")
+            shot(out, "26-$name", "layout-body")
             KeysConfigHelper.setActiveKeyboardSchema("pinyin_14jian")
             rule.runOnIdle { schema = "pinyin_14jian" }
             rule.waitForIdle()
-            shot("14-$name-0-normal")
-            // 两个字母的上角标都在键面上（er：e 的 3、r 的 4），不只画左边那个。
-            for (letter in listOf("e", "r", "w", "q")) {
-                assertTrue("14 键显示 $letter 的上角标", shown(QwertySwipeSymbols.up.getValue(letter)))
+            shot(out, "14-$name-0-normal", "layout-body")
+            // 每个键的上下角标都在键面上。
+            for (key in FourteenKeySymbols.keys) {
+                assertTrue("14 键 $key 显示上角标", shown(FourteenKeySymbols.up.getValue(key)))
+                assertTrue("14 键 $key 显示下角标", shown(FourteenKeySymbols.down.getValue(key)))
             }
-            val er = rule.onNodeWithTag("qwerty-key:er", true).fetchSemanticsNode().boundsInRoot
-            val key = rule.onNodeWithTag("qwerty-key:er", true)
-            // 按在 er 的右半，往下滑：方向盘应是 r 的角标。
-            key.performTouchInput {
-                down(Offset(this.width * 0.75f, this.height / 2f))
-                for (step in 1..6) moveTo(Offset(this.width * 0.75f, this.height / 2f + er.height * 0.12f * step))
-            }
-            rule.waitForIdle()
-            shot("14-$name-1-right-half-down")
-            key.performTouchInput { up() }
-            rule.waitForIdle()
-            key.performTouchInput {
-                down(Offset(this.width * 0.25f, this.height / 2f))
-                for (step in 1..6) moveTo(Offset(this.width * 0.25f, this.height / 2f + er.height * 0.12f * step))
-            }
-            rule.waitForIdle()
-            shot("14-$name-2-left-half-down")
-            key.performTouchInput { up() }
-            rule.waitForIdle()
+            // 默认下拉出上角标：er 下拉是 2；上滑出下角标：m 上滑是 》。
+            drag("qwerty-key:er", pullDown = true, name = "14-$name-1-er-pull-down")
+            drag("qwerty-key:m", pullDown = false, name = "14-$name-2-m-swipe-up")
         }
         KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
+    }
+
+    @Test fun renderSymbolEditorFourteenTab() {
+        val out = System.getenv("CYIME_RENDER_OUT")
+        assumeTrue(!out.isNullOrEmpty())
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        KeysConfigHelper.loadConfig(app)
+        rule.setContent {
+            MaterialTheme {
+                Box(Modifier.requiredSize(400.dp, 900.dp).testTag("editor-body")) {
+                    com.kingzcheung.xime.ui.settings.QwertySymbolEditor(onBack = {})
+                }
+            }
+        }
+        File(out!!).mkdirs()
+        rule.waitForIdle()
+        rule.onNodeWithTag("symbol-target:k14", true).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("symbol-editor-key:qw", true).assertExists()
+        assertTrue(rule.onAllNodesWithText("QW", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithText("中文14键").assertExists()
+        shot(out, "editor-14", "editor-body")
     }
 }

@@ -246,7 +246,7 @@ keyboard:
   # rows 支持子数组：[[q, w], [e, r], ...] 表示 q/w 合并在同一个键，每行键数变少键自然更宽（行内等宽）。
   # 合并键在 keys 里的 id 为组内字母拼接（qw、er...），tap 的 value 固定为组内第一个字母（代表字母），
   # Rime 侧由方案的拼写运算（derive + xlit）靠词库消歧。
-  # swipe_up：前 10 个键按行序输出数字 1-0，其余键沿用 26 键同字母的符号习惯；
+  # swipe_up：17/18 键前 10 个键按行序输出数字 1-0，其余键沿用 26 键同字母的符号习惯；14 键见 qwerty_14 的说明；
   # long_press 气泡保留组内字母的精确输入作为辅助。
   #
   # schemas 声明使用此布局的方案（schema_id），前端据此在方案切换时加载对应 section，
@@ -263,7 +263,8 @@ keyboard:
         - [[a, s], [d, f], [g, h], [j, k], [l]]
         - [[z, x], [c, v], [b, n], [m]]
     keys:
-      # 上下角标和 26 键同一字母一样（KeysConfigHelper.getKeyGesture 按字母查 26 键的符号，符号编辑同样生效），这里不再单独配置。
+      # 上下角标是 14 键自己的一套（FourteenKeySymbols：前两排上 1-0、下半角符号，第三排中文标点），符号设置页「中文14键」可改；
+      # 这里给某个键写 swipe_up / swipe_down 会顶替预设。
       qw: { tap: { label: "qw", value: "q" }, long_press: { display: "bubble", values: ["q", "w", "Q", "W"] } }
       er: { tap: { label: "er", value: "e" }, long_press: { display: "bubble", values: ["e", "r", "E", "R"] } }
       ty: { tap: { label: "ty", value: "t" }, long_press: { display: "bubble", values: ["t", "y", "T", "Y"] } }

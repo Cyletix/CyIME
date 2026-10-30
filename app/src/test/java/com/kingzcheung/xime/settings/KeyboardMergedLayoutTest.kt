@@ -323,7 +323,7 @@ class KeyboardMergedLayoutTest {
 
     @Test
     fun `17和18键每个字母键都有 swipe_up`() {
-        // 14 键不在这里配符号：每个字母沿用 26 键同一字母的上下角标（FourteenKeySymbolsTest）。
+        // 14 键不在这里配符号：角标是 FourteenKeySymbols 里 14 键自己的一套（FourteenKeySymbolsTest）。
         for (section in listOf("qwerty_17", "qwerty_18")) {
             val yaml = ximeYamlText()
             val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(yaml, section)
