@@ -11,11 +11,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -109,46 +114,16 @@ fun Modifier.keyboardBackground(
             return this.then(Modifier.background(fallbackColor))
         }
         "image" -> {
-            val context = LocalContext.current
-            val src = if (isDark) background.srcDark ?: background.src else background.src
+            val src = themeImageSource(background, isDark)
             if (src.isNullOrBlank()) return this.then(Modifier.background(fallbackColor))
 
-            var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-            LaunchedEffect(src) {
-                imageBitmap = try {
-                    withContext(Dispatchers.Default) {
-                        // 按屏幕宽度降采样：4000 px 的主题图整张解码要占几十 MB，键盘只铺满一屏宽。
-                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        openThemeImageStream(context, src)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-                        val target = context.resources.displayMetrics.let { maxOf(it.widthPixels, it.heightPixels) }
-                        var sample = 1
-                        while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target / 2) sample *= 2
-                        openThemeImageStream(context, src)?.use { stream ->
-                            BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
-                        }
-                    }
-                } catch (e: Exception) { null }
-            }
-
-            val bitmap = imageBitmap
+            val bitmap = rememberThemeImage(src)
             if (bitmap != null) {
                 val fit = background.fit ?: "cover"
-                val overlayAlpha = if (isDark) {
-                    background.overlayAlphaDark ?: background.overlayAlpha
-                } else {
-                    background.overlayAlpha
-                }
-                val overlayColor = (if (isDark) background.overlayColorDark ?: background.overlayColor
-                    else background.overlayColor)?.let { Color(0xFF000000 or it) } ?: Color.Black
                 return this.then(
                     Modifier.drawWithContent {
                         drawImageBackground(bitmap, fit)
-                        // 半透明遮罩（默认黑色）压住图片，提升按键与候选字对比度
-                        if (overlayAlpha != null && overlayAlpha > 0f) {
-                            drawRect(
-                                color = overlayColor.copy(alpha = overlayAlpha.coerceIn(0f, 1f)),
-                            )
-                        }
+                        drawImageOverlay(background, isDark)
                         drawContent()
                     }
                 )
@@ -159,15 +134,111 @@ fun Modifier.keyboardBackground(
     }
 }
 
+private fun themeImageSource(background: BackgroundConfig, isDark: Boolean): String? =
+    if (isDark) background.srcDark ?: background.src else background.src
+
+@Composable
+private fun rememberThemeImage(src: String): ImageBitmap? {
+    val context = LocalContext.current
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(src) {
+        imageBitmap = try {
+            withContext(Dispatchers.Default) {
+                // 按屏幕宽度降采样：4000 px 的主题图整张解码要占几十 MB，键盘只铺满一屏宽。
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                openThemeImageStream(context, src)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                val target = context.resources.displayMetrics.let { maxOf(it.widthPixels, it.heightPixels) }
+                var sample = 1
+                while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target / 2) sample *= 2
+                openThemeImageStream(context, src)?.use { stream ->
+                    BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+                }
+            }
+        } catch (e: Exception) { null }
+    }
+    return imageBitmap
+}
+
+/** 半透明遮罩（默认黑色）压住图片，提升按键与候选字对比度。 */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageOverlay(background: BackgroundConfig, isDark: Boolean) {
+    val overlayAlpha = if (isDark) background.overlayAlphaDark ?: background.overlayAlpha else background.overlayAlpha
+    if (overlayAlpha == null || overlayAlpha <= 0f) return
+    val overlayColor = (if (isDark) background.overlayColorDark ?: background.overlayColor
+        else background.overlayColor)?.let { Color(0xFF000000 or it) } ?: Color.Black
+    drawRect(color = overlayColor.copy(alpha = overlayAlpha.coerceIn(0f, 1f)))
+}
+
+/**
+ * 键盘卡片下面那条导航区的背景：接着卡片底边往下铺，而不是按这条自己的尺寸重新铺一遍。
+ *
+ * 各铺各的时，渐变在卡片底下从头色重新开始，图片另截中间一小块，底下那 1 厘米左右
+ * 跟键盘断开，看起来像键盘悬空了（2026-10-30 用户反馈：换了渐变/图片主题后底下悬空）。
+ * 渐变按卡片的同一条线性渐变延伸过去；图片没有卡片以外的部分，沿卡片底边镜像过来。
+ * 两种接缝处都和卡片最后一行同色。纯色和毛玻璃（已共用一张窗口坐标背景）照旧。
+ *
+ * [card] 是卡片在窗口里的位置；还没量到时退回按这条自身尺寸铺。
+ */
+@Composable
+fun Modifier.keyboardBackgroundBelowCard(
+    background: BackgroundConfig?,
+    isDark: Boolean,
+    fallbackColor: Color,
+    card: () -> Rect?,
+    frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences(isDark).frostedGlass,
+): Modifier {
+    val continued = background != null && !frostedGlass.enabled && when (background.type) {
+        "gradient" -> gradientColors(background, isDark) != null
+        "image" -> !themeImageSource(background, isDark).isNullOrBlank()
+        else -> false
+    }
+    if (!continued || background == null) return keyboardBackground(background, isDark, fallbackColor, frostedGlass)
+    val bitmap = if (background.type == "image") rememberThemeImage(themeImageSource(background, isDark)!!) else null
+    var origin by remember { mutableStateOf<Offset?>(null) }
+    return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
+        val frame = origin?.let { o -> card()?.takeIf { it.width > 0f && it.height > 0f }?.translate(-o.x, -o.y) }
+        if (background.type == "gradient") {
+            val colors = gradientColors(background, isDark)!!
+            val (start, end) = gradientLine(background, frame ?: Rect(Offset.Zero, size))
+            drawRect(Brush.linearGradient(colors, start, end), size = size)
+        } else if (frame != null && bitmap != null) {
+            // 窄于整宽的固定卡片两侧没有图，先铺主题底色。
+            drawRect(fallbackColor)
+            clipRect {
+                // 卡片底边为轴上下翻转：卡片最后一行正好落在这条第一行。
+                translate(frame.left, frame.bottom + frame.height) {
+                    scale(1f, -1f, pivot = Offset.Zero) {
+                        drawImageBackground(bitmap, background.fit ?: "cover", frame.width, frame.height)
+                    }
+                }
+            }
+            drawImageOverlay(background, isDark)
+        } else {
+            drawRect(fallbackColor)
+        }
+        drawContent()
+    }
+}
+
+private fun gradientColors(background: BackgroundConfig, isDark: Boolean): List<Color>? =
+    (if (isDark) background.colorsDark ?: background.colors else background.colors)
+        ?.takeIf { it.size >= 2 }?.map { Color(0xFF000000 or it) }
+
+/** 渐变在 [frame] 里的起止点（[Modifier.keyboardBackground] 按自身尺寸算的同一条线）。 */
+internal fun gradientLine(background: BackgroundConfig, frame: Rect): Pair<Offset, Offset> {
+    val (startRatio, endRatio) = angleToFractionalPoints(background.angle ?: 0)
+    return Offset(frame.left + frame.width * startRatio.x, frame.top + frame.height * startRatio.y) to
+        Offset(frame.left + frame.width * endRatio.x, frame.top + frame.height * endRatio.y)
+}
+
 /** 在 DrawScope 内绘制图片背景。 */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground(
     bitmap: ImageBitmap,
     fit: String,
+    dstW: Float = size.width,
+    dstH: Float = size.height,
 ) {
     val srcW = bitmap.width.toFloat()
     val srcH = bitmap.height.toFloat()
-    val dstW = size.width
-    val dstH = size.height
     if (srcW <= 0f || srcH <= 0f || dstW <= 0f || dstH <= 0f) return
 
     val scale: Float
@@ -179,7 +250,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground
             scale = min(dstW / srcW, dstH / srcH)
             offsetX = (dstW - srcW * scale) / 2f
             offsetY = (dstH - srcH * scale) / 2f
-            clipRect {
+            clipRect(right = dstW, bottom = dstH) {
                 drawImage(
                     bitmap,
                     dstOffset = IntOffset(offsetX.roundToInt(), offsetY.roundToInt()),
@@ -197,7 +268,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground
         "fit_width" -> {
             scale = dstW / srcW
             offsetY = (dstH - srcH * scale) / 2f
-            clipRect {
+            clipRect(right = dstW, bottom = dstH) {
                 drawImage(
                     bitmap,
                     dstOffset = IntOffset(0, offsetY.roundToInt()),
@@ -208,7 +279,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground
         "fit_height" -> {
             scale = dstH / srcH
             offsetX = (dstW - srcW * scale) / 2f
-            clipRect {
+            clipRect(right = dstW, bottom = dstH) {
                 drawImage(
                     bitmap,
                     dstOffset = IntOffset(offsetX.roundToInt(), 0),
@@ -227,7 +298,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground
             scale = max(dstW / srcW, dstH / srcH)
             offsetX = (dstW - srcW * scale) / 2f
             offsetY = (dstH - srcH * scale) / 2f
-            clipRect {
+            clipRect(right = dstW, bottom = dstH) {
                 drawImage(
                     bitmap,
                     dstOffset = IntOffset(offsetX.roundToInt(), offsetY.roundToInt()),
