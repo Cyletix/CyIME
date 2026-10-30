@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
@@ -51,8 +50,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import com.kingzcheung.xime.ui.common.CompactDropdownMenu
-import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -86,7 +83,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -145,7 +141,7 @@ fun PluginsSettingsContent(
     }
 }
 
-/** 已安装插件的右上角操作：刷新、从文件安装、浏览器导入。插件管理页和「扩展 › 插件」共用。 */
+/** 已安装插件的右上角操作：刷新、从文件安装。插件管理页和「扩展 › 插件」共用。 */
 @Composable
 internal fun InstalledPluginActions() {
     val viewModel: PluginsSettingsViewModel = viewModel()
@@ -155,52 +151,18 @@ internal fun InstalledPluginActions() {
         uris.forEach { viewModel.installPluginFromUri(it) }
     }
 
-    var showWirelessSheet by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
-
-    if (showWirelessSheet) {
-        WirelessImportSheet(
-            onDismiss = {
-                showWirelessSheet = false
-                viewModel.refreshPlugins()
-            },
-            onRefresh = { viewModel.refreshPlugins() }
-        )
-    }
     IconButton(onClick = { viewModel.refreshPlugins() }) {
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = "刷新"
         )
     }
-    Box {
-        IconButton(onClick = { showMenu = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "更多")
-        }
-        CompactDropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false },
-            offset = DpOffset(0.dp, 4.dp)
-        ) {
-            CompactMenuRow(
-                label = "从文件安装插件", icon = Icons.Default.FileOpen,
-                onClick = {
-                    showMenu = false
-                    importLauncher.launch(arrayOf("*/*"))
-                }
-            )
-            CompactMenuRow(
-                label = "浏览器导入", icon = Icons.Default.Wifi,
-                onClick = {
-                    showMenu = false
-                    showWirelessSheet = true
-                }
-            )
-        }
+    IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+        Icon(Icons.Default.FileOpen, contentDescription = "从文件安装插件")
     }
 }
 
-/** 已安装的插件列表（没有商店，插件只从文件或浏览器导入）。 */
+/** 已安装的插件列表（没有商店，插件只从文件导入）。 */
 @Composable
 internal fun InstalledPluginsList(
     modifier: Modifier = Modifier,

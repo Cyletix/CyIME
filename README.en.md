@@ -24,7 +24,7 @@
 
 ## Features
 
-- **Multiple input schemes** — bundled Pinyin dictionary plus Wubi / Pinyin / mixed schemes, custom schemes (Shuangpin, stroke, 9-key / 14-key), downloadable or importable over Wi-Fi
+- **Multiple input schemes** — bundled Pinyin dictionary plus Wubi / Pinyin / mixed schemes, custom schemes (Shuangpin, stroke, 9-key / 14-key), downloadable from the scheme store or importable from a file
 - **Rime engine** — mature and stable Rime (librime)
 - **Rich keyboard layouts** — QWERTY, T9 Pinyin, stroke, handwriting, number (with calculator), symbols and Emoji
 - **Floating keyboard** — draggable translucent card
