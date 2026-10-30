@@ -244,6 +244,10 @@ object WindowsDevices {
             try {
                 val data = WindowsPairingProtocol.offer(text)
                 require(data.optLong("expires_at", Long.MAX_VALUE) >= System.currentTimeMillis() / 1000 - 10) { "二维码已过期，请刷新电脑二维码" }
+                // 电脑一答应就作废这台设备原来的凭据，所以存不下的情况要在连电脑之前就拦住。
+                check(_saved.value.any { it.id == data.getString("server_id") } || _saved.value.size < MAX_SAVED) {
+                    "最多保存 $MAX_SAVED 台设备，请先取消一台再添加"
+                }
                 _status.value = "正在连接二维码中的电脑…"
                 val endpoints = data.getJSONArray("endpoints")
                 var failure: Exception? = null
