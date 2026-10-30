@@ -176,6 +176,10 @@ fun EditKeyboardLayout(
                     LocalKeyboardKeyContentScale provides glyphScale) {
                     // 行首/行尾在圆盘左右两侧，只在圆盘两边留得出位置时出现（平板、横屏）；手机按原设计不放。
                     val sideWidth = 1.5f * cellWidth.value - padDiameter.value / 2 - 2 * inset.value
+                    // 放得下当前倍率的图标和两个字（字宽随系统字号），左右再各留角键同样的边距才出现。
+                    val sideScale = minOf(glyphScale,
+                        ((cellHeight.value - 2 * inset.value - 12f) / (20f + 14f * fontScale)).coerceAtLeast(.25f))
+                    val sideNeeded = maxOf(20f, 20f * fontScale) * sideScale + 2 * maxOf(8f, inset.value + 2f)
                     val rows = listOf(
                         listOf("undo", "home", "", "end", "delete"),
                         listOf("redo", "line_start", "", "line_end", "select_all"),
@@ -187,7 +191,7 @@ fun EditKeyboardLayout(
                                     val cellModifier = Modifier.weight(1f).fillMaxHeight()
                                     if (command.isEmpty()) Spacer(cellModifier)
                                     else if (columnIndex == 0 || columnIndex == 4) key(command, cellModifier)
-                                    else if (rowIndex == 1 && sideWidth < EDITOR_SIDE_MIN_WIDTH * fontScale.coerceAtLeast(1f)) Spacer(cellModifier)
+                                    else if (rowIndex == 1 && sideWidth < sideNeeded) Spacer(cellModifier)
                                     else {
                                         val circleX = (2.5f - columnIndex) * cellWidth.value
                                         val circleY = (1.5f - rowIndex) * cellHeight.value
@@ -229,9 +233,6 @@ fun EditKeyboardLayout(
     }
     }
 }
-
-/** 圆盘两侧至少露出这么宽才放行首/行尾，放得下图标和两个字。 */
-private const val EDITOR_SIDE_MIN_WIDTH = 44f
 
 /** 手机上键缝约为格子短边的 15%；更大的格子按这个比例放宽。 */
 private const val EDITOR_GAP_FRACTION = 0.15f
