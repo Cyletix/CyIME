@@ -417,21 +417,22 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
+    // 编辑面板的所有动作与选择、移光标同一个按键队列、同一个输入框，按点的顺序执行（审计 F05：
+    // 以前全选/复制/剪切/粘贴/撤销直接作用于当前连接，排在前面的扩选还没执行就剪了旧选区）。
     internal fun handleToolbarEditingAction(action: String) {
-        val ic = service.currentInputConnection ?: return
+        if (service.currentInputConnection == null) return
         when (action) {
-            "undo" -> service.performEditorMenuAction(android.R.id.undo)
-            "redo" -> service.performEditorMenuAction(android.R.id.redo)
-            "select_all" -> ic.performContextMenuAction(android.R.id.selectAll)
-            "copy" -> ic.performContextMenuAction(android.R.id.copy)
-            "cut" -> ic.performContextMenuAction(android.R.id.cut)
-            "paste" -> {
+            "undo", "redo" -> editCursor { service.sendUndoShortcut(it, redo = action == "redo") }
+            "select_all" -> editCursor { it.performContextMenuAction(android.R.id.selectAll) }
+            "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
+            "cut" -> editCursor { it.performContextMenuAction(android.R.id.cut) }
+            "paste" -> editCursor {
                 service.dismissPredictionsForPaste()
-                ic.performContextMenuAction(android.R.id.paste)
+                it.performContextMenuAction(android.R.id.paste)
             }
             "select_begin" -> editCursor { editorCursor.beginSelection(it) }
             "select_end" -> editCursor(finishComposition = false) { editorCursor.endSelection(it) }
-            "select_reset" -> editorCursor.resetSelection()
+            "select_reset" -> editCursor(finishComposition = false) { editorCursor.resetSelection() }
             "home", "end", "select_paragraph_start", "select_paragraph_end" -> editCursor {
                 editorCursor.moveToParagraphBoundary(it, toEnd = action.endsWith("end"), selecting = action.startsWith("select_"))
             }
