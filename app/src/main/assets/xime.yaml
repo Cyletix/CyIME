@@ -391,7 +391,8 @@ keyboard:
   # schemas 声明使用九键布局的方案，未声明的方案一律全键盘；
   # 第三方九键方案在 xime.custom.yaml 的 t9.schemas 追加即可，无需改代码。
   t9:
-    schemas: [t9_pinyin, t9, wanxiang_t9]
+    # t9_flypy：方案商店的「小鹤双拼九键」，装了才生效。
+    schemas: [t9_pinyin, t9, wanxiang_t9, t9_flypy]
     # ── 左侧快捷符号栏（空闲态显示；列表长度不限，超过 4 个时可上下滑动，右缘有滚动条）──
     # 默认与常用符号面板第一页的前 16 个相同；列尾的「编辑」打开设置里的「九键侧栏」。
     # 用户在 xime.custom.yaml 的同路径覆盖整个列表，未配置时使用内置默认值
