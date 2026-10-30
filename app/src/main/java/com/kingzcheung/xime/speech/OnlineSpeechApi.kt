@@ -36,26 +36,28 @@ object OnlineSpeechApi {
             .readTimeout(30, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).build()
     }
 
-    private fun prefs(context: Context) = (context.applicationContext ?: context).getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    /** 可空：测试里的假 Context 可能没有这个设置文件，此时按未填写处理。 */
+    private fun prefs(context: Context): android.content.SharedPreferences? =
+        (context.applicationContext ?: context).getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun config(context: Context): Config = prefs(context).let {
-        Config(it.getString(KEY_BASE_URL, null)?.takeIf { url -> url.isNotBlank() } ?: DEFAULT_BASE_URL,
-            it.getString(KEY_API_KEY, "").orEmpty(),
-            it.getString(KEY_MODEL, null)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL)
+        Config(it?.getString(KEY_BASE_URL, null)?.takeIf { url -> url.isNotBlank() } ?: DEFAULT_BASE_URL,
+            it?.getString(KEY_API_KEY, "").orEmpty(),
+            it?.getString(KEY_MODEL, null)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL)
     }
 
     /** 改了配置就清掉旧的测试结果，状态不会停在“可用”误导人。 */
     fun save(context: Context, config: Config) {
-        prefs(context).edit().putString(KEY_BASE_URL, config.baseUrl.trim()).putString(KEY_API_KEY, config.apiKey.trim())
-            .putString(KEY_MODEL, config.model.trim()).remove(KEY_STATUS).apply()
+        prefs(context)?.edit()?.putString(KEY_BASE_URL, config.baseUrl.trim())?.putString(KEY_API_KEY, config.apiKey.trim())
+            ?.putString(KEY_MODEL, config.model.trim())?.remove(KEY_STATUS)?.apply()
     }
 
     fun isConfigured(context: Context): Boolean = config(context).apiKey.isNotBlank()
 
     /** 填好并且最近一次「测试」通过：只有这时才能选「优先使用在线接口」。 */
-    fun isUsable(context: Context): Boolean = isConfigured(context) && prefs(context).getString(KEY_STATUS, null).orEmpty().startsWith("可用")
+    fun isUsable(context: Context): Boolean = isConfigured(context) && prefs(context)?.getString(KEY_STATUS, null).orEmpty().startsWith("可用")
 
-    fun status(context: Context): String = prefs(context).getString(KEY_STATUS, null)
+    fun status(context: Context): String = prefs(context)?.getString(KEY_STATUS, null)
         ?: if (isConfigured(context)) "未测试" else "未填写密钥"
 
     /** 用一秒静音真正调用一次转写接口：地址、密钥、模型都对才算可用。在后台线程调用。 */
@@ -64,7 +66,7 @@ object OnlineSpeechApi {
         val status = if (!isConfigured(context)) "未填写密钥"
             else transcribe(context, ByteArray(SAMPLE_RATE * 2), InputLanguage.CHINESE)
                 .fold({ "可用（$time 测试）" }, { "不可用：${it.message}（$time 测试）" })
-        prefs(context).edit().putString(KEY_STATUS, status).apply()
+        prefs(context)?.edit()?.putString(KEY_STATUS, status)?.apply()
         return status
     }
 
