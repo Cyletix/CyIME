@@ -70,6 +70,12 @@ clear leaves, which is the 2026-10-23 report (old digits came back after Enter).
 `rime_ice`) adds a phrase to `custom_phrase.txt` while a session is open and reports which step makes
 it appear. 2026-10-23: nothing until the schema is selected again; maintenance is not needed.
 
+`CaretCandidateProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists `t9_pinyin` and
+`rime_ice`) moves the code caret inside xu'yao'jia'ge to just after yao, the way the pinyin editor does,
+and checks that 需要 is first rather than the whole 需要价格, and that choosing it leaves jia'ge with 价格
+offered. 2026-10-30: both nine-key (9892654243, caret 5) and full pinyin pass on the engine; the
+nine-key bug was the editor never moving the engine caret.
+
 `ChaosInputProbe.java` (library dir, a deployed user copy listing `t9_pinyin`, `rime_ice` and
 `pinyin_14jian`, seed, rounds) types seeded random sequences: half-typed codes, partial choices,
 deletes and new keys, capitals/digits/punctuation inside pinyin, separators, space, the app's clear

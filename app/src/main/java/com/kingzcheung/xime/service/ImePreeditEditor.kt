@@ -43,7 +43,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             val session = if (input.isEmpty() || text.isEmpty() || unsupportedCode) null
             else PinyinEditSession(state.inputSessionId, state.currentSchemaId, input,
                 if (t9) "" else input.take(confirmed), prefix, text,
-                if (t9) text.length else display.displayOffset(((snapshot.getOrNull(1)?.toIntOrNull() ?: input.length) - confirmed).coerceIn(0, normalized.length)), t9, if (t9) engine.t9GetRemainingDigits() else "", service.uiState.value.t9RightCandidateSelectedCount)
+                if (t9) com.kingzcheung.xime.rime.offsetAfterCodeKeys(text, com.kingzcheung.xime.rime.codeKeysBefore(input, snapshot.getOrNull(1)?.toIntOrNull() ?: input.length)) else display.displayOffset(((snapshot.getOrNull(1)?.toIntOrNull() ?: input.length) - confirmed).coerceIn(0, normalized.length)), t9, if (t9) engine.t9GetRemainingDigits() else "", service.uiState.value.t9RightCandidateSelectedCount)
             withContext(Dispatchers.Main) {
                 if (service.uiState.value.inputSessionId == state.inputSessionId &&
                     service.uiState.value.currentSchemaId == state.currentSchemaId) {
@@ -110,15 +110,13 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             }
             val engine = service.rimeEngine
             val changed = text != session.text
-            if (!changed && session.isT9) {
-                // Merely moving the caret must not lock an ambiguous nine-key reading.
-                liveSession = session.copy(caret = caret)
-                withContext(Dispatchers.Main) { if (owner.isActive()) reply(liveSession) }
-                return@enqueue
-            }
             val result = engine.editPinyinAndReadState {
-                if (session.isT9) engine.applyT9PinyinEdit(session.expectedInput, text,
-                    session.t9RemainingDigits, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
+                // Candidates follow the caret. Merely moving it must not lock an ambiguous
+                // nine-key reading, so only the engine caret moves; an edit rebuilds the keys first.
+                if (session.isT9) (!changed || engine.applyT9PinyinEdit(session.expectedInput, text,
+                    session.t9RemainingDigits, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }) &&
+                    engine.placeT9CodeCaret(com.kingzcheung.xime.rime.codeKeysBefore(text, caret),
+                        if (changed) null else session.expectedInput, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
                 else {
                     val engineText = if (changed) session.protectedInput + (com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(session.schemaId)?.encode(text) ?: text) else session.expectedInput
                     val engineCaret = if (changed) caret else PinyinEditDisplay(

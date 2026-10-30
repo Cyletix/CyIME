@@ -421,6 +421,11 @@ class RimeEngine {
     private external fun nativeHighlightCandidate(index: Int): Boolean
 
     private fun displayPreedit(input: String, preedit: String, spelling: String): String {
+        // A nine-key caret inside the code leaves the raw keys after it in Rime's preedit.
+        t9CaretReading?.let { (code, reading) ->
+            if (code == input && reading.isNotEmpty() && preedit != reading &&
+                (nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull() ?: input.length) < input.length) return reading
+        }
         val schema = nativeGetCurrentSchema().orEmpty()
         val profile = com.kingzcheung.xime.settings.InputProfiles.describe(schema)
         val groups = if (profile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
@@ -649,6 +654,32 @@ class RimeEngine {
         nativeSetCaret(caret.coerceIn(0, newInput.length))
         true
     }
+
+    /**
+     * Nine-key code caret after [keys] code keys: candidates then cover only the code before it,
+     * as with full pinyin. Only the caret moves, so no ambiguous reading is locked; the reading of
+     * the whole code is kept for display, since Rime shows the keys after the caret as digits.
+     */
+    internal fun placeT9CodeCaret(keys: Int, expectedInput: String? = null, expectedSchema: String? = null,
+        isStillCurrent: () -> Boolean = { true },
+    ): Boolean = mutateLocked {
+        if (!nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode() ||
+            (expectedSchema != null && nativeGetCurrentSchema() != expectedSchema)) return@mutateLocked false
+        val input = nativeGetInput().orEmpty()
+        if (expectedInput != null && input != expectedInput) return@mutateLocked false
+        val snapshot = nativePinyinEditSnapshot()
+        val caret = snapshot.getOrNull(1)?.toIntOrNull() ?: input.length
+        if (caret >= input.length) t9CaretReading = input to snapshot.getOrNull(4).orEmpty()
+        val target = offsetAfterCodeKeys(input, keys)
+        if (target != caret) {
+            candidateRevision.incrementAndGet()
+            nativeSetCaret(target)
+        }
+        true
+    }
+
+    /** Whole-code reading of the nine-key code whose caret [placeT9CodeCaret] moved. */
+    @Volatile private var t9CaretReading: Pair<String, String>? = null
 
     /** 实体键盘左右键：编码内移动一个字母；已在该方向的尽头时返回 null，不绕回。 */
     internal fun moveCompositionCaret(delta: Int): RimeProcessResult? = editPinyinAndReadState {

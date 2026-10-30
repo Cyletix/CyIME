@@ -43,4 +43,18 @@ class PinyinEditBufferTest {
         assertEquals("你ni'hao", pinyinPreviewText("你ni hao"))
         assertEquals("xiu'gai'shu'ru", pinyinPreviewText("xiu gai shu ru"))
     }
+
+    @Test fun nineKeyCaretInsideTheReadingMapsToTheKeysBeforeIt() {
+        // xu'yao|jia'ge: candidates must cover the five keys of xu yao, not the whole code.
+        val text = "xu'yao'jia'ge"
+        assertEquals(5, codeKeysBefore(text, 6))
+        assertEquals(5, codeKeysBefore(text, 7))
+        assertEquals(5, offsetAfterCodeKeys("9892654243", 5))
+        // Manual delimiters in the code are skipped both ways; the caret stays before them.
+        assertEquals(5, offsetAfterCodeKeys("98926'54243", 5))
+        assertEquals(6, offsetAfterCodeKeys(text, codeKeysBefore("98926'54243", 5)))
+        assertEquals(0, offsetAfterCodeKeys("9892654243", codeKeysBefore(text, 0)))
+        assertEquals(10, offsetAfterCodeKeys("9892654243", codeKeysBefore(text, text.length)))
+        assertEquals(text.length, offsetAfterCodeKeys(text, 99))
+    }
 }
