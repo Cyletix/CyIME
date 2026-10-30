@@ -28,6 +28,21 @@ class JavaHomeTest(unittest.TestCase):
             (root/'bin/jlink.exe').touch()
             self.assertTrue(m.complete_java_home(root))
 
+class SignatureSchemeTest(unittest.TestCase):
+    V1 = 'Verified using v1 scheme (JAR signing): true\n'
+    V2 = 'Verified using v2 scheme (APK Signature Scheme v2): true\n'
+
+    def test_v2_only_apk_is_rejected_because_vivo_needs_v1(self):
+        with self.assertRaisesRegex(m.DeliveryError, 'missing v1 signature'):
+            m.check_signature_schemes(self.V1.replace('true', 'false') + self.V2)
+
+    def test_v1_and_v2_pass(self):
+        m.check_signature_schemes(self.V1 + self.V2 + 'Verified using v3 scheme (APK Signature Scheme v3): false\n')
+
+    def test_output_without_verbose_lines_is_not_a_pass(self):
+        with self.assertRaisesRegex(m.DeliveryError, 'missing v1/v2 signature'):
+            m.check_signature_schemes('Signer #1 certificate DN: CN=Android Debug, O=Android, C=US\n')
+
 class AdbHandshakeTest(unittest.TestCase):
     def test_reserved_superdisplay_port_stops_before_any_adb_command(self):
         runner = Mock()
@@ -126,7 +141,13 @@ class FakeRunner(m.Runner):
                 self.submodule_status = self.submodule_status.replace('-', ' ', 1)
                 return ''
             return super().run(args, **kw)
-        if args[0] == 'fake-powershell': return ''
+        if args[0] == 'fake-powershell':
+            if 'fake-signer' in args[-1]:
+                # Like apksigner: without --min-sdk-version below 24 it skips v1 and reports it false.
+                v1 = 'true' if '--min-sdk-version 23' in args[-1] else 'false'
+                return (f'Verified using v1 scheme (JAR signing): {v1}\n'
+                        'Verified using v2 scheme (APK Signature Scheme v2): true\n')
+            return ''
         if args[0] == 'fake-aapt':
             pkg = 'wrong.package' if self.bad_package else m.PACKAGE
             return f"package: name='{pkg}' versionCode='20261071' versionName='1.6.0' platformBuildVersionName='1'\nnative-code: 'arm64-v8a'"

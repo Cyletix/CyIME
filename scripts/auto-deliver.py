@@ -82,6 +82,13 @@ def write_json(path: Path, value):
 def ps_quote(value: str) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
+def check_signature_schemes(verify_output: str):
+    # vivo OriginOS refuses v2-only APKs as 「安装包缺乏开发者证书」: it looks for the v1 (JAR) certificate in META-INF.
+    # apksigner skips v1 for minSdk >= 24 and then always prints "v1 ...: false"; verify with --min-sdk-version 23.
+    missing = [s for s in ("v1", "v2") if not re.search(rf"Verified using {s} scheme \([^)]*\): true", verify_output)]
+    if missing:
+        raise DeliveryError("APK is missing " + "/".join(missing) + " signature (vivo needs v1 + v2).")
+
 def parse_version(text: str) -> tuple[str, int]:
     # Only literal assignments, not comments or the androidComponents overrides.
     names = re.findall(r'^\s*versionName\s*=\s*"([^"\r\n]+)"\s*$', text, re.M)
@@ -564,8 +571,8 @@ class Delivery:
         path = artifact["path"]
         if digest(Path(path)) != artifact["sha256"]:
             raise DeliveryError("APK changed after build.")
-        command = f"& {ps_quote(self.signer)} verify --print-certs {ps_quote(path)}; exit $LASTEXITCODE"
-        self.r.run([self.ps, "-NoProfile", "-NonInteractive", "-Command", command])
+        command = f"& {ps_quote(self.signer)} verify --verbose --min-sdk-version 23 --print-certs {ps_quote(path)}; exit $LASTEXITCODE"
+        check_signature_schemes(self.r.run([self.ps, "-NoProfile", "-NonInteractive", "-Command", command]))
         badging = self.r.run([self.aapt, "dump", "badging", path])
         match = re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", badging)
         if not match or match.groups() != (PACKAGE, str(self.code), self.version):
