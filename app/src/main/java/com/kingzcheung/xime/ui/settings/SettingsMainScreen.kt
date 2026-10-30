@@ -28,13 +28,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.automirrored.twotone.MenuBook
+import androidx.compose.material.icons.twotone.Draw
+import androidx.compose.material.icons.twotone.Swipe
+import androidx.compose.material.icons.twotone.Language
+import androidx.compose.material.icons.twotone.AppSettingsAlt
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.twotone.LibraryBooks
-import androidx.compose.material.icons.twotone.Gesture
 import androidx.compose.material.icons.twotone.Speed
 import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.Backup
-import androidx.compose.material.icons.twotone.Ballot
 
 import androidx.compose.material.icons.twotone.Build
 import androidx.compose.material.icons.twotone.CloudDownload
@@ -174,7 +176,7 @@ fun SettingsMainContent(
             item {
                 SettingsSection(title = "配置选择", content = {
                     SettingsItem(
-                        icon = Icons.TwoTone.Keyboard,
+                        icon = Icons.TwoTone.AppSettingsAlt,
                         title = "启用输入法",
                         subtitle = "在系统设置中启用 CyIME",
                         status = if (entryStatus.imeEnabled) "已设置" else "未设置",
@@ -289,7 +291,7 @@ fun SettingsMainContent(
             // 首页五组按用户 10-21 的分法：配置选择 / 输入 / 外观 / 智能 / 系统。
             item {
                 SettingsSection(title = "输入", content = {
-                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "语言与方案",
+                    SettingsItem(icon = Icons.TwoTone.Language, title = "语言与方案",
                         subtitle = "语言、每种语言的布局和输入方案、语言键切换方式", onClick = onNavigateToLanguages, showArrow = true)
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 56.dp),
@@ -297,7 +299,7 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
-                        icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
+                        icon = Icons.TwoTone.Keyboard,
                         title = "键盘布局",
                         subtitle = "26 键、九键与 14 键、自定义布局、按键符号、分体",
                         onClick = onNavigateToLayoutDisplay,
@@ -309,7 +311,7 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
-                        icon = Icons.TwoTone.Gesture,
+                        icon = Icons.TwoTone.Swipe,
                         title = "按键与手势",
                         subtitle = "角标输入、长按语言键、滑动移动光标、长按空格",
                         onClick = { onNavigateToRoute("${SettingsRoutes.LayoutDisplay}?page=gestures") },
@@ -367,7 +369,7 @@ fun SettingsMainContent(
             item {
                 SettingsSection(title = "智能", content = {
                     SettingsItem(
-                        icon = Icons.TwoTone.Ballot,
+                        icon = Icons.AutoMirrored.TwoTone.MenuBook,
                         title = "词库",
                         subtitle = "我的短语、导入的词库、删掉的候选、查词",
                         onClick = onNavigateToDictionary,
@@ -410,7 +412,7 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
-                        icon = Icons.TwoTone.Gesture,
+                        icon = Icons.TwoTone.Draw,
                         title = "手写",
                         subtitle = "停顿识别、公式标记、手写模型",
                         onClick = { onNavigateToRoute(SettingsRoutes.Handwriting) },

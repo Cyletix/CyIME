@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -213,7 +214,7 @@ fun SmartPredictionSettingsContent(
                     }
                     SettingsSection(title = "联想行为", content = {
                         SettingsToggleItem(
-                            icon = Icons.Default.AutoAwesome,
+                            icon = Icons.TwoTone.AutoAwesome,
                             title = "空格上屏联想候选",
                             subtitle = "有联想候选时，按空格键直接上屏第一个联想词",
                             checked = spaceCommitEnabled,

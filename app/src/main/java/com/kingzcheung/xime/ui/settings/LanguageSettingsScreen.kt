@@ -4,8 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.twotone.ViewModule
+import androidx.compose.material.icons.twotone.Inventory
+import androidx.compose.material.icons.twotone.Translate
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.twotone.KeyboardAlt
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
@@ -124,7 +126,7 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
             item(key = "chinese-output") {
                 val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
                 SettingsSection(title = "中文输出") {
-                    SettingsToggleItem(Icons.TwoTone.KeyboardAlt, "繁体输出",
+                    SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
                         "候选和上屏改用台湾正体（台灣、計畫、了解），全拼、双拼、九键、14 键都适用；词库和学习记录不变，开启时不给中文联想。",
                         checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) })
                 }
@@ -135,9 +137,9 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
             // 已装的方案组合（启停、排序、应用更改）和导入，原首页「输入资源」。
             item(key = "schema-resources") {
                 SettingsSection(title = "方案资源") {
-                    SettingsItem(Icons.TwoTone.KeyboardAlt, "已安装的方案",
+                    SettingsItem(Icons.TwoTone.Inventory, "已安装的方案",
                         "启停和排序语言、方案与布局的组合，导入方案文件", onClick = onOpenSchemaResources, showArrow = true)
-                    SettingsItem(Icons.TwoTone.KeyboardAlt, "双拼方案",
+                    SettingsItem(Icons.TwoTone.ViewModule, "双拼方案",
                         "小鹤、首道双拼的键位，新建和修改自己的双拼方案", onClick = onOpenDoublePinyin, showArrow = true)
                 }
             }

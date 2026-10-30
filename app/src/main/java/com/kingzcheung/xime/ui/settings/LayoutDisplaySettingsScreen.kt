@@ -11,11 +11,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.twotone.Dialpad
+import androidx.compose.material.icons.twotone.FormatColorFill
+import androidx.compose.material.icons.twotone.AspectRatio
+import androidx.compose.material.icons.twotone.DataObject
+import androidx.compose.material.icons.twotone.EmojiSymbols
+import androidx.compose.material.icons.twotone.DashboardCustomize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Straighten
 import androidx.compose.material.icons.twotone.Padding
-import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -42,6 +47,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.SettingsPreferences
+
+/** 「键盘布局」里各布局一行的图标：26 键用键盘，九键与 14 键用拨号盘。 */
+private val LayoutInputCategory.icon: androidx.compose.ui.graphics.vector.ImageVector
+    get() = when (this) {
+        LayoutInputCategory.Qwerty -> Icons.TwoTone.Keyboard
+        LayoutInputCategory.Nine -> Icons.TwoTone.Dialpad
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,24 +120,24 @@ private fun LayoutDisplayPage(
                 SettingsSection(title = "各布局", content = {
                     LayoutInputCategory.entries.forEachIndexed { index, category ->
                         if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(Icons.TwoTone.Keyboard, category.title, category.description,
+                        SettingsItem(category.icon, category.title, category.description,
                             onClick = { onOpenLayout(category.route) }, showArrow = true)
                     }
                 })
             }
             if (page == null) item {
                 SettingsSection(title = "布局与符号", content = {
-                    SettingsItem(com.kingzcheung.xime.ui.keyboard.AddLayoutIcon, "自定义布局", "新建、复制和编辑按键排列",
+                    SettingsItem(Icons.TwoTone.DashboardCustomize, "自定义布局", "新建、复制和编辑按键排列",
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
                         showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    SettingsItem(Icons.TwoTone.Keyboard, "按键符号", "26 键上下角标、九键与笔画侧栏、手写和常用符号栏，一处按位置编辑",
+                    SettingsItem(Icons.TwoTone.EmojiSymbols, "按键符号", "26 键上下角标、九键与笔画侧栏、手写和常用符号栏，一处按位置编辑",
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
                             .putExtra("edit_symbols", true)) },
                         showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     var pairedSymbols by remember { mutableStateOf(SettingsPreferences.isPairedSymbolsEnabled(context)) }
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "输入成对符号",
+                    SettingsToggleItem(Icons.TwoTone.DataObject, "输入成对符号",
                         "点 “ （ 《 【 等开头的一半时连结尾一起输入，光标停在中间；接着点结尾会跳过已有的那个，" +
                             "退格删掉空的一对。所有屏幕键盘、符号面板和侧栏都一样，实体键盘不变。",
                         checked = pairedSymbols, onCheckedChange = {
@@ -133,16 +145,16 @@ private fun LayoutDisplayPage(
                         })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val split = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitKeyboardEnabled
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "分体键盘",
+                    SettingsToggleItem(SplitKeyboardIcon, "分体键盘",
                         "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
                         checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val filled = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().fillBlankAreas
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "填满留空处",
+                    SettingsToggleItem(Icons.TwoTone.FormatColorFill, "填满留空处",
                         "分体中缝和固定键盘两侧的空白用键盘背景铺满，遮住后面的应用；关闭时镂空，透出后面的内容。",
                         checked = filled, onCheckedChange = { SettingsPreferences.setKeyboardBlankFilled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    SettingsItem(Icons.TwoTone.Tune, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
+                    SettingsItem(Icons.TwoTone.AspectRatio, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
                         "高度、宽度、悬浮与分体、透明度，打开键盘菜单里同一个调节面板",
                         onClick = { onOpenLayout(SettingsRoutes.KeyboardResize) }, showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))

@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.twotone.Apps
+import androidx.compose.material.icons.twotone.Opacity
+import androidx.compose.material.icons.twotone.BlurOn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Image
-import androidx.compose.material.icons.twotone.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -169,7 +171,7 @@ private fun ThemeSettingsPage(
             
             item {
                 SettingsSection(title = "材质效果") {
-                    SettingsToggleItem(icon = Icons.TwoTone.Palette, title = "玻璃效果",
+                    SettingsToggleItem(icon = Icons.TwoTone.BlurOn, title = "玻璃效果",
                         subtitle = "沿用当前配色，切换主题时保持", checked = glass.dark.enabled,
                         onCheckedChange = { enabled ->
                             changeAppearance(context, onThemeChanged) {
@@ -177,7 +179,7 @@ private fun ThemeSettingsPage(
                             }
                         })
                     if (glass.dark.enabled) {
-                        SettingsItem(icon = Icons.TwoTone.Palette, title = "透明度与模糊",
+                        SettingsItem(icon = Icons.TwoTone.Opacity, title = "透明度与模糊",
                             subtitle = "切换深浅时，背景与按键透明度互换", showArrow = true,
                             onClick = { showGlassSettings = true })
                     }
@@ -255,7 +257,7 @@ private fun ThemeSettingsPage(
             item { KeyboardAppearanceSettings() }
             item {
                 SettingsSection(title = "桌面图标") {
-                    SettingsItem(icon = Icons.TwoTone.Palette, title = "图标设置",
+                    SettingsItem(icon = Icons.TwoTone.Apps, title = "图标设置",
                         subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
                         onClick = openIcons, showArrow = true)
                 }
