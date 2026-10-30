@@ -68,7 +68,9 @@ class EditorCursorTest {
         verify(ic, times(2)).sendKeyEvent(any())
     }
 
-    private fun editor(start: Int, end: Int = start, offset: Int = 0, text: String = "abcd", normalized: Boolean = false): InputConnection {
+    /** [ignoresReverse]：像部分 WebView，start > end 时返回成功但不改选区。 */
+    private fun editor(start: Int, end: Int = start, offset: Int = 0, text: String = "abcd", normalized: Boolean = false,
+        ignoresReverse: Boolean = false): InputConnection {
         val extracted = ExtractedText().apply {
             this.text = text
             startOffset = offset
@@ -86,6 +88,7 @@ class EditorCursorTest {
             on { setSelection(any(), any()) } doAnswer {
                 val anchor = it.getArgument<Int>(0) - offset
                 val active = it.getArgument<Int>(1) - offset
+                if (ignoresReverse && anchor > active) return@doAnswer true
                 extracted.selectionStart = if (normalized) minOf(anchor, active) else anchor
                 extracted.selectionEnd = if (normalized) maxOf(anchor, active) else active
                 true
@@ -228,9 +231,9 @@ class EditorCursorTest {
         cursor.beginSelection(ic)
         repeat(3) { cursor.move(ic, -1, true) }
         inOrder(ic) {
-            verify(ic).setSelection(3, 2)
-            verify(ic).setSelection(3, 1)
-            verify(ic).setSelection(3, 0)
+            verify(ic).setSelection(2, 3)
+            verify(ic).setSelection(1, 3)
+            verify(ic).setSelection(0, 3)
         }
     }
 
@@ -241,8 +244,8 @@ class EditorCursorTest {
         cursor.move(ic, -2, true)
         repeat(3) { cursor.move(ic, 1, true) }
         inOrder(ic) {
-            verify(ic).setSelection(3, 1)
-            verify(ic).setSelection(3, 2)
+            verify(ic).setSelection(1, 3)
+            verify(ic).setSelection(2, 3)
             verify(ic).setSelection(3, 3)
             verify(ic).setSelection(3, 4)
         }
@@ -254,8 +257,8 @@ class EditorCursorTest {
         cursor.beginSelection(ic)
         cursor.move(ic, -1, true)
         cursor.move(ic, -1, true)
-        verify(ic).setSelection(204, 203)
-        verify(ic).setSelection(204, 201)
+        verify(ic).setSelection(203, 204)
+        verify(ic).setSelection(201, 204)
     }
 
     @Test fun `cancel reverse selection collapses to the active smaller endpoint`() {
@@ -349,7 +352,7 @@ class EditorCursorTest {
         cursor.beginSelection(ic)
         cursor.moveToParagraphBoundary(ic, false, true)
         cursor.moveToParagraphBoundary(ic, true, true)
-        verify(ic).setSelection(6, 4)
+        verify(ic).setSelection(4, 6)
         verify(ic).setSelection(6, 8)
     }
 
@@ -444,9 +447,28 @@ class EditorCursorTest {
         cursor.beginSelection(ic)
         cursor.move(ic, -20, true)
         cursor.move(ic, 20, true)
-        verify(ic).setSelection(2, 0)
+        verify(ic).setSelection(0, 2)
         verify(ic).setSelection(2, 4)
         verify(ic, never()).sendKeyEvent(any())
     }
 
+    @Test fun `selection expands left up and to paragraph start when host ignores reversed ranges`() {
+        val ic = editor(6, text = "one\nabcd\nlast", ignoresReverse = true)
+        val cursor = EditorCursor()
+        cursor.beginSelection(ic)
+        cursor.move(ic, -1, true)
+        cursor.move(ic, -1, true)
+        cursor.moveVertical(ic, -1, true)
+        cursor.move(ic, 1, true)
+        cursor.moveToParagraphBoundary(ic, false, true)
+        inOrder(ic) {
+            verify(ic).setSelection(5, 6)
+            verify(ic).setSelection(4, 6)
+            verify(ic).setSelection(0, 6)
+            verify(ic).setSelection(1, 6)
+            verify(ic).setSelection(0, 6)
+        }
+        cursor.endSelection(ic)
+        verify(ic).setSelection(0, 0)
+    }
 }

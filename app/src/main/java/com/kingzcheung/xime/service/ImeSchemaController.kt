@@ -339,15 +339,23 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
      * 编码内移动不可用时放弃这一步——绝不把未完成的拼音定格进输入框，也不清空 Rime。
      * 工具栏等明确的编辑命令不传 [preeditKey]，沿用原行为。
      */
+    // 内部输入框每次新建连接会让 EditorCursor 当成换了输入框而丢掉选择锚点，同一输入框复用一个连接。
+    private var internalConnection: Pair<android.widget.EditText, InputConnection>? = null
+
+    private fun internalConnectionFor(editor: android.widget.EditText): InputConnection? =
+        internalConnection?.takeIf { it.first === editor }?.second
+            ?: editor.onCreateInputConnection(android.view.inputmethod.EditorInfo())?.also { internalConnection = editor to it }
+
     private fun editCursor(finishComposition: Boolean = true, preeditKey: String? = null, action: (InputConnection) -> Unit) {
         val target = service.uiState.value.inputTarget
         if (target.isInternal) {
             val editor = target.editText() ?: return // Never fall back to the host when an internal editor owns input.
-            val connection = editor.onCreateInputConnection(android.view.inputmethod.EditorInfo()) ?: return
+            val connection = internalConnectionFor(editor) ?: return
             editorCursor.observeSelection(connection, editor.selectionStart, editor.selectionEnd)
             action(connection)
             return
         }
+        internalConnection = null
         val original = service.currentInputConnection ?: return
         val inputSession = service.uiState.value.inputSessionId
         service.keyRouter.postRimeJob {
@@ -388,7 +396,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         val target = service.uiState.value.inputTarget
         val internalEditor = target.editText()
         val ic = if (target.isInternal) {
-            internalEditor?.onCreateInputConnection(android.view.inputmethod.EditorInfo()) ?: return
+            internalEditor?.let(::internalConnectionFor) ?: return
         } else service.currentInputConnection ?: return
         if (internalEditor != null) editorCursor.observeSelection(ic, internalEditor.selectionStart, internalEditor.selectionEnd)
         editorCursor.movePhysical(ic, event.keyCode, event.isShiftPressed,
