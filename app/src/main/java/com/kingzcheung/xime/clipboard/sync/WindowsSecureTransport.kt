@@ -62,11 +62,15 @@ class WindowsSecureTransport internal constructor(
                 }
             }
             val tls = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
+            // 电脑发放新凭据前要等手头那次剪贴板读写做完，发放即作废旧凭据；配对请求多等一会儿，
+            // 免得电脑已经换了凭据、这边却因为超时没收到，旧凭据从此 401。
+            val pairing = path.startsWith("/api/pair")
             val client = OkHttpClient.Builder().proxy(java.net.Proxy.NO_PROXY).sslSocketFactory(tls.socketFactory, trust)
                 .hostnameVerifier { _, session ->
                     runCatching { ClipboardProfile.sha256Hex(session.peerCertificates[0].encoded) == pin }.getOrDefault(false)
                 }.followRedirects(false).followSslRedirects(false)
-                .connectTimeout(4, TimeUnit.SECONDS).readTimeout(4, TimeUnit.SECONDS).callTimeout(6, TimeUnit.SECONDS).build()
+                .connectTimeout(4, TimeUnit.SECONDS).readTimeout(if (pairing) 20L else 4L, TimeUnit.SECONDS)
+                .callTimeout(if (pairing) 25L else 6L, TimeUnit.SECONDS).build()
             val request = Request.Builder().url(origin + path).header("Accept", "application/json")
             if (token) { require(peer.token.matches(Regex("[A-Za-z0-9_-]{43}"))); request.header("Authorization", "Bearer ${peer.token}") }
             if (etag != null) request.header("If-None-Match", "\"$etag\"")
