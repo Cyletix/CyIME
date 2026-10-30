@@ -67,7 +67,7 @@ import java.io.File
  * 按键形状（圆角 / 方形 / 直角）× 每个主题 × 深浅 × 玻璃开关，各出一张总图：
  * 行是 26 键、14 键、九键、Typewise、数字、常用符号、符号、编辑面板，列是三种形状。
  * 另出视觉样式 × 形状两张，和设置页的选择卡片。只在设了 CYIME_RENDER_OUT 时出图；
- * CYIME_RENDER_THEMES（逗号分隔）只画其中几个主题。
+ * CYIME_RENDER_THEMES（逗号分隔）只画其中几个主题。每次渲染前在 progress.txt 记下组合和堆占用，卡住时看最后一行。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w420dp-h900dp-xhdpi")
@@ -91,7 +91,12 @@ class KeyShapeRenderTest {
         else -> "rime_ice"
     }
 
-    @Test fun renderKeyShapes() {
+    // A fresh activity per group: a stall in one group leaves the other groups' sheets, and progress.txt names it.
+    @Test fun renderCoolThemes() = renderKeyShapes(themes.take(5), styles = false)
+    @Test fun renderWarmThemes() = renderKeyShapes(themes.drop(5), styles = false)
+    @Test fun renderVisualStyles() = renderKeyShapes(emptyList(), styles = true)
+
+    private fun renderKeyShapes(group: List<String>, styles: Boolean) {
         val out = System.getenv("CYIME_RENDER_OUT")
         assumeTrue(!out.isNullOrEmpty())
         val only = System.getenv("CYIME_RENDER_THEMES")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
@@ -165,7 +170,11 @@ class KeyShapeRenderTest {
             if (crop !== full) full.recycle()
             return crop
         }
+        // The step about to render, so a stall names its combination.
+        val progress = File(dir, "progress.txt")
         fun show(t: String, d: Boolean, g: Boolean, l: String, shape: KeyShape) {
+            progress.appendText("$t ${if (d) "dark" else "light"} ${if (g) "glass" else "solid"} $l ${shape.id} " +
+                "${VisualStyles.current.id} heap=${(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) shr 20}MB\n")
             val s = schemaFor(l)
             KeysConfigHelper.setActiveKeyboardSchema(s)
             SettingsPreferences.getPrefsPublic(app).edit().putString("keyboard_theme", t).commit()
@@ -175,7 +184,7 @@ class KeyShapeRenderTest {
             }
             rule.waitForIdle()
         }
-        for (t in themes.filter { only == null || it in only }) for (d in listOf(false, true)) for (g in listOf(false, true)) {
+        for (t in group.filter { only == null || it in only }) for (d in listOf(false, true)) for (g in listOf(false, true)) {
             val sheet = Sheet(layouts, KeyShape.entries.map { it.id })
             layouts.forEachIndexed { r, l -> KeyShape.entries.forEachIndexed { c, shape ->
                 show(t, d, g, l, shape); sheet.put(r, c, grab("shape-body"))
@@ -183,10 +192,10 @@ class KeyShapeRenderTest {
             sheet.save(File(dir, "$t-${if (d) "dark" else "light"}-${if (g) "glass" else "solid"}.png"))
         }
         // 视觉样式：键帽材质按同一半径画，换形状后描边、高光都要跟着键角走。
-        for ((t, d) in listOf("soft_blue" to false, "pure_black" to true)) {
-            val styles = VisualStyle.entries
-            val sheet = Sheet(styles.map { it.id }, KeyShape.entries.map { it.id })
-            styles.forEachIndexed { r, style ->
+        if (styles) for ((t, d) in listOf("soft_blue" to false, "pure_black" to true)) {
+            val looks = VisualStyle.entries
+            val sheet = Sheet(looks.map { it.id }, KeyShape.entries.map { it.id })
+            looks.forEachIndexed { r, style ->
                 rule.runOnIdle { VisualStyles.current = style }
                 KeyShape.entries.forEachIndexed { c, shape -> show(t, d, false, "26", shape); sheet.put(r, c, grab("shape-body")) }
             }
