@@ -54,7 +54,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     HorizontalDivider()
                     // 「键盘滑动」移光标和滑行冲突：照常显示，被锁时置灰并写明被谁锁（见 InputGestureLocks）。
                     SettingsToggleItem(Icons.TwoTone.Gesture, "滑行输入",
-                        "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
+                        "26 键手指划过字母出整词：英文直接上屏、候选栏可换词；中文全拼、双拼划一个词的拼音，接着划或点按都接在后面，照常选字。开着时 26 键不显示上下角标，竖着滑一行仍输入角标符号。",
                         checked = settings.glideTyping, onCheckedChange = {
                             settings = settings.copy(glideTyping = it); settings.save(context)
                         },

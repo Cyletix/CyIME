@@ -86,3 +86,17 @@ fun glideCased(word: String, shifted: Boolean, capsLocked: Boolean): String = wh
     shifted -> word.replaceFirstChar { it.uppercaseChar() }
     else -> word
 }
+
+/**
+ * 当前键盘能不能滑行：英文 26 键；中文全拼、双拼的字母键盘（26 键、分体、自定义字母排列）。
+ * 14 键、九键、注音、日文、五笔不滑行；双拼只认得出键位表的方案。
+ */
+fun glideSupported(isAsciiMode: Boolean, profile: com.kingzcheung.xime.settings.InputProfile, schemaId: String): Boolean =
+    isAsciiMode || chineseGlideSupported(profile, schemaId)
+
+fun chineseGlideSupported(profile: com.kingzcheung.xime.settings.InputProfile, schemaId: String): Boolean =
+    profile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
+        profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC &&
+        (profile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN ||
+            profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
+            com.kingzcheung.xime.settings.DoublePinyinSchemes.find(schemaId) != null)

@@ -327,6 +327,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /**
+     * 中文滑行：一个词的编码按点按同一路径逐键送进 Rime，已打的拼音、分段选词、邻键纠错和候选刷新都不变。
+     * 接在未上屏的编码后面时先补音节分隔符（xi 后面划 an 是 xi'an，不会并成 xian）。
+     */
+    internal fun typeGlideCode(code: String) {
+        if (code.isEmpty() || hasPendingCandidateCommit) return
+        val input = service.candidateState.value.inputText
+        if (input.isNotEmpty() && input.last() != '\'') handleKeyPress("'", false)
+        code.forEach { handleKeyPress(it.toString(), false) }
+    }
+
     internal fun handleKeyPress(key: String, isShifted: Boolean, hardwarePageDirection: Int = 0,
         languageSwitchMode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null,
         hardwareEvent: KeyEvent? = null, mergedKey: Boolean = false) {

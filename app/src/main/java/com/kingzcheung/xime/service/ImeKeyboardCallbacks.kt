@@ -58,6 +58,7 @@ internal fun rememberImeKeyboardCallbacks(
         KeyboardCallbacks(
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
             onGlideWord = service.keyRouter::commitGlideWord,
+            onGlideCode = service.keyRouter::typeGlideCode,
             inputAdmissionTicket = { if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket() },
             captureInputContext = service.keyRouter::captureInputContext,
             t9LeftContext = {
