@@ -109,6 +109,9 @@ fun ToolPanel(
                     }
                 },
                 update = { editText ->
+                    // Something else took view focus (the toolbar's layout switch rebuilds the keyboard
+                    // under the search field): give it back so the caret stays where keys go.
+                    if (isFocused && !editText.hasFocus()) editText.post { editText.requestFocus() }
                     if (initialText.isNotEmpty() && !editText.text.toString().equals(initialText)) {
                         editText.setText(initialText)
                         editText.setSelection(initialText.length)
