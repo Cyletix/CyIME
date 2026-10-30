@@ -14,7 +14,6 @@ object DoublePinyinSchemes {
     private const val TAG = "DoublePinyinSchemes"
     const val FILE = "custom-double-pinyin.json"
     private const val BASE = "double_pinyin_flypy"
-    private const val SHOUDAO_OFFERED = "double_pinyin_shoudao_offered_v1"
 
     fun isGenerated(id: String) = id == DoublePinyinScheme.SHOUDAO_ID || id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX)
     fun isCustom(id: String) = id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX)
@@ -84,19 +83,19 @@ object DoublePinyinSchemes {
         }
     }
 
-    /** 首道双拼只在升级后加入方案列表一次，排在小鹤双拼后面；之后用户的启停选择不再改动。 */
-    fun offerShoudaoOnce(context: Context, enabled: List<String>): List<String> {
-        val prefs = SettingsPreferences.getPrefsPublic(context)
-        if (prefs.getBoolean(SHOUDAO_OFFERED, false)) return enabled
-        if (!File(SchemaManager.getRimeDir(context), "${DoublePinyinScheme.SHOUDAO_ID}.schema.yaml").isFile) return enabled
-        val updated = if (DoublePinyinScheme.SHOUDAO_ID in enabled) enabled else {
-            val after = enabled.indexOf(BASE)
-            if (after < 0) enabled + DoublePinyinScheme.SHOUDAO_ID
-            else enabled.take(after + 1) + DoublePinyinScheme.SHOUDAO_ID + enabled.drop(after + 1)
-        }
-        if (updated != enabled) SchemaManager.setEnabledSchemas(context, updated)
-        prefs.edit().putBoolean(SHOUDAO_OFFERED, true).apply()
-        return updated
+    /** 在方案栏显示或隐藏一个双拼方案；首道双拼默认不启用，在双拼方案页自己打开。 */
+    fun setEnabled(context: Context, id: String, enabled: Boolean) {
+        val current = SchemaManager.getEnabledSchemas(context)
+        val updated = if (enabled) {
+            val after = current.indexOf(BASE)
+            if (id in current) current else if (after < 0) current + id
+            else current.take(after + 1) + id + current.drop(after + 1)
+        } else current.filterNot { it == id }.ifEmpty { listOf("rime_ice") }
+        if (updated == current) return
+        if (!enabled && SettingsPreferences.getCurrentSchema(context) == id)
+            SettingsPreferences.setCurrentSchema(context, updated.firstOrNull { InputProfiles.describe(it).language == InputLanguage.CHINESE } ?: updated.first())
+        SchemaManager.setEnabledSchemas(context, updated)
+        notifyChanged(context)
     }
 
     fun save(context: Context, scheme: DoublePinyinScheme) {
