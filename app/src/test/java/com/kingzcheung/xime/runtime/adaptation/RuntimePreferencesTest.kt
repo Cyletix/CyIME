@@ -87,7 +87,7 @@ class RuntimePreferencesTest {
     @Test fun `disabled speech or online mode never requests local correction`() {
         val asr = mapOf("selected_model" to SpeechModelCatalog.TWO_PASS)
         assertFalse(read(mapOf("stt_enabled" to false), asr).voiceCorrection.value)
-        assertFalse(read(mapOf("stt_use_local" to false), asr).voiceCorrection.value)
+        // 只存了「不用本地」、在线接口没测试通过也没选插件时仍用本地（不会打开语音就关），见 SettingsPreferences.isSttUseLocal。
         assertFalse(read(mapOf("stt_online_plugin_id" to "configured"), asr).voiceCorrection.value)
         assertFalse(read(mapOf("smart_prediction_enabled" to false)).neuralPrediction.value)
     }
