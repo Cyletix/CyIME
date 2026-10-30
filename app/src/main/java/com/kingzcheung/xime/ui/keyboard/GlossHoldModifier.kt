@@ -58,6 +58,16 @@ internal fun Modifier.glossHold(
 }
 
 /**
+ * 九键“下一项”长按 = 按住 Shift：按住期间候选中英对调（[CandidateGlossary.t9NextHeld]），松手或键失效时恢复。
+ * [onHeld] 在开始按住时调用，这次松手的点按应由调用方忽略。
+ */
+internal fun Modifier.t9NextShiftHold(enabled: Boolean, onDown: () -> Unit, onHeld: () -> Unit): Modifier =
+    glossHold(enabled, onDown = onDown) { holding ->
+        if (holding) onHeld()
+        com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = holding
+    }
+
+/**
  * 从这个键拖到候选栏上：手指离开按下点超过 [area]（键盘区）宽或高的一半才算拖动选词（用户 10-25），
  * 没过这个距离仍是键自己的左滑、上滑、点按。进入拖动后在 Initial 阶段消费触摸，键自己的手势随即取消
  * （不再出「上一项」等预览，松手也不触发）；候选栏和键盘都画出从键到手指的拖线（[CandidateDropTargets.dragLine]），
