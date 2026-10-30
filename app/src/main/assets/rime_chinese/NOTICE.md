@@ -7,3 +7,7 @@ CyIME 构建适配在 `app/build-logic/tasks-chinese.gradle.kts`：接入候选�
 中文九键沿用 Xime 的原生 librime-t9 适配；中文14键源自本仓库 `docs/schemas_examples/pinyin_14jian.schema.yaml`。两者的词典引用改为 rime_ice，其余键位映射保留。市场同名方案和个人 .custom.yaml 优先，不覆盖用户修改。
 
 来源：https://github.com/iDvel/rime-ice/tree/9e66b0729083b37d217312294f6d516c8d7234be
+
+## 简繁转换表（opencc/）
+
+`s2t.json`、`s2tw.json`、`s2hk.json` 和其中引用的 `.ocd2` 表来自 OpenCC（Apache-2.0），即 librime 子模块 `deps/opencc` 的提交 `e9f3bb3`，由同一份源码编出，未修改。`cyime_s2tw.json` 在 `s2tw.json` 后加一步 `CyimeTWPhrases.ocd2`，把 s2tw 选的字形换成台湾日常写法（臺→台、計劃→計畫、瞭解→了解），表的原文是 `tools/opencc/cyime_tw_phrases.txt`，按小麦注音 McBopomofo（MIT）`Source/Data/phrase.occ` 的词频挑出，提交 `18e2060dd5d0b511753ad79a8fe0d112e944f1af`。生成方法见 `tools/opencc/build_cyime_opencc.py`。

@@ -34,6 +34,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("pinyin26WordModel", 5)
     inputs.property("candidateComments", 1)
     inputs.property("cyimeTerms", 1)
+    inputs.property("taiwanTraditional", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -266,7 +267,11 @@ val prepareChineseDictionaries by tasks.registering {
         val particles = (finalParticles.readLines() + measureWords.readLines()).map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith("#") }
         check(particles.isNotEmpty()) { "No sentence-final particles in ${finalParticles.name}" }
-        val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
+        // 简/繁 converts to Taiwan everyday forms (台灣, 計畫, 了解): assets/rime_chinese/opencc/cyime_s2tw.json,
+        // built by tools/opencc/build_cyime_opencc.py. Upstream's s2t.json gives 臺灣 and was never bundled.
+        fun taiwanForms(schema: String) = schema.replace("  opencc_config: s2t.json ", "  opencc_config: cyime_s2tw.json ")
+            .also { check(it.contains("  opencc_config: cyime_s2tw.json ")) { "Upstream traditionalize config changed" } }
+        val baseSchema = taiwanForms(File(root, "rime_ice.schema.yaml").readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
             // A doubled letter typed once where syllables meet (chengong → 成功 second, after the typed 陈宫), shown
             // only when the corrected word is 20 times as common as the typed reading (docs/development/typo-correction-20261021.md).
@@ -333,7 +338,7 @@ val prepareChineseDictionaries by tasks.registering {
         }
         File(root, "rime_ice.schema.yaml").writeText(baseSchema)
         val doublePinyin = File(root, "double_pinyin_flypy.schema.yaml")
-        doublePinyin.writeText(doublePinyin.readText().replace("\ntranslator:\n",
+        doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  cyime_neighbor_correction: true\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
             .replace("enable_correction: false", "enable_correction: true"))

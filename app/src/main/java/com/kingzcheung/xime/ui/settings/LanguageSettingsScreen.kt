@@ -121,6 +121,14 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                     }
                 }
             }
+            item(key = "chinese-output") {
+                val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
+                SettingsSection(title = "中文输出") {
+                    SettingsToggleItem(Icons.TwoTone.KeyboardAlt, "繁体输出",
+                        "候选和上屏改用台湾正体（台灣、計畫、了解），全拼、双拼、九键、14 键都适用；词库和学习记录不变，开启时不给中文联想。",
+                        checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) })
+                }
+            }
             item(key = "language-key-switch") {
                 LanguageKeySwitchSettings(availableProfiles, orderedLanguages, profilesState.currentSchema)
             }

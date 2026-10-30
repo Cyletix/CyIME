@@ -852,9 +852,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     
     private fun getPredictionFromPlugin(contextText: String) {
-        if (!isChineseMode || !canPredictAfter(contextText)) return
+        if (!isChineseMode || !canPredictAfter(contextText) || traditionalChineseOutput()) return
         predictionManager.getPrediction(contextText)
     }
+
+    /** 联想表只有简体：繁体输出时不给中文联想，免得简体词混进繁体文字。 */
+    private fun traditionalChineseOutput(): Boolean = SettingsPreferences.getPrefsPublic(this)
+        .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
     
     private var rimeInitializationJob: kotlinx.coroutines.Job? = null
 

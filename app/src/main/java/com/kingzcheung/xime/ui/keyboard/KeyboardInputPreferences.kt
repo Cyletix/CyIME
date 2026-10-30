@@ -70,6 +70,8 @@ data class KeyboardInputPreferences(
     val neighborCorrection: Boolean = true,
     /** 中文全拼 26 键中英混输（nihaohello → 你好hello），默认关；见 app/data/cyime_mixed_input.lua。 */
     val mixedInput: Boolean = false,
+    /** 中文候选和上屏用台湾正体（台灣、計畫），默认关；Rime 选项 traditionalization，转换表见 assets/rime_chinese/opencc。 */
+    val traditionalOutput: Boolean = false,
     val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
     val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
     val reverseSymbolSwipe: Boolean = false,
@@ -116,12 +118,14 @@ data class KeyboardInputPreferences(
     companion object {
         /** 中英混输开关；输入法每次按字母键读它（ImeKeyRouter），改了下一键就生效。 */
         const val MIXED_INPUT_KEY = "mixed_input"
+        /** 繁体输出开关；同中英混输，输入法按键前读它（ImeKeyRouter）。 */
+        const val TRADITIONAL_OUTPUT_KEY = "traditional_output"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", MIXED_INPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", MIXED_INPUT_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -171,6 +175,7 @@ data class KeyboardInputPreferences(
                 symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(prefs.getFloat("symbol_key_hold_seconds", 1f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
+                traditionalOutput = prefs.getBoolean(TRADITIONAL_OUTPUT_KEY, false),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
                 fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),
                 symbolInputMode = SymbolInputMode.entries.firstOrNull {
@@ -204,6 +209,7 @@ data class KeyboardInputPreferences(
             .putFloat("symbol_key_hold_seconds", normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds))
             .putBoolean("neighbor_correction", neighborCorrection)
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
+            .putBoolean(TRADITIONAL_OUTPUT_KEY, traditionalOutput)
             .putBoolean("fourteen_letter_swipe", fourteenLetterSwipe)
             .putFloat("fourteen_letter_swipe_dp", normalizeLetterSwipeDistance(fourteenLetterSwipeDp))
             .putString("symbol_input_mode", symbolInputMode.name)
