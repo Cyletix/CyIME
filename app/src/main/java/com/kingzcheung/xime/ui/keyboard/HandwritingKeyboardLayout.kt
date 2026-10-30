@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.handwriting.EnglishWordRecognizer
+import com.kingzcheung.xime.handwriting.EnglishWordSpacing
 import com.kingzcheung.xime.handwriting.FormulaRecognizer
 import com.kingzcheung.xime.handwriting.HandwritingCandidate
 import com.kingzcheung.xime.handwriting.HandwritingEngine
@@ -199,6 +200,11 @@ fun HandwritingKeyboardLayout(
     val useTemplates by rememberUpdatedState(templateScript != null && templateCount > 0)
     // 公式模式下首选候选的渲染预览（LaTeX → KaTeX），板上没笔迹时不显示
     var formulaPreview by remember { mutableStateOf("") }
+    // 英文：停顿后接着写的新词前补空格、一段里写了几个词时分开认（整词模型不出空格）
+    val wordSpacing = remember(sessionKey, language) { EnglishWordSpacing() }
+    fun spaced(segments: List<OverlappedHandwritingRecognizer.Segment>, startsWord: Boolean) =
+        if (!startsWord || segments.isEmpty()) segments
+        else listOf(segments[0].copy(candidates = segments[0].candidates.map { it.copy(char = " " + it.char) })) + segments.drop(1)
     val session = remember(scope, sessionKey, language) {
         HandwritingInputSession(scope, { pauseMs }, recognize = { strokes ->
             if (formulaActive) recognitionMutex.withLock {
@@ -215,6 +221,7 @@ fun HandwritingKeyboardLayout(
                 withContext(Dispatchers.Default) {
                     val script = templateScript ?: return@withContext emptyList()
                     val points = strokes.map { stroke -> stroke.map { it.x to it.y } }
+                    val chunk = if (script == HandwritingTemplates.Script.LATIN) wordSpacing.next(points) else null
                     val gaps = HandwritingStrokeFx.windowGaps(strokes).map { it * OverlappedHandwritingRecognizer.GAP_SPLIT_MS / pauseMs }
                     // 字母最多 4 笔；日语有漢字，沿用中文的上限
                     // 日语、英文习惯从左往右并排写：位置空隙也当换字信号
@@ -227,18 +234,18 @@ fun HandwritingKeyboardLayout(
                             .map { (text, score) -> HandwritingCandidate(text, (2f * score - 1f).coerceAtLeast(0.0001f)) }
                     }).segments
                     // 英文整词模型在时：整段笔迹一次认成单词放在前面，逐个字母切出来的结果拼成一个词排在后面（数字只有它能出）
-                    val words = if (script == HandwritingTemplates.Script.LATIN && EnglishWordRecognizer.isAvailable(context))
-                        EnglishWordRecognizer.recognize(context, points) else emptyList()
+                    val words = if (chunk != null && EnglishWordRecognizer.isAvailable(context))
+                        EnglishWordRecognizer.recognizeWords(context, points, chunk.words) else emptyList()
                     if (words.isNotEmpty()) {
                         val spelled = segments.joinToString("") { it.candidates.firstOrNull()?.char.orEmpty() }
                         val candidates = (words.map { (word, score) -> HandwritingCandidate(word, score) } +
                             listOfNotNull(spelled.takeIf { it.isNotEmpty() }?.let { HandwritingCandidate(it, 0f) }))
                             .distinctBy { it.char }
                         HandwritingTemplates.rememberForLearning(context, script, null)
-                        return@withContext listOf(OverlappedHandwritingRecognizer.Segment(0, strokes.size, candidates))
+                        return@withContext spaced(listOf(OverlappedHandwritingRecognizer.Segment(0, strokes.size, candidates)), chunk?.startsWord == true)
                     }
                     HandwritingTemplates.rememberForLearning(context, script, points.takeIf { segments.size == 1 })
-                    segments
+                    spaced(segments, chunk?.startsWord == true)
                 }
             } else {
                 // 只传不可变快照；每次创建新窗口，取消的本地推理不会污染下一字缓存。
@@ -246,20 +253,23 @@ fun HandwritingKeyboardLayout(
                 recognitionMutex.withLock {
                     withContext(Dispatchers.Default) {
                         // 英文（内置模型里的字母）也按并排书写切分；中文保持叠写习惯
-                        (if (recognitionLanguage == InputLanguage.CHINESE) OverlappedHandwritingRecognizer()
+                        val points = strokes.map { stroke -> stroke.map { it.x to it.y } }
+                        val startsWord = recognitionLanguage == InputLanguage.ENGLISH && wordSpacing.next(points).startsWord
+                        spaced((if (recognitionLanguage == InputLanguage.CHINESE) OverlappedHandwritingRecognizer()
                             else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true,
                                 maxStrokesPerSegment = if (recognitionLanguage == InputLanguage.ENGLISH) 4
                                     else OverlappedHandwritingRecognizer.DEFAULT_MAX_STROKES_PER_SEGMENT,
                                 lettersApart = recognitionLanguage == InputLanguage.ENGLISH,
                                 letterCost = OverlappedHandwritingRecognizer.MODEL_LETTER_COST)).recognize(
-                            strokes.map { stroke -> stroke.map { it.x to it.y } }, gaps,
-                            predictFn = { points, topK -> HandwritingEngine.predict(points, topK, recognitionLanguage) },
-                        ).segments
+                            points, gaps,
+                            predictFn = { seg, topK -> HandwritingEngine.predict(seg, topK, recognitionLanguage) },
+                        ).segments, startsWord)
                     }
                 }
             }
         }, onNewCharacter = { newCharacter?.invoke() },
-            onRecognition = { result?.invoke(it) }, onKey = { keyAction(it) }, keepInk = { formulaActive })
+            // 按键（空格、回车、标点…）在本段笔迹认完之后才执行：从这里起下一段不再补空格
+            onRecognition = { result?.invoke(it) }, onKey = { wordSpacing.reset(); keyAction(it) }, keepInk = { formulaActive })
     }
     val modelDownloaded by remember {
         ModelManager.downloadStates.map { it["ochwpro"] is ModelDownloadState.Complete }.distinctUntilChanged()
