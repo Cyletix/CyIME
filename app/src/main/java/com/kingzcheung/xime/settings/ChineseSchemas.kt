@@ -128,7 +128,7 @@ object ChineseSchemas {
     /** 一次整理旧默认和重复模式，之后用户的启停选择继续有效。 */
     @Synchronized
     fun addOnFirstUpgrade(context: Context, enabled: List<String>): List<String> =
-        DoublePinyinSchemes.offerShoudaoOnce(context, addChineseDefaults(context, enabled))
+        addChineseDefaults(context, enabled)
 
     private fun addChineseDefaults(context: Context, enabled: List<String>): List<String> {
         val prefs = SettingsPreferences.getPrefsPublic(context)

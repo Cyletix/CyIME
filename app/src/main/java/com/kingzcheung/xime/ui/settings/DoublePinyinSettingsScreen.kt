@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.settings.DoublePinyinScheme
 import com.kingzcheung.xime.settings.DoublePinyinSchemes
 import com.kingzcheung.xime.settings.CustomKeyboardLayouts
+import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,6 +42,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var schemes by remember { mutableStateOf(DoublePinyinScheme.BUILTINS) }
+    var enabled by remember { mutableStateOf(emptySet<String>()) }
     var draft by remember { mutableStateOf<DoublePinyinScheme?>(null) }
     var original by remember { mutableStateOf<DoublePinyinScheme?>(null) }
     var picked by remember { mutableStateOf<String?>(null) }
@@ -59,6 +61,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         runCatching { withContext(Dispatchers.IO) { DoublePinyinSchemes.all(context) } }
             .onSuccess { schemes = it }.onFailure { message = "无法读取双拼方案：${it.message}" }
+        enabled = withContext(Dispatchers.IO) { SchemaManager.getEnabledSchemas(context).toSet() }
     }
     DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
@@ -93,6 +96,25 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                 scheme.collisions().size.let { if (it > 0) " · $it 组同码" else "" },
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             DoublePinyinKeyMap(scheme)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("在方案栏显示", style = MaterialTheme.typography.bodyLarge)
+                                    Text("打开后可在「语言与方案」里选它", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Switch(scheme.id in enabled, enabled = !busy, modifier = Modifier.testTag("double-pinyin-enabled:${scheme.id}"),
+                                    onCheckedChange = { on ->
+                                        busy = true
+                                        scope.launch {
+                                            runCatching { withContext(Dispatchers.IO) {
+                                                DoublePinyinSchemes.setEnabled(context, scheme.id, on)
+                                                SchemaManager.getEnabledSchemas(context).toSet()
+                                            } }.onSuccess { enabled = it; message = if (on) "已打开，正在应用" else "已从方案栏隐藏" }
+                                                .onFailure { message = "设置失败：${it.message}" }
+                                            busy = false
+                                        }
+                                    })
+                            }
                             Row {
                                 if (custom) TextButton(onClick = { edit(scheme) }, enabled = !busy) { Text("编辑") }
                                 TextButton(onClick = { edit(copyOf(scheme)) }, enabled = !busy) { Text(if (custom) "复制" else "复制修改") }
@@ -157,7 +179,8 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                     val saving = current.copy(name = current.name.trim())
                     scope.launch {
                         runCatching { withContext(Dispatchers.IO) { DoublePinyinSchemes.save(context, saving); DoublePinyinSchemes.all(context) } }
-                            .onSuccess { schemes = it; draft = null; message = "已保存，正在应用；之后可在「语言与方案」的方案一栏选择" }
+                            .onSuccess { schemes = it; draft = null; enabled = enabled + saving.id
+                                message = "已保存，正在应用；之后可在「语言与方案」的方案一栏选择" }
                             .onFailure { message = "保存失败：${it.message}" }
                         busy = false
                     }
