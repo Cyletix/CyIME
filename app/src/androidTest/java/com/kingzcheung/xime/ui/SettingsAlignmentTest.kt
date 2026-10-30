@@ -60,7 +60,7 @@ class SettingsAlignmentTest {
     @Test fun spaceHoldOptionsShareOneFullWidthRowAndStillPersistSelection() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val keys = listOf("space_hold_action", "cursor_step_dp", "key_text_scale", "fixed_symbols", "handwriting_pause_seconds", "handwriting_pause_seconds_v2")
+        val keys = listOf("space_hold_action", "cursor_gesture_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols", "handwriting_pause_seconds", "handwriting_pause_seconds_v2")
         val saved = keys.associateWith { prefs.all[it] }
         try {
             rule.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
@@ -70,8 +70,8 @@ class SettingsAlignmentTest {
                     }
                 }
             } }
-            val left = rule.onNodeWithText("移动光标")
-            val right = rule.onNodeWithText("连续空格")
+            val left = rule.onNodeWithTag("space-hold:REPEAT")
+            val right = rule.onNodeWithTag("space-hold:VOICE_TOGGLE")
             val a = left.fetchSemanticsNode().boundsInRoot
             val b = right.fetchSemanticsNode().boundsInRoot
             val row = rule.onNodeWithTag("space-hold-options", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -82,9 +82,9 @@ class SettingsAlignmentTest {
             assertEquals(row.right, b.right, 1f)
             assertTrue(a.right < b.left)
             right.performClick().assertIsSelected()
-            rule.runOnIdle { assertEquals(SpaceHoldAction.REPEAT, KeyboardInputPreferences.read(context).spaceHold) }
+            rule.runOnIdle { assertEquals(SpaceHoldAction.VOICE_TOGGLE, KeyboardInputPreferences.read(context).effectiveSpaceHold) }
             left.performClick().assertIsSelected()
-            rule.runOnIdle { assertEquals(SpaceHoldAction.CURSOR, KeyboardInputPreferences.read(context).spaceHold) }
+            rule.runOnIdle { assertEquals(SpaceHoldAction.REPEAT, KeyboardInputPreferences.read(context).effectiveSpaceHold) }
             screenshot("space-hold-alignment")
         } finally {
             prefs.edit().also { edit -> saved.forEach { (key, value) -> when (value) {

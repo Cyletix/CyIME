@@ -150,7 +150,7 @@ internal fun InputExperienceSettings(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            // 只显示当前生效的项：长按空格移动光标时不列连续空格/语音；关闭滑动移动光标时不显示光标距离。
+            // 只显示当前生效的项：关闭滑动移动光标时不显示光标距离。
             // 触发时长跟着空格当前的长按功能放，标题写明它控制的是哪个功能。
             @Composable fun spaceHoldSlider() {
                 val actionText = when (settings.effectiveSpaceHold) {
@@ -163,11 +163,6 @@ internal fun InputExperienceSettings(
                         onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..1f, steps = 8)
                     Text("默认 0.2 秒，每档 0.1 秒。语言键的长按单独设置。", style = MaterialTheme.typography.bodySmall)
                 }
-            }
-            if (settings.cursorGesture == CursorGestureMode.SPACE) {
-                Text("长按空格后左右滑动移动光标；要让长按空格连续输入空格或开关语音，先改用其他移动方式。",
-                    style = MaterialTheme.typography.bodySmall)
-                spaceHoldSlider()
             }
             if (settings.cursorGesture != CursorGestureMode.NONE) {
                 Column(Modifier.settingsSearchAnchor("从中间滑到边缘走几行", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -200,24 +195,29 @@ internal fun InputExperienceSettings(
                 if (SettingsPreferences.isSoundEnabled(context)) cursorStepSwitch("移动光标时播放按键音",
                     "光标每移动一字响一下按键音。", settings.cursorStepSound, "cursor-step-sound") { settings.copy(cursorStepSound = it) }
             }
-            if (settings.cursorGesture != CursorGestureMode.SPACE) {
-                HorizontalDivider()
-                Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("长按空格", style = MaterialTheme.typography.titleSmall)
-                    Text("语音再次长按结束，也可用工具栏麦克风结束。", style = MaterialTheme.typography.bodySmall)
-                    Row(Modifier.fillMaxWidth().height(104.dp).testTag("space-hold-options"),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE).forEach { action ->
-                            IllustratedChoiceCard(action.label, settings.effectiveSpaceHold == action,
-                                onClick = { settings = settings.copy(spaceHold = action); settings.save(context) },
-                                modifier = Modifier.weight(1f), tag = "space-hold:${action.name}") {
-                                SpaceHoldIllustration(voice = action == SpaceHoldAction.VOICE_TOGGLE)
-                            }
+            // 连续空格/语音一直列出来（用户 10-30：先得把移动光标改走才看得到语音，找不着）。
+            // 长按空格正在移动光标时点这两项直接改过来，见 [KeyboardInputPreferences.withSpaceHold]。
+            HorizontalDivider()
+            Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("长按空格", style = MaterialTheme.typography.titleSmall)
+                Text("语音再次长按结束，也可用工具栏麦克风结束。", style = MaterialTheme.typography.bodySmall)
+                if (settings.cursorGesture == CursorGestureMode.SPACE) {
+                    Text("现在长按空格用来移动光标。选下面一项后，滑动移动光标改为「${settings.cursorGestureAfterLeavingSpace.label}」。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("space-hold-takes-over-cursor"))
+                }
+                Row(Modifier.fillMaxWidth().height(104.dp).testTag("space-hold-options"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE).forEach { action ->
+                        IllustratedChoiceCard(action.label, settings.effectiveSpaceHold == action,
+                            onClick = { settings = settings.withSpaceHold(action); settings.save(context) },
+                            modifier = Modifier.weight(1f), tag = "space-hold:${action.name}") {
+                            SpaceHoldIllustration(voice = action == SpaceHoldAction.VOICE_TOGGLE)
                         }
                     }
                 }
-                spaceHoldSlider()
             }
+            spaceHoldSlider()
             }
             if (InputExperiencePart.LANGUAGE_HOLD in parts) {
             divider()

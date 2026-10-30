@@ -100,6 +100,13 @@ data class KeyboardInputPreferences(
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
+    /** 长按空格不再移动光标时，滑动移动光标改成哪种：键盘滑动；英文滑行锁着键盘滑动就关掉。 */
+    val cursorGestureAfterLeavingSpace: CursorGestureMode get() =
+        if (InputGestureLocks.lockFor(this, InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD) == null)
+            CursorGestureMode.KEYBOARD else CursorGestureMode.NONE
+    /** 设置页选长按空格连续空格/语音：长按空格正在移动光标时一并把移动光标改成 [cursorGestureAfterLeavingSpace]，选了立刻生效。 */
+    fun withSpaceHold(action: SpaceHoldAction): KeyboardInputPreferences = copy(spaceHold = action,
+        cursorGesture = if (cursorGesture == CursorGestureMode.SPACE) cursorGestureAfterLeavingSpace else cursorGesture)
     /** 空格的所有长按行为（移动光标、连续空格、语音）共用“空格长按触发”时长，默认 0.2 秒。 */
     val spaceHoldDelayMs: Long get() = (normalizeCursorHoldSeconds(cursorHoldSeconds) * 1000).roundToInt().toLong()
     val symbolKeyHoldMs: Long get() = (normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds) * 1000).roundToInt().toLong()

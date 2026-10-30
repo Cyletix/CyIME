@@ -28,6 +28,26 @@ class KeyboardInputPreferencesTest {
         }
     }
 
+    @Test fun `choosing voice for long-press space works even while space moves the cursor`() {
+        val cursorOnSpace = KeyboardInputPreferences(cursorGesture = CursorGestureMode.SPACE)
+        assertEquals(SpaceHoldAction.CURSOR, cursorOnSpace.effectiveSpaceHold)
+        val voice = cursorOnSpace.withSpaceHold(SpaceHoldAction.VOICE_TOGGLE)
+        assertEquals(SpaceHoldAction.VOICE_TOGGLE, voice.effectiveSpaceHold)
+        assertEquals(CursorGestureMode.KEYBOARD, voice.cursorGesture)
+        // 英文滑行锁着键盘滑动：移动光标关掉，不去占用滑行。
+        val glide = cursorOnSpace.copy(glideTyping = true).withSpaceHold(SpaceHoldAction.REPEAT)
+        assertEquals(SpaceHoldAction.REPEAT, glide.effectiveSpaceHold)
+        assertEquals(CursorGestureMode.NONE, glide.cursorGesture)
+        assertEquals(true, glide.glideTyping)
+        // 没占着空格时只换空格功能，移动光标方式原样不动。
+        for (mode in listOf(CursorGestureMode.KEYBOARD, CursorGestureMode.NONE)) {
+            val other = KeyboardInputPreferences(spaceHold = SpaceHoldAction.REPEAT, cursorGesture = mode)
+                .withSpaceHold(SpaceHoldAction.VOICE_TOGGLE)
+            assertEquals(mode, other.cursorGesture)
+            assertEquals(SpaceHoldAction.VOICE_TOGGLE, other.effectiveSpaceHold)
+        }
+    }
+
     @Test fun `symbol direction defaults to pulling into key and persists either habit`() {
         assertEquals(false, KeyboardInputPreferences.read(context).reverseSymbolSwipe)
         for (reversed in listOf(true, false)) {
