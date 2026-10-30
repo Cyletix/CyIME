@@ -1068,14 +1068,17 @@ private fun ResetKey(
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val hintSize = 9f * adaptiveHintScale(contentScale)
+        val iconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, if (compactMode) 16f else 20f)
+        val hintOffset = KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale)
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = "重输",
             tint = textColor,
-            modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value, if (compactMode) 16f else 20f).dp)
+            modifier = Modifier.size(iconSize.dp)
         )
 
-        if (!compactMode) {
+        // 键太矮放不下时只留图标，文字不能压在图标上。
+        if (!compactMode && KeyboardKeyMetrics.hintClearsIcon(hintOffset, hintSize, density.fontScale, iconSize)) {
             Text(
                 text = "重输",
                 color = keyHintColor(textColor, frostedGlass, 0.5f),
@@ -1084,7 +1087,7 @@ private fun ResetKey(
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.offset(y = -KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp)
+                modifier = Modifier.offset(y = -hintOffset.dp)
             )
         }
     }

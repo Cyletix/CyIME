@@ -37,7 +37,16 @@ internal object KeyboardKeyMetrics {
 
     fun hintOffsetDp(heightDp: Float, hintSizeSp: Float, fontScale: Float, contentScale: Float): Float =
         adaptiveHintOffsetDp(contentScale)
-            .coerceAtMost(((heightDp - hintSizeSp * fontScale * 1.2f) / 2f - 2f).coerceAtLeast(0f))
+            // 矮键上提示贴顶只留 1dp（行高本身上方还有约 1dp 留白），给下面的图标多让 1dp。
+            .coerceAtMost(((heightDp - hintSizeSp * fontScale * 1.2f) / 2f - 1f).coerceAtLeast(0f))
+
+    /**
+     * 图标键上方的提示文字（清空、重输）会不会压到图标：文字中心在键中心上方 [hintCenterAboveDp]。
+     * Material 图标的字形约占图标框的 75%，汉字字形约等于字号；两者之间至少留 1dp，
+     * 放不下（矮键、大字号）时只画图标。
+     */
+    fun hintClearsIcon(hintCenterAboveDp: Float, hintSizeSp: Float, fontScale: Float, iconDp: Float): Boolean =
+        hintCenterAboveDp - hintSizeSp * fontScale / 2f >= iconDp * 0.375f + 1f
 }
 
 /** Grid siblings share one scale; sub-pixel cell allocation must not change their font size. */

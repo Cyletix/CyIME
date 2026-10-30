@@ -173,7 +173,8 @@ fun SpaceKeyButton(
             maxWidth.value, maxHeight.value, density.fontScale, settings.keyTextScale),
             labelHeight / (density.fontScale * 1.4f)).coerceAtLeast(1f)
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            if (schemaName.isNotBlank() && schemaName != "空格") Text(
+            // 键太矮时方案名会被压成看不清的小点，这时只留空格图标。
+            if (schemaName.isNotBlank() && schemaName != "空格" && labelSize >= 8f) Text(
                 schemaName.replace("拼音九键", "拼音"), color = textColor,
                 fontSize = labelSize.sp, lineHeight = (labelSize * 1.2f).sp, maxLines = 1, softWrap = false,
                 fontFamily = AppFonts.keyFontFamily)
