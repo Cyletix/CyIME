@@ -98,9 +98,11 @@ internal class EditorCursor {
 
     private fun setSelection(ic: InputConnection, target: Int, selecting: Boolean): Boolean {
         val start = if (selecting) anchor ?: target else target
-        if (!runCatching { ic.setSelection(start, target) }.getOrDefault(false)) return false
-        reportedStart = start
-        reportedEnd = target
+        // 一律按小、大顺序设置：WebView 等宿主收到 start > end 会原样返回成功却不改选区，
+        // 向左、向上、段首扩选因此失效。活动端由 anchor/active 记录，不依赖宿主保存方向。
+        if (!runCatching { ic.setSelection(minOf(start, target), maxOf(start, target)) }.getOrDefault(false)) return false
+        reportedStart = minOf(start, target)
+        reportedEnd = maxOf(start, target)
         if (selecting) { anchor = start; active = target }
         return true
     }
