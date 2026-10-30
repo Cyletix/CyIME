@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.Image
 import androidx.compose.material.icons.twotone.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,6 +42,9 @@ import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.FrostedGlassProfiles
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.theme.VisualStyles
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -224,6 +232,15 @@ private fun ThemeSettingsPage(
                 }
             }
             
+            item {
+                CustomImageThemeSection(currentThemeId = uiState.colorTheme) {
+                    viewModel.refreshThemes()
+                    changeAppearance(context, onThemeChanged) {
+                        viewModel.setColorTheme(com.kingzcheung.xime.ui.theme.CustomImageTheme.ID)
+                    }
+                }
+            }
+
             // 视觉样式只有一组卡片，直接放在本页；按键显示（字号、角标、气泡、底部）也属于外观。
             item {
                 VisualStylePicker(VisualStyles.current) { style ->
@@ -279,5 +296,37 @@ private fun ThemeSettingsPage(
                 onDismiss = { showGlassSettings = false },
             )
         }
+    }
+}
+
+/** 「用自己的图片」：从相册选一张图做键盘背景，存好后直接换成「我的图片」主题。 */
+@Composable
+private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var hasImage by remember { mutableStateOf(com.kingzcheung.xime.ui.theme.CustomImageTheme.hasImage(context)) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val base = com.kingzcheung.xime.ui.theme.CustomImageTheme.baseFor(context, currentThemeId)
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                runCatching { com.kingzcheung.xime.ui.theme.CustomImageTheme.save(context, uri, base) }
+            }
+            saved.onSuccess {
+                com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
+                hasImage = true
+                onSaved()
+            }.onFailure {
+                com.kingzcheung.xime.util.FileLogger.e("Appearance", "Custom background failed", it)
+                android.widget.Toast.makeText(context, "这张图片读不出来，换一张试试", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    SettingsSection(title = "背景图片") {
+        SettingsItem(icon = Icons.TwoTone.Image, title = "用自己的图片",
+            subtitle = if (hasImage) "已设置，在上面的配色里选「我的图片」使用；点这里换一张"
+                else "从相册选一张图片做键盘背景，按键和文字的颜色沿用当前主题",
+            onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            showArrow = true)
     }
 }
