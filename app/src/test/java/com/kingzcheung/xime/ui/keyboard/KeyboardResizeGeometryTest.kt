@@ -418,9 +418,9 @@ class KeyboardResizeGeometryTest {
 
     @Test
     fun `最小尺寸：手机基准与可用区域取小`() {
-        // 最低面板高度恢复手机基准228dp，各设备与显示模式一致。
+        // 最低面板高度为手机基准 244dp（四行各 48dp），各设备与显示模式一致。
         assertEquals(400, FLOATING_RESIZE_MIN_WIDTH_DP)
-        assertEquals(228, FLOATING_RESIZE_MIN_HEIGHT_DP)
+        assertEquals(244, FLOATING_RESIZE_MIN_HEIGHT_DP)
         assertTrue(FLOATING_RESIZE_MIN_HEIGHT_DP >= 220)
         assertEquals(FLOATING_RESIZE_MIN_WIDTH_DP, floatingResizeMinWidthDp(1000))
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeMinHeightDp(800))
@@ -449,5 +449,5 @@ class KeyboardResizeGeometryTest {
         assertEquals(400, keyboardWidthBounds(1200).first)
         assertEquals(1200, keyboardWidthBounds(1200).last)
         assertTrue(floatingResizeHeightBounds(800, true).last >= 520)
-        assertEquals(228, floatingResizeHeightBounds(800, true).first)
+        assertEquals(244, floatingResizeHeightBounds(800, true).first)
     }}

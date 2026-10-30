@@ -201,8 +201,9 @@ internal fun keyVisualMetrics(
     )
 }
 
-/** The existing minimum panel includes a 44dp toolbar. This is a baseline, not a cap. */
-internal const val MINIMUM_KEY_BODY_HEIGHT_DP = FLOATING_RESIZE_MIN_HEIGHT_DP - 44f
+/** Gap baseline: the former 228dp minimum panel minus its 44dp toolbar. Kept fixed when the
+ * minimum was raised to 244dp, so key gaps at every height stay as they were. Not a cap. */
+internal const val MINIMUM_KEY_BODY_HEIGHT_DP = 184f
 
 /** Resolve the same edge-aligned grid for typing, symbols, candidates and live resizing.
  * Default spacing follows cell width. Above the normal/square row height, split
