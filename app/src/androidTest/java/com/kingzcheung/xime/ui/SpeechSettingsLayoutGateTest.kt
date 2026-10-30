@@ -19,8 +19,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.kingzcheung.xime.settings.SettingsPreferences
-import com.kingzcheung.xime.ui.settings.AsrProvider
-import com.kingzcheung.xime.ui.settings.OnlineAsrTab
 import com.kingzcheung.xime.ui.settings.SpeechToTextSettingsContent
 import org.junit.Rule
 import org.junit.Test
@@ -82,55 +80,13 @@ class SpeechSettingsLayoutGateTest {
         for (v in viewports) {
             rule.runOnIdle { viewport.value = v }
             rule.assertGeometry("speech-settings-host", "本地语音设置 $v")
-            rule.onNodeWithText("保持引擎常驻").performScrollTo().assertIsDisplayed()
+            rule.onNodeWithText("本地识别").performScrollTo().assertIsDisplayed()
             val lastModel = rule.onNodeWithTag("speech-correction").performScrollTo()
                 .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val host = rule.onNodeWithTag("speech-settings-host").fetchSemanticsNode().boundsInRoot
             org.junit.Assert.assertTrue("本地语音页末项超出 $v: $lastModel / $host", lastModel.bottom <= host.bottom + 1f)
             rule.assertGeometry("speech-settings-host", "本地语音模型末项 $v")
         }
-    }
-
-    @Test fun onlineProviderCardFitsAndKeepsSettingsActionReachable() {
-        val viewport = mutableStateOf(viewports.first())
-        val provider = AsrProvider(
-            id = "layout-gate-provider",
-            name = "在线语音识别服务",
-            description = "用于检查在线服务说明在窄屏和大字体下能否完整显示。",
-            isOnline = true,
-            isConfigured = true,
-            isActive = true,
-            features = listOf("实时流式", "中间结果", "在线"),
-        )
-        var settingsClicks = 0
-        rule.setContent {
-            val v = viewport.value
-            CompositionLocalProvider(LocalDensity provides Density(1f, v.font)) {
-                MaterialTheme {
-                    Box(Modifier.requiredSize(v.width.dp, v.height.dp).testTag("speech-provider-host")) {
-                        key(v) {
-                            Column(Modifier.verticalScroll(rememberScrollState())) {
-                                OnlineAsrTab(listOf(provider), onProviderClick = {}, onSettings = { settingsClicks++ })
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        for (v in viewports) {
-            rule.runOnIdle { viewport.value = v }
-            val name = rule.onNodeWithText(provider.name).performScrollTo()
-            rule.assertGeometry("speech-provider-host", "在线语音服务卡 $v")
-            val settings = rule.onNodeWithContentDescription("设置").performScrollTo()
-            if (fitsDevice(v)) {
-                name.assertIsDisplayed()
-                settings.assertIsDisplayed().performClick()
-            } else {
-                assertInsideHost("speech-provider-host", name, "在线服务名称 $v")
-                assertInsideHost("speech-provider-host", settings, "在线服务设置 $v")
-            }
-        }
-        rule.runOnIdle { org.junit.Assert.assertEquals(viewports.count(::fitsDevice), settingsClicks) }
     }
 
     private fun fitsDevice(viewport: Viewport): Boolean {

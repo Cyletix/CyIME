@@ -80,7 +80,7 @@ enum class ToolbarButton(
 
         /** 菜单默认一页 8 项（另加末尾的“排列”）：只放打字时会临时调整的入口，其余可在“排列”中加入。 */
         // 字幕不在这份一页 8 项的清单里；新装用户由 QuickActionLayout.defaultMenu 加入，已保存菜单由 SettingsPreferences 插入一次。
-        val DEFAULT_MENU = listOf(SETTINGS, FLOAT, OCR, SOUND, FLOATING, GLASS, INCOGNITO, FULL_SHAPE, ARRANGE)
+        val DEFAULT_MENU = listOf(SETTINGS, FLOAT, OCR, SOUND, GLASS, INCOGNITO, FULL_SHAPE, ARRANGE)
         /** 布局手势开关：默认排在菜单的“排列”之前（见 QuickActionLayout.defaultMenu），每个布局只显示适用的一两个。 */
         val LAYOUT_GESTURES = listOf(GLIDE, T9_FLICK, FOURTEEN_SWIPE, KANA_HINTS, FLICK_DISC)
         /** 开关类入口：菜单中显示开/关状态，工具栏中开启时高亮。 */

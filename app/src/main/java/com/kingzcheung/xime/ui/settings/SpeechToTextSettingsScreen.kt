@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,19 +59,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class AsrProvider(
-    val id: String,
-    val name: String,
-    val description: String,
-    val iconRes: Int? = null,
-    val icon: ImageVector? = null,
-    val pluginIcon: PluginIcon? = null,
-    val isOnline: Boolean,
-    val isConfigured: Boolean,
-    val isActive: Boolean = false,
-    val features: List<String> = emptyList()
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpeechToTextSettingsContent(
@@ -80,62 +68,12 @@ fun SpeechToTextSettingsContent(
 ) {
     val context = LocalContext.current
 
-    var activeAsrPluginId by remember {
-        mutableStateOf(SettingsPreferences.getSttOnlinePluginId(context))
-    }
-
     var useLocal by remember {
         mutableStateOf(OfflineAsrSettings.isSupported() && SettingsPreferences.isSttUseLocal(context))
     }
 
     var saveTuningAudio by remember {
         mutableStateOf(SettingsPreferences.isSttDebugRecord(context))
-    }
-
-    var providersRevision by remember { mutableStateOf(0) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        activeAsrPluginId = SettingsPreferences.getSttOnlinePluginId(context)
-        providersRevision++
-    }
-    val onlineProviders = remember(activeAsrPluginId, providersRevision) {
-        val installedAsr = ExtensionManager.getAllInstalledPlugins()
-            .filter { it.category == PluginCategory.ASR }
-        mutableStateListOf<AsrProvider>().apply {
-            installedAsr.forEach { info ->
-                val instance = PluginManager.getPluginInstance(info.id) as? AsrPlugin
-                if (instance != null) {
-                    val caps = instance.getCapabilities()
-                    add(
-                        AsrProvider(
-                            id = info.id,
-                            name = info.name,
-                            description = "在线语音识别插件",
-                            isOnline = true,
-                            isConfigured = instance.isConfigured(),
-                            isActive = info.id == activeAsrPluginId,
-                            pluginIcon = ExtensionManager.extractPluginIcon(context, info.id, instance, info),
-                            features = buildList {
-                                add(if (caps.inputMode == "streaming") "实时流式" else "文件识别")
-                                if (caps.supportsPartialResults) add("中间结果")
-                                if (caps.requiresNetwork) add("在线")
-                            }
-                        )
-                    )
-                } else {
-                    add(
-                        AsrProvider(
-                            id = info.id,
-                            name = info.name,
-                            description = info.description.ifBlank { "在线语音识别插件" },
-                            isOnline = true,
-                            isConfigured = false,
-                            isActive = info.id == activeAsrPluginId,
-                            features = listOf("在线")
-                        )
-                    )
-                }
-            }
-        }
     }
 
     Scaffold(
@@ -187,7 +125,7 @@ fun SpeechToTextSettingsContent(
             val scope = rememberCoroutineScope()
 
             if (OfflineAsrSettings.isSupported()) {
-                // 本地/在线引擎切换开关
+                // 本地/在线引擎切换开关：关掉本地即用下方填写的在线语音接口
                 OfflineAsrSettings.EngineSelector(
                     useLocal = useLocal,
                     onUseLocalChange = {
@@ -206,6 +144,7 @@ fun SpeechToTextSettingsContent(
                         }
                     }
                 )
+                if (!useLocal) OnlineSpeechApiSection()
 
                 if (useLocal) {
                     // 模型常驻与空闲释放统一在「性能与省电」设置，这里不再重复（两处会互相覆盖）。
@@ -216,7 +155,8 @@ fun SpeechToTextSettingsContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
                         )
-                        Column(Modifier.settingsSearchAnchor("保存语音调优录音").fillMaxWidth().padding(16.dp)) {
+                        // 调优录音是开发者工具：只在自用测试包和调试包里显示。
+                        if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG) Column(Modifier.settingsSearchAnchor("保存语音调优录音").fillMaxWidth().padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "保存语音调优录音",
@@ -388,172 +328,51 @@ fun SpeechToTextSettingsContent(
                 }
             }
 
-            if (!useLocal) {
-                OnlineAsrTab(
-                    providers = onlineProviders,
-                    onProviderClick = { provider ->
-                        if (provider.isActive) {
-                            onNavigateToPluginSettings(provider.id)
-                            return@OnlineAsrTab
-                        }
-                        val wasConfigured = provider.isConfigured
-                        scope.launch(Dispatchers.IO) {
-                            // 单选激活：同一时间只能使用 1 个在线 ASR 插件
-                            ExtensionManager.getAllInstalledPlugins()
-                                .filter { it.category == PluginCategory.ASR && it.id != provider.id }
-                                .forEach { SettingsPreferences.setPluginEnabled(context, it.id, false) }
-                            SettingsPreferences.setSttOnlinePluginId(context, provider.id)
-                            SettingsPreferences.setPluginEnabled(context, provider.id, true)
-                            PluginManager.launchPlugin(provider.id)
-                            activeAsrPluginId = provider.id
-                            if (!wasConfigured) {
-                                withContext(Dispatchers.Main) {
-                                    onNavigateToPluginSettings(provider.id)
-                                }
-                            }
-                        }
-                    },
-                    onSettings = onNavigateToPluginSettings
-                )
-            }
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
+/** 内置在线语音：接口地址、密钥、模型，一个测试按钮和接口状态。密钥只存本机、不进备份。 */
 @Composable
-fun OnlineAsrTab(
-    providers: List<AsrProvider>,
-    onProviderClick: (AsrProvider) -> Unit,
-    onSettings: (String) -> Unit = {}
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        SettingsSection(title = "在线服务") {
-            if (providers.isEmpty()) {
-                Text(
-                    text = "尚未安装在线语音插件；也可以返回上方选择本地模型。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                providers.forEachIndexed { index, provider ->
-                    if (index > 0) {
-                        androidx.compose.material3.HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                    }
-                    AsrProviderCardModern(
-                        provider = provider,
-                        onClick = { onProviderClick(provider) },
-                        onSettings = { onSettings(provider.id) }
-                    )
-                }
-            }
-        }
-
-        Text(
-            text = "在线服务需要网络连接，可能需要账号或 API 密钥；费用和数据处理方式以服务提供方为准。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+internal fun OnlineSpeechApiSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val saved = remember { com.kingzcheung.xime.speech.OnlineSpeechApi.config(context) }
+    var baseUrl by remember { mutableStateOf(saved.baseUrl) }
+    var apiKey by remember { mutableStateOf(saved.apiKey) }
+    var model by remember { mutableStateOf(saved.model) }
+    var status by remember { mutableStateOf(com.kingzcheung.xime.speech.OnlineSpeechApi.status(context)) }
+    var testing by remember { mutableStateOf(false) }
+    fun save() {
+        com.kingzcheung.xime.speech.OnlineSpeechApi.save(context,
+            com.kingzcheung.xime.speech.OnlineSpeechApi.Config(baseUrl, apiKey, model))
+        status = com.kingzcheung.xime.speech.OnlineSpeechApi.status(context)
     }
-}
-
-@Composable
-fun AsrProviderCardModern(
-    provider: AsrProvider,
-    onClick: () -> Unit,
-    onSettings: () -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (provider.iconRes != null) {
-                    Icon(
-                        painter = painterResource(provider.iconRes),
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp)
-                    )
-                } else if (provider.icon != null) {
-                    Icon(
-                        imageVector = provider.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    PluginIconView(
-                        icon = provider.pluginIcon,
-                        category = PluginCategory.ASR,
-                        modifier = Modifier.size(36.dp),
-                        showBackground = false
-                    )
-                }
+    SettingsSection(title = "在线语音接口") {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it; save() },
+                label = { Text("接口地址") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("speech-api-url"))
+            androidx.compose.material3.OutlinedTextField(value = apiKey, onValueChange = { apiKey = it; save() },
+                label = { Text("API 密钥") }, singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth().testTag("speech-api-key"))
+            androidx.compose.material3.OutlinedTextField(value = model, onValueChange = { model = it; save() },
+                label = { Text("模型") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("speech-api-model"))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("状态：$status", style = MaterialTheme.typography.bodyMedium,
+                    color = if (status.startsWith("可用")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f).testTag("speech-api-status"))
+                androidx.compose.material3.OutlinedButton(enabled = !testing, onClick = {
+                    save(); testing = true; status = "测试中…"
+                    scope.launch {
+                        status = withContext(Dispatchers.IO) { com.kingzcheung.xime.speech.OnlineSpeechApi.test(context) }
+                        testing = false
+                    }
+                }, modifier = Modifier.testTag("speech-api-test")) { Text("测试") }
             }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = provider.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = provider.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = when {
-                        provider.isActive -> "当前使用中"
-                        provider.isConfigured -> "已配置"
-                        else -> "未配置"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (provider.isActive) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (provider.isActive || provider.isConfigured) {
-                IconButton(onClick = onSettings) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = "设置",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        if (provider.features.isNotEmpty()) {
-            Text(
-                text = provider.features.joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 56.dp, top = 4.dp)
-            )
+            Text("兼容 OpenAI 语音转写接口（/audio/transcriptions），如 OpenAI、Groq、硅基流动；说完一句整段上传识别。密钥只存在本机，不进备份。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

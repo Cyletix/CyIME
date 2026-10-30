@@ -35,7 +35,7 @@ internal fun OfflineAsrEngineSelector(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = if (useLocal) "离线运行，无需网络" else "使用在线语音识别插件",
+                    text = if (useLocal) "离线运行，无需网络" else "使用下方填写的在线语音接口",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

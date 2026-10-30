@@ -61,6 +61,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -297,7 +298,7 @@ internal fun InstalledPluginsList(
                             else -> false
                         },
                         onActivate = when (extension.category) {
-                            PluginCategory.ASR -> onNavigateToSpeechToText
+                            // 语音页已改为内置在线接口，不再挑语音插件。
                             PluginCategory.CLIPBOARD_SYNC -> onNavigateToClipboardSync
                             else -> null
                         }
@@ -334,7 +335,7 @@ private fun ExtensionItem(
     // 启用状态在用到它的地方切换（如表情面板）；每次回到本页都重新读，标签不显示旧状态。
     var resumeTick by remember { mutableStateOf(0) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { resumeTick++ }
-    val isEnabled = remember(extension.id, resumeTick) { viewModel.isPluginEnabled(extension.id) }
+    var isEnabled by remember(extension.id, resumeTick) { mutableStateOf(viewModel.isPluginEnabled(extension.id)) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showTrustConfirm by remember { mutableStateOf(false) }
@@ -563,7 +564,7 @@ private fun ExtensionItem(
                             }
                         }
                     } else {
-                        // 多选分类：插件管理不提供启用开关，启用/停用在使用处进行（如表情面板）
+                        // 多选分类（表情、工具等）：使用处没有开关，就在这里启用/停用。
                         Text(
                             text = when {
                                 !hostCompatible -> "不兼容"
@@ -580,6 +581,10 @@ private fun ExtensionItem(
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
+                        Switch(checked = isEnabled, enabled = hostCompatible, onCheckedChange = {
+                            isEnabled = it
+                            viewModel.setPluginEnabled(extension.id, it)
+                        })
                     }
 
                     // 设置按钮

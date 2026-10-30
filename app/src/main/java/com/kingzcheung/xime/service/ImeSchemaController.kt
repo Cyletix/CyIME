@@ -198,7 +198,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     prefs.edit().putString(com.kingzcheung.xime.settings.CustomKeyboardLayouts.STATUS, "布局已应用，可从中文输入模式选择").apply()
                 }
             } catch (e: Exception) {
-                prefs.edit().putString(com.kingzcheung.xime.settings.CustomKeyboardLayouts.STATUS, "已保存，但应用失败：${e.message}；可在菜单重新部署").apply()
+                prefs.edit().putString(com.kingzcheung.xime.settings.CustomKeyboardLayouts.STATUS, "已保存，但应用失败：${e.message}；可在「已安装的方案」点「应用方案更改」重试").apply()
             }
         }
     }
@@ -569,7 +569,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 if (!service.rimeEngine.switchSchema(schemaId)) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(service, if (service.rimeEngine.isMaintaining())
-                            "词库部署中，请稍后再切换方案" else "方案未部署，请在方案管理中部署后再试", Toast.LENGTH_SHORT).show()
+                            "词库部署中，请稍后再切换方案" else "方案未部署，请在「已安装的方案」点「应用方案更改」后再试", Toast.LENGTH_SHORT).show()
                     }
                     return@postRimeJob
                 }
@@ -613,7 +613,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             
             withContext(Dispatchers.Main) {
                 if (success) {
-                    Toast.makeText(service, "$schemaId 下载成功，请点击部署", Toast.LENGTH_LONG).show()
+                    Toast.makeText(service, "$schemaId 下载成功，请在「已安装的方案」点「应用方案更改」", Toast.LENGTH_LONG).show()
                 } else {
                     Toast.makeText(service, "$schemaId 下载失败", Toast.LENGTH_SHORT).show()
                 }
