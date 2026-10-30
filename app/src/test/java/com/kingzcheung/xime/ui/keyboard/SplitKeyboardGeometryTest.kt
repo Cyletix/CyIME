@@ -103,4 +103,17 @@ class SplitKeyboardGeometryTest {
         val fraction = SplitKeyboardGeometry.keyWidthFraction(width, 0.3f, 8f)
         assertEquals(width - 16f - 300f, (width - 16f) * fraction, 0.01f)
     }
+
+    /** 「填满留空处」：两侧照常分开排布，但中缝不挖空、不让出触摸。 */
+    @Test fun filledGapKeepsTheSplitLayoutButLeavesNoHole() {
+        val gap = SplitKeyboardGap()
+        gap.reportRow(0, androidx.compose.ui.geometry.Rect(400f, 100f, 600f, 160f))
+        gap.reportRow(1, androidx.compose.ui.geometry.Rect(380f, 160f, 620f, 220f))
+        assertEquals(androidx.compose.ui.geometry.Rect(400f, 100f, 600f, 300f), gap.hole(300f))
+        gap.updateFilled(true)
+        assertEquals(null, gap.hole(300f))
+        assertEquals(400f to 600f, gap.gapX())
+        gap.updateFilled(false)
+        assertTrue(gap.hole(300f) != null)
+    }
 }

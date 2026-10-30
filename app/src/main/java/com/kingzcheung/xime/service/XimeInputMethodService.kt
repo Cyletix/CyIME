@@ -127,6 +127,7 @@ import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
+import com.kingzcheung.xime.ui.theme.keyboardBackgroundBesideCard
 import com.kingzcheung.xime.ui.theme.keyboardBackgroundBelowCard
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.keyboard.isBottomDocked
@@ -355,10 +356,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         } else return
         val density = resources.displayMetrics.density
         surface.configure(glassConfig.enabled, (glassConfig.blurRadiusDp * density).roundToInt(),
-            if (name == "navigation") 0f else 16f * density)
+            if (name == "navigation" || name.startsWith("keyboard-side")) 0f else 16f * density)
         surface.setOpacity(glassOpacity)
         surface.setRegion(glassSurfaceBounds[name])
         surface.setVisible(glassWindowVisible)
+    }
+
+    /** 「填满留空处」时固定卡片两侧也是键盘：各开一块直角模糊，与卡片拼成整宽。 */
+    private fun updateKeyboardSideGlass(card: android.graphics.Rect?) {
+        val host = IntArray(2)
+        val width = if (::keyboardContainer.isInitialized) keyboardContainer.width.also {
+            keyboardContainer.getLocationInWindow(host) } else 0
+        val left = host[0]
+        val right = left + width
+        val sides = card?.takeIf { !uiState.value.isFloatingMode && !uiState.value.handwritingExpanded &&
+            width > 0 && SettingsPreferences.isKeyboardBlankFilled(this) }
+        updateGlassSurface("keyboard-side-left", sides?.takeIf { it.left > left }
+            ?.let { android.graphics.Rect(left, it.top, it.left, it.bottom) })
+        updateGlassSurface("keyboard-side-right", sides?.takeIf { it.right < right }
+            ?.let { android.graphics.Rect(it.right, it.top, right, it.bottom) })
     }
 
     private fun onSplitGapChanged() {
@@ -378,6 +394,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 分体时模糊分三块：上方工具栏整宽，左右两半各一块，中缝保持清晰。 */
     private fun updateKeyboardGlass() {
         val card = if (uiState.value.handwritingExpanded) handwritingGlassControls else keyboardGlassCard
+        updateKeyboardSideGlass(card)
         val hole = card?.let { splitKeyboardGap.hole(it.bottom.toFloat()) }
         if (card == null || hole == null) {
             updateGlassSurface("keyboard", card)
@@ -1975,6 +1992,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         // 浮动模式：卡片由 KeyboardView 内部 FloatingKeyboardContainer 自绘背景与定位，此处不做背景/偏移。
                         // 固定卡片在窗口里的位置：导航条的渐变/图片接着卡片底边铺，不另起一段。
                         val navigationStripCard = remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+                        // 「填满留空处」：固定卡片两侧的留空用键盘背景铺满（默认镂空，透出后面的应用）。
+                        if (!state.isFloatingMode && !handwritingExpanded &&
+                            com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).fillBlankAreas) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = keyboardLayerOpacity }
+                                    .keyboardBackgroundBesideCard(rootTheme.keyboardBackground, isDark, keyboardBgColor,
+                                        card = { navigationStripCard.value })
+                            )
+                        }
                         if (!state.isFloatingMode && !roundedKeyboardBottom) {
                             Box(
                                 modifier = Modifier
@@ -4026,7 +4054,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     // 透明和触摸范围不改变固定键盘的避让高度。宿主底部操作栏也必须
                     // 避让整张卡片（包含工具栏/候选栏），不能仅依赖编辑框的自动平移。
                     outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
-                    outInsets.touchableRegion.set(card.left, topPx, card.right, card.bottom)
+                    // 「填满留空处」时两侧铺了键盘背景，点按不再让给后面的应用。
+                    if (SettingsPreferences.isKeyboardBlankFilled(this)) outInsets.touchableRegion.set(
+                        loc[0], topPx, loc[0] + keyboardContainer.width, card.bottom)
+                    else outInsets.touchableRegion.set(card.left, topPx, card.right, card.bottom)
                     // 分体中缝不拦截触摸，点到的是下面的应用。
                     splitHole?.let {
                         outInsets.touchableRegion.op(it.left.roundToInt(), it.top.roundToInt(),

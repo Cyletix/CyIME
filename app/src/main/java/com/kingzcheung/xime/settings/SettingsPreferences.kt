@@ -99,6 +99,18 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SPLIT_KEYBOARD, enabled).apply()
     }
 
+    const val KEY_FILL_KEYBOARD_BLANK = "fill_keyboard_blank"
+
+    /**
+     * 分体中缝、固定键盘两侧的留空默认镂空，透出后面的应用（用户的设计）；
+     * 打开后用键盘底色填满，遮住后面的内容，也不再把点按让给后面的应用。
+     */
+    fun isKeyboardBlankFilled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_FILL_KEYBOARD_BLANK, false)
+
+    fun setKeyboardBlankFilled(context: Context, filled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_FILL_KEYBOARD_BLANK, filled).apply()
+    }
+
     const val KEY_SPLIT_GAP_PORTRAIT = "split_gap_fraction_portrait"
     const val KEY_SPLIT_GAP_LANDSCAPE = "split_gap_fraction_landscape"
 
