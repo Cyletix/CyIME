@@ -639,9 +639,12 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_STT_DEBUG_RECORD, enabled).apply()
     }
 
-    /** 整句定稿：SenseVoice 在真停顿或结束时校正一整句，不再每 6 秒切一次。默认关，真机耗时测完再定。 */
+    /**
+     * 整句定稿：在真停顿或结束时校正一整句，结束时整段重识别。默认开：平板实测说完 30 秒的话
+     * 约 1.2–1.4 秒出定稿（2026-10-30，SenseVoice / X-ASR，sherpa-onnx 1.13.8 两线程）。
+     */
     fun isSttWholeSentence(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_STT_WHOLE_SENTENCE, false)
+        return getPrefs(context).getBoolean(KEY_STT_WHOLE_SENTENCE, true)
     }
 
     fun setSttWholeSentence(context: Context, enabled: Boolean) {
