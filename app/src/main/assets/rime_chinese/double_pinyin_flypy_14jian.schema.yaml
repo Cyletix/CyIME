@@ -19,6 +19,8 @@ switches:
   - name: ascii_punct
     reset: 0
     states: [ 。，, ．， ]
+  - name: traditionalization
+    states: [ 简, 繁 ]
 
 engine:
   processors:
@@ -42,6 +44,7 @@ engine:
   # 与 26 键、九键同一套候选规则：长按删掉的候选不再出现（cyime_candidate_policy）。
   filters:
     - cyime_candidate_policy
+    - simplifier@traditionalize
     - uniquifier
 
 speller:
@@ -131,3 +134,9 @@ recognizer:
   import_preset: default
   patterns:
     punct: "^/([0-9]+[a-z]*|[a-z]+)$"
+
+# 简/繁（设置 → 语言与方案 → 繁体输出）：与 26 键同一张台湾正体转换表，见 opencc/cyime_s2tw.json。
+traditionalize:
+  option_name: traditionalization
+  opencc_config: cyime_s2tw.json
+  tips: none

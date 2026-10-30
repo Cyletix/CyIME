@@ -631,6 +631,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY, false)
                 if (service.rimeEngine.getOption("cyime_mixed_input") != mixed) service.rimeEngine.setOption("cyime_mixed_input", mixed)
             }
+            // 繁体输出（默认关）：同上，按键前补设 traditionalization；九键数字键也走这里。
+            if (key.length == 1 && key[0].isLetterOrDigit()) {
+                val traditional = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
+                if (service.rimeEngine.getOption("traditionalization") != traditional) service.rimeEngine.setOption("traditionalization", traditional)
+            }
             if (service.japaneseInputController.handleKey(key)) return@command
             val state = service.uiState.value
             val candState = service.candidateState.value

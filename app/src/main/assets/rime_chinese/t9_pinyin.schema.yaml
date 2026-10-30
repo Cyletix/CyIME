@@ -93,6 +93,8 @@ switches:
   - name: ascii_punct
     reset: 0
     states: [ 。，, ．， ]
+  - name: traditionalization
+    states: [ 简, 繁 ]
 
 engine:
   processors:
@@ -119,6 +121,7 @@ engine:
   filters:
     - cyime_candidate_policy
     - t9_filter
+    - simplifier@traditionalize
     - uniquifier
 
 speller:
@@ -202,3 +205,9 @@ t9_english:
   digit_suffixes: false
   # 按到第 4 个键起，给出以所按键开头的最常用的 3 个英文词（termin… 出 terminal），排在整词英文之后。
   completion_limit: 3
+
+# 简/繁（设置 → 语言与方案 → 繁体输出）：与 26 键同一张台湾正体转换表，见 opencc/cyime_s2tw.json。
+traditionalize:
+  option_name: traditionalization
+  opencc_config: cyime_s2tw.json
+  tips: none
