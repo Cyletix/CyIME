@@ -4,9 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +29,6 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.twotone.CloudDownload
 import androidx.compose.material.icons.twotone.DriveFolderUpload
 import androidx.compose.material.icons.twotone.Storefront
 import androidx.compose.material3.AlertDialog
@@ -47,7 +44,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedButton
@@ -72,9 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -132,9 +126,6 @@ fun SchemaSettingsContent(
         viewModel.importCompleted.collect { localViewModel.loadLocalPackages() }
     }
     var showMenu by remember { mutableStateOf(false) }
-    var showUrlDialog by remember { mutableStateOf(false) }
-    var urlInput by remember { mutableStateOf("") }
-    var wasDownloading by remember { mutableStateOf(false) }
     var showImportWarning by remember { mutableStateOf(false) }
     var dontShowImportWarning by remember { mutableStateOf(false) }
     var pendingImportAction by remember { mutableStateOf<() -> Unit>({}) }
@@ -203,111 +194,6 @@ fun SchemaSettingsContent(
             pendingImportAction = action
             showImportWarning = true
         }
-    }
-
-    if (showUrlDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!uiState.isDownloading) { showUrlDialog = false; urlInput = "" }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = {
-                Text("网络导入", fontWeight = FontWeight.SemiBold)
-            },
-            text = {
-                Column {
-                    Text(
-                        "输入压缩包下载地址",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "支持 .zip 和 .tar.gz 格式",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    var urlFocused by remember { mutableStateOf(false) }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusEvent { urlFocused = it.isFocused }
-                            .clip(RoundedCornerShape(28.dp))
-                            .background(
-                                if (urlFocused) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
-                            )
-                    ) {
-                        BasicTextField(
-                            value = urlInput,
-                            onValueChange = { urlInput = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            enabled = !uiState.isDownloading,
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            decorationBox = { innerTextField ->
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    if (urlInput.isEmpty() && !urlFocused) {
-                                        Text(
-                                            "https://example.com/schema.tar.gz",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-                    }
-                    if (uiState.isDownloading) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Text(
-                        text = "使用导入方案功能时，请先了解 Rime 配置方案以及文档（github.com/rime/home/wiki），以及确保你知道自己正在做什么。如果你不知道自己在做什么，请使用默认方案。",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "正在下载并解压...",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        wasDownloading = true
-                        viewModel.importFromUrl(urlInput)
-                    },
-                    enabled = urlInput.isNotBlank() && !uiState.isDownloading
-                ) { Text("确定") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showUrlDialog = false; urlInput = "" }
-                ) { Text("取消") }
-            }
-        )
     }
 
     if (uiState.showUninstallDialog) {
@@ -388,15 +274,6 @@ fun SchemaSettingsContent(
         )
     }
 
-    // Auto-close dialog when download finishes
-    LaunchedEffect(uiState.isDownloading) {
-        if (wasDownloading && !uiState.isDownloading) {
-            showUrlDialog = false
-            urlInput = ""
-        }
-        wasDownloading = uiState.isDownloading
-    }
-
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -458,13 +335,6 @@ fun SchemaSettingsContent(
                                 }
                             )
                             CompactMenuDivider()
-                            CompactMenuRow(
-                                label = "网络导入", icon = Icons.TwoTone.CloudDownload,
-                                onClick = {
-                                    showMenu = false
-                                    requireImportWarning { showUrlDialog = true }
-                                }
-                            )
                             CompactMenuRow(
                                 label = "从文件选择", icon = Icons.TwoTone.DriveFolderUpload,
                                 onClick = {
