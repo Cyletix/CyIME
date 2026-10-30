@@ -195,7 +195,10 @@ object PersonalDictManager {
         // 让 librime 按 schema 原声明编译原始词典名（如 pinyin_simp.table.bin），
         // 恢复 wubi86_pinyin 等方案的 reverse_lookup 拼音反查。
         cleanupStaleMergedPatch(rimeDir, schemaId)
-        val dictName = getCustomPhraseDictName(rimeDir, schemaId)
+        // 九键打出来的是数字、14 键是合并键的大写码：短语换成这个键盘实际打出的编码另存一份，方案挂这一份。
+        val keys = PhraseKeys.of(schemaId)
+        val dictName = keys?.dictName ?: getCustomPhraseDictName(rimeDir, schemaId)
+        if (keys != null) writeKeyedPhrases(rimeDir, keys)
         val phraseFile = File(rimeDir, "$dictName.txt")
         if (!phraseFile.exists()) {
             phraseFile.parentFile?.mkdirs()
@@ -210,6 +213,61 @@ object PersonalDictManager {
         if (phraseFile.readText(Charsets.UTF_8).lineSequence().count { it.isNotBlank() && !it.startsWith('#') } > 0) {
             applyCustomPhraseTranslator(rimeDir, schemaId, dictName)
         }
+        // 旧版本给九键、14 键挂的是字母码的 custom_phrase，换成按键码的那一份。
+        if (keys != null) retargetCustomPhraseDict(File(rimeDir, "${schemaId}.custom.yaml"), dictName)
+    }
+
+    /**
+     * Keyboards whose keys do not type the letters of a phrase code. The shared custom_phrase.txt stays the
+     * only list the user edits; each of these gets a copy whose codes are what its keys send.
+     */
+    internal enum class PhraseKeys(val dictName: String) {
+        /** abc→2 … wxyz→9, the digits the nine keys send. */
+        T9("custom_phrase_t9"),
+        /** A pair key taps its capital (qw→Q, er→E …; l and m stay); letters swiped one by one stay as written. */
+        MERGED14("custom_phrase_k14");
+
+        fun codes(code: String): List<String> {
+            val letters = code.lowercase().filterNot { it == ' ' || it == '\'' }
+            if (letters.isEmpty() || letters.any { it !in 'a'..'z' }) return emptyList()
+            return when (this) {
+                T9 -> listOf(letters.map { T9_DIGITS[it - 'a'] }.joinToString(""))
+                MERGED14 -> listOf(letters.map { MERGED14_KEYS[it - 'a'] }.joinToString(""), letters).distinct()
+            }
+        }
+
+        companion object {
+            private const val T9_DIGITS = "22233344455566677778889999"
+            private const val MERGED14_KEYS = "ABCDEDGGUJJlmBOOQEATUCQZTZ"
+            fun of(schemaId: String): PhraseKeys? {
+                val profile = if (KeysConfigHelper.hasLoadedLayoutBindings) InputProfiles.current(schemaId)
+                    else InputProfiles.describe(schemaId)
+                return when {
+                    profile.layout.kind == LayoutKind.T9 -> T9
+                    profile.layout == InputLayout.MERGED14 -> MERGED14
+                    else -> null
+                }
+            }
+        }
+    }
+
+    /** Rewrites the keyed copy only when its content changes, so an unchanged list costs no reload. */
+    internal fun writeKeyedPhrases(rimeDir: File, keys: PhraseKeys) {
+        val source = File(rimeDir, CUSTOM_PHRASE_FILE).takeIf { it.isFile }?.readText(Charsets.UTF_8).orEmpty()
+        val entries = parseStableDbEntries(source).flatMap { entry -> keys.codes(entry.code).map { entry.copy(code = it) } }
+        val text = buildStableDbText(STABLEDB_HEADER.replace("db_name\tcustom_phrase", "db_name\t${keys.dictName}"), entries)
+        val target = File(rimeDir, "${keys.dictName}.txt")
+        if (target.takeIf { it.isFile }?.readText(Charsets.UTF_8) != text) target.writeText(text, Charsets.UTF_8)
+    }
+
+    /** Points an existing custom_phrase translator patch at [dictName]; other patch lines are kept. */
+    internal fun retargetCustomPhraseDict(customFile: File, dictName: String) {
+        if (!customFile.isFile) return
+        val text = customFile.readText(Charsets.UTF_8)
+        val block = Regex("""(?m)^(\s*"?custom_phrase"?:\s*\n(?:\s{4,}.*\n)*?\s{4,}user_dict:\s*)(\S+)""")
+        val match = block.find(text) ?: return
+        if (match.groupValues[2] == dictName) return
+        customFile.writeText(text.replaceRange(match.groups[2]!!.range, dictName), Charsets.UTF_8)
     }
 
     /**

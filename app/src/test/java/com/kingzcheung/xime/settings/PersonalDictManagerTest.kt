@@ -31,6 +31,43 @@ private fun mockContext(): Context {
 
 class PersonalDictManagerTest {
 
+    // ── 九键、14 键的自定义短语按键码 ──
+
+    @Test
+    fun `phrase codes become the keys nine and fourteen keys send`() {
+        assertEquals(listOf("39"), PersonalDictManager.PhraseKeys.T9.codes("dz"))
+        assertEquals(listOf("94264"), PersonalDictManager.PhraseKeys.T9.codes("xiang"))
+        // 14 键：点按出合并键大写，l、m 原样；整段左右滑出的字母照样能打。
+        assertEquals(listOf("DZ", "dz"), PersonalDictManager.PhraseKeys.MERGED14.codes("dz"))
+        assertEquals(listOf("lm"), PersonalDictManager.PhraseKeys.MERGED14.codes("lm"))
+        assertEquals(listOf("QEATUCQZTZ", "wrstuvwxyz"), PersonalDictManager.PhraseKeys.MERGED14.codes("wrstuvwxyz"))
+        assertEquals(listOf("39"), PersonalDictManager.PhraseKeys.T9.codes("D'Z"))
+        assertEquals(emptyList<String>(), PersonalDictManager.PhraseKeys.T9.codes("a1"))
+        assertEquals(PersonalDictManager.PhraseKeys.T9, PersonalDictManager.PhraseKeys.of("t9_pinyin"))
+        assertEquals(PersonalDictManager.PhraseKeys.MERGED14, PersonalDictManager.PhraseKeys.of("pinyin_14jian"))
+        assertEquals(PersonalDictManager.PhraseKeys.MERGED14, PersonalDictManager.PhraseKeys.of("double_pinyin_flypy_14jian"))
+        assertEquals(null, PersonalDictManager.PhraseKeys.of("rime_ice"))
+    }
+
+    @Test
+    fun `keyed phrase copy follows the shared list and old patches are retargeted`() {
+        val dir = File.createTempFile("rime", "").apply { delete(); mkdirs() }
+        File(dir, "custom_phrase.txt").writeText("# Rime table\n#@/db_name\tcustom_phrase\n地址\tdz\t9\n我的邮箱\twdyx\n")
+        PersonalDictManager.writeKeyedPhrases(dir, PersonalDictManager.PhraseKeys.T9)
+        val t9 = File(dir, "custom_phrase_t9.txt").readText()
+        assertTrue(t9.contains("#@/db_name\tcustom_phrase_t9\n"))
+        assertEquals(listOf(DictEntry("地址", "39", 9), DictEntry("我的邮箱", "9399")),
+            PersonalDictManager.parseStableDbEntries(t9))
+        val patch = File(dir, "t9_pinyin.custom.yaml")
+        patch.writeText("patch:\n  \"engine/translators/+\":\n    - table_translator@custom_phrase\n  \"custom_phrase\":\n" +
+            "    dictionary: \"\"\n    user_dict: custom_phrase\n    db_class: stabledb\n")
+        PersonalDictManager.retargetCustomPhraseDict(patch, "custom_phrase_t9")
+        assertTrue(patch.readText().contains("    user_dict: custom_phrase_t9\n    db_class: stabledb\n"))
+        assertTrue(patch.readText().contains("    - table_translator@custom_phrase\n"))
+        assertEquals("custom_phrase_t9", PersonalDictManager.getCustomPhraseDictName(dir, "t9_pinyin"))
+        dir.deleteRecursively()
+    }
+
     // ── 个人词库（只读显示） ──
 
     @Test
