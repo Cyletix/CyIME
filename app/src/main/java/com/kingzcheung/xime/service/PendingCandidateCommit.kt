@@ -6,4 +6,5 @@ internal data class PendingCandidateCommit(
     val text: String,
     val t9: Boolean,
     val learnSelection: Boolean = true,
+    val caret: CommitCaret = CommitCaret.NONE,
 )

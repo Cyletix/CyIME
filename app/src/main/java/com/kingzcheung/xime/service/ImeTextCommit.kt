@@ -202,6 +202,9 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
     internal fun commitLiteralText(text: String, preserveWidth: Boolean = false, hardware: Boolean = false) {
         if (text.isEmpty()) return
         val literal = keyboardLiteral(text, preserveWidth = preserveWidth, hardware = hardware)
+        // 成对符号只管屏幕键盘；实体键盘的符号多数由引擎处理，只配一部分反而不一致。
+        val (paired, caret) = if (!hardware && com.kingzcheung.xime.settings.SettingsPreferences.isPairedSymbolsEnabled(service))
+            PairedSymbols.commitFor(literal) else literal to CommitCaret.NONE
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         val owner = service.uiState.value.inputSessionId
         val submit: suspend () -> Unit = literal@ {
@@ -217,7 +220,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 withContext(Dispatchers.Main) { Unit }
             }
             if (owner != service.uiState.value.inputSessionId) return@literal
-            commitCompositionAndLiteral(literal, asTyped = true)
+            commitCompositionAndLiteral(paired, asTyped = true, caret = caret)
         }
         val t9Queue = if (isT9Schema(service.uiState.value.currentSchemaId) && !service.uiState.value.isAsciiMode) {
             service.keyboardCallbacks?.onT9RunLiteralInput
@@ -227,7 +230,8 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
 
     /** One editor transaction for prefix + literal, reused when leaving a typing panel.
      * [asTyped]: symbols, panels and the language key keep the letters, not the first candidate. */
-    internal suspend fun commitCompositionAndLiteral(literal: String = "", asTyped: Boolean = false): Boolean {
+    internal suspend fun commitCompositionAndLiteral(literal: String = "", asTyped: Boolean = false,
+        caret: CommitCaret = CommitCaret.NONE): Boolean {
         InputCommandOwner.requireOwner().validate()
         if (service.keyRouter.usesDirectFieldInput) return service.keyRouter.commitDirectFieldLiteral(literal)
         if (service.keyRouter.hasPendingCandidateCommit) return false
@@ -248,7 +252,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         val text = prefix + literal
         if (text.isEmpty()) return true
         // Rejection retains the complete text and the original command owner for retry/cancel.
-        val result = service.keyRouter.commitPreparedText(text, t9)
+        val result = service.keyRouter.commitPreparedText(text, t9, caret)
         withContext(Dispatchers.Main) {
             InputCommandOwner.requireOwner().validate()
             if (result.accepted) {

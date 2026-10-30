@@ -3997,16 +3997,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         )
     }
 
-    internal fun submitText(text: String): TextCommitResult {
+    internal fun submitText(text: String, caret: CommitCaret = CommitCaret.NONE): TextCommitResult {
         InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
-        return commitTextAndPredict(text, false)
+        return commitTextAndPredict(text, false, caret = caret)
     }
 
-    internal fun commitTextAndPredict(text: String, isPaste: Boolean, allowPrediction: Boolean = true): TextCommitResult {
+    internal fun commitTextAndPredict(text: String, isPaste: Boolean, allowPrediction: Boolean = true,
+        caret: CommitCaret = CommitCaret.NONE): TextCommitResult {
         // Invalidate before delivery: a queued prediction or English completion must
         // not reappear after a paste, including rejected/internal-editor pastes.
         if (isPaste) dismissPredictionsForPaste()
-        val result = commitTextSilently(text, isPaste)
+        val result = commitTextSilently(text, isPaste, caret = caret)
         if (result != TextCommitResult.ACCEPTED_HOST || isPaste || !allowPrediction) return result
         if (isSecretEditor() || editorInputPolicy.directInput) return result
         if (!canPredictAfter(text)) {
@@ -4060,7 +4061,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * [isPaste] 标记粘贴性质上屏，透传到 text_committed payload（见 commitPastedText）。
      * 需在主线程调用。
      */
-    internal fun commitTextSilently(text: String, isPaste: Boolean = false, isSensitive: Boolean = false): TextCommitResult {
+    internal fun commitTextSilently(text: String, isPaste: Boolean = false, isSensitive: Boolean = false,
+        caret: CommitCaret = CommitCaret.NONE): TextCommitResult {
         check(Looper.myLooper() == Looper.getMainLooper()) { "Editor commits belong to Main" }
         if (InputCommandOwner.current.get() == null) {
             check(com.kingzcheung.xime.rime.RimeCommandContext.validity.get() == null) {
@@ -4074,7 +4076,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (!inputReadiness.accepts(admission) || uiState.value.inputSessionId != editor)
                     throw kotlinx.coroutines.CancellationException("Expired direct editor action")
             }
-            return owner.runInline { commitTextSilently(text, isPaste, isSensitive) }
+            return owner.runInline { commitTextSilently(text, isPaste, isSensitive, caret) }
         }
         InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
         val target = uiState.value.inputTarget
@@ -4082,13 +4084,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val editor = target.editText() ?: return TextCommitResult.NO_CONNECTION
             val editable = editor.text ?: return TextCommitResult.NO_CONNECTION
             val start = editor.selectionStart.coerceIn(0, editable.length)
-            val end = editor.selectionEnd.coerceIn(start, editable.length)
+            var end = editor.selectionEnd.coerceIn(start, editable.length)
+            val overtype = caret.overtype
+            if (overtype != null && start == end && editable.startsWith(overtype, end)) end += overtype.length
             editable.replace(start, end, text)
-            editor.setSelection(start + text.length)
+            editor.setSelection(start + text.length - caret.caretBack.coerceIn(0, text.length))
             return TextCommitResult.ACCEPTED_INTERNAL
         }
         val connection = currentInputConnection ?: return TextCommitResult.NO_CONNECTION
-        if (!connection.commitText(text, 1)) return TextCommitResult.REJECTED
+        val committed = if (caret == CommitCaret.NONE) connection.commitText(text, 1)
+            else connection.commitTextWithCaret(text, caret)
+        if (!committed) return TextCommitResult.REJECTED
         if (isSensitive || isSecretEditor()) return TextCommitResult.ACCEPTED_HOST
         pluginEvents.onTextCommitted(text, isPaste)
         if (isChineseMode) {
@@ -4098,6 +4104,27 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (!isPaste) predictionManager.recordInput(text)
         }
         return TextCommitResult.ACCEPTED_HOST
+    }
+
+    /** 退格：开着「输入成对符号」且光标夹在一对空符号中间时两边一起删，否则照常发退格键。 */
+    internal fun sendDeleteKey() {
+        if (SettingsPreferences.isPairedSymbolsEnabled(this) && deleteEmptyPairAroundCursor()) return
+        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+    }
+
+    private fun deleteEmptyPairAroundCursor(): Boolean {
+        val target = uiState.value.inputTarget
+        if (target.isInternal) {
+            val editor = target.editText() ?: return false
+            val editable = editor.text ?: return false
+            val start = editor.selectionStart
+            if (start <= 0 || start != editor.selectionEnd || start >= editable.length) return false
+            if (!PairedSymbols.isEmptyPairAround(editable.subSequence(start - 1, start),
+                    editable.subSequence(start, editable.length))) return false
+            editable.delete(start - 1, start + 1)
+            return true
+        }
+        return currentInputConnection?.deleteEmptyPairAroundCursor() == true
     }
 
     /** 当前编辑目标的绝对光标位置，供手写候选验证文字所属位置。 */
