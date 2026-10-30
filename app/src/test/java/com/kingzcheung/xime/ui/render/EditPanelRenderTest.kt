@@ -33,8 +33,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 编辑面板（四行：行首/行尾、段首/段尾、选择）出图：手机、平板宽 × 最小、默认高度 ×
- * 浅色纯色 / 深色玻璃 / 图片主题，看四角文字是否压到中间的方向圆盘。只在设了 CYIME_RENDER_OUT 时出图。
+ * 编辑面板（三行，圆盘两侧有空位时加行首/行尾）出图：手机、平板宽 × 最小、默认高度 ×
+ * 浅色纯色 / 深色玻璃 / 图片主题，看四角文字是否压到中间的方向圆盘；另出一组从窄到宽、
+ * 两种系统字号的对照，看行首/行尾从哪个宽度出现、文字图标放不放得下。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w900dp-h500dp-xhdpi")
@@ -53,11 +54,14 @@ class EditPanelRenderTest {
         var glass by mutableStateOf(false)
         var width by mutableStateOf(360)
         var height by mutableStateOf(250)
+        var fontScale by mutableStateOf(1f)
         rule.setContent {
             val palette = resolveKeyboardPalette(theme, dark)
             val config = FrostedGlassConfig.defaults(dark, enabled = glass)
             XimeTheme(darkTheme = dark, themeId = theme) {
                 CompositionLocalProvider(LocalKeyboardExplicitWidth provides true,
+                    androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                        androidx.compose.ui.platform.LocalDensity.current.density, fontScale),
                     LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config)) {
                     Box(Modifier.requiredSize(width.dp, height.dp).testTag("edit-body")
                         .keyboardBackground(KeyboardThemes.getRenderingScheme(theme).keyboardBackground,
@@ -90,6 +94,13 @@ class EditPanelRenderTest {
             rule.runOnIdle { theme = t; dark = d; glass = g; width = w; height = h }
             rule.waitForIdle()
             shot("$device-$label-$t-${if (d) "dark" else "light"}-${if (g) "glass" else "solid"}")
+        }
+        // 从手机竖屏到平板逐档加宽：排布不变，只看两侧行首/行尾何时出现、字和图标是否放得下。
+        com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(app).edit().putString("keyboard_theme", "soft_blue").commit()
+        for (font in listOf(1f, 1.3f)) for (h in listOf(200, 250, 320)) for (w in listOf(360, 411, 480, 560, 640, 720, 800, 900)) {
+            rule.runOnIdle { theme = "soft_blue"; dark = false; glass = false; width = w; height = h; fontScale = font }
+            rule.waitForIdle()
+            shot("sweep-font$font-h$h-w$w")
         }
     }
 
