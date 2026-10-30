@@ -57,4 +57,12 @@ class PinyinEditBufferTest {
         assertEquals(10, offsetAfterCodeKeys("9892654243", codeKeysBefore(text, text.length)))
         assertEquals(text.length, offsetAfterCodeKeys(text, 99))
     }
+
+    @Test fun keysLeftAfterAPartialChoiceKeepTheReadingTheUserSaw() {
+        // xu'ya|o'jia'ge: 需 takes xu, the rest still reads yao jia ge; 呀 then leaves o jia ge.
+        assertEquals("yao jia ge", dropReadingKeys("xu yao jia ge", 2))
+        assertEquals("ao jia ge", dropReadingKeys("xu yao jia ge", 3))
+        assertEquals("o jia ge", dropReadingKeys("yao jia ge", 2))
+        assertEquals("", dropReadingKeys("xu yao", 5))
+    }
 }

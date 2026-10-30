@@ -684,9 +684,15 @@ class RimeEngine {
     /** After the remaining keys of a partial choice are set, put back the caret the choice did not reach. */
     internal fun restoreT9CaretAfterChoice(remaining: String) {
         val keys = t9CaretKeysAfterChoice
+        val reading = t9ReadingAfterChoice
         t9CaretKeysAfterChoice = -1
-        if (keys > 0 && keys < codeKeysBefore(remaining, remaining.length)) placeT9CodeCaret(keys, remaining)
+        t9ReadingAfterChoice = ""
+        if (keys > 0 && keys < codeKeysBefore(remaining, remaining.length) && placeT9CodeCaret(keys, remaining) &&
+            reading.count { it != ' ' && it != '\'' } == codeKeysBefore(remaining, remaining.length))
+            t9CaretReading = remaining to reading
     }
+
+    @Volatile private var t9ReadingAfterChoice = ""
 
     /** Whole-code reading of the nine-key code whose caret [placeT9CodeCaret] moved. */
     @Volatile private var t9CaretReading: Pair<String, String>? = null
@@ -1262,8 +1268,11 @@ class RimeEngine {
         val full = nativeT9SelectCandidate(pinyin, text, length)
         // A caret inside the code still bounds what is left of it, as in full pinyin.
         val remaining = nativeT9GetRemainingDigits().orEmpty()
-        t9CaretKeysAfterChoice = if (full || caretKeys == null) -1
-            else caretKeys - (codeKeysBefore(before, before.length) - codeKeysBefore(remaining, remaining.length))
+        val consumed = codeKeysBefore(before, before.length) - codeKeysBefore(remaining, remaining.length)
+        t9CaretKeysAfterChoice = if (full || caretKeys == null) -1 else caretKeys - consumed
+        // The keys left keep the reading the user saw, not a fresh decode of them alone.
+        t9ReadingAfterChoice = t9CaretReading?.takeIf { t9CaretKeysAfterChoice > 0 && it.first == before }
+            ?.let { dropReadingKeys(it.second, consumed) }.orEmpty()
         nativeT9FlushRimeInput()
         full to withDisplayPreedit(nativeGetProcessResult(true))
     }
