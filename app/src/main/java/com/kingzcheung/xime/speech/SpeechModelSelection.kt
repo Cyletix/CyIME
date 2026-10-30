@@ -37,6 +37,37 @@ internal object SpeechModelSelection {
         else -> error("不支持的语音模型：$model")
     }
 
+    /**
+     * 整句定稿 really changes one language's dictation: Chinese only, with a streaming preview + SenseVoice
+     * correction, or SenseVoice alone. Paraformer / Zipformer alone and other languages ignore the switch.
+     */
+    fun wholeSentenceApplies(mode: String, chinese: Boolean): Boolean =
+        chinese && (hasCorrection(mode) || primary(mode) == SpeechModelCatalog.SENSEVOICE)
+
+    /** X-ASR (when downloaded) finalizes instead of SenseVoice only for Chinese preview + correction with 整句定稿 on. */
+    fun xasrFinalizes(mode: String, chinese: Boolean, wholeSentenceOn: Boolean): Boolean =
+        wholeSentenceOn && chinese && hasCorrection(mode)
+
+    /** What decodes one language's dictation; the :asr service and every line of the voice settings page use this. */
+    data class Pipeline(
+        /** Shows words while speaking (Paraformer / Zipformer); null = text appears at each pause. */
+        val preview: String?,
+        /** Writes the final text: [SpeechModelCatalog.XASR], SenseVoice, or the primary model itself. */
+        val finalizer: String,
+        val wholeSentence: Boolean,
+    )
+
+    fun pipeline(mode: String, chinese: Boolean, wholeSentenceOn: Boolean, xasrReady: Boolean): Pipeline {
+        val primary = primary(mode)
+        val finalizer = when {
+            !hasCorrection(mode) -> primary
+            xasrReady && xasrFinalizes(mode, chinese, wholeSentenceOn) -> SpeechModelCatalog.XASR
+            else -> SpeechModelCatalog.SENSEVOICE
+        }
+        val streaming = primary == SpeechModelCatalog.PARAFORMER || primary == SpeechModelCatalog.ZIPFORMER
+        return Pipeline(primary.takeIf { streaming }, finalizer, wholeSentenceOn && wholeSentenceApplies(mode, chinese))
+    }
+
     fun displayName(model: String): String? = when (model) {
         SpeechModelCatalog.ZIPFORMER -> "Zipformer · 中文"
         SpeechModelCatalog.ZIPFORMER_JA -> "Zipformer · 日语原版"

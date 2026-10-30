@@ -248,6 +248,13 @@ fun SpeechToTextSettingsContent(
             }
 
             SettingsSection(title = "字幕") {
+                // CaptionController.chineseMode：字幕自己挑模型，和上面语音输入的选择分开，这里写明，免得两处看起来矛盾。
+                Text(
+                    text = "字幕的中文识别不跟上面的模型选择：Paraformer 和 SenseVoice 都下载了就边说边出字、再由 SenseVoice 校正，只有 SenseVoice 就一句一句出字；不用 X-ASR 和整句定稿。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                )
                 var captionIcon by remember { mutableStateOf(CaptionLauncherIcon.isEnabled(context)) }
                 Column(Modifier.settingsSearchAnchor("桌面显示“字幕”图标").fillMaxWidth().padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

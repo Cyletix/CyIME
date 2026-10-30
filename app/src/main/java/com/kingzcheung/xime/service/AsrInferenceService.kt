@@ -12,6 +12,7 @@ import com.kingzcheung.xime.speech.CaptionDictationArbiter
 import com.kingzcheung.xime.speech.ResidentSpeechSessionOwner
 import com.kingzcheung.xime.speech.SherpaSpeechEngine
 import com.kingzcheung.xime.speech.SpeechBoundary
+import com.kingzcheung.xime.speech.SpeechModelSelection
 import com.kingzcheung.xime.speech.SpeechTuningRecorder
 import com.kingzcheung.xime.speech.caption.KnownVoices
 import com.kingzcheung.xime.speech.caption.CaptionSpeechSession
@@ -158,8 +159,10 @@ class AsrInferenceService : Service() {
                 val manager = AsrModelManager(this@AsrInferenceService)
                 val chosen = manager.selection(modelId, language)
                 check(chosen.ready) { "所选语音模型尚未完整下载" }
-                // 整句定稿只用于中文：X-ASR 已下载时用它定稿（代替 SenseVoice），没下载照旧用 SenseVoice。
-                val wholeSentence = wholeSentenceFinal && chosen.recognitionLanguage == "zh"
+                // 整句定稿只用于中文（规则见 SpeechModelSelection.wholeSentenceApplies，设置页同一条）：
+                // X-ASR 已下载时用它定稿（代替 SenseVoice），没下载照旧用 SenseVoice。
+                val wholeSentence = wholeSentenceFinal &&
+                    SpeechModelSelection.wholeSentenceApplies(chosen.mode, chosen.recognitionLanguage == "zh")
                 val selection = if (wholeSentence) manager.wholeSentenceFinalizer(chosen) else chosen
                 val recorder = if (saveTuningAudio) SpeechTuningRecorder(
                     java.io.File(getExternalFilesDir(null) ?: filesDir, "speech_tuning"), mapOf(
