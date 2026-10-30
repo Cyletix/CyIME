@@ -376,6 +376,46 @@ keyboard:
       "'": { tap: { label: "，", value: "，" }, swipe_up: { label: "。", value: "。" } , long_press: { display: "bubble", values: [ "，", "。"] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
+  # 仓颉五代（对应方案 cyime_cangjie，默认不启用）：同 26 键排列，键帽是仓颉字根，点按送字母码。
+  # 字根同方案 preedit_format 的 xlit（z 在五仓里是符号码，键帽「符」）。上下角标同 26 键（QwertySwipeSymbols），这里不配。
+  qwerty_cangjie:
+    schemas: [cyime_cangjie]
+    button_layout: standard
+    layout:
+      rows:
+        - [q, w, e, r, t, y, u, i, o, p]
+        - [a, s, d, f, g, h, j, k, l]
+        - [z, x, c, v, b, n, m]
+    keys:
+      q: { tap: { label: "手", value: "q" }, long_press: { display: "bubble", values: ["q", "Q"] } }
+      w: { tap: { label: "田", value: "w" }, long_press: { display: "bubble", values: ["w", "W"] } }
+      e: { tap: { label: "水", value: "e" }, long_press: { display: "bubble", values: ["e", "E"] } }
+      r: { tap: { label: "口", value: "r" }, long_press: { display: "bubble", values: ["r", "R"] } }
+      t: { tap: { label: "廿", value: "t" }, long_press: { display: "bubble", values: ["t", "T"] } }
+      y: { tap: { label: "卜", value: "y" }, long_press: { display: "bubble", values: ["y", "Y"] } }
+      u: { tap: { label: "山", value: "u" }, long_press: { display: "bubble", values: ["u", "U"] } }
+      i: { tap: { label: "戈", value: "i" }, long_press: { display: "bubble", values: ["i", "I"] } }
+      o: { tap: { label: "人", value: "o" }, long_press: { display: "bubble", values: ["o", "O"] } }
+      p: { tap: { label: "心", value: "p" }, long_press: { display: "bubble", values: ["p", "P"] } }
+      a: { tap: { label: "日", value: "a" }, long_press: { display: "bubble", values: ["a", "A"] } }
+      s: { tap: { label: "尸", value: "s" }, long_press: { display: "bubble", values: ["s", "S"] } }
+      d: { tap: { label: "木", value: "d" }, long_press: { display: "bubble", values: ["d", "D"] } }
+      f: { tap: { label: "火", value: "f" }, long_press: { display: "bubble", values: ["f", "F"] } }
+      g: { tap: { label: "土", value: "g" }, long_press: { display: "bubble", values: ["g", "G"] } }
+      h: { tap: { label: "竹", value: "h" }, long_press: { display: "bubble", values: ["h", "H"] } }
+      j: { tap: { label: "十", value: "j" }, long_press: { display: "bubble", values: ["j", "J"] } }
+      k: { tap: { label: "大", value: "k" }, long_press: { display: "bubble", values: ["k", "K"] } }
+      l: { tap: { label: "中", value: "l" }, long_press: { display: "bubble", values: ["l", "L"] } }
+      z: { tap: { label: "符", value: "z" }, long_press: { display: "bubble", values: ["z", "Z"] } }
+      x: { tap: { label: "難", value: "x" }, long_press: { display: "bubble", values: ["x", "X"] } }
+      c: { tap: { label: "金", value: "c" }, long_press: { display: "bubble", values: ["c", "C"] } }
+      v: { tap: { label: "女", value: "v" }, long_press: { display: "bubble", values: ["v", "V"] } }
+      b: { tap: { label: "月", value: "b" }, long_press: { display: "bubble", values: ["b", "B"] } }
+      n: { tap: { label: "弓", value: "n" }, long_press: { display: "bubble", values: ["n", "N"] } }
+      m: { tap: { label: "一", value: "m" }, long_press: { display: "bubble", values: ["m", "M"] } }
+      "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
+      earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
+
   # 日语：26 键用成熟 jaroomaji 罗马音转换，九宫格将假名读音交给同一引擎。
   japanese_kana:
     schemas: [japanese_kana]

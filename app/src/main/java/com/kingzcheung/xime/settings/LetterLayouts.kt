@@ -23,8 +23,9 @@ object LetterLayouts {
             language == InputLanguage.JAPANESE && scheme == InputScheme.ROMAJI ||
             language == InputLanguage.CHINESE && scheme in LETTER_CODED_CHINESE
 
-    /** Chinese schemes typed letter by letter on 26 keys besides pinyin: double pinyin and code tables (五笔、音形等导入的码表). */
-    private val LETTER_CODED_CHINESE = setOf(InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN, InputScheme.EXTERNAL)
+    /** Chinese schemes typed letter by letter on 26 keys besides pinyin: double pinyin and code tables (五笔、仓颉、音形等导入的码表). */
+    private val LETTER_CODED_CHINESE = setOf(InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN,
+        InputScheme.CANGJIE, InputScheme.EXTERNAL)
 
     fun typable(layout: CustomKeyboardLayout): Boolean = layout.mergedGroups.isEmpty()
 

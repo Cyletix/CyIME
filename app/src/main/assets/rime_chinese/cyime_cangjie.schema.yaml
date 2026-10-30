@@ -1,0 +1,95 @@
+# Rime schema
+# encoding: utf-8
+#
+# 仓颉五代，默认不启用（设置 → 已安装的方案里打开）。
+# 写法参照 rime/rime-cangjie（LGPL-3.0）fcb3d7dd94ac1304663d575727d24d8107f6b082 的 cangjie5.schema.yaml。
+# CyIME 适配：
+# - 码表 cyime_cangjie.dict.yaml 由 app/build-logic/tasks-cangjie.gradle.kts 构建时从 Jackchows/Cangjie5（MIT）生成，
+#   Windows 用同一张表。CyIME 不带 essay.txt，字频取小麦注音台湾语料与雾凇字频的大者，词组由 librime 按构词规则编码。
+#   只留基本区、扩展 A 和通用规范汉字表里的字，所以去掉「常用/增廣」开关和字集过滤。
+# - 去掉依赖 luna_pinyin 的拼音反查（CyIME 不带 luna_pinyin，键盘也打不出 `）。
+# - 码表是繁体，简繁跟「繁体输出」设置走：关（默认）时经 opencc/cyime_t2s.json 转成简体。ImeKeyRouter 按键前同步 simplification。
+# - 编码显示成字根（人戈日口），键盘见 xime.yaml 的 keyboard.qwerty_cangjie。
+
+schema:
+  schema_id: cyime_cangjie
+  name: 仓颉五代
+  version: "1.0-cyime1"
+  author:
+    - 發明人 朱邦復先生
+  description: |
+    第五代倉頡輸入法
+    碼表源自倉頡之友發佈的《五倉世紀版》
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 西文 ]
+  - name: full_shape
+    states: [ 半角, 全角 ]
+  # 1 = 出简体。设置里打开「繁体输出」时按键前改成 0。
+  - name: simplification
+    reset: 1
+    states: [ 繁, 简 ]
+  - name: ascii_punct
+    reset: 0
+    states: [ 。，, ．， ]
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - table_translator
+  filters:
+    - simplifier
+    - uniquifier
+    - single_char_filter
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+
+translator:
+  dictionary: cyime_cangjie
+  enable_sentence: true
+  enable_encoder: true
+  encode_commit_history: true
+  max_phrase_length: 5
+  preedit_format:
+    - "xlit|abcdefghijklmnopqrstuvwxyz|日月金木水火土竹戈十大中一弓人心手口尸廿山女田難卜符|"
+  comment_format:
+    - "xlit|abcdefghijklmnopqrstuvwxyz~|日月金木水火土竹戈十大中一弓人心手口尸廿山女田難卜符～|"
+  # z、yyy 是符号码，不记用户词频
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+    - "^yyy.*$"
+
+simplifier:
+  option_name: simplification
+  opencc_config: cyime_t2s.json
+  tips: none
+
+punctuator:
+  import_preset: default
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    punct: '^/([0-9]0?|[A-Za-z]+)$'
