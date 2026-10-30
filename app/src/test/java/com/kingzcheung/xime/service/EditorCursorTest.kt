@@ -513,20 +513,53 @@ class EditorCursorTest {
         verify(ic, never()).sendKeyEvent(any())
     }
 
-    @Test fun `selecting by line holds shift and restores the active end first`() {
-        val ic = editor(6, text = "one\nabcd\nlast")
+    @Test fun `selecting by line with the active end on the left moves it without shift and keeps the anchor`() {
+        // 用户 10-30：选择中 ← ← 再按行首，选区少了末尾两个字。宿主不收反向选区，Shift 动的是锚点那一端。
+        val ic = editor(6, text = "one\nabcd\nlast", ignoresReverse = true)
         val cursor = EditorCursor()
         cursor.beginSelection(ic)
         cursor.move(ic, -1, true)
         clearInvocations(ic)
+        assertEquals(listOf(listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 0), listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, 0)),
+            keyEvents { cursor.moveLine(ic, -1, selecting = true, multiLine = true) })
+        verify(ic).setSelection(5, 5)
+        // 宿主先回报折叠（还在 5，不算），再回报移到上一行的位置，此时接回锚点 6。
+        cursor.observeSelection(ic, 5, 5)
+        verify(ic, never()).setSelection(1, 6)
+        cursor.observeSelection(ic, 1, 1)
+        verify(ic).setSelection(1, 6)
+    }
+
+    @Test fun `line start after selecting leftwards keeps the original anchor`() {
+        val ic = editor(7, text = "今天天气真好世", ignoresReverse = true)
+        val cursor = EditorCursor()
+        cursor.beginSelection(ic)
+        cursor.move(ic, -1, true)
+        cursor.move(ic, -1, true)
+        verify(ic).setSelection(5, 7)
+        clearInvocations(ic)
+        assertEquals(listOf(listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MOVE_HOME, 0), listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MOVE_HOME, 0)),
+            keyEvents { cursor.moveToLineBoundary(ic, false, selecting = true) })
+        verify(ic).setSelection(5, 5)
+        cursor.observeSelection(ic, 5, 5)
+        cursor.observeSelection(ic, 0, 0)
+        verify(ic).setSelection(0, 7)
+        // 已在行首：宿主不会动，不折叠选区。
+        clearInvocations(ic)
+        assertEquals(emptyList<List<Int>>(), keyEvents { assertEquals(false, cursor.moveToLineBoundary(ic, false, selecting = true)) })
+        verify(ic, never()).setSelection(any(), any())
+    }
+
+    @Test fun `line end while selecting rightwards still holds shift`() {
+        val ic = editor(2, text = "abcdef")
+        val cursor = EditorCursor()
+        cursor.beginSelection(ic)
+        cursor.move(ic, 1, true)
+        clearInvocations(ic)
         val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
-        assertEquals(listOf(
-            listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, shift),
-            listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, shift),
-            listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, shift),
-            listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0),
-        ), keyEvents { cursor.moveLine(ic, -1, selecting = true, multiLine = true) })
-        verify(ic).setSelection(6, 5)
+        assertEquals(listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MOVE_END, shift),
+            keyEvents { cursor.moveToLineBoundary(ic, true, selecting = true) }[1])
+        verify(ic, never()).setSelection(any(), any())
     }
 
     @Test fun `line start and end use the host visual line keys`() {
