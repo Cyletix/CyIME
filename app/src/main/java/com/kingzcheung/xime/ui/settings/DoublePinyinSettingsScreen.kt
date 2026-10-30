@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
 /** 韵母按键上的写法：v 写作 ü（lü、lüe），与常见双拼键位图一致。 */
 private fun finalLabel(final: String) = final.replace('v', 'ü')
 
-/** 双拼方案：内置的小鹤、首道、自然码等可复制修改；自定义方案改键位后保存，按键排列和符号与中文26键（14 键版本与中文14键）相同。 */
+/** 双拼方案：内置的小鹤、首道、自然码等可复制修改；自定义方案改键位后保存。符号与中文26键（14 键版本与中文14键）相同，字母排列随所选字母布局。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DoublePinyinSettingsContent(onBack: () -> Unit) {
@@ -84,7 +84,8 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
             val current = draft
             if (current == null) {
                 Text("在「语言与方案」的方案一栏切换双拼。内置方案可以复制后修改键位，保存为自己的方案；" +
-                    "按键排列、符号和词库与中文26键相同。启用了中文14键时，在方案栏显示的双拼方案在14键上也能用。",
+                    "符号和词库与中文26键相同。在「语言与方案」点 QWJRTK、Colemak 或自己的字母布局，双拼也按那个排列打；" +
+                    "启用了中文14键时，在方案栏显示的双拼方案在14键上也能用。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = { edit(copyOf(DoublePinyinScheme.FLYPY)) }, enabled = !busy,

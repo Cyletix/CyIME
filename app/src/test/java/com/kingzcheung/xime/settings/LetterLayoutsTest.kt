@@ -23,6 +23,33 @@ class LetterLayoutsTest {
     @After fun clear() {
         LetterLayouts.setForTest(InputLanguage.ENGLISH, null)
         LetterLayouts.setForTest(InputLanguage.JAPANESE, null)
+        LetterLayouts.setForTest(InputLanguage.CHINESE, null)
+    }
+
+    /** 双拼（小鹤、自然码、自定义）和英文、日语罗马字一样，能用中文拼音提供的字母布局；14 键版本照旧只有 14 键。 */
+    @Test fun doublePinyinTypesOnTheChineseLetterLayouts() {
+        val all = entries + listOf("double_pinyin_flypy", "double_pinyin_flypy_14jian", DoublePinyinScheme.ZIRANMA_ID)
+            .map { SchemaInfo(it, if (it == DoublePinyinScheme.ZIRANMA_ID) "自然码" else "小鹤双拼", "", "", "") }
+        fun e(id: String) = all.first { it.schemaId == id }
+        for (id in listOf("double_pinyin_flypy", DoublePinyinScheme.ZIRANMA_ID))
+            assertEquals(listOf(InputLayout.QWERTY.id, Cyletix10Layout.ID, ColemakLayout.ID),
+                InputProfileSelection.layoutsOf(e(id), all).map { it.id })
+        assertEquals(listOf(InputLayout.MERGED14.id), InputProfileSelection.layoutsOf(e("double_pinyin_flypy_14jian"), all).map { it.id })
+        // 点 Colemak 时保持当前双拼方案，只换按键排列。
+        assertEquals(InputProfileSelection.LayoutSwitch(e(DoublePinyinScheme.ZIRANMA_ID), true),
+            InputProfileSelection.switchLayout(all, e(DoublePinyinScheme.ZIRANMA_ID), ColemakLayout.ID))
+        LetterLayouts.setForTest(InputLanguage.CHINESE, ColemakLayout.ID)
+        val profile = InputProfiles.current(DoublePinyinScheme.ZIRANMA_ID)
+        assertEquals(InputScheme.DOUBLE_PINYIN, profile.scheme)
+        assertEquals(EngineProfile.Rime(DoublePinyinScheme.ZIRANMA_ID), profile.engineProfile)
+        assertEquals(ColemakLayout.ID, profile.layout.id)
+        assertEquals(ColemakLayout.preset.typingRows(), KeysConfigHelper.letterLayout("double_pinyin_flypy", false)?.typingRows())
+        // 拼音的布局在方案里，英文有自己的排列，都不受影响。
+        assertNull(KeysConfigHelper.letterLayout("rime_ice", false))
+        assertEquals(InputLayout.QWERTY.id, InputProfiles.current("rime_ice", asciiMode = true).layout.id)
+        // 回到 26 键：不再用 Colemak。
+        assertEquals(InputProfileSelection.LayoutSwitch(e(DoublePinyinScheme.ZIRANMA_ID), true),
+            InputProfileSelection.switchLayout(all, e(DoublePinyinScheme.ZIRANMA_ID), InputLayout.QWERTY.id))
     }
 
     @Test fun colemakIsABuiltinLetterLayoutLikeCyletix10() {
