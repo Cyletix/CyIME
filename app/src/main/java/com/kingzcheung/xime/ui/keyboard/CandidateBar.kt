@@ -20,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -332,8 +333,13 @@ fun CandidateBar(
 
     val associationHighlight = (state as? CandidateBarState.AssociationOnly)?.highlightIndex
         ?.takeIf { it in displayAssociation.indices }
+    // 换了一组候选回到最前；「下一项」移动联想高亮时，高亮已完整露出就不滚，移出栏外才滚到刚好露出，
+    // 和打字候选同一规矩（用户 10-30：原来每按一下都把高亮滚到最左，像在翻页，看着永远是第一个）。
+    // 纯联想态栏里只有联想词，联想序号就是 LazyRow 的序号。
+    val associationSpacingPx = with(density) { 4.dp.roundToPx() }
     LaunchedEffect(displayCandidates, displayAssociation, associationHighlight) {
-        candidateListState.scrollToItem(associationHighlight ?: 0)
+        if (associationHighlight == null) candidateListState.scrollToItem(0)
+        else candidateListState.revealItem(associationHighlight, associationSpacingPx)
     }
 
     // Keep this animation outside the conditional button branches so changing pages
@@ -1418,3 +1424,37 @@ internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Co
 private fun colorsClose(a: Color, b: Color): Boolean =
     kotlin.math.abs(a.red - b.red) < 0.12f && kotlin.math.abs(a.green - b.green) < 0.12f &&
         kotlin.math.abs(a.blue - b.blue) < 0.12f
+
+/** 列表里一项当前所占的横向范围（像素，相对视口）。 */
+internal data class CandidateItemSpan(val index: Int, val start: Int, val end: Int)
+
+/**
+ * 让第 [index] 项完整露出还要滚多少像素：已完整露出是 0，往前露出是负数；紧挨在最后一个可见项后面、还没排出来时
+ * 先滚到它露头（下一轮按量出的宽度补齐）；离得更远（如从最后一个绕回第一个）返回 null，直接跳到那一项。
+ */
+internal fun candidateRevealDelta(index: Int, visible: List<CandidateItemSpan>, viewportStart: Int, viewportEnd: Int,
+    spacing: Int): Int? {
+    visible.firstOrNull { it.index == index }?.let { item ->
+        return when {
+            item.start < viewportStart -> item.start - viewportStart
+            item.end > viewportEnd -> minOf(item.end - viewportEnd, item.start - viewportStart)
+            else -> 0
+        }
+    }
+    val last = visible.lastOrNull() ?: return null
+    return if (index == last.index + 1) maxOf(last.end - viewportEnd, 0) + spacing + 1 else null
+}
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.revealItem(index: Int, spacing: Int) {
+    // 等这一帧排完再量：高亮换了的那一项字重会变，宽度以新排的为准。
+    androidx.compose.runtime.withFrameNanos { }
+    repeat(3) {
+        val info = layoutInfo
+        val spans = info.visibleItemsInfo.map { CandidateItemSpan(it.index, it.offset, it.offset + it.size) }
+        when (val delta = candidateRevealDelta(index, spans, info.viewportStartOffset, info.viewportEndOffset, spacing)) {
+            null -> { scrollToItem(index); return }
+            0 -> return
+            else -> scrollBy(delta.toFloat())
+        }
+    }
+}
