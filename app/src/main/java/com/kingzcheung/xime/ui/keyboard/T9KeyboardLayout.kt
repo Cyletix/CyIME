@@ -456,8 +456,14 @@ private fun T9KeyboardContent(
                     maxLines = 1, softWrap = false)
                 val availableTextWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
                 val candidateFontSize = metrics.fontSizeSp * minOf(1f, availableTextWidth / sample.size.width.coerceAtLeast(1))
+                // 超出四格时右缘显示滚动条；空闲的符号列末尾放「编辑」，点开这一栏的符号设置。
+                val railState = androidx.compose.foundation.lazy.rememberLazyListState()
+                // 符号列滑下去后开始打字，拼音列要从第一个起。
+                androidx.compose.runtime.LaunchedEffect(showCandidates) { railState.scrollToItem(0) }
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().testTag("t9-pinyin-options"),
+                    state = railState,
+                    modifier = Modifier.fillMaxSize().testTag("t9-pinyin-options")
+                        .railScrollIndicator(railState, keyTextColor.copy(alpha = 0.35f)),
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     itemsIndexed(displayItems) { index, item ->
@@ -487,6 +493,11 @@ private fun T9KeyboardContent(
                             modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp)
                                 .testTag("t9-pinyin-option:$index")
                         )
+                    }
+                    if (!showCandidates) item(key = "edit") {
+                        SideRailEditItem(SideSymbolTarget.T9, keyTextColor, keyBackgroundColor,
+                            iconSize = (candidateFontSize * 1.1f).dp, onPress = { onKeyPressDown?.invoke("edit") },
+                            modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp).testTag("t9-side-symbols-edit"))
                     }
                 }
             }
