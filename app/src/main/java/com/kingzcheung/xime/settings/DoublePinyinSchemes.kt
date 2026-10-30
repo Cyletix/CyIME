@@ -7,7 +7,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * 首道双拼（内置键位表）和用户自定义的双拼方案（键位表 custom-double-pinyin.json 是唯一来源）。
+ * 首道、自然码等内置键位表和用户自定义的双拼方案（键位表 custom-double-pinyin.json 是唯一来源）。
  * Rime 方案和中英混输词表每次初始化时由已部署的小鹤双拼方案重新生成；不删除词库和学习记录。
  */
 object DoublePinyinSchemes {
@@ -15,11 +15,12 @@ object DoublePinyinSchemes {
     const val FILE = "custom-double-pinyin.json"
     private const val BASE = "double_pinyin_flypy"
 
-    fun isGenerated(id: String) = isT9(id) || id == DoublePinyinScheme.SHOUDAO_ID || isCustom(id)
+    fun isGenerated(id: String) = isT9(id) || isBuiltin(id) && id != BASE || isCustom(id)
     fun isCustom(id: String) = id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX) && !id.endsWith(DoublePinyinScheme.T9_SUFFIX)
-    /** 双拼方案的九键版本（小鹤、首道和自定义方案各一个，默认不启用）。 */
+    private fun isBuiltin(id: String) = DoublePinyinScheme.BUILTINS.any { it.id == id }
+    /** 双拼方案的九键版本（每个内置和自定义方案各一个，默认不启用）。 */
     fun isT9(id: String) = id.endsWith(DoublePinyinScheme.T9_SUFFIX) && id.removeSuffix(DoublePinyinScheme.T9_SUFFIX).let {
-        it == BASE || it == DoublePinyinScheme.SHOUDAO_ID || isCustom(it)
+        isBuiltin(it) || isCustom(it)
     }
 
     @Volatile private var cached: List<DoublePinyinScheme> = emptyList()
@@ -36,7 +37,7 @@ object DoublePinyinSchemes {
             .filter { it.valid() && isCustom(it.id) }.distinctBy { it.id }.also { cached = it }
     }
 
-    /** 小鹤双拼和首道双拼在前，可以复制成自己的方案。 */
+    /** 内置方案（小鹤、首道、自然码等）在前，可以复制成自己的方案。 */
     fun all(context: Context): List<DoublePinyinScheme> = DoublePinyinScheme.BUILTINS + load(context)
 
     private fun decode(o: JSONObject): DoublePinyinScheme {
@@ -82,7 +83,7 @@ object DoublePinyinSchemes {
         writeIfChanged(File(rimeDir, "${DoublePinyinScheme.t9Id(scheme.id)}.schema.yaml"), scheme.t9Schema())
     }
 
-    /** 初始化时调用：小鹤双拼方案随版本更新后，首道、自定义方案和各九键版本跟着更新。 */
+    /** 初始化时调用：小鹤双拼方案随版本更新后，其他内置、自定义方案和各九键版本跟着更新。 */
     @Synchronized fun install(context: Context, rimeDir: File) {
         if (!File(rimeDir, "$BASE.schema.yaml").isFile) return
         for (scheme in DoublePinyinScheme.BUILTINS + runCatching { load(context) }.getOrDefault(emptyList())) {
@@ -91,7 +92,7 @@ object DoublePinyinSchemes {
         }
     }
 
-    /** 在方案栏显示或隐藏一个双拼方案；首道双拼和各九键版本默认不启用，在双拼方案页自己打开。 */
+    /** 在方案栏显示或隐藏一个双拼方案；小鹤以外的内置方案和各九键版本默认不启用，在双拼方案页自己打开。 */
     fun setEnabled(context: Context, id: String, enabled: Boolean) {
         val current = SchemaManager.getEnabledSchemas(context)
         val updated = if (enabled) {
