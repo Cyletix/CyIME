@@ -200,6 +200,15 @@ class KeyboardT9StrokeGestureTest {
     }
 
     @Test
+    fun `内置九键侧栏与常用符号面板前 16 个相同`() {
+        // 用户 10-30：左栏只有四个、滑不动；默认放满常用中文标点，与常用符号面板同一顺序。
+        val text = repoFile("src/main/assets/xime.yaml").readText()
+        val expected = com.kingzcheung.xime.keyboard.commonSymbolsFor("中").take(16)
+        assertEquals(expected, KeysConfigHelper.parseKeyboardT9YamlPartial(text)?.sideSymbols)
+        assertEquals(expected, KeysConfigHelper.DEFAULT_T9_SIDE_SYMBOLS)
+    }
+
+    @Test
     fun `内置 stroke side_symbols 与历史硬编码一致`() {
         val text = repoFile("src/main/assets/xime.yaml").readText()
         val partial = KeysConfigHelper.parseKeyboardStrokeYamlPartial(text)
