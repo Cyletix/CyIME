@@ -40,6 +40,45 @@ class WholeSessionRereadTest {
         assertEquals(64000, engine.reread.last()) // every captured sample, once
     }
 
+    @Test fun `SenseVoice alone keeps punctuation, decodes the last sentence and re-reads the whole input`() {
+        val engine = object : Engine() {
+            override val hasRefinement = false
+            override val isStreaming = false
+            override fun accept(samples: FloatArray) = error("no streaming model")
+            override fun finishStream() = error("no streaming model")
+            override fun refine(samples: FloatArray) = error("whole sentence keeps punctuation")
+            override fun refinePunctuated(samples: FloatArray): String {
+                reread.add(samples.size)
+                return if (samples.size >= 4 * 16000) "整段识别的结果。" else "段。"
+            }
+        }
+        val s = LocalSpeechSession(engine, {}, {}, wholeSentence = true)
+        s.acceptPcm(pcm(16000, loud)); s.acceptPcm(pcm(32000, quiet)); s.acceptPcm(pcm(16000, loud))
+        assertEquals("整段识别的结果。", s.finish())
+        assertEquals(64000, engine.reread.last())
+        assertTrue("both sentences are decoded at their pause/stop first", engine.reread.size >= 3)
+    }
+
+    @Test fun `SenseVoice alone with the switch off keeps the old segments without a re-read`() {
+        val engine = object : Engine() {
+            override val hasRefinement = false
+            override val isStreaming = false
+        }
+        LocalSpeechSession(engine, {}, {}).apply { acceptPcm(pcm(16000, loud)); finish() }
+        assertTrue(engine.reread.isEmpty())
+    }
+
+    @Test fun `a rolling-preview recognizer such as Japanese Zipformer is not switched to whole sentences`() {
+        val engine = object : Engine() {
+            override val hasRefinement = false
+            override val isStreaming = false
+            override val hasRollingPreview = true
+            override fun preview(samples: FloatArray) = "预览"
+        }
+        LocalSpeechSession(engine, {}, {}, wholeSentence = true).apply { acceptPcm(pcm(16000, loud)); finish() }
+        assertTrue(engine.reread.isEmpty())
+    }
+
     @Test fun `switch off or no second pass never re-reads`() {
         val off = Engine()
         LocalSpeechSession(off, {}, {}).apply { acceptPcm(pcm(16000, loud)); finish() }
