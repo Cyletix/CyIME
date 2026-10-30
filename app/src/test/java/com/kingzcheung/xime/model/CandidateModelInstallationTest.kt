@@ -85,7 +85,8 @@ class CandidateModelInstallationTest {
 
     @Test fun immutableGithubAssetDownloadsRequestBinaryWithoutAffectingOtherHosts() {
         val grammar = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.GRAMMAR }
-        assertEquals("application/octet-stream", modelDownloadRequest(grammar.files.single().downloadUrl).build().header("Accept"))
+        val assetUrl = grammar.versions.flatMap { it.files }.map { it.downloadUrl }.first { "/releases/assets/" in it }
+        assertEquals("application/octet-stream", modelDownloadRequest(assetUrl).build().header("Accept"))
         assertNull(modelDownloadRequest("https://example.org/repos/a/b/releases/assets/1").build().header("Accept"))
         assertNull(modelDownloadRequest("https://api.github.com/repos/a/b").build().header("Accept"))
         assertTrue(CandidateModelCatalog.models.all { it.category == ModelCategory.CANDIDATE })
