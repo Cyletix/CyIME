@@ -38,13 +38,27 @@ class SpeechPunctuationTest {
         assertEquals("你好 我在", normalizeVoiceText("你好，我在。")) // switch off: model marks become spacing
     }
 
-    @Test fun `regions never repeat a full stop and need no space after a mark`() {
+    @Test fun `regions never repeat a mark and need no space after a mark`() {
         val t = SpeechTranscript(keepMarks = true)
         t.update(1, "今天天气不错。", SpeechBoundary.PAUSE)
-        assertEquals("今天天气不错。我们出去吧。", t.update(2, "。我们出去吧。", SpeechBoundary.PAUSE))
+        assertEquals("今天天气不错，我们出去吧。", t.update(2, "。我们出去吧。", SpeechBoundary.PAUSE))
         val preview = SpeechTranscript(keepMarks = true)
         preview.update(1, "第一句。", SpeechBoundary.PAUSE)
-        assertEquals("第一句。第二句还在说", preview.update(2, "第二句还在说")) // streaming preview has no marks yet
+        assertEquals("第一句，第二句还在说", preview.update(2, "第二句还在说")) // streaming preview has no marks yet
+    }
+
+    @Test fun `a pause inside a sentence does not leave a full stop behind`() {
+        // The user's own dictation on 1.15.2: every pause segment came back ending in 。 and the session was
+        // sent before the end-of-input re-read, so the stops stayed mid-sentence.
+        val t = SpeechTranscript(keepMarks = true)
+        t.update(1, "你之前好好给我保证了，说的。", SpeechBoundary.PAUSE)
+        t.update(2, "不用流式，用整句识别。", SpeechBoundary.PAUSE)
+        t.update(3, "那肯定是哪里有问题的？", SpeechBoundary.PAUSE)
+        assertEquals("你之前好好给我保证了，说的，不用流式，用整句识别，那肯定是哪里有问题的？你看这能看吗。",
+            t.update(4, "你看这能看吗。", SpeechBoundary.PAUSE)) // the latest segment keeps its stop; ？ always stays
+        val english = SpeechTranscript(keepMarks = true)
+        english.update(1, "hello world.", SpeechBoundary.PAUSE)
+        assertEquals("hello world, next one.", english.update(2, "next one.", SpeechBoundary.LIMIT))
     }
 
     @Test fun `session keeps marks only with whole sentence on`() {
