@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,9 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -39,11 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,7 +48,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -97,7 +89,6 @@ fun SchemaSettingsContent(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val localViewModel: SchemaLocalViewModel = viewModel()
     val localUiState by localViewModel.uiState.collectAsStateWithLifecycle()
-    var tabIndex by remember { mutableStateOf(0) }
     var showExtraSchemas by remember { mutableStateOf(false) }
     var englishEnabled by remember { mutableStateOf(InputLanguage.ENGLISH in LanguagePreferences.enabled(context)) }
     var modeOrderRevision by remember { mutableIntStateOf(0) }
@@ -108,13 +99,16 @@ fun SchemaSettingsContent(
         englishEnabled = InputLanguage.ENGLISH in LanguagePreferences.enabled(context)
         modeOrderRevision++
     }
-    // 切 tab 时刷新对应列表，保持数据一致
-    LaunchedEffect(tabIndex) {
-        if (tabIndex == 0) viewModel.refresh() else localViewModel.loadLocalPackages()
-    }
-    // 导入完成后刷新本地包列表
+    // 导入完成后刷新方案包；有同名文件没装上的，接着问用户（弹「更新共用文件」）。
     LaunchedEffect(Unit) {
-        viewModel.importCompleted.collect { localViewModel.loadLocalPackages() }
+        viewModel.importCompleted.collect { result ->
+            localViewModel.loadLocalPackages()
+            result?.pendingPackageId?.let { localViewModel.installImported(it, result.pendingName) }
+        }
+    }
+    // 方案包装好或卸掉后，上面的方案列表跟着刷新。
+    LaunchedEffect(localUiState.installingId, localUiState.packages) {
+        if (localUiState.installingId == null) viewModel.refresh()
     }
     var showImportWarning by remember { mutableStateOf(false) }
     var dontShowImportWarning by remember { mutableStateOf(false) }
@@ -195,84 +189,6 @@ fun SchemaSettingsContent(
         }
     }
 
-    if (uiState.showUninstallDialog) {
-        val packages = uiState.marketPackages.filterNot { it.packageId == "builtin" }
-        val selectedIds = remember { mutableStateListOf<String>() }
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissUninstallDialog() },
-            title = { Text("卸载方案") },
-            text = {
-                if (packages.isEmpty()) {
-                    Text(
-                        "没有可卸载的方案",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Column {
-                        Text(
-                            "选择要卸载的方案：",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        packages.forEach { pkg ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (pkg.packageId in selectedIds) {
-                                            selectedIds.remove(pkg.packageId)
-                                        } else {
-                                            selectedIds.add(pkg.packageId)
-                                        }
-                                    }
-                                    .padding(vertical = 4.dp),
-                            ) {
-                                Checkbox(
-                                    checked = pkg.packageId in selectedIds,
-                                    onCheckedChange = { checked ->
-                                        if (checked) selectedIds.add(pkg.packageId)
-                                        else selectedIds.remove(pkg.packageId)
-                                    }
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Column {
-                                    Text(pkg.displayName, style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        "${pkg.schemaCount} 个输入方案 · ${pkg.fileCount} 个文件" +
-                                            if (pkg.version.isNotEmpty()) " · v${pkg.version}" else "",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.uninstallPackages(selectedIds.toList())
-                    },
-                    enabled = selectedIds.isNotEmpty(),
-                ) {
-                    Text(
-                        "卸载 (${selectedIds.size})",
-                        color = if (selectedIds.isNotEmpty()) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissUninstallDialog() }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -333,181 +249,137 @@ fun SchemaSettingsContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 和词库页同一种标签栏。
-            PrimaryTabRow(selectedTabIndex = tabIndex, containerColor = MaterialTheme.colorScheme.surface) {
-                Tab(
-                    selected = tabIndex == 0,
-                    onClick = { tabIndex = 0 },
-                    text = { Text("已安装") },
-                )
-                Tab(
-                    selected = tabIndex == 1,
-                    onClick = { tabIndex = 1 },
-                    text = { Text("已下载/导入") },
-                )
+            val installedIds = uiState.allSchemas.map { it.schemaId }.toSet()
+            val visibleSchemas = uiState.allSchemas.filter {
+                com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds)
+            }
+            val schemaById = visibleSchemas.associateBy { it.schemaId }
+            val fullOrder = remember(uiState.allSchemas, modeOrderRevision) {
+                orderedInstalledModeIds(context, uiState.allSchemas)
+            }
+            val enabledIds = uiState.enabledSchemas.toSet()
+            val savedEnabledIds = fullOrder.filter { id ->
+                (id == InputModes.ENGLISH && englishEnabled) || (id in enabledIds && id in schemaById)
+            }
+            val dragOrder = rememberDragOrder(savedEnabledIds) { reordered ->
+                if (reorderEnabledModes(context, uiState.allSchemas, enabledIds, englishEnabled, reordered)) modeOrderRevision++
+            }
+            val orderedEnabledIds = dragOrder.order
+            // 和词库、布局管理同一套：组名 + 连成一张卡片的行 + 卡片下的小字说明（不再用红字）。
+            LazyColumn(
+                state = dragOrder.list,
+                modifier = Modifier.settingsGutterScroll(dragOrder.list)
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+            ) {
+                item {
+                    SettingsGroupTitle("已启用的输入组合", Modifier.padding(top = 8.dp))
+                }
+
+                if (orderedEnabledIds.isEmpty()) {
+                    item {
+                        Text(
+                            text = "暂未启用任何方案",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
+                }
+
+                itemsIndexed(orderedEnabledIds, key = { _, id -> id }) { row, id ->
+                    val isEnglish = id == InputModes.ENGLISH
+                    val schema = if (isEnglish) SchemaMeta(id, "英文") else schemaById.getValue(id)
+                    SchemaToggleItem(
+                        schema = schema,
+                        enabled = true,
+                        isCompiled = isEnglish || SchemaManager.isSchemaCompiled(context, id),
+                        isCurrent = !isEnglish && id == uiState.currentSchema,
+                        onToggle = { if (!isEnglish) viewModel.toggleSchema(schema) },
+                        onSelect = { if (!isEnglish) viewModel.selectSchema(schema) },
+                        isBuiltIn = isEnglish,
+                        isDragging = dragOrder.dragging == id,
+                        isDropTarget = false,
+                        reorderModifier = dragOrderItem(dragOrder, id, orderedEnabledIds.size > 1),
+                        groupIndex = row,
+                        groupSize = orderedEnabledIds.size,
+                    )
+                }
+
+                item {
+                    SettingsNote("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言与方案」选择。",
+                        Modifier.padding(top = 4.dp))
+                    SettingsNote("九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「应用方案更改」生效。日常打字不需要定期部署。")
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                val disabledSchemas = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas &&
+                    (showExtraSchemas || it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended) }
+                item {
+                    TextButton(onClick = { showExtraSchemas = !showExtraSchemas }) {
+                        Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）")
+                    }
+                }
+
+                if (disabledSchemas.isEmpty()) {
+                    item {
+                        Text(
+                            text = "没有其他可用方案",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
+                }
+
+                itemsIndexed(disabledSchemas, key = { _, schema -> schema.schemaId }) { row, schema ->
+                    SchemaToggleItem(
+                        schema = schema,
+                        enabled = false,
+                        isCompiled = SchemaManager.isSchemaCompiled(context, schema.schemaId),
+                        isCurrent = false,
+                        onToggle = { viewModel.toggleSchema(schema) },
+                        onSelect = { viewModel.selectSchema(schema) },
+                        groupIndex = row,
+                        groupSize = disabledSchemas.size,
+                    )
+                }
+                // 导入和从「扩展 › 方案」获取的方案包：卸载在这里；同名文件没确认的包留着，可以再装或删。
+                val packages = localUiState.packages.filterNot { it.packageId == "builtin" }
+                if (packages.isNotEmpty()) {
+                    item { SettingsGroupTitle("导入和下载的方案包", Modifier.padding(top = 8.dp)) }
+                    itemsIndexed(packages, key = { _, pkg -> "package:${pkg.packageId}" }) { row, pkg ->
+                        SettingsGroupRow(row, packages.size) {
+                            SchemaPackageRow(
+                                item = pkg,
+                                installing = localUiState.installingId == pkg.packageId,
+                                onInstall = { localViewModel.installPackage(pkg) },
+                                onDelete = { localViewModel.deleteDownloaded(pkg) },
+                                onUninstall = { localViewModel.uninstall(pkg) },
+                            )
+                        }
+                    }
+                }
+                // 直接看、改 Rime 文件只用来排错，放在高级方案后面。
+                item {
+                    TextButton(onClick = onNavigateToRimeFileBrowser) {
+                        Text("Rime 配置文件（高级）")
+                    }
+                }
+                item { Spacer(Modifier.height(8.dp)) }
             }
 
-            when (tabIndex) {
-                0 -> {
-                    val installedIds = uiState.allSchemas.map { it.schemaId }.toSet()
-                    val visibleSchemas = uiState.allSchemas.filter {
-                        com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds)
-                    }
-                    val schemaById = visibleSchemas.associateBy { it.schemaId }
-                    val fullOrder = remember(uiState.allSchemas, modeOrderRevision) {
-                        orderedInstalledModeIds(context, uiState.allSchemas)
-                    }
-                    val enabledIds = uiState.enabledSchemas.toSet()
-                    val savedEnabledIds = fullOrder.filter { id ->
-                        (id == InputModes.ENGLISH && englishEnabled) || (id in enabledIds && id in schemaById)
-                    }
-                    val dragOrder = rememberDragOrder(savedEnabledIds) { reordered ->
-                        if (reorderEnabledModes(context, uiState.allSchemas, enabledIds, englishEnabled, reordered)) modeOrderRevision++
-                    }
-                    val orderedEnabledIds = dragOrder.order
-                    // 和词库、布局管理同一套：组名 + 连成一张卡片的行 + 卡片下的小字说明（不再用红字）。
-                    LazyColumn(
-                        state = dragOrder.list,
-                        modifier = Modifier.settingsGutterScroll(dragOrder.list)
-                            .weight(1f)
-                            .padding(horizontal = 16.dp),
-                    ) {
-                        item {
-                            SettingsGroupTitle("已启用的输入组合", Modifier.padding(top = 8.dp))
-                        }
-
-                        if (orderedEnabledIds.isEmpty()) {
-                            item {
-                                Text(
-                                    text = "暂未启用任何方案",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                )
-                            }
-                        }
-
-                        itemsIndexed(orderedEnabledIds, key = { _, id -> id }) { row, id ->
-                            val isEnglish = id == InputModes.ENGLISH
-                            val schema = if (isEnglish) SchemaMeta(id, "英文") else schemaById.getValue(id)
-                            SchemaToggleItem(
-                                schema = schema,
-                                enabled = true,
-                                isCompiled = isEnglish || SchemaManager.isSchemaCompiled(context, id),
-                                isCurrent = !isEnglish && id == uiState.currentSchema,
-                                onToggle = { if (!isEnglish) viewModel.toggleSchema(schema) },
-                                onSelect = { if (!isEnglish) viewModel.selectSchema(schema) },
-                                isBuiltIn = isEnglish,
-                                isDragging = dragOrder.dragging == id,
-                                isDropTarget = false,
-                                reorderModifier = dragOrderItem(dragOrder, id, orderedEnabledIds.size > 1),
-                                groupIndex = row,
-                                groupSize = orderedEnabledIds.size,
-                            )
-                        }
-
-                        item {
-                            SettingsNote("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言与方案」选择。",
-                                Modifier.padding(top = 4.dp))
-                            SettingsNote("九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「应用方案更改」生效。日常打字不需要定期部署。")
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        val disabledSchemas = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas &&
-                            (showExtraSchemas || it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended) }
-                        item {
-                            TextButton(onClick = { showExtraSchemas = !showExtraSchemas }) {
-                                Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）")
-                            }
-                        }
-
-                        if (disabledSchemas.isEmpty()) {
-                            item {
-                                Text(
-                                    text = "没有其他可用方案",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                )
-                            }
-                        }
-
-                        itemsIndexed(disabledSchemas, key = { _, schema -> schema.schemaId }) { row, schema ->
-                            SchemaToggleItem(
-                                schema = schema,
-                                enabled = false,
-                                isCompiled = SchemaManager.isSchemaCompiled(context, schema.schemaId),
-                                isCurrent = false,
-                                onToggle = { viewModel.toggleSchema(schema) },
-                                onSelect = { viewModel.selectSchema(schema) },
-                                groupIndex = row,
-                                groupSize = disabledSchemas.size,
-                            )
-                        }
-                        // 直接看、改 Rime 文件只用来排错，放在高级方案后面。
-                        item {
-                            TextButton(onClick = onNavigateToRimeFileBrowser) {
-                                Text("Rime 配置文件（高级）")
-                            }
-                        }
-                        item { Spacer(Modifier.height(8.dp)) }
-                    }
-
-                    Button(
-                        onClick = { viewModel.deploySchema() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        if (uiState.isDeploying) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        Text("应用方案更改")
-                    }
+            Button(
+                onClick = { viewModel.deploySchema() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                if (uiState.isDeploying) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    Spacer(Modifier.width(8.dp))
                 }
-
-                1 -> {
-                    val packages = localUiState.packages
-                    if (packages.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "暂无本地方案",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    } else {
-                        val listState = rememberLazyListState()
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.settingsGutterScroll(listState)
-                                .weight(1f)
-                                .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            item { Spacer(Modifier.height(4.dp)) }
-                            items(packages, key = { it.packageId }) { item ->
-                                LocalPackageItemCard(
-                                    item = item,
-                                    installing = localUiState.installingId == item.packageId,
-                                    onInstall = { localViewModel.installPackage(item) },
-                                    onDelete = { localViewModel.deleteDownloaded(item) },
-                                    onUninstall = { localViewModel.uninstall(item) },
-                                )
-                            }
-                            item {
-                                Spacer(Modifier.height(16.dp))
-                                Text(
-                                    "安装后需切到「已安装」tab 点击「应用方案更改」生效",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(bottom = 16.dp),
-                                )
-                            }
-                        }
-                    }
-                }
+                Text("应用方案更改")
             }
         }
     }
@@ -650,110 +522,30 @@ internal fun SchemaToggleItem(
     }
 }
 
+/** 一个方案包一行：名字、状态，右边是卸载，或没装上时的安装和删除。 */
 @Composable
-private fun LocalPackageItemCard(
+private fun SchemaPackageRow(
     item: LocalPackageItem,
     installing: Boolean,
     onInstall: () -> Unit,
     onDelete: () -> Unit,
     onUninstall: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    item.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(8.dp))
-                val tagColor = when {
-                    item.installed -> MaterialTheme.colorScheme.primary
-                    item.downloaded -> MaterialTheme.colorScheme.outline
-                    else -> MaterialTheme.colorScheme.error
-                }
-                LocalPackageTag(
-                    if (item.installed) "已安装" else if (item.downloaded) "已下载" else "未知",
-                    tagColor,
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "ID: ${item.packageId}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
-            if (item.version.isNotEmpty() || item.fileCount > 0) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    buildString {
-                        if (item.version.isNotEmpty()) append("版本: ${item.version}")
-                        if (item.fileCount > 0) {
-                            if (isNotEmpty()) append(" · ")
-                            append("${item.fileCount} 个文件")
-                        }
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                when {
-                    installing -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(6.dp))
-                            Text("安装中…", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    item.packageId == "builtin" -> Text("随应用提供", style = MaterialTheme.typography.labelMedium)
-                    item.installed -> {
-                        OutlinedButton(onClick = onUninstall) { Text("卸载") }
-                    }
-                    item.downloaded -> OutlinedButton(onClick = onInstall) { Text("安装") }
-                }
-                Spacer(Modifier.weight(1f))
-                if (item.packageId != "builtin" && item.downloaded) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "删除下载文件",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+    val detail = buildString {
+        append(if (item.installed) "已安装" else "未安装")
+        if (item.version.isNotEmpty()) append(" · ${item.version}")
+        if (item.fileCount > 0) append(" · ${item.fileCount} 个文件")
+    }
+    SettingsListRow(item.displayName, detail) {
+        when {
+            installing -> CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp).size(18.dp), strokeWidth = 2.dp)
+            item.installed -> TextButton(onClick = onUninstall) { Text("卸载") }
+            else -> {
+                TextButton(onClick = onInstall) { Text("安装") }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "删除下载文件", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun LocalPackageTag(text: String, color: androidx.compose.ui.graphics.Color) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.12f),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-        )
     }
 }

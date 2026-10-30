@@ -21,8 +21,18 @@ import kotlinx.coroutines.withContext
 object ImportManager {
 
     sealed class ImportResult {
-        /** 方案 / 词典 / 背景图等，走 [SchemaManager.saveImportedFile] 的落地结果。 */
-        data class Content(val success: Boolean, val installedDirect: Boolean) : ImportResult()
+        /**
+         * 方案 / 词典 / 背景图等，走 [SchemaManager.saveImportedFile] 的落地结果。
+         * 方案压缩包导入后直接安装；和已有文件同名时不覆盖，[pendingPackageId] 留给页面问用户。
+         * [message] 是给用户看的一句结果。
+         */
+        data class Content(
+            val success: Boolean,
+            val installedDirect: Boolean,
+            val pendingPackageId: String? = null,
+            val pendingName: String = "",
+            val message: String = if (success) "导入成功" else "导入失败",
+        ) : ImportResult()
 
         /** 插件（.xipk）安装结果。 */
         data class Plugin(val pluginInfo: PluginInfo?) : ImportResult()
@@ -55,10 +65,36 @@ object ImportManager {
                 ImportResult.Failed("无法读取文件")
             } else {
                 val r = SchemaManager.saveImportedFile(context, name, stream)
-                ImportResult.Content(r.success, r.installedDirect)
+                val packageId = r.packageId
+                if (r.success && packageId != null) installArchive(context, packageId, archiveTitle(name))
+                else ImportResult.Content(r.success, r.installedDirect,
+                    message = if (r.success && r.installedDirect) "已导入，点「应用方案更改」生效" else if (r.success) "导入成功" else "导入失败")
             }
         }
     }
+
+    /** 导入的方案包直接安装（并打开其中的主方案）；有同名文件时留着等确认，装不上就删掉存下的包。 */
+    private suspend fun installArchive(context: Context, packageId: String, title: String): ImportResult.Content {
+        val install = SchemaManager.installPackageFromMarketDir(context, packageId, displayName = title)
+        return when {
+            install.success -> ImportResult.Content(true, installedDirect = true, message = buildString {
+                append("已安装「$title」，点「应用方案更改」生效")
+                if (install.parseFailures.isNotEmpty()) append("\n" + install.parseFailures.joinToString("\n"))
+            })
+            install.conflicts.isNotEmpty() -> ImportResult.Content(true, installedDirect = false,
+                pendingPackageId = packageId, pendingName = title,
+                message = "「$title」里有和已装方案同名的文件，确认后再安装")
+            else -> {
+                runCatching { SchemaManager.getMarketDir(context, packageId).deleteRecursively() }
+                ImportResult.Content(false, installedDirect = false,
+                    message = "导入失败：${install.failureReason ?: "安装失败"}")
+            }
+        }
+    }
+
+    /** 压缩包名去掉扩展名，作为方案包的显示名。 */
+    internal fun archiveTitle(name: String): String =
+        Regex("""\.(zip|tar\.gz|tgz)$""", RegexOption.IGNORE_CASE).replace(name, "").ifBlank { name }
 
     private fun queryDisplayName(context: Context, uri: Uri): String? {
         return try {

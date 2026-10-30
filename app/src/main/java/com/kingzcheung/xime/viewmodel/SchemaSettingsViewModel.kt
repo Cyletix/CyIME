@@ -10,7 +10,6 @@ import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.settings.ImportManager
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.PersonalDictManager
-import com.kingzcheung.xime.settings.SchemaManifestManager
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.settings.SchemaMeta
@@ -32,8 +31,6 @@ data class SchemaUiState(
     val currentSchema: String = "t9_pinyin",
     val isDeploying: Boolean = false,
     val toastMessage: String? = null,
-    val marketPackages: List<SchemaManifestManager.MarketPackageInfo> = emptyList(),
-    val showUninstallDialog: Boolean = false,
 )
 
 class SchemaSettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -42,8 +39,9 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
     private val _uiState = MutableStateFlow(SchemaUiState())
     val uiState: StateFlow<SchemaUiState> = _uiState.asStateFlow()
 
-    private val _importCompleted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val importCompleted: SharedFlow<Unit> = _importCompleted.asSharedFlow()
+    /** 每次导入完成发一次；方案包有同名文件待确认时带上它，页面接着问用户。 */
+    private val _importCompleted = MutableSharedFlow<ImportManager.ImportResult.Content?>(extraBufferCapacity = 1)
+    val importCompleted: SharedFlow<ImportManager.ImportResult.Content?> = _importCompleted.asSharedFlow()
 
     init {
         refresh()
@@ -116,7 +114,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                 }
             } else {
                 rollbackSchemaSelection(previous)
-                showToast("请点击「部署」按钮")
+                showToast("请先点「应用方案更改」")
             }
         } else {
             com.kingzcheung.xime.settings.InputModes.selectProfile(context, schema.toSchemaInfo())
@@ -138,55 +136,18 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
             when (val result = ImportManager.import(context, uri)) {
                 is ImportManager.ImportResult.Content -> {
                     refresh()
-                    _importCompleted.tryEmit(Unit)
-                    showToast(
-                        if (!result.success) "导入失败"
-                        else if (result.installedDirect) "导入成功，已放入 rime 目录"
-                        else "导入成功，请到「本地方案」安装"
-                    )
+                    _importCompleted.tryEmit(result)
+                    showToast(result.message)
                 }
                 is ImportManager.ImportResult.Plugin -> {
                     withContext(Dispatchers.IO) { PluginManager.loadEnabledPlugins() }
                     refresh()
-                    _importCompleted.tryEmit(Unit)
+                    _importCompleted.tryEmit(null)
                     showToast("插件「${result.pluginInfo?.name}」安装成功")
                 }
                 is ImportManager.ImportResult.Failed -> showToast("导入失败：${result.reason}")
                 is ImportManager.ImportResult.Unsupported -> showToast("不支持的文件类型")
             }
-        }
-    }
-
-    fun loadMarketPackages() {
-        viewModelScope.launch {
-            val packages = withContext(Dispatchers.IO) {
-                SchemaManifestManager.getInstalledPackages(context)
-            }
-            _uiState.update { it.copy(marketPackages = packages) }
-        }
-    }
-
-    fun showUninstallDialog() {
-        loadMarketPackages()
-        _uiState.update { it.copy(showUninstallDialog = true) }
-    }
-
-    fun dismissUninstallDialog() {
-        _uiState.update { it.copy(showUninstallDialog = false) }
-    }
-
-    fun uninstallPackage(packageId: String) = uninstallPackages(listOf(packageId))
-
-    fun uninstallPackages(packageIds: List<String>) {
-        viewModelScope.launch {
-            // 批量操作串行进行，避免启用列表的读改写互相覆盖或失败提示被后一个成功吞掉。
-            val results = withContext(Dispatchers.IO) {
-                packageIds.distinct().map { id -> id to SchemaManager.uninstallPackage(context, id) }
-            }
-            if (results.all { it.second.success }) _uiState.update { it.copy(showUninstallDialog = false) }
-            refresh()
-            loadMarketPackages()
-            showToast(results.joinToString("\n") { (id, result) -> "$id：${result.message}" })
         }
     }
 

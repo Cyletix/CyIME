@@ -980,7 +980,8 @@ object SchemaManager {
     suspend fun deleteSchemaFiles(context: Context, schemaId: String): Boolean =
         uninstallPackage(context, schemaId).success
 
-    data class ImportResult(val success: Boolean, val installedDirect: Boolean = false)
+    /** [packageId]：压缩包存进 market/ 的目录名，由 [ImportManager] 接着安装。 */
+    data class ImportResult(val success: Boolean, val installedDirect: Boolean = false, val packageId: String? = null)
 
     /** 判断文件名是否为压缩包。 */
     fun isArchive(name: String): Boolean =
@@ -1067,7 +1068,7 @@ object SchemaManager {
                 ImportResult(false)
             }
         } else if (isArchive(name)) {
-            // 压缩包：保存到 market/ 等待用户手动安装
+            // 压缩包：先存进 market/，由 ImportManager 接着安装（同名文件冲突时留在这里等用户确认）
             val importId = generateImportId()
             val pkgDir = getMarketDir(context, importId)
             try {
@@ -1077,7 +1078,7 @@ object SchemaManager {
                     archiveFile.outputStream().use { output -> input.copyTo(output) }
                 }
                 FileLogger.i(TAG, "Imported $name -> $importId (not installed yet)")
-                ImportResult(true)
+                ImportResult(true, packageId = importId)
             } catch (e: Exception) {
                 FileLogger.e(TAG, "Failed to import archive $name", e)
                 try { if (pkgDir.exists()) pkgDir.deleteRecursively() } catch (_: Exception) {}
