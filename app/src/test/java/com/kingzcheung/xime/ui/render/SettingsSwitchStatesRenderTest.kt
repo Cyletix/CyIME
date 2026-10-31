@@ -16,13 +16,16 @@ import androidx.compose.material.icons.twotone.Gesture
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kingzcheung.xime.settings.CustomKeyboardLayouts
 import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.InputModes
+import com.kingzcheung.xime.settings.LetterLayouts
 import com.kingzcheung.xime.settings.SchemaMeta
 import com.kingzcheung.xime.ui.settings.LanguageSettingsContent
 import com.kingzcheung.xime.ui.settings.SchemaToggleItem
@@ -54,6 +57,11 @@ class SettingsSwitchStatesRenderTest {
         assumeTrue(!out.isNullOrEmpty())
         val context = ApplicationProvider.getApplicationContext<Context>()
         KeyboardThemes.initFromConfig(context)
+        // 语言页在后台线程读 LetterLayouts / CustomKeyboardLayouts；它们的状态要先在全局快照里建好，
+        // 否则第一次读发生在组合快照里，报「state created after the snapshot was taken」。
+        CustomKeyboardLayouts.load(context)
+        LetterLayouts.load(context)
+        Snapshot.sendApplyNotifications()
         val variants = listOf("light" to (false to false), "dark" to (true to false), "glass" to (true to true))
         val shown = mutableIntStateOf(0)
         val lock = "已被「角标输入方式：长按」锁定"
