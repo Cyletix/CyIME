@@ -3486,6 +3486,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         glassWindowVisible = true
         glassBlurWindows.values.forEach { it.setVisible(true) }
         openPendingOcrPanel()
+        startVoiceAfterPermission()
         requestHardwareCursorUpdates()
         startRuntimeObservation()
         // 键盘弹出时对比系统取色与缓存的动态主题色，壁纸取色变化则重建主题并热更新 UI。
@@ -3494,6 +3495,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         clipboardSyncBridge?.setKeyboardVisible(true)
         mainHandler.removeCallbacks(releaseIdlePredictionModel)
         serviceScope.launch { AssociationManager.restoreModelAfterIdle() }
+    }
+
+    /**
+     * 第一次点麦克风弹系统授权，允许后回到输入框时直接开始语音（2026-10-31 平板新装：原来要再点一次）。
+     * 和点麦克风走同一条路；已经在语音中、或这个输入框不许语音时不开。
+     */
+    private fun startVoiceAfterPermission() {
+        if (!com.kingzcheung.xime.util.PermissionHelper.takeVoiceAfterGrant(this)) return
+        mainHandler.post {
+            if (!uiState.value.isVoiceMode) keyboardCallbacks?.onVoiceStickyToggle?.invoke()
+        }
     }
 
     private fun openPendingOcrPanel() {

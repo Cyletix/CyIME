@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        PermissionHelper.onRecordAudioResult(isGranted)
         if (isGranted) {
             Toast.makeText(this, "麦克风权限已授权", Toast.LENGTH_SHORT).show()
         } else {
@@ -124,6 +125,7 @@ class MainActivity : ComponentActivity() {
             if (!PermissionHelper.hasRecordAudioPermission(this)) {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             } else {
+                PermissionHelper.onRecordAudioResult(true)
                 Toast.makeText(this, "麦克风权限已授权", Toast.LENGTH_SHORT).show()
                 finish()
             }
