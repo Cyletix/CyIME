@@ -246,6 +246,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("启用智能联想", prediction, SettingsRoutes.SmartPrediction, "联想 开关 预测 基础联想"),
         SettingsSearchEntry("空格上屏联想候选", prediction, SettingsRoutes.SmartPrediction, "空格 联想 上屏", section = "功能开关"),
         SettingsSearchEntry("退格直接删字", prediction, SettingsRoutes.SmartPrediction, "退格 删除 删字 联想 收起联想 按两下", section = "功能开关"),
+        SettingsSearchEntry("删字后给同音字", prediction, SettingsRoutes.SmartPrediction, "退格 删除 删错 恢复 撤销 同音字 纠错", section = "功能开关"),
         SettingsSearchEntry("连续联想", prediction, SettingsRoutes.SmartPrediction, "连续 联想 推理", section = "功能开关"),
         SettingsSearchEntry("单次联想", prediction, SettingsRoutes.SmartPrediction, "单次 联想 停止", section = "功能开关"),
         SettingsSearchEntry("选择模型", prediction, SettingsRoutes.SmartPrediction, "联想模型 模型 下载 增强", section = "功能开关"),

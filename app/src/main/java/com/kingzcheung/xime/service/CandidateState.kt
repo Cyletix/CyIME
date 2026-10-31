@@ -34,7 +34,13 @@ data class CandidateState(
     val smsVerificationCode: String? = null,
     val clipboardImage: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
     val candidateFocus: CandidateFocus? = null,
+    /** 「删字后给同音字」放上去的那一组（第一项是删掉的那一段）；联想位置换成别的词后自然不再算。见 DeletionRecovery。 */
+    val deletionRecovery: List<String> = emptyList(),
 )
+
+/** 候选栏上现在是删字后放回的那一组：不挡退格、不被空格上屏、不进九键选词。 */
+internal val CandidateState.isDeletionRecovery: Boolean
+    get() = deletionRecovery.isNotEmpty() && associationCandidates == deletionRecovery
 
 /** Appending expanded pages or updating suggestions does not change existing candidate identities. */
 internal fun CandidateState.hasSameSelectionSource(current: CandidateState): Boolean =
