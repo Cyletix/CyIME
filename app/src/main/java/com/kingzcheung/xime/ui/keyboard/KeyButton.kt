@@ -370,7 +370,15 @@ fun SwipeableKeyButton(
     fun flickAction(index: Int): (() -> Unit)? = flickAt(index)?.let { letter -> { onFlickLetter?.invoke(letter); Unit } }
     // 按住符号键当 Ctrl 时，另一根手指点字母发 Ctrl+字母，不打字（用户 10-24）。
     val ctrlTargets = LocalShiftSlideTargets.current
-    val tapOrCtrl: () -> Unit = { if (ctrlTargets?.ctrlTap(letterGroup ?: text) != true) onClick() }
+    // 14 键快捷键键面出来前双字母键还没拆开：按点在左半还是右半决定是哪个字母，和拆开后的位置一样（用户 10-31）。
+    val ctrlTapFraction = remember { floatArrayOf(0.5f) }
+    val fourteenKeyLayout = LocalFourteenKeyLayout.current
+    val tapOrCtrl: () -> Unit = {
+        val letters = letterGroup ?: text
+        val pick = if (fourteenKeyLayout && letters.length == 2 && ctrlTargets?.ctrl == true)
+            letters[if (ctrlTapFraction[0] < 0.5f) 0 else 1].toString() else letters
+        if (ctrlTargets?.ctrlTap(pick) != true) onClick()
+    }
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -480,8 +488,14 @@ fun SwipeableKeyButton(
         } else shiftTargets?.remove(shiftToken)
     }
     val shiftHovered = shiftLetters != null && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
-    // 按住符号键当 Ctrl：单字母键换成快捷键键面（用户 10-24）。
-    val ctrlLetter = shiftLetters?.singleOrNull()?.takeIf { shiftTargets?.ctrl == true }
+    // 按住符号键当 Ctrl：单字母键换成快捷键键面（用户 10-24）；按满时限才换，渐变出来，松手立刻换回（用户 10-31）。
+    val ctrlLetter = shiftLetters?.singleOrNull()?.takeIf { shiftTargets?.ctrlFaces == true }
+    // 从 0 起渐变：14 键这时才拆成单字母键，新键也要渐变出来，不能一出现就是快捷键键面。
+    val ctrlFade = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(ctrlLetter != null) {
+        if (ctrlLetter != null) ctrlFade.animateTo(1f, androidx.compose.animation.core.tween(CTRL_FACE_FADE_MS))
+        else ctrlFade.snapTo(0f)
+    }
     // 双拼键位提示：这个键代表的翘舌声母和韵母（只在开着开关的双拼 26 键有）。开着时所有字母键都不画上下角标
     // （没有提示的 a、e 也一样），滑动照常。
     val doublePinyinHints = LocalDoublePinyinKeyHints.current
@@ -514,6 +528,12 @@ fun SwipeableKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .fillMaxWidth()
+            .then(if (shiftLetters?.length == 2) Modifier.pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    ctrlTapFraction[0] = if (size.width > 0) down.position.x / size.width else 0.5f
+                }
+            } else Modifier)
             .pointerInput(Unit) { detectExclusiveKeyGestures { currentActions } }
             .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
@@ -552,7 +572,7 @@ fun SwipeableKeyButton(
         val dpFinals = dpHint?.let { fitDoublePinyinFinals(it.finals, maxWidth.value - 6f, maxHeight.value * 0.42f,
             effectiveSwipeFontSize.value, density.fontScale) }
         Box(Modifier.fillMaxSize().graphicsLayer {
-            alpha = if (ctrlLetter != null) 0f else if (showDisc) 1f else 1f - flickFade.strongest
+            alpha = (1f - if (ctrlLetter != null) ctrlFade.value else 0f) * (if (showDisc) 1f else 1f - flickFade.strongest)
         }, contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center) {
             if (layoutMode == ButtonLayout.COMPACT) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -704,8 +724,10 @@ fun SwipeableKeyButton(
                 initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f),
                 finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f), fontFamily = keyLabelFontFamily)
         }
-        if (ctrlLetter != null) CtrlShortcutFace(ctrlLetter, resolvedText, frostedGlass, labelSize,
-            effectiveSwipeFontSize, hintsVisible, maxWidth.value, keyFontFamily)
+        if (ctrlLetter != null) Box(Modifier.matchParentSize().graphicsLayer { alpha = ctrlFade.value }) {
+            CtrlShortcutFace(ctrlLetter, resolvedText, frostedGlass, labelSize,
+                effectiveSwipeFontSize, hintsVisible, maxWidth.value, keyFontFamily)
+        }
         else if (showDisc && discLabels != null) {
             KanaDirectionIndicator(discDirection, MaterialTheme.colorScheme.primary.copy(alpha = .6f))
             DirectionDiscPreview(discLabels, discDirection, resolvedBackground, resolvedText, contentScale)

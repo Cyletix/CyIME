@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -29,8 +30,9 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 /**
- * 26 键按住 !@# 当 Ctrl：按下就换键面，拖到字母上松手发 Ctrl+字母；不拖动且 1 秒内松手打开符号，
+ * 26 键按住 !@# 当 Ctrl：拖到字母上松手发 Ctrl+字母；不拖动且 1 秒内松手打开符号，
  * 超过 1 秒或拖出去没落在字母上松手什么都不做。
+ * 字母键的快捷键键面按满 1 秒（同时限）或拖出符号键才渐变出来，点一下开符号键盘不闪（用户 10-31）。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "w400dp-h800dp-xhdpi")
@@ -70,9 +72,13 @@ class CtrlSymbolKeyTest {
         assertTrue(!labelShown("复制"))
         val symbol = bounds("mode-slot-1")
         val c = bounds("qwerty-key:c")
+        rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
-        rule.waitForIdle()
-        assertTrue("按下就显示快捷键", labelShown("复制") && labelShown("粘贴") && labelShown("全选"))
+        rule.mainClock.advanceTimeBy(900)
+        assertTrue("没按满时限不换键面", !labelShown("复制"))
+        rule.mainClock.advanceTimeBy(100 + CTRL_FACE_FADE_MS + 50L)
+        assertTrue("按满时限显示快捷键", labelShown("复制") && labelShown("粘贴") && labelShown("全选"))
+        rule.mainClock.autoAdvance = true
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput {
             val target = c.center - symbol.topLeft
             for (step in 1..8) moveTo(center + (target - center) * (step / 8f))
@@ -82,6 +88,40 @@ class CtrlSymbolKeyTest {
         assertEquals(listOf("ctrl:c"), commands)
         assertEquals("拖到字母不打开符号", emptyList<String>(), keys)
         assertTrue("松手恢复字母键面", !labelShown("复制"))
+    }
+
+    /** 点一下开符号：从按下到松手，字母键一直不换成「复制」「粘贴」。 */
+    @Test fun quickTapNeverShowsShortcutFaces() {
+        show()
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
+        for (step in 1..6) {
+            rule.mainClock.advanceTimeBy(50)
+            assertTrue("按下 ${step * 50} 毫秒还不换键面", !labelShown("复制"))
+        }
+        rule.onNodeWithTag("mode-slot-1", true).performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(1500)
+        assertTrue(!labelShown("复制"))
+        assertEquals(listOf("symbol"), keys)
+    }
+
+    /** 不等时限直接拖：一拖出符号键就显示快捷键，松在 V 上立刻发 Ctrl+V。 */
+    @Test fun immediateDragShowsFacesAndSends() {
+        show()
+        val symbol = bounds("mode-slot-1")
+        val v = bounds("qwerty-key:v")
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("mode-slot-1", true).performTouchInput {
+            down(center)
+            val target = v.center - symbol.topLeft
+            for (step in 1..8) moveTo(center + (target - center) * (step / 8f))
+        }
+        rule.mainClock.advanceTimeBy(CTRL_FACE_FADE_MS + 50L)
+        assertTrue("拖出去就显示快捷键", labelShown("粘贴"))
+        rule.onNodeWithTag("mode-slot-1", true).performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(100)
+        assertEquals(listOf("ctrl:v"), commands)
+        assertEquals(emptyList<String>(), keys)
     }
 
     @Test fun tapOpensSymbols() {
@@ -131,22 +171,51 @@ class CtrlSymbolKeyTest {
     }
 
     /** 一根手指按住 !@#，另一根手指点字母：和按住 Shift 再点一样，发 Ctrl+字母、不打字，松开 !@# 也不开符号。 */
-    private fun tapEachLetterWhileHolding(letters: List<Char>) {
+    private fun tapEachLetterWhileHolding(letters: List<Char>, waitForFaces: Boolean = true) {
         val symbol = bounds("mode-slot-1").center
+        // 不等就是快速按住立刻点：时钟手动走，每下只走一帧，整段不到时限，14 键一直没拆开。
+        val points = letters.map { if (waitForFaces) Offset.Zero else letterPoint(it) }
+        if (!waitForFaces) rule.mainClock.autoAdvance = false
         rule.onRoot().performTouchInput { down(0, symbol) }
-        rule.waitForIdle()
-        for (letter in letters) {
-            val key = bounds("qwerty-key:$letter").center
+        // 等快捷键键面出来（14 键这时拆成单字母键）。
+        if (waitForFaces) rule.mainClock.advanceTimeBy(1000L + CTRL_FACE_FADE_MS + 50L)
+        fun settle() = if (waitForFaces) rule.waitForIdle() else rule.mainClock.advanceTimeBy(16)
+        settle()
+        for ((index, letter) in letters.withIndex()) {
+            if (!waitForFaces) assertTrue("还没到时限，不换键面", !labelShown("复制"))
+            val key = if (waitForFaces) bounds("qwerty-key:$letter").center else points[index]
             rule.onRoot().performTouchInput { down(1, key); up(1) }
-            rule.waitForIdle()
+            settle()
         }
         rule.onRoot().performTouchInput { up(0) }
+        settle()
+        if (!waitForFaces) rule.mainClock.autoAdvance = true
         rule.waitForIdle()
         assertEquals(letters.map { "ctrl:$it" }, commands)
         assertEquals("不打字也不开符号", emptyList<String>(), keys)
     }
 
     private val shortcutLetters = "acvxzysfwtnorpbi".toList()
+
+    /** 字母在键盘上的位置：单字母键取中心；14 键还没拆开时取双字母键的左半或右半中心。 */
+    private fun letterPoint(letter: Char): Offset {
+        val single = rule.onAllNodesWithTag("qwerty-key:$letter", true).fetchSemanticsNodes()
+        if (single.isNotEmpty()) return single.first().boundsInRoot.center
+        val pair = com.kingzcheung.xime.settings.FourteenKeySymbols.rows.flatten().first { letter in it && it.length == 2 }
+        val b = bounds("qwerty-key:$pair")
+        val x = if (pair[0] == letter) b.left + b.width / 4 else b.right - b.width / 4
+        return Offset(x, b.center.y)
+    }
+
+    @Test fun fourteenKeyQuickSecondFingerTapSendsShortcutsBeforeFacesShow() {
+        show("pinyin_14jian")
+        tapEachLetterWhileHolding(listOf('c', 'v', 'x', 'z', 'a', 'w'), waitForFaces = false)
+    }
+
+    @Test fun quickSecondFingerTapSendsShortcutsBeforeFacesShow() {
+        show()
+        tapEachLetterWhileHolding(listOf('c', 'v', 'z'), waitForFaces = false)
+    }
 
     @Test fun secondFingerTapSendsEveryShortcut() {
         show()
@@ -164,9 +233,10 @@ class CtrlSymbolKeyTest {
             val symbol = bounds("mode-slot-1")
             rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
             rule.waitForIdle()
-            val key = bounds("qwerty-key:$letter")
+            // 不等时限直接拖：双字母键还没拆，按拆开后的位置（左半/右半）拖过去。
+            val key = letterPoint(letter)
             rule.onNodeWithTag("mode-slot-1", true).performTouchInput {
-                val target = key.center - symbol.topLeft
+                val target = key - symbol.topLeft
                 for (step in 1..8) moveTo(center + (target - center) * (step / 8f))
                 up()
             }
