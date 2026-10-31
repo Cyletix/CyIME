@@ -47,7 +47,7 @@ import java.io.File
 
 /**
  * 一致性修复的出图核对：光标调整遮罩（盖在 26 键上）、颜文字空页、忘掉学习确认卡，
- * 柔和蓝 / 黑白 / iOS 渐变 × 深浅色 × 毛玻璃。只在设了 CYIME_RENDER_OUT 时出图。
+ * 柔和蓝 / 黑白 / iOS 渐变 / 薰衣草紫 × 深浅色 × 毛玻璃。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1300dp-h400dp-xhdpi")
@@ -105,7 +105,7 @@ class SurfaceConsistencyRenderTest {
                 body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
             File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        for (t in listOf("soft_blue", "pure_black", "transparent_glass")) for (d in listOf(false, true)) for (g in listOf(false, true)) {
+        for (t in listOf("soft_blue", "pure_black", "transparent_glass", "lavender_purple")) for (d in listOf(false, true)) for (g in listOf(false, true)) {
             KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
             // 面板底色按设置里的主题取渐变/图片（KeyboardPanelBackground），不设的话 iOS 渐变出图成纯黑。
             com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(app).edit().putString("keyboard_theme", t).commit()
