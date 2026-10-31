@@ -52,8 +52,19 @@ class CustomKeyboardLayoutTest {
         assertEquals(layout.id, (entry(translator, "prism") as YamlScalar).content)
         assertEquals("rime_ice", (entry(translator, "dictionary") as YamlScalar).content)
         val algebra = entry(entry(node, "speller") as YamlMap, "algebra") as YamlList
-        assertEquals("xlit/abcdefghijklmnopqrstuvwxyz/${layout.encode("abcdefghijklmnopqrstuvwxyz")}/", (algebra.items.last() as YamlScalar).content)
+        // qw、er 两组：点按的代表字母和长按选的另一个字母都能打（不用整表 xlit，xlit 会把 wen 解成“额”）。
+        assertEquals(listOf("derive/[w]/q/", "derive/[r]/e/"), algebra.items.takeLast(2).map { (it as YamlScalar).content })
+        assertFalse(algebra.items.any { (it as YamlScalar).content.startsWith("xlit/abcdefghijklmnopqrstuvwxyz/") })
         assertEquals(layout.name, (entry(entry(node, "schema") as YamlMap, "name") as YamlScalar).content)
+    }
+    @Test fun legacyTransliterationIsReplacedByPerGroupDerivation() {
+        val layout = CustomKeyboardLayout.fresh().merge("q").merge("e")
+        val legacy = "speller:\n  algebra:\n    - erase/^xx$/\n" + CustomKeyboardLayout.legacyRule(layout) + "\ntranslator:\n  dictionary: rime_ice\n"
+        assertEquals("    - xlit/abcdefghijklmnopqrstuvwxyz/abcdefghijklmnopqestuvqxyz/\n", CustomKeyboardLayout.legacyRule(layout))
+        val migrated = legacy.replace(CustomKeyboardLayout.legacyRule(layout), layout.mergedRules())
+        assertTrue(migrated.contains("    - erase/^xx$/\n    - derive/[w]/q/\n    - derive/[r]/e/\n\ntranslator:"))
+        // 没有合并键的布局没有这条规则，也不加派生。
+        assertEquals("", CustomKeyboardLayout.fresh().mergedRules())
     }
     @Test fun spareSlotMovesWithoutCreatingPunctuationAndCanBeFilledExplicitly() {
         val base = CustomKeyboardLayout.fresh().withSpareSlot()
