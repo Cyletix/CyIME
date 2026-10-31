@@ -3,6 +3,7 @@ package com.kingzcheung.xime.settings
 import com.kingzcheung.xime.keyboard.GestureAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -200,12 +201,17 @@ class KeyboardT9StrokeGestureTest {
     }
 
     @Test
-    fun `内置九键侧栏与常用符号面板前 16 个相同`() {
-        // 用户 10-30：左栏只有四个、滑不动；默认放满常用中文标点，与常用符号面板同一顺序。
+    fun `内置九键侧栏只放最常用标点且括号只留一对`() {
+        // 用户 10-30：左栏只有四个、滑不动，要能滑；10-31：默认不需要这么多括号，放最常用的就行。
         val text = repoFile("src/main/assets/xime.yaml").readText()
-        val expected = com.kingzcheung.xime.keyboard.commonSymbolsFor("中").take(16)
+        val expected = listOf("，", "。", "？", "！", "…", "～", "、", "：", "“", "”", "；", "（", "）")
         assertEquals(expected, KeysConfigHelper.parseKeyboardT9YamlPartial(text)?.sideSymbols)
         assertEquals(expected, KeysConfigHelper.DEFAULT_T9_SIDE_SYMBOLS)
+        // 都在常用符号面板里，四格之外仍可滑动
+        assertTrue(com.kingzcheung.xime.keyboard.commonSymbolsFor("中").containsAll(expected))
+        assertTrue(expected.size > 4)
+        val brackets = listOf("（", "）", "《", "》", "【", "】", "‘", "’", "「", "」")
+        assertEquals(listOf("（", "）"), expected.filter { it in brackets })
     }
 
     @Test
