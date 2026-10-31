@@ -123,6 +123,8 @@ internal fun InputExperienceSettings(
                         settings = settings.copy(reverseSymbolSwipe = it); settings.save(context)
                     })
             }
+            // 分隔线隔开不同的事：上面是角标手势，这里是删除键清空，下面是 Z X C V 快捷操作（10-31 走查：只有 ZXCV 上面有线）。
+            divider()
             Row(Modifier.settingsSearchAnchor("打字中清空整个输入框", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("打字中清空整个输入框", style = MaterialTheme.typography.titleSmall)
