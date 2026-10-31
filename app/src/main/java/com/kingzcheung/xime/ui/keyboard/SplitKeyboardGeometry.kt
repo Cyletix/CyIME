@@ -92,11 +92,12 @@ internal object SplitKeyboardGeometry {
      * 一行左半的按键个数：键中心落在五单位中线左侧（含中线）的留在左边。
      * 标准错位下即 qwert|yuiop、asdfg|hjkl、zxcv|bnm，每个键只出现一次。
      */
-    fun leftCount(keys: List<String>, startUnits: Float, weighted: Boolean): Int {
+    fun leftCount(keys: List<String>, startUnits: Float, weighted: Boolean, widths: List<Float>? = null): Int {
         var x = startUnits
         var count = 0
-        for (key in keys) {
-            val w = if (weighted) key.length.toFloat() else 1f
+        for ((index, key) in keys.withIndex()) {
+            // 自定义布局调过键宽时按实际宽度找中线，分体缝才落在手指实际的分界上。
+            val w = widths?.getOrNull(index) ?: if (weighted) key.length.toFloat() else 1f
             if (x + w / 2f > MIDLINE_UNITS + 0.001f) break
             count++
             x += w
