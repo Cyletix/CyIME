@@ -61,7 +61,8 @@ internal fun InputExperienceSettings(
                     InputGestureLocks.lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, it)
                 }?.let { SettingsLockNote("「${it.lockedValue.let { v -> (v as SymbolInputMode).label }}」${it.message}") }
                 Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
-                    "按住满 0.3 秒立即输入上方角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。"
+                    "按住满 0.3 秒立即输入上方角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。" +
+                        "西班牙语键盘的元音和 n 长按仍出 á é ñ 等重音字母，这几个键的上角标改用上滑输入。"
                     else "滑动时在原键内预览，松手输入；所有布局角标的方向均可在下方反转。",
                     style = MaterialTheme.typography.bodySmall)
             }
@@ -72,7 +73,7 @@ internal fun InputExperienceSettings(
                 Row(Modifier.settingsSearchAnchor("长按弹出字母气泡", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("长按弹出字母气泡", style = MaterialTheme.typography.titleSmall)
-                        Text("26/14 键长按字母弹出大小写和带音调的字母，九键长按弹出本键的几个字母；关掉后长按不弹，上下拖动输入角标不受打扰。",
+                        Text("26/14 键长按字母弹出大小写和带音调的字母，九键长按弹出本键的几个字母；关掉后长按不弹，上下拖动输入角标不受打扰。西班牙语键盘长按元音和 n 总是弹出重音字母，不受这个开关影响。",
                             style = MaterialTheme.typography.bodySmall)
                         if (lock != null) SettingsLockNote(lock.message)
                     }
