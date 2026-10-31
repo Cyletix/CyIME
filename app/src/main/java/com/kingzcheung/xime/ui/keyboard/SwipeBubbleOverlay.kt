@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import android.view.WindowManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
@@ -17,6 +18,18 @@ import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+/**
+ * 按键上的浮窗（点按气泡、滑动/长按选择气泡、拂动方向盘）只显示、不接触摸。
+ * 浮窗是单独的窗口，盖住按下的键、上一排的键和四周一圈阴影；可接触摸时，落在里面的点按全被它吃掉：
+ * 抬手后气泡还留几十毫秒，这时快速再点同一个键或旁边的键就丢字（用户反馈 10-31「同一个键快速连按两下漏字」）。
+ * 不接触摸后这些点按落回键盘；正在按着的那根手指本来就归键盘窗口，滑动和长按选择照旧。
+ */
+internal val DisplayOnlyPopupProperties = PopupProperties(
+    flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+    dismissOnBackPress = false, dismissOnClickOutside = false,
+)
 
 /** 悬浮键盘当前的旋转角；独立窗口里的气泡要跟着转，尖角才对得上按键。 */
 internal val LocalFloatingKeyboardRotation = compositionLocalOf { 0f }
@@ -48,10 +61,7 @@ private fun RotatedSwipeBubble(data: BubbleDrawData, shadow: Float, width: Int, 
                 IntOffset((anchorBounds.left + offsetX).roundToInt(), (anchorBounds.top + offsetY).roundToInt())
         }
     }
-    Popup(popupPositionProvider = provider, properties = PopupProperties(
-        focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false,
-        clippingEnabled = false,
-    )) {
+    Popup(popupPositionProvider = provider, properties = DisplayOnlyPopupProperties) {
         Canvas(Modifier.size(with(density) { boxWidth.toDp() }, with(density) { boxHeight.toDp() })
             .testTag("key-choice-popup")) {
             withTransform({
@@ -98,10 +108,7 @@ internal fun SwipeBubbleOverlay(data: BubbleDrawData?) {
             }
         }
     }
-    Popup(popupPositionProvider = provider, properties = PopupProperties(
-        focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false,
-        clippingEnabled = false,
-    )) {
+    Popup(popupPositionProvider = provider, properties = DisplayOnlyPopupProperties) {
         // 从按键上的尖角处淡入放大；选择只看手指坐标，缩放不影响命中。
         val origin = TransformOrigin(
             ((data.pointerLeftInBox + data.keyWidthPx / 2f + shadow) / width).coerceIn(0f, 1f), 1f)
