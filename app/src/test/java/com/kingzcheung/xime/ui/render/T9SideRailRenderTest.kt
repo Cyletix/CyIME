@@ -45,7 +45,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 九键左栏（用户 10-30：只有四个标点、滑不动、找不到在哪改）：默认 16 个常用标点，右缘滚动条，
+ * 九键左栏（用户 10-30：只有四个标点、滑不动、找不到在哪改）：默认一列常用标点（10-31 括号只留一对），右缘滚动条，
  * 列尾「编辑」。柔和蓝 / 黑白 / iOS 渐变 × 深浅色 × 毛玻璃，各出列首和滑到底两张。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -107,7 +107,7 @@ class T9SideRailRenderTest {
             rule.waitForIdle()
             val name = "$t-${if (d) "dark" else "light"}-${if (g) "glass" else "solid"}"
             shot("$name-top")
-            rule.onNodeWithTag("t9-pinyin-options", true).performScrollToIndex(16)
+            rule.onNodeWithTag("t9-pinyin-options", true).performScrollToIndex(KeysConfigHelper.DEFAULT_T9_SIDE_SYMBOLS.size)
             rule.waitForIdle()
             assertTrue(rule.onNodeWithTag("t9-side-symbols-edit", true).fetchSemanticsNode().boundsInRoot.height > 0f)
             shot("$name-end")
