@@ -746,7 +746,8 @@ fun KeyboardLayout(
                                             (if (key === bottomKeys.last()) fourteenMExtra else 0f) else 1f)
                                             .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
-                                        symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
+                                        symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
+                    .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
                                         swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && keySwipeDownHints) swipeDownLabel else null,
@@ -1415,7 +1416,8 @@ fun KeyboardRowWithConfig(
                     end = if (index == keys.lastIndex && !extendLastKeyToEdge) endInset else 0.dp,
                 ),
                 swipeText = swipeUpText,
-                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
+                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
+                    .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && swipeDownHintsEnabled) swipeDownLabel else null,
@@ -1712,7 +1714,8 @@ fun CompactKeyboardRowWithConfig(
                 textColor = config.keyTextColor,
                 modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                 swipeText = swipeUpText,
-                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
+                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
+                    .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = swipeDownKeyLabel,
