@@ -52,7 +52,7 @@
     <string name="item_backup_title">Backup and restore</string>
     <string name="item_backup_summary">Export settings to a local file, or restore from a backup file</string>
     <string name="item_performance_title">Performance and battery</string>
-    <string name="item_performance_summary">Switch between high, medium and low in one tap; voice model memory use</string>
+    <string name="item_performance_summary">Switch between auto, high, medium and low in one tap; voice model memory use</string>
     <string name="item_about_title">About CyIME</string>
     <string name="item_about_summary">Version, developer, contact</string>
     <string name="settings_app_language">Language · 语言</string>
