@@ -13,7 +13,8 @@ class CandidateEmojiSchemaTest {
             val text = File(chinese, "$name.schema.yaml").readText()
             assertTrue(name, text.contains("  - name: emoji\n    reset: 0\n"))
             // 表情排在繁体转换前面，开着繁体输出时词仍会转成正体，表情原样保留（与雾凇 26 键同序）。
-            assertTrue(name, text.contains("    - simplifier@emoji\n    - simplifier@traditionalize\n"))
+            val emoji = text.indexOf("    - simplifier@emoji\n")
+            assertTrue(name, emoji >= 0 && emoji < text.indexOf("    - simplifier@traditionalize\n"))
             assertTrue(name, text.contains("\nemoji:\n  option_name: emoji\n  opencc_config: emoji.json\n"))
         }
     }
