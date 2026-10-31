@@ -54,8 +54,16 @@ internal class RejectedCommit {
 
     companion object {
         /** 上屏里带的标点（如按逗号选词时的「，」）不在词库里，去掉两头的非文字再减。 */
-        internal fun learnedWord(text: String): String? =
-            text.trim { !Character.isLetterOrDigit(it) }.takeIf { it.isNotEmpty() }
+        /** 按码点判断：扩展 B 以后的字（𠀀）是一对代理字符，单看每一半都不算文字。 */
+        internal fun learnedWord(text: String): String? {
+            var start = 0
+            var end = text.length
+            while (start < end && !Character.isLetterOrDigit(text.codePointAt(start)))
+                start += Character.charCount(text.codePointAt(start))
+            while (end > start && !Character.isLetterOrDigit(text.codePointBefore(end)))
+                end -= Character.charCount(text.codePointBefore(end))
+            return text.substring(start, end).takeIf { it.isNotEmpty() }
+        }
 
         internal fun hasHan(text: String): Boolean =
             text.codePoints().anyMatch { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }
