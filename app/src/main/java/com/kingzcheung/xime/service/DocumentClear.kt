@@ -24,6 +24,19 @@ internal data class ClearedDocument(
     val restoredSelection: IntRange get() = before.length..(before.length + selected.length)
 }
 
+/** 删除键“清空”清什么：空闲时清整个输入框；打字中默认只清没上屏的拼音，开了「打字中清空整个输入框」两样一起清。 */
+internal enum class ClearAllScope(val composition: Boolean, val field: Boolean) {
+    COMPOSITION(true, false), COMPOSITION_AND_FIELD(true, true), FIELD(false, true);
+
+    companion object {
+        fun of(composing: Boolean, wholeFieldWhileComposing: Boolean): ClearAllScope = when {
+            !composing -> FIELD
+            wholeFieldWhileComposing -> COMPOSITION_AND_FIELD
+            else -> COMPOSITION
+        }
+    }
+}
+
 internal fun InputConnection.readDocumentForClear(limit: Int): ClearedDocument? {
     val before = getTextBeforeCursor(limit, 0)?.toString() ?: return null
     val after = getTextAfterCursor(limit, 0)?.toString() ?: return null

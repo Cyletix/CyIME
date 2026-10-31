@@ -121,6 +121,24 @@ class DocumentClearTest {
         assertEquals("新", field.text)
     }
 
+    /** 10-31：打字中清空默认只清拼音（原行为）；开了「打字中清空整个输入框」拼音和输入框一起清；空闲时总是清输入框。 */
+    @Test fun whatClearAllClears() {
+        assertEquals(ClearAllScope.COMPOSITION, ClearAllScope.of(composing = true, wholeFieldWhileComposing = false))
+        assertEquals(ClearAllScope.COMPOSITION_AND_FIELD, ClearAllScope.of(composing = true, wholeFieldWhileComposing = true))
+        assertEquals(ClearAllScope.FIELD, ClearAllScope.of(composing = false, wholeFieldWhileComposing = false))
+        assertEquals(ClearAllScope.FIELD, ClearAllScope.of(composing = false, wholeFieldWhileComposing = true))
+        assertFalse(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences().clearAllWhileComposing)
+    }
+
+    /** 直接上屏的英文（还在打字中）已经在输入框里：跟着整框一起清，撤回原样放回。 */
+    @Test fun committedEnglishBeingTypedIsClearedAndRestoredWithTheField() {
+        val field = Field("你好 hel", 6)
+        val cleared = clear(field)!!
+        assertEquals("", field.text)
+        assertTrue(field.connection.restoreDocument(cleared, 100))
+        assertEquals("你好 hel", field.text)
+    }
+
     @Test fun anEmptyFieldRecordsNothing() {
         assertNull(clear(Field("", 0)))
     }
