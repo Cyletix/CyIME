@@ -121,7 +121,7 @@ engine:
   filters:
     - cyime_candidate_policy
     - t9_filter
-    # 时间、日期、星期后面接当前时间和日期（设置 › 语言与方案 › 中文输出，默认开）。
+    # 时间、日期、星期后面接当前时间和日期（设置 › 语言与方案 › 中文输出，默认关）。
     - cyime_datetime
     - simplifier@traditionalize
     - uniquifier

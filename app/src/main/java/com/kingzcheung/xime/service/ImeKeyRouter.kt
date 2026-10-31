@@ -712,7 +712,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val traditional = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
                 if (service.rimeEngine.getOption("traditionalization") != traditional) service.rimeEngine.setOption("traditionalization", traditional)
-                // 时间日期候选（默认开）：同上；选项是反的，会话重建清零后仍是开。
+                // 时间日期候选（默认关）：同上；选项是反的，会话重建清零后仍是开。
                 val datetimeOff = !com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false)
                 if (service.rimeEngine.getOption("_cyime_datetime_off") != datetimeOff) service.rimeEngine.setOption("_cyime_datetime_off", datetimeOff)

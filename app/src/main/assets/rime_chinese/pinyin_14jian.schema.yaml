@@ -47,7 +47,7 @@ engine:
   # 与 26 键、九键同一套候选规则：长按删掉的候选不再出现、同字候选去重（cyime_candidate_policy），再去重一次。
   filters:
     - cyime_candidate_policy
-    # 时间、日期、星期后面接当前时间和日期（设置 › 语言与方案 › 中文输出，默认开）。
+    # 时间、日期、星期后面接当前时间和日期（设置 › 语言与方案 › 中文输出，默认关）。
     - cyime_datetime
     - simplifier@traditionalize
     - uniquifier
