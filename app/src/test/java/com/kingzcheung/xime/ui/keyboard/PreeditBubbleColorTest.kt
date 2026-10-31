@@ -25,7 +25,8 @@ class PreeditBubbleColorTest {
 
     @Test fun glassWithLiveBlurKeepsOnlyASliverOfSeeThrough() {
         val bubble = preeditBubbleColor(darkSurface, Color(0xFF4A4658), blurBehind = true)
-        assertEquals(PREEDIT_BUBBLE_GLASS_ALPHA, bubble.alpha, 0.001f)
+        // Color 按 8 位存透明度，0.9 存成 230/255。
+        assertEquals(PREEDIT_BUBBLE_GLASS_ALPHA, bubble.alpha, 1f / 255f)
         assertTrue(bubble.alpha >= 0.9f)
     }
 
