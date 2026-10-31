@@ -189,7 +189,9 @@ private fun imeWindowDrawsNavButtons(imeWindow: Window): Boolean {
 
 /**
  * 手势导航时系统底部手势区的上沿（px，[view] 所在窗口的坐标）：从这里往下按住上滑会被系统当成回桌面。
- * 三键导航、Android 9 或读不到时为 null。判断手势导航的规则与 [imeBottomInsetPx] 相同。
+ * 三键导航、Android 9 或读不到时为 null。
+ * 小米、vivo、OPPO、华为等的全面屏手势不一定写系统的 navigation_mode，也不一定给输入法窗口报手势区，
+ * 所以同时读各家自己的开关（[vendorGestureNavigationOn]），手势区报得太小时按 [GESTURE_ZONE_MIN_DP] 算。
  */
 internal fun bottomGestureZoneTopInWindowPx(view: android.view.View): Int? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
@@ -206,13 +208,56 @@ internal fun bottomGestureZoneTopInWindowPx(view: android.view.View): Int? {
             @Suppress("DEPRECATION")
             tappable = insets.tappableElementInsets.bottom
         }
-        if (zone <= 0) return null
-        val navigationMode = readSetting {
-            android.provider.Settings.Secure.getInt(view.context.contentResolver, "navigation_mode")
+        val resolver = view.context.contentResolver
+        val navigationMode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
+        val vendorGesture = vendorGestureNavigationOn(Build.MANUFACTURER) { global, key ->
+            readSetting {
+                if (global) android.provider.Settings.Global.getInt(resolver, key)
+                else android.provider.Settings.Secure.getInt(resolver, key)
+            }
         }
-        val gesture = if (navigationMode != null) navigationMode == 2 else tappable <= 0
-        if (!gesture) null else view.rootView.height - zone
+        val minZonePx = (GESTURE_ZONE_MIN_DP * view.resources.displayMetrics.density).roundToInt()
+        bottomGestureZoneHeightPx(zone, tappable, navigationMode, vendorGesture, minZonePx)
+            ?.let { view.rootView.height - it }
     } catch (e: Exception) { null }
+}
+
+/** 手势导航时底部手势区至少按这么高（dp）算；系统没报或报得比这小时用它。 */
+internal const val GESTURE_ZONE_MIN_DP = 32f
+
+/**
+ * 底部手势区高度（px），不是手势导航时为 null。
+ * 手势导航：系统 navigation_mode 为 2、厂商自己的全面屏手势开着，或两者都读不到且底部没有可点的系统按钮。
+ */
+internal fun bottomGestureZoneHeightPx(
+    zonePx: Int,
+    tappablePx: Int,
+    navigationMode: Int?,
+    vendorGesture: Boolean?,
+    minZonePx: Int,
+): Int? {
+    val gesture = navigationMode == 2 || vendorGesture == true ||
+        (navigationMode == null && vendorGesture == null && tappablePx <= 0 && zonePx > 0)
+    return if (gesture) maxOf(zonePx, minZonePx) else null
+}
+
+/**
+ * 厂商自己的全面屏手势开关：开着为 true，关着为 false，不是这些厂商或读不到为 null。
+ * 小米 force_fsg_nav_bar（Global）、vivo navigation_gesture_on、OPPO/一加/realme hide_navigationbar_enable、
+ * 华为/荣耀 secure_gesture_navigation（Secure）；值非 0 即手势。
+ */
+internal fun vendorGestureNavigationOn(
+    manufacturer: String?,
+    read: (global: Boolean, key: String) -> Int?,
+): Boolean? {
+    val (global, key) = when (manufacturer?.lowercase()) {
+        "xiaomi", "redmi", "poco" -> true to "force_fsg_nav_bar"
+        "vivo", "iqoo" -> false to "navigation_gesture_on"
+        "oppo", "oneplus", "realme" -> false to "hide_navigationbar_enable"
+        "huawei", "honor" -> false to "secure_gesture_navigation"
+        else -> return null
+    }
+    return read(global, key)?.let { it != 0 }
 }
 
 private inline fun readSetting(read: () -> Int): Int? = try { read() } catch (_: Exception) { null }

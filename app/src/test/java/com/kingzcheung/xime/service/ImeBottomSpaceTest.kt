@@ -46,4 +46,41 @@ class ImeBottomSpaceTest {
     @Test fun noSystemBarStaysZero() {
         assertEquals(0, imeBottomInsetPx(0, tappablePx = 0, navigationMode = 2, imeNavButtons = false, gestureBarPx = 72))
     }
+
+    // 调节键盘的底边把手要避开的底部手势区（密度 3：最小 32dp = 96px）。
+    @Test fun gestureZoneFollowsSystemNavigationMode() {
+        assertEquals(144, bottomGestureZoneHeightPx(144, tappablePx = 0, navigationMode = 2, vendorGesture = null, minZonePx = 96))
+        assertEquals(null, bottomGestureZoneHeightPx(144, tappablePx = 144, navigationMode = 0, vendorGesture = null, minZonePx = 96))
+        assertEquals(null, bottomGestureZoneHeightPx(144, tappablePx = 144, navigationMode = 0, vendorGesture = false, minZonePx = 96))
+    }
+    // 10-31 用户反馈：拖底部留白触发全面屏手势。厂商手势不写 navigation_mode（仍为 0）时按厂商开关算。
+    @Test fun vendorGestureCountsEvenWhenNavigationModeSaysButtons() {
+        assertEquals(144, bottomGestureZoneHeightPx(144, tappablePx = 144, navigationMode = 0, vendorGesture = true, minZonePx = 96))
+    }
+    @Test fun missingOrTinyGestureZoneUsesTheMinimum() {
+        assertEquals(96, bottomGestureZoneHeightPx(0, tappablePx = 0, navigationMode = 2, vendorGesture = null, minZonePx = 96))
+        assertEquals(96, bottomGestureZoneHeightPx(30, tappablePx = 0, navigationMode = 0, vendorGesture = true, minZonePx = 96))
+    }
+    @Test fun unknownModeFallsBackToTappableButtons() {
+        assertEquals(96, bottomGestureZoneHeightPx(60, tappablePx = 0, navigationMode = null, vendorGesture = null, minZonePx = 96))
+        assertEquals(null, bottomGestureZoneHeightPx(60, tappablePx = 144, navigationMode = null, vendorGesture = null, minZonePx = 96))
+        assertEquals(null, bottomGestureZoneHeightPx(0, tappablePx = 0, navigationMode = null, vendorGesture = null, minZonePx = 96))
+    }
+    @Test fun vendorGestureKeysPerManufacturer() {
+        val settings = mapOf(
+            (true to "force_fsg_nav_bar") to 1,
+            (false to "navigation_gesture_on") to 1,
+            (false to "hide_navigationbar_enable") to 0,
+            (false to "secure_gesture_navigation") to 1,
+        )
+        val read: (Boolean, String) -> Int? = { global, key -> settings[global to key] }
+        assertEquals(true, vendorGestureNavigationOn("Xiaomi", read))
+        assertEquals(true, vendorGestureNavigationOn("vivo", read))
+        assertEquals(false, vendorGestureNavigationOn("OPPO", read))
+        assertEquals(true, vendorGestureNavigationOn("HONOR", read))
+        assertEquals(null, vendorGestureNavigationOn("samsung", read))
+        assertEquals(null, vendorGestureNavigationOn("Google", read))
+        assertEquals(null, vendorGestureNavigationOn(null, read))
+        assertEquals(null, vendorGestureNavigationOn("vivo") { _, _ -> null })
+    }
 }
