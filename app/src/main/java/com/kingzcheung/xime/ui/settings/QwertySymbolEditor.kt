@@ -149,12 +149,15 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
             val boardRows = if (fourteen) FourteenKeySymbols.rows
                 else customLayout?.let(CustomLayoutSymbols::rows)
                 ?: QwertySwipeSymbols.rows.map { row -> row.map(Char::toString) }
-            val rowSlots = boardRows.maxOf { it.size }
+            // 自建布局和键盘上一样按字母数分键宽（合并键两格宽），每排居中；26 键、14 键每键一格。
+            fun width(key: String) = if (customLayout != null) key.length else 1
+            val rowSlots = boardRows.maxOf { row -> row.sumOf(::width) }
             boardRows.forEach { row ->
+                val units = row.sumOf(::width)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (row.size < rowSlots) Spacer(Modifier.weight((rowSlots - row.size) / 2f))
+                    if (units < rowSlots) Spacer(Modifier.weight((rowSlots - units) / 2f))
                     row.forEach { key ->
-                        Surface(modifier = Modifier.weight(1f).height(64.dp).testTag("symbol-editor-key:$key")
+                        Surface(modifier = Modifier.weight(width(key).toFloat()).height(64.dp).testTag("symbol-editor-key:$key")
                             .clickable(enabled = loaded && !busy) { selected = key },
                             shape = RoundedCornerShape(8.dp),
                             color = if (selected == key) MaterialTheme.colorScheme.secondaryContainer
@@ -167,7 +170,7 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                             }
                         }
                     }
-                    if (row.size < rowSlots) Spacer(Modifier.weight((rowSlots - row.size) / 2f))
+                    if (units < rowSlots) Spacer(Modifier.weight((rowSlots - units) / 2f))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
