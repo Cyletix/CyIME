@@ -57,6 +57,9 @@ object AppUpdater {
     /** 老人版是单独打的包，换成公开包会丢掉老人版的界面，不给更新入口。 */
     val supported: Boolean get() = !BuildConfig.ELDER
 
+    /** 自用版：只查不装，见 [fetchLatest]。 */
+    val privateBuild: Boolean get() = BuildConfig.DEV_TOOLS
+
     private val _state = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
     val state: StateFlow<AppUpdateState> = _state
 
@@ -121,7 +124,10 @@ object AppUpdater {
         client.newCall(request).execute().use { response ->
             if (response.code == 403 || response.code == 429) throw IOException("rate-limited")
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-            return AppUpdateCatalog.latest(response.body.string(), BuildConfig.BUNDLED_MODELS, Build.SUPPORTED_ABIS.toList())
+            val latest = AppUpdateCatalog.latest(response.body.string(), BuildConfig.BUNDLED_MODELS, Build.SUPPORTED_ABIS.toList())
+            // 自用版（打包器「装到我的设备」）带个人九键模型、CyLM 和私有释义，公开包覆盖上去会把它们换掉：
+            // 只提示有新版，不给一键下载安装，点了去发布页。
+            return if (privateBuild) latest?.copy(asset = null) else latest
         }
     }
 

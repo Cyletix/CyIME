@@ -46,7 +46,8 @@ private fun updateSubtitle(state: AppUpdateState): String {
         }
         is AppUpdateState.Available -> state.release.asset?.let { asset ->
             "${state.release.version} $editionName ${formatModelMegabytes(asset.sizeBytes)}，点一下下载"
-        } ?: "${state.release.version} 没有适合这台设备的安装包，点一下打开发布页"
+        } ?: if (AppUpdater.privateBuild) "${state.release.version} 已发布；自用版不在这里一键更新（会换掉个人模型），点一下打开发布页"
+        else "${state.release.version} 没有适合这台设备的安装包，点一下打开发布页"
         is AppUpdateState.Downloading -> {
             val total = if (state.total > 0) " / ${formatModelMegabytes(state.total)}" else ""
             "正在下载 ${state.release.version}：${formatModelMegabytes(state.downloaded)}$total，点一下暂停"
