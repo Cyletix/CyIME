@@ -8,7 +8,7 @@ import com.charleskorn.kaml.YamlScalar
 import java.io.File
 
 /**
- * 模糊音（中文全拼 26 键；另开「模糊音也用于双拼」时双拼 26 键）和双拼邻键纠错（双拼 26 键）。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
+ * 模糊音（中文全拼 26 键；另开「模糊音也用于双拼」时双拼 26 键及其自建合并键布局版本）和双拼邻键纠错（双拼 26 键）。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
  * 这里只增删自己标记的一段，个人词库、分类词库、短语等其他补丁原样保留。
  * 别人提的需求（B 站评论 10-31），默认全关；全关时不写任何文件，九键、14 键、注音不碰。
  */
@@ -77,6 +77,14 @@ object SpellingPatches {
     internal fun doublePinyinSchemas(context: Context): List<String> = (DoublePinyinScheme.BUILTINS.map { it.id } +
         runCatching { DoublePinyinSchemes.load(context).map { it.id } }.getOrDefault(emptyList())).distinct()
 
+    /**
+     * 双拼在自建合并键布局（如 20 键）上的版本：拼写规则是 26 键双拼的规则再接合并键派生，模糊音照样排在最前。
+     * 这些版本按设计不开邻键纠错（[DoublePinyinScheme.layoutSchema]），只写模糊音。
+     */
+    internal fun doublePinyinLayoutVariants(rimeDir: File): List<String> = rimeDir.listFiles().orEmpty()
+        .mapNotNull { file -> file.name.removeSuffix(".schema.yaml").takeIf { file.isFile && file.name.endsWith(".schema.yaml") } }
+        .filter { DoublePinyinScheme.splitLayoutVariant(it) != null }.sorted()
+
     /** 设置页改完开关后在后台线程调用：写补丁，有改动就通知输入法重新部署。 */
     @Synchronized fun apply(context: Context) {
         if (!sync(context)) return
@@ -104,6 +112,9 @@ object SpellingPatches {
                 listOf(fuzzyPart(schema, doublePinyinFuzzy) ?: return@write null,
                     Part(CORRECTION, if (correction) listOf("\"$CORRECTION\": true") else emptyList()))
             } || changed
+        }
+        for (id in doublePinyinLayoutVariants(rimeDir)) {
+            changed = write(rimeDir, id) { schema -> listOf(fuzzyPart(schema, doublePinyinFuzzy) ?: return@write null) } || changed
         }
         return changed
     }

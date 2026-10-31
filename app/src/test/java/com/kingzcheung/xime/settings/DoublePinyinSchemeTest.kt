@@ -156,6 +156,10 @@ class DoublePinyinSchemeTest {
             assertTrue(scheme.id, code("lan") in typed(SpellingPatches.Fuzzy.NL, "nan"))
             assertTrue(scheme.id, code("fan") in typed(SpellingPatches.Fuzzy.AN, "fang"))
             assertFalse(scheme.id, code("xian") in typed(SpellingPatches.Fuzzy.AN, "xiang"))
+            // 用户 10-31：小鹤 bkgr（bing guan）要出宾馆（bin guan）；en/eng 两个方向同样。
+            assertTrue(scheme.id, code("bing") in typed(SpellingPatches.Fuzzy.IN, "bin"))
+            assertTrue(scheme.id, code("chen") in typed(SpellingPatches.Fuzzy.EN, "cheng"))
+            assertTrue(scheme.id, code("cheng") in typed(SpellingPatches.Fuzzy.EN, "chen"))
             // 不开模糊音：每个音节只有自己的编码。
             assertEquals(scheme.id, setOf(code("xing")), spellings(scheme.algebra(), "xing"))
             // 11 组全开：每个音节派生出的拼写仍然都是两键编码，不多出没换成双拼的长拼写。
@@ -165,6 +169,58 @@ class DoublePinyinSchemeTest {
                 assertTrue("${scheme.id} $syllable $odd", odd.isEmpty())
             }
         }
+    }
+
+    /** 随应用内置的 26 键小鹤双拼（雾凇 double_pinyin_flypy.schema.yaml）的拼写规则原文，不是由键位表生成的那份。 */
+    private val shippedFlypy = """
+        erase/^xx$/
+        derive/^([jqxy])u$/$1v/
+        derive/^([aoe])([ioun])$/$1$1$2/
+        xform/^([aoe])(ng)?$/$1$1$2/
+        xform/iu$/Ⓠ/
+        xform/(.)ei$/$1Ⓦ/
+        xform/uan$/Ⓡ/
+        xform/[uv]e$/Ⓣ/
+        xform/un$/Ⓨ/
+        xform/^sh/Ⓤ/
+        xform/^ch/Ⓘ/
+        xform/^zh/Ⓥ/
+        xform/uo$/Ⓞ/
+        xform/ie$/Ⓟ/
+        xform/(.)i?ong$/$1Ⓢ/
+        xform/ing$|uai$/Ⓚ/
+        xform/(.)ai$/$1Ⓓ/
+        xform/(.)en$/$1Ⓕ/
+        xform/(.)eng$/$1Ⓖ/
+        xform/[iu]ang$/Ⓛ/
+        xform/(.)ang$/$1Ⓗ/
+        xform/ian$/Ⓜ/
+        xform/(.)an$/$1Ⓙ/
+        xform/(.)ou$/$1Ⓩ/
+        xform/[iu]a$/Ⓧ/
+        xform/iao$/Ⓝ/
+        xform/(.)ao$/$1Ⓒ/
+        xform/ui$/Ⓥ/
+        xform/in$/Ⓑ/
+        xlit/ⓆⓌⓇⓉⓎⓊⒾⓄⓅⓈⒹⒻⒼⒽⒿⓀⓁⓏⓍⒸⓋⒷⓃⓂ/qwrtyuiopsdfghjklzxcvbnm/
+    """.trimIndent().lines()
+
+    /** 用户 10-31：小鹤双拼打 bkgr 出不来宾馆。打开 in/ing 模糊音（并打开「模糊音也用于双拼」）后，宾 bin 也能按 bk 打。 */
+    @Test fun shippedFlypyTypesBinguanAsBkgrWithInIngFuzzy() {
+        assertEquals(setOf("bb"), spellings(shippedFlypy, "bin"))
+        assertEquals(setOf("gr"), spellings(shippedFlypy, "guan"))
+        assertEquals(setOf("bb", "bk"), spellings(SpellingPatches.Fuzzy.IN.rules + shippedFlypy, "bin"))
+        // 11 组全开时同样，每个音节仍然只派生出两键编码。
+        val all = SpellingPatches.Fuzzy.entries.flatMap { it.rules } + shippedFlypy
+        assertTrue("bk" in spellings(all, "bin") && "gr" in spellings(all, "guan"))
+        assertTrue(DoublePinyinScheme.FLYPY.code("cheng") in spellings(all, "chen"))
+        for (syllable in DoublePinyinScheme.SYLLABLES) {
+            val odd = spellings(all, syllable).filterNot { it.matches(Regex("[a-z]{2}")) }
+            assertTrue("$syllable $odd", odd.isEmpty())
+        }
+        // 键位表上的编码内置规则都能打（内置的另外多出 jv、ew 这类写法）。
+        for (syllable in DoublePinyinScheme.SYLLABLES)
+            assertTrue(syllable, DoublePinyinScheme.FLYPY.code(syllable) in spellings(shippedFlypy, syllable))
     }
 
     @Test fun t9VersionTypesEachSyllableOnTwoDigitKeys() {
