@@ -65,4 +65,17 @@ class CandidateStripGeometryTest {
  @Test fun zeroWidthDoesNotMeasureAnyText() {
   assertEquals(0,candidatePrefixCount(500,0,4) { error("offscreen text measured") })
  }
+ @Test fun tailPaddingLetsTheLastScreenStartAtAWholeCandidate() {
+  val widths=listOf(40,70,80,30,50)
+  // 50+4+30=84 fits, 80 more does not: pad 30 so scrolled to the end 30 starts at the left edge.
+  assertEquals(30,candidateTailPadding(widths.size,114,4) { widths[it] })
+  assertEquals(0,candidateTailPadding(2,114,4) { listOf(40,200)[it] })
+  assertEquals(0,candidateTailPadding(0,114,4) { error("nothing to measure") })
+  assertEquals(0,candidateTailPadding(3,0,4) { error("nothing to measure") })
+ }
+ @Test fun tailPaddingOnlyMeasuresTheLastScreen() {
+  val measured=mutableListOf<Int>()
+  assertEquals(18,candidateTailPadding(500,100,2) { measured+=it;40 })
+  assertEquals(listOf(499,498,497),measured)
+ }
 }

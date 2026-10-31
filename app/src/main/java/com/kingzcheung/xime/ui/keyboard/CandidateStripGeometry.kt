@@ -45,6 +45,25 @@ internal inline fun candidatePrefixCount(total: Int, available: Int, spacing: In
     return count.coerceAtLeast(1)
 }
 
+/**
+ * 能滑的候选行末尾要补的空白：从最后一个往前排满一屏，剩下的就是要补的，
+ * 这样滑到最末、对齐到候选开头时，最后一屏左边也是一个完整的候选，不会被切掉一半。
+ * 最后一个比整条还宽时不补。
+ */
+internal inline fun candidateTailPadding(total: Int, available: Int, spacing: Int, widthAt: (Int) -> Int): Int {
+    if (total <= 0 || available <= 0) return 0
+    var used = widthAt(total - 1)
+    if (used >= available) return 0
+    var first = total - 1
+    while (first > 0) {
+        val next = used + spacing + widthAt(first - 1)
+        if (next > available) break
+        used = next
+        first--
+    }
+    return available - used
+}
+
 /** Remove the rendered prefix only; global engine indices survive filtering/reflow unchanged. */
 internal fun remainingCandidates(entries: List<CandidateEntry>, visible: List<String>): List<CandidateEntry> =
     if (entries.take(visible.size).map { it.text } == visible) entries.drop(visible.size) else entries
