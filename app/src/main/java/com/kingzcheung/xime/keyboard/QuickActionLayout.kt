@@ -13,6 +13,8 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
         const val MENU_DIVIDER = "#menu"
         const val UNUSED_DIVIDER = "#unused"
         val PINNED = ToolbarButton.SETTINGS.id
+        /** 2026-10-31 起默认在菜单里的开关；已保存的菜单由 SettingsPreferences 插入一次。 */
+        val MENU_TOGGLES_1031 = listOf(ToolbarButton.FLOATING, ToolbarButton.TRADITIONAL)
 
         fun normalize(toolbar: List<String>, menu: List<String>): QuickActionLayout {
             // 旧版“固定内容”并入剪贴板：工具栏和菜单都按同一规则改写。
@@ -26,6 +28,8 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
             val base = (ToolbarButton.DEFAULT_MENU - ToolbarButton.ARRANGE).toMutableList()
             // 字幕是主入口：新装用户的默认菜单也有它（紧跟拍照识别），不放进一页 8 项的 DEFAULT_MENU 契约。
             base.add(base.indexOf(ToolbarButton.OCR) + 1, ToolbarButton.CAPTION)
+            // 悬浮、简繁两个开关也默认放进菜单，紧跟全角/半角（用户 2026-10-31）；简繁只在拼音、双拼、仓颉键盘出现。
+            base.addAll(base.indexOf(ToolbarButton.FULL_SHAPE) + 1, MENU_TOGGLES_1031)
             return (base + ToolbarButton.LAYOUT_GESTURES + ToolbarButton.ARRANGE).map { it.id }.filter { it !in toolbar }
         }
 
