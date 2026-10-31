@@ -14,7 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -185,6 +191,44 @@ internal fun CandidateCommentIllustration(mode: CandidateCommentMode) {
             CandidateStrip(withComments = true)
             CandidateStrip(withComments = false, narrow = true)
         }
+    }
+}
+
+/**
+ * 候选栏取消按钮：打字时候选栏最左边的「<」，点它取消当前输入；关掉后候选从最左边开始。
+ * 两端圆底按钮和真实候选栏一样（左取消、右展开），随开关实时变化。
+ */
+@Composable
+internal fun CandidateCancelIllustration(show: Boolean) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val primary = MaterialTheme.colorScheme.primary
+    val muted = onSurface.copy(alpha = 0.6f)
+    @Composable
+    fun EdgeButton(icon: ImageVector, highlight: Boolean) {
+        Box(Modifier.size(26.dp).clip(CircleShape)
+            .background(if (highlight) primary.copy(alpha = 0.3f) else onSurface.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = if (highlight) primary else muted, modifier = Modifier.size(20.dp))
+        }
+    }
+    Column(Modifier.fillMaxWidth().testTag("candidate-cancel-illustration").clip(RoundedCornerShape(6.dp))
+        .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp)) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 4.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (show) EdgeButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, highlight = true)
+            Spacer(Modifier.width(if (show) 8.dp else 4.dp))
+            Text("你好", fontSize = 13.sp, color = primary, fontWeight = FontWeight.Medium, maxLines = 1)
+            Spacer(Modifier.width(12.dp))
+            Text("拟好", fontSize = 13.sp, color = onSurface, maxLines = 1)
+            Spacer(Modifier.width(12.dp))
+            Text("你", fontSize = 13.sp, color = onSurface, maxLines = 1)
+            Spacer(Modifier.weight(1f))
+            EdgeButton(Icons.Filled.KeyboardArrowUp, highlight = false)
+        }
+        Spacer(Modifier.height(4.dp))
+        // 开着时「↑」对着左箭头（按钮中心离边 4 + 13 = 17dp）。
+        Text(if (show) "↑ 点它取消当前输入" else "候选词从最左边开始", fontSize = 12.sp, maxLines = 1,
+            color = if (show) primary else muted, modifier = Modifier.padding(start = if (show) 13.dp else 4.dp))
     }
 }
 

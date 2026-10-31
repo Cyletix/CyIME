@@ -43,10 +43,11 @@ class CandidateBarOptionsTest {
     @Before fun setup() { SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
     @After fun teardown() { SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
 
-    @Test fun defaultCandidatesUseLeadingSpaceAndPreferenceUpdatesImmediately() {
+    @Test fun defaultCandidatesShowCancelButtonAndPreferenceUpdatesImmediately() {
         var cancels = 0
         var selects = 0
-        assertFalse(SettingsPreferences.shouldShowCandidateCancelButton(context))
+        // 用户 10-31：默认打开。
+        assertTrue(SettingsPreferences.shouldShowCandidateCancelButton(context))
         rule.setContent {
             CompositionLocalProvider(LocalContext provides context) {
                 MaterialTheme {
@@ -56,19 +57,19 @@ class CandidateBarOptionsTest {
                 }
             }
         }
-        rule.onNodeWithContentDescription("取消输入").assertDoesNotExist()
+        rule.onNodeWithContentDescription("取消输入").assertIsDisplayed()
         val barLeft = rule.onNodeWithTag("candidate-bar").fetchSemanticsNode().boundsInRoot.left
-        val originalLeft = rule.onNodeWithText("你好").fetchSemanticsNode().boundsInRoot.left
+        val enabledLeft = rule.onNodeWithText("你好").fetchSemanticsNode().boundsInRoot.left
         val density = context.resources.displayMetrics.density
+        rule.runOnIdle { SettingsPreferences.setShowCandidateCancelButton(context, false) }
+        rule.onNodeWithContentDescription("取消输入").assertDoesNotExist()
+        val originalLeft = rule.onNodeWithText("你好").fetchSemanticsNode().boundsInRoot.left
         assertTrue("隐藏按钮不保留40dp占位", originalLeft - barLeft < 20f * density)
+        assertEquals(44f * density, enabledLeft - originalLeft, 2f)
         rule.runOnIdle { SettingsPreferences.setShowCandidateCancelButton(context, true) }
         rule.onNodeWithContentDescription("取消输入").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(1, cancels); assertEquals(0, selects) }
-        val enabledLeft = rule.onNodeWithText("你好").fetchSemanticsNode().boundsInRoot.left
-        assertEquals(44f * density, enabledLeft - originalLeft, 2f)
-        rule.runOnIdle { SettingsPreferences.setShowCandidateCancelButton(context, false) }
-        rule.onNodeWithContentDescription("取消输入").assertDoesNotExist()
-        assertEquals(originalLeft, rule.onNodeWithText("你好").fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals(enabledLeft, rule.onNodeWithText("你好").fetchSemanticsNode().boundsInRoot.left, 1f)
         rule.onNodeWithText("你好").performClick()
         rule.runOnIdle { assertEquals(1, selects) }
     }
@@ -131,19 +132,21 @@ class CandidateBarOptionsTest {
         rule.runOnIdle { assertEquals(1, opens); assertEquals(1, closes) }
     }
 
-    @Test fun settingIsInitiallyOffAndSavesExplicitChoice() {
+    @Test fun settingIsInitiallyOnAndSavesExplicitChoice() {
         rule.setContent {
             CompositionLocalProvider(LocalContext provides context) {
                 // 候选词从首页直接进入。
                 MaterialTheme { LayoutDisplaySettingsContent(onBack = {}, initialPage = "candidates") }
             }
         }
-        val setting = rule.onNodeWithTag("candidate-cancel-setting")
-        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("candidate-cancel-setting"))
-        setting.assertIsOff().performClick().assertIsOn()
-        rule.runOnIdle { assertTrue(SettingsPreferences.shouldShowCandidateCancelButton(context)) }
-        setting.performClick().assertIsOff()
+        // 外层设置搜索定位修饰的 testTag 在前，同一节点上前面的生效，两个名字都认。
+        val tagged = hasTestTag("candidate-cancel-setting") or hasTestTag("settings-search-anchor:候选栏取消按钮")
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(tagged)
+        val setting = rule.onNode(tagged)
+        setting.assertIsOn().performClick().assertIsOff()
         rule.runOnIdle { assertFalse(SettingsPreferences.shouldShowCandidateCancelButton(context)) }
+        setting.performClick().assertIsOn()
+        rule.runOnIdle { assertTrue(SettingsPreferences.shouldShowCandidateCancelButton(context)) }
     }
 
     @Test fun preeditShowsSyllableSeparatorsAtEditorFontSizeAndRemainsClickable() {

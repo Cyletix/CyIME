@@ -272,9 +272,9 @@ object SettingsPreferences {
         setCandidateCommentMode(context, if (show) CandidateCommentMode.SHOW else CandidateCommentMode.HIDE)
     }
 
-    /** 候选词默认靠左；需要一键取消编码时可自行启用。 */
+    /** 默认打开（用户 10-31）：打字时候选栏最左边有「<」一键取消编码。手动关过的仍按存下的值。 */
     fun shouldShowCandidateCancelButton(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_SHOW_CANDIDATE_CANCEL_BUTTON, false)
+        return getPrefs(context).getBoolean(KEY_SHOW_CANDIDATE_CANCEL_BUTTON, true)
     }
 
     fun setShowCandidateCancelButton(context: Context, show: Boolean) {
