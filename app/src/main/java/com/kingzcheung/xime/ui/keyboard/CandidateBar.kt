@@ -992,7 +992,7 @@ fun CandidateItem(
                 imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
                 contentDescription = null,
                 tint = accentColor,
-                modifier = Modifier.align(Alignment.Top).size(with(LocalDensity.current) { (fontSize.value * 0.45f).sp.toDp() })
+                modifier = Modifier.align(Alignment.Top).size(with(LocalDensity.current) { learnedMarkSize(fontSize).toDp() })
                     .testTag("candidate-learned:$index"),
             )
         }
@@ -1013,6 +1013,14 @@ fun CandidateItem(
         }
     }
 }
+
+/** 「打过的词」小图标的边长：画图标和量候选宽度共用，量少了最后一个候选会被挤到栏外。 */
+internal fun learnedMarkSize(fontSize: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.TextUnit =
+    (fontSize.value * 0.45f).sp
+
+/** 候选后面那段小字：有纠错显示纠错，否则显示注释（和 [CandidateItem] 一致）。 */
+internal fun candidateSecondaryText(comment: String, correction: String): AnnotatedString =
+    if (correction.isNotEmpty()) correctionAnnotatedString(correction, Color.Unspecified) else AnnotatedString(comment)
 
 /** 候选两侧的默认留白。 */
 internal val CANDIDATE_ITEM_PADDING = 4.dp
@@ -1263,18 +1271,25 @@ internal fun FixedCandidateStrip(
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
-        val window = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap) {
+        // 小图标、纠错和画出来的一样算进宽度，否则放不下的最后一个候选也算「显示了」，「下一项」移到它时被栏边切掉。
+        val learnedCandidates = LocalLearnedCandidates.current
+        val correctedCandidates = LocalCorrectedCandidates.current
+        val window = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, learnedCandidates, correctedCandidates) {
             val widthAt: (Int) -> Int = { index ->
-                val text = candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size)
+                val numbered = index < candidates.size
+                val text = candidateNumberedText(all[index], index, showNumberLabels && numbered)
                 val primary = measurer.measure(AnnotatedString(text),
                     candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused),
                     softWrap = false).size.width
-                val comment = shownComments.getOrElse(index) { "" }
-                val secondary = if (comment.isEmpty()) 0 else measurer.measure(AnnotatedString(comment),
+                val learnedMark = if (numbered && all[index] in learnedCandidates)
+                    with(density) { learnedMarkSize(fontSize).toDp().roundToPx() } else 0
+                val secondaryText = candidateSecondaryText(shownComments.getOrElse(index) { "" },
+                    if (numbered) correctedCandidates[all[index]].orEmpty() else "")
+                val secondary = if (secondaryText.isEmpty()) 0 else measurer.measure(secondaryText,
                     inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
                         fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
                 // Padding rounds each side independently at fractional device densities.
-                primary + secondary + with(density) { 2 * itemPadding.roundToPx() }
+                primary + learnedMark + secondary + with(density) { 2 * itemPadding.roundToPx() }
             }
             if (localGap != null) {
                 CandidateStripWindow(splitCandidateWindow(all.size, focused, localGap.first, constraints.maxWidth - localGap.second,
