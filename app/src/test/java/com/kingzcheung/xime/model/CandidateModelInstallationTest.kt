@@ -70,6 +70,10 @@ class CandidateModelInstallationTest {
         assertTrue(full.versions.any { it.retired && it.files.single().sizeBytes == 367598664L })
         val sentence = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.SENTENCE }
         assertTrue(sentence.downloadableVersions.isEmpty())
+        // 语法增强被九键词组模型取代：不再提供下载，但最新一份仍认得出来（可删、可被自动清理）。
+        val grammar = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.GRAMMAR }
+        assertTrue(grammar.downloadableVersions.isEmpty())
+        assertTrue(grammar.versions.any { it.files.single().sizeBytes == 418078764L })
     }
 
     @Test fun lighterBundleDoesNotDeletePreviouslyInstalledEnhancements() {

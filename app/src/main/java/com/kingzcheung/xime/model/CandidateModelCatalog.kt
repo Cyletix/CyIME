@@ -25,8 +25,10 @@ object CandidateModelCatalog {
                 ModelFile("t9_ngram.lm", "https://github.com/Cyletix/CyIME/releases/download/models/t9_ngram-v4-ls-p5e-8-c3.lm",
                     "7d346a1fa2b332bdd764d1b91bc8002526cb7d563fea091f6b861279be025c4e", 109685894L),
             )))),
-        ModelInfo(GRAMMAR, "九键语法增强", "没装九键词组模型时增强九键组句排序；装了词组模型就不再起作用，会自动删除。来源：RIME-LMDG，CC-BY-4.0。", ModelCategory.CANDIDATE,
-            versions = listOf(ModelVersion(version = "lts-e34500ab", size = "398.7 MB", files = listOf(
+        // 九键词组模型在全部回放测试集上都比它准（t9-ngram-handover-20261010.md），体积不到它的三分之一：不再提供下载。
+        // 条目保留：认出已下载的文件；没装词组模型的人它仍在起作用，装了词组模型后由 dropSupersededGrammar 删掉。
+        ModelInfo(GRAMMAR, "九键语法增强（已停用）", "已停用：九键词组模型更准、更小，请改装词组模型；装了词组模型后它不再起作用，会自动删除。来源：RIME-LMDG，CC-BY-4.0。", ModelCategory.CANDIDATE,
+            versions = listOf(ModelVersion(version = "lts-e34500ab", retired = true, size = "398.7 MB", files = listOf(
                 // 上游 2026-10-30 前又替换了 LTS 资产（仍是 Rime::Grammar/1.0 格式，418,078,764 字节），资产 650124920 那份已下不到。
                 // 先走上游固定文件名，上游再换文件时哈希对不上，就改用 CyIME Release 里转存的这一份。
                 ModelFile("wanxiang-lts-zh-hans.gram", "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
