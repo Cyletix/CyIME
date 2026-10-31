@@ -66,9 +66,18 @@ class ToolbarButtonItemTest {
         val item = resolveToolbarButtonItem("emoji", colliding)
         assertEquals(ToolbarButton.EMOJI, (item as ToolbarButtonItem.Builtin).button)
     }
-    @Test fun legacyPinnedShortcutMergesWithoutDroppingPluginsOrEditingShortcuts() {
-        assertEquals(listOf("voice", "clipboard", "copy", "com.test.ai_reply"),
+    @Test fun legacyPinnedShortcutMergesWithoutDroppingPlugins() {
+        assertEquals(listOf("voice", "clipboard", "edit", "com.test.ai_reply"),
             ToolbarButton.normalizeIds(listOf("voice", "quick_phrase", "copy", "clipboard", "com.test.ai_reply")))
+    }
+
+    /** 全选、复制、粘贴、段首、段尾已移除：放过它们的位置换成一个“编辑”，已有“编辑”时不重复。 */
+    @Test fun removedEditingShortcutsBecomeOneEditEntry() {
+        assertEquals(listOf("schema", "edit", "voice"),
+            ToolbarButton.normalizeIds(listOf("schema", "copy", "paste", "voice", "home")))
+        assertEquals(listOf("edit", "emoji"),
+            ToolbarButton.normalizeIds(listOf("edit", "emoji", "select_all", "end")))
+        assertNull(ToolbarButton.fromId("copy"))
     }
 
 }

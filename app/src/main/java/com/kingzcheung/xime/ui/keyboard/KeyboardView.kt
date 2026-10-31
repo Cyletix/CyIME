@@ -586,11 +586,6 @@ fun KeyboardView(
                     })
                     ToolbarButton.SCHEMA -> ({ viewModel.toggleOverlay(OverlayRoute.SchemaList) })
                     ToolbarButton.SYMBOL -> ({ viewModel.toggleOverlay(OverlayRoute.Symbol) })
-                    ToolbarButton.SELECT_ALL -> ({ callbacks.onToolbarEditingAction?.invoke("select_all") })
-                    ToolbarButton.COPY -> ({ callbacks.onToolbarEditingAction?.invoke("copy") })
-                    ToolbarButton.PASTE -> ({ callbacks.onToolbarEditingAction?.invoke("paste") })
-                    ToolbarButton.HOME -> ({ callbacks.onToolbarEditingAction?.invoke("home") })
-                    ToolbarButton.END -> ({ callbacks.onToolbarEditingAction?.invoke("end") })
                     ToolbarButton.FLOAT -> ({ viewModel.closeOverlay(); callbacks.onKeyboardResize?.invoke() })
                     ToolbarButton.HANDWRITING_LOOKUP -> ({
                         if (!state.isHandwritingMode && !viewModel.hasTemporaryHandwriting) {

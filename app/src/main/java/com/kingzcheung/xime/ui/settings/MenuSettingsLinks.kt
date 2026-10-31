@@ -5,7 +5,7 @@ import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 
 /**
  * 键盘菜单长按打开的设置项，写设置搜索索引里的标题：跳转、定位和高亮与搜索点开同一条路。
- * 纯动作（全选、复制、粘贴、段首、段尾、编辑）、临时状态（全角/半角）、设置入口本身，
+ * 纯动作（编辑）、临时状态（全角/半角）、设置入口本身，
  * 以及表情、符号面板没有可设的东西，不在这里，长按不响应。
  */
 internal val MenuSettingsTitles: Map<ToolbarButton, String> = mapOf(

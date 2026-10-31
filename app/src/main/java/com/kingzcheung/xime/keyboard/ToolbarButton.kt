@@ -2,15 +2,10 @@ package com.kingzcheung.xime.keyboard
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.Assignment
-import androidx.compose.material.icons.automirrored.twotone.LastPage
-import androidx.compose.material.icons.twotone.ContentCopy
-import androidx.compose.material.icons.twotone.ContentPaste
 import androidx.compose.material.icons.twotone.EmojiEmotions
-import androidx.compose.material.icons.twotone.FirstPage
 import androidx.compose.material.icons.twotone.KeyboardAlt
 import androidx.compose.material.icons.twotone.LastPage
 import androidx.compose.material.icons.twotone.Paid
-import androidx.compose.material.icons.twotone.SelectAll
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DocumentScanner
@@ -44,11 +39,6 @@ enum class ToolbarButton(
     SYMBOL("symbol", "符号", Icons.TwoTone.Paid),
     // 保留已保存的旧 ID，悬浮模式统一在键盘调节中设置。
     FLOAT("float", "键盘调节", Icons.TwoTone.Tune),
-    SELECT_ALL("select_all", "全选", Icons.TwoTone.SelectAll),
-    COPY("copy", "复制", Icons.TwoTone.ContentCopy),
-    PASTE("paste", "粘贴", Icons.TwoTone.ContentPaste),
-    HOME("home", "段首", Icons.TwoTone.FirstPage),
-    END("end", "段尾", Icons.AutoMirrored.TwoTone.LastPage),
     HANDWRITING_LOOKUP("handwriting_lookup", "手写", Icons.Outlined.Gesture),
     EDIT("edit", "编辑", Icons.TwoTone.OpenWith),
     VOICE("voice", "语音", Icons.TwoTone.Mic),
@@ -91,8 +81,14 @@ enum class ToolbarButton(
         /** 已移除的旧版“固定内容”（quick_phrase）并入剪贴板。 */
         private const val LEGACY_QUICK_PHRASE = "quick_phrase"
 
+        /**
+         * 已移除的全选、复制、粘贴、段首、段尾入口（用户 2026-10-31：编辑面板里都有）：
+         * 放过它们的位置换成“编辑”，同一处已有“编辑”就只留一个。
+         */
+        private val LEGACY_EDITING = setOf("select_all", "copy", "paste", "home", "end")
+
         fun normalizeIds(ids: List<String>): List<String> =
-            ids.map { if (it == LEGACY_QUICK_PHRASE) CLIPBOARD.id else it }.distinct()
+            ids.map { when (it) { LEGACY_QUICK_PHRASE -> CLIPBOARD.id; in LEGACY_EDITING -> EDIT.id; else -> it } }.distinct()
 
         fun fromId(id: String): ToolbarButton? =
             entries.find { it.id == id }
