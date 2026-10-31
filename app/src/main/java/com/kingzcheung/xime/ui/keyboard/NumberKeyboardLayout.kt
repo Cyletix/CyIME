@@ -78,6 +78,8 @@ fun NumberKeyboardLayout(
     isFloatingMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
     isJapaneseKana: Boolean = false,
+    /** 回车键动作名（换行、发送、搜索等），与主键盘同一来源，决定回车键图标。 */
+    enterKeyText: String = "确定",
 ) {
     if (isJapaneseKana) {
         CompositionLocalProvider(LocalKeyboardPunctuation provides LocalKeyboardPunctuation.current?.copy(numberPanel = true)) {
@@ -169,6 +171,7 @@ fun NumberKeyboardLayout(
                     shadowShapeRadius = shadowShapeRadius,
                     onKeyPressDown = onKeyPressDown,
                     specialKeyTextColor = specialKeyTextColor,
+                    enterKeyText = enterKeyText,
                     onSwipeStateChange = ::processSwipeState
                 )
             }
@@ -193,6 +196,7 @@ private fun NumberRows(
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
     compactMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
+    enterKeyText: String = "确定",
 ) {
     val modeWeight = 0.8f
     val symFontSize = if (compactMode) 14.sp else 18.sp
@@ -270,7 +274,7 @@ private fun NumberRows(
                 modifier = Modifier.weight(0.8f), onPress = { onKeyPressDown?.invoke(".") },
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
-            ActionKeyButton(text = "确定", onClick = { onKeyPress("enter") },
+            ActionKeyButton(text = enterKeyText, onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                 modifier = Modifier.weight(0.8f), onPress = { onKeyPressDown?.invoke("enter") },
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
