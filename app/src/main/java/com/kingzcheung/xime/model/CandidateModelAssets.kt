@@ -121,6 +121,8 @@ internal object CandidateModelAssets {
     private fun dropRetiredModels(context: Context) {
         for (model in CandidateModelCatalog.models) {
             if (model.versions.isEmpty() || !model.versions.all { it.retired }) continue
+            // 语法增强在没有九键词组模型时仍参与九键排序，只在装了词组模型后删（dropSupersededGrammar）。
+            if (model.id == CandidateModelCatalog.GRAMMAR) continue
             val names = model.versions.flatMap { it.files }.map { it.name }.distinct()
             val present = names.any { name ->
                 modelDownloadFile(File(context.filesDir, "rime"), name).exists() ||
