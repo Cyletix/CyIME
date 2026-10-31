@@ -68,6 +68,7 @@ object SetupGuide {
         }
         return SetupFacts(
             tier = DeviceModelProfiles.choose(hardware).tier,
+            performanceTier = com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.classify(hardware),
             // 和键盘一样按最短边 600dp 分手机、平板。
             device = if (context.resources.configuration.smallestScreenWidthDp >= 600) "平板" else "手机",
             memoryBytes = hardware.totalMemoryBytes,

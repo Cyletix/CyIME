@@ -202,7 +202,10 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(SettingsRoutes.Performance) { PerformanceSettingsContent(onBack = { navController.popBackStack() }) }
+        composable(SettingsRoutes.Performance) {
+            PerformanceSettingsContent(onBack = { navController.popBackStack() },
+                onOpenSetupGuide = { navController.navigate(SettingsRoutes.SetupGuide) })
+        }
         composable(SettingsRoutes.KeyEffect) {
             KeyEffectSettingsContent(
                 onBack = { navController.popBackStack() }
@@ -284,7 +287,8 @@ fun SettingsScreen(
             )
         }
         composable(SettingsRoutes.SetupGuide) {
-            SetupGuideScreen(firstRun = false, onDone = { navController.popBackStack() })
+            SetupGuideScreen(firstRun = false, onDone = { navController.popBackStack() },
+                onOpenPerformance = { navController.navigate(SettingsRoutes.Performance) })
         }
         composable(SettingsRoutes.StorageSpace) {
             StorageSpaceScreen(

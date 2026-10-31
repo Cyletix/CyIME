@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.model
 
+import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 
 /** 语音输入打算怎么用：向导里的三个选项，说法面向不懂模型名的人。 */
@@ -25,7 +26,13 @@ data class DoublePinyinChoice(val id: String, val name: String, val example: Str
 
 /** 一台设备在向导眼里的样子；大小都是字节，读不到的为 null。 */
 data class SetupFacts(
+    /** 选模型用的档（6 GB 起算较强）：只决定推荐哪些模型。 */
     val tier: DeviceModelTier,
+    /**
+     * 给人看的档位，与「性能与省电」的“本机配置推荐”是同一个判断（[com.kingzcheung.xime.runtime.adaptation.PerformanceTiers]），
+     * 两页对同一台设备说同一句话。
+     */
+    val performanceTier: PerformanceTier = PerformanceTier.MEDIUM,
     /** 给人看的设备叫法：「手机」或「平板」。 */
     val device: String = "手机",
     val memoryBytes: Long? = null,

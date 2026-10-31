@@ -53,7 +53,7 @@ class PerformanceScaleRenderTest {
             XimeTheme(darkTheme = themes[theme.intValue].second.first) {
                 // 页面在组合时读一次设置：换状态时换 key 重新组合。
                 key(theme.intValue, shown.intValue) {
-                    Box(Modifier.fillMaxSize()) { PerformanceSettingsContent(onBack = {}) }
+                    Box(Modifier.fillMaxSize()) { PerformanceSettingsContent(onBack = {}, onOpenSetupGuide = {}) }
                 }
             }
         }

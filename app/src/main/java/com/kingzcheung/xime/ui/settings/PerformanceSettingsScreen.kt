@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,7 +51,7 @@ import com.kingzcheung.xime.settings.PerformanceProfile
 import com.kingzcheung.xime.settings.PerformanceSettings
 import kotlin.math.roundToInt
 
-private val tierNames = mapOf(PerformanceTier.HIGH to "高配", PerformanceTier.MEDIUM to "中配", PerformanceTier.LOW to "低配")
+internal val tierNames = mapOf(PerformanceTier.HIGH to "高配", PerformanceTier.MEDIUM to "中配", PerformanceTier.LOW to "低配")
 private val tierHints = mapOf(
     PerformanceTier.HIGH to "动效和炫光全开，语音模型常驻，二次校正模型空闲 30 分钟后释放",
     PerformanceTier.MEDIUM to "保留按键动效，语音空闲 5 分钟先释放二次校正模型，30 分钟后全部释放",
@@ -75,10 +76,14 @@ internal fun positionText(settings: PerformanceSettings): String {
     }
 }
 
-/** 性能与省电：一键选档；改任何一项自动变成“自定义”。 */
+/**
+ * 性能与省电：一键选档；改任何一项自动变成“自定义”。
+ * 和「按设备推荐配置」分工：这页随时调、马上生效（动效、语音模型常驻多久）；用哪些模型、删哪些在那一页，
+ * 那里要下载、删文件，点了「按推荐设置」才改。两页互相有入口，设备档位用同一个判断。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PerformanceSettingsContent(onBack: () -> Unit) {
+fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit)? = null) {
     val context = LocalContext.current
     var settings by remember { mutableStateOf(PerformanceProfile.read(context)) }
     var auto by remember { mutableStateOf(PerformanceProfile.isAuto(context)) }
@@ -141,6 +146,15 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
                         IdleLevelSlider("语音模型空闲后全部释放", settings.speechEngineIdleMinutes,
                             "“永不”= 一直常驻，按麦克风最快，占内存最多",
                             "speech-engine-idle-slider") { custom(settings.copy(speechEngineIdleMinutes = it)) }
+                    }
+                }
+            }
+            onOpenSetupGuide?.let { open ->
+                item {
+                    SettingsSection(title = "模型") {
+                        SettingsItem(icon = Icons.TwoTone.Tune, title = "按设备推荐配置",
+                            subtitle = "这页只管动效和语音模型常驻多久；语音、九键、联想用哪些模型，删掉用不到的，在这里选",
+                            onClick = open, showArrow = true)
                     }
                 }
             }
