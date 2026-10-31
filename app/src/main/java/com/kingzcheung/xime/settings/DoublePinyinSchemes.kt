@@ -107,7 +107,7 @@ object DoublePinyinSchemes {
         }
     }
 
-    /** 在方案栏显示或隐藏一个双拼方案；小鹤以外的内置方案和各九键版本默认不启用，在双拼方案页自己打开。 */
+    /** 在方案栏显示或隐藏一个双拼方案；内置的 26 键双拼默认显示（见 CyimeInputDefaults.withDoublePinyin），各九键版本默认不启用，在双拼方案页自己打开。 */
     fun setEnabled(context: Context, id: String, enabled: Boolean) {
         val current = SchemaManager.getEnabledSchemas(context)
         val updated = if (enabled) {
