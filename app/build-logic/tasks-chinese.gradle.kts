@@ -416,7 +416,7 @@ val prepareChineseDictionaries by tasks.registering {
         // upstream's large table 41448.dict.yaml (Unihan kMandarin + zdic readings) ships disabled. Importing all of
         // it cost the nine-key replay +140% dictionary entries per key at the same first candidates, so the
         // characters 8105 lacks go to cyime_rare.txt instead, read by lua/cyime_rare_chars.lua for full-pinyin 26 keys
-        // only while its switch is on (default off). Only the BMP (URO and Ext A, about 18,000): most Android fonts
+        // and nine keys (t9_pinyin.schema.yaml) only while its switch is on (default off; 槻 gui 2026-10-31 too). Only the BMP (URO and Ext A, about 18,000): most Android fonts
         // have no glyphs for Ext B and beyond, which would show as empty boxes. Only readings 8105 already has (drops
         // 黁 nun). The large table itself is no longer bundled: the generated list is about half its size.
         val common = HashSet<String>()
