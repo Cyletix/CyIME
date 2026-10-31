@@ -183,7 +183,9 @@ object InputProfiles {
 
     /** Actual layout bindings win over built-in defaults, including an explicitly unbound schema. */
     fun resolveLayout(section: String?, custom: CustomKeyboardLayout? = null): InputLayout = when (section) {
-        "qwerty", "qwerty_en", "qwerty_japanese", "qwerty_cangjie", "qwerty_spanish" -> InputLayout(section, "26键", LayoutKind.ALPHABETIC)
+        "qwerty", "qwerty_en", "qwerty_japanese", "qwerty_spanish" -> InputLayout(section, "26键", LayoutKind.ALPHABETIC)
+        // 仓颉只是键帽换成字根，仍是中文的 26 键：同一个布局，方案行里与拼音、双拼、五笔并列。
+        "qwerty_cangjie" -> InputLayout.QWERTY
         "t9" -> InputLayout.T9
         "stroke" -> InputLayout.STROKE
         "handwriting" -> InputLayout.HANDWRITING
