@@ -1052,17 +1052,50 @@ object SettingsPreferences {
         getPrefs(context).edit().putInt(key, widthDp).apply()
     }
 
-    /** 固定键盘横竖屏独立；0 宽度代表铺满宿主，偏移相对宿主中心。 */
-    fun getFixedWidthDp(context: Context, landscape: Boolean): Int =
-        getPrefs(context).getInt(if (landscape) "fixed_width_dp_landscape" else "fixed_width_dp", 0)
+    /**
+     * 固定键盘横竖屏独立，并且每块屏各存一份；0 宽度代表铺满宿主，偏移相对宿主中心。
+     * 折叠屏的外屏、内屏都是竖屏，原来共用一份，外屏调好的宽度展开后带到内屏，内屏占不满（GitHub #37）。
+     * 屏按最短边 dp 区分（转屏不变，外屏和内屏差得很远）。
+     */
+    fun getFixedWidthDp(context: Context, landscape: Boolean): Int = fixedGeometry(context, "fixed_width_dp", landscape)
 
-    fun getFixedOffsetX(context: Context, landscape: Boolean): Int =
-        getPrefs(context).getInt(if (landscape) "fixed_offset_x_landscape" else "fixed_offset_x", 0)
+    fun getFixedOffsetX(context: Context, landscape: Boolean): Int = fixedGeometry(context, "fixed_offset_x", landscape)
 
     fun setFixedHorizontalGeometry(context: Context, width: Int, offset: Int, landscape: Boolean) {
         val suffix = if (landscape) "_landscape" else ""
+        val screen = fixedGeometryScreen(context)
+        // 不带屏的旧键照样写，并记下是哪块屏调的；另存一份带屏的，换回这块屏时用。
         getPrefs(context).edit().putInt("fixed_width_dp$suffix", width)
-            .putInt("fixed_offset_x$suffix", offset).apply()
+            .putInt("fixed_offset_x$suffix", offset)
+            .putInt("fixed_width_dp${suffix}_sw$screen", width)
+            .putInt("fixed_offset_x${suffix}_sw$screen", offset)
+            .putInt("fixed_geometry_screen$suffix", screen).apply()
+    }
+
+    private fun fixedGeometryScreen(context: Context): Int = context.resources.configuration.smallestScreenWidthDp
+
+    private fun fixedGeometry(context: Context, name: String, landscape: Boolean): Int {
+        val prefs = getPrefs(context)
+        val suffix = if (landscape) "_landscape" else ""
+        val screen = fixedGeometryScreen(context)
+        val own = "$name${suffix}_sw$screen"
+        return resolveFixedGeometry(
+            ownValue = if (prefs.contains(own)) prefs.getInt(own, 0) else null,
+            sharedValue = prefs.getInt("$name$suffix", 0),
+            sharedScreen = prefs.getInt("fixed_geometry_screen$suffix", 0),
+            screen = screen,
+        )
+    }
+
+    /**
+     * 不带屏的那一份是最后一次调节写的，在调它的那块屏上照旧用它；旧版本存的值不知道是哪块屏，也照旧用，
+     * 单屏手机、平板升级后不变，改系统显示大小这类小变化（最短边差不到 15%）也算同一块屏。
+     * 换到大小差很多的另一块屏（折叠屏外屏↔内屏）时用那块屏自己存的；那块屏没调过就铺满、居中（默认）。
+     */
+    internal fun resolveFixedGeometry(ownValue: Int?, sharedValue: Int, sharedScreen: Int, screen: Int): Int {
+        if (sharedScreen <= 0 || screen <= 0) return sharedValue
+        val sameScreen = kotlin.math.abs(sharedScreen - screen) * 100 <= maxOf(sharedScreen, screen) * 15
+        return if (sameScreen) sharedValue else ownValue ?: 0
     }
 
     fun getPageSize(context: Context): Int {
