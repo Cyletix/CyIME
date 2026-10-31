@@ -745,6 +745,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 SettingsPreferences.KEY_INCOGNITO -> {
                     privacy.setManual(SettingsPreferences.isIncognito(this))
                 }
+                // 繁体输出：工具栏、菜单的简繁按钮或设置页一改就写进引擎；正在打的拼音当场换成新写法，
+                // 不用等下一个字母键（以前关掉后直接点候选或空格，上屏的还是繁体）。
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY -> inputCommands.submit {
+                    if (sessionController.applyTraditionalOutput(persist = true)) withContext(Dispatchers.Main) { updateUI() }
+                }
                 SettingsPreferences.KEY_KEY_SHAPE -> {
                     com.kingzcheung.xime.ui.theme.KeyShapes.current = SettingsPreferences.getKeyShape(this@XimeInputMethodService)
                 }

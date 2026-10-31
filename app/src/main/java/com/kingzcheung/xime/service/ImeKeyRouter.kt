@@ -756,11 +756,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY, false)
                 if (service.rimeEngine.getOption("cyime_mixed_input") != mixed) service.rimeEngine.setOption("cyime_mixed_input", mixed)
             }
-            // 繁体输出（默认关）：同上，按键前补设 traditionalization；九键数字键也走这里。
+            // 繁体输出（默认关）：同上，按键前补设 traditionalization（仓颉是 simplification）；九键数字键也走这里。
+            // 设置一变也会立刻写一次（XimeInputMethodService 的设置监听），这里兜住会话重建。
             if (key.length == 1 && key[0].isLetterOrDigit()) {
-                val traditional = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
-                if (service.rimeEngine.getOption("traditionalization") != traditional) service.rimeEngine.setOption("traditionalization", traditional)
+                service.sessionController.applyTraditionalOutput()
                 // 时间日期候选（默认关）：同上；选项是反的，会话重建清零后仍是开。
                 val datetimeOff = !com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false)
@@ -777,9 +776,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val rare = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY, false)
                 if (service.rimeEngine.getOption("cyime_rare_chars") != rare) service.rimeEngine.setOption("cyime_rare_chars", rare)
-                // 仓颉码表本身是繁体，反过来：simplification 开着时转简体。
-                if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE &&
-                    service.rimeEngine.getOption("simplification") == traditional) service.rimeEngine.setOption("simplification", !traditional)
             }
             if (service.japaneseInputController.handleKey(key)) return@command
             val state = service.uiState.value
