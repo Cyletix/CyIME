@@ -129,6 +129,33 @@ class EditorInfoClassifierTest {
         )
     }
 
+    // ── isTerminalEditor ──
+
+    @Test
+    fun `TYPE_NULL是终端`() {
+        assertTrue(EditorInfoClassifier.isTerminalEditor(editorInfo(InputType.TYPE_NULL)))
+    }
+
+    @Test
+    fun `Termux按字符输入不带类别位也是终端且受限`() {
+        // Termux「enforce-char-based-input」写的 inputType：VISIBLE_PASSWORD | NO_SUGGESTIONS，没有 TYPE_CLASS_TEXT。
+        val termux = editorInfo(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
+        assertTrue(EditorInfoClassifier.isTerminalEditor(termux))
+        assertTrue(EditorInfoClassifier.isRestrictedEditor(termux))
+        assertTrue(EditorInfoClassifier.isSecretEditor(termux))
+        assertFalse(EditorInfoClassifier.isNumberEditor(termux))
+    }
+
+    @Test
+    fun `带类别位的文本框和密码框都不是终端`() {
+        assertFalse(EditorInfoClassifier.isTerminalEditor(null))
+        assertFalse(EditorInfoClassifier.isTerminalEditor(editorInfo(InputType.TYPE_CLASS_TEXT)))
+        assertFalse(EditorInfoClassifier.isTerminalEditor(editorInfo(
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)))
+        assertFalse(EditorInfoClassifier.isTerminalEditor(editorInfo(InputType.TYPE_CLASS_NUMBER)))
+        assertFalse(EditorInfoClassifier.isTerminalEditor(editorInfo(InputType.TYPE_CLASS_PHONE)))
+    }
+
     @Test
     fun `TYPE_NULL算秘密框`() {
         assertTrue(EditorInfoClassifier.isSecretEditor(editorInfo(InputType.TYPE_NULL)))

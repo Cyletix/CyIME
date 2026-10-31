@@ -376,7 +376,8 @@ class VoiceRecognitionHandler(
             ic.setComposingText("", 1); ic.finishComposingText()
         }
         if (ic != null && cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：")) {
-            commitFinal(ic, cleanText, lastPartialText)
+            // 终端里临时结果没写进去（见 handlePartialResult），整句按新文字上屏。
+            commitFinal(ic, cleanText, if (TerminalEditor.active) "" else lastPartialText)
         }
         lastPartialText = ""
 
@@ -437,7 +438,8 @@ class VoiceRecognitionHandler(
         if (ic != null) {
             if (toolbarSession) {
                 updateToolbarText(ic, cleanText)
-            } else {
+            } else if (!TerminalEditor.active) {
+                // 终端收到组合区文字就直接发出去，之后每次改写都会再发一遍：临时结果只显示在键盘上。
                 onComposingWritten()
                 ic.setComposingText(cleanText, 1)
             }

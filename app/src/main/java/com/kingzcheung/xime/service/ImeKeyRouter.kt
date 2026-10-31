@@ -1657,7 +1657,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         val removed = service.t9PartialSegments.rollbackPartialSegments(1)
                         withEditor {
                             if (owner != service.uiState.value.inputSessionId) return@withEditor
-                            if (SettingsPreferences.getInputTextLocation(service)
+                            if (TerminalEditor.inputTextLocation(service)
                                 == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                                 service.endComposingInputBox()
                             }
@@ -1977,7 +1977,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             hasPrevPage = false,
             candidateFocus = null
         )
-        if (SettingsPreferences.getInputTextLocation(service) ==
+        if (TerminalEditor.inputTextLocation(service) ==
             SettingsPreferences.INPUT_TEXT_INPUT_BOX
         ) {
             withEditor { service.endComposingInputBox() }

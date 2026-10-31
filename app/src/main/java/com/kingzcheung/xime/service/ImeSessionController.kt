@@ -33,7 +33,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     ) {
         if (suppressFieldComposition()) return
         val inputText = composition.input
-        val codeInInputBox = SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX
+        val codeInInputBox = TerminalEditor.inputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX
         // 日语罗马音显示归一化：末尾未拼完的字母按按下的键显示（与 updateUIWithResult 同一出口规则）
         val preeditText = service.japaneseInputController.normalizePreedit(inputText, composition.preedit)
         val candidatesWithComments = composition.candidates.toList()
@@ -179,7 +179,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
 
     /** 九键「下一项」换了高亮：输入框模式里的编码跟着换成高亮候选的拼音。 */
     internal fun refreshInputBoxComposition() {
-        if (SettingsPreferences.getInputTextLocation(service) != SettingsPreferences.INPUT_TEXT_INPUT_BOX ||
+        if (TerminalEditor.inputTextLocation(service) != SettingsPreferences.INPUT_TEXT_INPUT_BOX ||
             service.uiState.value.toolPanelInputFocused) return
         val state = service.candidateState.value
         val text = state.shownPreedit(service.uiState.value.inputProfile)
@@ -311,7 +311,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
 
         if (updateInputBoxComposition &&
-            SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
+            TerminalEditor.inputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {
                 showInputBoxComposition(ic, displayText)

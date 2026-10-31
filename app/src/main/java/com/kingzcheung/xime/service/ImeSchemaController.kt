@@ -391,7 +391,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     return@withContext
                 }
                 val preserveComposition = finishComposition &&
-                    SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
+                    TerminalEditor.inputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
                     service.candidateState.value.isComposing
                 if (preserveComposition) {
                     service.finishComposingInputBoxKeepingText()
@@ -409,6 +409,11 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
      */
     internal fun moveEditorCursorVertical(steps: Int, selecting: Boolean = false) =
         editCursor(preeditKey = "preedit_cursor:${if (steps < 0) "start" else "end"}") { connection ->
+            if (service.isTerminalEditor()) {
+                // 终端里上下键就是翻命令历史，原样发出去。
+                TerminalEditor.sendKeys(connection, if (steps < 0) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN, abs(steps))
+                return@editCursor
+            }
             val multiLine = editorIsMultiLine()
             repeat(abs(steps).coerceAtMost(1000)) {
                 if (!editorCursor.moveLine(connection, steps.sign, selecting, multiLine)) return@editCursor
@@ -427,12 +432,18 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             internalEditor?.let(::internalConnectionFor) ?: return
         } else service.currentInputConnection ?: return
         if (internalEditor != null) editorCursor.observeSelection(ic, internalEditor.selectionStart, internalEditor.selectionEnd)
+        // 终端读不到文字，下面的文内移动永远原地不动；方向键连同 Shift/Ctrl 交给终端自己处理。
+        if (!target.isInternal && service.isTerminalEditor()) return TerminalEditor.forward(ic, event)
         editorCursor.movePhysical(ic, event.keyCode, event.isShiftPressed,
             byWord = event.isCtrlPressed, toBoundary = event.isAltPressed || event.isMetaPressed)
     }
 
     internal fun moveEditorCursor(steps: Int, selecting: Boolean = false, onStep: () -> Unit = {}) =
-        editCursor(preeditKey = "preedit_cursor:$steps") { editorCursor.moveWithFeedback(it, steps, selecting, onStep) }
+        editCursor(preeditKey = "preedit_cursor:$steps") {
+            if (service.isTerminalEditor()) TerminalEditor.sendKeys(it,
+                if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT, abs(steps), onStep)
+            else editorCursor.moveWithFeedback(it, steps, selecting, onStep)
+        }
 
     /** 已在按键队列中，不能再次排队，否则长按方向键会积压到后续操作之后。 */
     internal suspend fun moveJapaneseCursorFromKeyQueue(steps: Int) {
@@ -449,6 +460,17 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     // 以前全选/复制/剪切/粘贴/撤销直接作用于当前连接，排在前面的扩选还没执行就剪了旧选区）。
     internal fun handleToolbarEditingAction(action: String) {
         if (service.currentInputConnection == null) return
+        if (service.isTerminalEditor()) {
+            val key = TerminalEditor.keyForEditingAction(action)
+            when {
+                key != null -> editCursor { TerminalEditor.sendKeys(it, key) }
+                action == "paste" -> editCursor { service.pasteIntoTerminal() }
+                // 复制交给宿主：有自己选区的终端会处理，不处理也不出错。撤销（Ctrl+Z 会挂起前台程序）、
+                // 剪切、全选和选择模式在终端里没有意义，不发任何东西。
+                action == "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
+            }
+            return
+        }
         when (action) {
             "undo", "redo" -> editCursor { service.sendUndoShortcut(it, redo = action == "redo") }
             "select_all" -> editCursor { it.performContextMenuAction(android.R.id.selectAll) }

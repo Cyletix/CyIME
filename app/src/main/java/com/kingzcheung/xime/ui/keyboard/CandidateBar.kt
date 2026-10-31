@@ -249,7 +249,8 @@ fun CandidateBar(
     }
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     val commentsAllowed = rememberCandidateCommentsAllowed()
-    val inputTextLocation = SettingsPreferences.getInputTextLocation(context)
+    // 终端里编码一律显示在候选栏（见 TerminalEditor）。
+    val inputTextLocation = com.kingzcheung.xime.service.TerminalEditor.inputTextLocation(context)
     val showInputBoxStyle = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX
     val candidateTextSize = rememberCandidateTextSize()
     val candidateFontFamily = AppFonts.candidateFontFamily
