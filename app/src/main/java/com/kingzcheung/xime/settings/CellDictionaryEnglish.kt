@@ -69,15 +69,29 @@ object CellDictionaryEnglish {
         |  enable_sentence: false
         |""".trimMargin()
 
-    /** Patch lines adding the table to a schema (inside CellDictionaryRime's marked block). */
-    fun patchLines(kind: Kind): List<String> = listOf(
-        "\"schema/dependencies/+\": [\"${kind.dictionary}\"]",
-        // Rime elects among translations pairwise in list order, so on nine keys the table must sit before
-        // the bundled English (t9_english, last); appended after it, its words came only after every Chinese one.
-        if (kind == Kind.T9) "\"engine/translators/@before last\": \"${kind.translator}@$NAMESPACE\""
-        else "\"engine/translators/+\": [\"${kind.translator}@$NAMESPACE\"]",
-        "$NAMESPACE: {dictionary: ${kind.dictionary}, ${kind.options}}",
-    )
+    /**
+     * Patch lines adding the table to a schema (inside CellDictionaryRime's marked block); null when the
+     * schema's own patch already uses every key a line could take. A YAML map cannot hold the same key twice,
+     * so a list another patch already appends to with `/+` (CyIME's own custom-phrase translator does) gets
+     * this table through `/@next` instead.
+     */
+    fun patchLines(kind: Kind, taken: (String) -> Boolean = { false }): List<String>? {
+        fun append(list: String, item: String) = when {
+            !taken("$list/+") -> "\"$list/+\": [\"$item\"]"
+            !taken("$list/@next") -> "\"$list/@next\": \"$item\""
+            else -> null
+        }
+        val translator = "${kind.translator}@$NAMESPACE"
+        val lines = listOf(
+            append("schema/dependencies", kind.dictionary),
+            // Rime elects among translations pairwise in list order, so on nine keys the table must sit before
+            // the bundled English (t9_english, last); appended after it, its words came only after every Chinese one.
+            if (kind == Kind.T9) "\"engine/translators/@before last\": \"$translator\"".takeUnless { taken("engine/translators/@before last") }
+            else append("engine/translators", translator),
+            "$NAMESPACE: {dictionary: ${kind.dictionary}, ${kind.options}}".takeUnless { taken(NAMESPACE) },
+        )
+        return if (null in lines) null else lines.filterNotNull()
+    }
 
     fun isDependency(schemaId: String): Boolean = Kind.entries.any { it.dictionary == schemaId }
 }

@@ -39,9 +39,8 @@ object CellDictionaryRime {
         require(map?.node("translator/packs/+") == null && map?.node("translator/packs/@next") == null) {
             "方案已自定义追加词库，暂不能自动合并；原配置已保留"
         }
-        require(english == null || listOf("schema/dependencies/+", "engine/translators/+", "engine/translators/@before last",
-            CellDictionaryEnglish.NAMESPACE)
-            .none { map?.node(it) != null }) { "方案已自定义追加翻译器，暂不能自动合并英文词；原配置已保留" }
+        val englishLines = english?.let { kind -> CellDictionaryEnglish.patchLines(kind) { map?.node(it) != null } }
+        require(english == null || englishLines != null) { "方案已自定义追加翻译器，暂不能自动合并英文词；原配置已保留" }
         // Reject flow maps/aliases instead of rewriting third-party YAML and losing its semantics.
         val line = Regex("(?m)^patch:[ \\t]*(?:#[^\\r\\n]*)?(?:\\r?\\n|$)").find(source)
         require(line != null || patchNode == null) { "暂不支持此方案的 patch 写法；原配置已保留" }
@@ -51,7 +50,7 @@ object CellDictionaryRime {
             Regex("(?m)^([ ]+)\\S").find(following)?.groupValues?.get(1) ?: "  "
         } else "  "
         // user_* also satisfies the legacy T9 pack validator; the file already exists before deployment.
-        val lines = listOf("\"translator/packs/+\": [\"$pack\"]") + english?.let(CellDictionaryEnglish::patchLines).orEmpty()
+        val lines = listOf("\"translator/packs/+\": [\"$pack\"]") + englishLines.orEmpty()
         val block = "$indentation$START$newline" + lines.joinToString("") { "$indentation$it$newline" } + "$indentation$END$newline"
         val output = if (line == null) {
             val withoutEnd = source.trimEnd().removeSuffix("...").trimEnd()

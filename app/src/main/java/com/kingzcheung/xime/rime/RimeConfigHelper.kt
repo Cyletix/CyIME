@@ -220,7 +220,13 @@ object RimeConfigHelper {
         } catch (e: Exception) {
             FileLogger.e(TAG, "Failed to sync built-in cell dictionaries", e)
         }
-        if (restoreCellDictionaries) com.kingzcheung.xime.settings.CellDictionaryManager.prepare(context)
+        // 分类词库合不进某个方案（比如方案自定义文件写法不支持）时，prepare 一个文件都不写、原样保留上次的配置；
+        // 这是配置问题，重试也不会好，不能因此卡住整个键盘。「导入的词库」页点「应用更改」时仍会显示原因。
+        if (restoreCellDictionaries) try {
+            com.kingzcheung.xime.settings.CellDictionaryManager.prepare(context)
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "Cell dictionaries not merged, previous config kept: ${e.message}")
+        }
         // 内置资源发生替换时已失效旧编译缓存；其它配置变动仍由 ensureDeployment 增量处理。
 
         Pair(rimeDir.absolutePath, rimeDir.absolutePath)
