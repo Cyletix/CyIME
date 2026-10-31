@@ -79,6 +79,22 @@ class WholeSessionRereadTest {
         assertTrue(engine.reread.isEmpty())
     }
 
+    @Test fun `a quiet room with no speech region commits nothing and is not re-read`() {
+        // 2026-10-31 tablet: about 2 s of room noise, SenseVoice alone re-read it and committed 「我。」.
+        for (streaming in listOf(false, true)) {
+            val engine = object : Engine() {
+                override val hasRefinement = streaming
+                override val isStreaming = streaming
+                override fun refinePunctuated(samples: FloatArray): String { reread.add(samples.size); return "我。" }
+            }
+            val output = java.util.Collections.synchronizedList(mutableListOf<String>())
+            val s = LocalSpeechSession(engine, { output.add(it) }, {}, wholeSentence = true)
+            s.acceptPcm(pcm(32000, quiet))
+            assertEquals("", s.finish())
+            assertTrue(engine.reread.isEmpty()); assertFalse(output.contains("我。"))
+        }
+    }
+
     @Test fun `switch off or no second pass never re-reads`() {
         val off = Engine()
         LocalSpeechSession(off, {}, {}).apply { acceptPcm(pcm(16000, loud)); finish() }
