@@ -740,6 +740,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 SettingsPreferences.KEY_KEY_SHAPE -> {
                     com.kingzcheung.xime.ui.theme.KeyShapes.current = SettingsPreferences.getKeyShape(this@XimeInputMethodService)
                 }
+                // 卡片顶角由 Compose 跟着改；模糊窗的圆角要在这里重新配一次。
+                SettingsPreferences.KEY_ROUNDED_KEYBOARD_TOP -> updateKeyboardGlass()
                 SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
                     com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this@XimeInputMethodService)
                     loadDarkModePreference()
