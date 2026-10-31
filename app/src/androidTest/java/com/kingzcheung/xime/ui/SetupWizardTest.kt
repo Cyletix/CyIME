@@ -52,4 +52,17 @@ class SetupWizardTest {
         rule.onNodeWithText("完成三项后即可开始使用").assertIsNotEnabled()
         rule.onNodeWithText("✓ 设置成功，可以开始输入了").assertDoesNotExist()
     }
+    @Test fun pickerFallbackOpensSystemSettingsAndKeepsPickerAsSecondary() {
+        var settings = 0
+        var picker = 0
+        rule.setContent { MaterialTheme {
+            SetupWizardContent(SetupStatus(imeEnabled = true, preparing = false, schemas = listOf("中文九键")),
+                {}, {}, {}, { picker++ }, {}, pickerFallbackHint = "vivo 提示", onOpenImeSettings = { settings++ })
+        } }
+        rule.onNodeWithText("vivo 提示").assertExists()
+        rule.onNodeWithText("去系统设置选择 CyIME").performScrollTo().assertIsEnabled().performClick()
+        rule.onNodeWithText("仍用输入法选择框").performScrollTo().performClick()
+        assertEquals(1, settings)
+        assertEquals(1, picker)
+    }
 }
