@@ -103,6 +103,8 @@ internal class LocalSpeechSession(
     private var sessionSamples = 0
     private var sessionOverflow = false
     private val sessionPauses = mutableListOf<Int>()
+    /** VAD 至少打开过一段。一段都没有就是没说话：整段重识别不跑，SenseVoice 在近乎静音上会编出「我。」。 */
+    @Volatile private var heardSpeech = false
     // The re-read runs on the finishing thread after both workers stop: a successor must wait for
     // it (awaitIdle) before resetting or reusing the engine. Released by finish or cancel.
     private val wholeLock = Any()
@@ -184,6 +186,7 @@ internal class LocalSpeechSession(
 
     private fun endRegion(id: Long, samples: FloatArray, boundary: SpeechBoundary) {
         synchronized(outputLock) { ended[id] = boundary }
+        heardSpeech = true
         // The region ends inside the current capture chunk, after at least 1 s of quiet.
         if (wholeSentenceActive && boundary == SpeechBoundary.PAUSE) sessionPauses.add(sessionSamples)
         onRegion(id, samples.size, boundary)
@@ -240,7 +243,7 @@ internal class LocalSpeechSession(
      * 完成后运行（同一线程独占识别器）；被取消、超出预算、出现外文字或识别为空时返回 null，保留原文。
      */
     private fun wholeSessionText(deadline: Long): String? = synchronized(wholeLock) {
-        if (abandoned.get() || sessionOverflow || sessionSamples == 0) return null
+        if (abandoned.get() || sessionOverflow || sessionSamples == 0 || !heardSpeech) return null
         val pcm = FloatArray(sessionSamples)
         var offset = 0
         sessionAudio.forEach { it.copyInto(pcm, offset); offset += it.size }
