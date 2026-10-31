@@ -62,6 +62,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.model.ModelCategory
 import com.kingzcheung.xime.model.ModelManager
+import androidx.compose.ui.res.stringResource
+import com.kingzcheung.xime.R
+import com.kingzcheung.xime.model.DeviceModelProfiles
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.viewmodel.SmartPredictionSettingsViewModel
 
@@ -257,7 +260,7 @@ fun SmartPredictionSettingsContent(
 
             if (predictionModels.isNotEmpty()) {
                 item { Column {
-                    SettingsSection(title = "选择模型", content = {
+                    SettingsSection(title = stringResource(R.string.section_choose_model), searchKey = "选择模型", content = {
                         predictionModels.forEach { model ->
                             PredictionModelCard(
                                 modelInfo = model,
@@ -278,7 +281,7 @@ fun SmartPredictionSettingsContent(
                         }
                     })
                     // 有人看不懂 base / small（用户 10-31 转述）：直接说该选哪个。
-                    SettingsNote("怎么选：大多数手机选「完整」，联想更准；内存 4 GB 以下或空间不够选「轻量」，只有一半大。两个只用装一个，都很快。")
+                    SettingsNote(stringResource(R.string.model_prediction_choose_note))
                 } }
             }
 
@@ -386,7 +389,12 @@ private fun PredictionModelCard(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = modelInfo.name,
+                // 联想两档的名字随界面语言；其他模型（商店里来的）仍用目录里的中文名。
+                text = when (modelInfo.id) {
+                    DeviceModelProfiles.BASE -> stringResource(R.string.model_prediction_base_name)
+                    DeviceModelProfiles.SMALL -> stringResource(R.string.model_prediction_small_name)
+                    else -> modelInfo.name
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -411,7 +419,7 @@ private fun PredictionModelCard(
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ) {
                     Text(
-                        text = if (isDownloaded) "已下载" else "未下载",
+                        text = stringResource(if (isDownloaded) R.string.model_downloaded else R.string.model_not_downloaded),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isDownloaded) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -442,7 +450,7 @@ private fun PredictionModelCard(
                     )
                     Spacer(Modifier.width(4.dp))
                 }
-                Text(if (isSelected) "使用中" else "使用")
+                Text(stringResource(if (isSelected) R.string.model_in_use else R.string.model_use))
             }
         } else {
             Spacer(modifier = Modifier.width(8.dp))
@@ -456,7 +464,7 @@ private fun PredictionModelCard(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.width(4.dp))
-                Text("去商店")
+                Text(stringResource(R.string.model_go_to_store))
             }
         }
     }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 13 起系统设置 › 应用 › CyIME › 语言 里能选的界面语言；和应用里「界面语言」是同一个值（AppLanguages）。 -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh-CN" />
+    <locale android:name="zh-TW" />
+    <locale android:name="en" />
+    <locale android:name="ja" />
+</locale-config>

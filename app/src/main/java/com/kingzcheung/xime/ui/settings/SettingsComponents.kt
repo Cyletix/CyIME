@@ -63,6 +63,8 @@ import com.kingzcheung.xime.ui.keyboard.legibleForTheme
 @Composable
 fun SettingsSection(
     title: String,
+    /** 设置搜索跳转用的定位名；标题随界面语言翻译时传中文原名，搜索仍能找到这里。 */
+    searchKey: String = title,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column {
@@ -78,7 +80,7 @@ fun SettingsSection(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shadowElevation = 0.dp
         ) {
-            Column(Modifier.settingsSearchAnchor(title)
+            Column(Modifier.settingsSearchAnchor(searchKey)
                 .visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), content = content)
         }
     }
@@ -147,10 +149,12 @@ fun SettingsItem(
     /** 右侧状态小字，如「已设置」「未连接」或当前主题名；[statusTone] 决定颜色。 */
     status: String? = null,
     statusTone: SettingsStatusTone = SettingsStatusTone.NEUTRAL,
+    /** 搜索定位和测试标签用的名字，见 [SettingsSection]。 */
+    searchKey: String = title,
 ) {
     Row(
         modifier = Modifier
-            .settingsSearchAnchor(title)
+            .settingsSearchAnchor(searchKey)
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(16.dp),
@@ -187,7 +191,7 @@ fun SettingsItem(
         if (status != null) {
             Spacer(Modifier.width(12.dp))
             Text(status, style = MaterialTheme.typography.labelMedium, color = statusTone.color(),
-                maxLines = 1, modifier = Modifier.testTag("settings-status:$title"))
+                maxLines = 1, modifier = Modifier.testTag("settings-status:$searchKey"))
         }
         if (showArrow) {
             Icon(
@@ -223,11 +227,13 @@ fun SettingsToggleItem(
     showArrow: Boolean = false,
     /** 被别的设置锁住时的原因（如「已被『角标输入方式：长按』锁定」）：开关置灰不可点，并在说明下显示这句。 */
     lockMessage: String? = null,
+    /** 搜索定位用的名字，见 [SettingsSection]。 */
+    searchKey: String = title,
 ) {
     val locked = lockMessage != null
     Row(
         modifier = Modifier
-            .settingsSearchAnchor(title)
+            .settingsSearchAnchor(searchKey)
             .fillMaxWidth()
             .then(
                 if (locked) Modifier

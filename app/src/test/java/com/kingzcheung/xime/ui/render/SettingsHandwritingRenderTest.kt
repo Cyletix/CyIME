@@ -42,7 +42,7 @@ import java.io.File
  * 只在设置了环境变量 CYIME_RENDER_OUT=<目录> 时出图（平时跳过，不进普通单测）。
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w7920dp-h2000dp-mdpi")
+@Config(sdk = [34], application = android.app.Application::class, qualifiers = "zh-rCN-w7920dp-h2000dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsHandwritingRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
