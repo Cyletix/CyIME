@@ -92,6 +92,23 @@ class SettingsRoundTripTest {
             splitGapLandscape = changed.splitGapLandscape, sideSymbols = changed.sideSymbols))
     }
 
+    /**
+     * 新装横竖屏都默认固定（用户 10-31），但用户自己切成悬浮后，下次弹出键盘、转回这个方向都还是悬浮，
+     * 位置、宽度、旋转角也原样；横竖屏各存一份，改一个方向不动另一个。
+     */
+    @Test fun floatingChoiceAndPositionStayPerOrientation() {
+        for (landscape in listOf(false, true)) assertEquals(false, S.isFloatingMode(context, landscape))
+        S.setFloatingMode(context, true, true)
+        S.setFloatingOffsetX(context, -37, true); S.setFloatingOffsetY(context, 120, true)
+        S.setFloatingWidthDp(context, 300, true); S.setFloatingRotation(context, 12f, true)
+        S.setFloatingOffsetX(context, 5, false); S.setFloatingOffsetY(context, 40, false)
+        assertEquals(listOf<Any>(true, -37, 120, 300, 12f), listOf<Any>(S.isFloatingMode(context, true),
+            S.getFloatingOffsetX(context, true), S.getFloatingOffsetY(context, true),
+            S.getFloatingWidthDp(context, true), S.getFloatingRotation(context, true)))
+        assertEquals(listOf<Any>(false, 5, 40, 0), listOf<Any>(S.isFloatingMode(context, false),
+            S.getFloatingOffsetX(context, false), S.getFloatingOffsetY(context, false), S.getFloatingWidthDp(context, false)))
+    }
+
     /** 剪贴板同步页显示的插件 = 后台实际在用的插件：偏好不可用或没选时都是第一个已启用的。 */
     @Test fun clipboardSyncShowsThePluginTheServiceUses() {
         val available = listOf("a" to 1, "b" to 2)
