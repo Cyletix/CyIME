@@ -5,9 +5,11 @@ import com.kingzcheung.xime.speech.SpeechModelCatalog
 /** 语音输入打算怎么用：向导里的三个选项，说法面向不懂模型名的人。 */
 enum class VoiceUse { OFTEN, SOMETIMES, NEVER }
 
-/** 一台手机在向导眼里的样子；大小都是字节，读不到的为 null。 */
+/** 一台设备在向导眼里的样子；大小都是字节，读不到的为 null。 */
 data class SetupFacts(
     val tier: DeviceModelTier,
+    /** 给人看的设备叫法：「手机」或「平板」。 */
+    val device: String = "手机",
     val memoryBytes: Long? = null,
     val cores: Int? = null,
     val maxCpuKHz: Long? = null,
@@ -134,8 +136,8 @@ object SetupGuidePlanner {
         var xasr = streaming && answers.voice == VoiceUse.OFTEN && facts.tier == DeviceModelTier.ENHANCED &&
             (free == null || free >= XASR_FREE)
         if (answers.voice == VoiceUse.OFTEN && !streaming) notes += when {
-            light -> "这台手机${memoryText(facts.memoryBytes)}，边说边出字要同时跑两个语音模型，容易卡，先用「说完一句出字」。"
-            else -> "手机剩余空间不到 3 GB，先用「说完一句出字」，少占 226 MB。"
+            light -> "这台${facts.device}${memoryText(facts.memoryBytes)}，边说边出字要同时跑两个语音模型，容易卡，先用「说完一句出字」。"
+            else -> "${facts.device}剩余空间不到 3 GB，先用「说完一句出字」，少占 226 MB。"
         }
 
         // 九键词组：完整 203 MB，精简 105 MB（首选约低 3 个百分点）。已经有哪一档就留哪一档。
@@ -181,7 +183,7 @@ object SetupGuidePlanner {
                 if (free - downloadBytes() >= RESERVE_AFTER_DOWNLOAD) break
                 if (step()) downgraded = true
             }
-            if (downgraded) notes += "手机剩余空间只有 ${gbText(free)}，选了更省空间的搭配。"
+            if (downgraded) notes += "${facts.device}剩余空间只有 ${gbText(free)}，选了更省空间的搭配。"
         }
 
         val keepIds = needed()
@@ -207,7 +209,7 @@ object SetupGuidePlanner {
             facts.metered -> notes += "现在用的是移动数据，要下载的 ${mbText(download)} 会等连上 Wi-Fi 再下。"
         }
         if (facts.inPackage.isNotEmpty() && remove.isNotEmpty()) {
-            notes += "安装包本身占的空间由系统管理，单独删不掉；这里删的是解压到手机里的那一份。以后要用，直接从安装包取回，不用联网。"
+            notes += "安装包本身占的空间由系统管理，单独删不掉；这里删的是解压到${facts.device}里的那一份。以后要用，直接从安装包取回，不用联网。"
         }
         val voiceMode = when {
             answers.voice == VoiceUse.NEVER -> null
@@ -225,10 +227,10 @@ object SetupGuidePlanner {
         }
         SpeechModelCatalog.PARAFORMER -> if (answers.voice == VoiceUse.OFTEN) "说话时字就跟着出来，不用等说完。"
             else "字幕边听边出字，看的人跟得上。"
-        SpeechModelCatalog.XASR -> "说完后把整句中文再认一遍，比上面更准；这台手机性能够、空间也够。"
+        SpeechModelCatalog.XASR -> "说完后把整句中文再认一遍，比上面更准；这台${facts.device}性能够、空间也够。"
         SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA -> "你已经给日语选了它，保留。"
         BuiltinModelCatalog.SPEAKER_MODEL -> "字幕里分清是谁在说话。"
-        DeviceModelProfiles.BASE -> "联想下一个词更准，这台手机跑得动。"
+        DeviceModelProfiles.BASE -> "联想下一个词更准，这台${facts.device}跑得动。"
         DeviceModelProfiles.SMALL -> if (facts.tier == DeviceModelTier.LIGHT) "省内存，联想照样能用。" else "省空间，联想照样能用。"
         CandidateModelCatalog.NGRAM -> "九键按整句常用说法组词，长句一次打对的更多。"
         CandidateModelCatalog.NGRAM_SMALL -> "九键按整句组词；比完整版小一半，首选略差一点。"
@@ -243,7 +245,7 @@ object SetupGuidePlanner {
             else "用「说完一句出字」就够了，用不到它。"
         SpeechModelCatalog.XASR -> when {
             answers.voice == VoiceUse.NEVER && !answers.caption -> "不用语音，也不用字幕。"
-            streaming -> "整句精修说完要多跑一个模型，这台手机先不用。"
+            streaming -> "整句精修说完要多跑一个模型，这台${facts.device}先不用。"
             else -> "只在边说边出字时才用到。"
         }
         SpeechModelCatalog.ZIPFORMER -> if (answers.voice == VoiceUse.NEVER && !answers.caption) "不用语音，也不用字幕。"

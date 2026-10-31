@@ -126,4 +126,19 @@ class SetupGuidePlanTest {
             assertFalse(item.title, Regex("Paraformer|Zipformer|SenseVoice|X-ASR").containsMatchIn(item.title + item.reason))
         }
     }
+
+    @Test fun tabletIsCalledATablet() {
+        // 平板上不能写「这台手机」（10-31 平板新装走查）。各种机型、空间、用法都过一遍，所有给人看的文字只说平板。
+        val all = SetupGuidePlanner.managedIds.toSet()
+        for (tier in DeviceModelTier.entries) for (free in listOf(50 * gb, 2 * gb, 500 * mb)) for (voice in VoiceUse.entries) {
+            val bundled = setOf(SpeechModelCatalog.SENSEVOICE, DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL, CandidateModelCatalog.NGRAM)
+            val plan = SetupGuidePlanner.plan(facts(tier, free = free, installed = all - CandidateModelCatalog.NGRAM, inPackage = bundled)
+                .copy(device = "平板"), SetupAnswers(voice, t9 = true, caption = false))
+            val text = (plan.keep + plan.remove).flatMap { listOf(it.title, it.reason) } + plan.notes
+            text.forEach { assertFalse(it, "手机" in it) }
+        }
+        val light = SetupGuidePlanner.plan(facts(DeviceModelTier.LIGHT).copy(device = "平板"),
+            SetupAnswers(VoiceUse.OFTEN, t9 = false, caption = false))
+        assertTrue(light.notes.toString(), light.notes.any { "这台平板" in it })
+    }
 }
