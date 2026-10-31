@@ -264,8 +264,11 @@ object SetupGuide {
             runCatching { DoublePinyinSchemes.setEnabled(app, id, true) }.onFailure { failed += "双拼没打开：${it.message}" }
         }
         // 和双拼方案页的开关是同一个设置，正在显示的键盘监听它，马上生效。
+        // 键位提示和上下角标提示互锁（InputGestureLocks）：同一次写入一起关掉两个角标提示。
         if (input.keyHintsOn) SettingsPreferences.getPrefsPublic(app).edit()
-            .putBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, true).apply()
+            .putBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, true)
+            .putBoolean(SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, false)
+            .putBoolean(SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED, false).apply()
         if (redeploy) {
             // 与「已安装的方案」里「应用方案更改」同一步。
             val deployed = runCatching {

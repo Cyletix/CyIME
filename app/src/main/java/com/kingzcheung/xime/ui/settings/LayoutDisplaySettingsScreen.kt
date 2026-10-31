@@ -171,7 +171,9 @@ private fun LayoutDisplayPage(
                     SettingsToggleItem(Icons.TwoTone.ViewWeek, "合并键均匀排布",
                         "14 键和自己排的合并键布局（如 17、18、20 键）里，合并键只比单字母键宽三分之一，单字母键跟着变宽，" +
                             "每排更匀，小屏上好按。关闭时合并键严格占两个 26 键的位置。分体键盘不变。",
-                        checked = evenMerged, onCheckedChange = { SettingsPreferences.setEvenMergedKeysEnabled(context, it) })
+                        checked = evenMerged, onCheckedChange = { SettingsPreferences.setEvenMergedKeysEnabled(context, it) },
+                        // 分体按 26 键中线拆左右，均匀排布在分体时不起作用：置灰并说明，不让它看着开着却没用。
+                        lockMessage = if (split) "分体键盘开着时不起作用，关掉上面的「分体键盘」后可用" else null)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingsItem(Icons.TwoTone.AspectRatio, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
                         "高度、宽度、悬浮与分体、透明度，打开键盘菜单里同一个调节面板",
@@ -579,6 +581,10 @@ internal fun KeyboardAppearanceSettings() {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         InputExperienceSettings(setOf(InputExperiencePart.KEY_TEXT), "按键文字")
                 SettingsSection(title = "角标与气泡", content = {
+                    // 和「双拼键位提示」互锁（InputGestureLocks）：提示写在按键角上，开着时两个角标提示都关着不能开。
+                    val cornerLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(
+                        com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(),
+                        com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.CORNER_HINTS, true)
                     var swipeUpEnabled by remember {
                         mutableStateOf(SettingsPreferences.isSwipeUpHintsEnabled(context))
                     }
@@ -599,9 +605,11 @@ internal fun KeyboardAppearanceSettings() {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (cornerLock != null && !swipeUpEnabled) SettingsLockNote(cornerLock.message)
                         }
                         Switch(
                             checked = swipeUpEnabled,
+                            enabled = cornerLock == null || swipeUpEnabled,
                             onCheckedChange = { newValue ->
                                 swipeUpEnabled = newValue
                                 SettingsPreferences.setSwipeUpHintsEnabled(context, newValue)
@@ -633,9 +641,11 @@ internal fun KeyboardAppearanceSettings() {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (cornerLock != null && !swipeDownEnabled) SettingsLockNote(cornerLock.message)
                         }
                         Switch(
                             checked = swipeDownEnabled,
+                            enabled = cornerLock == null || swipeDownEnabled,
                             onCheckedChange = { newValue ->
                                 swipeDownEnabled = newValue
                                 SettingsPreferences.setSwipeDownHintsEnabled(context, newValue)

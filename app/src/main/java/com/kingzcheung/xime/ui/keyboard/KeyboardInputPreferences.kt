@@ -93,6 +93,12 @@ data class KeyboardInputPreferences(
     /** 双拼 26 键每个键上写出翘舌声母和韵母（双拼键位提示），默认关；见 DoublePinyinKeyHints。 */
     val doublePinyinKeyHints: Boolean = false,
     /**
+     * 上方、下方角标提示（主题与外观 › 角标与气泡）。只读：由 SettingsPreferences 自己保存，[save] 不写；
+     * 放在这里是为了设置互锁（InputGestureLocks：和双拼键位提示占同一块键面）。
+     */
+    val swipeUpHints: Boolean = true,
+    val swipeDownHints: Boolean = true,
+    /**
      * 微软双拼的 ing 放在 Shift 键上（和多数手机输入法一样），默认关：第二排不补分号键、L 在最右边，
      * 打了声母等韵母时左下角的 Shift 键变成 ing；见 KeysConfigHelper.setSemicolonOnShift、[SemicolonShiftKey]。
      */
@@ -208,6 +214,7 @@ data class KeyboardInputPreferences(
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
+                SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 BOTTOM_LIFT_CURSOR_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
@@ -264,6 +271,8 @@ data class KeyboardInputPreferences(
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 doublePinyinCorrection = prefs.getBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, false),
                 doublePinyinKeyHints = prefs.getBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, false),
+                swipeUpHints = SettingsPreferences.isSwipeUpHintsEnabled(context),
+                swipeDownHints = SettingsPreferences.isSwipeDownHintsEnabled(context),
                 doublePinyinSemicolonOnShift = prefs.getBoolean(DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY, false),
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
                 rareCharacters = prefs.getBoolean(RARE_CHARACTERS_KEY, false),

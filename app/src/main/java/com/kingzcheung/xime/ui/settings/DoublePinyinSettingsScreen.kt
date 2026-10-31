@@ -125,14 +125,18 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                 }
                             }
                             // ing 在分号上的方案（微软双拼）：ing 改放 Shift 键，多数手机输入法这样做；所有这类方案共用这一个开关。
+                            // 和「Shift 键分词」互锁：打字时都要占 Shift 键（InputGestureLocks）。
+                            val ingLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(keyboardPrefs, com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.SEMICOLON_ON_SHIFT, true)
+                                ?.takeIf { !keyboardPrefs.doublePinyinSemicolonOnShift }
                             if (scheme.usesSemicolon) Row(verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("ing 放在 Shift 键上", style = MaterialTheme.typography.bodyLarge)
                                     Text("和多数手机输入法一样：不加分号键，L 在第二排最右边；打了声母后左下角的 Shift 键变成 ing",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (ingLock != null) SettingsLockNote(ingLock.message)
                                 }
-                                Switch(keyboardPrefs.doublePinyinSemicolonOnShift, enabled = !busy, colors = settingsSwitchColors(),
+                                Switch(keyboardPrefs.doublePinyinSemicolonOnShift, enabled = !busy && ingLock == null, colors = settingsSwitchColors(),
                                     modifier = Modifier.testTag("double-pinyin-semicolon-on-shift:${scheme.id}"),
                                     onCheckedChange = { keyboardPrefs.copy(doublePinyinSemicolonOnShift = it).save(context) })
                             }
@@ -233,9 +237,13 @@ private fun DoublePinyinKeyHintsSwitch() {
     SettingsSection(title = "键盘上的提示") {
         SettingsToggleItem(Icons.TwoTone.Keyboard, "双拼键位提示",
             "双拼 26 键每个键上写出它代表的 zh、ch、sh 和韵母，和下面的键位图一样，记不住键位时打开。" +
-                "开着时字母键都不画上下角标（Z X C V 的撤销、剪切、复制、粘贴也不写），滑动照常；14 键、九键不显示。",
+                "提示写在按键角上，和上下角标提示不能同时开：先在 主题与外观 › 角标与气泡 关掉两个角标提示；" +
+                "滑动照常出符号。14 键、九键和自己排的合并键布局不显示。",
             checked = saved.doublePinyinKeyHints,
-            onCheckedChange = { saved.copy(doublePinyinKeyHints = it).save(context) })
+            onCheckedChange = { saved.copy(doublePinyinKeyHints = it).save(context) },
+            // 和上下角标提示互锁（InputGestureLocks）；两个都已开着时不锁，关哪个都行。
+            lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(saved, com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true)
+                ?.takeIf { !saved.doublePinyinKeyHints }?.message)
     }
 }
 

@@ -128,7 +128,7 @@ data class InputPlan(
     val downloadWubi: Boolean = false,
     val fuzzyOn: Set<String> = emptySet(),
     val fuzzyOff: Set<String> = emptySet(),
-    /** 打开「双拼键位提示」：从别的打法改成双拼时开，帮刚学的人记键位；本来就用双拼的不动。 */
+    /** 打开「双拼键位提示」：从别的打法改成双拼时开，帮刚学的人记键位；本来就用双拼的不动。和它互锁的上下角标提示同时关掉。 */
     val keyHintsOn: Boolean = false,
     /** 加（true）或去掉（false）桌面「字幕」图标；null 不动。 */
     val captionIcon: Boolean? = null,
@@ -323,7 +323,9 @@ object SetupGuidePlanner {
 
         // 刚改用双拼的人还没记熟键位：打开双拼键位提示（用户 10-31）。本来就用双拼的、已经开着的不动。
         val keyHintsOn = typing == TypingWay.DOUBLE_PINYIN && facts.typing != TypingWay.DOUBLE_PINYIN && !facts.doublePinyinKeyHints
-        if (keyHintsOn) lines += "打开双拼键位提示：双拼 26 键每个键上写出 zh、ch、sh 和韵母，记熟了可以在 语言与方案 › 双拼方案 关掉。"
+        // 键位提示和上下角标提示互锁（写在同一块键面上）：一起关掉角标提示，滑动照常出符号。
+        if (keyHintsOn) lines += "打开双拼键位提示：双拼 26 键每个键上写出 zh、ch、sh 和韵母。它写在按键角上，" +
+            "上下角标提示一并关掉，滑动照常出符号。记熟了可以在 语言与方案 › 双拼方案 关掉提示，再到 主题与外观 › 角标与气泡 打开角标。"
 
         val captionIcon = answers.caption.takeIf { facts.captionIconChangeable && it != facts.usesCaption }
         when (captionIcon) {
