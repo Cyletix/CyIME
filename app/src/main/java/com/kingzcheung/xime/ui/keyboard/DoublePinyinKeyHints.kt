@@ -21,7 +21,8 @@ import com.kingzcheung.xime.settings.DoublePinyinScheme
 /**
  * 双拼键位提示（设置 › 双拼方案，默认关）：双拼 26 键每个字母键上写出这个键代表的翘舌声母和韵母，
  * 内容与双拼方案页的键位图（DoublePinyinKeyMap）同源，都来自 [DoublePinyinScheme.keyLabels]。
- * 开着时这些键不画上下角标（同开着滑行输入时），滑动输入符号照常。
+ * 开着时所有字母键都不画上下角标（没有提示的 a、e 键和 Z X C V 的撤销、剪切、复制、粘贴也一样，见 [hidesCornerLabels]），
+ * 滑动输入符号、ZXCV 快捷操作照常。
  */
 internal data class DoublePinyinKeyHint(
     /** zh/ch/sh，写在右上角（上角标的位置）。 */
@@ -45,6 +46,13 @@ internal fun doublePinyinKeyHints(scheme: DoublePinyinScheme): Map<Char, DoubleP
 /** 这个键的提示：单个字母（或微软双拼的分号）键才有，大小写都认。 */
 internal fun Map<Char, DoublePinyinKeyHint>.forKey(key: String): DoublePinyinKeyHint? =
     key.singleOrNull()?.lowercaseChar()?.let(::get)
+
+/**
+ * 开着键位提示时这个键不画上下角标：所有字母键（和微软双拼的分号键）一样，不管键上有没有提示。
+ * 只有一部分键藏角标时，a、e 还留着角标、别的键没有，看着像漏了（用户 10-31 走查）。
+ */
+internal fun Map<Char, DoublePinyinKeyHint>.hidesCornerLabels(key: String): Boolean =
+    key.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' || it in this } == true
 
 /** 字母下面的韵母排成几行、多大字号；[heightDp] 是这几行连同底边距占的高度。 */
 internal data class DoublePinyinFinalsLayout(val lines: List<String>, val fontSp: Float, val heightDp: Float)

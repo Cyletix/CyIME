@@ -37,6 +37,15 @@ class DoublePinyinKeyHintsTest {
         assertNull(flypy.forKey("，"))
     }
 
+    @Test fun everyLetterKeyHidesCornerLabelsEvenWithoutAHint() {
+        // 一条规则：开着键位提示时字母键都不画角标，a、e 没有提示也一样；Z X C V 的编辑角标同样不画。
+        for (key in listOf("a", "e", "E", "v", "z", "x", "c")) assertTrue(key, flypy.hidesCornerLabels(key))
+        // 功能键、标点、数字照常画。
+        for (key in listOf("qw", "，", "1", ";")) assertFalse(key, flypy.hidesCornerLabels(key))
+        // 微软双拼的分号键代表 ing，按字母键算。
+        assertTrue(doublePinyinKeyHints(DoublePinyinScheme.BUILTINS.single { it.usesSemicolon }).hidesCornerLabels(";"))
+    }
+
     @Test fun finalsFitOnOneLineUnlessTheyWouldShrinkTooMuch() {
         // 手机竖屏一个字母键约 34×46 dp，韵母区占键高的 42%。
         val short = fitDoublePinyinFinals(listOf("uo"), 28f, 46f * 0.42f, 10f, 1f)!!
