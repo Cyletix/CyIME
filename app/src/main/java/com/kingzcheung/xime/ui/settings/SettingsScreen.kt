@@ -277,6 +277,7 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToPrivacy = { navController.navigate(SettingsRoutes.Privacy) },
                 onNavigateToLicenses = { navController.navigate(SettingsRoutes.Licenses) },
+                onNavigateToCredits = { navController.navigate(SettingsRoutes.Credits) },
                 onNavigateToLogViewer = { navController.navigate(SettingsRoutes.LogViewer) },
                 onNavigateToHandwritingCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) },
                 onNavigateToStorageSpace = { navController.navigate(SettingsRoutes.StorageSpace) }
@@ -321,6 +322,9 @@ fun SettingsScreen(
             LicensesContent(
                 onBack = { navController.popBackStack() }
             )
+        }
+        composable(SettingsRoutes.Credits) {
+            CreditsContent(onBack = { navController.popBackStack() })
         }
     }
 }
