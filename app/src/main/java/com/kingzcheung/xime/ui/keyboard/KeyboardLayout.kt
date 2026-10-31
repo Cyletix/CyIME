@@ -114,7 +114,7 @@ fun KeyboardLayout(
     uiState: KeyboardUiState,
     isAsciiMode: Boolean,
     modifier: Modifier = Modifier,
-    /** 打字中的编码；只给「ing 放在 Shift 键上」判断 Shift 键要不要换成 ing。 */
+    /** 打字中的编码；只给「ing 放在 Shift 键上」「Shift 键分词」判断 Shift 键要不要换；整块键盘不读它，免得每按一键整块重组。 */
     candidateState: androidx.compose.runtime.State<com.kingzcheung.xime.service.CandidateState>? = null,
 ) {
     // 配置或方案变化时，行列与间距一起更新。
@@ -147,6 +147,10 @@ fun KeyboardLayout(
     val fourteenKey = !isAsciiMode && uiState.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
     // 逗号键分词（默认关）：中文全拼、双拼时标点键多一个 ' 角标，字母键角标里的 ' 打拼音时也是分词。
     val syllableSplit = syllableSplitActive(LocalKeyboardInputPreferences.current.syllableSplitKey, isAsciiMode, uiState.inputProfile)
+    // Shift 键分词（默认关）：同样只管中文全拼、双拼；关着时 Shift 键原样不动。
+    val shiftSplit = syllableSplitActive(LocalKeyboardInputPreferences.current.shiftSyllableSplit, isAsciiMode, uiState.inputProfile)
+    val shiftComposingSplit: (() -> Boolean)? = if (shiftSplit && candidateState != null)
+        remember(candidateState) { { shiftTapTypesSeparator(true, candidateState.value.isComposing) } } else null
     // 双拼键位提示（默认关）：双拼 26 键每个键写出 zh/ch/sh 和韵母，和双拼方案页的键位图一样；14 键、九键不显示。
     val dpKeyHints = if (doublePinyin && !isAsciiMode && !fourteenKey &&
         LocalKeyboardInputPreferences.current.doublePinyinKeyHints) remember(uiState.currentSchemaId, cfgVer) {
@@ -702,6 +706,7 @@ fun KeyboardLayout(
                                 shadowEnabled = shadowEnabled,
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
+                                composingSplit = shiftComposingSplit,
                             )
                             }
                             }
@@ -1573,10 +1578,15 @@ internal fun ShiftCapsKeyButton(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    /** Shift 键分词（默认关）：返回 true 时点按是分词 '，键面写「分词」；null 为普通 Shift。 */
+    composingSplit: (() -> Boolean)? = null,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val targets = LocalShiftSlideTargets.current
+    // 在这里读「是否在打拼音」，变化时只重组 Shift 键。
+    val splitLabel = composingSplit?.invoke() == true
+    val currentSplit by rememberUpdatedState(composingSplit)
     val suppressCursorMove = LocalSuppressCursorMove.current
     val currentPress by rememberUpdatedState(onKeyPressDown)
     val currentKey by rememberUpdatedState(onKeyPress)
@@ -1662,7 +1672,11 @@ internal fun ShiftCapsKeyButton(
                         isPressed = false
                         suppressCursorMove.value = false
                         if (released && !dragged && !used && upTime - down.uptimeMillis < 350L) {
-                            if (lastTap != Long.MIN_VALUE && down.uptimeMillis - lastTap in 0..viewConfiguration.doubleTapTimeoutMillis) {
+                            // 打拼音时点按插入分词；不算进双击，连点两下不会锁成大写。
+                            if (currentSplit?.invoke() == true) {
+                                currentKey(SYLLABLE_SEPARATOR)
+                                lastTap = Long.MIN_VALUE
+                            } else if (lastTap != Long.MIN_VALUE && down.uptimeMillis - lastTap in 0..viewConfiguration.doubleTapTimeoutMillis) {
                                 currentKey("shift_caps")
                                 lastTap = Long.MIN_VALUE
                             } else {
@@ -1680,7 +1694,10 @@ internal fun ShiftCapsKeyButton(
         contentAlignment = Alignment.Center
     ) {
         // 空心箭头＝小写，实心＝下一个字母大写，实心加底横线＝大写锁定。
-        Icon(
+        // Shift 键分词开着并且在打拼音：键面写「分词」，点了就是它（印什么出什么）。
+        if (splitLabel) Text("分词", color = colors.foreground, fontSize = 14.sp, maxLines = 1,
+            modifier = Modifier.testTag("shift-key-split"))
+        else Icon(
             imageVector = ShiftKeyIcons.forMode(shiftMode),
             contentDescription = ShiftKeyIcons.description(shiftMode),
             tint = colors.foreground,
