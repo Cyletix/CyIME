@@ -22,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -94,6 +95,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -408,7 +410,9 @@ fun CandidateBar(
         verticalArrangement = Arrangement.Center,
     ) {
         if (showPreedit) {
-            PreeditPreview(preeditText, protectedVisuals, onEditPreedit)
+            PreeditPreview(preeditText, protectedVisuals, onEditPreedit,
+                preeditBubbleColor(themeSurface, visuals.preeditBackgroundColor,
+                    blurBehind = glass.enabled && glass.normalized().blurRadiusDp >= 1f))
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
@@ -1082,7 +1086,7 @@ private fun CandidateExpansionButton(
 
 /** 非聚焦窗口提供真实触控区域，点击编码不会抢走宿主编辑框焦点。 */
 @Composable
-private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?) {
+private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?, bubbleColor: Color) {
     val density = LocalDensity.current
     // 放大后的候选栏里 dp 变大了，按屏宽限宽要换回同样的像素宽度。
     val screenWidth = (LocalConfiguration.current.screenWidthDp / LocalCandidateBarScale.current).dp
@@ -1090,7 +1094,7 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val gap = with(density) { 2.dp.roundToPx() }
     val rotation = LocalFloatingKeyboardRotation.current
     if (isFloatingRotated(rotation)) {
-        RotatedPreeditPreview(text, visuals, onEdit, rotation, gap, screenWidth)
+        RotatedPreeditPreview(text, visuals, onEdit, rotation, gap, screenWidth, bubbleColor)
         return
     }
     // 气泡在键盘外面（上方），键盘的玻璃模糊盖不到它：开玻璃时给气泡单独垫一块同样的实时模糊（用户反馈 10-31
@@ -1115,7 +1119,7 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     }
     val glass = LocalKeyboardInputPreferences.current.frostedGlass.normalized()
     if (glass.enabled && glass.blurRadiusDp >= 1f) {
-        // 气泡内容是 44dp 高、上下各留 6dp，真正的底色块在中间，圆角 4dp（见下面 PreeditLabel 和 preeditSurface）。
+        // 气泡内容最少 44dp 高、上下各留 6dp，真正的底色块在中间，圆角 4dp（见下面 PreeditLabel）。
         val inset = with(density) { 6.dp.roundToPx() }
         PreeditBubbleBlur(bubbleBounds.value?.let { IntRect(it.left, it.top + inset, it.right, it.bottom - inset) },
             glass.blurRadiusDp, with(density) { 4.dp.toPx() })
@@ -1124,10 +1128,26 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = true)) {
         PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
-            .height(44.dp).padding(vertical = 6.dp)
-        )
+            .heightIn(min = 44.dp).padding(vertical = 6.dp),
+            solidBackground = bubbleColor, maxLines = PREEDIT_BUBBLE_MAX_LINES)
     }
 }
+
+/** 拼音气泡最多排几行；再长就在气泡里上下滚，始终露出光标所在的那行（没有光标时露出最后一行）。 */
+private const val PREEDIT_BUBBLE_MAX_LINES = 3
+
+/**
+ * 拼音气泡的底色：按键颜色叠在键盘底色上、不透明，和键盘上的按键一个样（用户 10-31：原来是按键色再打六折，
+ * 应用画面在气泡后面时拼音看不清；三星、Gboard 的气泡都是实底）。开着玻璃、气泡下面垫了实时模糊时只留一点透。
+ */
+internal fun preeditBubbleColor(surface: Color, key: Color, blurBehind: Boolean): Color {
+    val base = surface.copy(alpha = 1f)
+    val solid = if (key == Color.Unspecified || key.alpha == 0f) base
+        else key.compositeOver(base).copy(alpha = 1f)
+    return if (blurBehind) solid.copy(alpha = PREEDIT_BUBBLE_GLASS_ALPHA) else solid
+}
+
+internal const val PREEDIT_BUBBLE_GLASS_ALPHA = 0.9f
 
 /** 拼音气泡下面的实时模糊：和键盘卡片的玻璃同一种子窗口，放在输入法窗口下面，只模糊气泡那一块应用画面。 */
 @Composable
@@ -1155,7 +1175,7 @@ private fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadiu
  */
 @Composable
 private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?,
-    rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp) {
+    rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp, bubbleColor: Color) {
     val labelSize = remember { IntArray(2) }
     val positionProvider = remember(rotation, gap) {
         object : PopupPositionProvider {
@@ -1185,7 +1205,8 @@ private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, on
             }
         }) {
             PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
-                .height(44.dp).padding(vertical = 6.dp))
+                .heightIn(min = 44.dp).padding(vertical = 6.dp),
+                solidBackground = bubbleColor, maxLines = PREEDIT_BUBBLE_MAX_LINES)
         }
     }
 }
@@ -1193,7 +1214,11 @@ private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, on
 /** Shared by the screen keyboard preview and the hardware caret surface. */
 @Composable
 internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)? = null,
-    modifier: Modifier = Modifier, followTextTail: Boolean = false) {
+    modifier: Modifier = Modifier, followTextTail: Boolean = false,
+    /** 键盘上方的拼音气泡：给了就用这个实底（不再打折），字色按它调到看得清。 */
+    solidBackground: Color? = null,
+    /** 大于 1 时放不下就折行，最多这么多行，再多在里面上下滚。 */
+    maxLines: Int = 1) {
     val scrollState = rememberScrollState()
     // The input preview must expose newly typed syllables once it reaches the available width.
     // A manual scroll remains untouched until the text or viewport changes.
@@ -1204,7 +1229,13 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
     }
     val background = if (visuals.preeditBackgroundColor != Color.Unspecified) visuals.preeditBackgroundColor
         else if (visuals.textColor.luminance() > 0.5f) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
-    Box(modifier.preeditSurface(background)
+    val surface = solidBackground?.let {
+        Modifier.heightIn(min = PreeditStyle.SurfaceHeight).clip(RoundedCornerShape(4.dp)).background(it)
+            .padding(horizontal = 8.dp)
+    } ?: Modifier.preeditSurface(background)
+    val textColor = solidBackground?.let { readableThemeText(visuals.textColor, it.copy(alpha = 1f)) }
+        ?: visuals.textColor.copy(alpha = if (visuals.opaqueComments) 1f else 0.9f)
+    Box(modifier.then(surface)
         .testTag("candidate-preedit")
         .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
             onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
@@ -1216,9 +1247,42 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
         val caretAlpha by blink.animateFloat(1f, 0f, androidx.compose.animation.core.infiniteRepeatable(
             androidx.compose.animation.core.keyframes { durationMillis = 1060; 1f at 0; 1f at 529; 0f at 530; 0f at 1059 }),
             label = "preedit-caret-alpha")
-        Text(preeditWithCaret(shownText, visuals.accentColor, visuals.textColor, visuals.selectedTextColor, caretAlpha),
-            color = visuals.textColor.copy(alpha = if (visuals.opaqueComments) 1f else 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
-            softWrap = false, style = LocalTextStyle.current.copy(shadow = visuals.textShadow), modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
+        // 折行时在隔音符后面垫零宽空格：tou'ming'du 整串没有空格，不垫就只能从音节中间断开。
+        val displayText = if (maxLines > 1) shownText.replace("'", "'\u200B") else shownText
+        val annotated = preeditWithCaret(displayText, visuals.accentColor, textColor, visuals.selectedTextColor, caretAlpha)
+        val textStyle = LocalTextStyle.current.copy(shadow = visuals.textShadow)
+        if (maxLines <= 1) {
+            Text(annotated, color = textColor, fontSize = PreeditStyle.FontSize, maxLines = 1,
+                softWrap = false, style = textStyle, modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
+        } else {
+            // 长拼音折成几行，不再一行横穿整个应用、后半截被切掉（用户 10-31 截图）。
+            val density = LocalDensity.current
+            val lineHeight = PreeditStyle.FontSize * 1.35f
+            val viewportPx = with(density) { (lineHeight * maxLines).roundToPx() }
+            val lines = rememberScrollState()
+            var layout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+            LaunchedEffect(displayText, layout, lines.maxValue) {
+                val result = layout ?: return@LaunchedEffect
+                if (lines.maxValue == 0 || lines.maxValue == Int.MAX_VALUE) return@LaunchedEffect
+                val caret = displayText.indexOf(com.kingzcheung.xime.service.PREEDIT_CARET)
+                val target = if (caret < 0 || caret >= result.layoutInput.text.length) lines.maxValue else {
+                    val line = result.getLineForOffset(caret)
+                    val top = result.getLineTop(line).roundToInt()
+                    val bottom = result.getLineBottom(line).roundToInt()
+                    when {
+                        top < lines.value -> top
+                        bottom > lines.value + viewportPx -> bottom - viewportPx
+                        else -> lines.value
+                    }
+                }
+                lines.scrollTo(target.coerceIn(0, lines.maxValue))
+            }
+            Text(annotated, color = textColor, fontSize = PreeditStyle.FontSize, lineHeight = lineHeight,
+                softWrap = true, style = textStyle, onTextLayout = { layout = it },
+                modifier = Modifier.padding(vertical = 4.dp)
+                    .heightIn(max = with(density) { viewportPx.toDp() })
+                    .verticalScroll(lines).testTag("candidate-preedit-text"))
+        }
     }
 }
 

@@ -59,7 +59,7 @@ internal fun resolveFrostedTextSurface(
     return FrostedTextSurface(normalText, activeText, shadow,
         frostedKeyColor(keyBackground, normalText, config), halo)
 }
-private fun readableThemeText(color: Color, background: Color): Color {
+internal fun readableThemeText(color: Color, background: Color): Color {
     val opaque = color.copy(alpha = 1f)
     val endpoint = if (textContrast(Color.Black, background) >= textContrast(Color.White, background))
         Color.Black else Color.White
