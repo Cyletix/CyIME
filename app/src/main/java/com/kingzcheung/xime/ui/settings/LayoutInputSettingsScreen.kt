@@ -117,7 +117,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     SettingsSection(title = "九键", content = {
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
                             "左、上、右、下依次输入键上的第 1～4 个字母（7、9 用到下），点按仍是九键输入；" +
-                                "开启后长按输入数字、不再弹出字母菜单，与「长按输入」角标的方式一致。触发距离在下方「滑动触发距离」设置。",
+                                "开启后长按输入数字、不再弹出字母菜单。",
                             checked = settings.t9FlickLetters, onCheckedChange = {
                                 settings = settings.copy(t9FlickLetters = it); settings.save(context)
                             },
@@ -133,7 +133,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 valueRange = 20f..80f, steps = 5,
                                 onValueChange = { settings = settings.copy(candidateDragPercent = normalizeCandidateDragPercent(it)) },
                                 onValueChangeFinished = { settings.save(context) })
-                            Text("默认 50%，每档 10%。按住「下一项」拖出超过键盘宽或高的这个比例才算拖动选词（画出拖线），拖到候选上松手选它，和 26 键按住 Shift 拖到候选一样；没拖这么远仍是「下一项」自己的左滑、右滑。",
+                            Text("默认 50%。按住「下一项」拖过这么远才算拖到候选选词；没拖这么远仍是「下一项」自己的左滑、右滑。",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     })
@@ -143,9 +143,6 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             checked = settings.fourteenLetterSwipe, onCheckedChange = {
                                 settings = settings.copy(fourteenLetterSwipe = it); settings.save(context)
                             })
-                        Text("开启时，双字母键的横滑优先用于选字母；其他位置的光标手势仍遵循共通设置。",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                     })
                     SettingsSection(title = "滑动触发距离", content = {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -155,14 +152,14 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 valueRange = 12f..72f, steps = 29,
                                 onValueChange = { settings = settings.copy(fourteenLetterSwipeDp = normalizeLetterSwipeDistance(it)) },
                                 onValueChangeFinished = { settings.save(context) })
-                            Text("默认 24 dp，每档 2 dp；越大越不易误触。九键拂动选字母、14 键左右滑选字母和日语九键假名拂动共用这个距离。",
+                            Text("默认 24 dp，越大越不易误触。九键拂动选字母、14 键左右滑选字母和日语九键假名拂动共用。",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     })
                     InputExperienceSettings(setOf(InputExperiencePart.FLICK_DISC, InputExperiencePart.KANA), "拂动与假名提示")
                 }
             }
-            Text("分体键盘、按键符号在上一页「键盘布局」；角标、光标与空格在「按键与手势」；字号在「主题与外观」。各布局共用，无需逐个设置。",
+            Text("分体键盘、按键符号在上一页「键盘布局」；角标、光标与空格在「按键与手势」；字号在「主题与外观」。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -212,7 +209,7 @@ private fun QwertyStaggerSettings(
     Column(Modifier.settingsSearchAnchor("三行字母错位").padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("三行字母错位", style = MaterialTheme.typography.titleSmall)
         Text("实体键盘：A 行右移 1/4 键、Z 行右移 3/4 键；手机常见：Z 与 S 上下对齐；按尺寸自动：手机用手机排布，" +
-            "平板逐渐过渡到实体排布（原有行为）。分体与 14 键同样遵循。", style = MaterialTheme.typography.bodySmall,
+            "平板逐渐过渡到实体排布。分体与 14 键同样遵循。", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().height(108.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             modes.forEach { mode ->

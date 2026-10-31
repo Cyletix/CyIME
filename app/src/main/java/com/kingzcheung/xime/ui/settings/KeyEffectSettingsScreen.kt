@@ -352,8 +352,8 @@ fun KeyEffectSettingsContent(
                         }
 
                         Text(
-                            text = if (uiState.hapticPrimitives) "本机使用线性马达的短促点击触感，振幅调强弱；为 0（「系统默认」）时使用内置的轻触强度。"
-                                else "按时长振动；均为 0（「系统默认」）时使用系统默认触觉反馈。",
+                            text = if (uiState.hapticPrimitives) "为 0（「系统默认」）时用内置的轻触强度。"
+                                else "都为 0（「系统默认」）时用系统默认振动。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)

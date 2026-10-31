@@ -174,7 +174,7 @@ fun SpeechToTextSettingsContent(
             SettingsSection(title = "字幕") {
                 // CaptionController.chineseMode：字幕自己挑模型，和上面语音输入的选择分开，这里写明，免得两处看起来矛盾。
                 Text(
-                    text = "字幕的中文识别不跟上面的模型选择：Paraformer 和 SenseVoice 都下载了就边说边出字、再由 SenseVoice 校正，只有 SenseVoice 就一句一句出字；不用 X-ASR 和整句定稿。",
+                    text = "字幕的中文识别不跟上面的模型选择，按已下载的模型自动选。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
@@ -243,7 +243,7 @@ fun SpeechToTextSettingsContent(
                         )
                     }
                     Text(
-                        text = "和 Google 实时转写一样，“下载/CyIME字幕”里超过 3 天的字幕记录在下次打开字幕时自动删掉。关闭后一直保留。",
+                        text = "“下载/CyIME字幕”里超过 3 天的字幕记录在下次打开字幕时自动删掉。关闭后一直保留。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

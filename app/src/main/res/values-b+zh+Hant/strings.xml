@@ -13,7 +13,7 @@
     <string name="status_set">已設定</string>
     <string name="status_not_set">未設定</string>
     <string name="item_setup_guide_title">依裝置推薦配置</string>
-    <string name="item_setup_guide_summary">問打字習慣、看裝置效能和空間，設好全拼、雙拼或五筆，推薦語音、九鍵、聯想用哪些模型，刪掉用不到的</string>
+    <string name="item_setup_guide_summary">按打字習慣和裝置設好輸入方案、選好模型，刪掉用不到的</string>
     <string name="test_input_hint">點擊此處開始輸入測試...</string>
     <string name="action_clear">清除</string>
     <string name="section_input">輸入</string>
@@ -52,7 +52,7 @@
     <string name="item_backup_title">備份與還原</string>
     <string name="item_backup_summary">把設定匯出為本機檔案，或從備份檔案還原</string>
     <string name="item_performance_title">效能與省電</string>
-    <string name="item_performance_summary">自動、高配、中配、低配一鍵切換，語音模型佔用記憶體</string>
+    <string name="item_performance_summary">檔位、語音模型佔用記憶體</string>
     <string name="item_about_title">關於 CyIME</string>
     <string name="item_about_summary">版本資訊、開發者、聯絡方式</string>
     <string name="settings_app_language">介面語言 · Language</string>

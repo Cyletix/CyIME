@@ -13,7 +13,7 @@
     <string name="status_set">設定済み</string>
     <string name="status_not_set">未設定</string>
     <string name="item_setup_guide_title">このデバイスにおすすめの設定</string>
-    <string name="item_setup_guide_summary">入力の習慣を聞き、性能と空き容量を確認して、全拼・双拼・五筆を設定し、音声・9キー・予測のモデルを提案して使わないものを削除します</string>
+    <string name="item_setup_guide_summary">入力の習慣と端末に合わせて入力方式とモデルを設定し、使わないものを削除します</string>
     <string name="test_input_hint">ここをタップして入力を試す...</string>
     <string name="action_clear">クリア</string>
     <string name="section_input">入力</string>
@@ -52,7 +52,7 @@
     <string name="item_backup_title">バックアップと復元</string>
     <string name="item_backup_summary">設定をローカルファイルに書き出す、またはバックアップから復元します</string>
     <string name="item_performance_title">パフォーマンスと省電力</string>
-    <string name="item_performance_summary">自動・高・中・低をワンタップで切り替え、音声モデルのメモリ使用量</string>
+    <string name="item_performance_summary">性能レベル、音声モデルのメモリ使用量</string>
     <string name="item_about_title">CyIME について</string>
     <string name="item_about_summary">バージョン、開発者、連絡先</string>
     <string name="settings_app_language">表示言語 · Language</string>

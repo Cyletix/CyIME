@@ -172,8 +172,6 @@ internal fun OfflineModelCard() {
                 }
             }
         }
-        Text("同一模型只存一份；运行时只保留当前主模型及可选校正，不同时加载三种语言。模型文件大小不等于运行内存。",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("配置修改在下一次录音生效。录音中切换语言时，兼容同一模型就继续使用，否则保留已识别文字并切换模型，麦克风继续收音。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

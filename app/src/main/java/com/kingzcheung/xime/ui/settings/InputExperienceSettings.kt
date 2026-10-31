@@ -85,9 +85,8 @@ internal fun InputExperienceSettings(
                     InputGestureLocks.lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, it)
                 }?.let { SettingsLockNote("「${it.lockedValue.let { v -> (v as SymbolInputMode).label }}」${it.message}") }
                 Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
-                    "按住满 0.3 秒立即输入上方角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。" +
-                        "西班牙语键盘的元音和 n 长按仍出 á é ñ 等重音字母，这几个键的上角标改用上滑输入。"
-                    else "滑动时在原键内预览，松手输入；所有布局角标的方向均可在下方反转。",
+                    "按住 0.3 秒输入上方角标，不弹字母气泡。西班牙语键盘的元音和 n 长按仍出 á é ñ 等重音字母，这几个键的上角标改用上滑。"
+                    else "滑动时在键内预览，松手输入。",
                     style = MaterialTheme.typography.bodySmall)
             }
             // 角标“长按”时长按总是出角标，气泡出不来：照常显示，置灰并写明被谁锁。
@@ -97,7 +96,7 @@ internal fun InputExperienceSettings(
                 Row(Modifier.settingsSearchAnchor("长按弹出字母气泡", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("长按弹出字母气泡", style = MaterialTheme.typography.titleSmall)
-                        Text("26/14 键长按字母弹出大小写和带音调的字母，九键长按弹出本键的几个字母；关掉后长按不弹，上下拖动输入角标不受打扰。西班牙语键盘长按元音和 n 总是弹出重音字母，不受这个开关影响。",
+                        Text("关掉后长按不弹，上下拖动输入角标不受打扰。西班牙语键盘的元音和 n 总是弹出重音字母。",
                             style = MaterialTheme.typography.bodySmall)
                         if (lock != null) SettingsLockNote(lock.message)
                     }
@@ -139,9 +138,9 @@ internal fun InputExperienceSettings(
             Row(Modifier.settingsSearchAnchor("Z X C V 角标做撤销、剪切、复制、粘贴", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Z X C V 角标做撤销、剪切、复制、粘贴", style = MaterialTheme.typography.titleSmall)
-                    Text("默认关。打开后 26 键 Z X C V 的上方角标换成撤销、剪切、复制、粘贴，" +
+                    Text("26 键 Z X C V " +
                         (if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) "长按" else if (settings.reverseSymbolSwipe) "上拉" else "下拉") +
-                        "就执行，和按住 !@# 当 Ctrl 点这几个字母一样。按住 !@# 当 Ctrl 照常可用。",
+                        "就执行；按住 !@# 当 Ctrl 照常可用。",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.zxcvEditShortcuts, colors = settingsSwitchColors(),
@@ -155,7 +154,7 @@ internal fun InputExperienceSettings(
             Row(Modifier.settingsSearchAnchor("拂动时显示方向圆盘", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("拂动时显示方向圆盘", style = MaterialTheme.typography.titleSmall)
-                    Text("默认开启。日语假名、九键拂动选字母和 14 键字母对：按住时在键上方显示四个方向的圆盘和箭头；关闭后与 26 键一样在键内渐变提示。",
+                    Text("日语假名、九键拂动选字母和 14 键字母对按住时在键上方显示；关掉后和 26 键一样在键内提示。",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.flickDirectionDisc,
@@ -275,7 +274,7 @@ internal fun InputExperienceSettings(
                     Slider(value = settings.cursorHoldSeconds, modifier = Modifier.testTag("cursor-hold-slider"),
                         onValueChange = { settings = settings.copy(cursorHoldSeconds = normalizeCursorHoldSeconds(it)) },
                         onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..1f, steps = 8)
-                    Text("默认 0.2 秒，每档 0.1 秒。语言键的长按单独设置。", style = MaterialTheme.typography.bodySmall)
+                    Text("默认 0.2 秒。", style = MaterialTheme.typography.bodySmall)
                 }
             }
             spaceHoldSlider()
@@ -283,27 +282,27 @@ internal fun InputExperienceSettings(
             if (settings.cursorGesture != CursorGestureMode.NONE || settings.bottomLiftCursor) {
                 Column(Modifier.settingsSearchAnchor("从中间滑到边缘走几行", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("从中间滑到屏幕边缘走：${"%.2f".format(settings.cursorSwipeLines).trimEnd('0').trimEnd('.')} 行")
-                    Text("按当前输入框一行能放几个字换算，字号、屏幕大小、横竖屏自动对上，手机和平板不用分别调", style = MaterialTheme.typography.bodySmall)
+                    Text("按输入框一行能放几个字换算，换屏幕、横竖屏不用重调", style = MaterialTheme.typography.bodySmall)
                     Slider(value = settings.cursorSwipeLines, onValueChange = { settings = settings.copy(cursorSwipeLines = normalizeCursorSwipeLines(it)) },
                         onValueChangeFinished = { settings.save(context) }, valueRange = 0.5f..3f, steps = 9)
                 }
                 Column(Modifier.settingsSearchAnchor("光标每移动一字所需距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档（约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米）")
-                    Text("少数输入框不提供排版，读不到一行几个字时用这个距离；距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
+                    Text("只在读不到一行几个字的输入框里用；越小越灵敏", style = MaterialTheme.typography.bodySmall)
                     Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
                         onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
                 }
             }
             Column(Modifier.settingsSearchAnchor("长按语言键弹出列表", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("长按语言键弹出列表：${"%.2f".format(settings.languageMenuHoldSeconds)} 秒")
-                Text("默认 0.15 秒，每档 0.05 秒；按住语言键达到时长后弹出语言列表，与空格长按分开设置。", style = MaterialTheme.typography.bodySmall)
+                Text("默认 0.15 秒。", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.languageMenuHoldSeconds, modifier = Modifier.testTag("language-menu-hold-slider"),
                     onValueChange = { settings = settings.copy(languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.05f..1f, steps = 18)
             }
             Column(Modifier.settingsSearchAnchor("符号键松手打开符号的时限", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("符号键松手打开符号的时限：${"%.1f".format(settings.symbolKeyHoldSeconds)} 秒")
-                Text("默认 1 秒，每档 0.1 秒；26 键按住 !@# 是 Ctrl，拖到字母上松手发快捷键（如 C 复制）。不拖动并在时限内松手才打开符号，超过时限或拖出去后松手不打开。", style = MaterialTheme.typography.bodySmall)
+                Text("默认 1 秒。26 键按住 !@# 是 Ctrl，拖到字母上松手发快捷键（如 C 复制）；超过时限或拖出去再松手不打开符号。", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.symbolKeyHoldSeconds, modifier = Modifier.testTag("symbol-key-hold-slider"),
                     onValueChange = { settings = settings.copy(symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.3f..2f, steps = 16)
@@ -313,7 +312,7 @@ internal fun InputExperienceSettings(
             divider()
             Column(Modifier.settingsSearchAnchor("手写停顿识别", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("手写停顿识别：${"%.1f".format(settings.handwritingPauseSeconds)} 秒")
-                Text("默认 0.5 秒，每档 0.1 秒；继续书写会重新计时。", style = MaterialTheme.typography.bodySmall)
+                Text("默认 0.5 秒；继续书写会重新计时。", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.handwritingPauseSeconds, modifier = Modifier.testTag("handwriting-pause-slider"),
                     onValueChange = { settings = settings.copy(handwritingPauseSeconds = normalizeHandwritingPause(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..2.5f, steps = 23)
@@ -348,7 +347,7 @@ internal fun InputExperienceSettings(
             Row(Modifier.settingsSearchAnchor("字母键显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("字母键显示大写", style = MaterialTheme.typography.titleSmall)
-                    Text("26 键、14 键等字母键帽一律写大写字母，只改显示：中文照常打拼音，英文大小写仍看 Shift 键上的箭头（空心小写、实心单次大写、带底线大写锁定）。",
+                    Text("只改键帽显示；英文大小写仍看 Shift 键上的箭头。",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.uppercaseKeyLabels,

@@ -316,9 +316,9 @@ fun SchemaSettingsContent(
                 }
 
                 item {
-                    SettingsNote("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言与方案」选择。",
+                    SettingsNote("长按可排序；语言和默认组合在「语言与方案」选择。",
                         Modifier.padding(top = 4.dp))
-                    SettingsNote("九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「应用方案更改」生效。日常打字不需要定期部署。")
+                    SettingsNote("安装或启停其他方案后，点「应用方案更改」生效。")
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 

@@ -13,7 +13,7 @@
     <string name="status_set">Done</string>
     <string name="status_not_set">Not set</string>
     <string name="item_setup_guide_title">Recommended setup for this device</string>
-    <string name="item_setup_guide_summary">Asks how you type, checks speed and free space, sets up full pinyin, shuangpin or Wubi, suggests which voice, T9 and prediction models to use, and removes unused ones</string>
+    <string name="item_setup_guide_summary">Sets up your input scheme and models for how you type and this device, and removes unused ones</string>
     <string name="test_input_hint">Tap here to try typing...</string>
     <string name="action_clear">Clear</string>
     <string name="section_input">Input</string>
@@ -52,7 +52,7 @@
     <string name="item_backup_title">Backup and restore</string>
     <string name="item_backup_summary">Export settings to a local file, or restore from a backup file</string>
     <string name="item_performance_title">Performance and battery</string>
-    <string name="item_performance_summary">Switch between auto, high, medium and low in one tap; voice model memory use</string>
+    <string name="item_performance_summary">Performance level, voice model memory use</string>
     <string name="item_about_title">About CyIME</string>
     <string name="item_about_summary">Version, developer, contact</string>
     <string name="settings_app_language">Language · 语言</string>
