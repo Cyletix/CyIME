@@ -21,7 +21,7 @@ class FrostedTextSurfaceTest {
                 val surface = resolveFrostedTextSurface(background, normal, selected, accent)
                 assertEquals(normal.copy(alpha = 1f), surface.text)
                 assertEquals(1f, surface.selectedText.alpha, 0f)
-                assertTrue((surface.shadow.color.luminance() > 0.5f) != (surface.text.luminance() > 0.5f))
+                surface.shadow?.let { assertTrue((it.color.luminance() > 0.5f) != (surface.text.luminance() > 0.5f)) }
             }
         }
     }

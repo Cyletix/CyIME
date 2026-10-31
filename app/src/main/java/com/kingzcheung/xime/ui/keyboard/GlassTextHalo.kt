@@ -19,17 +19,23 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
 /**
- * 没有键帽托着的字和图标（候选栏、工具栏、实体键盘浮条）背后垫的反色光晕。
+ * 没有键帽托着的字和图标（候选栏、工具栏、实体键盘浮条）背后垫的反色柔光托底。
  *
  * 透明键盘后面是什么颜色，输入法看不到：系统模糊由合成器完成，Android 不让输入法读别的应用的画面。
  * 所以不靠检测，而是按最坏情况算：后面可能是纯白也可能是纯黑，两种都要达到与键面文字相同的 4.5:1。
  * 光晕与文字反色（深字白晕、浅字黑晕）：后面本来就亮（深字）或本来就暗（浅字）时光晕与背景同色、看不出来；
  * 后面换成反差色时它才显出来托住字。普通情况的观感和整体透明度都不变。
+ * 形状是每个词后面一块边缘很软的托底，不是贴着笔画的一圈描边：贴笔画的描边像浮雕字、看着廉价（用户 10-31）。
  */
 internal data class GlassTextHalo(val color: Color, val alpha: Float)
 
-/** 光晕的模糊半径；中文字的笔画内空约 1-2dp，2dp 能填满并在字外留一圈窄柔边。 */
-internal val GLASS_HALO_RADIUS = 2.dp
+/** 第一次模糊：把一个词的笔画连成一整块（中文笔画内空约 1-2dp，字距 4dp 以内）。 */
+internal val GLASS_HALO_CORE_RADIUS = 4.dp
+/** 第二次模糊：块的边缘柔和过渡，看起来像玻璃在字后面厚了一点，而不是字上描了边。 */
+internal val GLASS_HALO_SOFT_RADIUS = 8.dp
+
+/** 托底只在 RenderEffect 可用时画（Android 12+，玻璃模糊本来也只在 12 以上）。 */
+internal fun glassHaloSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
 /**
  * 光晕颜色与文字阴影同一规则：取与文字反差更大的黑或白。
@@ -73,11 +79,14 @@ internal fun glassTextHalo(
  */
 @Composable
 internal fun Modifier.glassTextHalo(halo: GlassTextHalo?): Modifier {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return this
+    if (!glassHaloSupported()) return this
     if (halo == null || halo.alpha <= 0f) return this
-    val radiusPx = with(LocalDensity.current) { GLASS_HALO_RADIUS.toPx() }
+    val corePx = with(LocalDensity.current) { GLASS_HALO_CORE_RADIUS.toPx() }
+    val softPx = with(LocalDensity.current) { GLASS_HALO_SOFT_RADIUS.toPx() }
     val layer = rememberGraphicsLayer()
-    val effect = remember(halo.color, radiusPx) { glassHaloEffect(halo.color, radiusPx).asComposeRenderEffect() }
+    val effect = remember(halo.color, corePx, softPx) {
+        glassHaloEffect(halo.color, corePx, softPx).asComposeRenderEffect()
+    }
     return drawWithContent {
         layer.record { this@drawWithContent.drawContent() }
         layer.renderEffect = effect
@@ -87,22 +96,27 @@ internal fun Modifier.glassTextHalo(halo: GlassTextHalo?): Modifier {
     }
 }
 
-/** 取字形 → 模糊 → 染成光晕色并加厚，相当于把字形向外扩一圈柔边。 */
+/** 取字形 → 模糊并取满（连成每个词一块）→ 再模糊（软边）→ 染成光晕色。 */
 @RequiresApi(Build.VERSION_CODES.S)
-private fun glassHaloEffect(color: Color, radiusPx: Float): android.graphics.RenderEffect {
+private fun glassHaloEffect(color: Color, corePx: Float, softPx: Float): android.graphics.RenderEffect {
     val glyphs = android.graphics.RenderEffect.createColorFilterEffect(
         ColorMatrixColorFilter(ColorMatrix(glyphMaskMatrix(darkGlyphs = color.luminance() > 0.5f))))
-    val blurred = android.graphics.RenderEffect.createBlurEffect(radiusPx, radiusPx, glyphs, Shader.TileMode.DECAL)
+    val core = android.graphics.RenderEffect.createBlurEffect(corePx, corePx, glyphs, Shader.TileMode.DECAL)
+    val block = android.graphics.RenderEffect.createColorFilterEffect(
+        ColorMatrixColorFilter(ColorMatrix(alphaGainMatrix(GLASS_HALO_CORE_GAIN))), core)
+    val soft = android.graphics.RenderEffect.createBlurEffect(softPx, softPx, block, Shader.TileMode.DECAL)
     return android.graphics.RenderEffect.createColorFilterEffect(
-        ColorMatrixColorFilter(ColorMatrix(haloTintMatrix(color))), blurred)
+        ColorMatrixColorFilter(ColorMatrix(haloTintMatrix(color))), soft)
 }
 
 /** 选字矩阵的放大倍数：深浅分明的字形取满。 */
 internal const val GLASS_HALO_MASK_GAIN = 2f
 /** 选字门槛：选中高亮（主题色 20%）这类淡填充落在门槛下，不生晕。 */
 internal const val GLASS_HALO_MASK_THRESHOLD = 0.5f
-/** 模糊后的加厚倍数：笔画周围一圈取满光晕浓度，再往外柔和过渡。 */
-internal const val GLASS_HALO_SPREAD_GAIN = 4f
+/** 第一次模糊后的取满倍数：一个词的笔画和字间空隙连成一整块。 */
+internal const val GLASS_HALO_CORE_GAIN = 10f
+/** 软边后的取满倍数：块的里面（字所在处）回到满浓度，只有外缘柔和过渡。 */
+internal const val GLASS_HALO_SPREAD_GAIN = 2f
 
 /**
  * Android ColorMatrix（未预乘，0-255）。白晕时字比背景深：A' = g·(A − L) − t；
@@ -119,6 +133,13 @@ internal fun glyphMaskMatrix(darkGlyphs: Boolean): FloatArray {
         sign * g * 0.2126f, sign * g * 0.7152f, sign * g * 0.0722f, g, offset,
     )
 }
+
+internal fun alphaGainMatrix(gain: Float): FloatArray = floatArrayOf(
+    0f, 0f, 0f, 0f, 0f,
+    0f, 0f, 0f, 0f, 0f,
+    0f, 0f, 0f, 0f, 0f,
+    0f, 0f, 0f, gain, 0f,
+)
 
 internal fun haloTintMatrix(color: Color): FloatArray = floatArrayOf(
     0f, 0f, 0f, 0f, color.red * 255f,

@@ -106,4 +106,40 @@ class GlassTextHaloTest {
             FrostedGlassConfig(enabled = true, backgroundOpacity = 1f), Color.White)
         assertNull(opaque.halo)
     }
+
+    /** 用户 10-31「开玻璃之后的候选词看着好廉价」：贴着笔画的细阴影把字描出毛边，字本来就清楚时一律不画。 */
+    @Test fun readableGlassTextHasNoGlyphOutline() {
+        val theme = PureBlackTheme.create()
+        listOf(true, false).forEach { softBacking ->
+            val surface = resolveFrostedTextSurface(theme.surfaceDark, theme.candidateTextColorDark,
+                theme.candidateSelectedTextColorDark, theme.accentDark,
+                FrostedGlassConfig.defaults(isDark = true, enabled = true), theme.surfaceDark,
+                softBackingAvailable = softBacking)
+            assertNull(surface.halo)
+            assertNull(surface.shadow)
+        }
+    }
+
+    /** 玻璃太薄时用软边托底代替描边；画不了托底的老系统才退回细阴影，且与字反色。 */
+    @Test fun thinGlassUsesTheSoftBackingInsteadOfAGlyphOutline() {
+        val config = FrostedGlassConfig.defaults(isDark = false, enabled = true)
+        val modern = resolveFrostedTextSurface(Color(0xFFE8E8EA), Color(0xFF454545), Color.Black, Color(0xFF454545),
+            config, Color.White, softBackingAvailable = true)
+        assertNotNull(modern.halo)
+        assertNull(modern.shadow)
+        val legacy = resolveFrostedTextSurface(Color(0xFFE8E8EA), Color(0xFF454545), Color.Black, Color(0xFF454545),
+            config, Color.White, softBackingAvailable = false)
+        assertEquals(modern.halo, legacy.halo)
+        assertEquals(Color.White, legacy.shadow?.color?.copy(alpha = 1f))
+    }
+
+    /** 托底分两步取满：先把一个词连成一块，软边后字所在处回到满浓度。 */
+    @Test fun backingGainsSaturateTheWordBlock() {
+        val core = alphaGainMatrix(GLASS_HALO_CORE_GAIN)
+        assertEquals(255f, maskAlpha(core, Color.Black.copy(alpha = 0.2f)), 0f)
+        assertEquals(0f, maskAlpha(core, Color.Transparent), 0f)
+        val tint = haloTintMatrix(Color.White)
+        assertEquals(255f, maskAlpha(tint, Color.Black.copy(alpha = 0.6f)), 0f)
+        assertTrue(GLASS_HALO_SOFT_RADIUS > GLASS_HALO_CORE_RADIUS)
+    }
 }
