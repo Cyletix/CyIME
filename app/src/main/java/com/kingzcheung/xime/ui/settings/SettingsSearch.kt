@@ -142,6 +142,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("键盘尺寸与位置", layouts, SettingsRoutes.KeyboardResize, "尺寸 大小 高度 宽度 调整尺寸 键盘调节 悬浮 浮动 分体 透明度 底部留白 单手 位置 旋转"),
         page("工具栏与菜单排列", layouts, SettingsRoutes.ToolbarArrange, "工具栏 菜单 排列 顺序 入口 图标 按钮 自定义工具栏"),
         SettingsSearchEntry("邻键纠错", qwertyPath, qwerty, "纠错 打错 误触 全拼 按错 相邻"),
+        SettingsSearchEntry("模糊音", qwertyPath, qwerty, "模糊音 模糊 平翘舌 前后鼻音 z zh c ch s sh n l f h r an ang en eng in ing 分不清 口音 方言"),
         SettingsSearchEntry("滑行输入", qwertyPath, qwerty, "滑行 划词 滑动输入 手势输入 英文 中文 拼音 双拼 整词 swype"),
         SettingsSearchEntry("三行字母错位", qwertyPath, qwerty, "错位 排布 实体键盘 对齐 手机排布 字母行 偏移"),
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),

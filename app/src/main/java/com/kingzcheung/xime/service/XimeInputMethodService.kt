@@ -727,6 +727,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         com.kingzcheung.xime.settings.InputModes.ordered(this@XimeInputMethodService, uiState.value.schemas))
                 }
                 com.kingzcheung.xime.settings.CustomKeyboardLayouts.REVISION -> schemaController.applyCustomLayouts()
+                com.kingzcheung.xime.settings.SpellingPatches.REVISION -> schemaController.applySpellingPatches()
                 // Saved custom phrases: an open session re-reads them only when its schema is selected again.
                 // Not tied to an editor: the keyboard may be hidden while phrases are edited in settings.
                 com.kingzcheung.xime.settings.PersonalDictManager.CUSTOM_PHRASE_REVISION -> inputCommands.submit {
