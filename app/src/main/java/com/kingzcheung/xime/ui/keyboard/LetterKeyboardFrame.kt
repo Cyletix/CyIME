@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.runtime.staticCompositionLocalOf
+
 /** The physical ten-unit letter frame; key grouping and letter order belong to the layout. */
 internal data class LetterKeyboardFrame(val rowUnits: List<Int>) {
     val columns: Float get() = 10f
@@ -32,6 +34,26 @@ internal fun letterKeyboardFrame(rows: List<List<String>>): LetterKeyboardFrame?
     return if (units[0] in 9..10 && units[1] in 9..10 && units[2] in 6..7)
         LetterKeyboardFrame(units) else null
 }
+
+/**
+ * 「合并键均匀排布」（设置 → 布局，默认关）每多一个字母多占的宽度：两字母键是单字母键的 4/3 宽。
+ * 关闭时合并键按字母数占格，与 26 键键缝严格对齐。
+ */
+internal const val EVEN_MERGED_EXTRA_PER_LETTER = 1f / 3f
+
+/**
+ * 字母键在本行所占的份数。[weighted] 为 false 时每键一份；严格对齐时按字母数；
+ * [evenMerged] 时 n 字母键占 1 + (n-1)/3 份，单字母键相对变宽，整行仍铺满 26 键网格给这一行的宽度
+ * （第二行缩进、Shift、删除键都不变）。
+ */
+internal fun letterKeySpan(key: String, weighted: Boolean, evenMerged: Boolean = false): Float = when {
+    !weighted -> 1f
+    evenMerged -> 1f + (key.length - 1).coerceAtLeast(0) * EVEN_MERGED_EXTRA_PER_LETTER
+    else -> key.length.toFloat()
+}
+
+/** 当前键盘是否按「合并键均匀排布」分键宽：只对自建/内置字母排列生效，14 键和分体键盘照旧严格对齐。 */
+internal val LocalEvenMergedKeys = staticCompositionLocalOf { false }
 
 /** 14 键末尾单字母 m 从删除键借的宽度。无错位时删除键与 Shift 等宽，m 不借，与 26 键 m 对齐；
  * 宽屏错位把删除键加宽后，m 分走富余的一半（最多一个键宽），删除键仍不窄于 Shift 与删除键的平均宽。 */

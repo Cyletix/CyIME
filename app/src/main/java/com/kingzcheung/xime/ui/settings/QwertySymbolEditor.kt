@@ -150,12 +150,14 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                 else customLayout?.let(CustomLayoutSymbols::rows)
                 ?: QwertySwipeSymbols.rows.map { row -> row.map(Char::toString) }
             // 自建布局和键盘上一样按字母数分键宽（合并键两格宽），每排居中；26 键、14 键每键一格。
-            fun width(key: String) = if (customLayout != null) key.length else 1
+            // 打开「合并键均匀排布」时同键盘一样，合并键只比单字母键宽三分之一。
+            fun width(key: String): Double = com.kingzcheung.xime.ui.keyboard.letterKeySpan(key, customLayout != null,
+                inputSettings.evenMergedKeys).toDouble()
             val rowSlots = boardRows.maxOf { row -> row.sumOf(::width) }
             boardRows.forEach { row ->
                 val units = row.sumOf(::width)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (units < rowSlots) Spacer(Modifier.weight((rowSlots - units) / 2f))
+                    if (units < rowSlots - 1e-3) Spacer(Modifier.weight(((rowSlots - units) / 2).toFloat()))
                     row.forEach { key ->
                         Surface(modifier = Modifier.weight(width(key).toFloat()).height(64.dp).testTag("symbol-editor-key:$key")
                             .clickable(enabled = loaded && !busy) { selected = key },
@@ -170,7 +172,7 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                             }
                         }
                     }
-                    if (units < rowSlots) Spacer(Modifier.weight((rowSlots - units) / 2f))
+                    if (units < rowSlots - 1e-3) Spacer(Modifier.weight(((rowSlots - units) / 2).toFloat()))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

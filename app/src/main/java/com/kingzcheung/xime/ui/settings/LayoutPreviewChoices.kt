@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.Dp
 import com.kingzcheung.xime.settings.*
 import com.kingzcheung.xime.ui.keyboard.japaneseKanaKeys
 import com.kingzcheung.xime.ui.keyboard.letterKeyboardFrame
+import com.kingzcheung.xime.ui.keyboard.letterKeySpan
+import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import kotlin.math.roundToInt
 
 /** A view of the layout data, never a second keyboard or an engine session. */
@@ -57,6 +59,7 @@ internal fun LayoutPreviewChoices(
     onSelect: (String) -> Unit,
 ) {
     val revision by KeysConfigHelper.configVersion.collectAsState()
+    val evenMergedKeys = rememberKeyboardInputPreferences().evenMergedKeys
     val list = rememberLazyListState()
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     LaunchedEffect(selectedId, layouts) {
@@ -93,6 +96,7 @@ internal fun LayoutPreviewChoices(
                                 else MiniatureKeyboard(rows, layout.kind in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED, LayoutKind.ZHUYIN),
                                     contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isNearBlack(),
                                     equalMergedKeys = layout.kind == LayoutKind.MERGED && CustomKeyboardLayouts.find(layout.id) == null,
+                                    evenMergedKeys = evenMergedKeys && CustomKeyboardLayouts.find(layout.id) != null,
                                     qwertyStagger = qwertyPreviewStagger)
                     }
                 }
@@ -145,7 +149,9 @@ private fun previewRows(layout: InputLayout, language: InputLanguage, @Suppress(
 
 @Composable
 private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, contentColor: Color, modifier: Modifier,
-    fillKeys: Boolean = true, equalMergedKeys: Boolean = false, qwertyStagger: Float = 0f) {
+    fillKeys: Boolean = true, equalMergedKeys: Boolean = false, qwertyStagger: Float = 0f,
+    /** 「合并键均匀排布」：行宽不变，行内按 [letterKeySpan] 分键宽，同键盘。 */
+    evenMergedKeys: Boolean = false) {
     val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER } }
     val frame = if (letterLayout) letterKeyboardFrame(rows) else null
     val columns = rows.maxOfOrNull { it.sumOf { key -> if (letterLayout) key.length.coerceAtLeast(1) else 1 } } ?: 1
@@ -175,9 +181,14 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
                     else -> 0f
                 }
             }
-            row.forEach { key ->
+            val evenSpans = if (evenMergedKeys && letterLayout) row.map { letterKeySpan(it, true, true) } else null
+            row.forEachIndexed { index, key ->
                 val span = if (letterLayout) key.length.coerceAtLeast(1) else 1
-                val w = if (equalMergedKeys) (rowWidth - gap * (row.size - 1)) / row.size else rowUnit * span + gap * (span - 1)
+                val w = when {
+                    equalMergedKeys -> (rowWidth - gap * (row.size - 1)) / row.size
+                    evenSpans != null -> (rowWidth - gap * (row.size - 1)) * evenSpans[index] / evenSpans.sum()
+                    else -> rowUnit * span + gap * (span - 1)
+                }
                 val y = r * (h + gap)
                 if (fillKeys) drawRoundRect(contentColor.copy(alpha = .10f), Offset(x, y), Size(w, h), CornerRadius(3.dp.toPx()))
                 else drawRoundRect(contentColor.copy(alpha = .30f), Offset(x, y), Size(w, h), CornerRadius(3.dp.toPx()),

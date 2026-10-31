@@ -142,6 +142,18 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_WIDE_KEYS, enabled).apply()
     }
 
+    const val KEY_EVEN_MERGED_KEYS = "even_merged_keys"
+
+    /**
+     * 「合并键均匀排布」默认关：打开后自建的合并键布局（17、18、20 键等）里合并键只比单字母键宽三分之一，
+     * 单字母键相应变宽，每行排得更匀，小屏上好按（10-31 别人的需求）。关闭时严格对齐 26 键键缝。
+     */
+    fun isEvenMergedKeysEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_EVEN_MERGED_KEYS, false)
+
+    fun setEvenMergedKeysEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_EVEN_MERGED_KEYS, enabled).apply()
+    }
+
     const val KEY_SPLIT_GAP_PORTRAIT = "split_gap_fraction_portrait"
     const val KEY_SPLIT_GAP_LANDSCAPE = "split_gap_fraction_landscape"
 
