@@ -11,7 +11,9 @@ enum class SideSymbolTarget(val key: String, val label: String, val where: Strin
     STROKE("stroke", "笔画侧栏", "笔画键盘左侧一列", null, true),
     HANDWRITING("handwriting", "手写侧栏", "手写键盘右侧删除键下方的三格", 3, true),
     HANDWRITING_ROW("handwriting_row", "手写展开栏", "全屏手写底部删除键左侧的一排", 6, false),
-    COMMON("common", "常用符号栏", "点键盘「符号」键，排在「常用」页最前面，留空只显示默认符号", null, false);
+    COMMON("common", "常用符号栏", "点键盘「符号」键，排在「常用」页最前面，留空只显示默认符号", null, false),
+    /** 26 键、14 键字母上方的一排（「键盘布局 → 数字行」打开，默认关）；格数不限，所有格平分这一排。 */
+    NUMBER_ROW("number_row", "数字行", "26 键、14 键字母上方的一排，在「键盘布局」里打开", null, false);
 
     val prefKey: String get() = "side_symbols_$key"
 
@@ -22,7 +24,11 @@ enum class SideSymbolTarget(val key: String, val label: String, val where: Strin
         HANDWRITING -> listOf("？", "，", "。")
         HANDWRITING_ROW -> listOf("；", "：", "！", "？", "，", "。")
         COMMON -> emptyList()
+        NUMBER_ROW -> NUMBER_ROW_DEFAULT
     }
+
+    /** 旧的共用快捷符号列表只给原来那几条栏兜底；数字行是新栏，没单独设置就是 1-0，不能被它顶掉。 */
+    val usesLegacyList: Boolean get() = this != NUMBER_ROW
 
     /** 键盘实际显示的内容：固定格数的栏位不足时用默认补齐，多出的截掉。 */
     fun resolve(custom: List<String>?): List<String> = slots?.let { n ->
@@ -31,6 +37,8 @@ enum class SideSymbolTarget(val key: String, val label: String, val where: Strin
     } ?: (custom ?: defaults())
 
     companion object {
+        val NUMBER_ROW_DEFAULT = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+
         fun parse(raw: String?): List<String>? = raw?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?.takeIf { it.isNotEmpty() }
     }

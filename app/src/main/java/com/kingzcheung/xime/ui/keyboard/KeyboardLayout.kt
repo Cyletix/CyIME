@@ -169,6 +169,12 @@ fun KeyboardLayout(
     } else null
     // 注音（大千）：11 列，下面三行 10 键缩进半键，没有 Shift，删除键在第四行末尾。
     val zhuyin = !isAsciiMode && uiState.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ZHUYIN
+    // 数字行（默认关）：字母上方一排，键和顺序在「按键符号 → 数字行」里改；注音不加（见 [numberRowShown]）。
+    val numberRowPrefs = LocalKeyboardInputPreferences.current
+    val numberKeys = remember(numberRowPrefs.numberRow, zhuyin, numberRowPrefs.sideSymbols) {
+        if (numberRowShown(numberRowPrefs.numberRow, zhuyin)) numberRowPrefs.numberRowKeys() else emptyList()
+    }
+    val numberRowWeight = if (numberKeys.isEmpty()) 0f else NUMBER_ROW_HEIGHT_WEIGHT
     val metricContext = LocalContext.current
     val metricDisplay = LocalView.current.display
     val metricConfiguration = LocalConfiguration.current
@@ -198,6 +204,8 @@ fun KeyboardLayout(
         LocalDoublePinyinKeyHints provides dpKeyHints, LocalKeyboardInputPreferences provides keyLabelPrefs) {
     KeyboardKeySpacingScope(Modifier.fillMaxSize(),
         columns = letterKeyboardColumns(keyRows, fourteenKey),
+        // 数字行和字母行共用键盘高度：多一排就按多出的份数算每排高度，键高与纵缝跟着变。
+        rows = 4f + numberRowWeight,
         widthFraction = if (splitKeyboard) SplitKeyboardGeometry.keyWidthFraction(
             maxWidth.value, splitGapFraction, splitGutterDp) else 1f,
         policy = KeyVisualPolicy.Qwerty,
@@ -528,6 +536,37 @@ fun KeyboardLayout(
                         .padding(top = honeycombOverhang),
                     verticalArrangement = Arrangement.Top,
                 ) {
+                    // 数字行：点按原样上屏，和字母键上角标的数字同一条路；分体时左右各占一半，中缝与字母行对齐。
+                    if (numberKeys.isNotEmpty()) {
+                        val numberSplitAt = numberRowSplitAt(numberKeys.size, splitKeyboard)
+                        Box(modifier = Modifier.weight(numberRowWeight)) {
+                            if (isVoiceMode && !isVoiceSticky) {
+                                DummyKeyboardRow(
+                                    keys = numberKeys,
+                                    keySpans = numberRowSpans(numberKeys.size, numberSplitAt),
+                                    weightedLetters = false,
+                                    keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
+                                    keyboardBackgroundColor = keyboardBackgroundColor,
+                                    splitAt = numberSplitAt, splitGap = splitGapDp, splitRow = NUMBER_ROW_SPLIT_ROW,
+                                )
+                            } else {
+                                NumberKeyRow(
+                                    keys = numberKeys,
+                                    splitAt = numberSplitAt,
+                                    splitGap = splitGapDp,
+                                    keyBackgroundColor = keyBackgroundColor,
+                                    keyTextColor = keyTextColor,
+                                    shadowEnabled = shadowEnabled,
+                                    shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                    onInput = { text -> (onCommitText ?: onKeyPress)(text) },
+                                    onKeyPressDown = onKeyPressDown,
+                                    onKeyRelease = onKeyRelease,
+                                )
+                            }
+                        }
+                    }
+
                     // 第一行
                     if (isVoiceMode && !isVoiceSticky) {
                         Box(modifier = Modifier.weight(1f)) {

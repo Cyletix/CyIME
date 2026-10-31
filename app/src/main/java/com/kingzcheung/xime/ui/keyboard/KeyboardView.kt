@@ -1985,7 +1985,7 @@ fun KeyboardView(
             density = resizeControlDensity,
             aspectLimits = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind, splitActive, splitGapFraction),
             squareSnap = KeyboardSquareSnap.forLayout(state.inputProfile.layout.kind, splitActive, splitGapFraction,
-                inputPreferences.wideKeys),
+                inputPreferences.wideKeys, numberRow = inputPreferences.numberRow),
             splitGapFraction = splitGapSetting,
             splitPitchDp = splitPitchDp,
             onSplitGapChange = { splitGapPreview.value = it },

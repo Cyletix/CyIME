@@ -170,6 +170,19 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_EVEN_MERGED_KEYS, enabled).apply()
     }
 
+    const val KEY_NUMBER_ROW = "number_row"
+
+    /**
+     * 「数字行」默认关：打开后 26 键、14 键（含自建字母布局）字母上方加一排数字，点按直接上屏，
+     * 键和顺序在「按键符号 → 数字行」里改（10-31 用户反馈：平板想要一排数字、数字键位置能自己排）。
+     * 键盘总高度不变，五排分高度；注音（大千）首排本身就是数字位，不加。
+     */
+    fun isNumberRowEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_NUMBER_ROW, false)
+
+    fun setNumberRowEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_NUMBER_ROW, enabled).apply()
+    }
+
     const val KEY_SPLIT_GAP_PORTRAIT = "split_gap_fraction_portrait"
     const val KEY_SPLIT_GAP_LANDSCAPE = "split_gap_fraction_landscape"
 

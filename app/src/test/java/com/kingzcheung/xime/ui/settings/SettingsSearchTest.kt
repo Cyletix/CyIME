@@ -108,6 +108,12 @@ class SettingsSearchTest {
         assertTrue(titles("键盘高度调节").size < 5)
     }
 
+    /** 「数字行」：用户说法「数字栏」「平板一排数字」都能找到。 */
+    @Test fun numberRowIsSearchable() {
+        assertTrue("数字行" in titles("数字栏"))
+        assertTrue("数字行" in titles("平板 一排数字"))
+    }
+
     /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */
     @Test fun everyAnchorExistsOnItsPage() {
         val dir = java.io.File("src/main/java/com/kingzcheung/xime/ui/settings")

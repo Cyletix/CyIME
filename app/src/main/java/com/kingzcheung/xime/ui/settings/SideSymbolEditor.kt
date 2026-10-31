@@ -67,7 +67,11 @@ internal fun SideSymbolEditor(target: SideSymbolTarget) {
     }
 
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(target.where + if (target.slots != null) "，固定 ${target.slots} 格。" else "；格数不限，超出时可在键盘上滚动。",
+        Text(target.where + when {
+                target.slots != null -> "，固定 ${target.slots} 格。"
+                target == SideSymbolTarget.NUMBER_ROW -> "；格数不限，所有格平分这一排。"
+                else -> "；格数不限，超出时可在键盘上滚动。"
+            },
             style = MaterialTheme.typography.bodySmall)
         Text("每格填一个符号或一个短语，点按即输入。" + if (!custom && saved != null) "当前沿用旧的共用快捷符号列表。" else "",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -120,7 +124,8 @@ internal fun SideSymbolEditor(target: SideSymbolTarget) {
                 val edit = SettingsPreferences.getPrefsPublic(context).edit()
                 val legacy = prefs.symbols()
                 if (legacy != null) {
-                    SideSymbolTarget.entries.filter { it != target && SideSymbolTarget.parse(prefs.sideSymbols[it.key]) == null }
+                    SideSymbolTarget.entries.filter { it != target && it.usesLegacyList &&
+                        SideSymbolTarget.parse(prefs.sideSymbols[it.key]) == null }
                         .forEach { edit.putString(it.prefKey, legacy.joinToString("\n")) }
                     edit.putString("fixed_symbols", "")
                 }

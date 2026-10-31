@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.twotone.Dialpad
+import androidx.compose.material.icons.twotone.FormatListNumbered
 import androidx.compose.material.icons.twotone.FormatColorFill
 import androidx.compose.material.icons.twotone.AspectRatio
 import androidx.compose.material.icons.twotone.DataObject
@@ -215,6 +216,15 @@ private fun LayoutDisplayPage(
                             }
                         )
                     }
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    // 数字行（默认关）：点开关打开，点这一行进「按键符号 → 数字行」改键和顺序。
+                    val numberRow = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().numberRow
+                    SettingsToggleItem(Icons.TwoTone.FormatListNumbered, "数字行",
+                        "26 键、14 键字母上方加一排数字，键盘总高度不变、字母键变矮。点这一行改每个键和顺序。",
+                        checked = numberRow, onCheckedChange = { SettingsPreferences.setNumberRowEnabled(context, it) },
+                        onClick = { com.kingzcheung.xime.ui.keyboard.openSideSymbolEditor(context,
+                            com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.NUMBER_ROW) },
+                        showArrow = true)
                 })
             }
             if (page == "candidates") item {

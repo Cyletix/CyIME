@@ -73,6 +73,8 @@ data class KeyboardInputPreferences(
     val wideKeys: Boolean = false,
     /** 合并键均匀排布：14 键和自建合并键布局里合并键只比单字母键宽三分之一（默认关，见 [letterKeySpan]）。 */
     val evenMergedKeys: Boolean = false,
+    /** 数字行：26 键、14 键字母上方加一排数字（默认关，键和顺序见 [numberRowKeys]）。 */
+    val numberRow: Boolean = false,
     /** 分体中缝比例（竖屏/横屏），null 为自动。 */
     val splitGapPortrait: Float? = null,
     val splitGapLandscape: Float? = null,
@@ -219,7 +221,7 @@ data class KeyboardInputPreferences(
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, SYMBOL_NAMES_KEY,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, SYMBOL_NAMES_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
@@ -253,6 +255,7 @@ data class KeyboardInputPreferences(
                 fillBlankAreas = SettingsPreferences.isKeyboardBlankFilled(context),
                 wideKeys = SettingsPreferences.isWideKeysEnabled(context),
                 evenMergedKeys = SettingsPreferences.isEvenMergedKeysEnabled(context),
+                numberRow = SettingsPreferences.isNumberRowEnabled(context),
                 splitGapPortrait = SettingsPreferences.getSplitGapFraction(context, false),
                 splitGapLandscape = SettingsPreferences.getSplitGapFraction(context, true),
                 qwertyStagger = QwertyStaggerMode.entries.firstOrNull { it.name == prefs.getString("qwerty_stagger_mode", null) }
@@ -385,7 +388,10 @@ data class KeyboardInputPreferences(
 
     /** 某个固定栏的自定义内容；该栏未单独设置时沿用旧的共用列表，都没有则为 null（用默认）。 */
     fun symbolsFor(target: SideSymbolTarget): List<String>? =
-        SideSymbolTarget.parse(sideSymbols[target.key]) ?: symbols()
+        SideSymbolTarget.parse(sideSymbols[target.key]) ?: symbols()?.takeIf { target.usesLegacyList }
+
+    /** 数字行上的键，从左到右；没在「按键符号 → 数字行」里改过就是 1-0。 */
+    fun numberRowKeys(): List<String> = SideSymbolTarget.NUMBER_ROW.resolve(symbolsFor(SideSymbolTarget.NUMBER_ROW))
 
     fun symbols(): List<String>? = fixedSymbols.lines().map { it.trim() }
         .filter { it.isNotEmpty() }.distinct().takeIf { it.isNotEmpty() }

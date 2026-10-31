@@ -33,6 +33,7 @@ class SettingsRoundTripTest {
         Case("数字框自动数字键盘", false, true, S::setAutoNumberKeyboardEnabled, S::isAutoNumberKeyboardEnabled),
         Case("分体键盘", true, false, S::setSplitKeyboardEnabled, S::isSplitKeyboardEnabled),
         Case("右半边也放 G 键", true, false, S::setSplitRightGEnabled, S::isSplitRightGEnabled),
+        Case("数字行", true, false, S::setNumberRowEnabled, S::isNumberRowEnabled),
         Case("无痕", true, false, S::setIncognito, S::isIncognito),
         Case("候选注释", CandidateCommentMode.HIDE, CandidateCommentMode.SHOW, S::setCandidateCommentMode, S::candidateCommentMode),
         Case("候选注释内容", CandidateCommentContent.GLOSS, CandidateCommentContent.PINYIN,

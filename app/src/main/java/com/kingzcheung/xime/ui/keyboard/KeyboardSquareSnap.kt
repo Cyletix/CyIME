@@ -7,7 +7,9 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
     /** 分体中缝占整张键盘宽度的比例。 */
     val gapFraction: Float = 0.1f,
     /** 「加宽按键」：与渲染同一套留白和键缝（分体不加宽）。 */
-    val wideKeys: Boolean = false) {
+    val wideKeys: Boolean = false,
+    /** 键盘体分几排高（字母键盘 4 排，开了「数字行」再加 [NUMBER_ROW_HEIGHT_WEIGHT]），方形按字母键算。 */
+    val rows: Float = 4f) {
     val section get() = if (keypad) "t9" else "qwerty"
 
     fun capDifference(rect: ResizeRect, density: Float, extra: Float,
@@ -21,7 +23,7 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
         val policy = (if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty)
             .let { if (widened) it.widened() else it }
             .copy(maxKeyWidth = Float.MAX_VALUE)
-        val metrics = keyboardGridMetrics(policy, width, bodyHeight, columns,
+        val metrics = keyboardGridMetrics(policy, width, bodyHeight, columns, rows = rows,
             horizontalInsetDp = if (widened) KeyVisualPolicy.WideKeysGutter else 8f,
             allowShrink = floating, widthFraction = fraction, growthSpacing = spacing)
         val cellWidth = metrics.cellWidthDp
@@ -51,8 +53,9 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
 
     companion object {
         fun forLayout(kind: LayoutKind, split: Boolean, gapFraction: Float = 0.1f,
-            wideKeys: Boolean = false): KeyboardSquareSnap? = when (kind) {
-            LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false, gapFraction, wideKeys)
+            wideKeys: Boolean = false, numberRow: Boolean = false): KeyboardSquareSnap? = when (kind) {
+            LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false, gapFraction, wideKeys,
+                rows = 4f + if (numberRow) NUMBER_ROW_HEIGHT_WEIGHT else 0f)
             LayoutKind.T9 -> KeyboardSquareSnap(5f * 3f / 3.4f, false, true, wideKeys = wideKeys)
             else -> null
         }
