@@ -686,17 +686,14 @@ fun KeyboardView(
                 .hiddenDuringCursorControl(cursorControlActive)
         ) {
             var handwritingCandidates by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf<List<String>>(emptyList()) }
-            var handwritingComments by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf<List<String>>(emptyList()) }
             var handwritingClearSignal by remember(state.inputSessionId, state.inputProfile.language) { mutableIntStateOf(0) }
             val handwritingPending = remember(state.inputSessionId, state.inputProfile.language) { HandwritingCandidateQueue() }
             fun refreshHandwritingCandidates() {
                 handwritingCandidates = handwritingPending.candidates
-                handwritingComments = emptyList()
             }
             fun clearHandwriting() {
                 handwritingPending.clear()
                 handwritingCandidates = emptyList()
-                handwritingComments = emptyList()
                 handwritingClearSignal++
             }
             val handwritingContext = LocalContext.current
@@ -731,6 +728,15 @@ fun KeyboardView(
                 clearHandwriting()
             }
             val showHandwritingCandidates = isHandwritingPage && handwritingCandidates.isNotEmpty()
+            // 中文手写候选的注释是读音（带声调），忘了读音的字写出来对一下；释义模式下也显示读音。
+            val handwritingChinese = isHandwritingPage && state.inputProfile.language == InputLanguage.CHINESE
+            LaunchedEffect(handwritingChinese) {
+                if (handwritingChinese) com.kingzcheung.xime.handwriting.HanziPinyin.load(handwritingContext)
+            }
+            val hanziPinyinRevision = com.kingzcheung.xime.handwriting.HanziPinyin.revision
+            val handwritingComments = remember(handwritingCandidates, handwritingChinese, hanziPinyinRevision) {
+                if (handwritingChinese) com.kingzcheung.xime.handwriting.HanziPinyin.comments(handwritingCandidates) else emptyList()
+            }
 
             if (state.showQuickSendForm && state.ocrDraft) {
                 val ocrContext = LocalContext.current
