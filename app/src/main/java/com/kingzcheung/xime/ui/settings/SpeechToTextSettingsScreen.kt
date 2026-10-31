@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.GraphicEq
+import androidx.compose.material.icons.twotone.Spellcheck
 import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.twotone.DirectionsCar
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -118,6 +119,21 @@ fun SpeechToTextSettingsContent(
                     SettingsToggleItem(icon = Icons.TwoTone.DirectionsCar, title = "开车连续语音",
                         subtitle = "语音收起成悬浮条后，发送完回到输入框自动接着听",
                         checked = pillResume, onCheckedChange = { pillResume = it; SettingsPreferences.setSttPillResume(context, it) })
+                }
+            }
+
+            // 自动加标点以前只挂在本地卡片的「二次校正」里，但它也决定内置在线接口的原文标点是否保留，
+            // 所以提到页内公共位置；默认关，和 1.15.24 一样。
+            if (sttEnabled) {
+                var autoPunctuation by remember { mutableStateOf(SettingsPreferences.isSttAutoPunctuation(context)) }
+                SettingsSection(title = "识别结果") {
+                    Column(Modifier.fillMaxWidth().testTag("speech-auto-punctuation")) {
+                        SettingsToggleItem(icon = Icons.TwoTone.Spellcheck, title = "自动加标点",
+                            subtitle = "保留识别结果自带的逗号、句号、问号：本地中文模型在整句定稿时、内置在线接口的原文都按这里设置；" +
+                                "关闭时停顿处留空格。说「逗号」「句号」「问号」「感叹号」始终出标点。",
+                            checked = autoPunctuation,
+                            onCheckedChange = { autoPunctuation = it; SettingsPreferences.setSttAutoPunctuation(context, it) })
+                    }
                 }
             }
 

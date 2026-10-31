@@ -94,6 +94,10 @@ class SpeechRecognitionManager(
     @Volatile var noticeCallback: ((String) -> Unit)? = null
     private var amplitudeCallback: ((Float) -> Unit)? = null
     private var spectrumCallback: ((FloatArray) -> Unit)? = null
+    /** 最近一条最终结果是否自带标点：由真正产出该结果的后端在回调时决定，随结果交给上层。 */
+    @Volatile
+    var lastResultKeepsPunctuation: Boolean = false
+        private set
 
     // 预启动的 AudioRecord：手指按下 150ms 后启动，语音激活时直接交给录音线程
     private var preStartedRecord: AudioRecord? = null
@@ -180,6 +184,8 @@ class SpeechRecognitionManager(
         // 新会话复用后端：取消上一次会话遗留的延迟释放
         mainHandler.removeCallbacks(pendingBackendRelease)
         pendingReleaseSession = -1
+        // 上一条结果的标点能力不跨会话/换后端延续。
+        lastResultKeepsPunctuation = false
 
         // 预启动的 AudioRecord 已运行 ~250ms，直接交给录音线程
         var preStarted: AudioRecord? = null
@@ -506,6 +512,8 @@ class SpeechRecognitionManager(
                 onResult = { value ->
                     if (active) {
                         text = value
+                        // 由产出这条结果的后端声明标点能力：在线接口原文 true，本地回退/插件 false。
+                        lastResultKeepsPunctuation = currentBackend.resultKeepsPunctuation
                         if (!switching) postForSession(session) { if (active && !cancelRequested) resultCallback?.invoke(combined(value)) }
                     }
                 },

@@ -143,25 +143,6 @@ internal fun OfflineModelCard() {
                     Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null,
                         colors = settingsSwitchColors())
                 }
-                // 自动加标点和整句定稿分开：关掉标点照样整句定稿（默认关，和 1.15.0 以前一样不自动加标点）。
-                val autoPunctuationAvailable = wholeSentenceAvailable && wholeSentence
-                var autoPunctuation by remember { mutableStateOf(SettingsPreferences.isSttAutoPunctuation(context)) }
-                HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Row(Modifier.fillMaxWidth().settingsSearchAnchor("自动加标点").testTag("speech-auto-punctuation")
-                    .toggleable(value = autoPunctuation, enabled = autoPunctuationAvailable, role = Role.Switch,
-                        onValueChange = { autoPunctuation = it; SettingsPreferences.setSttAutoPunctuation(context, it) })
-                    .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("自动加标点", style = MaterialTheme.typography.bodyLarge)
-                        Text(if (autoPunctuationAvailable) "保留模型打的逗号、句号、问号；关闭时停顿处留空格。说「逗号」「句号」「问号」「感叹号」始终出标点。"
-                            else "只在整句定稿开着时可用；现在停顿处留空格，说「逗号」「句号」「问号」「感叹号」出标点。",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = autoPunctuation, enabled = autoPunctuationAvailable, onCheckedChange = null,
-                        colors = settingsSwitchColors())
-                }
                 // 整句定稿能用的地方（含只用 SenseVoice 的中文）都能接 X-ASR，下载入口跟着整句定稿走。
                 if (wholeSentenceAvailable && !xasrReady) {
                     ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }

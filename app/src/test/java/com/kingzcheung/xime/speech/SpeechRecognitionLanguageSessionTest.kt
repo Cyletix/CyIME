@@ -36,6 +36,8 @@ class SpeechRecognitionLanguageSessionTest {
         @Volatile var startSucceeds = true
         var compatibleLanguages = emptySet<InputLanguage>()
         override fun canContinueIn(language: InputLanguage) = language in compatibleLanguages
+        // 由产出结果的识别器声明标点能力（内置在线接口原文 true，本地/插件 false）。
+        @Volatile override var resultKeepsPunctuation = false
         @Volatile private var language = InputLanguage.UNSPECIFIED
         override fun setCallbacks(onResult: (String) -> Unit, onPartialResult: ((String) -> Unit)?,
             onStateChange: (RecognitionState) -> Unit, onError: (String) -> Unit) {
@@ -570,5 +572,26 @@ class SpeechRecognitionLanguageSessionTest {
         assertEquals(RecognitionState.ERROR, f.manager.getState())
         assertTrue(f.errors.single().contains("未标注语言"))
         assertTrue(f.results.isEmpty())
+    }
+
+    @Test fun theBackendProducingAFinalDecidesWhetherItsMarksAreKeptAndANewSessionForgetsIt() = Fixture().use { f ->
+        f.backend.resultKeepsPunctuation = true
+        f.manager.startRecognition()
+        val first = f.session()
+        f.await { f.manager.getState() == RecognitionState.LISTENING }
+        first.second.final("你好，世界。")
+        f.drain()
+        assertTrue(f.manager.lastResultKeepsPunctuation)
+
+        f.manager.stopRecognition()
+        f.backend.allowClose.countDown()
+        f.await { f.backend.completedStops.get() == 1 }
+
+        // 下一条结果由真正产出它的后端决定：本地模型/在线回退不声明标点能力，不沿用上一条。
+        f.backend.resultKeepsPunctuation = false
+        f.manager.startRecognition()
+        f.session()
+        f.await { f.manager.getState() == RecognitionState.LISTENING }
+        assertFalse(f.manager.lastResultKeepsPunctuation)
     }
 }
