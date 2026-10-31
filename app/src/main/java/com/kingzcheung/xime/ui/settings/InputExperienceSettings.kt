@@ -182,7 +182,18 @@ internal fun InputExperienceSettings(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            // 只显示当前生效的项：关闭滑动移动光标时不显示光标距离。
+            // 底部留白滑动和上面三选一互不影响，单独一行开关（用户 10-31 要求新增，默认关）。
+            Row(Modifier.settingsSearchAnchor("底部留白滑动移动光标", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("底部留白滑动移动光标", style = MaterialTheme.typography.titleSmall)
+                    Text("固定键盘在「调节键盘」里调出底部留白后，在键盘下面空出的那一条左右滑动移动光标，按住 Shift 滑是选字。没有留白或悬浮时不起作用。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.bottomLiftCursor, modifier = Modifier.testTag("bottom-lift-cursor-switch"),
+                    onCheckedChange = { settings = settings.copy(bottomLiftCursor = it); settings.save(context) })
+            }
+            // 只显示当前生效的项：滑动移动光标关闭且底部留白滑动也关着时不显示光标距离。
             // 触发时长跟着空格当前的长按功能放，标题写明它控制的是哪个功能。
             @Composable fun spaceHoldSlider() {
                 val actionText = when (settings.effectiveSpaceHold) {
@@ -196,7 +207,7 @@ internal fun InputExperienceSettings(
                     Text("默认 0.2 秒，每档 0.1 秒。语言键的长按单独设置。", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            if (settings.cursorGesture != CursorGestureMode.NONE) {
+            if (settings.cursorGesture != CursorGestureMode.NONE || settings.bottomLiftCursor) {
                 Column(Modifier.settingsSearchAnchor("从中间滑到边缘走几行", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("从中间滑到屏幕边缘走：${"%.2f".format(settings.cursorSwipeLines).trimEnd('0').trimEnd('.')} 行")
                     Text("按当前输入框一行能放几个字换算，字号、屏幕大小、横竖屏自动对上，手机和平板不用分别调", style = MaterialTheme.typography.bodySmall)

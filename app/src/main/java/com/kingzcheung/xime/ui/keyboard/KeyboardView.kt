@@ -400,6 +400,8 @@ fun KeyboardView(
         val resizeRotation = remember(sessionKey) { mutableFloatStateOf(if (state.isFloatingMode) state.floatingRotation else 0f) }
         val renderedBottomPaddingDp = if (resizeActive && !state.isFloatingMode)
             previewPaddingDp.intValue else state.keyboardBottomPaddingDp
+        // 调节键盘时底部留白在被拖动改高度，不当移光标区。
+        val bottomLiftCursorOn = inputPreferences.bottomLiftCursor && !resizeActive && !state.isFloatingMode
 
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
@@ -1480,9 +1482,7 @@ fun KeyboardView(
                                 modifier = Modifier.weight(1f).then(cursorMod),
                                 t9Controller = t9Controller,
                             )
-                            if (renderedBottomPaddingDp > 0) {
-                                Spacer(modifier = Modifier.height(renderedBottomPaddingDp.dp))
-                            }
+                            BottomLiftSpacer(renderedBottomPaddingDp, bottomLiftCursorOn, callbacks.onCursorMove)
                         }
                     }
 
@@ -1545,9 +1545,7 @@ fun KeyboardView(
                             specialKeyTextColor = specialKeyTextColor,
                             modifier = Modifier.weight(1f),
                         )
-                        if (renderedBottomPaddingDp > 0) {
-                            Spacer(modifier = Modifier.height(renderedBottomPaddingDp.dp))
-                        }
+                        BottomLiftSpacer(renderedBottomPaddingDp, bottomLiftCursorOn, callbacks.onCursorMove)
                     }
 
                     MainType.STROKE -> {
@@ -1656,9 +1654,7 @@ fun KeyboardView(
                     )
 
                 }
-                if (renderedBottomPaddingDp > 0) {
-                    Spacer(Modifier.height(renderedBottomPaddingDp.dp))
-                }
+                BottomLiftSpacer(renderedBottomPaddingDp, bottomLiftCursorOn, callbacks.onCursorMove)
             }
             } // Full candidate panel reveals over the complete keyboard body.
             KeyboardPanelReveal(
