@@ -128,10 +128,10 @@ class KeyboardInputPreferencesTest {
         assertEquals(false, KeyboardInputPreferences.read(context).qwertyPeriodKey)
     }
 
-    @Test fun `time and date candidates are on by default and stay off once turned off`() {
-        // 用户 10-31：打“时间”“日期”要给当前时间和日期，像别的输入法一样默认就有。
-        assertEquals(true, KeyboardInputPreferences().datetimeCandidates)
-        assertEquals(true, KeyboardInputPreferences.read(context).datetimeCandidates)
+    @Test fun `time and date candidates are off by default and stay on once turned on`() {
+        // 更新不改原有习惯（用户 10-31）：新功能默认关，在 语言与方案 › 中文输出 打开。
+        assertEquals(false, KeyboardInputPreferences().datetimeCandidates)
+        assertEquals(false, KeyboardInputPreferences.read(context).datetimeCandidates)
         KeyboardInputPreferences.read(context).copy(datetimeCandidates = false).save(context)
         assertEquals(false, values[KeyboardInputPreferences.DATETIME_CANDIDATES_KEY])
         assertEquals(false, KeyboardInputPreferences.read(context).datetimeCandidates)
