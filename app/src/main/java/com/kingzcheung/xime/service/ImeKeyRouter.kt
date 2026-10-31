@@ -1640,7 +1640,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             pendingEnglish = candState.pendingEnglishText.isNotEmpty(),
             candidatesVisible = candState.associationCandidates.isNotEmpty() || candState.isShowingRecentClipboard,
             predictionPending = predictionWasPending,
-        )
+        ).skippingAssociation(SettingsPreferences.isDeleteSkipsAssociation(service), candState.isShowingRecentClipboard)
         if (target == DeletionTarget.WAIT) return
         // 计算器模式：追踪退格
         val calculatorWasActive = service.calculatorEngine.isActive()

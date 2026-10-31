@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.twotone.Backspace
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
@@ -216,6 +217,9 @@ fun SmartPredictionSettingsContent(
                     var singleMode by remember {
                         mutableStateOf(SettingsPreferences.isSingleAssociationMode(context))
                     }
+                    var deleteSkipsAssociation by remember {
+                        mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context))
+                    }
                     SettingsSection(title = "联想行为", content = {
                         SettingsToggleItem(
                             icon = Icons.TwoTone.AutoAwesome,
@@ -225,6 +229,21 @@ fun SmartPredictionSettingsContent(
                             onCheckedChange = {
                                 spaceCommitEnabled = it
                                 SettingsPreferences.setSpaceCommitAssociationEnabled(context, it)
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsToggleItem(
+                            icon = Icons.AutoMirrored.TwoTone.Backspace,
+                            title = "退格直接删字",
+                            subtitle = "有联想词时，退格直接删掉刚上屏的字，不用先按一下收起联想",
+                            checked = deleteSkipsAssociation,
+                            onCheckedChange = {
+                                deleteSkipsAssociation = it
+                                SettingsPreferences.setDeleteSkipsAssociation(context, it)
                             }
                         )
                         HorizontalDivider(

@@ -11,3 +11,10 @@ internal fun deletionTarget(engineComposing: Boolean?, uiComposing: Boolean, par
     candidatesVisible || predictionPending -> DeletionTarget.CANDIDATES
     else -> DeletionTarget.DOCUMENT
 }
+
+/**
+ * 设置「退格直接删字」打开时，只有联想词（含在途的联想）挡着的那一下退格改成删字；
+ * 剪贴板胶囊照旧先收起，不删正文。
+ */
+internal fun DeletionTarget.skippingAssociation(enabled: Boolean, clipboardShown: Boolean): DeletionTarget =
+    if (enabled && this == DeletionTarget.CANDIDATES && !clipboardShown) DeletionTarget.DOCUMENT else this

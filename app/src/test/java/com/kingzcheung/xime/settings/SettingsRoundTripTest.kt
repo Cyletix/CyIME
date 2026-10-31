@@ -51,6 +51,7 @@ class SettingsRoundTripTest {
         Case("智能联想", false, true, S::setSmartPredictionEnabled, S::isSmartPredictionEnabled),
         Case("空格上屏后联想", false, true, S::setSpaceCommitAssociationEnabled, S::isSpaceCommitAssociationEnabled),
         Case("单字联想", true, false, S::setAssociationSingleMode, S::isSingleAssociationMode),
+        Case("退格直接删字", true, false, S::setDeleteSkipsAssociation, S::isDeleteSkipsAssociation),
         Case("上方角标提示", false, true, S::setSwipeUpHintsEnabled, S::isSwipeUpHintsEnabled),
         Case("下方角标提示", false, true, S::setSwipeDownHintsEnabled, S::isSwipeDownHintsEnabled),
         Case("点按弹出气泡", true, false, S::setShowPressBubble, S::shouldShowPressBubble),
