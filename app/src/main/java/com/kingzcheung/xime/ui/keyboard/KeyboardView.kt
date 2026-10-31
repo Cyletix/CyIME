@@ -563,10 +563,11 @@ fun KeyboardView(
         // 工具栏与菜单共用一组入口：动作、开/关状态和按键反馈相同，放在哪一处都一样。
         val quickContext = LocalContext.current
         val quickToggles = rememberQuickToggleStates()
+        // 仓颉也跟着「繁体输出」出简繁（ImeKeyRouter 设 simplification），按钮同样要在。
         val traditionalSwitchApplies = !state.isAsciiMode && !state.isHandwritingMode &&
             state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
             state.inputProfile.scheme in setOf(com.kingzcheung.xime.settings.InputScheme.PINYIN,
-                com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN)
+                com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN, com.kingzcheung.xime.settings.InputScheme.CANGJIE)
         fun quickAction(id: String): ToolbarAction? {
             val item = resolveToolbarButtonItem(id, state.toolbarPluginButtons) ?: return null
             val widthSwitch = if (state.isAsciiMode) null else state.schemaSwitches.firstOrNull { it.name == "full_shape" }
@@ -623,7 +624,7 @@ fun KeyboardView(
                     ToolbarButton.INCOGNITO -> ({ SettingsPreferences.setIncognito(quickContext, !quickToggles.incognito) })
                     // 英文状态标点固定半角，入口不出现，避免“点了看不到变化，实际却改了状态”。
                     ToolbarButton.FULL_SHAPE -> widthSwitch?.let { sw -> { callbacks.onToggleSchemaSwitch?.invoke(sw) } } ?: return null
-                    // 繁体输出只对拼音、双拼生效（注音本来就出正体），其余状态不出现；下一个按键起按新设置出字。
+                    // 繁体输出只对拼音、双拼、仓颉生效（注音本来就出正体），其余状态不出现；下一个按键起按新设置出字。
                     ToolbarButton.TRADITIONAL -> if (traditionalSwitchApplies) ({
                         inputPreferences.copy(traditionalOutput = !inputPreferences.traditionalOutput).save(quickContext)
                     }) else return null
