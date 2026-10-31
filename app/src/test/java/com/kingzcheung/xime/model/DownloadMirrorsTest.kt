@@ -26,6 +26,21 @@ class DownloadMirrorsTest {
         assertTrue(DownloadMirrors.candidates("", emptyList(), preferDomestic = true).isEmpty())
     }
 
+    /** GitHub 在国内常下不动：商店里每个还能下载的文件都要有一条国内线路（魔搭或 HuggingFace 国内镜像）。 */
+    @Test fun everyDownloadableModelHasADomesticRoute() {
+        val missing = BuiltinModelCatalog.models.flatMap { model ->
+            model.versions.filterNot { it.retired }.flatMap { version ->
+                val archive = version.archiveUrl
+                if (archive != null) {
+                    listOf(model.id to DownloadMirrors.candidates(archive, version.archiveMirrors, preferDomestic = true))
+                } else version.files.map { file ->
+                    "${model.id}/${file.name}" to DownloadMirrors.candidates(file.downloadUrl, file.mirrors, preferDomestic = true)
+                }
+            }
+        }.filterNot { (_, urls) -> urls.firstOrNull()?.let(DownloadMirrors::isDomestic) == true }.map { it.first }
+        assertEquals(emptyList<String>(), missing)
+    }
+
     @Test fun localImportMatchesOnlyCompleteVerifiedVersions() {
         val a = File("a"); val b = File("b"); val archive = File("c")
         val files = ModelInfo("files", "文件模型", "", ModelCategory.PREDICTION, versions = listOf(ModelVersion("v1",

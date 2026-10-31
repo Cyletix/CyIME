@@ -45,6 +45,7 @@ object SpeechModelCatalog {
         ModelInfo(XASR, "X-ASR · 中英整句定稿", "可选。中文开着「整句定稿」时（只用 SenseVoice，或 Paraformer / Zipformer 加 SenseVoice 二次校正），下载后改用它定稿：更准、更快；只用于中文。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "2026-06-03", size = "136.4MB",
                 archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03.tar.bz2", sha256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224",
+                archiveMirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03.tar.bz2"),
                 files = listOf(
                     ModelFile("encoder-epoch-99-avg-1.int8.onnx", "", "", 0L),
                     ModelFile("decoder-epoch-99-avg-1.onnx", "", "", 0L),
