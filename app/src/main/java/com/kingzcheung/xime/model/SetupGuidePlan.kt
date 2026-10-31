@@ -69,6 +69,8 @@ data class SetupFacts(
     val wubiInstalled: Boolean = false,
     /** 已打开的模糊音（[SpellingPatches.Fuzzy] 的 id）。 */
     val fuzzy: Set<String> = emptySet(),
+    /** 能不能替人加、去桌面「字幕」图标；老人包固定有图标。 */
+    val captionIconChangeable: Boolean = true,
 )
 
 data class SetupAnswers(
@@ -100,6 +102,8 @@ data class InputPlan(
     val downloadWubi: Boolean = false,
     val fuzzyOn: Set<String> = emptySet(),
     val fuzzyOff: Set<String> = emptySet(),
+    /** 加（true）或去掉（false）桌面「字幕」图标；null 不动。 */
+    val captionIcon: Boolean? = null,
     val lines: List<String> = emptyList(),
     val hideLine: String? = null,
 )
@@ -247,8 +251,15 @@ object SetupGuidePlanner {
             if (wanted && !now) { fuzzyOn += habit.fuzzyIds; lines += "打开模糊音：${habit.title}。" }
             if (!wanted && now) { fuzzyOff += habit.fuzzyIds.filter { it in facts.fuzzy }; lines += "关掉模糊音：${habit.title}。" }
         }
+
+        val captionIcon = answers.caption.takeIf { facts.captionIconChangeable && it != facts.usesCaption }
+        when (captionIcon) {
+            true -> lines += "桌面上加一个「字幕」图标（系统会问一次要不要添加）。"
+            false -> lines += "桌面上的「字幕」图标关掉（变灰后可长按移除）。"
+            null -> {}
+        }
         return InputPlan(switchTo, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
-            lines, hideLine)
+            captionIcon, lines, hideLine)
     }
 
     fun plan(facts: SetupFacts, answers: SetupAnswers): SetupPlan {

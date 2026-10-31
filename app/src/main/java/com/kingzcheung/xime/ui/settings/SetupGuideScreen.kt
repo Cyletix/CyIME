@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.theme.CyMotion
+import com.kingzcheung.xime.model.BuiltinModelCatalog
 import com.kingzcheung.xime.model.DeviceModelTier
 import com.kingzcheung.xime.model.FuzzyHabit
 import com.kingzcheung.xime.model.InputPlan
@@ -283,11 +284,12 @@ private fun CheckBadge(selected: Boolean) {
     }
 }
 
-/** 一个问题：标题＋竖排的大选项卡（不并排，手机上每张卡都够宽）。 */
+/** 一个问题：标题（可带一段说明）＋竖排的大选项卡（不并排，手机上每张卡都够宽）。 */
 @Composable
 private fun <T> GuideQuestion(title: String, options: List<Triple<T, String, String>>, selected: T, tagPrefix: String,
-    onSelect: (T) -> Unit) {
+    note: String? = null, onSelect: (T) -> Unit) {
     GuideHeading(title)
+    note?.let { Text(it, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
     Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         options.forEach { (value, optionTitle, subtitle) ->
             GuideOption(selected == value, optionTitle, subtitle, "$tagPrefix:$value") { onSelect(value) }
@@ -334,10 +336,21 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
         Triple(VoiceUse.SOMETIMES, "偶尔用，说完出字就行", "说完一句再出字，错字少、带标点，占的空间少一半"),
         Triple(VoiceUse.NEVER, "不用语音", "关掉语音输入，不留语音模型（字幕要用的除外）"),
     ), answers.voice, "setup-voice") { onAnswers(answers.copy(voice = it)) }
-    GuideQuestion("用字幕吗？", listOf(
-        Triple(true, "用字幕", "开会、和听力不好的人说话时，把别人说的话实时显示在屏幕上，并分清是谁说的"),
-        Triple(false, "不用字幕", "不留分清说话人的模型"),
-    ), answers.caption, "setup-caption") { onAnswers(answers.copy(caption = it)) }
+    val speaker = facts.sizes[BuiltinModelCatalog.SPEAKER_MODEL]?.takeIf { it > 0 }?.let { "（${SetupGuidePlanner.mbText(it)}）" }.orEmpty()
+    val icon = when {
+        !facts.captionIconChangeable -> "桌面上的「字幕」图标保留"
+        facts.usesCaption -> "桌面上已有「字幕」图标，点一下就打开"
+        else -> "桌面上加一个「字幕」图标（系统会问一次要不要添加），点一下就打开"
+    }
+    GuideQuestion("要用「字幕」吗？", listOf(
+        Triple(true, "用字幕", "$icon；键盘菜单里也能进。会留下分清谁在说话的模型$speaker"),
+        Triple(false, "不用字幕", (if (facts.captionIconChangeable) "桌面上不放「字幕」图标（已有的会变灰，可长按移除），" else "") +
+            "删掉分清谁在说话的模型。以后想用，在 设置 → 语音转文本 → 字幕 打开"),
+    ), answers.caption, "setup-caption",
+        note = "「字幕」是 CyIME 里单独的一个页面：把身边的人说的话实时变成大字显示在屏幕上，还能分清是谁在说。" +
+            "适合开会、上课，或和听力不好的人当面说话。用不用都不影响打字和语音输入。") {
+        onAnswers(answers.copy(caption = it))
+    }
 }
 
 /** 打字方式这一块要改的：每项一句；“方案栏里藏起用不到的双拼”单独一行开关，默认开。 */

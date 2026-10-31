@@ -20,6 +20,8 @@ import com.kingzcheung.xime.settings.SpellingPatches
 import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.SpeechModelSelection
 import com.kingzcheung.xime.util.FileLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
@@ -97,6 +99,7 @@ object SetupGuide {
             doublePinyinChoices = doublePinyins.map { DoublePinyinChoice(it.id, it.name, it.preview(), !DoublePinyinSchemes.isCustom(it.id)) },
             wubiInstalled = File(SchemaManager.getRimeDir(context), "${SetupGuidePlanner.WUBI}.schema.yaml").isFile,
             fuzzy = SpellingPatches.fuzzy(context).mapTo(linkedSetOf()) { it.id },
+            captionIconChangeable = !com.kingzcheung.xime.BuildConfig.ELDER,
         )
     }
 
@@ -183,7 +186,7 @@ object SetupGuide {
     }
 
     /**
-     * 打字方式：模糊音、双拼方案栏、五笔、当前方案。都走设置页同一套函数（双拼页、模糊音、方案市场），
+     * 打字方式：模糊音、双拼方案栏、五笔、当前方案、桌面「字幕」图标。都走设置页同一套函数（双拼页、模糊音、方案市场），
      * 输入法服务照常收到改动后重新部署、切回当前方案。返回没做成的，白话。
      */
     private suspend fun applyInput(app: Context, input: InputPlan, hideDoublePinyin: Boolean, online: Boolean): List<String> {
@@ -253,6 +256,11 @@ object SetupGuide {
         if (switchTo != null && com.kingzcheung.xime.rime.RimeEngine.isInitialized()) runCatching {
             val engine = com.kingzcheung.xime.rime.RimeEngine.getInstance()
             if (switchTo in engine.getAvailableSchemas()) engine.switchSchema(switchTo)
+        }
+
+        input.captionIcon?.let { on ->
+            runCatching { withContext(Dispatchers.Main) { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.setEnabled(app, on) } }
+                .onFailure { failed += "桌面「字幕」图标没改成，可以在 设置 → 语音转文本 → 字幕 里开关。" }
         }
         return failed
     }
