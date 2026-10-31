@@ -289,4 +289,17 @@ class SetupGuidePlanTest {
         // 明确选了 26 键就切过去。
         assertEquals("rime_ice", SetupGuidePlanner.plan(f, answers.copy(keyboard = KeyboardWay.QWERTY)).input.switchTo)
     }
+
+    @Test fun switchingToDoublePinyinTurnsOnKeyHintsOnlyForNewcomers() {
+        val f = typingFacts()
+        val toDouble = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN)).input
+        assertTrue(toDouble.keyHintsOn)
+        assertTrue(toDouble.lines.toString(), toDouble.lines.any { it.startsWith("打开双拼键位提示") })
+        // 本来就用双拼（换一种也算）、已经开着、或不选双拼：不动。
+        val already = f.copy(typing = TypingWay.DOUBLE_PINYIN, doublePinyin = "double_pinyin_flypy")
+        assertFalse(SetupGuidePlanner.plan(already, SetupGuidePlanner.suggest(already).copy(doublePinyin = "double_pinyin_ziranma")).input.keyHintsOn)
+        val on = f.copy(doublePinyinKeyHints = true)
+        assertFalse(SetupGuidePlanner.plan(on, SetupGuidePlanner.suggest(on).copy(typing = TypingWay.DOUBLE_PINYIN)).input.keyHintsOn)
+        assertFalse(SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input.keyHintsOn)
+    }
 }

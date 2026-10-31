@@ -87,6 +87,8 @@ data class SetupFacts(
     val doublePinyinChoices: List<DoublePinyinChoice> = emptyList(),
     /** 五笔86 已经装在手机上。 */
     val wubiInstalled: Boolean = false,
+    /** 「双拼键位提示」已经开着。 */
+    val doublePinyinKeyHints: Boolean = false,
     /** 已打开的模糊音（[SpellingPatches.Fuzzy] 的 id）。 */
     val fuzzy: Set<String> = emptySet(),
     /** 能不能替人加、去桌面「字幕」图标；老人包固定有图标。 */
@@ -126,6 +128,8 @@ data class InputPlan(
     val downloadWubi: Boolean = false,
     val fuzzyOn: Set<String> = emptySet(),
     val fuzzyOff: Set<String> = emptySet(),
+    /** 打开「双拼键位提示」：从别的打法改成双拼时开，帮刚学的人记键位；本来就用双拼的不动。 */
+    val keyHintsOn: Boolean = false,
     /** 加（true）或去掉（false）桌面「字幕」图标；null 不动。 */
     val captionIcon: Boolean? = null,
     val lines: List<String> = emptyList(),
@@ -317,6 +321,10 @@ object SetupGuidePlanner {
             if (!wanted && now) { fuzzyOff += habit.fuzzyIds.filter { it in facts.fuzzy }; lines += "关掉模糊音：${habit.title}。" }
         }
 
+        // 刚改用双拼的人还没记熟键位：打开双拼键位提示（用户 10-31）。本来就用双拼的、已经开着的不动。
+        val keyHintsOn = typing == TypingWay.DOUBLE_PINYIN && facts.typing != TypingWay.DOUBLE_PINYIN && !facts.doublePinyinKeyHints
+        if (keyHintsOn) lines += "打开双拼键位提示：双拼 26 键每个键上写出 zh、ch、sh 和韵母，记熟了可以在 语言与方案 › 双拼方案 关掉。"
+
         val captionIcon = answers.caption.takeIf { facts.captionIconChangeable && it != facts.usesCaption }
         when (captionIcon) {
             true -> lines += "桌面上加一个「字幕」图标（系统会问一次要不要添加）。"
@@ -324,7 +332,7 @@ object SetupGuidePlanner {
             null -> {}
         }
         return InputPlan(switchTo, enable, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
-            captionIcon, lines, hideLine)
+            keyHintsOn, captionIcon, lines, hideLine)
     }
 
     fun plan(facts: SetupFacts, answers: SetupAnswers): SetupPlan {
