@@ -19,7 +19,8 @@ class T9CandidateNavigationTest {
         assertTrue(composing.hasSameSelectionSource(second))
         val third = second.advanceT9Candidate(profile)
         assertEquals(2, third.spaceCandidateIndex(profile))
-        assertEquals(0, third.advanceT9Candidate(profile).highlightedCandidateIndex)
+        // 末个再「下一项」停在末个，不绕回首选（用户 10-31）。
+        assertEquals(2, third.advanceT9Candidate(profile).highlightedCandidateIndex)
         // Space captures an immutable selection before a subsequent Next tap.
         assertEquals(1, second.spaceCandidateIndex(profile))
     }
@@ -41,7 +42,9 @@ class T9CandidateNavigationTest {
         assertEquals(composing, second.copy(candidateFocus = null))
         assertEquals("不是一样吗", second.candidates[second.spaceCandidateIndex(profile)])
         assertEquals(0, second.retreatT9Candidate(profile).highlightedCandidateIndex)
-        assertEquals(2, composing.retreatT9Candidate(profile).highlightedCandidateIndex)
+        // 首选再左滑「上一项」停在首选，不跳到队尾（用户 10-31）。
+        assertSame(composing, composing.retreatT9Candidate(profile))
+        assertEquals(0, second.retreatT9Candidate(profile).retreatT9Candidate(profile).highlightedCandidateIndex)
         assertEquals(2, third.spaceCandidateIndex(profile))
     }
 
@@ -77,7 +80,7 @@ class T9CandidateNavigationTest {
             }
     }
 
-    @Test fun predictionArrowFocusesFirstThenCyclesAndNewResultsInvalidateFocus() {
+    @Test fun predictionArrowFocusesFirstStopsAtBothEndsAndNewResultsInvalidateFocus() {
         val state = CandidateState(associationCandidates = listOf("世界", "朋友", "大家"))
         assertTrue(state.usesT9CandidateNavigation(profile))
         assertNull(state.focusedT9AssociationIndex)
@@ -86,6 +89,13 @@ class T9CandidateNavigationTest {
         val second = first.advanceT9Candidate(profile)
         assertEquals(1, second.spaceCandidateIndex(profile))
         assertEquals(0, second.retreatT9Candidate(profile).focusedT9AssociationIndex)
+        // 联想没高亮时左滑不跳到队尾；高亮在两头时也不绕到另一头。
+        assertSame(state, state.retreatT9Candidate(profile))
+        val first0 = second.retreatT9Candidate(profile)
+        assertSame(first0, first0.retreatT9Candidate(profile))
+        val last = second.advanceT9Candidate(profile)
+        assertEquals(2, last.focusedT9AssociationIndex)
+        assertSame(last, last.advanceT9Candidate(profile))
         assertNull(second.copy(associationCandidates = listOf("新词")).focusedT9AssociationIndex)
         assertFalse(state.copy(pendingEnglishText = "hello").usesT9CandidateNavigation(profile))
         assertFalse(CandidateState().usesT9CandidateNavigation(profile))
@@ -113,8 +123,10 @@ class T9CandidateNavigationTest {
         // 英文候选没有注释，用它本身的字母。
         val seo = ren.advanceT9Candidate(profile).advanceT9Candidate(profile)
         assertEquals("seo", seo.shownPreedit(profile))
-        // 回到首选，又是引擎的编码；回车按屏上编码上屏。
-        assertEquals("pen", seo.advanceT9Candidate(profile).shownPreedit(profile))
+        // 末个不绕回首选；退回首选，又是引擎的编码；回车按屏上编码上屏。
+        assertEquals("seo", seo.advanceT9Candidate(profile).shownPreedit(profile))
+        assertEquals("pen", seo.retreatT9Candidate(profile).retreatT9Candidate(profile).retreatT9Candidate(profile)
+            .shownPreedit(profile))
         assertEquals("ren", rawCompositionCommitText("736", ren.shownPreedit(profile), t9 = true))
         // 编码一变，高亮回首选，显示回到引擎编码。
         assertEquals("pen", ren.copy(engineRevision = 4).shownPreedit(profile))

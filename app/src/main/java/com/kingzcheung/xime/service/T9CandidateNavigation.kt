@@ -47,12 +47,15 @@ internal fun CandidateState.advanceT9Candidate(profile: InputProfile): Candidate
 internal fun CandidateState.retreatT9Candidate(profile: InputProfile): CandidateState =
     moveT9Candidate(profile, -1)
 
+/** 到首个、末个就停住，不绕到另一头（用户 10-31：左滑不能切到队尾）。 */
 private fun CandidateState.moveT9Candidate(profile: InputProfile, direction: Int): CandidateState {
     val words = t9NavigationWords
     if (!usesT9CandidateNavigation(profile) || words.isEmpty()) return this
     val index = if (!isComposing && focusedT9AssociationIndex == null) {
-        if (direction > 0) 0 else words.lastIndex
-    } else (highlightedCandidateIndex + direction + words.size) % words.size
+        if (direction > 0) 0 else return this
+    } else (highlightedCandidateIndex + direction).coerceIn(0, words.lastIndex)
+    if (isComposing && index == highlightedCandidateIndex) return this
+    if (!isComposing && index == focusedT9AssociationIndex) return this
     return copy(candidateFocus = CandidateFocus.at(index, this))
 }
 
