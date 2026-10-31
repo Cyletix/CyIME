@@ -35,6 +35,14 @@ class ImeBottomSpaceTest {
     @Test fun gestureNavigationKeepsTheBarWhenTheSystemDrawsKeyboardButtonsThere() {
         assertEquals(144, imeBottomInsetPx(144, tappablePx = 0, navigationMode = 2, imeNavButtons = true, gestureBarPx = 72))
     }
+    // vivo 手势导航时键盘下面有「切换输入法」按钮（10-31 用户反馈压住了）：只有三星缩到手势条。
+    @Test fun onlyVerifiedVendorsShrinkToTheGestureBar() {
+        assertEquals(true, gestureStripVerifiedVendor("samsung"))
+        assertEquals(true, gestureStripVerifiedVendor("Samsung"))
+        for (vendor in listOf("vivo", "Xiaomi", "OPPO", "HONOR", "HUAWEI", "Google", "", null)) {
+            assertEquals(vendor.toString(), false, gestureStripVerifiedVendor(vendor))
+        }
+    }
     @Test fun noSystemBarStaysZero() {
         assertEquals(0, imeBottomInsetPx(0, tappablePx = 0, navigationMode = 2, imeNavButtons = false, gestureBarPx = 72))
     }
