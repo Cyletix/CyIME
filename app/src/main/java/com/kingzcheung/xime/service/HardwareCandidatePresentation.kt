@@ -13,6 +13,12 @@ internal data class HardwareCandidatePresentation(
     val standaloneWords: List<String> get() = if (association) emptyList() else words
 
     /**
+     * 「联想也显示在候选窗」打开时，联想和打字候选在同一个浮窗里，不在浮窗和工具条之间来回换位置
+     * （B 站反馈 10-31，外接便携键盘）。默认关：联想仍在工具条。
+     */
+    fun windowWords(associationInWindow: Boolean): List<String> = if (associationInWindow) words else standaloneWords
+
+    /**
      * The physical-keyboard toolbar numbers at most [HARDWARE_PAGE_SIZE] candidates. A longer engine
      * page is shown as consecutive windows; paging moves through them before turning the engine page.
      */

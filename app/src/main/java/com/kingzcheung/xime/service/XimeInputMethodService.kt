@@ -1870,7 +1870,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 frostedGlass = glass,
                                 inputText = if (hardwareEnglish) "" else cand.inputText,
                                 preeditText = if (hardwareEnglish) "" else cand.shownPreedit(state.inputProfile),
-                                candidates = hardwareCandidates.standaloneWords,
+                                candidates = hardwareCandidates.windowWords(state.hardwareOptions.associationInWindow),
                                 hasNextPage = hardwareCandidates.hasNextPage,
                                 hasPrevPage = hardwareCandidates.hasPreviousPage,
                                 cursorAnchor = state.cursorAnchor.takeIf { state.hardwareOptions.followCursor },
@@ -1934,7 +1934,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         showNumberLabels = !hardwareEnglish)
                                   }
                                 },
-                                showCandidatesWhenFloating = hardwareCandidates.association,
+                                showCandidatesWhenFloating = hardwareCandidates.association && !state.hardwareOptions.associationInWindow,
                                 candidatesPending = !hardwareEnglish && pendingPrediction != 0L,
                                 contentColor = hardwarePalette.candidateText,
                                 position = hardwareToolbarPosition.value,
