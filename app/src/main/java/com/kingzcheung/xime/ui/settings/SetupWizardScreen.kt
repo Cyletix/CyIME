@@ -19,6 +19,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.settings.ChineseSchemas
+import com.kingzcheung.xime.settings.DoublePinyinScheme
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +69,11 @@ fun SetupWizardScreen(
         try {
             val schemas = withContext(Dispatchers.IO) {
                 RimeConfigHelper.prepareAutomatically(context)
-                SchemaManager.getEnabledSchemas(context).map { ChineseSchemas.displayName(it, it) }
+                // 用方案文件里的名字（小鹤双拼等），和「语言与方案」页一致；读不到才退回内置名或 ID。
+                val names = SchemaManager.discoverSchemas(context).associate { it.schemaId to it.name }
+                SchemaManager.getEnabledSchemas(context).map { id ->
+                    names[id] ?: DoublePinyinScheme.BUILTINS.firstOrNull { it.id == id }?.name ?: ChineseSchemas.displayName(id, id)
+                }
             }
             status = status.copy(preparing = false, schemas = schemas,
                 error = if (schemas.isEmpty()) "请至少启用一个输入方案" else null)
