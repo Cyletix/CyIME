@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.theme.CyMotion
 import com.kingzcheung.xime.model.DeviceModelTier
+import com.kingzcheung.xime.model.FuzzyHabit
+import com.kingzcheung.xime.model.InputPlan
 import com.kingzcheung.xime.model.SetupAnswers
 import com.kingzcheung.xime.model.SetupFacts
 import com.kingzcheung.xime.model.SetupGuide
@@ -46,6 +48,7 @@ import com.kingzcheung.xime.model.SetupGuidePlanner
 import com.kingzcheung.xime.model.SetupItem
 import com.kingzcheung.xime.model.SetupPlan
 import com.kingzcheung.xime.model.SetupSource
+import com.kingzcheung.xime.model.TypingWay
 import com.kingzcheung.xime.model.VoiceUse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,8 +56,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * 按设备推荐配置：首次设置完成后出现一次，之后从设置首页「配置选择」进入。
- * 先问三件用法（语音、九键、字幕），再按设备情况给出要留、要下载、可以删的模型，全部用白话说明；
- * 只有点了“按推荐设置”才改设置和删文件。
+ * 先问打字习惯（全拼／双拼哪一种／五笔、分不清的读音、九键）和用法（语音、字幕），再按设备情况给出
+ * 打字方式要改的几项和要留、要下载、可以删的模型，全部用白话说明；只有点了“按推荐设置”才改设置和删文件。
  *
  * 引导页原则（用户 10-30）：字要大，选项卡要大，选中的那个一目了然（底色、粗边框、打勾三样一起变），
  * 过渡放慢到看得清（[CyMotion.GUIDE]），不靠小圆点或开关位置让人猜选了哪个。
@@ -68,6 +71,7 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit) {
     var applying by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<SetupGuide.Result?>(null) }
     var allowMetered by remember { mutableStateOf(false) }
+    var hideDoublePinyin by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         val read = withContext(Dispatchers.IO) { SetupGuide.readFacts(context) }
         facts = read
@@ -82,6 +86,7 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit) {
     SetupGuideContent(
         facts = facts, plan = plan, removeIds = removeIds, allowMetered = allowMetered,
         applying = applying, result = result, firstRun = firstRun,
+        hideDoublePinyin = hideDoublePinyin, onHideDoublePinyin = { hideDoublePinyin = it },
         onAnswers = { answers = it },
         onToggleRemove = { id, on -> removeIds = if (on) removeIds + id else removeIds - id },
         onAllowMetered = { allowMetered = it },
@@ -89,7 +94,9 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit) {
             plan?.let { current ->
                 applying = true
                 scope.launch {
-                    result = withContext(Dispatchers.IO) { SetupGuide.apply(context, current, removeIds, allowMetered) }
+                    result = withContext(Dispatchers.IO) {
+                        SetupGuide.apply(context, current, removeIds, allowMetered, hideDoublePinyin)
+                    }
                     applying = false
                 }
             }
@@ -115,6 +122,8 @@ internal fun SetupGuideContent(
     onApply: () -> Unit,
     onSkip: () -> Unit,
     onDone: () -> Unit,
+    hideDoublePinyin: Boolean = true,
+    onHideDoublePinyin: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -139,7 +148,8 @@ internal fun SetupGuideContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Spacer(Modifier.height(4.dp))
-            Text("看看这台设备的情况，再告诉 CyIME 你打算怎么用，它会推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
+            Text("看看这台设备的情况，再告诉 CyIME 你平时怎么打字、打算怎么用，它会照你的习惯设好打字方式，" +
+                "推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
                 style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (facts == null || plan == null) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
@@ -149,7 +159,8 @@ internal fun SetupGuideContent(
                 Spacer(Modifier.height(24.dp))
             } else {
                 DeviceSection(facts)
-                AnswerSection(plan.answers, onAnswers)
+                AnswerSection(facts, plan.answers, onAnswers)
+                InputSection(plan.input, hideDoublePinyin, onHideDoublePinyin)
                 KeepSection(plan.keep, facts.device)
                 if (plan.remove.isNotEmpty()) RemoveSection(plan.remove, removeIds, onToggleRemove)
                 SummarySection(facts, plan, removeIds)
@@ -229,7 +240,7 @@ private fun FactLine(text: String) {
  * 没选中的是浅底、细边框、空心圆；读屏按单选按钮报“已选中”。
  */
 @Composable
-private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag: String, onClick: () -> Unit) {
+private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag: String, multi: Boolean = false, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(if (selected) colors.primaryContainer else colors.surfaceContainerLow,
         tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-option-container")
@@ -242,7 +253,8 @@ private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag:
     val shape = RoundedCornerShape(16.dp)
     Surface(shape = shape, color = container, border = BorderStroke(edgeWidth, edge),
         modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp).testTag(tag).clip(shape)
-            .selectable(selected, role = Role.RadioButton, onClick = onClick)) {
+            .then(if (multi) Modifier.toggleable(selected, role = Role.Checkbox, onValueChange = { onClick() })
+                else Modifier.selectable(selected, role = Role.RadioButton, onClick = onClick))) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, style = GuideText.optionTitle(), color = content)
@@ -284,20 +296,65 @@ private fun <T> GuideQuestion(title: String, options: List<Triple<T, String, Str
 }
 
 @Composable
-private fun AnswerSection(answers: SetupAnswers, onAnswers: (SetupAnswers) -> Unit) {
+private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (SetupAnswers) -> Unit) {
+    GuideQuestion("打中文用哪种方式？", listOfNotNull(
+        Triple(TypingWay.FULL_PINYIN, "全拼", "拼音全部打出来，如“中国”打 zhongguo；不用记键位"),
+        Triple(TypingWay.DOUBLE_PINYIN, "双拼", "每个字只按两个键，如小鹤双拼“中国”打 vsgo；打得快，要先记键位"),
+        Triple(TypingWay.WUBI, "五笔", "按字形拆成字根打，不看读音；" +
+            if (facts.wubiInstalled || facts.typing == TypingWay.WUBI) "五笔方案已在${facts.device}上" else "要下载五笔86方案，约 2 MB"),
+        Triple(TypingWay.KEEP, "保持现在的${facts.typingName}", "不改打字方式").takeIf { facts.typing == TypingWay.KEEP },
+    ), answers.typing, "setup-typing") { onAnswers(answers.copy(typing = it)) }
+    if (answers.typing == TypingWay.DOUBLE_PINYIN && facts.doublePinyinChoices.isNotEmpty()) {
+        GuideQuestion("用哪一种双拼？", facts.doublePinyinChoices.map { choice ->
+            Triple(choice.id, choice.name, "“双拼”两个字打 ${choice.example}" + if (choice.builtin) "" else "（你自己建的）")
+        }, answers.doublePinyin, "setup-double-pinyin") { onAnswers(answers.copy(doublePinyin = it)) }
+    }
+    if (answers.typing == TypingWay.FULL_PINYIN) {
+        // 多选：可以同时分不清几组；“都分得清”和其他互斥，让“一个都不选”也是看得见的选择。
+        GuideHeading("有分不清的读音吗？")
+        Text("选上的打开模糊音，两边的读音都能打出对方的字，候选会多一些近音字。只对全拼 26 键起作用。",
+            style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            GuideOption(answers.fuzzy.isEmpty(), "都分得清", "不打开模糊音，候选最准", "setup-fuzzy:none") {
+                onAnswers(answers.copy(fuzzy = emptySet()))
+            }
+            FuzzyHabit.entries.forEach { habit ->
+                GuideOption(habit in answers.fuzzy, habit.title, habit.example, "setup-fuzzy:${habit.name}", multi = true) {
+                    onAnswers(answers.copy(fuzzy = if (habit in answers.fuzzy) answers.fuzzy - habit else answers.fuzzy + habit))
+                }
+            }
+        }
+    }
+    GuideQuestion("用九键打字吗？", listOf(
+        Triple(true, "用九键", "九键按整句常用说法组词，长句更容易一次打对；需要九键整句组词模型"),
+        Triple(false, "不用九键", "只用 26 键、14 键或手写，不留九键模型"),
+    ), answers.t9, "setup-t9") { onAnswers(answers.copy(t9 = it)) }
     GuideQuestion("语音输入打算怎么用？", listOf(
         Triple(VoiceUse.OFTEN, "经常用，想边说边看到字", "说话时字就跟着出来，停下后再自动改错、加标点"),
         Triple(VoiceUse.SOMETIMES, "偶尔用，说完出字就行", "说完一句再出字，错字少、带标点，占的空间少一半"),
         Triple(VoiceUse.NEVER, "不用语音", "关掉语音输入，不留语音模型（字幕要用的除外）"),
     ), answers.voice, "setup-voice") { onAnswers(answers.copy(voice = it)) }
-    GuideQuestion("用九键打字吗？", listOf(
-        Triple(true, "用九键", "九键按整句常用说法组词，长句更容易一次打对；需要九键整句组词模型"),
-        Triple(false, "不用九键", "只用 26 键、14 键或手写，不留九键模型"),
-    ), answers.t9, "setup-t9") { onAnswers(answers.copy(t9 = it)) }
     GuideQuestion("用字幕吗？", listOf(
         Triple(true, "用字幕", "开会、和听力不好的人说话时，把别人说的话实时显示在屏幕上，并分清是谁说的"),
         Triple(false, "不用字幕", "不留分清说话人的模型"),
     ), answers.caption, "setup-caption") { onAnswers(answers.copy(caption = it)) }
+}
+
+/** 打字方式这一块要改的：每项一句；“方案栏里藏起用不到的双拼”单独一行开关，默认开。 */
+@Composable
+private fun InputSection(input: InputPlan, hideDoublePinyin: Boolean, onHide: (Boolean) -> Unit) {
+    if (input.lines.isEmpty() && input.hideLine == null) return
+    GuideHeading("打字方式会这样改")
+    GuideCard {
+        if (input.lines.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            input.lines.forEach { Text(it, style = GuideText.body()) }
+        }
+        input.hideLine?.let { line ->
+            if (input.lines.isNotEmpty()) GuideDivider()
+            GuideSwitchRow(title = "方案栏只留用得到的", subtitle = line, checked = hideDoublePinyin,
+                tag = "setup-hide-double-pinyin", onCheckedChange = onHide)
+        }
+    }
 }
 
 @Composable
@@ -394,6 +451,8 @@ private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit) {
                     "还要下载 ${SetupGuidePlanner.mbText(result.downloading)}，连上 Wi-Fi 后自动下载。"
                     else "正在后台下载 ${SetupGuidePlanner.mbText(result.downloading)}，下好就能用。")
                 if (result.failed.isNotEmpty()) add("这些没删成：${result.failed.joinToString("、")}，可以在 扩展 → 已安装的模型 里再删。")
+                addAll(result.inputDone)
+                addAll(result.inputFailed)
             }
             lines.forEach { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, style = GuideText.body()) }
         }
