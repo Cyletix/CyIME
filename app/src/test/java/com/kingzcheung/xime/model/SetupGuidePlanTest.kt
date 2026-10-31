@@ -144,7 +144,8 @@ class SetupGuidePlanTest {
 
     private val doublePinyins = listOf("double_pinyin_flypy" to "小鹤双拼", "double_pinyin_shoudao" to "首道双拼",
         "double_pinyin_ziranma" to "自然码", "double_pinyin_znabc" to "智能ABC双拼", "double_pinyin_jiajia" to "拼音加加",
-        "double_pinyin_microsoft" to "微软双拼").map { (id, name) -> DoublePinyinChoice(id, name, "xx'xx") }
+        "double_pinyin_microsoft" to "微软双拼").map { (id, name) ->
+            DoublePinyinChoice(id, name, "xx'xx", lettersOnly = id == "double_pinyin_microsoft") }
     /** 新装：全拼 26 键，六种内置双拼都在方案栏里，没开模糊音，没有字幕图标。 */
     private fun typingFacts() = facts(DeviceModelTier.ENHANCED).copy(doublePinyinChoices = doublePinyins,
         shownDoublePinyin = doublePinyins.map { it.id }.toSet())
@@ -173,7 +174,7 @@ class SetupGuidePlanTest {
     }
 
     @Test fun onNineKeysTheSchemeIsShownButNotSwitched() {
-        val f = typingFacts().copy(onLetterKeyboard = false, usesT9 = true)
+        val f = typingFacts().copy(keyboard = KeyboardWay.T9, usesT9 = true)
         val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.WUBI)).input
         assertNull(input.switchTo)
         assertTrue(input.useWubi && input.downloadWubi)
@@ -209,11 +210,83 @@ class SetupGuidePlanTest {
     }
 
     @Test fun otherInputWaysAreKeptAsTheyAre() {
-        val f = typingFacts().copy(typing = TypingWay.KEEP, typingName = "仓颉", onLetterKeyboard = false)
+        val f = typingFacts().copy(typing = TypingWay.KEEP, typingName = "仓颉", keyboard = KeyboardWay.KEEP)
         assertEquals(TypingWay.KEEP, SetupGuidePlanner.suggest(f).typing)
         val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input
         assertNull(input.switchTo)
         assertTrue(input.hideDoublePinyin.isEmpty())
         assertTrue(input.lines.isEmpty())
+    }
+
+    @Test fun keyboardQuestionStartsAtTheCurrentKeyboardAndChangesNothingWhenKept() {
+        val f = typingFacts()
+        assertEquals(KeyboardWay.QWERTY, SetupGuidePlanner.suggest(f).keyboard)
+        assertEquals(listOf(KeyboardWay.QWERTY, KeyboardWay.K14, KeyboardWay.T9),
+            SetupGuidePlanner.keyboards(f, SetupGuidePlanner.suggest(f)))
+        // QWJRTK 等字母排列也算 26 键：回答不变就不切，不会被换回 QWERTY。
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input
+        assertNull(input.switchTo)
+        assertTrue(input.enable.isEmpty())
+        // 五笔只问打法，不问键盘。
+        assertTrue(SetupGuidePlanner.keyboards(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.WUBI)).isEmpty())
+    }
+
+    @Test fun choosingFourteenKeysTurnsTheLayoutOnAndSwitchesToIt() {
+        val f = typingFacts()
+        val full = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(keyboard = KeyboardWay.K14)).input
+        assertEquals("pinyin_14jian", full.switchTo)
+        assertEquals(listOf("pinyin_14jian"), full.enable)
+        assertTrue(full.lines.toString(), "中文换成 14 键，用全拼打。" in full.lines)
+        // 双拼 14 键：打开双拼和中文14键，14 键版本随两者自动出现，不单独打开。
+        val double = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN,
+            keyboard = KeyboardWay.K14)).input
+        assertEquals("double_pinyin_flypy_14jian", double.switchTo)
+        assertEquals("double_pinyin_flypy", double.showDoublePinyin)
+        assertEquals(listOf("pinyin_14jian"), double.enable)
+        assertTrue(double.lines.toString(), "中文换成 14 键，用小鹤双拼打。" in double.lines)
+    }
+
+    @Test fun nineKeysForDoublePinyinUsesItsNineKeyVersion() {
+        val f = typingFacts()
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN,
+            doublePinyin = "double_pinyin_ziranma", keyboard = KeyboardWay.T9)).input
+        assertEquals("double_pinyin_ziranma_t9", input.switchTo)
+        assertEquals(listOf("double_pinyin_ziranma_t9"), input.enable)
+        assertTrue(input.lines.toString(), "中文换成九键，用自然码打。" in input.lines)
+    }
+
+    @Test fun fullPinyinOnNineKeysKeepsTheNineKeyModelWithoutAskingAgain() {
+        val f = typingFacts().copy(installed = mapOf(CandidateModelCatalog.NGRAM to 203 * mb))
+        val plan = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(keyboard = KeyboardWay.T9, t9 = false))
+        assertEquals("t9_pinyin", plan.input.switchTo)
+        assertEquals(CandidateModelCatalog.NGRAM, plan.t9Model)
+        // 双拼九键不用九键整句组词模型：照“用九键打字吗”的回答。
+        val double = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN,
+            keyboard = KeyboardWay.T9, t9 = false))
+        assertNull(double.t9Model)
+    }
+
+    @Test fun microsoftDoublePinyinOnlyOffersTwentySixKeys() {
+        val f = typingFacts()
+        val answers = SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN, doublePinyin = "double_pinyin_microsoft",
+            keyboard = KeyboardWay.K14)
+        assertEquals(listOf(KeyboardWay.QWERTY), SetupGuidePlanner.keyboards(f, answers))
+        assertEquals(KeyboardWay.QWERTY, SetupGuidePlanner.keyboardOf(f, answers))
+        val input = SetupGuidePlanner.plan(f, answers).input
+        assertEquals("double_pinyin_microsoft", input.switchTo)
+        assertTrue(input.enable.isEmpty())
+    }
+
+    @Test fun otherKeyboardsCanBeKept() {
+        // 现在在 17 键：多一个“保持现在的17键”，默认选它；选双拼时只在方案栏打开，不换键盘。
+        val f = typingFacts().copy(keyboard = KeyboardWay.KEEP, keyboardName = "17键")
+        val answers = SetupGuidePlanner.suggest(f)
+        assertEquals(KeyboardWay.KEEP, answers.keyboard)
+        assertEquals(KeyboardWay.KEEP, SetupGuidePlanner.keyboards(f, answers).last())
+        val input = SetupGuidePlanner.plan(f, answers.copy(typing = TypingWay.DOUBLE_PINYIN)).input
+        assertNull(input.switchTo)
+        assertTrue(input.lines.toString(), input.lines.any { it.startsWith("方案栏里打开小鹤双拼") })
+        // 明确选了 26 键就切过去。
+        assertEquals("rime_ice", SetupGuidePlanner.plan(f, answers.copy(keyboard = KeyboardWay.QWERTY)).input.switchTo)
     }
 }

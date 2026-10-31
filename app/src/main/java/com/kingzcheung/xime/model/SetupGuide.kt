@@ -9,6 +9,7 @@ import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.settings.DoublePinyinScheme
 import com.kingzcheung.xime.settings.DoublePinyinSchemes
 import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.InputLayout
 import com.kingzcheung.xime.settings.InputModes
 import com.kingzcheung.xime.settings.InputScheme
 import com.kingzcheung.xime.settings.InputProfiles
@@ -61,6 +62,15 @@ object SetupGuide {
             InputScheme.CANGJIE, InputScheme.ZHUYIN, InputScheme.STROKE -> TypingWay.KEEP
             else -> TypingWay.FULL_PINYIN
         }
+        // 现在打中文的键盘；不是中文、或仓颉注音这类另有打法的，不问键盘也不换。
+        val chineseLayout = profile?.takeIf { it.language == InputLanguage.CHINESE && typing != TypingWay.KEEP }?.layout
+        val keyboard = when {
+            chineseLayout == null -> KeyboardWay.KEEP
+            chineseLayout.kind == LayoutKind.T9 -> KeyboardWay.T9
+            chineseLayout.id == InputLayout.MERGED14.id -> KeyboardWay.K14
+            chineseLayout.kind == LayoutKind.ALPHABETIC -> KeyboardWay.QWERTY
+            else -> KeyboardWay.KEEP
+        }
         val doublePinyins = DoublePinyinScheme.BUILTINS + runCatching { DoublePinyinSchemes.load(context) }.getOrDefault(emptyList())
         // 自己下载过九键词组模型（不是安装包带的那份）也算在用九键。
         val t9Download = listOf(CandidateModelCatalog.NGRAM, CandidateModelCatalog.NGRAM_SMALL).any { id ->
@@ -93,10 +103,11 @@ object SetupGuide {
             typingName = profile?.scheme?.displayName.orEmpty(),
             // 九键、14 键、自建合并键布局上的双拼算同一种双拼（26 键那个方案）。
             doublePinyin = if (typing != TypingWay.DOUBLE_PINYIN) null else DoublePinyinSchemes.baseId(currentSchema),
-            onLetterKeyboard = profile != null && profile.language == InputLanguage.CHINESE && profile.layout.kind == LayoutKind.ALPHABETIC &&
-                typing != TypingWay.KEEP,
+            keyboard = keyboard,
+            keyboardName = chineseLayout?.displayName.orEmpty(),
             shownDoublePinyin = DoublePinyinScheme.BUILTINS.map { it.id }.filterTo(linkedSetOf()) { it in enabledSchemas },
-            doublePinyinChoices = doublePinyins.map { DoublePinyinChoice(it.id, it.name, it.preview(), !DoublePinyinSchemes.isCustom(it.id)) },
+            doublePinyinChoices = doublePinyins.map { DoublePinyinChoice(it.id, it.name, it.preview(), !DoublePinyinSchemes.isCustom(it.id),
+                lettersOnly = it.usesSemicolon) },
             wubiInstalled = File(SchemaManager.getRimeDir(context), "${SetupGuidePlanner.WUBI}.schema.yaml").isFile,
             fuzzy = SpellingPatches.fuzzy(context).mapTo(linkedSetOf()) { it.id },
             captionIconChangeable = !com.kingzcheung.xime.BuildConfig.ELDER,
@@ -230,11 +241,16 @@ object SetupGuide {
         }
         val switchTo = input.switchTo?.takeIf { it != SetupGuidePlanner.WUBI || wubiReady }
         switchTo?.let { id ->
-            // 要切到的方案不在方案栏里（如全拼被关掉过）：先打开，双拼由下面那一步打开。
-            val enabled = SchemaManager.getEnabledSchemas(app)
-            if (id != input.showDoublePinyin && id !in enabled) {
-                SchemaManager.setEnabledSchemas(app, enabled + id)
-                LanguagePreferences.enableForSchema(app, id)
+            // 要用的布局不在方案栏里（如 14 键没开过、全拼被关掉过）：先打开，双拼由下面那一步打开。
+            // 双拼的九键版本走双拼页同一个开关（排在九键后面）；双拼的 14 键版本随双拼和中文14键自动出现。
+            val missing = input.enable.filterNot { it in SchemaManager.getEnabledSchemas(app) }
+            missing.filter(DoublePinyinSchemes::isT9).forEach { t9 ->
+                runCatching { DoublePinyinSchemes.setEnabled(app, t9, true) }.onFailure { failed += "九键双拼没打开：${it.message}" }
+            }
+            val others = missing.filterNot(DoublePinyinSchemes::isT9)
+            if (others.isNotEmpty()) {
+                SchemaManager.setEnabledSchemas(app, SchemaManager.getEnabledSchemas(app) + others)
+                others.forEach { LanguagePreferences.enableForSchema(app, it) }
                 redeploy = true
             }
             SettingsPreferences.setCurrentSchema(app, id)

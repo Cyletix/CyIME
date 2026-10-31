@@ -10,6 +10,12 @@ enum class VoiceUse { OFTEN, SOMETIMES, NEVER }
 enum class TypingWay { FULL_PINYIN, DOUBLE_PINYIN, WUBI, KEEP }
 
 /**
+ * 打中文用哪种键盘（用户 10-31：引导里要问 26 键、14 键还是九键）。
+ * [KEEP] 只在现在用的是别的键盘（17/18 键、手写、笔画、自己合并的布局等）或不是中文时出现，表示不改。
+ */
+enum class KeyboardWay(val title: String) { QWERTY("26 键"), K14("14 键"), T9("九键"), KEEP("") }
+
+/**
  * 常见的分不清的读音，一项对应模糊音设置里的一组或几组（[SpellingPatches.Fuzzy] 的 id）。
  * r 和 l 不常见，不在这里问，向导不动它。
  */
@@ -22,7 +28,9 @@ enum class FuzzyHabit(val title: String, val example: String, val fuzzyIds: List
 }
 
 /** 一种可选的双拼：[example] 是“双拼”两个字的打法，如 ul'pb。 */
-data class DoublePinyinChoice(val id: String, val name: String, val example: String, val builtin: Boolean = true)
+data class DoublePinyinChoice(val id: String, val name: String, val example: String, val builtin: Boolean = true,
+    /** 只有 26 键（ing 在分号键上的微软双拼）：14 键、九键没有分号键，不生成这两个版本。 */
+    val lettersOnly: Boolean = false)
 
 /** 一台设备在向导眼里的样子；大小都是字节，读不到的为 null。 */
 data class SetupFacts(
@@ -66,8 +74,13 @@ data class SetupFacts(
     val typingName: String = "",
     /** 现在用的双拼（26 键那个方案的 id）；没在用双拼时为 null。 */
     val doublePinyin: String? = null,
-    /** 现在是不是中文 26 键（含 QWJRTK 等字母排列）：只有这时才替人切换方案，九键、14 键、手写不动。 */
-    val onLetterKeyboard: Boolean = true,
+    /**
+     * 现在打中文的键盘：中文 26 键（含 QWJRTK 等字母排列）、14 键、九键；别的键盘或现在不是中文为 [KeyboardWay.KEEP]。
+     * 回答和这里一样就不切方案，自己的字母排列、自定义布局都不会被换掉。
+     */
+    val keyboard: KeyboardWay = KeyboardWay.QWERTY,
+    /** [keyboard] 是 [KeyboardWay.KEEP] 时现在那种键盘的名字（如“17键”“手写”）。 */
+    val keyboardName: String = "",
     /** 方案栏里显示着的内置双拼（26 键）。 */
     val shownDoublePinyin: Set<String> = emptySet(),
     /** 能选的双拼：内置的在前，自己建的在后。 */
@@ -89,6 +102,8 @@ data class SetupAnswers(
     val doublePinyin: String = FLYPY,
     /** 全拼时分不清的读音（打开模糊音）。 */
     val fuzzy: Set<FuzzyHabit> = emptySet(),
+    /** 打中文用哪种键盘。 */
+    val keyboard: KeyboardWay = KeyboardWay.QWERTY,
 ) {
     companion object { const val FLYPY = "double_pinyin_flypy" }
 }
@@ -100,6 +115,8 @@ data class SetupAnswers(
 data class InputPlan(
     /** 设成当前方案；null 不切。 */
     val switchTo: String? = null,
+    /** 要在方案栏打开的布局（中文14键、九键、某种双拼的九键版本）；已经开着的不动。双拼本身由 [showDoublePinyin] 打开。 */
+    val enable: List<String> = emptyList(),
     /** 要在方案栏打开的双拼。 */
     val showDoublePinyin: String? = null,
     /** 可以从方案栏隐藏的内置双拼。 */
@@ -196,6 +213,7 @@ object SetupGuidePlanner {
         t9 = facts.usesT9,
         caption = facts.usesCaption,
         typing = facts.typing,
+        keyboard = facts.keyboard,
         doublePinyin = facts.doublePinyin ?: facts.doublePinyinChoices.firstOrNull()?.id ?: SetupAnswers.FLYPY,
         fuzzy = FuzzyHabit.entries.filterTo(linkedSetOf()) { habit -> habit.fuzzyIds.any { it in facts.fuzzy } },
     )
@@ -203,42 +221,82 @@ object SetupGuidePlanner {
     /** 五笔86 的方案 id（「扩展 › 方案」里审过的那份，约 2 MB）。 */
     const val WUBI = "wubi86"
     const val FULL_PINYIN = "rime_ice"
+    const val K14 = "pinyin_14jian"
+    const val T9 = "t9_pinyin"
+    /** 与 DoublePinyinScheme 的 14 键、九键版本后缀相同（这里是纯逻辑，不引用设置层）。 */
+    private const val K14_SUFFIX = "_14jian"
+    private const val T9_SUFFIX = "_t9"
+
+    /** 这种打法能用的键盘：全拼、双拼有 26 键、14 键、九键（微软双拼只有 26 键）；五笔只问打法，不问键盘。 */
+    fun keyboards(facts: SetupFacts, answers: SetupAnswers): List<KeyboardWay> {
+        val choices = when (answers.typing) {
+            TypingWay.FULL_PINYIN -> listOf(KeyboardWay.QWERTY, KeyboardWay.K14, KeyboardWay.T9)
+            TypingWay.DOUBLE_PINYIN -> if (facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }?.lettersOnly == true)
+                listOf(KeyboardWay.QWERTY) else listOf(KeyboardWay.QWERTY, KeyboardWay.K14, KeyboardWay.T9)
+            TypingWay.WUBI, TypingWay.KEEP -> emptyList()
+        }
+        return if (choices.isNotEmpty() && facts.keyboard == KeyboardWay.KEEP) choices + KeyboardWay.KEEP else choices
+    }
+
+    /** 实际按哪种键盘设：选的键盘这种打法没有（如微软双拼选了九键）时用 26 键。 */
+    fun keyboardOf(facts: SetupFacts, answers: SetupAnswers): KeyboardWay =
+        keyboards(facts, answers).let { if (answers.keyboard in it) answers.keyboard else it.firstOrNull() ?: KeyboardWay.KEEP }
+
+    /** 打法 × 键盘对应的方案；[KeyboardWay.KEEP] 不切。双拼的 14 键版本是组合配置，双拼和中文14键都开着时自动有。 */
+    internal fun schemaFor(typing: TypingWay, doublePinyin: String, keyboard: KeyboardWay): String? = when (typing) {
+        TypingWay.FULL_PINYIN -> when (keyboard) {
+            KeyboardWay.QWERTY -> FULL_PINYIN
+            KeyboardWay.K14 -> K14
+            KeyboardWay.T9 -> T9
+            KeyboardWay.KEEP -> null
+        }
+        TypingWay.DOUBLE_PINYIN -> when (keyboard) {
+            KeyboardWay.QWERTY -> doublePinyin
+            KeyboardWay.K14 -> doublePinyin + K14_SUFFIX
+            KeyboardWay.T9 -> doublePinyin + T9_SUFFIX
+            KeyboardWay.KEEP -> null
+        }
+        TypingWay.WUBI -> WUBI
+        TypingWay.KEEP -> null
+    }
 
     fun inputPlan(facts: SetupFacts, answers: SetupAnswers): InputPlan {
         val lines = mutableListOf<String>()
         val typing = answers.typing
         val choice = facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }
-        val target = when (typing) {
-            TypingWay.FULL_PINYIN -> FULL_PINYIN
-            TypingWay.DOUBLE_PINYIN -> answers.doublePinyin
-            TypingWay.WUBI -> WUBI
-            TypingWay.KEEP -> null
-        }
-        val current = when (facts.typing) {
-            TypingWay.DOUBLE_PINYIN -> facts.doublePinyin
-            TypingWay.FULL_PINYIN -> FULL_PINYIN
-            TypingWay.WUBI -> WUBI
-            TypingWay.KEEP -> null
-        }
+        val keyboard = keyboardOf(facts, answers)
         val name = when (typing) {
             TypingWay.FULL_PINYIN -> "全拼"
             TypingWay.DOUBLE_PINYIN -> choice?.name ?: "双拼"
             TypingWay.WUBI -> "五笔86"
             TypingWay.KEEP -> facts.typingName
         }
-        val changed = target != null && target != current
+        // 打法、哪一种双拼、键盘都和现在一样就不切：自己的字母排列（QWJRTK 等）、自定义布局不会被换掉。
+        val sameWay = typing == facts.typing && (typing != TypingWay.DOUBLE_PINYIN || answers.doublePinyin == facts.doublePinyin)
+        val changed = typing != TypingWay.KEEP && (!sameWay ||
+            (typing != TypingWay.WUBI && keyboard != KeyboardWay.KEEP && keyboard != facts.keyboard))
         // 已经显示着时再打开一次什么也不改（DoublePinyinSchemes.setEnabled 内容没变不写）。
         val showDoublePinyin = answers.doublePinyin.takeIf { typing == TypingWay.DOUBLE_PINYIN }
         // 已经在用五笔（86、98 或五笔拼音）就不动；从别的方式改成五笔才装、才打开五笔86。
         val useWubi = typing == TypingWay.WUBI && facts.typing != TypingWay.WUBI
         val downloadWubi = useWubi && !facts.wubiInstalled
         if (downloadWubi) lines += "下载五笔86方案（约 2 MB，要联网），装好后在方案栏里打开。"
-        val switchTo = target.takeIf { changed && facts.onLetterKeyboard }
+        // 五笔只有 26 键：在 26 键上才替人切过去，九键、14 键、手写不动。全拼、双拼按回答的键盘切。
+        val switchTo = if (!changed) null
+            else if (typing == TypingWay.WUBI) WUBI.takeIf { facts.keyboard == KeyboardWay.QWERTY }
+            else schemaFor(typing, answers.doublePinyin, keyboard)
+        // 要用的布局不在方案栏里就打开：中文14键（双拼的 14 键版本也靠它）、九键、双拼的九键版本。
+        val enable = buildList {
+            if (switchTo == null) return@buildList
+            if (keyboard == KeyboardWay.K14) add(K14)
+            if (switchTo != showDoublePinyin && switchTo != WUBI && !switchTo.endsWith(K14_SUFFIX) && switchTo !in this) add(switchTo)
+        }
         when {
-            switchTo != null -> lines += "中文 26 键改用$name。"
-            // 全拼（雾凇）一直在方案栏里，不在 26 键上时没有要改的。
-            changed && typing != TypingWay.FULL_PINYIN -> lines += "方案栏里打开$name，在键盘上切到中文 26 键就能用；现在的九键、14 键或手写不变。"
-            !changed && target != null -> lines += "打字方式还是$name，不变。"
+            switchTo != null && keyboard == KeyboardWay.QWERTY || switchTo == WUBI -> lines += "中文 26 键改用$name。"
+            switchTo != null -> lines += "中文换成${if (keyboard == KeyboardWay.K14) " " else ""}${keyboard.title}，用${name}打。"
+            // 全拼（雾凇）一直在方案栏里，不切时没有要改的。
+            changed && typing != TypingWay.FULL_PINYIN -> lines += "方案栏里打开$name，在键盘上切到中文 26 键就能用；现在的键盘不变。"
+            !changed && typing != TypingWay.KEEP -> lines += "打字方式还是$name，不变。"
         }
         // 方案栏只留用得到的：内置双拼里除了选中的那种都可以藏起来，自己建的双拼不动。
         val hide = if (typing == TypingWay.KEEP) emptyList()
@@ -265,7 +323,7 @@ object SetupGuidePlanner {
             false -> lines += "桌面上的「字幕」图标关掉（变灰后可长按移除）。"
             null -> {}
         }
-        return InputPlan(switchTo, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
+        return InputPlan(switchTo, enable, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
             captionIcon, lines, hideLine)
     }
 
@@ -290,7 +348,9 @@ object SetupGuidePlanner {
         }
 
         // 九键词组：完整 203 MB，精简 105 MB（首选约低 3 个百分点）。已经有哪一档就留哪一档。
-        var t9Model = if (!answers.t9) null else when {
+        // 全拼选了九键就是用九键，“用九键打字吗”那题不再问。
+        val usesT9 = answers.t9 || answers.typing == TypingWay.FULL_PINYIN && keyboardOf(facts, answers) == KeyboardWay.T9
+        var t9Model = if (!usesT9) null else when {
             CandidateModelCatalog.NGRAM in facts.installed && !veryTight -> CandidateModelCatalog.NGRAM
             CandidateModelCatalog.NGRAM_SMALL in facts.installed -> CandidateModelCatalog.NGRAM_SMALL
             CandidateModelCatalog.NGRAM in facts.inPackage && !veryTight -> CandidateModelCatalog.NGRAM
