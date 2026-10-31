@@ -22,6 +22,9 @@ internal data class ClearedDocument(
 
     /** 恢复后的选区（光标）相对恢复起点的位置；与清空前相同。 */
     val restoredSelection: IntRange get() = before.length..(before.length + selected.length)
+
+    /** 「只清空光标前的内容」：光标后的字不清（选中的照样清），撤回只放回光标前和选中的。 */
+    fun beforeCursorOnly(): ClearedDocument = copy(after = "")
 }
 
 /** 删除键“清空”清什么：空闲时清整个输入框；打字中默认只清没上屏的拼音，开了「打字中清空整个输入框」两样一起清。 */
@@ -55,6 +58,7 @@ internal const val CLEAR_UNDO_LIMIT = 2_097_152
 
 /**
  * 删掉整个输入框：先删 [document] 读到的，再一轮轮删光标两边剩下的，直到两边都空。
+ * [beforeOnly]（「只清空光标前的内容」，10-31）只删光标前和选中的，光标后的一个字不动。
  * 轮与轮之间让出主线程，长文本不卡界面；[stillCurrent] 为假（换了输入框）就停。
  * 返回清掉的全部文字（供撤回，含清完后光标两边还剩的字）；没删成或超过 [undoLimit] 时为 null。
  */
@@ -63,7 +67,9 @@ internal suspend fun InputConnection.clearDocument(
     limit: Int,
     undoLimit: Int = CLEAR_UNDO_LIMIT,
     stillCurrent: () -> Boolean = { true },
+    beforeOnly: Boolean = false,
 ): ClearedDocument? {
+    @Suppress("NAME_SHADOWING") val document = if (beforeOnly) document.beforeCursorOnly() else document
     if (document.text.isEmpty()) return null
     beginBatchEdit()
     try {
@@ -83,7 +89,7 @@ internal suspend fun InputConnection.clearDocument(
         yield()
         if (!stillCurrent()) break
         val nextBefore = getTextBeforeCursor(limit, 0)?.toString().orEmpty()
-        val nextAfter = getTextAfterCursor(limit, 0)?.toString().orEmpty()
+        val nextAfter = if (beforeOnly) "" else getTextAfterCursor(limit, 0)?.toString().orEmpty()
         if (nextBefore.isEmpty() && nextAfter.isEmpty()) break
         if (!deleteSurroundingText(nextBefore.length, nextAfter.length)) break
         rounds++
