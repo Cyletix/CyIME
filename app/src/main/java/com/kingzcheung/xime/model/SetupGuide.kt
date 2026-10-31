@@ -109,6 +109,8 @@ object SetupGuide {
             doublePinyinChoices = doublePinyins.map { DoublePinyinChoice(it.id, it.name, it.preview(), !DoublePinyinSchemes.isCustom(it.id),
                 lettersOnly = it.usesSemicolon) },
             wubiInstalled = File(SchemaManager.getRimeDir(context), "${SetupGuidePlanner.WUBI}.schema.yaml").isFile,
+            doublePinyinKeyHints = SettingsPreferences.getPrefsPublic(context)
+                .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, false),
             fuzzy = SpellingPatches.fuzzy(context).mapTo(linkedSetOf()) { it.id },
             captionIconChangeable = !com.kingzcheung.xime.BuildConfig.ELDER,
         )
@@ -259,6 +261,9 @@ object SetupGuide {
         input.showDoublePinyin?.let { id ->
             runCatching { DoublePinyinSchemes.setEnabled(app, id, true) }.onFailure { failed += "双拼没打开：${it.message}" }
         }
+        // 和双拼方案页的开关是同一个设置，正在显示的键盘监听它，马上生效。
+        if (input.keyHintsOn) SettingsPreferences.getPrefsPublic(app).edit()
+            .putBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, true).apply()
         if (redeploy) {
             // 与「已安装的方案」里「应用方案更改」同一步。
             val deployed = runCatching {
