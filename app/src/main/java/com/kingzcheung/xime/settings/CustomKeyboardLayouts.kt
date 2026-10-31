@@ -238,6 +238,7 @@ object CustomKeyboardLayouts {
             catch (e: Exception) { if (previous != null) writeAtomically(schema, previous); throw e }
             cached = old.filterNot { it.id == id }
         }
+        CustomLayoutSymbols.clear(context, id)
         if (SettingsPreferences.getCurrentSchema(context) == id) SettingsPreferences.setCurrentSchema(context, "rime_ice")
         SchemaManager.setEnabledSchemas(context, (remaining + "rime_ice").distinct())
         notifyChanged(context)

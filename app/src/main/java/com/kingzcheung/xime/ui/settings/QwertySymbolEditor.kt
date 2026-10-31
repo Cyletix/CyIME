@@ -32,8 +32,12 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
     val bottomGesture = if (reverseSwipe) "下拉" else "上拉"
     val scope = rememberCoroutineScope()
     var english by rememberSaveable { mutableStateOf(false) }
-    // 中文 14 键自己的一套角标（FourteenKeySymbols），按键编辑；为 true 时 english 一定是 false。
-    var fourteen by rememberSaveable { mutableStateOf(false) }
+    // 合并键布局按键编辑：内置 14 键（FourteenKeySymbols）或某个自建双字母布局（CustomLayoutSymbols，存布局 id）；
+    // null 是 26 键。不为 null 时 english 一定是 false。
+    var merged by rememberSaveable { mutableStateOf<String?>(null) }
+    val fourteen = merged == FOURTEEN
+    var customLayouts by remember { mutableStateOf<List<CustomKeyboardLayout>>(emptyList()) }
+    val customLayout = customLayouts.firstOrNull { it.id == merged }
     var selected by rememberSaveable { mutableStateOf("q") }
     var values by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var originalOverrides by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -46,40 +50,51 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
         com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.entries.any { it.key == key } }) }
     var reload by remember { mutableStateOf(0) }
     var pendingTab by remember { mutableStateOf<Pair<Boolean, String?>?>(null) }
-    var pendingFourteen by remember { mutableStateOf(false) }
+    var pendingMerged by remember { mutableStateOf<String?>(null) }
     var dirty by remember { mutableStateOf(false) }
     var discard by remember { mutableStateOf(false) }
     var versions by remember { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
     var versionName by rememberSaveable { mutableStateOf("") }
     fun back() { if (!busy) { if (dirty) discard = true else onBack() } }
     BackHandler { back() }
-    LaunchedEffect(english, fourteen, reload) {
+    LaunchedEffect(english, merged, reload) {
         loaded = false
+        val layouts = withContext(Dispatchers.IO) {
+            KeysConfigHelper.loadConfig(context)
+            runCatching { CustomKeyboardLayouts.load(context).filter(CustomLayoutSymbols::editable) }.getOrDefault(emptyList())
+        }
+        customLayouts = layouts
+        val custom = layouts.firstOrNull { it.id == merged }
+        // 正在改的自建布局已经删掉或拆回单字母：回到中文26键。
+        if (merged != null && merged != FOURTEEN && custom == null) { merged = null; return@LaunchedEffect }
         // Read the same effective gestures used by the keyboard, including existing YAML overrides.
         values = withContext(Dispatchers.IO) {
-            KeysConfigHelper.loadConfig(context)
-            if (fourteen) KeysConfigHelper.fourteenSymbolEditorValues(context)
+            if (merged == FOURTEEN) KeysConfigHelper.fourteenSymbolEditorValues(context)
+            else if (custom != null) KeysConfigHelper.customLayoutSymbolEditorValues(context, custom)
             else KeysConfigHelper.qwertySymbolEditorValues(context, english)
         }
-        originalOverrides = if (fourteen) FourteenKeySymbols.load(context) else QwertySwipeSymbols.load(context, english)
-        if (fourteen && selected !in FourteenKeySymbols.keys) selected = FourteenKeySymbols.keys.first()
-        if (!fourteen && selected !in QwertySwipeSymbols.up) selected = "q"
+        originalOverrides = if (merged == FOURTEEN) FourteenKeySymbols.load(context)
+            else if (custom != null) CustomLayoutSymbols.load(context, custom)
+            else QwertySwipeSymbols.load(context, english)
+        val boardKeys = if (merged == FOURTEEN) FourteenKeySymbols.keys
+            else custom?.let(CustomLayoutSymbols::keys) ?: QwertySwipeSymbols.keys.map(Char::toString)
+        if (selected !in boardKeys) selected = boardKeys.first()
         versions = withContext(Dispatchers.IO) { QwertySwipeSymbols.versions(context) }
         originalValues = values
         dirty = false
         loaded = true
     }
-    fun applyTab(nextEnglish: Boolean, nextSide: String?, nextFourteen: Boolean = false) {
+    fun applyTab(nextEnglish: Boolean, nextSide: String?, nextMerged: String? = null) {
         val discarded = dirty
-        english = nextEnglish; fourteen = nextFourteen; sideTarget = nextSide; message = ""
+        english = nextEnglish; merged = nextMerged; sideTarget = nextSide; message = ""
         if (discarded) reload++
     }
-    // 26 键、14 键角标未保存时，切走前先确认是否放弃。
-    fun changeTab(nextEnglish: Boolean, nextSide: String?, nextFourteen: Boolean = false) {
-        if (nextEnglish == english && nextSide == sideTarget && nextFourteen == fourteen) return
-        if (dirty && (nextSide != null || nextEnglish != english || nextFourteen != fourteen)) {
-            pendingTab = nextEnglish to nextSide; pendingFourteen = nextFourteen
-        } else applyTab(nextEnglish, nextSide, nextFourteen)
+    // 26 键、14 键、自建布局角标未保存时，切走前先确认是否放弃。
+    fun changeTab(nextEnglish: Boolean, nextSide: String?, nextMerged: String? = null) {
+        if (nextEnglish == english && nextSide == sideTarget && nextMerged == merged) return
+        if (dirty && (nextSide != null || nextEnglish != english || nextMerged != merged)) {
+            pendingTab = nextEnglish to nextSide; pendingMerged = nextMerged
+        } else applyTab(nextEnglish, nextSide, nextMerged)
     }
     Scaffold(topBar = {
         TopAppBar(title = { Text("按键符号") }, navigationIcon = {
@@ -93,16 +108,23 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
     // 一处编辑所有“某个位置的第二输入”：26 键角标与各固定栏，用标签页切换。
     val sideTargets = com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.entries
     val sideIndex = sideTargets.indexOfFirst { it.key == sideTarget }
-    PrimaryScrollableTabRow(selectedTabIndex = if (sideIndex >= 0) 3 + sideIndex else if (fourteen) 2 else if (english) 1 else 0,
+    val customIndex = customLayouts.indexOfFirst { it.id == merged }
+    PrimaryScrollableTabRow(selectedTabIndex = if (sideIndex >= 0) 3 + customLayouts.size + sideIndex
+        else if (customIndex >= 0) 3 + customIndex else if (fourteen) 2 else if (english) 1 else 0,
         edgePadding = 0.dp) {
-        Tab(selected = sideTarget == null && !english && !fourteen, onClick = { changeTab(false, null) }, enabled = !busy,
+        Tab(selected = sideTarget == null && !english && merged == null, onClick = { changeTab(false, null) }, enabled = !busy,
             text = { Text("中文26键") })
         Tab(selected = sideTarget == null && english, onClick = { changeTab(true, null) }, enabled = !busy,
             text = { Text("英文26键") })
-        Tab(selected = sideTarget == null && fourteen, onClick = { changeTab(false, null, nextFourteen = true) }, enabled = !busy,
+        Tab(selected = sideTarget == null && fourteen, onClick = { changeTab(false, null, FOURTEEN) }, enabled = !busy,
             text = { Text("中文14键") }, modifier = Modifier.testTag("symbol-target:k14"))
+        // 自建的双字母布局各有一页，标签用布局自己的名字；没有合并键的自建布局按 26 键位置，在「中文26键」里改。
+        customLayouts.forEach { layout ->
+            Tab(selected = sideTarget == null && merged == layout.id, onClick = { changeTab(false, null, layout.id) }, enabled = !busy,
+                text = { Text(layout.name) }, modifier = Modifier.testTag("symbol-target:${layout.id}"))
+        }
         sideTargets.forEach { target ->
-            Tab(selected = sideTarget == target.key, onClick = { changeTab(english, target.key, fourteen) }, enabled = !busy,
+            Tab(selected = sideTarget == target.key, onClick = { changeTab(english, target.key, merged) }, enabled = !busy,
                 text = { Text(target.label) }, modifier = Modifier.testTag("symbol-target:${target.key}"))
         }
     }
@@ -111,18 +133,22 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
     if (side != null) SettingsSection(title = side.label) { SideSymbolEditor(side) }
     else SettingsSection(title = "字母键符号") {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("先点一个${if (fourteen) "键" else "字母"}，再在下面两个框里改它的上方、下方符号，最后点「保存符号」。" +
+            Text("先点一个${if (merged != null) "键" else "字母"}，再在下面两个框里改它的上方、下方符号，最后点「保存符号」。" +
                 "键盘上${topGesture}输入上方、${bottomGesture}输入下方；框里留空表示这个位置不放符号。",
                 style = MaterialTheme.typography.bodySmall)
             Text(if (fourteen) "14 键全拼、双拼共用这一套，按整个键改：前两排上方是 1-0、下方是半角符号，" +
                     "第三排上下都是中文标点。这里写什么就输入什么，不随全角／半角变化。"
+                else if (customLayout != null) "只有「${customLayout.name}」用这一套，按整个键改。预设和 14 键同一条规则：" +
+                    "按从左到右、从上到下的顺序，前 10 个键上方是 1-0、下方是半角符号，其余键上下都是中文标点。" +
+                    "这里写什么就输入什么，不随全角／半角变化；之后再合并或拆开的键回到预设。"
                 else if (english) "英文26键有自己的一套半角符号，换了字母排列也按位置用这一套，点「恢复预设」还原。"
                 else "全拼、双拼等中文26键共用这一套，换了字母排列（Cyletix10、Colemak 等）也按位置用这一套：" +
                     "上方默认是数字和常用全角符号，下方是半角符号。" +
                     "这里写什么就输入什么，不随全角／半角变化；只有空格两边的逗号句号跟着全角／半角走。",
                 style = MaterialTheme.typography.bodySmall)
             val boardRows = if (fourteen) FourteenKeySymbols.rows
-                else QwertySwipeSymbols.rows.map { row -> row.map(Char::toString) }
+                else customLayout?.let(CustomLayoutSymbols::rows)
+                ?: QwertySwipeSymbols.rows.map { row -> row.map(Char::toString) }
             val rowSlots = boardRows.maxOf { it.size }
             boardRows.forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -158,15 +184,20 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                 TextButton(enabled = loaded && !busy, onClick = {
                     busy = true
                     val board = fourteen
-                    val preset = if (english) emptyMap() else buildMap {
+                    val custom = customLayout
+                    // 自建布局没有 YAML 那一层，清掉修改就是预设。
+                    val preset = if (english || custom != null) emptyMap() else buildMap {
                         (if (board) FourteenKeySymbols.up else QwertySwipeSymbols.up).forEach { (k, v) -> put("up.$k", v) }
                         (if (board) FourteenKeySymbols.down else QwertySwipeSymbols.down).forEach { (k, v) -> put("down.$k", v) }
                     }
                     scope.launch {
                         runCatching { withContext(Dispatchers.IO) {
-                            if (board) FourteenKeySymbols.save(context, preset) else QwertySwipeSymbols.save(context, english, preset)
+                            if (board) FourteenKeySymbols.save(context, preset)
+                            else if (custom != null) CustomLayoutSymbols.save(context, custom, preset)
+                            else QwertySwipeSymbols.save(context, english, preset)
                         } }
-                            .onSuccess { message = if (board) "中文14键已恢复预设" else if (english) "英文26键已恢复预设" else "中文26键已恢复预设"; reload++ }
+                            .onSuccess { message = if (board) "中文14键已恢复预设" else if (custom != null) "「${custom.name}」已恢复预设"
+                                else if (english) "英文26键已恢复预设" else "中文26键已恢复预设"; reload++ }
                             .onFailure { message = "保存失败：${it.message}" }
                         busy = false
                     }
@@ -176,9 +207,12 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                     val displayedSnapshot = values
                     val snapshot = originalOverrides + values.filter { (key, value) -> originalValues[key] != value }
                     val board = fourteen
+                    val custom = customLayout
                     scope.launch {
                         runCatching { withContext(Dispatchers.IO) {
-                            if (board) FourteenKeySymbols.save(context, snapshot) else QwertySwipeSymbols.save(context, english, snapshot)
+                            if (board) FourteenKeySymbols.save(context, snapshot)
+                            else if (custom != null) CustomLayoutSymbols.save(context, custom, snapshot)
+                            else QwertySwipeSymbols.save(context, english, snapshot)
                         } }
                             .onSuccess { originalOverrides = snapshot; originalValues = displayedSnapshot; dirty = false; message = "已保存，键盘上立即生效" }
                             .onFailure { message = "保存失败：${it.message}" }
@@ -187,8 +221,8 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                 }) { Text(if (busy) "保存中…" else "保存符号") }
             }
             if (message.isNotEmpty()) Text(message, style = MaterialTheme.typography.bodySmall)
-            // 布局版本存的是 26 键 52 个位置，14 键页不显示。
-            if (!english && !fourteen) {
+            // 布局版本存的是 26 键 52 个位置，14 键、自建布局页不显示。
+            if (!english && merged == null) {
                 HorizontalDivider()
                 Text("布局版本", style = MaterialTheme.typography.titleSmall)
                 Text("把当前这套另存为版本，以后可以一键载入切换；载入后点「保存符号」生效。",
@@ -232,7 +266,10 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
         dismissButton = { TextButton(onClick = { discard = false }) { Text("继续编辑") } })
     pendingTab?.let { (nextEnglish, nextSide) ->
         AlertDialog(onDismissRequest = { pendingTab = null }, title = { Text("放弃未保存的符号修改？") },
-            confirmButton = { TextButton(onClick = { pendingTab = null; applyTab(nextEnglish, nextSide, pendingFourteen) }) { Text("放弃") } },
+            confirmButton = { TextButton(onClick = { pendingTab = null; applyTab(nextEnglish, nextSide, pendingMerged) }) { Text("放弃") } },
             dismissButton = { TextButton(onClick = { pendingTab = null }) { Text("继续编辑") } })
     }
 }
+
+/** [merged] 里表示内置中文 14 键；其他值是自建布局 id。 */
+private val FOURTEEN = InputLayout.MERGED14.id
