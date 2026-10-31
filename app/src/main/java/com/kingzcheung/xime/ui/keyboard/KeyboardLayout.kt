@@ -152,7 +152,8 @@ fun KeyboardLayout(
     val shiftComposingSplit: (() -> Boolean)? = if (shiftSplit && candidateState != null)
         remember(candidateState) { { shiftTapTypesSeparator(true, candidateState.value.isComposing) } } else null
     // 双拼键位提示（默认关）：双拼 26 键每个键写出 zh/ch/sh 和韵母，和双拼方案页的键位图一样；14 键、九键不显示。
-    val dpKeyHints = if (doublePinyin && !isAsciiMode && !fourteenKey &&
+    // 自己排的合并键布局（一个键两个字母）也不显示：合并键写不下两个字母的提示，只有单字母键有会前后不一。
+    val dpKeyHints = if (doublePinyin && !isAsciiMode && !fourteenKey && keyRows.all { row -> row.all { it.length <= 1 } } &&
         LocalKeyboardInputPreferences.current.doublePinyinKeyHints) remember(uiState.currentSchemaId, cfgVer) {
         com.kingzcheung.xime.settings.DoublePinyinSchemes.find(uiState.currentSchemaId)?.let(::doublePinyinKeyHints)
     } else null

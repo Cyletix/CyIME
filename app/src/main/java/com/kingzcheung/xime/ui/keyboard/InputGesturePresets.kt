@@ -45,7 +45,13 @@ enum class InputGesturePreset(val label: String) {
 
 /** 一个被锁住的选项值：[option] 不能设成 [lockedValue]，原因是 [by] 这个设置。 */
 data class InputGestureLock(val option: Option, val lockedValue: Any, val by: String) {
-    enum class Option { SYMBOL_INPUT_MODE, LETTER_LONG_PRESS_MENU, GLIDE_TYPING, CURSOR_GESTURE, T9_FLICK_LETTERS }
+    enum class Option {
+        SYMBOL_INPUT_MODE, LETTER_LONG_PRESS_MENU, GLIDE_TYPING, CURSOR_GESTURE, T9_FLICK_LETTERS,
+        /** 双拼键位提示 ↔ 上方/下方角标提示（两个开关都用 [CORNER_HINTS]）。 */
+        DOUBLE_PINYIN_KEY_HINTS, CORNER_HINTS,
+        /** Shift 键分词 ↔ ing 放在 Shift 键上。 */
+        SHIFT_SYLLABLE_SPLIT, SEMICOLON_ON_SHIFT,
+    }
 
     /** 设置页在被锁的那一项下面显示这句。 */
     val message: String get() = "已被「$by」锁定"
@@ -56,7 +62,10 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
  * - 角标“长按” ↔ 字母键长按气泡：长按总是出角标，气泡出不来。
  * - 英文、中文滑行输入 ↔ 键盘区滑动移光标：都是在字母上拖动。
  * - 角标“长按”时九键拂动必须开：长按被数字占了，不开拂动就没法指定字母。
+ * - 双拼键位提示 ↔ 上方/下方角标提示：都写在键面四角，一起开会把符号挡住（用户 10-31「这个开了那个就开不了」）。
+ * - Shift 键分词 ↔ ing 放在 Shift 键上：打字时都把 Shift 键换成别的键。
  * 角标“滑动” + 字母气泡不锁：这正是用户要的可选项，慢拖会被打断已写在说明里。
+ * 两项都已开着（加锁以前开的）时都不锁，关掉哪个都行；设置页只在被锁的一项关着时置灰它。
  */
 object InputGestureLocks {
     fun of(settings: KeyboardInputPreferences): List<InputGestureLock> = buildList {
@@ -74,6 +83,18 @@ object InputGestureLocks {
         }
         if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
             add(InputGestureLock(InputGestureLock.Option.GLIDE_TYPING, true, "滑动移光标：键盘滑动"))
+        }
+        if (settings.doublePinyinKeyHints) {
+            add(InputGestureLock(InputGestureLock.Option.CORNER_HINTS, true, "双拼键位提示"))
+        } else if (settings.swipeUpHints || settings.swipeDownHints) {
+            val corners = listOfNotNull("上方".takeIf { settings.swipeUpHints }, "下方".takeIf { settings.swipeDownHints })
+            add(InputGestureLock(InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true,
+                corners.joinToString("、") + "角标提示"))
+        }
+        if (settings.doublePinyinSemicolonOnShift) {
+            add(InputGestureLock(InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true, "ing 放在 Shift 键上"))
+        } else if (settings.shiftSyllableSplit) {
+            add(InputGestureLock(InputGestureLock.Option.SEMICOLON_ON_SHIFT, true, "Shift 键分词"))
         }
     }
 

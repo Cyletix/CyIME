@@ -295,6 +295,8 @@ class SetupGuidePlanTest {
         val toDouble = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN)).input
         assertTrue(toDouble.keyHintsOn)
         assertTrue(toDouble.lines.toString(), toDouble.lines.any { it.startsWith("打开双拼键位提示") })
+        // 和角标提示互锁：计划里说清楚角标一起关。
+        assertTrue(toDouble.lines.toString(), toDouble.lines.any { it.startsWith("打开双拼键位提示") && "上下角标提示一并关掉" in it })
         // 本来就用双拼（换一种也算）、已经开着、或不选双拼：不动。
         val already = f.copy(typing = TypingWay.DOUBLE_PINYIN, doublePinyin = "double_pinyin_flypy")
         assertFalse(SetupGuidePlanner.plan(already, SetupGuidePlanner.suggest(already).copy(doublePinyin = "double_pinyin_ziranma")).input.keyHintsOn)

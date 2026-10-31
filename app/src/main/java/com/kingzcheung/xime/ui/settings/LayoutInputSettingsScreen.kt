@@ -116,7 +116,10 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             "没在打拼音时照旧切换大小写，按住 Shift 打大写也不变。",
                         checked = settings.shiftSyllableSplit, onCheckedChange = {
                             settings = settings.copy(shiftSyllableSplit = it); settings.save(context)
-                        })
+                        },
+                        // 和微软双拼的「ing 放在 Shift 键上」互锁：打字时都要占 Shift 键。
+                        lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings, com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true)
+                            ?.takeIf { !settings.shiftSyllableSplit }?.message)
                 })
                 FuzzyPinyinSection()
                 }
