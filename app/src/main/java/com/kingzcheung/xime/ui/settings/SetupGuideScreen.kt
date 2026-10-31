@@ -53,7 +53,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * 按设备推荐配置：首次设置完成后出现一次，之后从设置首页「配置选择」进入。
- * 先问三件用法（语音、九键、字幕），再按手机情况给出要留、要下载、可以删的模型，全部用白话说明；
+ * 先问三件用法（语音、九键、字幕），再按设备情况给出要留、要下载、可以删的模型，全部用白话说明；
  * 只有点了“按推荐设置”才改设置和删文件。
  *
  * 引导页原则（用户 10-30）：字要大，选项卡要大，选中的那个一目了然（底色、粗边框、打勾三样一起变），
@@ -139,7 +139,7 @@ internal fun SetupGuideContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Spacer(Modifier.height(4.dp))
-            Text("看看这台手机的情况，再告诉 CyIME 你打算怎么用，它会推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
+            Text("看看这台设备的情况，再告诉 CyIME 你打算怎么用，它会推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
                 style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (facts == null || plan == null) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
@@ -150,7 +150,7 @@ internal fun SetupGuideContent(
             } else {
                 DeviceSection(facts)
                 AnswerSection(plan.answers, onAnswers)
-                KeepSection(plan.keep)
+                KeepSection(plan.keep, facts.device)
                 if (plan.remove.isNotEmpty()) RemoveSection(plan.remove, removeIds, onToggleRemove)
                 SummarySection(facts, plan, removeIds)
                 if (facts.metered && facts.online && plan.downloadBytes > 0) GuideCard {
@@ -197,7 +197,7 @@ private fun GuideCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun DeviceSection(facts: SetupFacts) {
-    GuideHeading("这台手机")
+    GuideHeading("这台${facts.device}")
     GuideCard {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(when (facts.tier) {
@@ -307,7 +307,7 @@ private fun GuideDivider() {
 }
 
 @Composable
-private fun KeepSection(items: List<SetupItem>) {
+private fun KeepSection(items: List<SetupItem>, device: String) {
     GuideHeading("推荐留下的")
     GuideCard {
         items.forEachIndexed { index, item ->
@@ -322,7 +322,7 @@ private fun KeepSection(items: List<SetupItem>) {
                 Spacer(Modifier.width(12.dp))
                 val size = SetupGuidePlanner.mbText(item.bytes)
                 Text(when (item.source) {
-                    SetupSource.ON_PHONE -> "已在手机上\n$size"
+                    SetupSource.ON_PHONE -> "已在${device}上\n$size"
                     SetupSource.IN_PACKAGE -> "从安装包取出\n$size"
                     SetupSource.DOWNLOAD -> "要下载\n$size"
                 }, style = GuideText.note(),

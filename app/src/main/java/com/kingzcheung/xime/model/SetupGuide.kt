@@ -16,7 +16,7 @@ import com.kingzcheung.xime.speech.SpeechModelSelection
 import com.kingzcheung.xime.util.FileLogger
 import java.util.Locale
 
-/** 「按设备推荐配置」：读手机情况、照方案改设置、删掉用不到的模型。只在用户点了“按推荐设置”后改东西。 */
+/** 「按设备推荐配置」：读设备情况、照方案改设置、删掉用不到的模型。只在用户点了“按推荐设置”后改东西。 */
 object SetupGuide {
     private const val KEY_SHOWN = "setup_guide_shown"
 
@@ -49,6 +49,8 @@ object SetupGuide {
         }
         return SetupFacts(
             tier = DeviceModelProfiles.choose(hardware).tier,
+            // 和键盘一样按最短边 600dp 分手机、平板。
+            device = if (context.resources.configuration.smallestScreenWidthDp >= 600) "平板" else "手机",
             memoryBytes = hardware.totalMemoryBytes,
             cores = hardware.processors,
             maxCpuKHz = hardware.maxCpuKHz,
