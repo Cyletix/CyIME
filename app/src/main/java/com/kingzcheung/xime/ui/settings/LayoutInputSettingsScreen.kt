@@ -23,6 +23,7 @@ import com.kingzcheung.xime.settings.SpellingPatches
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.kingzcheung.xime.ui.keyboard.normalizeLetterSwipeDistance
+import com.kingzcheung.xime.ui.keyboard.normalizeCandidateDragPercent
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 internal enum class LayoutInputCategory(val route: String, val title: String, val description: String) {
@@ -115,6 +116,17 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
                                 com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, false)
                                 ?.takeIf { settings.t9FlickLetters }?.message)
+                        HorizontalDivider()
+                        Column(Modifier.settingsSearchAnchor("拖到候选选词的距离").padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text("拖到候选选词的距离：键盘的 ${settings.candidateDragPercent.toInt()}%", style = MaterialTheme.typography.titleSmall)
+                            Slider(value = settings.candidateDragPercent,
+                                modifier = Modifier.testTag("t9-candidate-drag-percent"),
+                                valueRange = 20f..80f, steps = 5,
+                                onValueChange = { settings = settings.copy(candidateDragPercent = normalizeCandidateDragPercent(it)) },
+                                onValueChangeFinished = { settings.save(context) })
+                            Text("默认 50%，每档 10%。按住「下一项」拖出超过键盘宽或高的这个比例才算拖动选词（画出拖线），拖到候选上松手选它，和 26 键按住 Shift 拖到候选一样；没拖这么远仍是「下一项」自己的左滑、右滑。",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     })
                     SettingsSection(title = "14 键双字母键", content = {
                         SettingsToggleItem(Icons.TwoTone.SwapHoriz, "左右滑动选字母",
