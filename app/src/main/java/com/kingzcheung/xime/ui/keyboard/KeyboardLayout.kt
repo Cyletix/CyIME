@@ -681,14 +681,16 @@ fun KeyboardLayout(
                                         .fillMaxHeight(),
                                 ) {
                                 segmentKeys.forEach { key ->
-                                    val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
+                                    // 「Z X C V 上角标改成撤销/剪切/复制/粘贴」（默认关）：上角标显示用途、发 Ctrl+字母，与按住 !@# 当 Ctrl 同一条路。
+                                    val editCorner = com.kingzcheung.xime.keyboard.CtrlShortcuts.editCornerLetter(key, LocalKeyboardInputPreferences.current.zxcvEditShortcuts)
+                                    val rawSwipeUpLabel = editCorner?.let { com.kingzcheung.xime.keyboard.CtrlShortcuts.label(it) } ?: KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
                                     val swipeUpText =
                                         if (swipeUpHintsEnabled) rawSwipeUpLabel else null
-                                    val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
-                                    val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
+                                    val swipeUpAction = if (editCorner != null) GestureAction.COMMAND else KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
+                                    val swipeUpDisplay = if (editCorner != null) DisplayMode.BOTH else KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
                                     val swipeUpKeyLabel =
                                         if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
-                                    val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
+                                    val swipeUpCommitValue = editCorner?.let { com.kingzcheung.xime.keyboard.CtrlShortcuts.command(it) } ?: KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
                                     val swipeDownRaw =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
                                     val swipeDownLabel =
@@ -760,7 +762,7 @@ fun KeyboardLayout(
                                             (if (key === bottomKeys.last()) fourteenMExtra else 0f) else 1f)
                                             .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
-                                        symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
+                                        symbolInputText = (if (editCorner != null) swipeUpCommitValue else symbolInputValue(swipeUpCommitValue, swipeUpAction))
                     .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
@@ -1380,13 +1382,15 @@ fun KeyboardRowWithConfig(
     ) {
         rowKeys.forEachIndexed { index, key ->
             if (index == splitAt) SplitGapSpacer(splitRow, rowGap)
-            val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
+            // 「Z X C V 上角标改成撤销/剪切/复制/粘贴」（默认关）：上角标显示用途、发 Ctrl+字母，与按住 !@# 当 Ctrl 同一条路。
+            val editCorner = com.kingzcheung.xime.keyboard.CtrlShortcuts.editCornerLetter(key, LocalKeyboardInputPreferences.current.zxcvEditShortcuts)
+            val rawSwipeUpLabel = editCorner?.let { com.kingzcheung.xime.keyboard.CtrlShortcuts.label(it) } ?: KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
             val swipeUpText = if (swipeUpHintsEnabled) rawSwipeUpLabel else null
-            val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
-            val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
+            val swipeUpAction = if (editCorner != null) GestureAction.COMMAND else KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
+            val swipeUpDisplay = if (editCorner != null) DisplayMode.BOTH else KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
             val swipeUpKeyLabel =
                 if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
-            val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
+            val swipeUpCommitValue = editCorner?.let { com.kingzcheung.xime.keyboard.CtrlShortcuts.command(it) } ?: KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
             val swipeDownRaw = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
             val swipeDownLabel = swipeDownRaw?.label?.takeIf { it.isNotEmpty() }
             val swipeDownAction = swipeDownRaw?.action
@@ -1464,7 +1468,7 @@ fun KeyboardRowWithConfig(
                     end = if (index == rowKeys.lastIndex && !extendLastKeyToEdge) rowEndInset else 0.dp,
                 ),
                 swipeText = swipeUpText,
-                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
+                symbolInputText = (if (editCorner != null) swipeUpCommitValue else symbolInputValue(swipeUpCommitValue, swipeUpAction))
                     .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
@@ -1691,13 +1695,15 @@ fun CompactKeyboardRowWithConfig(
             .fillMaxSize(),
     ) {
         keys.forEach { key ->
-            val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
+            // 「Z X C V 上角标改成撤销/剪切/复制/粘贴」（默认关）：上角标显示用途、发 Ctrl+字母，与按住 !@# 当 Ctrl 同一条路。
+            val editCorner = com.kingzcheung.xime.keyboard.CtrlShortcuts.editCornerLetter(key, LocalKeyboardInputPreferences.current.zxcvEditShortcuts)
+            val rawSwipeUpLabel = editCorner?.let { com.kingzcheung.xime.keyboard.CtrlShortcuts.label(it) } ?: KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
             val swipeUpText = if (swipeUpHintsEnabled) rawSwipeUpLabel else null
-            val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
-            val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
+            val swipeUpAction = if (editCorner != null) GestureAction.COMMAND else KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
+            val swipeUpDisplay = if (editCorner != null) DisplayMode.BOTH else KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
             val swipeUpKeyLabel =
                 if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
-            val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
+            val swipeUpCommitValue = editCorner?.let { com.kingzcheung.xime.keyboard.CtrlShortcuts.command(it) } ?: KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
             val swipeDownRaw = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
             val swipeDownLabel = swipeDownRaw?.label?.takeIf { it.isNotEmpty() }
             val swipeDownAction = swipeDownRaw?.action
@@ -1764,7 +1770,7 @@ fun CompactKeyboardRowWithConfig(
                 textColor = config.keyTextColor,
                 modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                 swipeText = swipeUpText,
-                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
+                symbolInputText = (if (editCorner != null) swipeUpCommitValue else symbolInputValue(swipeUpCommitValue, swipeUpAction))
                     .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,

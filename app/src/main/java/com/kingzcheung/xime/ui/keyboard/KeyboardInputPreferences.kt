@@ -120,6 +120,8 @@ data class KeyboardInputPreferences(
     val letterLongPressMenu: Boolean = false,
     /** 九键拂动选字母（左上右下），数字改为长按。 */
     val t9FlickLetters: Boolean = false,
+    /** 26 键 Z X C V 的上角标改成撤销/剪切/复制/粘贴（发 Ctrl+字母，同按住 !@# 当 Ctrl）；别人提的，默认关（10-31）。 */
+    val zxcvEditShortcuts: Boolean = false,
     /** 长按语言键弹出列表，与空格长按分开设置；默认 0.15 秒（2026-10-13 用户要求）。 */
     val languageMenuHoldSeconds: Float = 0.15f,
     /** 按住符号键当 Ctrl；不拖动且在这个时限内松手才打开符号面板，超过时限松手什么都不做；默认 1 秒（2026-10-24 用户要求）。 */
@@ -148,6 +150,8 @@ data class KeyboardInputPreferences(
         const val MIXED_INPUT_KEY = "mixed_input"
         /** 生僻字开关；同中英混输，输入法按字母键前读它（ImeKeyRouter）。 */
         const val RARE_CHARACTERS_KEY = "rare_characters"
+        /** Z X C V 上角标改成撤销/剪切/复制/粘贴，默认关。 */
+        const val ZXCV_EDIT_SHORTCUTS_KEY = "zxcv_edit_shortcuts"
         /** 繁体输出开关；同中英混输，输入法按键前读它（ImeKeyRouter）。 */
         const val TRADITIONAL_OUTPUT_KEY = "traditional_output"
         /** 打字中清空整个输入框；输入法在清空时读它（ImeKeyRouter）。 */
@@ -244,6 +248,7 @@ data class KeyboardInputPreferences(
                 chineseGlideTyping = prefs.getBoolean(CHINESE_GLIDE_KEY, false),
                 letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
+                zxcvEditShortcuts = prefs.getBoolean(ZXCV_EDIT_SHORTCUTS_KEY, false),
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 uppercaseKeyLabels = prefs.getBoolean(UPPERCASE_KEY_LABELS_KEY, false),
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
@@ -284,6 +289,7 @@ data class KeyboardInputPreferences(
             .putBoolean("glide_typing", glideTyping)
             .putBoolean(CHINESE_GLIDE_KEY, chineseGlideTyping)
             .putBoolean("t9_flick_letters", t9FlickLetters)
+            .putBoolean(ZXCV_EDIT_SHORTCUTS_KEY, zxcvEditShortcuts)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
             .putFloat("cursor_swipe_lines", normalizeCursorSwipeLines(cursorSwipeLines))
             .putBoolean("cursor_step_haptic", cursorStepHaptic)

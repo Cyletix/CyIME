@@ -111,6 +111,20 @@ internal fun InputExperienceSettings(
                         settings = settings.copy(clearAllWhileComposing = it); settings.save(context)
                     })
             }
+            divider()
+            Row(Modifier.settingsSearchAnchor("Z X C V 角标做撤销、剪切、复制、粘贴", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Z X C V 角标做撤销、剪切、复制、粘贴", style = MaterialTheme.typography.titleSmall)
+                    Text("默认关。打开后 26 键 Z X C V 的上方角标换成撤销、剪切、复制、粘贴，" +
+                        (if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) "长按" else if (settings.reverseSymbolSwipe) "上拉" else "下拉") +
+                        "就执行，和按住 !@# 当 Ctrl 点这几个字母一样。按住 !@# 当 Ctrl 照常可用。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.zxcvEditShortcuts, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("zxcv-edit-shortcuts"), onCheckedChange = {
+                        settings = settings.copy(zxcvEditShortcuts = it); settings.save(context)
+                    })
+            }
             }
             if (InputExperiencePart.FLICK_DISC in parts) {
             divider()

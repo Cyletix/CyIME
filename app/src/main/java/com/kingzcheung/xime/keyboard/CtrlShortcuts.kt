@@ -34,6 +34,13 @@ object CtrlShortcuts {
         )
     }
 
+    /** 「Z X C V 上角标改成撤销/剪切/复制/粘贴」打开时换掉上角标的几个字母（10-31 用户反馈，默认关）。 */
+    val EDIT_CORNER_LETTERS = setOf('z', 'x', 'c', 'v')
+
+    /** 单字母 z/x/c/v 键在开关打开时返回它的字母（上角标改发 Ctrl+这个字母），其他键和双字母键返回 null。 */
+    fun editCornerLetter(key: String, enabled: Boolean): Char? =
+        key.singleOrNull()?.lowercaseChar()?.takeIf { enabled && it in EDIT_CORNER_LETTERS }
+
     /** 键盘层经 [GestureAction.COMMAND] 传给服务的命令名。 */
     fun command(letter: Char): String = "ctrl:${letter.lowercaseChar()}"
     fun letterOf(command: String): Char? =
