@@ -24,13 +24,13 @@ object BuiltinModelCatalog {
                     ModelFile("formula_vocab.json", RELEASE + "formula-handwriting-v1-vocab.json", "73653abb6993d5f2451501c804fb66671c05f86b4165bbe10cb3ef6ef96ec92c", 2003L),
                     ModelFile("formula_meta.json", RELEASE + "formula-handwriting-v1-meta.json", "2ad149afaa9f3872f872e1d4bf9560dfb67be21d08d69ec1a0fa05441cff7541", 205L),
                 )))),
-        ModelInfo("predictive-text-base", "智能联想模型 base 版本", "较大的本地联想模型。", ModelCategory.PREDICTION,
+        ModelInfo("predictive-text-base", "智能联想模型（完整）", "大多数手机选这个：联想下一个词更准，约 35 MB。和轻量版二选一，只用装一个；两个都很快，打字时感觉不出差别。", ModelCategory.PREDICTION,
             versions = listOf(ModelVersion(version = "v1.0", size = "34.8 MB",
                 files = listOf(
                     ModelFile("vocab.json", "https://www.modelscope.cn/models/bikeand/predictive-text-base/resolve/master/onnx/vocab.json", "3f7a6aa773afe6dacf75701f7861257d36a46a26ac70c0f8ee6dd4032cc3b9c2", 141139L, mirrors = listOf(RELEASE + "predictive-text-vocab-v1.0.json")),
                     ModelFile("model_int8_dynamic.onnx", "https://www.modelscope.cn/models/bikeand/predictive-text-base/resolve/master/onnx/model_int8_dynamic.onnx", "e15009c84d9702056ba8b5f6c04b27ae7d0400167647a5e94cb699f24f885a9d", 36353598L, mirrors = listOf(RELEASE + "predictive-text-base-v1.0-model_int8_dynamic.onnx")),
                 )))),
-        ModelInfo("predictive-text-small", "智能联想模型 small 版本", "轻量本地联想模型。", ModelCategory.PREDICTION,
+        ModelInfo("predictive-text-small", "智能联想模型（轻量）", "内存 4 GB 以下的手机、或手机空间紧张时选这个：只有完整版一半大（约 19 MB），联想略弱一点。和完整版二选一，只用装一个。", ModelCategory.PREDICTION,
             versions = listOf(ModelVersion(version = "v1.0", size = "18.9 MB",
                 files = listOf(
                     ModelFile("vocab.json", "https://www.modelscope.cn/models/bikeand/predictive-text-small/resolve/master/vocab.json", "3f7a6aa773afe6dacf75701f7861257d36a46a26ac70c0f8ee6dd4032cc3b9c2", 141139L, mirrors = listOf(RELEASE + "predictive-text-vocab-v1.0.json")),

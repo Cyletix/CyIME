@@ -256,7 +256,7 @@ fun SmartPredictionSettingsContent(
             }
 
             if (predictionModels.isNotEmpty()) {
-                item {
+                item { Column {
                     SettingsSection(title = "选择模型", content = {
                         predictionModels.forEach { model ->
                             PredictionModelCard(
@@ -277,7 +277,9 @@ fun SmartPredictionSettingsContent(
                             }
                         }
                     })
-                }
+                    // 有人看不懂 base / small（用户 10-31 转述）：直接说该选哪个。
+                    SettingsNote("怎么选：大多数手机选「完整」，联想更准；内存 4 GB 以下或空间不够选「轻量」，只有一半大。两个只用装一个，都很快。")
+                } }
             }
 
             item {
