@@ -293,17 +293,23 @@ fun SettingsToggleItem(
 
 /**
  * 设置里所有可能不能拨的开关（英文始终开启、被别的设置锁住、条件不满足、正在保存）都用这套颜色：
- * Material 默认「不能拨且开着」是灰底深色滑块，深色主题下看着像关着。这里开着时保留主题色只调淡，
- * 关着的禁用样式不变，一眼能分清开关状态，也能看出现在拨不动。
+ * Material 默认「不能拨且开着」是灰底深色滑块，深色主题下看着像关着；「不能拨且关着」的底几乎透明，
+ * 深色主题下是一块近黑的槽，和旁边能拨的关着开关不像一类（10-31 走查「右半边也放 G 键」）。
+ * 这里两种都照能拨时的样子调淡：开着保留主题色，关着保留灰底、描边和滑块，一眼能分清开关状态，也能看出现在拨不动。
  */
 @Composable
 internal fun settingsSwitchColors(): SwitchColors {
     val scheme = MaterialTheme.colorScheme
+    fun faded(color: Color) = color.copy(alpha = 0.55f).compositeOver(scheme.surface)
     return SwitchDefaults.colors(
         disabledCheckedThumbColor = scheme.onPrimary,
-        disabledCheckedTrackColor = scheme.primary.copy(alpha = 0.55f).compositeOver(scheme.surface),
-        disabledCheckedIconColor = scheme.primary.copy(alpha = 0.55f).compositeOver(scheme.surface),
+        disabledCheckedTrackColor = faded(scheme.primary),
+        disabledCheckedIconColor = faded(scheme.primary),
         disabledCheckedBorderColor = Color.Transparent,
+        disabledUncheckedThumbColor = faded(scheme.outline),
+        disabledUncheckedTrackColor = faded(scheme.surfaceContainerHighest),
+        disabledUncheckedIconColor = faded(scheme.surfaceContainerHighest),
+        disabledUncheckedBorderColor = faded(scheme.outline),
     )
 }
 
