@@ -90,6 +90,7 @@ object SettingsPreferences {
     const val KEY_STT_PUNCTUATION_COMMA = "stt_punctuation_comma"
     const val KEY_STT_PUNCTUATION_PERIOD = "stt_punctuation_period"
     const val KEY_STT_PUNCTUATION_QUESTION = "stt_punctuation_question"
+    const val KEY_STT_PUNCTUATION_TRAILING = "stt_punctuation_trailing"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
@@ -835,6 +836,10 @@ object SettingsPreferences {
     fun isSttPunctuationQuestion(context: Context) = getPrefs(context).getBoolean(KEY_STT_PUNCTUATION_QUESTION, true)
     fun setSttPunctuationQuestion(context: Context, enabled: Boolean) =
         getPrefs(context).edit().putBoolean(KEY_STT_PUNCTUATION_QUESTION, enabled).apply()
+    /** 整段话最后的标点；默认留（2026-10-31 用户反馈：想要中间有标点、末尾不带）。 */
+    fun isSttPunctuationTrailing(context: Context) = getPrefs(context).getBoolean(KEY_STT_PUNCTUATION_TRAILING, true)
+    fun setSttPunctuationTrailing(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_STT_PUNCTUATION_TRAILING, enabled).apply()
 
     /**
      * 开车连续语音：语音悬浮条听写时发出消息或离开输入框，回到同一应用的输入框自动接着听。

@@ -430,7 +430,8 @@ class VoiceRecognitionHandler(
         SettingsPreferences.isSttAutoPunctuation(context)
 
     private fun voiceMarks() = VoiceMarks(comma = SettingsPreferences.isSttPunctuationComma(context),
-        period = SettingsPreferences.isSttPunctuationPeriod(context), question = SettingsPreferences.isSttPunctuationQuestion(context))
+        period = SettingsPreferences.isSttPunctuationPeriod(context), question = SettingsPreferences.isSttPunctuationQuestion(context),
+        trailing = SettingsPreferences.isSttPunctuationTrailing(context))
 
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return

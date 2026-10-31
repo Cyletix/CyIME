@@ -7,15 +7,26 @@ private val dictatedPunctuation = Regex(" *(逗号|句号|问号|感叹号|叹�
 /** With model marks kept, a dictated mark replaces the marks the model put right next to it. */
 private val dictatedWithMarks = Regex("[，。？！、；：]*\\s*(逗号|句号|问号|感叹号|叹号)\\s*[，。？！、；：]*")
 
-/** Which of the model's marks 自动加标点 keeps; a dropped kind becomes spacing. Dictated marks always stay. */
-internal data class VoiceMarks(val comma: Boolean = true, val period: Boolean = true, val question: Boolean = true) {
+/**
+ * Which of the model's marks 自动加标点 keeps; a dropped kind becomes spacing. Dictated marks always stay.
+ * [trailing] = false drops only the model's marks at the very end of the dictation (every result is the whole text so far).
+ */
+internal data class VoiceMarks(val comma: Boolean = true, val period: Boolean = true, val question: Boolean = true,
+    val trailing: Boolean = true) {
     val all get() = comma && period && question
 }
+
+private val trailingMarks = Regex("[，。？！、；：,.;:?!\\s]+$")
 
 private val spacing = Regex(" {2,}")
 
 /** Drops the model marks of the kinds turned off; numeric '.', ',' and ':' between digits stay. */
 private fun dropMarks(text: String, marks: VoiceMarks): String {
+    val kept = dropKinds(text, marks)
+    return if (marks.trailing) kept else trailingMarks.replace(kept, "")
+}
+
+private fun dropKinds(text: String, marks: VoiceMarks): String {
     if (marks.all) return text
     val out = buildString {
         text.forEachIndexed { i, c ->

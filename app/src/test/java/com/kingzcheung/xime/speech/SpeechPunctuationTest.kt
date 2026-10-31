@@ -50,6 +50,22 @@ class SpeechPunctuationTest {
         assertEquals("我用 iPhone 很好用。", norm("我用 iPhone，很好用。", VoiceMarks(comma = false)))
     }
 
+    @Test fun `auto punctuation can drop only the mark at the very end`() {
+        fun norm(text: String, marks: VoiceMarks) = normalizeVoiceText(text, InputLanguage.CHINESE, keepMarks = true, marks = marks)
+        val noEnd = VoiceMarks(trailing = false)
+        assertEquals("你好，我在这里。你呢", norm("你好，我在这里。你呢？", noEnd))
+        assertEquals("今天天气不错", norm("今天天气不错。", noEnd))
+        assertEquals("版本是1.14", norm("版本是1.14。", noEnd))
+        assertEquals("你好，我在这里", norm("你好，我在这里，", noEnd))
+        // Dictated marks always stay, also at the end
+        assertEquals("你吃饭了吗？", norm("你吃饭了吗问号。", noEnd))
+        assertEquals("好的。", norm("好的句号", noEnd))
+        // Kinds and end combine: commas off still leaves the inner period
+        assertEquals("你好 我在这里。你呢", norm("你好，我在这里。你呢？", VoiceMarks(comma = false, trailing = false)))
+        // Default keeps the end
+        assertEquals("今天天气不错。", norm("今天天气不错。", VoiceMarks()))
+    }
+
     @Test fun `dropping marks never touches numbers or dictated marks`() {
         fun norm(text: String, marks: VoiceMarks) = normalizeVoiceText(text, InputLanguage.CHINESE, keepMarks = true, marks = marks)
         assertEquals("体温36.5度 会议10:30开始 花了1,200元。", norm("体温36.5度，会议10:30开始，花了1,200元。", VoiceMarks(comma = false)))

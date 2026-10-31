@@ -167,6 +167,7 @@ internal fun OfflineModelCard() {
                     Triple("逗号、顿号、分号", SettingsPreferences::isSttPunctuationComma, SettingsPreferences::setSttPunctuationComma),
                     Triple("句号", SettingsPreferences::isSttPunctuationPeriod, SettingsPreferences::setSttPunctuationPeriod),
                     Triple("问号、感叹号", SettingsPreferences::isSttPunctuationQuestion, SettingsPreferences::setSttPunctuationQuestion),
+                    Triple("末尾的标点", SettingsPreferences::isSttPunctuationTrailing, SettingsPreferences::setSttPunctuationTrailing),
                 ).forEach { (title, read, write) ->
                     var kept by remember(title) { mutableStateOf(read(context)) }
                     HorizontalDivider(modifier = Modifier.padding(start = 32.dp),
@@ -177,7 +178,11 @@ internal fun OfflineModelCard() {
                         verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(title, style = MaterialTheme.typography.bodyLarge)
-                            Text(if (kept) "保留模型打的$title。" else "不带$title，停顿处留空格；口述照样出。",
+                            Text(when {
+                                title == "末尾的标点" -> if (kept) "整段话最后保留句号、问号等标点。" else "整段话最后不带标点，中间的照留；口述照样出。"
+                                kept -> "保留模型打的$title。"
+                                else -> "不带$title，停顿处留空格；口述照样出。"
+                            },
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(checked = kept, onCheckedChange = null, colors = settingsSwitchColors())
