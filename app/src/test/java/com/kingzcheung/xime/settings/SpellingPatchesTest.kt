@@ -81,6 +81,22 @@ class SpellingPatchesTest {
         assertEquals(SpellingPatches.patch("", listOf("\"translator/enable_correction\": true")), correctionOnly)
     }
 
+    /** 双拼在自建合并键布局上的版本也写模糊音：只认这些版本的方案文件，不认全拼布局、14 键和补丁文件。 */
+    @Test fun doublePinyinLayoutVariantsAreListedFromTheRimeDirectory() {
+        val dir = kotlin.io.path.createTempDirectory("spelling").toFile()
+        try {
+            val layout = "custom_pinyin_" + "2".repeat(32)
+            val flypy = DoublePinyinScheme.layoutVariantId(DoublePinyinScheme.FLYPY.id, layout)
+            val ziranma = DoublePinyinScheme.layoutVariantId(DoublePinyinScheme.ZIRANMA_ID, layout)
+            for (id in listOf("rime_ice", DoublePinyinScheme.FLYPY.id, layout, ziranma, flypy, DoublePinyinScheme.k14Id(DoublePinyinScheme.ZIRANMA_ID)))
+                java.io.File(dir, "$id.schema.yaml").writeText("schema:\n  schema_id: $id\n")
+            java.io.File(dir, "$flypy.custom.yaml").writeText("patch:\n")
+            assertEquals(listOf(flypy, ziranma), SpellingPatches.doublePinyinLayoutVariants(dir))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     @Test fun anAndAngLeaveIanAndUanToTheirOwnGroups() {
         val toAn = Regex("(^|[^iu])ang$")
         val toAng = Regex("(^|[^iu])an$")
