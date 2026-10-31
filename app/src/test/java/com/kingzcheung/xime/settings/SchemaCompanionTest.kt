@@ -58,4 +58,31 @@ class SchemaCompanionTest {
         // 不是双拼方案的同名后缀不算。
         assertEquals(InputScheme.EXTERNAL, InputProfiles.describe("someone_else_14jian").scheme)
     }
+
+    /** 自建合并键布局（如自己排的 20 键）和 14 键一样：双拼方案和那个布局都启用时提供双拼在那个布局上的版本。 */
+    @Test fun everyShuangpinSchemeGetsAVersionOnEachMergedCustomLayout() {
+        val ziranma = DoublePinyinScheme.ZIRANMA_ID
+        val custom = DoublePinyinScheme.CUSTOM_PREFIX + "0".repeat(32)
+        val layout = "custom_pinyin_" + "2".repeat(32)
+        val onLayout = DoublePinyinScheme.layoutVariantId(ziranma, layout)
+        val customOnLayout = DoublePinyinScheme.layoutVariantId(custom, layout)
+        val all = installed + listOf(ziranma, custom, layout, onLayout, customOnLayout)
+        assertEquals(listOf(ziranma, layout, custom, onLayout, customOnLayout),
+            CyimeInputDefaults.withCompanions(listOf(ziranma, layout, custom), all))
+        // 布局或双拼方案不启用时，它的布局版本跟着去掉。
+        assertEquals(listOf(ziranma, custom), CyimeInputDefaults.withCompanions(listOf(ziranma, custom, onLayout), all))
+        assertEquals(listOf(layout, custom, customOnLayout), CyimeInputDefaults.withCompanions(listOf(layout, custom, onLayout), all))
+        assertEquals(listOf(ziranma, layout), CyimeInputDefaults.companionNeeds(onLayout))
+        assertEquals(listOf(custom, layout), CyimeInputDefaults.companionNeeds(customOnLayout))
+        // 布局版本不是自定义双拼方案本身（不在双拼方案页单独列出、不能单独编辑删除）。
+        assertEquals(false, DoublePinyinSchemes.isCustom(customOnLayout))
+        assertEquals(true, DoublePinyinSchemes.isCustom(custom))
+        assertEquals(custom, DoublePinyinSchemes.baseId(customOnLayout))
+        assertEquals(layout, DoublePinyinSchemes.layoutOf(customOnLayout))
+        assertEquals(InputScheme.DOUBLE_PINYIN, InputProfiles.describe(onLayout).scheme)
+        assertEquals(InputLanguage.CHINESE, InputProfiles.describe(customOnLayout).language)
+        // 不是双拼方案的前缀不算。
+        assertEquals(null, CyimeInputDefaults.companionNeeds("someone_$layout"))
+        assertEquals(null, DoublePinyinSchemes.layoutOf("someone_$layout"))
+    }
 }

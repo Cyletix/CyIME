@@ -429,7 +429,7 @@ class RimeEngine {
         val schema = nativeGetCurrentSchema().orEmpty()
         val profile = com.kingzcheung.xime.settings.InputProfiles.describe(schema)
         val groups = if (profile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
-            com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(schema)?.mergedGroups.orEmpty()
+            com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(schema)?.mergedGroups.orEmpty()
         if (groups.none { it.length > 1 } || nativeIsAsciiMode()) return preedit
         val snapshot = nativePinyinEditSnapshot()
         val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0

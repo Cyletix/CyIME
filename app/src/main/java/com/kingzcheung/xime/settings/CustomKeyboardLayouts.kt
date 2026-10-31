@@ -153,6 +153,8 @@ object CustomKeyboardLayouts {
     const val STATUS = "custom_keyboard_layout_status"
     private var cached: List<CustomKeyboardLayout> by mutableStateOf(emptyList())
     fun find(id: String) = cached.firstOrNull { it.id == id } ?: BuiltinLetterLayouts.find(id)
+    /** 方案用的自建布局：布局自己的拼音方案，或双拼在这个布局上的版本（见 DoublePinyinSchemes.isOnLayout）。 */
+    fun forSchema(id: String) = find(id) ?: DoublePinyinSchemes.layoutOf(id)?.let { cached.firstOrNull { layout -> layout.id == it } }
     fun isCustom(id: String) = id in BuiltinLetterLayouts.ids || id.startsWith("custom_pinyin_")
     @Synchronized fun load(context: Context): List<CustomKeyboardLayout> {
         val file = File(context.filesDir, "custom-keyboard-layouts.json")
@@ -209,6 +211,8 @@ object CustomKeyboardLayouts {
             }
             cached = updated
         }
+        // 双拼在合并键布局上的版本跟着这个布局的合并键重写，启用方案时一起提供。
+        DoublePinyinSchemes.syncLayouts(context)
         SchemaManager.setEnabledSchemas(context, (SchemaManager.getEnabledSchemas(context) + layout.id).distinct())
         notifyChanged(context)
     }
@@ -248,6 +252,8 @@ object CustomKeyboardLayouts {
             cached = old.filterNot { it.id == id }
         }
         CustomLayoutSymbols.clear(context, id)
+        // 删掉双拼在这个布局上的版本；正在用时换回那个双拼方案的 26 键。
+        DoublePinyinSchemes.syncLayouts(context)
         if (SettingsPreferences.getCurrentSchema(context) == id) SettingsPreferences.setCurrentSchema(context, "rime_ice")
         SchemaManager.setEnabledSchemas(context, (remaining + "rime_ice").distinct())
         notifyChanged(context)

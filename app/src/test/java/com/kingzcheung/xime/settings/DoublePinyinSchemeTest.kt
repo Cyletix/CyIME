@@ -422,6 +422,58 @@ class DoublePinyinSchemeTest {
         assertEquals("CA", DoublePinyinScheme.ZIRANMA.code("zhong")!!.map(::merged).joinToString(""))
     }
 
+    /** 自己排的 20 键（we、yu、op、as、jk、cv 合并）上的双拼：每一位都可以点合并键（送键上第一个字母）或长按选精确字母。 */
+    @Test fun layoutVersionTypesEachKeyExactlyOrMerged() {
+        val base = """
+            schema:
+              schema_id: double_pinyin_flypy
+              name: 小鹤双拼
+              description: |
+                雾凇拼音 - 小鹤双拼
+
+            translator:
+              dictionary: rime_ice
+              prism: double_pinyin_flypy    # 注释
+              enable_correction: true
+              cyime_neighbor_correction: true
+              preedit_format:
+                - xform/(\w)g/${'$'}1eng/
+
+            speller:
+              alphabet: zyxwvutsrqponmlkjihgfedcba
+              algebra:
+                - erase/^xx${'$'}/
+            """.trimIndent() + "\n"
+        val groups = listOf("q", "we", "r", "t", "yu", "i", "op", "as", "d", "f", "g", "h", "jk", "l", "z", "x", "cv", "b", "n", "m")
+        fun merged(c: Char) = groups.first { c in it }[0]
+        val layout = "custom_pinyin_" + "2".repeat(32)
+        for (scheme in DoublePinyinScheme.BUILTINS.drop(1).filterNot { it.usesSemicolon } + custom) {
+            val id = DoublePinyinScheme.layoutVariantId(scheme.id, layout)
+            assertEquals(scheme.id to layout, DoublePinyinScheme.splitLayoutVariant(id))
+            val text = scheme.layoutSchema(scheme.schema(base), id, "二十键", groups)
+            assertTrue(text.startsWith(DoublePinyinScheme.GENERATED_MARK + id + "\n"))
+            assertEquals(1, text.lines().count { it.startsWith(DoublePinyinScheme.GENERATED_MARK) })
+            assertTrue(text.contains("  schema_id: $id\n  language: zh\n  input_scheme: double_pinyin\n"))
+            // 名称和 26 键双拼相同：方案栏里同一个方案，换布局时保持。
+            assertTrue(text.contains("  name: ${org.json.JSONObject.quote(scheme.name)}\n"))
+            assertTrue(text.contains("自建布局「二十键」"))
+            assertTrue(text.contains("  prism: $id\n  spelling_hints: 8\n  always_show_comments: true\n"))
+            // 代表字母是小写，26 键的编码显示会把它显示成别的音节；临键纠错按 26 键位置算，合并键上不开。
+            assertTrue(text.contains("  preedit_format: []\n"))
+            assertFalse(text.contains("enable_correction") || text.contains("cyime_neighbor_correction"))
+            val rules = text.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
+                .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
+            assertEquals(scheme.algebra() + listOf(0, 1).flatMap { p -> groups.filter { it.length == 2 }.map { "derive/^(.{$p})[${it[1]}](.*)$/\$1${it[0]}\$2/" } }, rules)
+            for (syllable in DoublePinyinScheme.SYLLABLES) {
+                val code = scheme.code(syllable)!!
+                val expected = setOf(code, "${merged(code[0])}${code[1]}", "${code[0]}${merged(code[1])}", "${merged(code[0])}${merged(code[1])}")
+                assertEquals(syllable, expected, spellings(rules, syllable))
+            }
+        }
+        assertEquals(null, DoublePinyinScheme.splitLayoutVariant(DoublePinyinScheme.k14Id(DoublePinyinScheme.ZIRANMA_ID)))
+        assertEquals(null, DoublePinyinScheme.splitLayoutVariant("custom_pinyin_" + "2".repeat(32)))
+    }
+
     @Test fun flypyFourteenKeyAssetMatchesTheGeneratedRules() {
         // 随应用内置的 14 键小鹤双拼和由键位表生成的 14 键版本打出同样的编码（内置的另外多一组 ju→jv 的写法）。
         val asset = base14.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") || it.startsWith("    #") }

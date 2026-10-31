@@ -109,7 +109,7 @@ object InputProfiles {
     fun describe(id: String, language: InputLanguage? = null, scheme: InputScheme? = null): InputProfile {
         // Built-in descriptions are reused on every key; custom layouts remain live after edits.
         val base = installed[id] ?: builtin(id)
-        val custom = CustomKeyboardLayouts.find(id)
+        val custom = CustomKeyboardLayouts.forSchema(id)
         val actualLayout = custom?.let(::customLayout) ?: base.layout
         if ((language == null || language == base.language) && (scheme == null || scheme == base.scheme) && actualLayout == base.layout) return base
         val actualScheme = scheme ?: base.scheme
@@ -206,7 +206,7 @@ object InputProfiles {
         scheme: InputScheme? = null, arranged: Boolean = true): InputProfile {
         if (asciiMode || id == InputModes.ENGLISH) return describe(InputModes.ENGLISH).let { if (arranged) arranged(it) else it }
         val profile = describe(id, language, scheme)
-        val layout = resolveLayout(KeysConfigHelper.boundSectionForSchema(id), CustomKeyboardLayouts.find(id))
+        val layout = resolveLayout(KeysConfigHelper.boundSectionForSchema(id), CustomKeyboardLayouts.forSchema(id))
         val bound = if (layout.kind == LayoutKind.HANDWRITING) profile.handwriting()
             else if (profile.mode == InputMode.HANDWRITING) profile.copy(layout = layout,
                 mode = InputMode.KEYBOARD, engineProfile = EngineProfile.Rime(id))

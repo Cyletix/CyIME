@@ -37,7 +37,7 @@
 
 - ~~微软双拼~~（2026-10-31 已做，内置 `double_pinyin_microsoft`）：键位表允许 ing 放分号（`usesSemicolon`），生成的方案字母表加分号、`initials` 不加（没在打字时分号仍是标点）；26 键排列没有分号键时第二排末尾补一个（`KeysConfigHelper.withSemicolonKey`），分号键照常送进 Rime；14 键、九键版本不生成。零声母按微软拼音的 O 开头（爱 OL、而 OR）。官方 rime-double-pinyin `double_pinyin_mspy` 拼写运算交叉检查见 `DoublePinyinSchemeTest`。
 - 搜狗双拼：同样 ing 在分号上，加一张键位表即可。
-- 双拼在自己建的合并键布局上打（目前只有内置 14 键）：需要按那个布局的合并组生成 derive 规则，每个（方案 × 布局）一个 Rime 方案。
+- ~~双拼在自己建的合并键布局上打~~（2026-10-31 已做）：每个双拼方案在每个有合并键的自建布局上生成一个版本 `<双拼方案 id>_<布局 id>`（`DoublePinyinScheme.layoutSchema`），以这个方案的 26 键配置为底，拼写规则最后接每一位的合并键派生（和 14 键版本同一做法，代表字母是键上第一个字母、小写，即点按送的字母）；编码显示清空，屏上按首选读音换成本方案的双拼键（`spelling_hints`），合并键上不开临键纠错。和 14 键版本一样是组合配置（`CyimeInputDefaults.companionNeeds`）：双拼方案和那个布局都启用时提供。布局保存、删除时 `DoublePinyinSchemes.syncLayouts` 重写或删掉，微软双拼（分号）不生成。librime 1.10 实测见 `/mnt/project-files/custom-layout-20key-1031/README.md`。
 - 从拼音切到双拼时保持当前字母排列（现在点方案后排列回到双拼自己的选择，点布局时保持方案）。
 - 导入的方案没写 `language` 时没法在应用里指定语言（只能改 yaml 加 `language: zh`），这类方案用不了中文的字母布局、语音、手写。
 - 双拼 + 形码辅助码（自然码辅助码、小鹤双拼+鹤形）：现在只能导入现成的 Rime 方案。

@@ -91,9 +91,8 @@ object SetupGuide {
             sizes = models.associate { it.id to catalogBytes(it) },
             typing = typing,
             typingName = profile?.scheme?.displayName.orEmpty(),
-            // 九键、14 键双拼算同一种双拼（26 键那个方案）。
-            doublePinyin = if (typing != TypingWay.DOUBLE_PINYIN) null
-                else currentSchema.removeSuffix(DoublePinyinScheme.T9_SUFFIX).removeSuffix(DoublePinyinScheme.K14_SUFFIX),
+            // 九键、14 键、自建合并键布局上的双拼算同一种双拼（26 键那个方案）。
+            doublePinyin = if (typing != TypingWay.DOUBLE_PINYIN) null else DoublePinyinSchemes.baseId(currentSchema),
             onLetterKeyboard = profile != null && profile.language == InputLanguage.CHINESE && profile.layout.kind == LayoutKind.ALPHABETIC &&
                 typing != TypingWay.KEEP,
             shownDoublePinyin = DoublePinyinScheme.BUILTINS.map { it.id }.filterTo(linkedSetOf()) { it in enabledSchemas },

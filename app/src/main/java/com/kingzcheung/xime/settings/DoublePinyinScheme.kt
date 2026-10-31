@@ -256,6 +256,41 @@ data class DoublePinyinScheme(
         return "$GENERATED_MARK$k14\n$text"
     }
 
+    /**
+     * 自建合并键布局上的版本（如自己排的 20 键）：以本方案的 26 键配置 [base26] 为底，每个字的两位各自可以是
+     * 精确字母（长按气泡选的字母）或合并键（点按送的代表字母，即键上第一个字母），和 14 键版本同一个做法。
+     * 合并键的代表字母是小写，和精确字母同形，不能再套 26 键的编码显示（会把 we 键的 w 显示成另一个音节），
+     * 屏上编码按首选读音换成本方案的双拼键（同 14 键）。临键纠错按 26 键位置算，合并键上不开。
+     */
+    fun layoutSchema(base26: String, layoutVariantId: String, layoutName: String, groups: List<String>): String {
+        require(this == FLYPY || valid())
+        var text = base26.replace("\r\n", "\n").lineSequence().dropWhile { it.startsWith(GENERATED_MARK) }.joinToString("\n")
+        val header = Regex("(?ms)^schema:\\n.*?(?=^\\S)").find(text) ?: error("双拼方案缺少 schema 段")
+        val schemaBlock = header.value
+            .replaceFirst(Regex("(?m)^  schema_id: .*$"), "  schema_id: $layoutVariantId")
+            .replaceFirst(Regex("(?m)^  description: \\|\\n(?:    .*\\n)*"), Regex.escapeReplacement(
+                "  description: |\n    CyIME 双拼方案（由键位表生成）在自建布局「$layoutName」上的版本，词库与 26 键双拼相同。\n"))
+        check(schemaBlock.contains("  schema_id: $layoutVariantId\n")) { "双拼方案缺少 schema_id" }
+        text = text.replaceRange(header.range, schemaBlock)
+        val merged = (0..1).flatMap { position ->
+            groups.filter { it.length > 1 }.map { group -> "derive/^(.{$position})[${group.drop(1)}](.*)$/\$1${group[0]}\$2/" }
+        }
+        // 原有规则一字不动，合并键的派生接在最后（作用在已经换好的双拼编码上）。
+        val speller = Regex("(?ms)^speller:\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(text) ?: error("双拼方案缺少 speller 段")
+        val algebra = Regex("(?m)^  algebra:[^\\n]*\\n(?:    [^\\n]*\\n)*").find(speller.value) ?: error("双拼方案缺少 algebra")
+        val appended = speller.value.replaceRange(algebra.range, algebra.value + merged.joinToString("") { "    - \"$it\"\n" })
+        text = text.replaceRange(speller.range, appended)
+        val translator = Regex("(?ms)^translator:\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(text) ?: error("双拼方案缺少 translator 段")
+        val prism = Regex("(?m)^  prism: \\S+.*$")
+        check(prism.containsMatchIn(translator.value)) { "双拼方案缺少 prism" }
+        val translatorBlock = translator.value
+            .replace(Regex("(?m)^  (enable_correction|cyime_neighbor_correction|spelling_hints|always_show_comments):.*\\n"), "")
+            .replace(Regex("(?m)^  preedit_format:[^\\n]*\\n(?:    [^\\n]*\\n)*"), "  preedit_format: []\n")
+            .replaceFirst(prism, "  prism: $layoutVariantId\n  spelling_hints: 8\n  always_show_comments: true")
+        text = text.replaceRange(translator.range, translatorBlock)
+        return "$GENERATED_MARK$layoutVariantId\n$text"
+    }
+
     /** 换掉 [section] 段里 [key] 列表的全部条目（含其间的注释行）。 */
     private fun replaceList(text: String, section: String, key: String, items: List<String>): String {
         val block = Regex("(?ms)^$section:\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(text) ?: error("小鹤双拼方案缺少 $section 段")
@@ -324,6 +359,12 @@ data class DoublePinyinScheme(
         /** 14 键版本，与 14 键小鹤双拼 double_pinyin_flypy_14jian 同样的后缀。 */
         const val K14_SUFFIX = "_14jian"
         fun k14Id(id: String) = id + K14_SUFFIX
+        /** 自建合并键布局上的版本：双拼方案 id + 布局 id（custom_pinyin_…）。 */
+        fun layoutVariantId(id: String, layoutId: String) = "${id}_$layoutId"
+        private val LAYOUT_VARIANT = Regex("(.+)_(custom_pinyin_[a-f0-9]{32})")
+        /** 拆出 (双拼方案 id, 布局 id)；不是布局版本的 id 为 null。 */
+        fun splitLayoutVariant(id: String): Pair<String, String>? =
+            LAYOUT_VARIANT.matchEntire(id)?.let { it.groupValues[1] to it.groupValues[2] }
         /** 14 键的合并键（与 xime.yaml qwerty_14 和 14 键小鹤双拼的拼写运算相同）：点按送大写代表字母，l、m 单独一键。 */
         private val K14_GROUPS = listOf("qw" to 'Q', "er" to 'E', "ty" to 'T', "ui" to 'U', "op" to 'O', "as" to 'A',
             "df" to 'D', "gh" to 'G', "jk" to 'J', "zx" to 'Z', "cv" to 'C', "bn" to 'B')
