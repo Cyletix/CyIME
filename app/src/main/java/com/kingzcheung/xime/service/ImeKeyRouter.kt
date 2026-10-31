@@ -751,7 +751,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 service.endComposingInputBox()
                                 val limit = XimeInputMethodService.SAFE_TEXT_LIMIT
                                 val document = ic.readDocumentForClear(limit) ?: return@let
-                                service.lastClearedDocument = ic.clearDocument(document, limit)
+                                service.lastClearedDocument = ic.clearDocument(document, limit) {
+                                    service.currentInputConnection === ic
+                                }
                             }
                         }
                     }
