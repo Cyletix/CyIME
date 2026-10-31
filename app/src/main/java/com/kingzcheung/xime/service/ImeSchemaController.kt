@@ -184,8 +184,13 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         return true
     }
     
+    /**
+     * 设置页存了自定义布局：重新部署并切回当前方案。
+     * 不挂在某个输入框上（与自定义短语同样做法）：部署要几秒，期间设置页换了焦点或键盘收起都会换一代输入会话，
+     * 挂着旧会话的任务一碰引擎就被当作过期命令取消，提示「应用失败：Expired input command」（2026-10-31 平板）。
+     */
     internal fun applyCustomLayouts() {
-        service.keyRouter.postRimeJob {
+        service.inputCommands.submit(kind = "deploy") {
             val prefs = SettingsPreferences.getPrefsPublic(service)
             try {
                 KeysConfigHelper.loadConfig(service)
@@ -208,7 +213,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
 
     /** 模糊音等拼写补丁已由设置页写好：增量部署改过的方案，再切回当前方案让会话用上新规则。 */
     internal fun applySpellingPatches() {
-        service.keyRouter.postRimeJob {
+        // 同 [applyCustomLayouts]：不挂在输入框上，部署中换焦点不会让它半途作废。
+        service.inputCommands.submit(kind = "deploy") {
             try {
                 check(RimeConfigHelper.ensureDeployment(service)) { "方案部署失败" }
                 val id = SettingsPreferences.getCurrentSchema(service)
