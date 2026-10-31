@@ -99,8 +99,10 @@ fun SchemaListView(
                 rowHeight = schemeHeight,
                 containerColor = keyBgColor, contentColor = keyTextColor, accentColor = accentColor,
                 onManage = {
-                    context.startActivity(Intent(context, com.kingzcheung.xime.MainActivity::class.java)
-                        .putExtra("open_fragment", "schema").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    // 设置已开着（从键盘齿轮进的、或正在设置页里打字）时，只带 NEW_TASK 的同一个 Intent
+                    // 只会把旧页面拉到前面、收不到 onNewIntent，看起来就是点了没反应；和齿轮、长按菜单走同一个入口。
+                    context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
+                        com.kingzcheung.xime.ui.settings.SettingsRoutes.Schema))
                 }, onSelect = onSelectSchema)
         }
     }
