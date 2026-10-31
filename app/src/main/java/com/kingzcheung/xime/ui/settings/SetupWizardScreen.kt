@@ -34,6 +34,8 @@ internal data class SetupStatus(
     val preparing: Boolean = true,
     val schemas: List<String> = emptyList(),
     val error: String? = null,
+    /** 准备没过、正在等下一次自动重试时的原因（部署问题 + 几秒后重试）；正常准备中为 null。 */
+    val detail: String? = null,
 ) {
     val ready: Boolean get() = !preparing && error == null && schemas.isNotEmpty()
     val complete: Boolean get() = imeEnabled && imeSelected && ready
@@ -71,6 +73,8 @@ fun SetupWizardScreen(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var status by remember { mutableStateOf(SetupStatus()) }
     var attempt by remember { mutableIntStateOf(0) }
+    // 后台线程写的重试原因单独放一个状态：status 由主线程每 500ms 整体改写，混写会互相覆盖。
+    var preparationDetail by remember { mutableStateOf<String?>(null) }
     val pickerFallbackHint = remember { imePickerFallbackHint(Build.MANUFACTURER.orEmpty(), Build.BRAND.orEmpty()) }
 
     fun refreshImeState() {
@@ -91,9 +95,15 @@ fun SetupWizardScreen(
     LaunchedEffect(visible, attempt) {
         if (!visible) return@LaunchedEffect
         status = status.copy(preparing = true, error = null)
+        preparationDetail = null
         try {
             val schemas = withContext(Dispatchers.IO) {
-                RimeConfigHelper.prepareAutomatically(context)
+                // 准备没过时会一直自动重试；把原因摆出来，不再只有一根进度条转十几分钟看不出卡在哪（GitHub #36）。
+                RimeConfigHelper.prepareAutomatically(context) { message ->
+                    preparationDetail = if ("重试" !in message) null else
+                        listOf(RimeConfigHelper.deploymentProblem(context), message)
+                            .filter { it.isNotBlank() }.joinToString("\n")
+                }
                 // 用方案文件里的名字（小鹤双拼等），和「语言与方案」页一致；读不到才退回内置名或 ID。
                 val names = SchemaManager.discoverSchemas(context).associate { it.schemaId to it.name }
                 // 双拼的 14 键版本是组合配置（双拼 × 14 键），不单独列一项。
@@ -101,6 +111,7 @@ fun SetupWizardScreen(
                     names[id] ?: DoublePinyinScheme.BUILTINS.firstOrNull { it.id == id }?.name ?: ChineseSchemas.displayName(id, id)
                 }
             }
+            preparationDetail = null
             status = status.copy(preparing = false, schemas = schemas,
                 error = if (schemas.isEmpty()) "请至少启用一个输入方案" else null)
         } catch (e: kotlinx.coroutines.CancellationException) { throw e
@@ -110,7 +121,7 @@ fun SetupWizardScreen(
         }
     }
     if (visible) SetupWizardContent(
-        status = status,
+        status = status.copy(detail = preparationDetail.takeIf { status.preparing }),
         onEnable = { openImeSettings(context) },
         onSchemas = onNavigateToSchemaSettings,
         onRetry = { attempt++ },
@@ -165,6 +176,10 @@ internal fun SetupWizardContent(
                     status.preparing -> {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                         Text("正在准备词库，首次使用可能需要几分钟…")
+                        status.detail?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     status.error != null -> {
                         Text(status.error, color = MaterialTheme.colorScheme.error)
