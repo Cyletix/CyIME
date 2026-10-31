@@ -52,6 +52,13 @@ import kotlinx.coroutines.withContext
  * ImeGlassBlurWindow blurs that window; this modifier never fades text/icons.
  * Theme images keep their cached material rendering and do not capture the screen.
  */
+/**
+ * 「我的图片」开着玻璃时，背景图不模糊、不变淡：用户自己选的图要看得见（用户 10-31：被模糊掉了，什么都看不到）。
+ * 按键、候选栏照旧按玻璃透明；内置图片主题不变。
+ */
+internal fun FrostedGlassConfig.forBackground(background: BackgroundConfig?): FrostedGlassConfig =
+    if (CustomImageTheme.isCustomImage(background)) copy(blurRadiusDp = 0f, backgroundOpacity = 1f) else this
+
 @Composable
 internal fun Modifier.frostedGlassBackground(
     background: BackgroundConfig?,

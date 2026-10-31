@@ -39,6 +39,11 @@ object CustomImageTheme {
 
     fun hasImage(context: Context): Boolean = imageSource(context) != null
 
+    /** 这张背景是不是用户自己选的图（按存图的文件名认）。 */
+    fun isCustomImage(background: BackgroundConfig?): Boolean =
+        background?.type == "image" && listOfNotNull(background.src, background.srcDark)
+            .any { it.removePrefix("themes/").startsWith(FILE_PREFIX) }
+
     /** 已存的图片（themes/…），没有时为 null。 */
     fun imageSource(context: Context): String? {
         val src = SettingsPreferences.getPrefsPublic(context).getString(KEY_SRC, null) ?: return null

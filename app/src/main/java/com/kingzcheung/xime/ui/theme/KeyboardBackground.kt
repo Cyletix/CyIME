@@ -88,7 +88,7 @@ fun Modifier.keyboardBackground(
     translucentSurface: Boolean = false,
 ): Modifier {
     if (frostedGlass.enabled) {
-        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass, translucentSurface)
+        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass.forBackground(background), translucentSurface)
     }
     if (background == null) return this.then(Modifier.background(fallbackColor))
 
