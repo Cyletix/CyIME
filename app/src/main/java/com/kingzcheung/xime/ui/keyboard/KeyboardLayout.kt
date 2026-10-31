@@ -143,6 +143,11 @@ fun KeyboardLayout(
     // Shared physical frame and bottom-row spacing for 14/26 keys. The paired
     // alphabet keys still occupy their own five-column rows inside that frame.
     val fourteenKey = !isAsciiMode && uiState.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
+    // 双拼键位提示（默认关）：双拼 26 键每个键写出 zh/ch/sh 和韵母，和双拼方案页的键位图一样；14 键、九键不显示。
+    val dpKeyHints = if (doublePinyin && !isAsciiMode && !fourteenKey &&
+        LocalKeyboardInputPreferences.current.doublePinyinKeyHints) remember(uiState.currentSchemaId, cfgVer) {
+        com.kingzcheung.xime.settings.DoublePinyinSchemes.find(uiState.currentSchemaId)?.let(::doublePinyinKeyHints)
+    } else null
     // 注音（大千）：11 列，下面三行 10 键缩进半键，没有 Shift，删除键在第四行末尾。
     val zhuyin = !isAsciiMode && uiState.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ZHUYIN
     val metricContext = LocalContext.current
@@ -166,7 +171,8 @@ fun KeyboardLayout(
         splitGapSetting, maxWidth.value, splitGutterDp, physicalTargetCellDp) else 0f
     val splitGapDp = (splitGapFraction * maxWidth.value).dp
     // 分体两半贴住左右边：不套用居中的键宽上限。
-    CompositionLocalProvider(LocalKeyboardExplicitWidth provides (LocalKeyboardExplicitWidth.current || splitKeyboard)) {
+    CompositionLocalProvider(LocalKeyboardExplicitWidth provides (LocalKeyboardExplicitWidth.current || splitKeyboard),
+        LocalDoublePinyinKeyHints provides dpKeyHints) {
     KeyboardKeySpacingScope(Modifier.fillMaxSize(),
         columns = letterKeyboardColumns(keyRows, fourteenKey),
         widthFraction = if (splitKeyboard) SplitKeyboardGeometry.keyWidthFraction(

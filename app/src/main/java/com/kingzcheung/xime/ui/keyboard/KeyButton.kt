@@ -482,6 +482,8 @@ fun SwipeableKeyButton(
     val shiftHovered = shiftLetters != null && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
     // 按住符号键当 Ctrl：单字母键换成快捷键键面（用户 10-24）。
     val ctrlLetter = shiftLetters?.singleOrNull()?.takeIf { shiftTargets?.ctrl == true }
+    // 双拼键位提示：这个键代表的翘舌声母和韵母（只在开着开关的双拼 26 键有）；有提示时不画上下角标，滑动照常。
+    val doublePinyinHint = LocalDoublePinyinKeyHints.current?.forKey(letterGroup ?: text)
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val hexagonal = LocalHoneycombKeys.current && (letterGroup ?: text).let { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }
@@ -543,6 +545,9 @@ fun SwipeableKeyButton(
         val compactIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, 16f).dp
         val mainIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, iconSizeDp).dp
         val keyHeight = maxHeight
+        val dpHint = doublePinyinHint?.takeIf { hintsVisible }
+        val dpFinals = dpHint?.let { fitDoublePinyinFinals(it.finals, maxWidth.value - 6f, maxHeight.value * 0.42f,
+            effectiveSwipeFontSize.value, density.fontScale) }
         Box(Modifier.fillMaxSize().graphicsLayer {
             alpha = if (ctrlLetter != null) 0f else if (showDisc) 1f else 1f - flickFade.strongest
         }, contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center) {
@@ -582,7 +587,7 @@ fun SwipeableKeyButton(
                         horizontalAlignment = Alignment.End
                     ) {
                         val swipeUpHint = swipeUpKeyLabel ?: swipeText
-                        if (hintsVisible && flickPreview?.fromTop != true && !swipeUpHint.isNullOrEmpty()) {
+                        if (hintsVisible && doublePinyinHint == null && flickPreview?.fromTop != true && !swipeUpHint.isNullOrEmpty()) {
                             val displayText = if (swipeUpHint.length <= 2) swipeUpHint else swipeUpHint.take(2)
                             Text(
                                 text = punctuationKeyLabel(displayText),
@@ -596,7 +601,7 @@ fun SwipeableKeyButton(
                         }
 
                         val swipeDownHint = swipeDownKeyLabel
-                        if (hintsVisible && flickPreview?.fromTop != false && !swipeDownHint.isNullOrEmpty()) {
+                        if (hintsVisible && doublePinyinHint == null && flickPreview?.fromTop != false && !swipeDownHint.isNullOrEmpty()) {
                             val hasChinese = swipeDownHint.any { it in '\u4e00'..'\u9fff' || it in '\u3400'..'\u4dbf' || it in '\uf900'..'\ufaff' }
                             val adjustedFontSize = if (hasChinese && effectiveSwipeFontSize > 6.sp) (effectiveSwipeFontSize.value * 0.85f).sp else effectiveSwipeFontSize
                             Box(
@@ -631,7 +636,9 @@ fun SwipeableKeyButton(
                 } else {
                     Text(
                         text = customLayoutLabel(customLayout, punctuationKeyLabel(text), glassLabelSurface ?: resolvedBackground, customAccent, textColor),
-                        modifier = Modifier.fillMaxWidth().offset(y = if (hintsVisible && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp),
+                        // 双拼键位提示的韵母在字母下面：字母上移半个提示高，两者一起居中。
+                        modifier = Modifier.fillMaxWidth().offset(y = if (dpHint != null) (-(dpFinals?.heightDp ?: 0f) / 2f).dp
+                            else if (hintsVisible && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp),
                         color = resolvedText,
                         fontSize = labelSize.sp,
                         lineHeight = (labelSize * 1.2f).sp,
@@ -644,7 +651,7 @@ fun SwipeableKeyButton(
 
                 // 上滑提示与角标文字相同（如九键/笔画上滑输入键面数字）时不再重复渲染提示，
                 // 角标已表达该信息；swipeText 状态保持非空，上滑触发与气泡不受影响。
-                if (hintsVisible && flickPreview?.fromTop != true && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
+                if (hintsVisible && doublePinyinHint == null && flickPreview?.fromTop != true && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
                     val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
                     val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
                     Text(
@@ -660,7 +667,7 @@ fun SwipeableKeyButton(
                     )
                 }
 
-                if (hintsVisible && flickPreview?.fromTop != false && !swipeDownKeyLabel.isNullOrEmpty()) {
+                if (hintsVisible && doublePinyinHint == null && flickPreview?.fromTop != false && !swipeDownKeyLabel.isNullOrEmpty()) {
                     val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
                     Text(
                         text = punctuationKeyLabel(displayText),
@@ -690,6 +697,9 @@ fun SwipeableKeyButton(
                     )
                 }
             }
+            if (dpHint != null) DoublePinyinKeyHintFace(dpHint, dpFinals, effectiveSwipeFontSize,
+                initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f),
+                finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f), fontFamily = keyLabelFontFamily)
         }
         if (ctrlLetter != null) CtrlShortcutFace(ctrlLetter, resolvedText, frostedGlass, labelSize,
             effectiveSwipeFontSize, hintsVisible, maxWidth.value, keyFontFamily)

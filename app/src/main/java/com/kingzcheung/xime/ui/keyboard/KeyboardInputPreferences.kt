@@ -82,6 +82,8 @@ data class KeyboardInputPreferences(
     val neighborCorrection: Boolean = true,
     /** 双拼 26 键邻键纠错，默认关；方案补丁见 SpellingPatches。 */
     val doublePinyinCorrection: Boolean = false,
+    /** 双拼 26 键每个键上写出翘舌声母和韵母（双拼键位提示），默认关；见 DoublePinyinKeyHints。 */
+    val doublePinyinKeyHints: Boolean = false,
     /** 中文全拼 26 键中英混输（nihaohello → 你好hello），默认关；见 app/data/cyime_mixed_input.lua。 */
     val mixedInput: Boolean = false,
     /** 中文全拼 26 键补出生僻字（瀺 chan），默认关；见 app/data/cyime_rare_chars.lua。 */
@@ -154,6 +156,8 @@ data class KeyboardInputPreferences(
         const val DATETIME_CANDIDATES_KEY = "datetime_candidates"
         /** 中文滑行输入；新键，旧版本没写过，读不到就是关。 */
         const val CHINESE_GLIDE_KEY = "glide_typing_chinese"
+        /** 双拼键位提示开关；设置在「双拼方案」页。 */
+        const val DOUBLE_PINYIN_KEY_HINTS_KEY = "double_pinyin_key_hints"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
@@ -163,6 +167,7 @@ data class KeyboardInputPreferences(
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
+                DOUBLE_PINYIN_KEY_HINTS_KEY,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
         }
@@ -213,6 +218,7 @@ data class KeyboardInputPreferences(
                 candidateDragPercent = normalizeCandidateDragPercent(prefs.getFloat("t9_candidate_drag_percent", 50f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 doublePinyinCorrection = prefs.getBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, false),
+                doublePinyinKeyHints = prefs.getBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, false),
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
                 rareCharacters = prefs.getBoolean(RARE_CHARACTERS_KEY, false),
                 traditionalOutput = prefs.getBoolean(TRADITIONAL_OUTPUT_KEY, false),
@@ -254,6 +260,7 @@ data class KeyboardInputPreferences(
             .putFloat("t9_candidate_drag_percent", normalizeCandidateDragPercent(candidateDragPercent))
             .putBoolean("neighbor_correction", neighborCorrection)
             .putBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, doublePinyinCorrection)
+            .putBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, doublePinyinKeyHints)
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
             .putBoolean(RARE_CHARACTERS_KEY, rareCharacters)
             .putBoolean(TRADITIONAL_OUTPUT_KEY, traditionalOutput)

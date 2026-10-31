@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,8 +31,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** 韵母按键上的写法：v 写作 ü（lü、lüe），与常见双拼键位图一致。 */
-private fun finalLabel(final: String) = final.replace('v', 'ü')
+/** 韵母按键上的写法：v 写作 ü（lü、lüe），与常见双拼键位图、键盘上的双拼键位提示一致。 */
+private fun finalLabel(final: String) = com.kingzcheung.xime.ui.keyboard.doublePinyinFinalLabel(final)
 
 /** 双拼方案：内置的小鹤、首道、自然码等可复制修改；自定义方案改键位后保存。符号与中文26键（14 键版本与中文14键）相同，字母排列随所选字母布局。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -86,6 +87,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                     "启用了中文14键时，在方案栏显示的双拼方案在14键上也能用。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                DoublePinyinKeyHintsSwitch()
                 Button(onClick = { edit(copyOf(DoublePinyinScheme.FLYPY)) }, enabled = !busy,
                     modifier = Modifier.testTag("double-pinyin-new")) { Text("新建双拼方案") }
                 schemes.forEach { scheme ->
@@ -208,6 +210,20 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                 busy = false
             }
         }) { Text("删除") } }, dismissButton = { TextButton(onClick = { deleteId = null }) { Text("取消") } }) }
+}
+
+/** 键盘上的双拼键位提示（默认关）：别人提的需求，记不住键位时打开。 */
+@Composable
+private fun DoublePinyinKeyHintsSwitch() {
+    val context = LocalContext.current
+    val saved = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
+    SettingsSection(title = "键盘上的提示") {
+        SettingsToggleItem(Icons.TwoTone.Keyboard, "双拼键位提示",
+            "双拼 26 键每个键上写出它代表的 zh、ch、sh 和韵母，和下面的键位图一样，记不住键位时打开。" +
+                "开着时这些键不画上下角标，滑动输入符号照常；14 键、九键不显示。",
+            checked = saved.doublePinyinKeyHints,
+            onCheckedChange = { saved.copy(doublePinyinKeyHints = it).save(context) })
+    }
 }
 
 /** 26 键键位图：键上是字母、翘舌声母（强调色）和韵母；[onKey] 为空时只显示。 */

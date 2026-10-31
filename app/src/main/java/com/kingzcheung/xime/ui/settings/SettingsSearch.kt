@@ -131,6 +131,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("时间日期候选", languages, "languages", "时间 日期 星期 今天 几点 当前时间 当前日期 年月日 联想 候选"),
         page("已安装的方案", languages, SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序 方案资源 启用14键 中文14键"),
         page("双拼方案", languages, SettingsRoutes.DoublePinyin, "双拼 自定义双拼 首道双拼 小鹤双拼 自然码 智能ABC 拼音加加 微软双拼 分号 九键双拼 14键双拼 键位 韵母 零声母 新建 编辑"),
+        SettingsSearchEntry("双拼键位提示", "$languages › 双拼方案", SettingsRoutes.DoublePinyin, "双拼 键位 提示 键位图 记不住 韵母 声母 显示 键盘上 主题 双拼主题 小鹤 自然码"),
         // 输入 › 键盘布局
         page("26 键", layouts, qwerty, "26键 全键盘 全拼 qwerty 邻键纠错 滑行输入"),
         page("九键与 14 键", layouts, nine, "九键 9键 14键 拂动 假名 触发距离"),
