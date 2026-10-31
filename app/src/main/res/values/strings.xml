@@ -57,7 +57,7 @@
     <string name="item_backup_title">备份与恢复</string>
     <string name="item_backup_summary">把设置导出为本地文件，或从备份文件恢复</string>
     <string name="item_performance_title">性能与省电</string>
-    <string name="item_performance_summary">高配、中配、低配一键切换，语音模型占用内存</string>
+    <string name="item_performance_summary">自动、高配、中配、低配一键切换，语音模型占用内存</string>
     <string name="item_about_title">关于 CyIME</string>
     <string name="item_about_summary">版本信息、开发者、联系方式</string>
     <string name="settings_app_language">界面语言 · Language</string>

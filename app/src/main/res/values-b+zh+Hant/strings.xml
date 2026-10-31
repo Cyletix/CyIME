@@ -52,7 +52,7 @@
     <string name="item_backup_title">備份與還原</string>
     <string name="item_backup_summary">把設定匯出為本機檔案，或從備份檔案還原</string>
     <string name="item_performance_title">效能與省電</string>
-    <string name="item_performance_summary">高配、中配、低配一鍵切換，語音模型佔用記憶體</string>
+    <string name="item_performance_summary">自動、高配、中配、低配一鍵切換，語音模型佔用記憶體</string>
     <string name="item_about_title">關於 CyIME</string>
     <string name="item_about_summary">版本資訊、開發者、聯絡方式</string>
     <string name="settings_app_language">介面語言 · Language</string>

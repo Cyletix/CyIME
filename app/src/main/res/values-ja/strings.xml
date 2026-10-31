@@ -52,7 +52,7 @@
     <string name="item_backup_title">バックアップと復元</string>
     <string name="item_backup_summary">設定をローカルファイルに書き出す、またはバックアップから復元します</string>
     <string name="item_performance_title">パフォーマンスと省電力</string>
-    <string name="item_performance_summary">高・中・低をワンタップで切り替え、音声モデルのメモリ使用量</string>
+    <string name="item_performance_summary">自動・高・中・低をワンタップで切り替え、音声モデルのメモリ使用量</string>
     <string name="item_about_title">CyIME について</string>
     <string name="item_about_summary">バージョン、開発者、連絡先</string>
     <string name="settings_app_language">表示言語 · Language</string>
