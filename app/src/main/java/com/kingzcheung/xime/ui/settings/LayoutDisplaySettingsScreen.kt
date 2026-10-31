@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Straighten
 import androidx.compose.material.icons.twotone.Padding
 import androidx.compose.material.icons.twotone.Keyboard
+import androidx.compose.material.icons.twotone.Lightbulb
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -463,11 +464,20 @@ private fun LayoutDisplayPage(
                 })
             }
 
+            if (page == "key_tips") item { KeyTipsSettings() }
             if (page == "gestures") item { GesturePresetSettings() }
             if (page == "gestures") item {
                 InputExperienceSettings(setOf(InputExperiencePart.SYMBOLS, InputExperiencePart.LANGUAGE_HOLD), "角标与长按")
             }
             if (page == "gestures") item { InputExperienceSettings(setOf(InputExperiencePart.CURSOR), "光标与空格") }
+            // 隐藏操作的说明（用户 10-31）：这一页最下面一行，点进去是「按键技巧」；它不是设置，不占上面的位置。
+            if (page == "gestures") item {
+                SettingsSection(title = "说明", searchKey = "按键技巧入口", content = {
+                    SettingsItem(Icons.TwoTone.Lightbulb, "按键技巧",
+                        "Shift、Ctrl（!@#）、空格、删除键的隐藏操作", showArrow = true,
+                        onClick = { onOpenLayout("${SettingsRoutes.LayoutDisplay}?page=key_tips") })
+                })
+            }
         }
     }
 }
@@ -476,6 +486,8 @@ private fun LayoutDisplayPage(
 internal val LayoutDisplayPages = listOf(
     Triple("candidates", "候选词", "字号、候选注释（拼音或中英释义）、取消按钮、输入框或候选栏显示"),
     Triple("gestures", "按键与手势", "角标输入方式、上下滑方向、长按语言键、滑动移动光标、长按空格"),
+    // 不在首页列出，从「按键与手势」最下面进入。
+    Triple("key_tips", "按键技巧", "Shift、Ctrl（!@#）、空格、删除键的隐藏操作"),
 )
 
 /** 按键显示：字号、角标提示、点按气泡、顶部和底部圆角；放在「主题与外观」。 */
