@@ -704,7 +704,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 上滑清空 = 多次退格快捷方式（对标主流输入法）：输入态只清输入态，空闲态清空全部已上屏。
                     // 引擎繁忙时不把未知状态当成空闲，更不能清正文。
                     if (service.rimeEngine.compositionActiveForDeletion() == null) return@command
-                    if (hasInputState(candState)) {
+                    // 「打字中清空整个输入框」（默认关）：打字中也直接清整个输入框，没上屏的拼音丢掉，撤回只放回输入框原来的字。
+                    val wholeField = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service).getBoolean(
+                        com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_ALL_WHILE_COMPOSING_KEY, false)
+                    val scope = ClearAllScope.of(hasInputState(candState), wholeField)
+                    if (!scope.field) {
                         service.lastClearedDocument = null
                         // 输入态：只清输入态（等价于 clear_composition），并记录 lastClearedText 供下滑撤回。
                         // 需在 clearInputStateForKeys() 之前记录（该函数会清空 preeditText/inputText）。
@@ -728,6 +732,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         clearInputStateForKeys()
                     } else {
+                        // 直接上屏的英文已经在输入框里，跟着下面整框一起删、一起撤回，这里不单独回删。
+                        // 输入框本来是空的（只有拼音）时，撤回照原来一样放回拼音。
+                        val composedText = if (scope.composition && candState.pendingEnglishText.isEmpty()) candState.inputText else ""
+                        if (scope.composition) clearInputStateForKeys()
                         // 空闲态：清空整个输入框（光标前、选区、光标后），记下来供下滑撤回原位恢复。
                         service.calculatorEngine.clear()
                         updateCalculatorCandidates()
@@ -755,6 +763,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     service.currentInputConnection === ic
                                 }
                             }
+                            if (service.lastClearedDocument == null) service.lastClearedText = composedText
                         }
                     }
                     needsUIUpdate = true

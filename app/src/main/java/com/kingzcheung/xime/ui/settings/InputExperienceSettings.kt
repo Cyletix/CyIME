@@ -100,6 +100,17 @@ internal fun InputExperienceSettings(
                         settings = settings.copy(reverseSymbolSwipe = it); settings.save(context)
                     })
             }
+            Row(Modifier.settingsSearchAnchor("打字中清空整个输入框", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("打字中清空整个输入框", style = MaterialTheme.typography.titleSmall)
+                    Text("还有没上屏的拼音或候选时，删除键清空也把输入框里的字一起清掉；撤回放回原来的字。关掉时只清没上屏的拼音。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.clearAllWhileComposing, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("clear-all-while-composing"), onCheckedChange = {
+                        settings = settings.copy(clearAllWhileComposing = it); settings.save(context)
+                    })
+            }
             }
             if (InputExperiencePart.FLICK_DISC in parts) {
             divider()
