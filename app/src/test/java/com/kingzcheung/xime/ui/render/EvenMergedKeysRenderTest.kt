@@ -53,7 +53,7 @@ import java.io.File
 
 /**
  * 「合并键均匀排布」改前 / 改后：自建 18 键（参考图的 Q WE RT Y U IO P）和 20 键布局，手机竖屏 320dp、360dp 宽，
- * 键盘体高 232dp。列是 宽度-strict（严格对齐 26 键）/ 宽度-even（均匀排布），后面的提交加上大圆角列。
+ * 键盘体高 232dp。列是 宽度-strict（严格对齐 26 键）/ 宽度-even（均匀排布）/ 宽度-even-rounder（再加大圆角）。
  * 每个主题组合一张总图。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -72,7 +72,7 @@ class EvenMergedKeysRenderTest {
     )
     /** 宽度、均匀排布、按键形状。 */
     private val columns = listOf(320, 360).flatMap { w ->
-        listOf(Triple(w, false, KeyShape.ROUNDED), Triple(w, true, KeyShape.ROUNDED))
+        listOf(Triple(w, false, KeyShape.ROUNDED), Triple(w, true, KeyShape.ROUNDED), Triple(w, true, KeyShape.ROUNDER))
     }
     private val looks = listOf(Triple("soft_blue", false, false), Triple("pure_black", true, false),
         Triple("sakura_pink", false, true))
