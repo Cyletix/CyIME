@@ -14,7 +14,10 @@ import java.io.File
  */
 object SpellingPatches {
     const val FUZZY_KEY = "fuzzy_pinyin"
-    /** 模糊音也用于双拼 26 键：单独的开关，默认关，原来开着模糊音的人双拼照旧（用户 10-31）。 */
+    /**
+     * 模糊音也用于双拼 26 键：单独的开关。起初默认关；用户 10-31 自己用小鹤双拼开了 in/ing 仍不模糊，
+     * 改为默认开：开了哪几组，全拼、双拼一样模糊。各组本身仍默认关，没开模糊音的人双拼不变。
+     */
     const val FUZZY_DOUBLE_PINYIN_KEY = "fuzzy_pinyin_double_pinyin"
     /** 与 KeyboardInputPreferences.doublePinyinCorrection 同一个键：键盘按它决定是否把键位邻接表交给纠错。 */
     const val DOUBLE_PINYIN_CORRECTION_KEY = "double_pinyin_neighbor_correction"
@@ -54,7 +57,7 @@ object SpellingPatches {
     }
 
     fun fuzzyDoublePinyin(context: Context): Boolean =
-        SettingsPreferences.getPrefsPublic(context).getBoolean(FUZZY_DOUBLE_PINYIN_KEY, false)
+        SettingsPreferences.getPrefsPublic(context).getBoolean(FUZZY_DOUBLE_PINYIN_KEY, true)
 
     fun setFuzzyDoublePinyin(context: Context, enabled: Boolean) {
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(FUZZY_DOUBLE_PINYIN_KEY, enabled).apply()
