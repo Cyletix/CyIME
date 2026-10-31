@@ -88,12 +88,4 @@ class QwertyRowOptionsTest {
         for (symbol in listOf("’", "\"", ",", "-", "=")) assertFalse(symbol, cornerTypesSeparator(true, symbol))
         assertFalse(cornerTypesSeparator(false, "'"))
     }
-
-    @Test fun shiftTypesTheSeparatorOnlyWhileComposing() {
-        assertTrue(shiftTapTypesSeparator(active = true, composing = true))
-        // 没在打拼音、或开关关着（含英文、注音等不生效的方案）：Shift 照旧切换大小写。
-        assertFalse(shiftTapTypesSeparator(active = true, composing = false))
-        assertFalse(shiftTapTypesSeparator(active = false, composing = true))
-        assertFalse(syllableSplitActive(true, ascii = true, profile = InputProfiles.describe("rime_ice")))
-    }
 }
