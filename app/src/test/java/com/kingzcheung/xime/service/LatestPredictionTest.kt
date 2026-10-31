@@ -200,4 +200,35 @@ class LatestPredictionTest {
         assertFalse(worker.invalidateAndHold())
         assertFalse(worker.invalidate())
     }
+
+    // 用户反馈 10-31「联想有延迟」：单独一次上屏不再固定等 160 ms；连着上屏仍等这一串停下。
+    @Test fun singleCommitPredictsWithoutSettleDelay() = runTest {
+        val calls = mutableListOf<Long>(); val output = mutableListOf<String>()
+        val worker = LatestPrediction(backgroundScope, { calls += testScheduler.currentTime; listOf(it) }, { output += it },
+            { testScheduler.currentTime })
+        advanceTimeBy(5_000)
+        worker.submit("你好")
+        runCurrent()
+        assertEquals(listOf(5_000L), calls)
+        assertEquals(listOf("你好"), output)
+        advanceTimeBy(3_000) // 停了一会儿再上屏，仍然不用等
+        worker.submit("再见")
+        runCurrent()
+        assertEquals(listOf(5_000L, 8_000L), calls)
+        assertEquals(listOf("你好", "再见"), output)
+    }
+
+    @Test fun commitsInQuickSuccessionStillSettle() = runTest {
+        val calls = mutableListOf<String>(); val output = mutableListOf<String>()
+        val worker = LatestPrediction(backgroundScope, { calls += it; listOf(it) }, { output += it }, { testScheduler.currentTime })
+        advanceTimeBy(5_000)
+        worker.submit("第一")
+        advanceTimeBy(100) // 100 ms 后又上屏：算连着上屏
+        worker.submit("第二")
+        advanceTimeBy(150); runCurrent()
+        assertEquals(listOf("第一"), calls)
+        advanceTimeBy(20); runCurrent()
+        assertEquals(listOf("第一", "第二"), calls)
+        assertEquals(listOf("第一", "第二"), output)
+    }
 }

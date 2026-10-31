@@ -24,6 +24,8 @@ internal class LatestPrediction(
     val isPending: Boolean get() = pendingGeneration.value != 0L
     val revision: Long get() = generation
     private var nextAllowed = 0L
+    // 上一次 submit 的时间：紧跟着上一次（[BURST_WINDOW_MS] 内）才算连着上屏，要等 [SETTLE_MS] 让这一串停下。
+    private var lastSubmitAt = Long.MIN_VALUE / 2
     // 上屏后到请求真正 submit 之间（中间隔一次 Main post）的登记；不显示在 pendingRequest 里。
     private var reservation: Long? = null
 
@@ -63,9 +65,14 @@ internal class LatestPrediction(
         invalidate()
         val request = generation
         pendingGeneration.value = request
+        val submittedAt = now()
+        // 单独一次上屏（最常见：打完一个词停下来）不再固定等 160 ms，立刻推理（用户反馈 10-31「联想有延迟」）；
+        // 连着上屏（连续点联想词、实体键盘连打）才等这一串停下，再跑昂贵的原生推理。
+        val settle = if (submittedAt - lastSubmitAt < BURST_WINDOW_MS) SETTLE_MS else 0L
+        lastSubmitAt = submittedAt
         job = scope.launch {
             try {
-                delay(160) // Let a burst settle before starting expensive native inference.
+                if (settle > 0) delay(settle) // Let a burst settle before starting expensive native inference.
                 gate.withLock {
                     delay((nextAllowed - now()).coerceAtLeast(0))
                     ensureActive()
@@ -84,5 +91,10 @@ internal class LatestPrediction(
                 }
             } finally { pendingGeneration.compareAndSet(request, 0L) }
         }
+    }
+
+    private companion object {
+        const val SETTLE_MS = 160L
+        const val BURST_WINDOW_MS = 400L
     }
 }
