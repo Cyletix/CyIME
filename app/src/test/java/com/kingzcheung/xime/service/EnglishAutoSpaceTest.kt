@@ -53,4 +53,36 @@ class EnglishAutoSpaceTest {
         autoSpace.disarm()
         assertNull(autoSpace.take())
     }
+    @Test fun punctuationSpaceFollowsWordsNotNumbers() {
+        // 字母后面的英文标点补空格（Hello, world）；西班牙语重音字母也是字母。
+        for (p in listOf(",", ".", "?", "!", ":", ";")) assertTrue(p, EnglishAutoSpace.spacesAfterPunctuation(p, "o", ""))
+        assertTrue(EnglishAutoSpace.spacesAfterPunctuation(",", "ñ", null))
+        assertTrue(EnglishAutoSpace.spacesAfterPunctuation(".", ")", ""))
+        assertTrue(EnglishAutoSpace.spacesAfterPunctuation(",", "\"", ""))
+        // 3.14、1,000、10:30 不拆开；问号、感叹号、分号跟在数字后面照样补。
+        for (p in listOf(",", ".", ":")) assertFalse(p, EnglishAutoSpace.spacesAfterPunctuation(p, "3", ""))
+        for (p in listOf("?", "!", ";")) assertTrue(p, EnglishAutoSpace.spacesAfterPunctuation(p, "5", ""))
+    }
+
+    @Test fun punctuationSpaceSkipsOtherContexts() {
+        // 输入框开头、空白、标点、汉字后面不补；光标后已是空白不补；其他符号不补。
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(",", "", ""))
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(",", null, null))
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(",", " ", ""))
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(".", ".", ""))
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(",", "好", ""))
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(",", "o", " "))
+        assertFalse(EnglishAutoSpace.spacesAfterPunctuation(",", "o", "\n"))
+        assertTrue(EnglishAutoSpace.spacesAfterPunctuation(",", "o", "w"))
+        for (k in listOf("-", "'", "@", "/", "(", ")", "，", "。", "a", "space", ""))
+            assertFalse(k, EnglishAutoSpace.spacesAfterPunctuation(k, "o", ""))
+    }
+
+    @Test fun punctuationSpaceArmsWithThePunctuation() {
+        // 补的空格交给同一套“下一个键”规则：光标前应是“标点+空格”。
+        val autoSpace = EnglishAutoSpace()
+        autoSpace.arm(",")
+        assertEquals(", ", autoSpace.take())
+        assertEquals(". ", EnglishAutoSpace.replacementFor("."))
+    }
 }

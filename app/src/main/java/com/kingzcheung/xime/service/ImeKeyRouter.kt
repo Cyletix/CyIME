@@ -324,11 +324,45 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 if (!ic.deleteSurroundingText(1, 0)) return@withEditor false
                 // 宿主不收标点就把空格放回去，什么都不丢。
                 if (!service.commitTextAndPredict(replacement, isPaste = false, allowPrediction = false).accepted) ic.commitText(" ", 1)
+                // 开着「标点后自动加空格」时，换到标点后面的空格同样只管下一个键：连打 ... ?! 空格一直留在最后。
+                else if (replacement.length == 2 && replacement[1] == ' ' && englishPunctuationSpaceEnabled())
+                    englishAutoSpace.arm(replacement.substring(0, 1))
             } finally {
                 ic.endBatchEdit()
             }
             service.candidateState.value = service.candidateState.value.copy(
                 pendingEnglishText = "", associationCandidates = emptyList())
+            true
+        }
+    }
+
+    private fun englishPunctuationSpaceEnabled(): Boolean =
+        SettingsPreferences.getPrefsPublic(service).getBoolean(EnglishAutoSpace.PUNCTUATION_PREF_KEY, false)
+
+    /**
+     * 英文标点后自动加空格（默认关）：英文、西班牙语屏幕键盘在字母后面打 , . ? ! : ; 时上屏“标点+空格”，
+     * 补的空格按 [EnglishAutoSpace] 的规则只管下一个键。返回 true 表示已上屏；
+     * 中文、日文、实体键盘、数字键盘、网址/邮箱/密码/数字框、终端、有选区或在组字时都返回 false，照常处理。
+     */
+    internal suspend fun commitEnglishPunctuationSpace(key: String): Boolean {
+        if (key.length != 1 || !englishPunctuationSpaceEnabled()) return false
+        return withEditor {
+            val ui = service.uiState.value
+            if (ui.inputTarget.isInternal || !(ui.isAsciiMode || ui.inputProfile.language.typesLettersDirectly)) return@withEditor false
+            if (service.textCommit.isJapaneseProfile()) return@withEditor false
+            if (service.editorInputPolicy.field.scoped || service.isSecretEditor() || service.isTerminalEditor()) return@withEditor false
+            if (service.keyboardViewModel.keyboardState.value is KeyboardLayoutState.Number) return@withEditor false
+            val candidates = service.candidateState.value
+            if (candidates.isComposing || candidates.inputText.isNotEmpty() || service.t9PartialSegments.isNotEmpty()) return@withEditor false
+            val ic = service.currentInputConnection ?: return@withEditor false
+            if (!ic.getSelectedText(0).isNullOrEmpty()) return@withEditor false
+            val before = runCatching { ic.getTextBeforeCursor(1, 0) }.getOrNull()
+            val after = runCatching { ic.getTextAfterCursor(1, 0) }.getOrNull()
+            if (!EnglishAutoSpace.spacesAfterPunctuation(key, before, after)) return@withEditor false
+            if (!service.commitTextAndPredict("$key ", isPaste = false, allowPrediction = false).accepted) return@withEditor false
+            service.candidateState.value = service.candidateState.value.copy(
+                pendingEnglishText = "", associationCandidates = emptyList())
+            englishAutoSpace.arm(key)
             true
         }
     }
