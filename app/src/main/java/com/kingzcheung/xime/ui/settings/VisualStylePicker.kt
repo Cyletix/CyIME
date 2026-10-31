@@ -90,10 +90,12 @@ internal fun KeyShapePicker(selected: KeyShape, onSelect: (KeyShape) -> Unit) {
     Column(Modifier.settingsSearchAnchor("按键形状", bleed = 6.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("按键形状", style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary)
-        Text("所有布局和面板的按键一起改。方形接近 iOS 18 以前的键盘；蜂窝布局的六边形字母键不变。",
+        Text("所有布局和面板的按键一起改。大圆角更圆润，方形接近 iOS 18 以前的键盘；蜂窝布局的六边形字母键不变。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // 四种形状两列排，同上面的视觉样式卡片；一排四张时「圆角 · 已选」放不下。
+        KeyShape.entries.chunked(2).forEach { shapeRow ->
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            KeyShape.entries.forEach { shape ->
+            shapeRow.forEach { shape ->
                 val palette = MaterialTheme.colorScheme
                 val surface = keyboard?.background ?: palette.surface
                 val accent = keyboard?.accent ?: palette.primary
@@ -123,6 +125,7 @@ internal fun KeyShapePicker(selected: KeyShape, onSelect: (KeyShape) -> Unit) {
                 }
                 }
             }
+        }
         }
     }
 }
