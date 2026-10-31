@@ -56,8 +56,9 @@ engine:
     - table_translator
   filters:
     - simplifier
-    - uniquifier
+    # 单字提前要在去重之前：它会先取一批候选，放在去重后面，繁简同形的字（傳、传都转成传）会去不掉
     - single_char_filter
+    - uniquifier
 
 speller:
   alphabet: zyxwvutsrqponmlkjihgfedcba

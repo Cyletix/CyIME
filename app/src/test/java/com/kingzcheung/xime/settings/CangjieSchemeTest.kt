@@ -88,4 +88,13 @@ class CangjieSchemeTest {
         // 符号码保留原表次序
         assertTrue(weight("「", "yyyaa") > 0)
     }
+
+    /** 单字提前放在去重后面会先取走一批候选，傳、传都转成「传」时去不掉，同一码出两个「传」。 */
+    @Test fun `single characters are lifted before duplicates are removed`() {
+        for (file in listOf("cyime_cangjie")) {
+            val filters = repoFile("src/main/assets/rime_chinese/$file.schema.yaml").readText()
+                .substringAfter("  filters:\n").substringBefore("\n\n").lines().filter { it.trim().startsWith("- ") }.map { it.trim().removePrefix("- ") }
+            assertEquals(file, listOf("simplifier", "single_char_filter", "uniquifier"), filters)
+        }
+    }
 }
