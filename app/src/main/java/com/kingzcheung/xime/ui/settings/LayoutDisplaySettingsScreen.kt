@@ -501,7 +501,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键上方的符号提示，输入方式和滑动方向在「按键与手势」设置；上下两项都关就是不带角标的干净键盘，开着滑行输入时 26 键也不显示",
+                                text = "显示按键上方的符号提示，输入方式和滑动方向在「按键与手势」设置；上下两项都关就是不带角标的干净键盘",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -535,7 +535,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键下方的提示内容，输入方式和滑动方向在「按键与手势」设置；开着滑行输入时 26 键不显示",
+                                text = "显示按键下方的提示内容，输入方式和滑动方向在「按键与手势」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

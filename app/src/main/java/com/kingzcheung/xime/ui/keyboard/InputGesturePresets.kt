@@ -9,7 +9,7 @@ package com.kingzcheung.xime.ui.keyboard
 enum class InputGesturePreset(val label: String) {
     SWIPE("滑动"),
     LONG_PRESS("长按"),
-    GLIDE("滑行输入"),
+    GLIDE("英文滑行"),
     CUSTOM("自定义");
 
     /** 预设说明。上角标（九键是数字）默认下滑、反转后上滑，与 [withSymbolSwipeDirection] 一致。 */
@@ -19,7 +19,7 @@ enum class InputGesturePreset(val label: String) {
         return when (this) {
             SWIPE -> "${top}上角标、${bottom}下角标；九键${top}数字、长按选字母"
             LONG_PRESS -> "长按出上角标、${bottom}下角标；九键长按数字、拂动选字母"
-            GLIDE -> "同“滑动”，26 键一笔划出整个词（中文划拼音），键上不显示角标"
+            GLIDE -> "同“滑动”，英文 26 键可以一笔划出整个词"
             CUSTOM -> "单独改过下面的某一项"
         }
     }
@@ -54,7 +54,7 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
 /**
  * 明显冲突的设置互相加锁（用户 10-20 要求）：先设好的那一项把冲突的选项锁死，并说明是谁锁的。
  * - 角标“长按” ↔ 字母键长按气泡：长按总是出角标，气泡出不来。
- * - 滑行输入 ↔ 键盘区滑动移光标：两个都是在字母上拖动。
+ * - 英文、中文滑行输入 ↔ 键盘区滑动移光标：都是在字母上拖动。
  * - 角标“长按”时九键拂动必须开：长按被数字占了，不开拂动就没法指定字母。
  * 角标“滑动” + 字母气泡不锁：这正是用户要的可选项，慢拖会被打断已写在说明里。
  */
@@ -69,6 +69,8 @@ object InputGestureLocks {
         }
         if (settings.glideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "滑行输入"))
+        } else if (settings.chineseGlideTyping) {
+            add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "中文滑行输入"))
         }
         if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
             add(InputGestureLock(InputGestureLock.Option.GLIDE_TYPING, true, "滑动移光标：键盘滑动"))
