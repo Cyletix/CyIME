@@ -141,7 +141,9 @@ class VoiceRecognitionHandler(
 
     fun stopRecognition() {
         if (::speechRecognitionManager.isInitialized) {
-            speechRecognitionManager.stopRecognition()
+            // 会话已丢弃（换了输入框等）：结果不会再上屏，模型加载中存着的录音也不必再认
+            if (sessionAbandoned) speechRecognitionManager.cancelRecognition()
+            else speechRecognitionManager.stopRecognition()
         }
         // handleFinalResult is now called from within handleSpeechResult
         // when the final stopRecognition result arrives
