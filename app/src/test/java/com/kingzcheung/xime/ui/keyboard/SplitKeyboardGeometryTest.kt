@@ -104,6 +104,72 @@ class SplitKeyboardGeometryTest {
         assertEquals(width - 16f - 300f, (width - 16f) * fraction, 0.01f)
     }
 
+    /**
+     * 按 [KeyboardRowWithConfig] 的排法算一行各键的左右边：首键带行首留白，末键带行尾留白，
+     * 第 [split] 个键前插入缝。返回 (键, 左, 右) 与缝的左右边。
+     */
+    private fun layoutRow(keys: List<String>, start: Float, unit: Float, split: Int, gap: Float, end: Float):
+        Pair<List<Triple<String, Float, Float>>, Pair<Float, Float>?> {
+        var x = start
+        var gapEdges: Pair<Float, Float>? = null
+        val placed = keys.mapIndexed { i, key ->
+            if (i == split) { gapEdges = x to x + gap; x += gap }
+            Triple(key, x, (x + unit).also { x = it })
+        }
+        if (split == keys.size) gapEdges = x to x + gap
+        return placed to gapEdges
+    }
+
+    /** 「右半边也放 G 键」：右半 g h j k l 与 y u i o p 上下对齐，左半和中缝不动，总宽不变。 */
+    @Test fun rightGLinesUpUnderYuiopAndKeepsTheGap() {
+        val width = 600f
+        for (stagger in listOf(0f, 0.5f, 1f)) {
+            val g = LetterKeyboardFrame(listOf(10, 9, 7)).geometry(1f, stagger)
+            val gap = 120f
+            val unit = (width - gap) / 10f
+            val start = g.middleRowInsetDp * unit
+            val end = g.middleRowEndInsetDp * unit
+            val split = SplitKeyboardGeometry.leftCount(middle, g.middleRowInsetDp, false)
+            val row = SplitKeyboardGeometry.homeRowWithRightG(middle, split, true, gap, end, unit)
+            assertEquals("asdfgghjkl".map { it.toString() }, row.keys)
+            assertEquals(5, row.mirrorIndex)
+            assertEquals(0f, row.endInset, 0.0001f)
+            val (topKeys, topGap) = layoutRow(top, 0f, unit, 5, gap, 0f)
+            val (plainKeys, plainGap) = layoutRow(middle, start, unit, split, gap, end)
+            val (keys, rowGap) = layoutRow(row.keys, start, unit, split, row.gap, row.endInset)
+            // 左半 a s d f g 位置不变。
+            (0 until 5).forEach { i -> assertEquals(plainKeys[i], keys[i]) }
+            // 右半五键正好在 y u i o p 下面，l 的右边就是行尾。
+            (5 until 10).forEach { i ->
+                assertEquals("stagger=$stagger ${keys[i].first}", topKeys[i].second, keys[i].second, 0.001f)
+                assertEquals(topKeys[i].third, keys[i].third, 0.001f)
+            }
+            assertEquals(width, keys.last().third + row.endInset, 0.001f)
+            // 缝的左边不变，右边与上一排一致：中缝矩形（各行缝的公共部分）不变。
+            assertEquals(plainGap!!.first, rowGap!!.first, 0.001f)
+            assertEquals(topGap!!.second, rowGap.second, 0.001f)
+            assertTrue(rowGap.second <= plainGap.second + 0.001f)
+        }
+    }
+
+    /** 选项关着、不分体、14 键、十键中排、缝太窄：原样返回，键、缝宽、行尾留白一个都不变。 */
+    @Test fun rightGLeavesEveryOtherRowUntouched() {
+        fun plain(keys: List<String>, split: Int, enabled: Boolean, gap: Float = 120f, end: Float = 24f, unit: Float = 48f) {
+            val row = SplitKeyboardGeometry.homeRowWithRightG(keys, split, enabled, gap, end, unit)
+            assertEquals(SplitHomeRow(keys, -1, gap, end), row)
+        }
+        plain(middle, 5, enabled = false)
+        // 不分体（splitAt = -1）：开关开着也不加。
+        plain(middle, -1, enabled = true, gap = 0f)
+        plain(listOf("as", "df", "g", "h", "jk", "l"), 3, enabled = true)
+        plain("arstdhneio".map { it.toString() }, 5, enabled = true)
+        plain("asdfghjkl;".map { it.toString() }, 5, enabled = true)
+        plain("qwertyuiop".map { it.toString() }, 5, enabled = true)
+        plain("zxcvbnm".map { it.toString() }, 4, enabled = true)
+        // 缝加行尾留白放不下一个键：不挤。
+        plain(middle, 5, enabled = true, gap = 20f, end = 24f, unit = 48f)
+    }
+
     /** 「填满留空处」：两侧照常分开排布，但中缝不挖空、不让出触摸。 */
     @Test fun filledGapKeepsTheSplitLayoutButLeavesNoHole() {
         val gap = SplitKeyboardGap()

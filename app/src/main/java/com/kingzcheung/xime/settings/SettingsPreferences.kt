@@ -107,6 +107,15 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SPLIT_KEYBOARD, enabled).apply()
     }
 
+    const val KEY_SPLIT_RIGHT_G = "split_keyboard_right_g"
+
+    /** 分体 26 键右半中排开头再放一个 G（别人提的需求，默认关）；只影响分体键盘。 */
+    fun isSplitRightGEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SPLIT_RIGHT_G, false)
+
+    fun setSplitRightGEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SPLIT_RIGHT_G, enabled).apply()
+    }
+
     const val KEY_FILL_KEYBOARD_BLANK = "fill_keyboard_blank"
 
     /**

@@ -61,6 +61,8 @@ data class KeyboardInputPreferences(
     val handwritingPauseSeconds: Float = 0.5f,
     val showPressBubble: Boolean = false,
     val splitKeyboardEnabled: Boolean = false,
+    /** 分体 26 键右半中排再放一个 G（默认关）。 */
+    val splitRightG: Boolean = false,
     /** 中缝和两侧留空用键盘底色填满（默认镂空）。 */
     val fillBlankAreas: Boolean = false,
     /** 分体中缝比例（竖屏/横屏），null 为自动。 */
@@ -150,7 +152,7 @@ data class KeyboardInputPreferences(
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
@@ -177,6 +179,7 @@ data class KeyboardInputPreferences(
                     .legibleForTheme(SettingsPreferences.getKeyboardTheme(context), isDark),
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
+                splitRightG = SettingsPreferences.isSplitRightGEnabled(context),
                 fillBlankAreas = SettingsPreferences.isKeyboardBlankFilled(context),
                 splitGapPortrait = SettingsPreferences.getSplitGapFraction(context, false),
                 splitGapLandscape = SettingsPreferences.getSplitGapFraction(context, true),
