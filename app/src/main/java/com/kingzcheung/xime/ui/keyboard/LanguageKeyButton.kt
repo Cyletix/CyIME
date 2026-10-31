@@ -208,11 +208,8 @@ fun LanguageKeyButton(
     // 常驻菜单时键盘被收起，下次弹出不再残留上次的菜单。
     DisposableEffect(view, menuOpen) {
         if (!menuOpen) return@DisposableEffect onDispose { }
-        val listener = android.view.ViewTreeObserver.OnWindowVisibilityChangeListener { visibility ->
-            if (visibility != android.view.View.VISIBLE) closeMenu()
-        }
-        view.viewTreeObserver.addOnWindowVisibilityChangeListener(listener)
-        onDispose { if (view.viewTreeObserver.isAlive) view.viewTreeObserver.removeOnWindowVisibilityChangeListener(listener) }
+        val stop = watchWindowHidden(view) { closeMenu() }
+        onDispose { stop() }
     }
     val menuPanel = panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
@@ -362,6 +359,36 @@ fun LanguageKeyButton(
                 }
             }
         }
+    }
+}
+
+/**
+ * 键盘窗口不再可见时回调一次，返回取消函数。
+ * 窗口可见性监听是 Android 13（API 33）才公开的接口，Android 11/12 上调用会直接崩溃（长按语言键闪退）；
+ * 更早的系统改为菜单开着时每 200ms 查一次窗口可见性。
+ */
+private fun watchWindowHidden(view: android.view.View, onHidden: () -> Unit): () -> Unit {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        return WindowVisibilityListenerApi33.watch(view, onHidden)
+    }
+    val check = object : Runnable {
+        override fun run() {
+            if (view.windowVisibility != android.view.View.VISIBLE) onHidden()
+            else view.postDelayed(this, 200L)
+        }
+    }
+    view.postDelayed(check, 200L)
+    return { view.removeCallbacks(check) }
+}
+
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
+private object WindowVisibilityListenerApi33 {
+    fun watch(view: android.view.View, onHidden: () -> Unit): () -> Unit {
+        val listener = android.view.ViewTreeObserver.OnWindowVisibilityChangeListener { visibility ->
+            if (visibility != android.view.View.VISIBLE) onHidden()
+        }
+        view.viewTreeObserver.addOnWindowVisibilityChangeListener(listener)
+        return { if (view.viewTreeObserver.isAlive) view.viewTreeObserver.removeOnWindowVisibilityChangeListener(listener) }
     }
 }
 
