@@ -35,7 +35,7 @@ internal fun OfflineModelCard() {
     val models by ModelManager.modelsFlow.collectAsState()
     val downloads by ModelManager.downloadStates.collectAsState()
     val selected = remember { mutableStateMapOf<InputLanguage, String>().apply {
-        InputLanguage.supported.forEach { put(it, manager.getSelectedModelId(it)) }
+        InputLanguage.speech.forEach { put(it, manager.getSelectedModelId(it)) }
     } }
     var editing by remember { mutableStateOf<InputLanguage?>(null) }
     var ready by remember { mutableStateOf(emptySet<String>()) }
@@ -47,7 +47,7 @@ internal fun OfflineModelCard() {
         }
         xasrReady = withContext(Dispatchers.IO) { runCatching { manager.isXasrReady() }.getOrDefault(false) }
         // An unchosen SenseVoice default becomes Paraformer + SenseVoice once Paraformer is downloaded.
-        InputLanguage.supported.forEach { selected[it] = withContext(Dispatchers.IO) { manager.getSelectedModelId(it) } }
+        InputLanguage.speech.forEach { selected[it] = withContext(Dispatchers.IO) { manager.getSelectedModelId(it) } }
     }
     fun refresh(language: InputLanguage) { selected[language] = manager.getSelectedModelId(language) }
     fun download(id: String) { ModelManager.getModel(id)?.let { ModelManager.downloadModelInBackground(context, it) } }
@@ -58,7 +58,7 @@ internal fun OfflineModelCard() {
         chinese = language == InputLanguage.CHINESE, wholeSentenceOn = wholeSentence, xasrReady = xasrReady)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SettingsSection(title = "语言 → 主模型") {
-            InputLanguage.supported.forEachIndexed { index, language ->
+            InputLanguage.speech.forEachIndexed { index, language ->
                 val mode = selected.getValue(language)
                 val primary = SpeechModelSelection.primary(mode)
                 if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp),

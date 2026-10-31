@@ -687,7 +687,8 @@ fun KeyboardLayout(
                                     val longPressConfig =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
                                     val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
-                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu) } ?: "key"
+                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu ||
+                    KeysConfigHelper.accentLongPress(isAsciiMode)) } ?: "key"
                                     val longPressLabels = if (longPressDisplay == "bubble") {
                                         longPressConfig?.values?.map { it.label }
                                             ?.filter { it.isNotEmpty() }?.ifEmpty { null }
@@ -727,7 +728,7 @@ fun KeyboardLayout(
                                                 gesture.action!!,
                                                 gesture.value.ifEmpty { selectedLabel })
                                         } else {
-                                            commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
+                                            commitLongPressChoice(selectedLabel, onCommitText, onKeyPress, KeysConfigHelper.accentLongPress(isAsciiMode))
                                         }
                                         Unit
                                     } }
@@ -1351,7 +1352,8 @@ fun KeyboardRowWithConfig(
             // 长按选项
             val longPressConfig = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
             val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
-                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu) } ?: "key"
+                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu ||
+                    KeysConfigHelper.accentLongPress(isAsciiMode)) } ?: "key"
             val longPressLabels = if (longPressDisplay == "bubble") {
                 longPressConfig?.values?.map { it.label }?.filter { it.isNotEmpty() }
                     ?.ifEmpty { null }
@@ -1391,7 +1393,7 @@ fun KeyboardRowWithConfig(
                         gesture.action!!,
                         gesture.value.ifEmpty { selectedLabel })
                 } else {
-                    commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
+                    commitLongPressChoice(selectedLabel, onCommitText, onKeyPress, KeysConfigHelper.accentLongPress(isAsciiMode))
                 }
                 Unit
             } }
@@ -1657,7 +1659,8 @@ fun CompactKeyboardRowWithConfig(
 
             val longPressConfig = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
             val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
-                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu) } ?: "key"
+                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu ||
+                    KeysConfigHelper.accentLongPress(isAsciiMode)) } ?: "key"
             val longPressLabels = if (longPressDisplay == "bubble") {
                 longPressConfig?.values?.map { it.label }?.filter { it.isNotEmpty() }
                     ?.ifEmpty { null }
@@ -1695,7 +1698,7 @@ fun CompactKeyboardRowWithConfig(
                         gesture.action!!,
                         gesture.value.ifEmpty { selectedLabel })
                 } else {
-                    commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
+                    commitLongPressChoice(selectedLabel, onCommitText, onKeyPress, KeysConfigHelper.accentLongPress(isAsciiMode))
                 }
                 Unit
             } }
@@ -1769,8 +1772,12 @@ private fun SpaceKey(
  * 长按菜单选中的小写字母当作点按：拼音组词中接到编码后面，不先上屏首选（h + 长按 g 不再变成「和g」）。
  * 其他字符（大写、变音字母、符号）照旧直接上屏。
  */
-internal fun commitLongPressChoice(label: String, onCommitText: ((String) -> Unit)?, onKeyPress: (String) -> Unit) {
-    if (label.length == 1 && label[0] in 'a'..'z') onKeyPress(label) else (onCommitText ?: onKeyPress)(label)
+internal fun commitLongPressChoice(label: String, onCommitText: ((String) -> Unit)?, onKeyPress: (String) -> Unit,
+    accentLetters: Boolean = false) {
+    // 西班牙语键盘长按出的 á、ñ 也是字母：像点按一样接进正在打的词，补全才认得出整个词。
+    val letter = label.length == 1 && (label[0] in 'a'..'z' ||
+        accentLetters && label[0].isLowerCase() && label[0] in com.kingzcheung.xime.association.SpanishLexicon.EXTRA_LETTERS)
+    if (letter) onKeyPress(label) else (onCommitText ?: onKeyPress)(label)
 }
 
 /**

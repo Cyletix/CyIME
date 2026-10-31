@@ -8,13 +8,14 @@ object SpeechLanguages {
         SpeechModelCatalog.ZIPFORMER -> language == InputLanguage.CHINESE
         SpeechModelCatalog.ZIPFORMER_JA, SpeechModelCatalog.ZIPFORMER_JA_INT8 -> language == InputLanguage.JAPANESE
         SpeechModelCatalog.PARAFORMER -> language in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
-        SpeechModelCatalog.SENSEVOICE -> language in InputLanguage.supported
+        SpeechModelCatalog.SENSEVOICE -> language in InputLanguage.speech
         else -> false
     }
 
     /** Keep a compatible saved choice. A language fallback is session-local, never persisted. */
     fun select(language: InputLanguage, preferred: String, isReady: (String) -> Boolean): String {
         require(language != InputLanguage.UNSPECIFIED) { "当前方案未标注语言，请先选择输入语言" }
+        require(language in InputLanguage.speech) { "暂时没有${language.displayName}语音识别" }
         if (supports(preferred, language)) {
             check(isReady(preferred)) { "所选${language.displayName}语音模型尚未完整下载，请在模型管理中下载" }
             return preferred
@@ -23,7 +24,7 @@ object SpeechLanguages {
             InputLanguage.CHINESE -> listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.SENSEVOICE)
             InputLanguage.ENGLISH -> listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
             InputLanguage.JAPANESE -> listOf(SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA, SpeechModelCatalog.SENSEVOICE)
-            InputLanguage.UNSPECIFIED -> emptyList()
+            InputLanguage.SPANISH, InputLanguage.UNSPECIFIED -> emptyList()
         }
         // A selected two-pass mode may already have a suitable multilingual second recognizer.
         val candidates = if (SpeechModelSelection.hasCorrection(preferred))

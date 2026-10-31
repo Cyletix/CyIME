@@ -7,7 +7,7 @@ object InputModes {
     const val ENGLISH = "__xime_english"
     const val ORDER_KEY = "input_mode_order"
     private const val LANGUAGE_ORDER_KEY = "input_language_order"
-    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, QwjrtkLayout.ID)
+    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, SpanishSchemas.ID, QwjrtkLayout.ID)
 
     /** Languages without a saved position: Chinese, then English, then the rest (Japanese never jumps ahead of English). */
     private val defaultLanguageOrder: List<InputLanguage>

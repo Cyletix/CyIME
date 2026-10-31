@@ -80,7 +80,7 @@ object DefaultModelInstaller {
                 if (SpeechModelSelection.hasCorrection(mode)) listOf(SpeechModelCatalog.SENSEVOICE) else emptyList()
             val manager = AsrModelManager(context)
             val choices = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
-            val current = dependencies(manager.getSelectedModelId()) + com.kingzcheung.xime.settings.InputLanguage.supported
+            val current = dependencies(manager.getSelectedModelId()) + com.kingzcheung.xime.settings.InputLanguage.speech
                 .filter { choices.contains("selected_model_${it.id}") }.flatMap { dependencies(manager.getSelectedModelId(it)) }
             addAll(dependencies(DeviceDefaults.voiceModel(context)).filter { it in current })
         }
