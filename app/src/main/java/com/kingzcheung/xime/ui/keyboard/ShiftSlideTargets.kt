@@ -20,14 +20,25 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     /** 按住符号键当 Ctrl：字母键改显示快捷键，拖到字母上松手发 Ctrl+字母，不选候选（用户 10-24）。 */
     var ctrl by mutableStateOf(false)
         private set
+    /**
+     * 字母键现在是否换成快捷键键面。按下符号键先不换：点一下就开符号时键盘不闪「复制」「粘贴」；
+     * 按满符号键时限（同长按）或拖出符号键才换（用户 10-31）。拖动、另一根手指点字母照样立刻发 Ctrl+字母。
+     */
+    var ctrlFaces by mutableStateOf(false)
+        private set
     private var ctrlShortcut: ((Char) -> Unit)? = null
     /** 这次按住符号键已经用另一根手指点过字母：松手不再当点按打开符号。 */
     var ctrlUsed = false
         private set
     fun beginCtrl(shortcut: (Char) -> Unit) {
         ctrl = true
+        ctrlFaces = false
         ctrlShortcut = shortcut
         ctrlUsed = false
+    }
+    /** 按满时限：字母键渐变成快捷键键面；不在按住符号键时什么都不做。 */
+    fun showCtrlFaces() {
+        if (ctrl) ctrlFaces = true
     }
     /** 按住符号键时另一根手指点字母：和按住 Shift 再点一样，发 Ctrl+这个字母（用户 10-24）。 */
     fun ctrlTap(letters: String): Boolean {
@@ -74,7 +85,8 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         val target = at(pointer)
         // Pointer motion redraws the line; keys recompose only when the target changes.
         if (hovered?.key != target?.key || hovered?.bounds != target?.bounds) hovered = target
-        if (!ctrl) {
+        if (ctrl) ctrlFaces = true
+        else {
             candidates.dragLine = drag?.let { it.origin to it.pointer }
             candidates.hoveredBounds = target?.takeIf { it.key == CANDIDATE_KEY }?.bounds
         }
@@ -85,6 +97,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         clearDrag()
         dragging = false
         ctrl = false
+        ctrlFaces = false
         ctrlShortcut = null
     }
     fun clearDrag() {

@@ -39,7 +39,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 26 键（和 14 键）按住 !@# 当 Ctrl：字母键换成快捷键键面，再拖到 C 上。
+ * 26 键（和 14 键）按住 !@# 当 Ctrl：刚按下键面不变，按满时限（这里 2 秒）字母键渐变成快捷键键面，再拖到 C 上。
  * 浅、深、纯黑、纯白，玻璃开关，手机/平板宽度。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -95,8 +95,14 @@ class CtrlSymbolKeyRenderTest {
             rule.runOnIdle { width = w; height = h; theme = id; dark = isDark; glass = g }
             rule.waitForIdle()
             val name = "$prefix-$w-$id-${if (isDark) "dark" else "light"}-${if (g) "glass" else "solid"}"
+            rule.mainClock.autoAdvance = false
             rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
-            rule.waitForIdle()
+            rule.mainClock.advanceTimeBy(300)
+            shot("$name-0-just-pressed")
+            rule.mainClock.advanceTimeBy(1700 + com.kingzcheung.xime.ui.keyboard.CTRL_FACE_FADE_MS / 2L)
+            shot("$name-0-fading")
+            rule.mainClock.advanceTimeBy(com.kingzcheung.xime.ui.keyboard.CTRL_FACE_FADE_MS + 50L)
+            rule.mainClock.autoAdvance = true
             shot("$name-1-held")
             val symbol = rule.onNodeWithTag("mode-slot-1", true).fetchSemanticsNode().boundsInRoot
             val c = rule.onNodeWithTag("qwerty-key:c", true).fetchSemanticsNode().boundsInRoot
