@@ -716,6 +716,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val datetimeOff = !com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false)
                 if (service.rimeEngine.getOption("_cyime_datetime_off") != datetimeOff) service.rimeEngine.setOption("_cyime_datetime_off", datetimeOff)
+                // 候选里显示表情（默认关）：同上。打开输入框时 restorePersistedSchemaOptions 会把方案里的 emoji 开关清成 false，这里按设置补回。
+                val emoji = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CANDIDATE_EMOJI_KEY, false)
+                if (service.rimeEngine.getOption("emoji") != emoji) service.rimeEngine.setOption("emoji", emoji)
                 // 仓颉码表本身是繁体，反过来：simplification 开着时转简体。
                 if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE &&
                     service.rimeEngine.getOption("simplification") == traditional) service.rimeEngine.setOption("simplification", !traditional)

@@ -21,6 +21,9 @@ switches:
     states: [ 。，, ．， ]
   - name: traditionalization
     states: [ 简, 繁 ]
+  - name: emoji
+    reset: 0
+    states: [ 无表情, 表情 ]
 
 engine:
   processors:
@@ -49,6 +52,7 @@ engine:
     - cyime_candidate_policy
     # 时间、日期、星期后面接当前时间和日期（设置 › 语言与方案 › 中文输出，默认关）。
     - cyime_datetime
+    - simplifier@emoji
     - simplifier@traditionalize
     - uniquifier
 
@@ -224,6 +228,13 @@ k14_english:
   completion_keys: "QETUOADGJZCBlm"
 
 # 简/繁（设置 → 语言与方案 → 繁体输出）：与 26 键同一张台湾正体转换表，见 opencc/cyime_s2tw.json。
+# 候选里显示表情（设置 › 语言与方案 › 中文输出，默认关）：打「开心」在词后面多出 😄。
+# 表情表与 26 键雾凇方案共用 opencc/emoji.json；输入法按键前按设置写 emoji 选项（ImeKeyRouter）。
+emoji:
+  option_name: emoji
+  opencc_config: emoji.json
+  inherit_comment: false
+
 traditionalize:
   option_name: traditionalization
   opencc_config: cyime_s2tw.json

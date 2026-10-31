@@ -9,6 +9,7 @@ import androidx.compose.material.icons.twotone.Inventory
 import androidx.compose.material.icons.twotone.Schedule
 import androidx.compose.material.icons.twotone.Translate
 import androidx.compose.material.icons.twotone.SpaceBar
+import androidx.compose.material.icons.twotone.EmojiEmotions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
@@ -135,6 +136,10 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                     SettingsToggleItem(Icons.TwoTone.Schedule, "时间日期候选",
                         "打“时间”“日期”“星期”时，词后面紧跟着给设备当前的时间和日期（15:35、2026-10-31、星期六），词本身的位置不变；全拼、双拼、九键、14 键都适用。",
                         checked = input.datetimeCandidates, onCheckedChange = { input.copy(datetimeCandidates = it).save(context) })
+                    HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.EmojiEmotions, "候选里显示表情",
+                        "打「开心」「爱心」这类词时，在词后面多出对应的表情（😄、❤️）；全拼、双拼、九键和 14 键都适用。",
+                        checked = input.candidateEmoji, onCheckedChange = { input.copy(candidateEmoji = it).save(context) })
                 }
             }
             item(key = "english-input") {
