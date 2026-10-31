@@ -13,7 +13,8 @@ internal data class FrostedTextSurface(
 
     val text: Color,
     val selectedText: Color,
-    val shadow: Shadow,
+    /** 贴着字形的细阴影：只在需要托底却画不了柔光托底（Android 12 以下）时才有，其余为 null。 */
+    val shadow: Shadow?,
     val controlBackground: Color,
     /** 宿主换成反差色时托住字的光晕（见 [glassTextHalo]）；白、黑宿主上都已清楚时为 null。 */
     val halo: GlassTextHalo? = null,
@@ -31,9 +32,10 @@ internal fun CandidateBarVisuals.withTextSurface(surface: FrostedTextSurface?): 
     )
 
 /**
- * Preserve readable theme colors and use only a small opposing glyph shadow for live content.
+ * Preserve readable theme colors; text stays crisp, with no outline hugging the glyphs.
  * No extra rail tint is painted. When the rail's glass is too thin for a white or black host,
- * an opposing glyph halo of just the needed strength keeps the text at the keycap label contrast.
+ * a soft opposing backing of just the needed strength keeps the text at the keycap label contrast.
+ * Only where that backing cannot be drawn (before Android 12) does the old thin glyph shadow remain.
  * Existing round toolbar controls use the same key opacity as ordinary keycaps.
  */
 internal fun resolveFrostedTextSurface(
@@ -44,15 +46,18 @@ internal fun resolveFrostedTextSurface(
     config: FrostedGlassConfig = FrostedGlassConfig(enabled = true),
     keyBackground: Color = background,
     shadowRadiusPx: Float = 2f,
+    softBackingAvailable: Boolean = glassHaloSupported(),
 ): FrostedTextSurface {
     val surface = background.copy(alpha = 1f)
     val highlight = accent.copy(alpha = 0.2f)
     val normalText = readableThemeText(text, surface)
     val activeText = readableThemeText(selectedText, highlight.compositeOver(surface))
-    return FrostedTextSurface(normalText, activeText,
-        Shadow(color = glassHaloColor(normalText).copy(alpha = 0.8f), blurRadius = shadowRadiusPx),
-        frostedKeyColor(keyBackground, normalText, config),
-        glassTextHalo(listOf(normalText, activeText), surface, config.normalized().backgroundOpacity))
+    val halo = glassTextHalo(listOf(normalText, activeText), surface, config.normalized().backgroundOpacity)
+    // 贴字的细阴影会把字描出一圈毛边，看着廉价（用户 10-31）；字本来就清楚或有柔光托底时不画。
+    val shadow = if (halo == null || softBackingAvailable) null
+        else Shadow(color = glassHaloColor(normalText).copy(alpha = 0.8f), blurRadius = shadowRadiusPx)
+    return FrostedTextSurface(normalText, activeText, shadow,
+        frostedKeyColor(keyBackground, normalText, config), halo)
 }
 private fun readableThemeText(color: Color, background: Color): Color {
     val opaque = color.copy(alpha = 1f)
