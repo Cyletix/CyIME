@@ -92,6 +92,7 @@ Tech stack: Kotlin · Jetpack Compose · Material 3 · librime (JNI / C++) · ON
 - Forked from [Xime](https://github.com/ximeiorg/Xime) (Kingz Cheung / kingzcheung and contributors) at upstream commit `9452b16` on 2026-09-21.
 - To keep the code easy to compare with upstream, the source namespace `com.kingzcheung.xime`, plugin IDs, `xime.yaml` / `xime.custom.yaml` and the extension store protocol are unchanged; only the install ID is CyIME's own. See [docs/cyime-identity.md](docs/cyime-identity.md) (Chinese).
 - The author's earlier work: [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) (2024 keyboard layout research, where the Cyletix10 layout comes from) and ASRInput (desktop voice captions; CyIME's caption pacing follows it).
+- Community Linux port: [tuxKOH/CyIME, branch linux-desktop-preview](https://github.com/tuxKOH/CyIME/tree/feat/linux-desktop-preview) (IBus Pinyin + desktop clipboard, maintained by tuxKOH). Linux forks are welcome, but I don't have the time to maintain a Linux version myself for now.
 
 ## Contributing
 
