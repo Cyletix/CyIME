@@ -11,5 +11,14 @@
   "sha256": "a8e76e91022e611afa34dad541d7574ec89119bfdbf4fcc216aed40ea710ddb4",
   "score": "count/total = P(continuation | context); mixed 0.7 base + 0.15 neural model + 0.15 personal in NgramFusionEngine",
   "purpose": "post-commit word association baseline, not a pinyin decoder or personal history",
-  "validation": "tools/ime_lab/ngram/suggest_eval.py on API-generated chat sentences (test only): top-3 continuation hit 18.4% -> 38.1% (chat-fn, 235 sentences), 17.1% -> 41.7% (everyday, 171); after common single characters 11.7% -> 21.2%; 这 1/53 -> 18/53"
+  "validation": "tools/ime_lab/ngram/suggest_eval.py on API-generated chat sentences (test only): top-3 continuation hit 18.4% -> 38.1% (chat-fn, 235 sentences), 17.1% -> 41.7% (everyday, 171); after common single characters 11.7% -> 21.2%; 这 1/53 -> 18/53",
+  "word_completions": {
+    "file": "lccc-base-v1.completions.gz",
+    "build": "tools/ime_lab/ngram/tag_word_completions.py lccc-base-v1.bin jieba-0.42.1/jieba/dict.txt (sha256 7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8)",
+    "lexicon": "jieba 0.42.1 dict.txt, MIT (https://github.com/fxsjy/jieba); words of 2+ characters",
+    "rule": "row marked when a suffix of the context plus a prefix of the continuation is a lexicon word (莫+名 -> 莫名); used only after a commit ending in 2+ Han characters, see BaseAssociationModel.predict(afterWholeWord)",
+    "rows_marked": 179537,
+    "bytes": 184098,
+    "sha256": "33a77d1bf121d92ebe4d618600d0ed69ee8f473b910683880f8bb4e8af74c195"
+  }
 }

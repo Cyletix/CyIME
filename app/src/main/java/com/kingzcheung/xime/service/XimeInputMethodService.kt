@@ -882,9 +882,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     
-    private fun getPredictionFromPlugin(contextText: String) {
+    private fun getPredictionFromPlugin(contextText: String, afterWholeWord: Boolean) {
         if (!isChineseMode || !canPredictAfter(contextText) || traditionalChineseOutput()) return
-        predictionManager.getPrediction(contextText)
+        predictionManager.getPrediction(contextText, afterWholeWord)
     }
 
     /** 联想表只有简体：繁体输出时不给中文联想，免得简体词混进繁体文字。注音一律出正体，同样不给。 */
@@ -4314,7 +4314,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
                     uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode &&
                     predictionManager.requestRevision == predictionRevision) {
-                    getPredictionFromPlugin(predictionManager.lastCommittedText)
+                    getPredictionFromPlugin(predictionManager.lastCommittedText, endsWithWholeWord(text))
                 }
                 predictionManager.releasePrediction(predictionRevision)
             }

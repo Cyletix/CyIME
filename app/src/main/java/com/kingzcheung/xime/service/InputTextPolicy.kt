@@ -2,6 +2,13 @@ package com.kingzcheung.xime.service
 
 internal fun canPredictAfter(text: String): Boolean = text.lastOrNull()?.isLetter() == true
 
+/**
+ * 这次上屏的以两个以上汉字结尾（整句、词、语音）：最后一个字已是一个词的末尾，联想只接下一个词，
+ * 不再把它补成以它开头的长词（「你在吃饭莫」后不出“莫名其妙”）。单个字上屏照旧，可以补成词（我→们）。
+ */
+internal fun endsWithWholeWord(committed: String): Boolean =
+    committed.takeLastWhile { it in '一'..'鿿' }.length >= 2
+
 internal fun isLiteralPunctuation(key: String): Boolean = key.length == 1 && when (key[0].category) {
     CharCategory.CONNECTOR_PUNCTUATION, CharCategory.DASH_PUNCTUATION,
     CharCategory.START_PUNCTUATION, CharCategory.END_PUNCTUATION,

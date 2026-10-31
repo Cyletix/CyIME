@@ -89,7 +89,8 @@ object AssociationManager {
         }
     }
     
-    suspend fun predict(contextText: String, topK: Int = 20): List<AssociationCandidate> = withContext(Dispatchers.Default) {
+    /** [afterWholeWord]: the last commit was a phrase of two or more characters; see [BaseAssociationModel.predict]. */
+    suspend fun predict(contextText: String, topK: Int = 20, afterWholeWord: Boolean = false): List<AssociationCandidate> = withContext(Dispatchers.Default) {
         if (!isInitialized) {
             val ctx = context
             if (ctx != null) {
@@ -131,7 +132,7 @@ object AssociationManager {
                 catch (error: Exception) { Log.w(TAG, "Using bundled prediction fallback", error); emptyList() }
             } else emptyList()
             
-            val fusedCandidates = fusionEngine.fuseCandidates(modelCandidates, contextText)
+            val fusedCandidates = fusionEngine.fuseCandidates(modelCandidates, contextText, afterWholeWord)
             
             usableCandidates(fusedCandidates).take(topK)
             

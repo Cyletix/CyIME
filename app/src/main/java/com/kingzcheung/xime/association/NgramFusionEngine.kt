@@ -26,9 +26,20 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
         
         val result = userNgramCache.initialize()
         baseModel = withContext(Dispatchers.IO) {
+            // Without the marks the table still works; after a whole word it then behaves as before.
+            val wordCompletions = try {
+                context.assets.open(BaseAssociationModel.WORD_COMPLETIONS_ASSET).use { input ->
+                    java.util.zip.GZIPInputStream(input).reader(Charsets.UTF_8).use(BaseAssociationModel::readWordCompletions)
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Association word completion marks failed to load", error)
+                emptyMap()
+            }
             try {
                 context.assets.open(BaseAssociationModel.ASSET).use { input ->
-                    java.util.zip.GZIPInputStream(input).reader(Charsets.UTF_8).use(BaseAssociationModel::read)
+                    java.util.zip.GZIPInputStream(input).reader(Charsets.UTF_8).use {
+                        BaseAssociationModel.readWithWordCompletions(it, wordCompletions)
+                    }
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Bundled association model failed to load", error)
@@ -43,9 +54,11 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
         userNgramCache.recordInput(text)
     }
     
+    /** [afterWholeWord]: see [BaseAssociationModel.predict]; only the corpus table depends on it. */
     fun fuseCandidates(
         modelCandidates: List<AssociationCandidate>,
-        context: String
+        context: String,
+        afterWholeWord: Boolean = false,
     ): List<AssociationCandidate> {
         if (!isInitialized) {
             return normalizeModelCandidates(modelCandidates)
@@ -56,7 +69,7 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
         // (a softmax share over its own top-k, not calibrated) and personal observations only
         // add a bounded share, so a rare long phrase cannot outrank 个/是/些 after 这 on its own.
         val allCandidates = mutableMapOf<String, Float>()
-        baseModel?.predict(context, BaseAssociationModel.MAX_PER_CONTEXT)?.forEach {
+        baseModel?.predict(context, BaseAssociationModel.MAX_PER_CONTEXT, afterWholeWord)?.forEach {
             allCandidates[it.text] = BASE_WEIGHT * it.score
         }
         normalizeModelCandidates(modelCandidates).forEach { candidate ->
