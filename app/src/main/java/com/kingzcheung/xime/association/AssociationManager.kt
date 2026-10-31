@@ -6,7 +6,10 @@ import com.kingzcheung.xime.model.ModelRuntime
 import com.kingzcheung.xime.model.ModelManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.util.FileLogger
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -108,13 +111,13 @@ object AssociationManager {
         // isInitialized 仍为 true。必须在这里检测引擎状态并按需重载（重新 bind +
         // loadModel），否则所有预测入口都会被本方法上方的 isInitialized 守卫放行、
         // 撞上引擎的 "Engine not initialized" 空转，联想永远失效。
+        // 重载放到后台，这一次不等它（用户反馈 10-31「联想有延迟，要等一会才出来」）：键盘收起 3 分钟后模型会卸载，
+        // 以前再打字时第一次联想要等重新起进程、读模型（一两秒）才出来。现在这一次先用内置联想表和个人数据出词
+        // （模型在融合里本来只占 15%），模型读好后下一次上屏就用上。
         if (!OnnxAssociationEngine.isInitialized() && context?.let {
                 ModelManager.isModelReady(it, SettingsPreferences.getPredictionSelectedModel(it))
             } == true) {
-            val reloaded = ModelRuntime.load("predictive_text")
-            if (!reloaded) {
-                FileLogger.e(TAG, "Reload predictive_text failed after service reclaim")
-            }
+            reloadModelInBackground()
         }
 
         try {
@@ -191,6 +194,22 @@ object AssociationManager {
         // Explicit off/model switch must also release a HOT model.
         ModelRuntime.releaseWarm("predictive_text")
         OnnxAssociationEngine.release()
+    }
+
+    private val reloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val reloading = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** 联想时发现模型没在（闲置卸载、进程被回收）：后台重载一次，同一时间只跑一个，联想本身不等。 */
+    private fun reloadModelInBackground() {
+        if (!reloading.compareAndSet(false, true)) return
+        reloadScope.launch {
+            try {
+                restoreModelAfterIdle()
+                if (!OnnxAssociationEngine.isInitialized()) FileLogger.w(TAG, "Background reload of predictive_text did not finish")
+            } finally {
+                reloading.set(false)
+            }
+        }
     }
 
     /** 键盘收起较久：卸载联想模型让 :inference 进程可被回收，词频缓存与学习数据保留。 */
