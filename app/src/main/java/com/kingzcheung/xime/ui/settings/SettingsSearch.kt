@@ -202,6 +202,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("显示模式", theme, SettingsRoutes.Theme, "深色 浅色 跟随系统 夜间 暗色 黑色 白色 明暗 日间"),
         SettingsSearchEntry("玻璃效果", theme, SettingsRoutes.Theme, "玻璃 毛玻璃 透明 材质 磨砂", section = "材质效果"),
         SettingsSearchEntry("透明度与模糊", theme, SettingsRoutes.Theme, "透明度 模糊 模糊强度 背景不透明度 按键不透明度 玻璃", section = "材质效果"),
+        SettingsSearchEntry("柔化顶部边缘", theme, SettingsRoutes.Theme, "柔化 羽化 渐变 边缘 上沿 割裂 衔接 玻璃 毛玻璃 磨砂", section = "材质效果"),
         SettingsSearchEntry("配色方案", theme, SettingsRoutes.Theme, "配色 颜色 主题色 皮肤 预览"),
         SettingsSearchEntry("用自己的图片", theme, SettingsRoutes.Theme, "背景图 背景图片 自定义背景 图片 照片 相册 壁纸 我的图片 换背景 调整图片 裁剪 缩放 对齐 留白 删除图片", section = "背景图片"),
         SettingsSearchEntry("视觉样式", theme, SettingsRoutes.Theme, "样式 圆角 扁平 立体 材质"),

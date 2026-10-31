@@ -23,6 +23,16 @@ object SettingsPreferences {
     fun setRoundedKeyboardTop(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_ROUNDED_KEYBOARD_TOP, enabled).apply()
     }
+    /**
+     * 玻璃「柔化顶部边缘」：固定键盘上沿一小段里模糊和底色渐变出来，不再一刀切；默认关（原样）。
+     * 和顶部圆角互斥（圆角缺口里没法渐变），两个开关在设置页互锁。
+     */
+    const val KEY_GLASS_SOFT_TOP_EDGE = "glass_soft_top_edge"
+    fun glassSoftTopEdge(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_GLASS_SOFT_TOP_EDGE, false)
+    fun setGlassSoftTopEdge(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_GLASS_SOFT_TOP_EDGE, enabled).apply()
+    }
     const val KEY_PUNCTUATION_FULL_WIDTH = "punctuation_full_width"
     fun punctuationFullWidth(context: Context, default: Boolean): Boolean =
         getPrefs(context).getBoolean(KEY_PUNCTUATION_FULL_WIDTH, default)

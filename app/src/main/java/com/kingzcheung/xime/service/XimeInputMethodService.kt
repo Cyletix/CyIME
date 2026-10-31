@@ -348,6 +348,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var glassSurfaceMode = ""
     // 整块键盘透明度与玻璃材质相乘：模糊窗口随按键一起淡出，而不是始终满强度地糊住宿主。
     private var glassOpacity = 1f
+    /** 「柔化顶部边缘」的细条模糊窗口各自的透明度系数（乘在 [glassOpacity] 上）；其他窗口是 1。 */
+    private val glassAlphaScale = mutableMapOf<String, Float>()
+    /** 「柔化顶部边缘」此刻是否适用（玻璃、固定键盘、顶部直角，见 Compose 里的 SideEffect）。 */
+    private var glassTopFeatherOn = false
+    /** 生效时固定卡片上沿在窗口里的 y：Compose 的玻璃底色按它渐隐，和下面的细条模糊对齐。 */
+    private val glassTopFeatherTop = mutableStateOf<Float?>(null)
 
     /** Blur windows follow measured content bounds; they never determine keyboard geometry. */
     private fun updateGlassSurface(name: String, bounds: android.graphics.Rect?) {
@@ -362,7 +368,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         surface.configure(glassConfig.enabled, (glassConfig.blurRadiusDp * density).roundToInt(),
             if (name == "navigation" || squareTop && name.startsWith("keyboard")) 0f
             else 16f * density)
-        surface.setOpacity(glassOpacity)
+        surface.setOpacity(glassOpacity * (glassAlphaScale[name] ?: 1f))
         surface.setRegion(glassSurfaceBounds[name])
         surface.setVisible(glassWindowVisible)
     }
@@ -400,7 +406,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val card = withFilledSides(if (uiState.value.handwritingExpanded) handwritingGlassControls else keyboardGlassCard)
         val hole = card?.let { splitKeyboardGap.hole(it.bottom.toFloat()) }
         if (card == null || hole == null) {
-            updateGlassSurface("keyboard", card)
+            updateTopGlass(card)
             updateGlassSurface("keyboard-left", null)
             updateGlassSurface("keyboard-right", null)
             return
@@ -408,9 +414,36 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val top = hole.top.roundToInt().coerceIn(card.top, card.bottom)
         // 两半向上压住工具栏那块的圆角，拼接处不露缺口。
         val halfTop = (top - (16f * resources.displayMetrics.density).roundToInt()).coerceAtLeast(card.top)
-        updateGlassSurface("keyboard", android.graphics.Rect(card.left, card.top, card.right, top))
+        updateTopGlass(android.graphics.Rect(card.left, card.top, card.right, top))
         updateGlassSurface("keyboard-left", android.graphics.Rect(card.left, halfTop, hole.left.roundToInt(), card.bottom))
         updateGlassSurface("keyboard-right", android.graphics.Rect(hole.right.roundToInt(), halfTop, card.right, card.bottom))
+    }
+
+    /**
+     * 卡片最上面那块模糊。「柔化顶部边缘」开着时上沿 16dp 切成几条细窗口，透明度一级级升到满，
+     * 那块整的从这段下面开始；Compose 里的玻璃底色按同一段渐隐（GlassTopFeather.kt）。
+     */
+    private fun updateTopGlass(rect: android.graphics.Rect?) {
+        val featherPx = (com.kingzcheung.xime.ui.theme.GLASS_TOP_FEATHER_HEIGHT.value * resources.displayMetrics.density).roundToInt()
+        val bands = if (glassTopFeatherOn && rect != null) com.kingzcheung.xime.ui.theme.glassTopFeatherBands(
+            rect.left, rect.top, rect.right, rect.bottom, featherPx) else emptyList()
+        glassTopFeatherTop.value = if (bands.isEmpty()) null else rect!!.top.toFloat()
+        updateGlassSurface("keyboard", if (bands.isEmpty()) rect
+            else android.graphics.Rect(rect!!.left, rect.top + featherPx, rect.right, rect.bottom))
+        for (i in 0 until com.kingzcheung.xime.ui.theme.GLASS_TOP_FEATHER_STEPS) {
+            val name = "keyboard-edge-$i"
+            val band = bands.getOrNull(i)
+            if (band == null) glassAlphaScale.remove(name) else glassAlphaScale[name] = band.alpha
+            if (band != null || glassBlurWindows.containsKey(name) || glassSurfaceBounds.containsKey(name)) {
+                updateGlassSurface(name, band?.let { android.graphics.Rect(it.left, it.top, it.right, it.bottom) })
+            }
+        }
+    }
+
+    private fun updateGlassTopFeather(on: Boolean) {
+        if (glassTopFeatherOn == on) return
+        glassTopFeatherOn = on
+        updateKeyboardGlass()
     }
 
     /** 当前布局真正以分体显示（偏好开启且是 26 键字母布局）。 */
@@ -421,7 +454,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun updateGlassOpacity(opacity: Float) {
         if (glassOpacity == opacity) return
         glassOpacity = opacity
-        glassBlurWindows.values.forEach { it.setOpacity(opacity) }
+        glassBlurWindows.forEach { (name, surface) -> surface.setOpacity(opacity * (glassAlphaScale[name] ?: 1f)) }
     }
 
     private fun updateGlassConfiguration(config: com.kingzcheung.xime.settings.FrostedGlassConfig, mode: String) {
@@ -1683,6 +1716,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 val isDarkTheme = isDarkTheme()
                 val roundedKeyboardBottom = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardBottom()
+                // 「柔化顶部边缘」只给固定键盘、顶部直角时（顶部圆角的缺口里没法渐变；设置页两者互锁）。
+                val softTopEdge = com.kingzcheung.xime.ui.keyboard.rememberGlassSoftTopEdge()
+                val roundedKeyboardTop = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardTop()
+                val glassTopFeather = frostedGlass.enabled && softTopEdge && !roundedKeyboardTop && !state.isCompact &&
+                    !state.voiceCollapsed && !state.isFloatingMode && !handwritingExpanded && !state.showKeyboardResize
                 // A see-through keyboard showing a panel (clipboard, emoji, symbols, editing, clipboard
                 // search) blurs the app behind it, so the panel's text is not read through the app's.
                 val panelBackdrop = com.kingzcheung.xime.ui.theme.panelNeedsBackdropBlur(frostedGlass.enabled,
@@ -1697,6 +1735,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     if (state.isCompact || state.voiceCollapsed || state.isFloatingMode || roundedKeyboardBottom) {
                         updateGlassSurface("navigation", null)
                     }
+                    updateGlassTopFeather(glassTopFeather)
                 }
                 val screenHeightDp = resources.configuration.screenHeightDp
                 val physicalScreenDp = (resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt()
@@ -1799,6 +1838,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         backdropHeight = (contentHeight + contentBottomPaddingDp + activeBottomDp).dp,
                         modifier = Modifier.fillMaxSize(),
                         clipboardInMotion = clipboardExpansion?.isInMotion == true,
+                        topFeather = glassTopFeatherTop,
                     ) {
                         // Sync FrameLayout height with Compose content height
                         val totalDp = if (handwritingExpanded || state.showKeyboardResize || state.isCompact || state.voiceCollapsed || state.isFloatingMode) effectiveScreenH
