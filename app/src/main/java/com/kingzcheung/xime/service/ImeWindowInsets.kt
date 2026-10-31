@@ -123,14 +123,24 @@ private fun gestureAwareBottom(insets: WindowInsets, imeWindow: Window?, fullPx:
     } == 1
     // 平板手势导航时任务栏在键盘下面画返回/切换输入法按钮，整条留着（未在平板上核对前不缩）。
     val taskbarScreen = context.resources.configuration.smallestScreenWidthDp >= 600
+    // 只有核对过的厂商才缩：vivo 等手势导航时也在键盘下面画「切换输入法」按钮，缩了会压在按钮上。
+    val unverifiedVendor = !gestureStripVerifiedVendor(Build.MANUFACTURER)
     val pick = imeBottomInsetPx(fullPx, tappable, navigationMode,
-        imeNavButtons = taskbarScreen || hideKeyboardButton || imeWindowDrawsNavButtons(imeWindow),
+        imeNavButtons = taskbarScreen || unverifiedVendor || hideKeyboardButton || imeWindowDrawsNavButtons(imeWindow),
         gestureBarPx = gestureBarHeightPx(context, hintHidden = gestureHint == 0))
     if (pick != fullPx) {
         Log.d(INSETS_TAG, "gesture nav: full=$fullPx mode=$navigationMode tappable=$tappable hint=$gestureHint hideButton=$hideKeyboardButton pick=$pick")
     }
     return pick
 }
+
+/**
+ * 手势导航时能不能把底部缩到手势条：只认核对过底部有没有系统按钮的厂商（三星，按它自己的
+ * 「手势提示」「隐藏键盘按钮」设置判断）。其他厂商（如 vivo 在键盘下面画「切换输入法」按钮）
+ * 照 1.15.17 以前整条留着，不让最下一排压住系统按钮。
+ */
+internal fun gestureStripVerifiedVendor(manufacturer: String?): Boolean =
+    manufacturer.equals("samsung", ignoreCase = true)
 
 /** 手势导航时键盘下面最多留多高（dp）：手势条本身。 */
 internal const val GESTURE_BAR_MAX_DP = 24
