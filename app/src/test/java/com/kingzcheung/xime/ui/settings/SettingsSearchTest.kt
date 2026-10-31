@@ -65,6 +65,15 @@ class SettingsSearchTest {
         assertTrue("Ctrl + 空格" in titles("ＣＴＲＬ"))
     }
 
+    /** 开着「繁体输出」搜设置：繁体字按简体找（10-31 新用户模拟里搜“十四鍵”什么都没找到）。 */
+    @Test fun traditionalCharactersFindSimplifiedSettings() {
+        assertEquals(titles("繁体输出"), titles("繁體輸出"))
+        assertTrue("繁体输出" in titles("繁體"))
+        assertEquals(titles("14键"), titles("十四鍵"))
+        assertTrue(titles("十四鍵").isNotEmpty())
+        assertTrue("剪贴板卡片最多显示" in titles("剪貼板"))
+    }
+
     /** 词没有连着出现时按相邻两字近似匹配：“候选字号”“按键声音大小”这类自己组的说法。 */
     @Test fun nearMatchesFindSettingsWithoutExactWords() {
         assertEquals("候选字大小", titles("候选字号").first())
