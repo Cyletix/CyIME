@@ -35,6 +35,7 @@ internal enum class LayoutInputCategory(val route: String, val title: String, va
 internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: () -> Unit) {
     val context = LocalContext.current
     val saved = rememberKeyboardInputPreferences()
+    val spellingScope = rememberCoroutineScope()
     var settings by remember(saved) { mutableStateOf(saved) }
     Scaffold(containerColor = MaterialTheme.colorScheme.surface, topBar = {
         TopAppBar(title = { Text(category.title) }, navigationIcon = {
@@ -50,6 +51,13 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         "仅用于中文全拼 26 键；按实际键位补充候选，保留原输入，不用于双拼。",
                         checked = settings.neighborCorrection, onCheckedChange = {
                             settings = settings.copy(neighborCorrection = it); settings.save(context)
+                        })
+                    HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.Spellcheck, "双拼邻键纠错",
+                        "仅用于双拼 26 键（小鹤、自然码等）；按实际键位补充按到相邻键的候选，保留原输入。改动后方案重新部署，要几秒。",
+                        checked = settings.doublePinyinCorrection, onCheckedChange = {
+                            settings = settings.copy(doublePinyinCorrection = it); settings.save(context)
+                            spellingScope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
                         })
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.Abc, "中英混输",

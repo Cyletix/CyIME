@@ -128,7 +128,11 @@ fun KeyboardLayout(
     val honeycomb = letterLayout?.honeycomb == true
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
-    val correctionEnabled = LocalKeyboardInputPreferences.current.neighborCorrection && !isAsciiMode
+    // 双拼有自己的开关（默认关）：方案补丁打开 enable_correction 后，还要这里交出键位邻接表才会纠错。
+    val doublePinyin = uiState.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN
+    val correctionEnabled = !isAsciiMode && LocalKeyboardInputPreferences.current.let {
+        if (doublePinyin) it.doublePinyinCorrection else it.neighborCorrection
+    }
     val geometry = remember(cfgVer, keyRows, correctionEnabled, uiState.currentSchemaId, splitKeyboard) {
         LetterGeometry { encoded -> callbacks.onLetterNeighbors?.invoke(uiState.currentSchemaId, if (correctionEnabled) encoded else "") }
     }
