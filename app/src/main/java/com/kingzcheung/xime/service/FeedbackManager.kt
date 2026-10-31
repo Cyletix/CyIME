@@ -112,6 +112,21 @@ class FeedbackManager(private val context: Context) {
         /** 删除音连发时只保留最新一层；其他按键音照常可以重叠。 */
         fun chokesPrevious(keyType: String): Boolean = keyType == "delete"
 
+        /** 按住删除键时每 30 ms 连删一下；离上一下这么近的只能是连删，手指连点到不了。 */
+        const val DELETE_REPEAT_GAP_MS = 80L
+
+        /**
+         * 连删时振动的最小间隔（用户转述 10-31：打字震得弱、长按删除震得很强）。原来每删一下都震，30 ms 一下的
+         * 短震首尾相接成一长串，比单击强得多；现在每一下和打字一样强，中间留出停顿，一秒约八下。
+         */
+        const val DELETE_REPEAT_HAPTIC_MS = 100L
+
+        fun isDeleteRepeat(nowUptime: Long, lastPressUptime: Long): Boolean =
+            lastPressUptime > 0L && nowUptime - lastPressUptime < DELETE_REPEAT_GAP_MS
+
+        fun deleteRepeatHapticDue(nowUptime: Long, lastHapticUptime: Long): Boolean =
+            nowUptime - lastHapticUptime >= DELETE_REPEAT_HAPTIC_MS
+
         /** 设置页「录屏时包含按键音」写入的偏好键，默认关。 */
         const val KEY_SOUND_CAPTURABLE = "key_sound_capturable"
 
@@ -298,7 +313,11 @@ class FeedbackManager(private val context: Context) {
         playKeySound(sound, hardware = true)
     }
 
-    fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER) {
+    /**
+     * [deleteRepeat]：按住删除键连删的一下。「启用」里调过「长按振动时长/振幅」时用那两项，没调（都为 0）时和按键振动一样。
+     */
+    fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER,
+        deleteRepeat: Boolean = false) {
         // 未开启松手反馈时，不必读取系统触觉设置。
         if (keyUp && !hapticOnKeyUp) return
         if (hapticMode == HapticMode.Disabled) return
@@ -307,8 +326,9 @@ class FeedbackManager(private val context: Context) {
 
         // 自定义时长、振幅只在「启用」模式下显示，跟随系统时不使用残留值。
         val custom = hapticMode == HapticMode.Enabled
-        val duration = if (!custom) 0L else if (longPress) longPressDuration else pressDuration
-        val amplitude = if (!custom) 0 else if (longPress) longPressAmplitude else pressAmplitude
+        val useLong = longPress || (deleteRepeat && (longPressDuration != 0L || longPressAmplitude != 0))
+        val duration = if (!custom) 0L else if (useLong) longPressDuration else pressDuration
+        val amplitude = if (!custom) 0 else if (useLong) longPressAmplitude else pressAmplitude
         val hfc: Int = if (longPress) {
             HapticFeedbackConstants.LONG_PRESS
         } else if (keyUp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -384,10 +404,22 @@ class FeedbackManager(private val context: Context) {
         hapticFeedback(view, type = type)
     }
 
-    fun performKeyPressDownEffect(key: String, view: View) {
+    private var lastDeletePressUptime = 0L
+    private var lastDeleteHapticUptime = 0L
+
+    fun performKeyPressDownEffect(key: String, view: View, nowUptime: Long = android.os.SystemClock.uptimeMillis()) {
         val type = KeyFeedbackType.fromKey(key)
         playKeySound(type.sound)
-        hapticFeedback(view, type = type)
+        if (type != KeyFeedbackType.DELETE) {
+            hapticFeedback(view, type = type)
+            return
+        }
+        // 连删：声音照旧每下都有，振动按 DELETE_REPEAT_HAPTIC_MS 隔开；单点删除照常每下都震。
+        val repeat = isDeleteRepeat(nowUptime, lastDeletePressUptime)
+        lastDeletePressUptime = nowUptime
+        if (repeat && !deleteRepeatHapticDue(nowUptime, lastDeleteHapticUptime)) return
+        lastDeleteHapticUptime = nowUptime
+        hapticFeedback(view, type = type, deleteRepeat = repeat)
     }
 
 
