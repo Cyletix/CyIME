@@ -92,6 +92,10 @@ speller:
     - xform/ui$/Ⓥ/
     - xform/in$/Ⓑ/
     - xlit/ⓆⓌⓇⓉⓎⓊⒾⓄⓅⓈⒹⒻⒼⒽⒿⓀⓁⓏⓍⒸⓋⒷⓃⓂ/qwrtyuiopsdfghjklzxcvbnm/
+    - "derive/^aa$/a'/"
+    - "derive/^oo$/o'/"
+    - "derive/^ee$/e'/"
+    - "abbrev/^(.).+$/$1'/"
     # 每一位可独立为精确字母或合并键，不将精确字母重新映射成歧义编码。
     - derive/^(.{0})[qw](.*)$/$1Q$2/
     - derive/^(.{0})[er](.*)$/$1E$2/
