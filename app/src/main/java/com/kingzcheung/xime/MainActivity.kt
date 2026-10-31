@@ -69,6 +69,8 @@ class MainActivity : ComponentActivity() {
     
     companion object {
         private const val TAG = "MainActivity"
+        /** A real permission dialog takes the user longer than this to answer. */
+        private const val NO_DIALOG_MS = 500L
 
         /** 构造跳转到指定插件网络授权页的 Intent（IME 等后台场景调用）。 */
         fun buildPluginAuthIntent(context: android.content.Context, pluginId: String): Intent {
@@ -88,14 +90,30 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        PermissionHelper.onRecordAudioResult(isGranted)
-        if (isGranted) {
-            Toast.makeText(this, "麦克风权限已授权", Toast.LENGTH_SHORT).show()
+        // Denied at once with no dialog: refused before with "don't ask again" (or twice on Android 11+). The
+        // system will never ask again, so the only way left is the app's settings page; the user is sent there.
+        val noDialog = !isGranted && !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) &&
+            android.os.SystemClock.uptimeMillis() - permissionAskedAt < NO_DIALOG_MS
+        if (noDialog) {
+            PermissionHelper.onSentToAppSettings()
+            Toast.makeText(this, "麦克风权限之前被拒绝过，请在设置的「权限」里允许麦克风", Toast.LENGTH_LONG).show()
+            try {
+                // Its own task: finishAndRemoveTask below must not take the settings page with it.
+                startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e: Exception) { Log.w(TAG, "App settings page unavailable", e) }
         } else {
-            Toast.makeText(this, "麦克风权限被拒绝，无法使用语音输入", Toast.LENGTH_SHORT).show()
+            PermissionHelper.onRecordAudioResult(isGranted)
+            if (isGranted) {
+                Toast.makeText(this, "麦克风权限已授权", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "麦克风权限被拒绝，无法使用语音输入", Toast.LENGTH_SHORT).show()
+            }
         }
-        finish()
+        finishAndRemoveTask()
     }
+    /** When the permission request started; a denial faster than this came without a dialog. */
+    private var permissionAskedAt = 0L
     
     private val prewarmScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
@@ -123,11 +141,12 @@ class MainActivity : ComponentActivity() {
         val requestPermission = intent?.getStringExtra("request_permission")
         if (requestPermission == PermissionHelper.PERMISSION_RECORD_AUDIO) {
             if (!PermissionHelper.hasRecordAudioPermission(this)) {
+                permissionAskedAt = android.os.SystemClock.uptimeMillis()
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             } else {
                 PermissionHelper.onRecordAudioResult(true)
                 Toast.makeText(this, "麦克风权限已授权", Toast.LENGTH_SHORT).show()
-                finish()
+                finishAndRemoveTask()
             }
             return
         }
