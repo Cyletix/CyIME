@@ -146,6 +146,23 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
       const double value = score(*sentence);
       if (value > chosen_score) { chosen_score = value; chosen = sentence; }
     }
+    // With stray initials (Syllabifier::MarkStrayInitials) the typed reading stands only through initials weighed as
+    // slips, so the corrected n-best is chosen by the word model too and leads (清晨 over 清真 in 是清晨的一杯).
+    if (q.syllables.cyime_stray_initials && q.enable_correction) {
+      an<Sentence> fixed;
+      double fixed_score = -std::numeric_limits<double>::infinity();
+      for (const auto& sentence : *sentences) {
+        if (!corrected(sentence)) continue;
+        const double value = score(*sentence);
+        if (value > fixed_score) { fixed_score = value; fixed = sentence; }
+      }
+      if (fixed) {
+        sentences->clear();
+        sentences->push_back(fixed);
+        sentences->push_back(chosen);
+        return;
+      }
+    }
   }
   sentences->clear();
   sentences->push_back(chosen);
