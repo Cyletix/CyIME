@@ -250,6 +250,9 @@ internal fun rememberImeKeyboardCallbacks(
                 if (!enabled) {
                     // 长按抬手：结束语音会话（提交当前已识别文本并停止识别）
                     service.endVoiceSession()
+                } else if (!service.uiState.value.isVoiceMode && !service.uiState.value.isSttEnabled) {
+                    // 「语音转文本」总开关关着：屏幕键盘也不开麦，与物理键盘 Alt+H 同一句提示。
+                    android.widget.Toast.makeText(service, "请先在设置中启用语音输入", android.widget.Toast.LENGTH_SHORT).show()
                 } else if (!service.uiState.value.isVoiceMode && !service.editorInputPolicy.locksNativeInput) {
                     service.uiState.value = service.uiState.value.copy(
                         isVoiceMode = true,
@@ -273,6 +276,9 @@ internal fun rememberImeKeyboardCallbacks(
                 if (state.isVoiceMode && state.voiceSticky) {
                     // 再次点击麦克风：停止录音并提交转录。
                     service.endVoiceSession()
+                } else if (!state.isVoiceMode && !state.isSttEnabled) {
+                    // 「语音转文本」总开关关着：工具栏麦克风和长按空格说话都不开麦（原来只有物理键盘 Alt+H 认这个开关）。
+                    android.widget.Toast.makeText(service, "请先在设置中启用语音输入", android.widget.Toast.LENGTH_SHORT).show()
                 } else if (!state.isVoiceMode && !service.editorInputPolicy.locksNativeInput) {
                     // 工具栏独立语音组件，不占用空格或改变键盘页面。
                     service.feedbackManager.playKeySound("voice_start")

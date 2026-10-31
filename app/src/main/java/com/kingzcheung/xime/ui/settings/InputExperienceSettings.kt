@@ -201,6 +201,10 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("长按空格", style = MaterialTheme.typography.titleSmall)
                 Text("语音开关：按住空格说话，松手结束并上屏。", style = MaterialTheme.typography.bodySmall)
+                // 语音总开关关着时，这里选了语音也不会开麦（键盘上只提示去打开），写明，免得以为没生效。
+                if (settings.effectiveSpaceHold == SpaceHoldAction.VOICE_TOGGLE && !SettingsPreferences.isSttEnabled(context)) {
+                    SettingsLockNote("「语音转文本」已关闭，按住空格不会开始说话；在「语音转文本」页打开后生效")
+                }
                 if (settings.cursorGesture == CursorGestureMode.SPACE) {
                     Text("现在长按空格用来移动光标。选下面一项后，滑动移动光标改为「${settings.cursorGestureAfterLeavingSpace.label}」。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
