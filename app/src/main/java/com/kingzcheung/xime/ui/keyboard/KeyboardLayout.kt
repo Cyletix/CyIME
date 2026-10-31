@@ -143,6 +143,8 @@ fun KeyboardLayout(
     // Shared physical frame and bottom-row spacing for 14/26 keys. The paired
     // alphabet keys still occupy their own five-column rows inside that frame.
     val fourteenKey = !isAsciiMode && uiState.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
+    // 逗号键分词（默认关）：中文全拼、双拼时标点键多一个 ' 角标，字母键角标里的 ' 打拼音时也是分词。
+    val syllableSplit = syllableSplitActive(LocalKeyboardInputPreferences.current.syllableSplitKey, isAsciiMode, uiState.inputProfile)
     // 双拼键位提示（默认关）：双拼 26 键每个键写出 zh/ch/sh 和韵母，和双拼方案页的键位图一样；14 键、九键不显示。
     val dpKeyHints = if (doublePinyin && !isAsciiMode && !fourteenKey &&
         LocalKeyboardInputPreferences.current.doublePinyinKeyHints) remember(uiState.currentSchemaId, cfgVer) {
@@ -266,7 +268,12 @@ fun KeyboardLayout(
     val onKeyPressDown = callbacks.onKeyPressDown
     val onKeyRelease = callbacks.onKeyRelease
     val onVoiceModeChange = callbacks.onVoiceModeChange
-    val onCommitText = callbacks.onCommitText
+    // 逗号键分词开着时，角标上屏的 ' 改走按键：打拼音时是分词，没在打拼音时照旧上屏 '。关着时原样不动。
+    val onCommitText: ((String) -> Unit)? = remember<((String) -> Unit)?>(callbacks.onCommitText, onKeyPress, syllableSplit) {
+        val commit = callbacks.onCommitText
+        if (!syllableSplit || commit == null) commit
+        else { text: String -> if (cornerTypesSeparator(true, text)) onKeyPress(SYLLABLE_SEPARATOR) else commit(text) }
+    }
     val onGestureAction: (GestureAction, String) -> Unit = { action, value ->
         when (action) {
             GestureAction.SWITCH_ROUTE -> {
@@ -852,8 +859,10 @@ fun KeyboardLayout(
                         if (isAsciiMode || (punctuationFull && text.any { it.code > 0x7E })) onKeyPress(text)
                         else (callbacks.onCommitExactText ?: onCommitText ?: onKeyPress)(text)
                     }
+                    // 逗号键分词：有逗号键放逗号键左下角，只开句号键放句号键。
+                    val (leftSplit, rightSplit) = syllableSplitOnPunctuation(syllableSplit, leftPunctuation, rightPunctuation)
                     @Composable
-                    fun RowScope.PunctuationKey(key: SpacePunctuationKey, tag: String) =
+                    fun RowScope.PunctuationKey(key: SpacePunctuationKey, tag: String, split: Boolean = false) =
                         // 主副字符已按全角/半角写定并原样上屏；键面不能再转一次，否则角标与副字符的宽度相反。
                         CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
                         SwipeableKeyButton(
@@ -867,6 +876,10 @@ fun KeyboardLayout(
                             swipeText = key.alternate.ifEmpty { null },
                             symbolInputText = key.alternate.ifEmpty { null },
                             onSwipe = if (key.alternate.isEmpty()) null else { _ -> commitPunctuation(key.alternate) },
+                            // 下角标和字母键一样：默认上滑，反转后下滑；打拼音时分词，否则上屏 '。
+                            swipeDownText = if (split) SYLLABLE_SEPARATOR else null,
+                            swipeDownKeyLabel = if (split && swipeDownHintsEnabled) SYLLABLE_SEPARATOR else null,
+                            onSwipeDown = if (split) { _ -> onKeyPress(SYLLABLE_SEPARATOR) } else null,
                             onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                             onPress = { onKeyPressDown?.invoke(key.primary) },
                             onRelease = { onKeyRelease?.invoke(key.primary) },
@@ -907,7 +920,7 @@ fun KeyboardLayout(
                                 )
                             }
 
-                            if (leftPunctuation != null) PunctuationKey(leftPunctuation, "qwerty-punctuation-key")
+                            if (leftPunctuation != null) PunctuationKey(leftPunctuation, "qwerty-punctuation-key", leftSplit)
                             else if (commaOnLeft) {
                             // 逗号 — 从配置读取 "'"
                             val k2KeyGesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
@@ -1051,7 +1064,7 @@ fun KeyboardLayout(
                             if (isVoiceMode && !isVoiceSticky) DummyKeyButton(
                                 backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
                                 modifier = Modifier.weight(bottom.punctuation)
-                            ) else PunctuationKey(rightPunctuation, "qwerty-period-key")
+                            ) else PunctuationKey(rightPunctuation, "qwerty-period-key", rightSplit)
                         }
 
                         // 中/英切换 + 回车（硬编码 + 配置驱动）

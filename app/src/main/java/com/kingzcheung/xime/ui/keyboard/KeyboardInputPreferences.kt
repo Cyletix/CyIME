@@ -80,6 +80,8 @@ data class KeyboardInputPreferences(
     /** 空格左侧逗号键、右侧句号键。 */
     val qwertyCommaKey: Boolean = true,
     val qwertyPeriodKey: Boolean = true,
+    /** 逗号键分词（默认关）：空格旁的标点键左下角放 '，打拼音时它和字母键角标里的 ' 都是分词，见 [syllableSplitActive]。 */
+    val syllableSplitKey: Boolean = false,
     /** 各固定栏按位置保存的符号（每行一个位置）；未设置的沿用旧的共用列表。 */
     val sideSymbols: Map<String, String> = emptyMap(),
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
@@ -233,6 +235,7 @@ data class KeyboardInputPreferences(
                 // 句号键 10-19 起默认开。旧键会被 save() 连同其他设置一起写成旧默认 false，
                 // 分不出是不是用户自己关的，所以只认新键；没有新键就是默认开。
                 qwertyPeriodKey = prefs.getBoolean("qwerty_period_key_v2", true),
+                syllableSplitKey = prefs.getBoolean("syllable_split_key", false),
                 sideSymbols = SideSymbolTarget.entries.mapNotNull { target ->
                     prefs.getString(target.prefKey, null)?.let { target.key to it }
                 }.toMap(),
@@ -337,6 +340,7 @@ data class KeyboardInputPreferences(
             .putFloat("qwerty_stagger_custom", qwertyStaggerCustom.coerceIn(0f, 1f))
             .putBoolean("qwerty_comma_key", qwertyCommaKey)
             .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)
+            .putBoolean("syllable_split_key", syllableSplitKey)
             .putBoolean("qwerty_period_key", qwertyPeriodKey).apply()
     }
 

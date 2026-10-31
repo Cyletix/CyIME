@@ -1,7 +1,10 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.settings.InputProfiles
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QwertyRowOptionsTest {
@@ -51,5 +54,38 @@ class QwertyRowOptionsTest {
         val (left, right) = SplitKeyboardGeometry.spaceSplit(b, b.space + b.punctuation, b.mode * 2f)
         assertEquals(5f, b.mode * 2f + left, 0.0001f)
         assertEquals(b.space + b.punctuation, left + right, 0.0001f)
+    }
+
+    @Test fun syllableSplitOnlyForChinesePinyinWhenSwitchedOn() {
+        val pinyin = InputProfiles.describe("rime_ice")
+        // 默认关：任何布局都和以前一样。
+        assertFalse(syllableSplitActive(false, ascii = false, profile = pinyin))
+        assertTrue(syllableSplitActive(true, ascii = false, profile = pinyin))
+        // 14 键全拼、双拼 26/14 键同样有拼音音节。
+        for (id in listOf("pinyin_14jian", "double_pinyin_flypy", "double_pinyin_flypy_14jian"))
+            assertTrue(id, syllableSplitActive(true, ascii = false, profile = InputProfiles.describe(id)))
+        // 英文状态、注音、仓颉、日文没有拼音音节：反例，开关开着也不加。
+        assertFalse(syllableSplitActive(true, ascii = true, profile = pinyin))
+        for (id in listOf("cyime_zhuyin", "cyime_cangjie", "japanese"))
+            assertFalse(id, syllableSplitActive(true, ascii = false, profile = InputProfiles.describe(id)))
+    }
+
+    @Test fun syllableSplitSitsOnTheCommaKeyOrTheOnlyPunctuationKey() {
+        val (comma, period) = spacePunctuationKeys(comma = true, period = true, fullWidth = true)
+        assertEquals(true to false, syllableSplitOnPunctuation(true, comma, period))
+        // 只开逗号键：仍在逗号键上；只开句号键：挪到句号键；两个都关：没有。
+        val commaOnly = spacePunctuationKeys(comma = true, period = false, fullWidth = true)
+        assertEquals(true to false, syllableSplitOnPunctuation(true, commaOnly.first, commaOnly.second))
+        val periodOnly = spacePunctuationKeys(comma = false, period = true, fullWidth = true)
+        assertEquals(false to true, syllableSplitOnPunctuation(true, periodOnly.first, periodOnly.second))
+        assertEquals(false to false, syllableSplitOnPunctuation(true, null, null))
+        assertEquals(false to false, syllableSplitOnPunctuation(false, comma, period))
+    }
+
+    @Test fun onlyTheApostropheCornerBecomesTheSeparator() {
+        assertTrue(cornerTypesSeparator(true, "'"))
+        // 其他角标照旧当符号上屏；开关关着时 ' 也照旧。
+        for (symbol in listOf("’", "\"", ",", "-", "=")) assertFalse(symbol, cornerTypesSeparator(true, symbol))
+        assertFalse(cornerTypesSeparator(false, "'"))
     }
 }
