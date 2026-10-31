@@ -178,6 +178,21 @@ internal enum class ResizeHandle {
 internal const val RESIZE_EDGE_HIT_DP = 26f
 internal const val RESIZE_CORNER_HIT_DP = 36f
 
+/** 固定键盘底边把手离系统底部手势区上沿至少留这么高（dp）。 */
+internal const val BOTTOM_HANDLE_GESTURE_CLEARANCE_DP = 12f
+
+/**
+ * 固定键盘底边（底部留白）把手的 y，和 [frame] 同一坐标。
+ * 手势导航时键盘底边贴着或落进系统底部手势区，按住把手往上拖会被系统当成回桌面（10-31 vivo 用户反馈）；
+ * 这时把手抬到手势区上沿之上 [clearancePx]，最多抬卡片高度的四分之一。[gestureZoneTopPx] 为 null
+ * （三键导航、读不到）或底边离手势区够远时就在底边，和原来一样。
+ */
+internal fun fixedBottomHandleY(frame: ResizeRect, gestureZoneTopPx: Float?, clearancePx: Float): Float {
+    val safe = (gestureZoneTopPx ?: return frame.bottom) - clearancePx
+    if (frame.bottom <= safe) return frame.bottom
+    return safe.coerceIn(frame.bottom - frame.height / 4f, frame.bottom)
+}
+
 /**
  * 调节框样式（dp），照用户给的设计图：一圈细线像选框一样框住键盘，四角是 L 形括号，
  * 四边中点是短条，括号和短条都骑在线上，外沿与键盘外沿齐平。
@@ -222,6 +237,8 @@ internal const val RESIZE_HANDLE_ACTIVE_SCALE = 1.25f
 internal fun resizeHandleAt(
     frame: ResizeRect, point: Offset, hitPx: Float, floating: Boolean,
     cornerHitPx: Float = hitPx,
+    /** 固定键盘底边把手的 y；抬离系统手势区时（[fixedBottomHandleY]）从把手往上 [hitPx] 起就算底边。 */
+    bottomHandleY: Float = frame.bottom,
 ): ResizeHandle {
     // Corners take priority over sides and movement. Cap inward reach on tiny windows
     // so the four targets cannot swallow the middle of an edge or the whole card.
@@ -240,7 +257,7 @@ internal fun resizeHandleAt(
     if (point.x < frame.left - hitPx || point.x > frame.right + hitPx) return ResizeHandle.NONE
     if (point.y < frame.top - hitPx || point.y > frame.bottom + hitPx) return ResizeHandle.NONE
     val top = point.y < frame.top + hitPx
-    val bottom = point.y > frame.bottom - hitPx
+    val bottom = point.y > minOf(frame.bottom, bottomHandleY) - hitPx
     val left = point.x < frame.left + hitPx
     val right = point.x > frame.right - hitPx
     return when {

@@ -335,6 +335,29 @@ class KeyboardResizeGeometryTest {
     }
 
     @Test
+    fun `固定键盘底边把手避开系统底部手势区`() {
+        // 键盘 1000x800，底边 y=2200；屏幕底 2344，手势区上沿 2200（手势区 144px），离手势区留 36px。
+        val fixed = ResizeRect(0f, 1400f, 1000f, 2200f)
+        // 三键导航 / 读不到：把手就在底边，和原来一样。
+        assertEquals(2200f, fixedBottomHandleY(fixed, null, 36f), 0.01f)
+        // 离手势区够远：不动。
+        assertEquals(2200f, fixedBottomHandleY(fixed, 2300f, 36f), 0.01f)
+        // 底边贴着或落进手势区：抬到手势区上沿之上 36px。
+        assertEquals(2164f, fixedBottomHandleY(fixed, 2200f, 36f), 0.01f)
+        assertEquals(2104f, fixedBottomHandleY(fixed, 2140f, 36f), 0.01f)
+        // 最多抬卡片高度的四分之一。
+        assertEquals(2000f, fixedBottomHandleY(fixed, 1500f, 36f), 0.01f)
+
+        // 命中跟着抬起的把手：把手往上 hit 以内按住就是调底部留白，不是左右移动。
+        val handle = fixedBottomHandleY(fixed, 2200f, 36f)
+        assertEquals(ResizeHandle.BOTTOM, resizeHandleAt(fixed, Offset(500f, handle - 20f), 28f, false, 36f, handle))
+        assertEquals(ResizeHandle.NONE, resizeHandleAt(fixed, Offset(500f, handle - 20f), 28f, false, 36f))
+        // 把手在底边时原来的命中不变。
+        assertEquals(ResizeHandle.BOTTOM, resizeHandleAt(fixed, Offset(500f, 2190f), 28f, false, 36f, 2200f))
+        assertEquals(ResizeHandle.NONE, resizeHandleAt(fixed, Offset(500f, 2150f), 28f, false, 36f, 2200f))
+    }
+
+    @Test
     fun `四角圆弧与卡片圆角同心`() {
         val card = ResizeRect(100f, 0f, 900f, 400f)
         val arcs = resizeCornerArcs(card, 16f)
