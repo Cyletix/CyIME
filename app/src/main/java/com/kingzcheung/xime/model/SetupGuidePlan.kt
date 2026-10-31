@@ -465,8 +465,8 @@ object SetupGuidePlanner {
             else "用「说完一句出字」就够了，用不到它。"
         SpeechModelCatalog.XASR -> when {
             answers.voice == VoiceUse.NEVER && !answers.caption -> "不用语音，也不用字幕。"
-            streaming -> "整句精修说完要多跑一个模型，这台${facts.device}先不用。"
-            else -> "只在边说边出字时才用到。"
+            answers.voice != VoiceUse.OFTEN -> "常用语音时才值得多下 136 MB，中文整句更准；现在先不用。"
+            else -> "整句精修说完要多跑一个模型，这台${facts.device}先不用。"
         }
         SpeechModelCatalog.ZIPFORMER -> if (answers.voice == VoiceUse.NEVER && !answers.caption) "不用语音，也不用字幕。"
             else "和「边说边出字」作用重复。"
