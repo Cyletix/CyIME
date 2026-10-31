@@ -201,7 +201,19 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
     }
 
     internal fun commitLiteralText(text: String, preserveWidth: Boolean = false, hardware: Boolean = false) {
-        if (text.isEmpty()) return
+        val submit = literalSubmission(text, preserveWidth, hardware) ?: return
+        val t9Queue = if (isT9Schema(service.uiState.value.currentSchemaId) && !service.uiState.value.isAsciiMode) {
+            service.keyboardCallbacks?.onT9RunLiteralInput
+        } else null
+        if (t9Queue != null) t9Queue(submit) else service.keyRouter.postRimeJob { submit() }
+    }
+
+    /**
+     * 上屏一个标点的那一步（含成对符号、英文自动空格、先把打着的字母原样上屏）；[commitLiteralText] 把它排进按键队列。
+     * 已经在按键队列里的命令直接调用它，保持和后面按键的先后（微软双拼没在打字时点的分号键）。
+     */
+    internal fun literalSubmission(text: String, preserveWidth: Boolean = false, hardware: Boolean = false): (suspend () -> Unit)? {
+        if (text.isEmpty()) return null
         val literal = keyboardLiteral(text, preserveWidth = preserveWidth, hardware = hardware)
         // 成对符号只管屏幕键盘；实体键盘的符号多数由引擎处理，只配一部分反而不一致。
         // 终端不认光标回退：补上的结尾会留在光标前面。
@@ -229,10 +241,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
             if (owner != service.uiState.value.inputSessionId) return@literal
             commitCompositionAndLiteral(paired, asTyped = true, caret = caret)
         }
-        val t9Queue = if (isT9Schema(service.uiState.value.currentSchemaId) && !service.uiState.value.isAsciiMode) {
-            service.keyboardCallbacks?.onT9RunLiteralInput
-        } else null
-        if (t9Queue != null) t9Queue(submit) else service.keyRouter.postRimeJob { submit() }
+        return submit
     }
 
     /** One editor transaction for prefix + literal, reused when leaving a typing panel.
