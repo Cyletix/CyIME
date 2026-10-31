@@ -2971,6 +2971,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         lastEditorIdentity = identity
         // Search belongs to the field it was opened in; another field starts without it.
         if (!sameField) closeClipboardSearch(openBoard = false)
+        // 换了输入框：上一处刚上屏的词不再跟着退格减学习。
+        if (!sameField) rimeEngine.rejectedCommit.clear()
         val detachedComposition = inlineComposition.detach()
         detachedComposition?.let { removeDetachedComposition(it, attribute, restarting, sameField) }
         englishEditorReadCapability.clear()
