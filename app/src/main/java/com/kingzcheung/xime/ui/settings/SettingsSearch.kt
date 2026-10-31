@@ -269,6 +269,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("检查更新", about, SettingsRoutes.About, "更新 升级 新版本 最新版本 下载 安装 版本号"),
         SettingsSearchEntry("自动检查更新", about, SettingsRoutes.About, "自动 更新 升级 新版本 提醒"),
         page("隐私策略", about, SettingsRoutes.Privacy, "隐私 数据 联网 收集"),
+        page("鸣谢", about, SettingsRoutes.Credits, "致谢 感谢 鸣谢 上游 Xime 雾凇 参考 来源 作者 credits"),
         page("开源许可证", about, SettingsRoutes.Licenses, "许可 开源 license 第三方"),
         page("日志查看器", about, SettingsRoutes.LogViewer, "日志 log 崩溃 错误"),
         page("存储空间", about, SettingsRoutes.StorageSpace, "存储 空间 占用 清理 缓存 容量"),
