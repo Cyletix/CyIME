@@ -56,6 +56,7 @@ import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.HighlightOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalTextStyle
@@ -238,16 +239,24 @@ fun CandidateBar(
     var showCancelButton by remember(preferences) {
         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
     }
+    var associationCancelOnRight by remember(preferences) {
+        mutableStateOf(SettingsPreferences.isAssociationCancelOnRight(context))
+    }
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON || key == null) {
                 showCancelButton = SettingsPreferences.shouldShowCandidateCancelButton(context)
+            }
+            if (key == SettingsPreferences.KEY_ASSOCIATION_CANCEL_ON_RIGHT || key == null) {
+                associationCancelOnRight = SettingsPreferences.isAssociationCancelOnRight(context)
             }
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
+    // 设置「联想时关闭键放右边」：上屏后的联想不在第一个联想词旁边放「<」，改在右边放 ⊗（同一个动作）。
+    val associationCancelRight = showCompositionCancel && associationCancelOnRight && state is CandidateBarState.AssociationOnly
     val commentsAllowed = rememberCandidateCommentsAllowed()
     // 终端里编码一律显示在候选栏（见 TerminalEditor）。
     val inputTextLocation = com.kingzcheung.xime.service.TerminalEditor.inputTextLocation(context)
@@ -431,7 +440,7 @@ fun CandidateBar(
                 .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (showCompositionCancel) {
+            if (showCompositionCancel && !associationCancelRight) {
                 KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入",
                     restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                 Spacer(Modifier.width(4.dp))
@@ -669,6 +678,15 @@ fun CandidateBar(
             if (state !is CandidateBarState.Idle) {
                 toolbarActions.filter { it.active }.forEach { action ->
                     ToolbarActionButton(action, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
+                }
+            }
+            if (associationCancelRight && !candidatePageExpanded) {
+                Spacer(Modifier.width(4.dp))
+                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
+                    modifier = Modifier.testTag("association-cancel-right"), restingFill = edgeButtonFill,
+                    slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
+                    Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
+                        tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
                 }
             }
             // 上屏后的联想（连续联想会一直接着出）不是在打字，收起按钮照样留在最右那一格；

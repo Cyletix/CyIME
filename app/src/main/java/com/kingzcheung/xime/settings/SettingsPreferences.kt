@@ -255,6 +255,7 @@ object SettingsPreferences {
     const val KEY_CANDIDATE_COMMENT_MODE = "candidate_comment_mode"
     const val KEY_CANDIDATE_COMMENT_CONTENT = "candidate_comment_content"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
+    const val KEY_ASSOCIATION_CANCEL_ON_RIGHT = "association_cancel_on_right"
     private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     private const val KEY_PAGE_SIZE = "page_size"
     private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
@@ -301,6 +302,17 @@ object SettingsPreferences {
 
     fun setShowCandidateCancelButton(context: Context, show: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_SHOW_CANDIDATE_CANCEL_BUTTON, show).apply()
+    }
+
+    /**
+     * 联想时关闭键放右边（B站反馈 10-31，别人的需求，默认关）：上屏后的联想词前面不放「<」，
+     * 改成右边一个 ⊗，点第一个联想词不会误点到关闭。打字时的「<」不变；只在取消按钮开着时有用。
+     */
+    fun isAssociationCancelOnRight(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_ASSOCIATION_CANCEL_ON_RIGHT, false)
+
+    fun setAssociationCancelOnRight(context: Context, onRight: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ASSOCIATION_CANCEL_ON_RIGHT, onRight).apply()
     }
 
     fun getInputTextLocation(context: Context): String {
