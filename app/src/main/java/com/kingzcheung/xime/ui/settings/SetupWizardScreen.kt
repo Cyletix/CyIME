@@ -96,7 +96,8 @@ fun SetupWizardScreen(
                 RimeConfigHelper.prepareAutomatically(context)
                 // 用方案文件里的名字（小鹤双拼等），和「语言与方案」页一致；读不到才退回内置名或 ID。
                 val names = SchemaManager.discoverSchemas(context).associate { it.schemaId to it.name }
-                SchemaManager.getEnabledSchemas(context).map { id ->
+                // 双拼的 14 键版本是组合配置（双拼 × 14 键），不单独列一项。
+                SchemaManager.getEnabledSchemas(context).filterNot(com.kingzcheung.xime.settings.CyimeInputDefaults::isCompanion).map { id ->
                     names[id] ?: DoublePinyinScheme.BUILTINS.firstOrNull { it.id == id }?.name ?: ChineseSchemas.displayName(id, id)
                 }
             }

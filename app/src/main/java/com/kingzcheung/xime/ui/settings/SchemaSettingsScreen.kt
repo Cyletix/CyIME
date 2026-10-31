@@ -314,7 +314,7 @@ fun SchemaSettingsContent(
                 }
 
                 val disabledSchemas = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas &&
-                    (showExtraSchemas || it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended) }
+                    (showExtraSchemas || it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.listedWhenOff) }
                 item {
                     TextButton(onClick = { showExtraSchemas = !showExtraSchemas }) {
                         Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）")

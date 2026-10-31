@@ -19,6 +19,16 @@ class CyimeInputDefaultsTest {
         assertEquals(listOf("rime_ice", "t9_pinyin"), CyimeInputDefaults.recommended)
         assertFalse(CyimeInputDefaults.recommended.any { it in CyimeInputDefaults.dependencies })
     }
+    @Test fun freshInstallAlsoShowsFourteenKeysButUpgradesKeepTheirList() {
+        assertEquals(listOf("rime_ice", "t9_pinyin", "pinyin_14jian"), CyimeInputDefaults.firstDefaults(freshInstall = true))
+        assertEquals(CyimeInputDefaults.recommended, CyimeInputDefaults.firstDefaults(freshInstall = false))
+        // 关着的 14 键在「已安装的方案」里直接列出，不藏进高级。
+        assertTrue("pinyin_14jian" in CyimeInputDefaults.listedWhenOff)
+        // 新装：14 键和双拼都开着时，各双拼的 14 键版本跟着出现（组合配置），不单独占一项。
+        val available = setOf("rime_ice", "t9_pinyin", "pinyin_14jian", "double_pinyin_flypy", "double_pinyin_flypy_14jian")
+        assertEquals(listOf("rime_ice", "double_pinyin_flypy", "t9_pinyin", "pinyin_14jian", "double_pinyin_flypy_14jian"),
+            CyimeInputDefaults.withCompanions(listOf("rime_ice", "double_pinyin_flypy", "t9_pinyin", "pinyin_14jian"), available))
+    }
     @Test fun builtinDoublePinyinGoesRightAfterFullPinyinWithoutMovingOtherChoices() {
         val dp = CyimeInputDefaults.doublePinyin
         assertEquals(listOf("double_pinyin_flypy", "double_pinyin_shoudao", "double_pinyin_ziranma",

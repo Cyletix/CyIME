@@ -3,6 +3,18 @@ package com.kingzcheung.xime.settings
 /** 面向用户的是布局；词典依赖继续安装/编译，但不重复占用语言菜单。 */
 object CyimeInputDefaults {
     val recommended = listOf("rime_ice", "t9_pinyin")
+
+    /**
+     * 只在新装时多打开的布局（用户 10-31：好多人问支不支持 14 键，其实一直有，只是藏在「其他已安装方案」里）：
+     * 新装的人布局栏里就有 14 键。升级的人方案栏不变，不改原有习惯。
+     */
+    val freshInstallExtras = listOf("pinyin_14jian")
+
+    /** 第一次整理默认方案时要打开的：新装多开 [freshInstallExtras]。 */
+    fun firstDefaults(freshInstall: Boolean): List<String> = recommended + if (freshInstall) freshInstallExtras else emptyList()
+
+    /** 「已安装的方案」里关着也直接列出、不收进「其他已安装方案（高级）」的。 */
+    val listedWhenOff: List<String> get() = recommended + freshInstallExtras
     val legacyDefaults = setOf("wubi86", "wubi86_pinyin", "wubi86_trad", "wubi86_trad_pinyin")
     val dependencies = setOf("cyime_t9_english", "cyime_k14_english", "melt_eng", "radical_pinyin", "numbers", "handwriting")
 

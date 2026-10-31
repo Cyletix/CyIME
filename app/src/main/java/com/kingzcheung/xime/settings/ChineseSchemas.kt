@@ -158,7 +158,7 @@ object ChineseSchemas {
             return repaired
         }
         val updated = CyimeInputDefaults.withCompanions((normalized.filterNot { it in CyimeInputDefaults.legacyDefaults } +
-            CyimeInputDefaults.recommended.filter { it in available }).distinct(), available)
+            CyimeInputDefaults.firstDefaults(isFreshInstall(context)).filter { it in available }).distinct(), available)
         if (updated != enabled) SchemaManager.setEnabledSchemas(context, updated)
         val current = SettingsPreferences.getCurrentSchema(context)
         val selected = CyimeInputDefaults.canonicalIds(listOf(current), available).firstOrNull()
@@ -167,6 +167,12 @@ object ChineseSchemas {
         prefs.edit().putBoolean(ADDED, true).apply()
         return updated
     }
+
+    /** 装上以后没更新过：首次安装时间等于最后更新时间。升级（覆盖安装）的人这两个时间不同。 */
+    private fun isFreshInstall(context: Context): Boolean = runCatching {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        info.firstInstallTime == info.lastUpdateTime
+    }.getOrDefault(false)
 
     fun displayName(id: String, original: String): String = CustomKeyboardLayouts.find(id)?.name ?: when (id) {
         "rime_ice" -> "中文26键"
