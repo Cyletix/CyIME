@@ -2,6 +2,7 @@ package com.kingzcheung.xime.service
 
 import android.view.inputmethod.InputConnection
 import org.junit.Assert.*
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.mockito.kotlin.*
 
@@ -11,8 +12,13 @@ class DocumentClearTest {
     private class Field(var text: String, var start: Int, var end: Int = start) {
         val connection = mock<InputConnection>()
         init {
-            whenever(connection.getTextBeforeCursor(any(), any())).thenAnswer { text.substring(0, start) }
-            whenever(connection.getTextAfterCursor(any(), any())).thenAnswer { text.substring(end) }
+            // 和真实输入框一样，一次最多给 n 个字。
+            whenever(connection.getTextBeforeCursor(any(), any())).thenAnswer {
+                text.substring(maxOf(0, start - it.getArgument<Int>(0)), start)
+            }
+            whenever(connection.getTextAfterCursor(any(), any())).thenAnswer {
+                text.substring(end, minOf(text.length, end + it.getArgument<Int>(0)))
+            }
             whenever(connection.getSelectedText(any())).thenAnswer { text.substring(start, end).ifEmpty { null } }
             whenever(connection.commitText(any(), any())).thenAnswer {
                 val inserted = it.getArgument<CharSequence>(0).toString()
@@ -30,8 +36,56 @@ class DocumentClearTest {
         }
     }
 
-    private fun clear(field: Field): ClearedDocument? =
-        field.connection.readDocumentForClear(100)?.let { field.connection.clearDocument(it, 100) }
+    private fun clear(field: Field, undoLimit: Int = CLEAR_UNDO_LIMIT, stillCurrent: () -> Boolean = { true }) =
+        runBlocking {
+            field.connection.readDocumentForClear(100)
+                ?.let { field.connection.clearDocument(it, 100, undoLimit, stillCurrent) }
+        }
+
+    /** 2026-10-31：超过一次能读到的长度（真机 262144 字，这里 100）也要一次清完，撤回原样放回。 */
+    @Test fun clearsTextLongerThanOneReadInOnePress() {
+        val long = (0 until 1234).joinToString("") { "${'a' + it % 26}" } + "😀" + "尾".repeat(321)
+        for (caret in listOf(0, 1, 99, 100, 101, 617, long.length - 1, long.length)) {
+            val field = Field(long, caret)
+            val cleared = clear(field)!!
+            assertEquals("caret $caret", "", field.text)
+            assertEquals(long, cleared.text)
+            assertEquals("", cleared.remainingBefore); assertEquals("", cleared.remainingAfter)
+            assertTrue(field.connection.restoreDocument(cleared, 100))
+            assertEquals(long, field.text)
+            assertEquals(caret, field.start); assertEquals(caret, field.end)
+        }
+    }
+
+    @Test fun clearsALongSelectionWithLongTextAround() {
+        val long = "x".repeat(450) + "选中的".repeat(10) + "y".repeat(380)
+        val field = Field(long, 450, 480)
+        val cleared = clear(field)!!
+        assertEquals("", field.text)
+        assertTrue(field.connection.restoreDocument(cleared, 100))
+        assertEquals(long, field.text)
+        assertEquals(450, field.start); assertEquals(480, field.end)
+    }
+
+    @Test fun hugeTextIsClearedButNotKeptForUndo() {
+        val field = Field("z".repeat(1000), 500)
+        assertNull(clear(field, undoLimit = 300))
+        assertEquals("", field.text)
+    }
+
+    @Test fun stopsWhenTheFieldIsNoLongerCurrent() {
+        val field = Field("w".repeat(1000), 500)
+        val cleared = clear(field, stillCurrent = { false })!!
+        assertEquals(800, field.text.length)
+        assertEquals(200, cleared.text.length)
+    }
+
+    @Test fun anEditorThatIgnoresDeletesDoesNotLoopForever() {
+        val field = Field("v".repeat(1000), 500)
+        whenever(field.connection.deleteSurroundingText(any(), any())).thenReturn(true)
+        clear(field)
+        verify(field.connection, times(MAX_CLEAR_ROUNDS)).deleteSurroundingText(any(), any())
+    }
 
     @Test fun clearsTextOnBothSidesOfTheCursor() {
         val field = Field("abcdef", 3)
