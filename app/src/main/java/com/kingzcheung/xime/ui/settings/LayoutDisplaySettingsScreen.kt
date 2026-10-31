@@ -149,6 +149,12 @@ private fun LayoutDisplayPage(
                         "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
                         checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    val rightG = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitRightG
+                    SettingsToggleItem(Icons.TwoTone.Keyboard, "右半边也放 G 键",
+                        "26 键分体时，右半 h j k l 那排开头再加一个 G，这一排向右对齐到 p 下面，两只手都能按 G。只改分体键盘，14 键和不分体的键盘不变。",
+                        checked = rightG, onCheckedChange = { SettingsPreferences.setSplitRightGEnabled(context, it) },
+                        lockMessage = if (split) null else "打开上面的「分体键盘」后可用")
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val filled = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().fillBlankAreas
                     SettingsToggleItem(Icons.TwoTone.FormatColorFill, "填满留空处",
                         "分体中缝和固定键盘两侧的空白用键盘背景铺满，遮住后面的应用；关闭时镂空，透出后面的内容。",

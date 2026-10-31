@@ -118,6 +118,28 @@ internal object SplitKeyboardGeometry {
         }
     }
 
+    /**
+     * 分体「右半边也放 G」（设置，默认关）：中排是 a s d f g | h j k l 时，右半开头再放一个 G，
+     * 右半五键贴到行尾，与上一排 y u i o p 上下对齐；左半不动，缝的右边与其他行一致，中缝不变。
+     * 只认 26 键这一种中排（九个单字母键、左五右四、第五个是 g）：14 键、注音、自定义十键中排、不分体一律原样。
+     * 缝窄到放不下一个键时也原样。尺寸都是 dp 数值。
+     */
+    fun homeRowWithRightG(
+        keys: List<String>,
+        splitAt: Int,
+        enabled: Boolean,
+        gap: Float,
+        endInset: Float,
+        unitWidth: Float,
+    ): SplitHomeRow {
+        val plain = SplitHomeRow(keys, -1, gap, endInset)
+        if (!enabled || splitAt != 5 || keys.size != 9 || keys.any { it.length != 1 } ||
+            !keys[4].equals("g", ignoreCase = true)) return plain
+        val narrowed = gap + endInset - unitWidth
+        if (!narrowed.isFinite() || narrowed < 0f) return plain
+        return SplitHomeRow(keys.take(splitAt) + keys[4] + keys.drop(splitAt), splitAt, narrowed, 0f)
+    }
+
     /** 底排在空格键内部分开：左侧空格补足到中线，其余归右侧。[leftFixed] 是空格左边各键的总宽。 */
     fun spaceSplit(
         bottom: QwertyBottomRowWeights,
@@ -128,6 +150,9 @@ internal object SplitKeyboardGeometry {
         return left to space - left
     }
 }
+
+/** 中排实际排出的键：[keys] 含补上的 G，[mirrorIndex] 是它的位置（-1 没补），[gap]、[endInset] 为这一行的缝宽和行尾留白（dp）。 */
+internal data class SplitHomeRow(val keys: List<String>, val mirrorIndex: Int, val gap: Float, val endInset: Float)
 
 /**
  * 分体中缝的实际位置（窗口像素坐标），由每行的缝占位上报。

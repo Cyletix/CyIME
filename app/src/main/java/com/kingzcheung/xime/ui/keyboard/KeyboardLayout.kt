@@ -221,6 +221,9 @@ fun KeyboardLayout(
     val splitAt1 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow1,
         splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f), splitWeighted) else -1
     val splitAt2 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow2, letterSideKeyWeight, splitWeighted) else -1
+    // 「右半边也放 G 键」只在 26 键分体时生效；14 键、注音、蜂窝和不分体的键盘不受影响。
+    val splitRightG = splitKeyboard && !fourteenKey && !zhuyin && !honeycomb &&
+        LocalKeyboardInputPreferences.current.splitRightG
     val isShifted = shiftMode.isShifted
 
     val context = LocalContext.current
@@ -531,10 +534,11 @@ fun KeyboardLayout(
 
                     // 第二行
                     if (isVoiceMode && !isVoiceSticky) {
+                        // 右半补 G 时行尾留白交给这一行自己算（右半贴到行尾），与正常按键行一致。
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(start = standardRowInset ?: 16.dp, end = standardRowEndInset ?: 16.dp)
+                                .padding(start = standardRowInset ?: 16.dp, end = if (splitRightG) 0.dp else standardRowEndInset ?: 16.dp)
                         ) {
                             DummyKeyboardRow(
                                 keys = renderRows.getOrNull(1).orEmpty(),
@@ -542,6 +546,7 @@ fun KeyboardLayout(
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
                                 keyboardBackgroundColor = keyboardBackgroundColor,
                                 splitAt = splitAt1, splitGap = splitGapDp, splitRow = 1,
+                                splitRightG = splitRightG, endInset = standardRowEndInset ?: 16.dp,
                             )
                         }
                     } else {
@@ -579,6 +584,7 @@ fun KeyboardLayout(
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
                                 splitAt = splitAt1, splitGap = splitGapDp, splitRow = 1,
+                                splitRightG = splitRightG,
                             )
                         }
                     }
@@ -1221,19 +1227,41 @@ private fun DummyKeyboardRow(
     splitAt: Int = -1,
     splitGap: Dp = 0.dp,
     splitRow: Int = 0,
+    /** 分体中排右半补 G（同 [KeyboardRowWithConfig]）；为 true 时行尾留白 [endInset] 由这里计算，外层不再留。 */
+    splitRightG: Boolean = false,
+    endInset: Dp = 0.dp,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth(),
-    ) {
-        keys.forEachIndexed { index, key ->
-            if (index == splitAt) SplitGapSpacer(splitRow, splitGap)
-            DummyKeyButton(
-                backgroundColor = keyBackgroundColor,
-                modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
-            )
+    if (!splitRightG) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth(),
+        ) {
+            keys.forEachIndexed { index, key ->
+                if (index == splitAt) SplitGapSpacer(splitRow, splitGap)
+                DummyKeyButton(
+                    backgroundColor = keyBackgroundColor,
+                    modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
+                )
+            }
+            if (splitAt == keys.size) SplitGapSpacer(splitRow, splitGap)
         }
-        if (splitAt == keys.size) SplitGapSpacer(splitRow, splitGap)
+        return
+    }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val gap = if (splitAt in 0..keys.size) splitGap.coerceAtMost(maxWidth) else 0.dp
+        val unitWidth = (maxWidth - endInset - gap) / keys.size.coerceAtLeast(1)
+        val homeRow = SplitKeyboardGeometry.homeRowWithRightG(keys, splitAt, !weightedLetters,
+            gap.value, endInset.value, unitWidth.value)
+        Row(Modifier.fillMaxWidth().padding(end = homeRow.endInset.dp)) {
+            homeRow.keys.forEachIndexed { index, key ->
+                if (index == splitAt) SplitGapSpacer(splitRow, homeRow.gap.dp)
+                DummyKeyButton(
+                    backgroundColor = keyBackgroundColor,
+                    modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
+                )
+            }
+            if (splitAt == homeRow.keys.size) SplitGapSpacer(splitRow, homeRow.gap.dp)
+        }
     }
 }
 
@@ -1321,6 +1349,8 @@ fun KeyboardRowWithConfig(
     splitAt: Int = -1,
     splitGap: Dp = 0.dp,
     splitRow: Int = 0,
+    /** 分体中排右半开头再放一个 G（设置「右半边也放 G 键」），见 [SplitKeyboardGeometry.homeRowWithRightG]。 */
+    splitRightG: Boolean = false,
 ) {
     val customLayout = LocalCustomLayout.current
     // 14 键合并键与自定义布局一样按字母数占位，和 26 键同一网格对齐。
@@ -1331,11 +1361,18 @@ fun KeyboardRowWithConfig(
     val endInset = edgeEndInset.coerceAtMost(maxWidth / 4)
     val gap = if (splitAt in 0..keys.size) splitGap.coerceAtMost(maxWidth) else 0.dp
     val unitWidth = (maxWidth - startInset - endInset - gap) / totalWeight
+    // 没打开或不适用时原样返回：键、缝宽、行尾留白都不变。
+    val homeRow = SplitKeyboardGeometry.homeRowWithRightG(keys, splitAt, splitRightG && !weighted,
+        gap.value, endInset.value, unitWidth.value)
+    val rowKeys = homeRow.keys
+    val rowGap = homeRow.gap.dp
+    val rowEndInset = homeRow.endInset.dp
+    val letterGeometry = LocalLetterGeometry.current
     Row(
         modifier = Modifier.fillMaxWidth(),
     ) {
-        keys.forEachIndexed { index, key ->
-            if (index == splitAt) SplitGapSpacer(splitRow, gap)
+        rowKeys.forEachIndexed { index, key ->
+            if (index == splitAt) SplitGapSpacer(splitRow, rowGap)
             val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
             val swipeUpText = if (swipeUpHintsEnabled) rawSwipeUpLabel else null
             val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
@@ -1401,6 +1438,8 @@ fun KeyboardRowWithConfig(
                 Unit
             } }
 
+            // 补上的 G 不登记字母位置：滑行与邻键纠错仍只认左半那个 G。
+            CompositionLocalProvider(LocalLetterGeometry provides if (index == homeRow.mirrorIndex) null else letterGeometry) {
             SwipeableKeyButton(
                 layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
                 followSymbolSwipeDirection = true,
@@ -1411,11 +1450,11 @@ fun KeyboardRowWithConfig(
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
                 modifier = Modifier.weight((unitWidth * (if (weighted) key.length else 1) +
-                    (if (index == 0) startInset else 0.dp) + (if (index == keys.lastIndex) endInset else 0.dp)).value.coerceAtLeast(1f))
-                    .testTag("qwerty-key:$key"),
+                    (if (index == 0) startInset else 0.dp) + (if (index == rowKeys.lastIndex) rowEndInset else 0.dp)).value.coerceAtLeast(1f))
+                    .testTag(if (index == homeRow.mirrorIndex) "qwerty-key-right:$key" else "qwerty-key:$key"),
                 edgeContentPadding = PaddingValues(
                     start = if (index == 0) startInset else 0.dp,
-                    end = if (index == keys.lastIndex && !extendLastKeyToEdge) endInset else 0.dp,
+                    end = if (index == rowKeys.lastIndex && !extendLastKeyToEdge) rowEndInset else 0.dp,
                 ),
                 swipeText = swipeUpText,
                 symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
@@ -1443,8 +1482,9 @@ fun KeyboardRowWithConfig(
                 shadowElevation = config.shadowElevation,
                 shadowShapeRadius = config.shadowShapeRadius,
             )
+            }
         }
-        if (splitAt == keys.size) SplitGapSpacer(splitRow, gap)
+        if (splitAt == rowKeys.size) SplitGapSpacer(splitRow, rowGap)
     }
     }
 }
