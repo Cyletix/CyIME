@@ -35,6 +35,7 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayout
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardExplicitWidth
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.legibleForTheme
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.LocalKeyboardPalette
 import com.kingzcheung.xime.ui.theme.keyboardBackground
