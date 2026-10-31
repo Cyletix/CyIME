@@ -26,7 +26,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 
 /** Five choices stay at fixed positions above the key; only the selected choice changes. */
 @Composable
@@ -57,9 +56,8 @@ internal fun DirectionDiscPreview(labels: Map<KanaFlickDirection, String>, direc
             )
         }
     }
-    Popup(popupPositionProvider = position,
-        properties = PopupProperties(focusable = false, dismissOnBackPress = false,
-            dismissOnClickOutside = false, clippingEnabled = false)) {
+    // 方向盘悬在上一排键上：只显示不接触摸，另一只手快速点上一排的键不被它吃掉。
+    Popup(popupPositionProvider = position, properties = DisplayOnlyPopupProperties) {
         Box(Modifier.size((112f * scale).dp).testTag("$tagPrefix-flick-preview")
             .semantics { stateDescription = labels[direction] ?: "无字符" }, contentAlignment = Alignment.Center) {
             Box(Modifier.size((100f * scale).dp).testTag("$tagPrefix-preview-bubble")
