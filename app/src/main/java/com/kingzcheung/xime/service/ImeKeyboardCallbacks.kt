@@ -83,7 +83,9 @@ internal fun rememberImeKeyboardCallbacks(
                 if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke(key) != true) {
                     val numberPanel = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
                     val separator = key == "'" && service.candidateState.value.isComposing && !service.uiState.value.isAsciiMode
-                    if (!numberPanel && !separator && isLiteralPunctuation(key)) {
+                    // 微软双拼的 ing 在分号上：分号键交给按键队列，打字中送进 Rime 组码，没在打字时照旧按标点上屏（见 ImeKeyRouter）。
+                    val semicolonCode = key == ";" && service.keyRouter.semicolonIsCode()
+                    if (!numberPanel && !separator && !semicolonCode && isLiteralPunctuation(key)) {
                         service.textCommit.commitLiteralText(key)
                     } else {
                         val mergedKey = com.kingzcheung.xime.rime.MergedLetterInput.isGroup(key,

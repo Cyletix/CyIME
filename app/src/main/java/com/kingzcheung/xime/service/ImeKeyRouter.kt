@@ -426,6 +426,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         code.forEach { handleKeyPress(it.toString(), false) }
     }
 
+    /** 当前方案把分号当编码键：微软双拼的 ing，或自建双拼把某个韵母放在分号上（[DoublePinyinScheme.usesSemicolon]）。 */
+    internal fun semicolonIsCode(): Boolean = service.uiState.value.let {
+        !it.isAsciiMode && com.kingzcheung.xime.settings.DoublePinyinSchemes.find(it.currentSchemaId)?.usesSemicolon == true
+    }
+
     internal fun handleKeyPress(key: String, isShifted: Boolean, hardwarePageDirection: Int = 0,
         languageSwitchMode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null,
         hardwareEvent: KeyEvent? = null, mergedKey: Boolean = false) {
@@ -540,7 +545,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (key.length == 1) {
                         val isLetter = key.matches(Regex("[a-zA-Z]"))
                         val isChineseMode = !service.uiState.value.isAsciiMode
-                        if (isLetter && isChineseMode) {
+                        // 微软双拼的分号：打字中和字母一样进 Rime（ing），没在打字时照旧按标点上屏。
+                        val semicolonCode = key == ";" && semicolonIsCode()
+                        if (semicolonCode && !hasComposing && hardwareEvent == null) {
+                            service.textCommit.commitLiteralText(key)
+                            return
+                        }
+                        if ((isLetter || semicolonCode && hasComposing) && isChineseMode) {
                             // 中文模式：字母进 Rime 拼音组合，候选栏选词后经 commitText 重定向进面板输入框
                             val keyCode = if (mergedKey) service.rimeEngine.mergedLetterKeyCode(key[0]) else key.lowercase()[0].code
                             val result = service.rimeEngine.processKeyAndGetResult(keyCode, 0)
@@ -608,6 +619,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command
             if (usesDirectFieldInput && routeDirectFieldKey(key, isShifted, hardwareEvent)) return@command
+            // 分号是编码键的方案（微软双拼）：没在打字时点屏幕上的分号键仍按标点上屏，和以前一样；打字中往下送进 Rime 组成 ing。
+            if (hardwareEvent == null && key == ";" && semicolonIsCode() && service.t9PartialSegments.isEmpty() &&
+                service.rimeEngine.readQueuedComposition()?.input.isNullOrEmpty()) {
+                service.textCommit.literalSubmission(key)?.invoke()
+                return@command
+            }
             if (englishAutoSpace.isArmed && consumeEnglishAutoSpace(key)) return@command
             if (hardwareEvent != null) {
                 // Idle Tab belongs to the editor: single-line fields move focus (Shift+Tab backwards),
@@ -647,7 +664,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
                 // 打拼音时不按 Shift 的 ; / \ 等：先把字母原样上屏（不上屏首选，Gboard 规则，用户 2026-10-24），
                 // 再按空闲时的标点规则出符号。翻页键另有入口，拼音分隔符 ' 照旧。
-                if (hardwarePageDirection == 0 && key.length == 1 && key != "'" && isLiteralPunctuation(key) &&
+                // 分号是编码键的方案（微软双拼）分号照样送进 Rime：打字中是 ing，没在打字时由 Rime 出标点。
+                if (hardwarePageDirection == 0 && key.length == 1 && key != "'" && !(key == ";" && semicolonIsCode()) &&
+                    isLiteralPunctuation(key) &&
                     !service.uiState.value.isAsciiMode &&
                     service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
                     (service.rimeEngine.readQueuedComposition()?.input?.isNotEmpty() == true ||
