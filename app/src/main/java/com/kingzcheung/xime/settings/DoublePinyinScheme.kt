@@ -68,6 +68,16 @@ data class DoublePinyinScheme(
     }
 
     /**
+     * 手动分词 '（Shift 键分词、逗号键分词）：双拼两键一字，' 只在单个键后面才有用。
+     * a'、o'、e' 是这个零声母字本身（a've 出啊这），其他单个键加 ' 是这个键开头的字（v'vs 出这种，同全拼的简拼）。
+     * 拼写里带着 '，只有真打了 ' 才对得上；不打 ' 的输入一个拼写也不多，选词不变。
+     * 雾凇的双拼方案特意关着简拼（不打 ' 时 kjx 会被拆成 k'jx），所以只放在 ' 后面。
+     * 加在本方案的拼写规则之后，作用在已经换好的双拼编码上；内置小鹤双拼在打包时加同样几条（tasks-chinese.gradle.kts）。
+     */
+    fun separatorRules(): List<String> =
+        listOf("a", "o", "e").map { "derive/^${zero.getValue(it)}$/$it'/" } + "abbrev/^(.).+$/\$1'/"
+
+    /**
      * 编码显示：按两个字母一组换回拼音（同码多音节时显示较常用的那个）；
      * 结果先写成带圈小写字母，避免被后面的规则再次匹配。
      */
@@ -108,7 +118,7 @@ data class DoublePinyinScheme(
                 "  description: |\n    CyIME 双拼方案（由键位表生成），词库、符号与按键排列和小鹤双拼相同。\n")
         check(schemaBlock.contains("  schema_id: $id\n")) { "小鹤双拼方案缺少 schema_id" }
         text = text.replaceRange(header.range, schemaBlock)
-        text = replaceList(text, "speller", "algebra", algebra())
+        text = replaceList(text, "speller", "algebra", algebra() + separatorRules())
         if (usesSemicolon) {
             // 分号只进字母表、不进 initials：没在打字时按分号仍是标点。
             val alphabet = Regex("(?m)^(  alphabet: )(\"?)([^\\s#\"]+)(\"?)").find(text) ?: error("小鹤双拼方案缺少 alphabet")

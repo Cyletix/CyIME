@@ -129,17 +129,19 @@ class DoublePinyinSchemeTest {
         assertTrue(text.contains("  user_dict: en_dicts/cn_en_${custom.id}\n"))
         assertTrue(text.contains("  dictionary: rime_ice\n"))
         assertTrue(text.contains("  # dictionary_exclude: []\n"))
-        assertFalse(text.contains("xform/iu${'$'}/Ⓠ/") || text.contains("abbrev") || text.contains("(\\w)g"))
+        assertFalse(text.contains("xform/iu${'$'}/Ⓠ/") || text.contains("# - abbrev") || text.contains("(\\w)g"))
         val algebra = text.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
-        assertEquals(custom.algebra().size, algebra.size)
+        assertEquals(custom.algebra().size + custom.separatorRules().size, algebra.size)
+        assertEquals("    - \"abbrev/^(.).+${'$'}/${'$'}1'/\"", algebra.last())
         assertEquals("    - \"xform/(?<=[A-Z])\\\\s(?=[A-Z])//\"", text.substringAfter("  preedit_format:\n")
             .lines().takeWhile { it.startsWith("    - ") }.last())
     }
 
-    /** 带 derive 的拼写运算：derive 保留原拼写并加上改写后的拼写。 */
+    /** 带 derive 的拼写运算：derive（和 abbrev）保留原拼写并加上改写后的拼写；没匹配上的不算新拼写。 */
     private fun spellings(rules: List<String>, input: String): Set<String> = rules.fold(setOf(input)) { set, rule ->
         val parts = rule.split('/')
-        if (parts[0] == "derive") set + set.map { Regex(parts[1]).replace(it, parts[2]) }
+        if (parts[0] == "derive" || parts[0] == "abbrev")
+            set + set.filter { Regex(parts[1]).containsMatchIn(it) }.map { Regex(parts[1]).replace(it, parts[2]) }
         else set.map { apply(listOf(rule), it) }.filter { it.isNotEmpty() }.toSet()
     }
 
@@ -221,6 +223,32 @@ class DoublePinyinSchemeTest {
         // 键位表上的编码内置规则都能打（内置的另外多出 jv、ew 这类写法）。
         for (syllable in DoublePinyinScheme.SYLLABLES)
             assertTrue(syllable, DoublePinyinScheme.FLYPY.code(syllable) in spellings(shippedFlypy, syllable))
+    }
+
+    /**
+     * 反馈 10-31（1.15.24）：双拼开了 Shift 键分词，a've 出的是 ave 不是啊这。双拼两键一字，单个键加 ' 以前没有拼写对得上。
+     * a' o' e' 是零声母字本身，其他单键加 ' 是这个键开头的字；不打 ' 时每个音节仍只有自己的两键编码。
+     */
+    @Test fun separatorAfterOneKeyTypesThatSyllable() {
+        val schemes = DoublePinyinScheme.BUILTINS + custom
+        for (scheme in schemes) {
+            val rules = scheme.algebra() + scheme.separatorRules()
+            assertTrue(scheme.id, "a'" in spellings(rules, "a") && "e'" in spellings(rules, "e") && "o'" in spellings(rules, "o"))
+            for (syllable in DoublePinyinScheme.SYLLABLES) {
+                val code = scheme.code(syllable)!!
+                val typed = spellings(rules, syllable)
+                assertEquals("${scheme.id} $syllable", setOf(code), typed.filterNot { '\'' in it }.toSet())
+                assertTrue("${scheme.id} $syllable $typed", "${code[0]}'" in typed)
+            }
+        }
+        val flypy = DoublePinyinScheme.FLYPY
+        assertEquals(listOf("derive/^aa$/a'/", "derive/^oo$/o'/", "derive/^ee$/e'/", "abbrev/^(.).+$/${'$'}1'/"), flypy.separatorRules())
+        assertEquals(setOf("aa", "a'"), spellings(shippedFlypy + flypy.separatorRules(), "a"))
+        assertEquals(setOf("ve", "v'"), spellings(shippedFlypy + flypy.separatorRules(), "zhe"))
+        assertEquals("derive/^oa$/a'/", DoublePinyinScheme.MICROSOFT.separatorRules().first())
+        // 内置小鹤双拼在打包时加同样几条（雾凇原文的规则不在 DoublePinyinScheme 里）。
+        val gradle = java.io.File("build-logic/tasks-chinese.gradle.kts").readText().replace("\\${'$'}", "${'$'}")
+        for (rule in flypy.separatorRules()) assertTrue(rule, gradle.contains("\"$rule\""))
     }
 
     @Test fun t9VersionTypesEachSyllableOnTwoDigitKeys() {
@@ -519,11 +547,11 @@ class DoublePinyinSchemeTest {
             assertFalse(text.contains("enable_correction") || text.contains("cyime_neighbor_correction"))
             val rules = text.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
                 .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
-            assertEquals(scheme.algebra() + listOf(0, 1).flatMap { p -> groups.filter { it.length == 2 }.map { "derive/^(.{$p})[${it[1]}](.*)$/\$1${it[0]}\$2/" } }, rules)
+            assertEquals(scheme.algebra() + scheme.separatorRules() + listOf(0, 1).flatMap { p -> groups.filter { it.length == 2 }.map { "derive/^(.{$p})[${it[1]}](.*)$/\$1${it[0]}\$2/" } }, rules)
             for (syllable in DoublePinyinScheme.SYLLABLES) {
                 val code = scheme.code(syllable)!!
                 val expected = setOf(code, "${merged(code[0])}${code[1]}", "${code[0]}${merged(code[1])}", "${merged(code[0])}${merged(code[1])}")
-                assertEquals(syllable, expected, spellings(rules, syllable))
+                assertEquals(syllable, expected, spellings(rules, syllable).filterNot { '\'' in it }.toSet())
             }
         }
         assertEquals(null, DoublePinyinScheme.splitLayoutVariant(DoublePinyinScheme.k14Id(DoublePinyinScheme.ZIRANMA_ID)))

@@ -365,6 +365,14 @@ val prepareChineseDictionaries by tasks.registering {
         }
         File(root, "rime_ice.schema.yaml").writeText(baseSchema)
         val doublePinyin = File(root, "double_pinyin_flypy.schema.yaml")
+        // Manual syllable split ' (Shift/comma split keys): a' o' e' are 啊 哦 额, any other single key + ' is the
+        // syllables that key starts (v'vs 这种). Spellings carry the ', so input without it is unchanged; same rules
+        // as DoublePinyinScheme.separatorRules for the generated schemes. Upstream keeps abbreviations off.
+        val flypyAbbrevOff = "    # - abbrev/^(.).+\$/\$1/"
+        check(doublePinyin.readText().split(flypyAbbrevOff).size == 2) { "Upstream double_pinyin_flypy algebra changed" }
+        val flypySeparatorRules = listOf("derive/^aa\$/a'/", "derive/^oo\$/o'/", "derive/^ee\$/e'/", "abbrev/^(.).+\$/\$1'/")
+            .joinToString("") { "    - \"$it\"\n" }
+        doublePinyin.writeText(doublePinyin.readText().replace(flypyAbbrevOff, flypySeparatorRules + flypyAbbrevOff))
         doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  cyime_neighbor_correction: true\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
