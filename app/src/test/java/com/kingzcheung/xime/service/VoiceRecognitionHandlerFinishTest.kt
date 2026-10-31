@@ -530,6 +530,52 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals("今日は 東京です", editor.toString())
     }
 
+    // 内置在线接口（OnlineSpeechApi）的完整 final 原文自带服务端标点：后端声明能力位后，
+    // 由已有的「自动加标点」开关决定是否保留，不再被「本地 + 整句定稿」绑死。
+    @Test fun `online final keeps the server's Chinese punctuation when auto punctuation is on`() {
+        autoPunctuation = true
+        whenever(mockManager.lastResultKeepsPunctuation).thenReturn(true)
+        startToolbar()
+        onResult("今天天气不错，我们去公园吧。")
+        assertEquals("今天天气不错，我们去公园吧。", editor.toString())
+    }
+
+    @Test fun `online final keeps the old spacing while auto punctuation is off`() {
+        // 默认关：和 1.15.24 一样把标点变成空格，升级后不改变用户习惯。
+        whenever(mockManager.lastResultKeepsPunctuation).thenReturn(true)
+        startToolbar()
+        onResult("今天天气不错，我们去公园吧。")
+        assertEquals("今天天气不错 我们去公园吧", editor.toString())
+    }
+
+    @Test fun `online final keeps the server's marks for a non Chinese language`() {
+        // 标点由转写这段话的接口给出（包括它自己的 language 参数），不是本地中文模型补的，所以不限语言。
+        autoPunctuation = true
+        whenever(mockManager.lastResultKeepsPunctuation).thenReturn(true)
+        currentState = currentState.copy(isAsciiMode = true)
+        startToolbar()
+        onResult("Hello, world! How are you?")
+        assertEquals("Hello, world! How are you?", editor.toString())
+    }
+
+    @Test fun `online final does not double a dictated comma`() {
+        autoPunctuation = true
+        whenever(mockManager.lastResultKeepsPunctuation).thenReturn(true)
+        startToolbar()
+        onResult("你好，逗号，我在这里。")
+        assertEquals("你好，我在这里。", editor.toString())
+    }
+
+    @Test fun `online fallback to the local model declares no marks and keeps the old spacing`() {
+        // 在线失败、这段录音改用本地模型识别：后端不声明能力位，即使「自动加标点」开着也按原空格化，
+        // 不能只按“在线”这个偏好盲保。
+        autoPunctuation = true
+        wholeSentence = false
+        startToolbar()
+        onResult("今天天气不错，我们去公园吧。")
+        assertEquals("今天天气不错 我们去公园吧", editor.toString())
+    }
+
     @Test fun `final revisions remove punctuation already present in partial without deleting words`() {
         startToolbar()
         onPartial("Hello, wor")

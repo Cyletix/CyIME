@@ -421,11 +421,14 @@ class VoiceRecognitionHandler(
         toolbarText.update(ic, toolbarSentencePrefix.orEmpty() + text)
     }
 
-    /** 整句定稿 (Chinese recognition only) keeps the local model's punctuation only when 自动加标点 is on (default off);
-     *  online engines, other recognizers (including the English side of a Chinese pair) and the 6 s mode keep the old spacing. */
-    private fun keepVoiceMarks(recognition: InputLanguage) = recognition == InputLanguage.CHINESE &&
-        SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context) &&
-        SettingsPreferences.isSttAutoPunctuation(context)
+    /** 自动加标点 (default off) decides whether the recognizer's own marks survive normalization:
+     *  the built-in online engine's final already carries the server's marks, so they are kept whatever the
+     *  language; the local model still only keeps them for Chinese 整句定稿. Online plugins, a local fallback
+     *  after a failed request and the 6 s mode declare no marks, so they keep the old spacing. */
+    private fun keepVoiceMarks(recognition: InputLanguage) = SettingsPreferences.isSttAutoPunctuation(context) &&
+        (speechRecognitionManager.lastResultKeepsPunctuation ||
+            recognition == InputLanguage.CHINESE && SettingsPreferences.isSttUseLocal(context) &&
+                SettingsPreferences.isSttWholeSentence(context))
 
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return

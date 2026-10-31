@@ -125,6 +125,9 @@ class OnlineApiAsrBackend(
     private var onError: ((String) -> Unit)? = null
     private val audio = ByteArrayOutputStream()
     private var language = InputLanguage.CHINESE
+    /** 只有接口原文带服务端标点；在线失败改用本地模型识别的那段没有，别按“在线”这个偏好盲保。 */
+    @Volatile private var keepsPunctuation = false
+    override val resultKeepsPunctuation: Boolean get() = keepsPunctuation
 
     override fun setCallbacks(
         onResult: (String) -> Unit,
@@ -154,7 +157,7 @@ class OnlineApiAsrBackend(
         if (pcm.isEmpty()) { onState?.invoke(RecognitionState.IDLE); return }
         onState?.invoke(RecognitionState.PROCESSING)
         OnlineSpeechApi.transcribe(context, pcm, language)
-            .onSuccess { onResult?.invoke(it); onState?.invoke(RecognitionState.IDLE) }
+            .onSuccess { keepsPunctuation = true; onResult?.invoke(it); onState?.invoke(RecognitionState.IDLE) }
             .onFailure { error ->
                 if (recognizeLocally(pcm)) onNotice("在线接口不可用（${error.message}），这次已改用本地模型")
                 else { onError?.invoke("在线语音：${error.message}；本地模型也没能识别"); onState?.invoke(RecognitionState.ERROR) }
@@ -171,6 +174,7 @@ class OnlineApiAsrBackend(
             if (!local.initialize(language) || !local.start(language)) return false
             pcm.asList().chunked(3200).forEach { local.processAudioChunk(it.toByteArray()) }
             local.stop()
+            keepsPunctuation = false
             onResult?.invoke(text.orEmpty()); onState?.invoke(RecognitionState.IDLE)
             true
         } catch (_: Exception) {
