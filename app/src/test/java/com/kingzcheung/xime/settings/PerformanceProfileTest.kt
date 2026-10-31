@@ -3,7 +3,6 @@ package com.kingzcheung.xime.settings
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilities
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTiers
-import com.kingzcheung.xime.ui.settings.positionText
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -69,16 +68,5 @@ class PerformanceProfileTest {
         val medium = PerformanceProfile.presets.getValue(PerformanceTier.MEDIUM)
         assertEquals(PerformanceProfile.idleLevelIndex(30), PerformanceProfile.idleLevelIndex(25))
         assertEquals(PerformanceProfile.score(medium), PerformanceProfile.score(medium.copy(speechEngineIdleMinutes = 25)))
-    }
-
-    @Test fun positionNamesTheTierOrTheTwoTiersAround() {
-        val medium = PerformanceProfile.presets.getValue(PerformanceTier.MEDIUM)
-        val high = PerformanceProfile.presets.getValue(PerformanceTier.HIGH)
-        assertEquals("45 分，就是中配", positionText(medium))
-        assertEquals("73 分，在中配和高配之间", positionText(high.copy(keyGlow = false)))
-        assertEquals("100 分，比高配还高", positionText(high.copy(speechRefinerIdleMinutes = 0)))
-        assertEquals("15 分，在低配和中配之间", positionText(PerformanceSettings(false, true, 1, 1)))
-        // 同分不同值：动效换成炫光，还是 45 分，但不算中配。
-        assertEquals("45 分，和中配一样高", positionText(medium.copy(keyAnimation = false, keyGlow = true)))
     }
 }

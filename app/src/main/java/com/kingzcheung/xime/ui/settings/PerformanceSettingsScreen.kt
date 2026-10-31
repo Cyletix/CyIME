@@ -61,21 +61,6 @@ private fun idleLabel(minutes: Int) = if (minutes == 0) "永不" else "$minutes 
 
 private val ladder = listOf(PerformanceTier.LOW, PerformanceTier.MEDIUM, PerformanceTier.HIGH)
 
-/** 「配置高低」标题后那句：几分，落在哪一档或哪两档之间。 */
-internal fun positionText(settings: PerformanceSettings): String {
-    val score = PerformanceProfile.score(settings)
-    PerformanceProfile.matching(settings)?.let { return "$score 分，就是${tierNames.getValue(it)}" }
-    val ticks = ladder.map { it to PerformanceProfile.score(PerformanceProfile.presets.getValue(it)) }
-    ticks.firstOrNull { it.second == score }?.let { return "$score 分，和${tierNames.getValue(it.first)}一样高" }
-    val lower = ticks.lastOrNull { it.second < score }
-    val upper = ticks.firstOrNull { it.second > score }
-    return when {
-        lower == null -> "$score 分，比低配还省"
-        upper == null -> "$score 分，比高配还高"
-        else -> "$score 分，在${tierNames.getValue(lower.first)}和${tierNames.getValue(upper.first)}之间"
-    }
-}
-
 /**
  * 性能与省电：一键选档；改任何一项自动变成“自定义”。
  * 和「按设备推荐配置」分工：这页随时调、马上生效（动效、语音模型常驻多久）；用哪些模型、删哪些在那一页，
@@ -110,7 +95,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
         LazyColumn(modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = listState,
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                Text("本机：${describe(device)} · 本机配置推荐：${tierNames.getValue(detected)}",
+                Text("本机：${describe(device)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp))
             }
@@ -119,7 +104,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                     PerformanceScale(settings)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    TierRow("自动（推荐）", "按本机配置自动选档 · 本机配置推荐：${tierNames.getValue(detected)}", auto) {
+                    TierRow("自动（推荐）", "按本机配置选：${tierNames.getValue(detected)}", auto) {
                         PerformanceProfile.applyAuto(context); refresh()
                     }
                     listOf(PerformanceTier.HIGH, PerformanceTier.MEDIUM, PerformanceTier.LOW).forEach { tier ->
@@ -131,8 +116,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                     // 「自定义」一直列着但不能点：手动改过明细或动效、值对不上任何一档时自动选中，表示当前状态。
                     val isCustom = !auto && current == null
                     RowDivider()
-                    TierRow("自定义", if (isCustom) "已单独调整明细或「按键效果」里的动效、炫光"
-                        else "单独调整下面的明细或「按键效果」里的动效、炫光后，自动选中这一项", isCustom, enabled = false) {}
+                    TierRow("自定义", "改了下面的明细或「按键效果」里的动效、炫光后自动选中", isCustom, enabled = false) {}
                 }
             }
             item {
@@ -140,7 +124,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                     // 分档横条，与「输入体验」里长按时长等设置同一样式：标题写当前值，下面一行说明，再是分档滑块。
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         IdleLevelSlider("语音二次校正空闲后释放", settings.speechRefinerIdleMinutes,
-                            "边说边出字＋二次校正时，先卸掉校正模型（SenseVoice 或 X-ASR），保留出字模型；再用时第一句定稿稍慢。只用一个模型（如只用 SenseVoice）时不起作用",
+                            "先卸掉二次校正模型，再用时第一句定稿稍慢；只用一个语音模型时不起作用",
                             "speech-refiner-idle-slider") { custom(settings.copy(speechRefinerIdleMinutes = it)) }
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         IdleLevelSlider("语音模型空闲后全部释放", settings.speechEngineIdleMinutes,
@@ -153,7 +137,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                 item {
                     SettingsSection(title = "模型") {
                         SettingsItem(icon = Icons.TwoTone.Tune, title = "按设备推荐配置",
-                            subtitle = "这页只管动效和语音模型常驻多久；语音、九键、联想用哪些模型，删掉用不到的，在这里选",
+                            subtitle = "语音、九键、联想用哪些模型，删掉用不到的",
                             onClick = open, showArrow = true)
                     }
                 }
@@ -226,7 +210,7 @@ private fun IdleLevelSlider(title: String, minutes: Int, description: String, ta
 private val scaleInset = 10.dp
 
 /**
- * 档位卡片顶上的刻度条：标题写几分、落在哪里，下面一条和滑条同色的横条，低配、中配、高配三档按同一算法标刻度，
+ * 档位卡片顶上的刻度条：标题下面一条和滑条同色的横条，低配、中配、高配三档按同一算法标刻度，
  * 实心圆点是当前设置。选中某档时圆点正好压在那档的刻度上；自定义时落在两档之间。
  */
 @Composable
@@ -236,13 +220,8 @@ private fun PerformanceScale(settings: PerformanceSettings) {
     val current = PerformanceProfile.matching(settings)
     val ticks = ladder.map { it to PerformanceProfile.score(PerformanceProfile.presets.getValue(it)) }
     Column(Modifier.fillMaxWidth().testTag("performance-scale").padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("配置高低", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.width(8.dp))
-            Text(positionText(settings), style = MaterialTheme.typography.bodyMedium, color = colors.primary)
-        }
-        Text("0 最省，100 全开：语音模型常驻时长占 70 分，按键动效、炫光各 15 分。分越高，按麦克风越快，占内存和电越多",
-            style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        // 刻度条自己就看得出在哪一档、几分，标题后面不再写一句“几分，就是高配”（用户 10-31）。
+        Text("配置高低", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(8.dp))
         ScaleLabels(listOf(score)) {
             Text("当前", style = MaterialTheme.typography.labelSmall, color = colors.primary, fontWeight = FontWeight.Medium)
