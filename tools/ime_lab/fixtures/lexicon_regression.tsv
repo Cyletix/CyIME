@@ -1147,3 +1147,7 @@ user-nage-1	26	nage	那个	1	user	2026-10-31	陈述语气比疑问语气常用�
 user-nage-2	26	nage	哪个	2	user	2026-10-31	哪个第二
 user-14-nage-1	14	BAGE	那个	1	user	2026-10-31	陈述语气比疑问语气常用：那个首选（14 键）
 user-win-nage-1	win26	nage	那个	1	user	2026-10-31	陈述语气比疑问语气常用：那个首选（Windows）
+user-a-an	26	a	安	10	user	2026-10-31	B站评论：一个 a 打不出晚安的安。单个 a/e/o 是完整音节，原来只出本音节的字（a 只有 7 个），后面全是英文
+user-a-first	26	a	啊	1	user	2026-10-31	同上，首选仍是啊
+user-e-er	26	e	二	10	user	2026-10-31	同上，e 也出二、而、儿
+user-o-ou	26	o	欧	10	user	2026-10-31	同上，o 也出欧、偶

@@ -14,7 +14,7 @@ index 5242f6d5..38314ca8 100644
    // 疊加運算規則, 將運算規則產生的屬性應用到當前拼寫上
    void Compose(const SpellingProperties& delta);
 diff --git a/src/rime/algo/syllabifier.cc b/src/rime/algo/syllabifier.cc
-index a5751781..d1c46208 100644
+index a5751781..9c99d268 100644
 --- a/src/rime/algo/syllabifier.cc
 +++ b/src/rime/algo/syllabifier.cc
 @@ -6,6 +6,7 @@
@@ -111,18 +111,23 @@ index a5751781..d1c46208 100644
              } else {
                it->second.type = (std::min)(it->second.type, props.type);
              }
-@@ -210,7 +263,9 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -209,8 +262,14 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+   set<int> good;
    good.insert(farthest);
    // fuzzy spellings are immune to invalidation by normal spellings
++  // CyIME: one key alone keeps the words it starts as well as its own syllable: a single 3 on nine keys,
++  // and a single a, e or o on 26 keys (a gave only 啊 阿 吖 锕 腌 呵 嗄, then pages of English; 安 爱 按
++  // were gone). They compete by weight with the abbreviation penalty, as on nine keys.
    SpellingType last_type =
 -      (std::max)(graph->vertices[farthest], kFuzzySpelling);
 +      (std::max)(graph->vertices[farthest],
-+          input.size() == 1 && input[0] >= '2' && input[0] <= '9'
++          input.size() == 1 && ((input[0] >= '2' && input[0] <= '9') ||
++                                (input[0] >= 'a' && input[0] <= 'z'))
 +              ? kAbbreviation : kFuzzySpelling);
    for (int i = farthest - 1; i >= 0; --i) {
      if (graph->vertices.find(i) == graph->vertices.end())
        continue;
-@@ -229,9 +284,27 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -229,9 +288,27 @@ int Syllabifier::BuildSyllableGraph(const string& input,
            ++k;
            continue;  // Don't care correction edges
          }
@@ -151,7 +156,7 @@ index a5751781..d1c46208 100644
            if (k->second.type < edge_type)
              edge_type = k->second.type;
            ++k;
-@@ -245,7 +318,9 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -245,7 +322,9 @@ int Syllabifier::BuildSyllableGraph(const string& input,
          ++j;
        }
      }
@@ -162,7 +167,7 @@ index a5751781..d1c46208 100644
        DLOG(INFO) << "remove stale vertex at " << i;
        graph->vertices.erase(i);
        graph->edges.erase(i);
-@@ -298,6 +373,10 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -298,6 +377,10 @@ int Syllabifier::BuildSyllableGraph(const string& input,
      }
    }
  
@@ -173,18 +178,19 @@ index a5751781..d1c46208 100644
    graph->input_length = input.length();
    graph->interpreted_length = farthest;
    DLOG(INFO) << "input length: " << graph->input_length;
-@@ -427,7 +506,9 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
+@@ -427,7 +510,10 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
    set<int> good;
    good.insert(farthest);
    SpellingType last_type =
 -      (std::max)(graph->vertices[farthest], kFuzzySpelling);
 +      (std::max)(graph->vertices[farthest],
-+          input.size() == 1 && input[0] >= '2' && input[0] <= '9'
++          input.size() == 1 && ((input[0] >= '2' && input[0] <= '9') ||
++                                (input[0] >= 'a' && input[0] <= 'z'))
 +              ? kAbbreviation : kFuzzySpelling);
    for (int i = farthest - 1; i >= 0; --i) {
      if (graph->vertices.find(i) == graph->vertices.end())
        continue;
-@@ -442,9 +523,27 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
+@@ -442,9 +528,27 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
            ++k;
            continue;
          }
@@ -213,7 +219,7 @@ index a5751781..d1c46208 100644
            if (k->second.type < edge_type)
              edge_type = k->second.type;
            ++k;
-@@ -458,7 +557,9 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
+@@ -458,7 +562,9 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
          ++j;
        }
      }
@@ -224,7 +230,7 @@ index a5751781..d1c46208 100644
        graph->vertices.erase(i);
        graph->edges.erase(i);
        continue;
-@@ -541,6 +642,65 @@ void Syllabifier::CheckOverlappedSpellings(SyllableGraph* graph,
+@@ -541,6 +647,65 @@ void Syllabifier::CheckOverlappedSpellings(SyllableGraph* graph,
    }
  }
  
