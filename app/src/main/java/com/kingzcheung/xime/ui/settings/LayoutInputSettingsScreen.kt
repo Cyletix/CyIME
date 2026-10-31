@@ -27,7 +27,7 @@ import com.kingzcheung.xime.ui.keyboard.normalizeCandidateDragPercent
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 internal enum class LayoutInputCategory(val route: String, val title: String, val description: String) {
-    Qwerty("layout_input_qwerty", "26 键", "纠错、中英混输、生僻字、滑行输入、中文滑行、模糊音、字母错位、空格两侧标点"),
+    Qwerty("layout_input_qwerty", "26 键", "纠错、中英混输、生僻字、滑行输入、中文滑行、模糊音、字母错位、空格两侧标点、逗号键分词"),
     Nine("layout_input_nine", "九键与 14 键", "拂动或滑动选字母、触发距离（含日语假名）、方向圆盘、假名提示"),
 }
 
@@ -109,6 +109,14 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     SettingsToggleItem(Icons.TwoTone.SpaceBar, "空格右侧句号键", "开启后空格让出一个键宽。",
                         checked = settings.qwertyPeriodKey, onCheckedChange = {
                             settings = settings.copy(qwertyPeriodKey = it); settings.save(context)
+                        })
+                    // 逗号键分词（默认关）：下角标的方向跟「反转上下滑方向」走，说明照实际方向写。
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "逗号键分词",
+                        "中文全拼、双拼的 26 键和 14 键：逗号键左下角加 '（只开句号键时在句号键上），" +
+                            "打拼音时${if (settings.reverseSymbolSwipe) "下滑" else "上滑"}插入分词（xi'an），F 键角标的 ' 也一样；" +
+                            "没在打拼音时输入 '。九键照旧用 1 键分词。",
+                        checked = settings.syllableSplitKey, onCheckedChange = {
+                            settings = settings.copy(syllableSplitKey = it); settings.save(context)
                         })
                 })
                 FuzzyPinyinSection()
