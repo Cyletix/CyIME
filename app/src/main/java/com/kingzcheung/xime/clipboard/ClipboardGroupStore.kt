@@ -58,6 +58,14 @@ class ClipboardGroupStore private constructor(context: Context) {
 
     fun delete(id: String) = update { it.withoutGroup(id) }
 
+    /** The group called [name], made (last in the tab row) when there is none; null when the name cannot be used. */
+    @Synchronized fun idForName(name: String): String? {
+        val clean = cleanClipboardGroupName(name)
+        _state.value.groups.firstOrNull { it.name == clean }?.let { return it.id }
+        if (add(clean) != null) return null
+        return _state.value.groups.firstOrNull { it.name == clean }?.id
+    }
+
     /** Null [groupId] takes the records out of their group. */
     fun assign(keys: Collection<String>, groupId: String?) {
         if (keys.isNotEmpty()) update { it.assigned(keys, groupId) }

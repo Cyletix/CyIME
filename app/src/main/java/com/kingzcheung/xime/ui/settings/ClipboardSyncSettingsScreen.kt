@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.ContentPaste
+import androidx.compose.material.icons.twotone.Download
 import androidx.compose.material.icons.twotone.Folder
 import androidx.compose.material.icons.twotone.PushPin
 import androidx.compose.material.icons.twotone.Sync
@@ -206,6 +207,7 @@ fun ClipboardSyncSettingsContent(
             VerificationCodeSettings()
             ClipboardCardLinesSetting(onNavigateToGroups)
             ClipboardExportSetting()
+            ClipboardImportSetting()
         }
     }
 }
@@ -287,8 +289,11 @@ internal fun ClipboardExportSetting() {
                     val now = System.currentTimeMillis()
                     val items = com.kingzcheung.xime.clipboard.ClipboardExport.order(
                         com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(context).exportItems(), includePinned)
+                    val groups = com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(context).state.value
                     context.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use {
-                        com.kingzcheung.xime.clipboard.ClipboardExport.write(items, chosen, it, now)
+                        com.kingzcheung.xime.clipboard.ClipboardExport.write(items, chosen, it, now) { item ->
+                            groups.groupOf("text:${item.id}")?.name
+                        }
                     }
                     items.size
                 }
@@ -329,6 +334,61 @@ internal fun ClipboardExportSetting() {
             }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("clipboard-export")) {
                 Icon(Icons.TwoTone.Upload, contentDescription = null)
                 Text("导出", modifier = Modifier.padding(start = 6.dp))
+            }
+            message?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+    })
+}
+
+/**
+ * 把导出的剪贴板文件（TXT / Markdown / JSON）导回来，经系统的打开窗口；只在用户点按钮时读一次文件。
+ * 已有的记录不重复加；JSON 和 Markdown 保留固定、编码和分组，TXT 只有文字，导成历史记录。
+ */
+@Composable
+internal fun ClipboardImportSetting() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busy = true; message = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val bytes = context.contentResolver.openInputStream(uri)!!.use { input ->
+                        val out = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            out.write(buffer, 0, n)
+                            check(out.size() <= com.kingzcheung.xime.clipboard.ClipboardImport.MAX_FILE_BYTES) { "文件太大" }
+                        }
+                        out.toByteArray()
+                    }
+                    val clips = com.kingzcheung.xime.clipboard.ClipboardImport.parse(bytes.decodeToString())
+                    com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(context).importItems(clips)
+                }
+            }
+            busy = false
+            message = result.fold({ it.message }, { "导入失败：${it.message ?: "未知错误"}" })
+        }
+    }
+    SettingsSection(title = "导入剪贴板", content = {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("从导出的文件导入", style = MaterialTheme.typography.titleSmall)
+            Text("选上面导出的 TXT、Markdown 或 JSON 文件，已有的记录不会重复。JSON 和 Markdown 保留固定内容、编码和分组；TXT 只有文字，导入成历史记录",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = {
+                launcher.launch(arrayOf("text/*", "application/json", "application/octet-stream"))
+            }, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("clipboard-import")) {
+                Icon(Icons.TwoTone.Download, contentDescription = null)
+                Text("选择文件导入", modifier = Modifier.padding(start = 6.dp))
             }
             message?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

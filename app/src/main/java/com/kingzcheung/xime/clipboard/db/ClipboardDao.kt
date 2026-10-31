@@ -227,6 +227,39 @@ interface ClipboardDao {
 
     suspend fun insertPinnedText(text: String, code: String, now: Long, searchKey: String = ""): Long =
         insert(ClipboardEntry(text = text, code = code, timestamp = now, isPinned = true, searchKey = searchKey))
+
+    /**
+     * One record from an import file, keeping its own time. Records already here stay as they are
+     * (ends' whitespace ignored, as for copies); a fixed one found only in history is fixed in place.
+     * A new row is written only when [canAdd] (room left); [ClipboardImportRow.id] is 0 when none was.
+     */
+    @Transaction
+    suspend fun importRecord(text: String, code: String, timestamp: Long, pinned: Boolean, searchKey: String,
+        canAdd: Boolean): ClipboardImportRow {
+        if (pinned) {
+            findPinnedSameText(text, code)?.let { return ClipboardImportRow(it.id, ClipboardImportRow.EXISTING) }
+            findSameText(text)?.takeIf { !it.isPinned }?.let {
+                pinWithCode(it.id, code)
+                deleteHistoryCopies(text, it.id)
+                return ClipboardImportRow(it.id, ClipboardImportRow.EXISTING)
+            }
+        } else {
+            findSameText(text)?.let { return ClipboardImportRow(it.id, ClipboardImportRow.EXISTING) }
+        }
+        if (!canAdd) return ClipboardImportRow(0, ClipboardImportRow.NO_ROOM)
+        val id = insert(ClipboardEntry(text = text, code = if (pinned) code else "", timestamp = timestamp,
+            isPinned = pinned, searchKey = searchKey))
+        return ClipboardImportRow(id, ClipboardImportRow.ADDED)
+    }
+}
+
+/** Where one imported record went: [id] of its row, and whether it was [ADDED], already there, or left out. */
+data class ClipboardImportRow(val id: Long, val outcome: Int) {
+    companion object {
+        const val ADDED = 0
+        const val EXISTING = 1
+        const val NO_ROOM = 2
+    }
 }
 
 /** The part of a record the search-key backfill needs. */
