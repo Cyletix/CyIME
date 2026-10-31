@@ -445,6 +445,7 @@ fun KeyboardView(
             supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode),
         onCornerTap = callbacks.onKeyboardResize,
         onCornerHandlesPositioned = onCornerHandlesPositioned,
+        sidesFilled = inputPreferences.fillBlankAreas && !state.handwritingExpanded,
     ) {
         // 候选栏随键盘半速放大：按卡片实际尺寸算，调节尺寸时跟着预览走；剪贴板上拉和搜索时卡片临时变高，不跟。
         val barScaleFrozen = LocalClipboardPanelExpansion.current != null || state.clipboardSearchVisible
