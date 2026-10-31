@@ -139,6 +139,17 @@ class KeyboardInputPreferencesTest {
         assertEquals(true, KeyboardInputPreferences.read(context).datetimeCandidates)
     }
 
+    @Test fun `symbol name candidates are off by default and persist`() {
+        // 别人请求的功能默认关，不改原有习惯；在 语言与方案 › 中文输出 打开。
+        assertEquals(false, KeyboardInputPreferences().symbolNames)
+        assertEquals(false, KeyboardInputPreferences.read(context).symbolNames)
+        KeyboardInputPreferences.read(context).copy(symbolNames = true).save(context)
+        assertEquals(true, values[KeyboardInputPreferences.SYMBOL_NAMES_KEY])
+        assertEquals(true, KeyboardInputPreferences.read(context).symbolNames)
+        KeyboardInputPreferences.read(context).copy(symbolNames = false).save(context)
+        assertEquals(false, KeyboardInputPreferences.read(context).symbolNames)
+    }
+
     @Test fun `bottom lift cursor is off by default and persists without touching the cursor gesture choice`() {
         val before = KeyboardInputPreferences.read(context)
         assertEquals(false, before.bottomLiftCursor)

@@ -754,6 +754,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val emoji = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CANDIDATE_EMOJI_KEY, false)
                 if (service.rimeEngine.getOption("emoji") != emoji) service.rimeEngine.setOption("emoji", emoji)
+                // 打符号名出符号（默认关）：同上，方案里的 simplifier@cyime_symbols 只在这个选项开着时工作。
+                val symbolNames = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.SYMBOL_NAMES_KEY, false)
+                if (service.rimeEngine.getOption("cyime_symbol_names") != symbolNames) service.rimeEngine.setOption("cyime_symbol_names", symbolNames)
                 // 仓颉码表本身是繁体，反过来：simplification 开着时转简体。
                 if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE &&
                     service.rimeEngine.getOption("simplification") == traditional) service.rimeEngine.setOption("simplification", !traditional)

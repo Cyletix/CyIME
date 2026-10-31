@@ -133,6 +133,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("选词后自动加空格", languages, "languages", "英文 英语 空格 自动空格 自动加空格 补全 标点 iOS 苹果 西班牙语"),
         SettingsSearchEntry("标点后自动加空格", languages, "languages", "英文 英语 空格 自动空格 自动加空格 标点 逗号 句号 问号 英文标点 标点空格 西班牙语"),
         SettingsSearchEntry("候选里显示表情", languages, "languages", "表情 emoji 联想表情 候选表情 开心 爱心 笑脸"),
+        SettingsSearchEntry("打符号名出符号", languages, "languages", "符号 符号名 加号 减号 等号 问号 括号 引号 百分号 标点 打字出符号 数学符号"),
         page("已安装的方案", languages, SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序 方案资源 启用14键 中文14键"),
         page("双拼方案", languages, SettingsRoutes.DoublePinyin, "双拼 自定义双拼 首道双拼 小鹤双拼 自然码 智能ABC 拼音加加 微软双拼 分号 九键双拼 14键双拼 键位 韵母 零声母 新建 编辑"),
         SettingsSearchEntry("双拼键位提示", "$languages › 双拼方案", SettingsRoutes.DoublePinyin, "双拼 键位 提示 键位图 记不住 韵母 声母 显示 键盘上 主题 双拼主题 小鹤 自然码"),
