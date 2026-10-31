@@ -175,6 +175,8 @@ fun KeyboardLayout(
         allowShrink = uiState.isFloatingMode,
         applyGutter = true,
         growthSpacing = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty"),
+        // 分体两半贴边、中缝按 8dp 外边距算（SplitKeyboardGeometry.gutterDp），加宽按键不改分体。
+        widenKeys = LocalKeyboardInputPreferences.current.wideKeys && !splitKeyboard,
     ) { bodyModifier ->
     val splitCellDp = LocalKeyboardKeyVisualMetrics.current.cellWidthDp
     val letterRowGeometry = standardLetterRowGeometry(

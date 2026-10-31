@@ -68,6 +68,30 @@ internal data class KeyVisualPolicy(
 
         /** `LocalKeyVisualPadding` 里表示“交给布局策略”的哨兵值（历史默认值，见 xime.yaml）。 */
         const val DeclaredDefaultGap = 2f
+
+        /** 「加宽按键」时键区两侧的最小留白（每侧 dp），原来是 [minGutter] 的 8dp。 */
+        const val WideKeysGutter = 3f
+        /** 「加宽按键」时横向键缝的倍数：手机上 26 键 4.5dp → 3dp，九键 6dp → 4dp。 */
+        const val WideKeysGapFactor = 2f / 3f
+        /** [referenceCellWidth] 所用的手机宽度（dp）。 */
+        const val PhoneReferenceWidth = 360f
+    }
+
+    /**
+     * 「加宽按键」（设置 → 布局，默认关）：两侧留白收到 [WideKeysGutter]，横向键缝减三分之一，
+     * 省下的宽度全给键帽；大屏的键缝上限和键宽上限不变，纵向键缝不变。
+     * 命中仍是整格，所以按键间距（触摸的键距）也随两侧留白变小而变大。
+     */
+    fun widened(): KeyVisualPolicy {
+        val gutter = minOf(minGutter, WideKeysGutter)
+        return copy(
+            gapX = gapX * WideKeysGapFactor,
+            minGapX = minGapX * WideKeysGapFactor,
+            minGutter = gutter,
+            // 参考格宽同样按 360dp 手机扣掉新的两侧留白算，手机上仍是基准键缝，不因格子变宽而自动放大。
+            referenceCellWidth = referenceCellWidth * (PhoneReferenceWidth - 2f * gutter) /
+                (PhoneReferenceWidth - 2f * minGutter),
+        )
     }
 }
 

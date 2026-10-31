@@ -22,6 +22,45 @@ class KeyVisualPolicyTest {
         assertEquals(29.9f, m.capShortEdge, tolerance)  // 键帽短边 = 34.4 - 4.5
     }
 
+    @Test fun wideKeysOnPhoneQwertyShrinkSidesAndColumnGapOnly() {
+        // 「加宽按键」：两侧 8 → 3dp，横缝 4.5 → 3dp，纵缝不变；格宽（触摸键距）34.4 → 35.4dp。
+        val m = keyVisualMetrics(KeyVisualPolicy.Qwerty.widened(), 360f, 260f, columns = 10f)
+        assertEquals(3f, m.gutterX, tolerance)
+        assertEquals(35.4f, m.cellWidthDp, tolerance)
+        assertEquals(1.5f, m.insetX!!, tolerance)
+        assertEquals(2.75f, m.insetY!!, tolerance)
+        assertEquals(1.0f, m.scale, tolerance)
+        assertEquals(32.4f, m.capShortEdge, tolerance)  // 原来 29.9dp
+    }
+
+    @Test fun wideKeysApplyTheSameRuleToFourteenAndNineKey() {
+        for ((policy, columns) in listOf(KeyVisualPolicy.FourteenKey to 5f, KeyVisualPolicy.T9 to (5f * 3f / 3.4f))) {
+            val normal = keyVisualMetrics(policy, 360f, 260f, columns)
+            val wide = keyVisualMetrics(policy.widened(), 360f, 260f, columns)
+            assertEquals(3f, wide.gutterX, tolerance)
+            assertTrue("wider cell", wide.cellWidthDp > normal.cellWidthDp)
+            assertTrue("narrower column gap", wide.insetX!! < normal.insetX!!)
+            assertEquals(normal.insetY!!, wide.insetY!!, tolerance)
+            assertEquals(normal.scale, wide.scale, tolerance)
+        }
+    }
+
+    @Test fun wideKeysKeepTabletCentringAndCaps() {
+        // 平板的留白来自键宽上限居中，不是 8dp 下限；加宽按键不让键无限变宽。
+        val m = keyVisualMetrics(KeyVisualPolicy.Qwerty.widened(), 800f, 420f, columns = 10f)
+        assertTrue("still centred: ${m.gutterX}", m.gutterX > 60f)
+        assertTrue("cap limit: ${m.capShortEdge}", m.capShortEdge <= 62f)
+    }
+
+    @Test fun wideKeysGridHonoursLowerInsetFloor() {
+        // 与 KeyboardKeySpacingScope 一致：横向下限同样收到 3dp，否则仍被 8dp 顶回去。
+        val m = keyboardGridMetrics(KeyVisualPolicy.Qwerty.widened(), 360f, 228f, 10f,
+            horizontalInsetDp = KeyVisualPolicy.WideKeysGutter, growthSpacing = null to null)
+        assertEquals(3f, m.gutterX, tolerance)
+        assertEquals(35.4f, m.cellWidthDp, tolerance)
+        assertEquals(3f, resolvedVisualGap(null, m.insetX!!), tolerance)
+    }
+
     @Test fun phoneFourteenKeyKeepsAbsoluteGapsInsteadOfScalingByKeyWidth() {
         val m = keyVisualMetrics(KeyVisualPolicy.FourteenKey, 360f, 260f, columns = 5f)
         assertEquals(8f, m.gutterX, tolerance)

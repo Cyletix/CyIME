@@ -128,6 +128,18 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_FILL_KEYBOARD_BLANK, filled).apply()
     }
 
+    const val KEY_WIDE_KEYS = "wide_keys"
+
+    /**
+     * 「加宽按键」默认关：打开后键盘两侧留白从 8dp 收到 3dp、横向键缝减三分之一，
+     * 手机上每个键更宽，触摸键距也更大（10-31 用户反馈手机上按键窄、容易误触）。
+     */
+    fun isWideKeysEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_WIDE_KEYS, false)
+
+    fun setWideKeysEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_WIDE_KEYS, enabled).apply()
+    }
+
     const val KEY_SPLIT_GAP_PORTRAIT = "split_gap_fraction_portrait"
     const val KEY_SPLIT_GAP_LANDSCAPE = "split_gap_fraction_landscape"
 

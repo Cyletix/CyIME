@@ -184,7 +184,9 @@ fun CandidatePage(
             widthFraction = qwerty?.widthFraction ?: 1f,
             policy = if (qwerty != null) KeyVisualPolicy.Qwerty else KeyVisualPolicy.T9,
             allowShrink = state.floating, applyGutter = true,
-            growthSpacing = spacing) { body ->
+            growthSpacing = spacing,
+            // 和身后的键盘同一网格：分体时键盘不加宽，这里也不加宽。
+            widenKeys = LocalKeyboardInputPreferences.current.wideKeys && qwerty?.split != true) { body ->
             CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(
                 horizontal = spacing.first?.dp ?: 2.dp, vertical = spacing.second?.dp ?: 2.dp)) {
                 CandidatePageContent(state.copy(bottomPaddingDp = 0), callbacks,

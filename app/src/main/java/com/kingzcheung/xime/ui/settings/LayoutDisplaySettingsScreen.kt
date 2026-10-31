@@ -160,6 +160,11 @@ private fun LayoutDisplayPage(
                         "分体中缝和固定键盘两侧的空白用键盘背景铺满，遮住后面的应用；关闭时镂空，透出后面的内容。",
                         checked = filled, onCheckedChange = { SettingsPreferences.setKeyboardBlankFilled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    val wideKeys = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().wideKeys
+                    SettingsToggleItem(Icons.TwoTone.Straighten, "加宽按键",
+                        "键盘两侧留白和按键之间的横向缝变窄，每个键更宽，手机上不容易按到旁边的键；分体键盘不变。",
+                        checked = wideKeys, onCheckedChange = { SettingsPreferences.setWideKeysEnabled(context, it) })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingsItem(Icons.TwoTone.AspectRatio, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
                         "高度、宽度、悬浮与分体、透明度，打开键盘菜单里同一个调节面板",
                         onClick = { onOpenLayout(SettingsRoutes.KeyboardResize) }, showArrow = true)
