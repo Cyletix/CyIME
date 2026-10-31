@@ -36,6 +36,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("cyimeTerms", 1)
     inputs.property("taiwanTraditional", 1)
     inputs.property("rareCharacters", 1)
+    inputs.property("datetimeHints", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -274,6 +275,11 @@ val prepareChineseDictionaries by tasks.registering {
         check(particles.isNotEmpty()) { "No sentence-final particles in ${finalParticles.name}" }
         // 简/繁 converts to Taiwan everyday forms (台灣, 計畫, 了解): assets/rime_chinese/opencc/cyime_s2tw.json,
         // built by tools/opencc/build_cyime_opencc.py. Upstream's s2t.json gives 臺灣 and was never bundled.
+        // 时间, 日期 and 星期 are followed by the current time or date (librime-t9 datetime_filter.h), the same
+        // filter as the nine-key and 14-key schemas; before traditionalize so 周六 converts with the rest.
+        fun withDatetimeHints(schema: String) = schema.replace("\n    - simplifier@traditionalize",
+            "\n    - cyime_datetime\n    - simplifier@traditionalize")
+            .also { check(it.split("\n    - cyime_datetime\n").size == 2) { "Upstream traditionalize filter changed" } }
         fun taiwanForms(schema: String) = schema.replace("  opencc_config: s2t.json ", "  opencc_config: cyime_s2tw.json ")
             .also { check(it.contains("  opencc_config: cyime_s2tw.json ")) { "Upstream traditionalize config changed" } }
         val baseSchema = taiwanForms(File(root, "rime_ice.schema.yaml").readText()).replace("\ntranslator:\n",
@@ -303,7 +309,8 @@ val prepareChineseDictionaries by tasks.registering {
                 else if (it == "    - script_translator") sequenceOf(it, "    - lua_translator@*cyime_mixed_input",
                     "    - lua_translator@*cyime_rare_chars") else sequenceOf(it) }
             .joinToString("\n")
-            .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
+            .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
+            .let { withDatetimeHints(it) } +
             "\ncyime:\n  candidate_policy: true\n" +
             // 26-key ranking by the nine-key word n-gram model (docs/development/pinyin26-word-model-20261018.md):
             // same decoder and model file; initials are not penalized (a letter names its initial, unlike a
@@ -353,6 +360,7 @@ val prepareChineseDictionaries by tasks.registering {
         doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  cyime_neighbor_correction: true\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
+            .let { withDatetimeHints(it) }
             .replace("enable_correction: false", "enable_correction: true"))
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",

@@ -84,6 +84,8 @@ data class KeyboardInputPreferences(
     val rareCharacters: Boolean = false,
     /** 中文候选和上屏用台湾正体（台灣、計畫），默认关；Rime 选项 traditionalization，转换表见 assets/rime_chinese/opencc。 */
     val traditionalOutput: Boolean = false,
+    /** 打出“时间、日期、星期”时紧跟着给当前时间和日期（15:35、2026-10-31），默认开；Rime 滤镜 cyime_datetime（librime-t9 datetime_filter.h）。 */
+    val datetimeCandidates: Boolean = true,
     val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
     val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
     val reverseSymbolSwipe: Boolean = false,
@@ -142,12 +144,14 @@ data class KeyboardInputPreferences(
         const val CLEAR_ALL_WHILE_COMPOSING_KEY = "clear_all_while_composing"
         /** 字母键帽显示大写。 */
         const val UPPERCASE_KEY_LABELS_KEY = "uppercase_key_labels"
+        /** 时间日期候选开关；同中英混输，输入法按键前读它（ImeKeyRouter），关掉时设 Rime 选项 _cyime_datetime_off。 */
+        const val DATETIME_CANDIDATES_KEY = "datetime_candidates"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -202,6 +206,7 @@ data class KeyboardInputPreferences(
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
                 rareCharacters = prefs.getBoolean(RARE_CHARACTERS_KEY, false),
                 traditionalOutput = prefs.getBoolean(TRADITIONAL_OUTPUT_KEY, false),
+                datetimeCandidates = prefs.getBoolean(DATETIME_CANDIDATES_KEY, true),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
                 fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),
                 symbolInputMode = SymbolInputMode.entries.firstOrNull {
@@ -241,6 +246,7 @@ data class KeyboardInputPreferences(
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
             .putBoolean(RARE_CHARACTERS_KEY, rareCharacters)
             .putBoolean(TRADITIONAL_OUTPUT_KEY, traditionalOutput)
+            .putBoolean(DATETIME_CANDIDATES_KEY, datetimeCandidates)
             .putBoolean("fourteen_letter_swipe", fourteenLetterSwipe)
             .putFloat("fourteen_letter_swipe_dp", normalizeLetterSwipeDistance(fourteenLetterSwipeDp))
             .putString("symbol_input_mode", symbolInputMode.name)

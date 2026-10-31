@@ -106,6 +106,17 @@ class KeyboardInputPreferencesTest {
         assertEquals(false, KeyboardInputPreferences.read(context).qwertyPeriodKey)
     }
 
+    @Test fun `time and date candidates are on by default and stay off once turned off`() {
+        // 用户 10-31：打“时间”“日期”要给当前时间和日期，像别的输入法一样默认就有。
+        assertEquals(true, KeyboardInputPreferences().datetimeCandidates)
+        assertEquals(true, KeyboardInputPreferences.read(context).datetimeCandidates)
+        KeyboardInputPreferences.read(context).copy(datetimeCandidates = false).save(context)
+        assertEquals(false, values[KeyboardInputPreferences.DATETIME_CANDIDATES_KEY])
+        assertEquals(false, KeyboardInputPreferences.read(context).datetimeCandidates)
+        KeyboardInputPreferences.read(context).copy(datetimeCandidates = true).save(context)
+        assertEquals(true, KeyboardInputPreferences.read(context).datetimeCandidates)
+    }
+
     @Test fun `every saved setting refreshes the keyboard already on screen`() {
         // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
         KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)
