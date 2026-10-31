@@ -13,7 +13,8 @@ object CandidateModelCatalog {
         ModelInfo(NGRAM, "九键词组模型（完整，203 MB）", "让九键按整句常用说法组词和排序，安装后重新启动输入法生效；不下载时九键使用旧算法。CyIME 自行训练，默认推荐。", ModelCategory.CANDIDATE,
             versions = listOf(ModelVersion(version = "v3-ls-tri-c3", size = "202.9 MB", files = listOf(
                 ModelFile("t9_ngram.lm", "https://github.com/Cyletix/CyIME/releases/download/models/t9_ngram-v3-ls-tri-c3.lm",
-                    "11cee2cbd87f42cb18ddcd2b38ac2c2ef9e4a778c64da68f8c6f615e4050c867", 212706156L),
+                    "11cee2cbd87f42cb18ddcd2b38ac2c2ef9e4a778c64da68f8c6f615e4050c867", 212706156L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "t9_ngram-v3-ls-tri-c3.lm")),
             )),
             // 旧版 370 MB 格式：只用来认出老版本留下的文件，让它在模型管理里可见、可删、可被新版替换；不作为下载版本。
             ModelVersion(version = "v3-ls-tri", retired = true, changelog = "旧格式，内容与新版相同；可删除后改装新版以节省空间。", size = "350.6 MB", files = listOf(
@@ -23,7 +24,8 @@ object CandidateModelCatalog {
         ModelInfo(NGRAM_SMALL, "九键词组模型（精简，105 MB）", "完整版剪枝后的小一半版本，整句首选约低 3 个百分点；和完整版二选一，安装后重新启动输入法生效。CyIME 自行训练。", ModelCategory.CANDIDATE,
             versions = listOf(ModelVersion(version = "v4-ls-p5e-8-c3", size = "104.6 MB", files = listOf(
                 ModelFile("t9_ngram.lm", "https://github.com/Cyletix/CyIME/releases/download/models/t9_ngram-v4-ls-p5e-8-c3.lm",
-                    "7d346a1fa2b332bdd764d1b91bc8002526cb7d563fea091f6b861279be025c4e", 109685894L),
+                    "7d346a1fa2b332bdd764d1b91bc8002526cb7d563fea091f6b861279be025c4e", 109685894L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "t9_ngram-v4-ls-p5e-8-c3.lm")),
             )))),
         // 九键词组模型在全部回放测试集上都比它准（t9-ngram-handover-20261010.md），体积不到它的三分之一：不再提供下载。
         // 条目保留：认出已下载的文件；没装词组模型的人它仍在起作用，装了词组模型后由 dropSupersededGrammar 删掉。
