@@ -7,8 +7,13 @@ import android.view.inputmethod.InputConnection
 import kotlin.math.abs
 
 /** 编辑器光标操作不经过 Rime，所有键盘布局使用相同的选择区语义。 */
-internal class EditorCursor {
-    private companion object { const val PENDING_TIMEOUT_MS = 1_000L }
+internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) {
+    private companion object {
+        const val PENDING_TIMEOUT_MS = 1_000L
+        /** 拖动中停顿超过这么久，下一格重新读一次输入框。 */
+        const val DRAG_TEXT_TTL_MS = 1_500L
+        const val DRAG_SELECTIONS_MAX = 4_096
+    }
     private var connection: InputConnection? = null
     private var anchor: Int? = null
     private var active: Int? = null
@@ -19,11 +24,19 @@ internal class EditorCursor {
     private var pendingAnchor: Int? = null
     private var pendingFrom: Int = 0
     private var pendingAt: Long = 0
+    // 拖动移光标（[moveWithFeedback]）时读一次输入框文字，之后每格按这份文字算位置、只发 setSelection。
+    // 原来每格都向宿主要一次全文（阻塞等宿主主线程），B 站放视频时一次约 130 ms，滑几格就落后半秒（用户 10-31）。
+    // 拖动中文字不变；宿主报来的选区不是自己设的（打了字、宿主自己改了）、换了输入框、做了别的编辑操作或停顿过久就丢掉重读。
+    private var dragging = false
+    private var dragText: ExtractedText? = null
+    private var dragTextAt = 0L
+    private val dragSelections = HashSet<Long>()
 
     fun observeSelection(ic: InputConnection, start: Int, end: Int) {
         bind(ic)
         reportedStart = start.takeIf { it >= 0 }
         reportedEnd = end.takeIf { it >= 0 }
+        if (dragText != null && selectionKey(minOf(start, end), maxOf(start, end)) !in dragSelections) dropDragText()
         val anchorBack = pendingAnchor ?: return
         if (System.currentTimeMillis() - pendingAt > PENDING_TIMEOUT_MS) { pendingAnchor = null; return }
         // 折叠本身的回报（还在原处）不算；宿主移动后的折叠光标才是新的活动端。
@@ -94,11 +107,55 @@ internal class EditorCursor {
             }
         }.getOrNull()
     }
-    private fun snapshot(ic: InputConnection): ExtractedText? =
+    private fun snapshot(ic: InputConnection): ExtractedText? {
+        if (dragging) return dragSnapshot(ic)
+        dropDragText()
+        return freshSnapshot(ic)
+    }
+
+    private fun freshSnapshot(ic: InputConnection): ExtractedText? =
         runCatching { ic.getExtractedText(ExtractedTextRequest(), 0) }.getOrNull()?.takeIf {
             val length = it.text?.length ?: return@takeIf false
             it.startOffset >= 0 && it.selectionStart in 0..length && it.selectionEnd in 0..length
         } ?: surroundingSnapshot(ic)
+
+    private fun dragSnapshot(ic: InputConnection): ExtractedText? {
+        val now = clock()
+        dragText?.takeIf { now - dragTextAt <= DRAG_TEXT_TTL_MS }?.let { dragTextAt = now; return it }
+        dropDragText()
+        val fresh = freshSnapshot(ic) ?: return null
+        val copy = ExtractedText().apply {
+            text = fresh.text.toString()
+            startOffset = fresh.startOffset
+            selectionStart = fresh.selectionStart
+            selectionEnd = fresh.selectionEnd
+        }
+        dragText = copy
+        dragTextAt = now
+        val start = copy.startOffset + minOf(copy.selectionStart, copy.selectionEnd)
+        val end = copy.startOffset + maxOf(copy.selectionStart, copy.selectionEnd)
+        dragSelections += selectionKey(start, end)
+        return copy
+    }
+
+    /** 自己刚设的选区记进缓存；超出缓存的文字范围就丢掉，下一格重读。 */
+    private fun recordDragSelection(start: Int, end: Int) {
+        val cached = dragText ?: return
+        val length = cached.text?.length ?: return dropDragText()
+        val localStart = start - cached.startOffset
+        val localEnd = end - cached.startOffset
+        if (localStart !in 0..length || localEnd !in 0..length || dragSelections.size >= DRAG_SELECTIONS_MAX) return dropDragText()
+        cached.selectionStart = localStart
+        cached.selectionEnd = localEnd
+        dragSelections += selectionKey(start, end)
+    }
+
+    private fun dropDragText() {
+        dragText = null
+        dragSelections.clear()
+    }
+
+    private fun selectionKey(start: Int, end: Int): Long = (start.toLong() shl 32) or (end.toLong() and 0xffffffffL)
 
     private fun syncSelection(extracted: ExtractedText) {
         val start = extracted.startOffset + extracted.selectionStart
@@ -119,6 +176,7 @@ internal class EditorCursor {
         reportedStart = minOf(start, target)
         reportedEnd = maxOf(start, target)
         if (selecting) { anchor = start; active = target }
+        recordDragSelection(minOf(start, target), maxOf(start, target))
         return true
     }
 
@@ -126,6 +184,7 @@ internal class EditorCursor {
         if (connection !== ic) {
             connection = ic
             resetSelection()
+            dropDragText()
             reportedStart = null
             reportedEnd = null
         }
@@ -133,9 +192,15 @@ internal class EditorCursor {
 
     /** 每一个成功的字符步长独立通知，边界和失败不产生额外触觉。 */
     fun moveWithFeedback(ic: InputConnection, steps: Int, selecting: Boolean = false, onStep: () -> Unit) {
-        repeat(abs(steps)) {
-            if (!move(ic, steps.compareTo(0), selecting)) return
-            onStep()
+        bind(ic)
+        dragging = true
+        try {
+            repeat(abs(steps)) {
+                if (!move(ic, steps.compareTo(0), selecting)) return
+                onStep()
+            }
+        } finally {
+            dragging = false
         }
     }
 
@@ -159,11 +224,19 @@ internal class EditorCursor {
             // 片段边缘不一定是文档边缘：查询光标周围文本后计算绝对位置，
             // 在真实文首/文末截停，不能继续发 DPAD 让宿主把焦点移出输入框。
             val target = if (moved == abs(remaining)) extracted.startOffset + next
-                else extendedHorizontalTarget(ic, extracted, from, remaining)
+                else extendedHorizontalTarget(ic, extracted, from, remaining).also { dropDragText() }
             if (target != null && setSelection(ic, target, selecting))
                 return target != extracted.startOffset + from || collapsed
         }
+        // 下面交给宿主按方向键移动，缓存的文字和选区都不再可信；这一步也不用缓存。
+        dropDragText()
         if (!allowKeyEventFallback) return false
+        val wasDragging = dragging
+        dragging = false
+        try { return moveByKeys(ic, steps, selecting) } finally { dragging = wasDragging }
+    }
+
+    private fun moveByKeys(ic: InputConnection, steps: Int, selecting: Boolean): Boolean {
         val key = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
         var moved = false
         repeat(abs(steps)) {

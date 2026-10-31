@@ -287,6 +287,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     }
     
     private val editorCursor = EditorCursor()
+    private val pendingCursorSteps = PendingCursorSteps()
     private val japaneseKanaComposer = JapaneseKanaComposer()
     private var japaneseKanaSession = Long.MIN_VALUE
 
@@ -365,7 +366,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         internalConnection?.takeIf { it.first === editor }?.second
             ?: editor.onCreateInputConnection(android.view.inputmethod.EditorInfo())?.also { internalConnection = editor to it }
 
-    private fun editCursor(finishComposition: Boolean = true, preeditKey: String? = null, action: (InputConnection) -> Unit) {
+    private fun editCursor(finishComposition: Boolean = true, preeditKey: (() -> String?)? = null, action: (InputConnection) -> Unit) {
         val target = service.uiState.value.inputTarget
         if (target.isInternal) {
             val editor = target.editText() ?: return // Never fall back to the host when an internal editor owns input.
@@ -387,7 +388,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 }
                 val composing = service.candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() }
                 if (preeditKey != null && composing) {
-                    service.keyboardCallbacks?.onPreeditCursorMove?.invoke(preeditKey)
+                    preeditKey()?.let { service.keyboardCallbacks?.onPreeditCursorMove?.invoke(it) }
                     return@withContext
                 }
                 val preserveComposition = finishComposition &&
@@ -408,7 +409,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
      * 单行框只在文本内移动（审计 F11：以前自动折行的长段落一下跳到段首/段尾）。
      */
     internal fun moveEditorCursorVertical(steps: Int, selecting: Boolean = false) =
-        editCursor(preeditKey = "preedit_cursor:${if (steps < 0) "start" else "end"}") { connection ->
+        editCursor(preeditKey = { "preedit_cursor:${if (steps < 0) "start" else "end"}" }) { connection ->
             if (service.isTerminalEditor()) {
                 // 终端里上下键就是翻命令历史，原样发出去。
                 TerminalEditor.sendKeys(connection, if (steps < 0) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN, abs(steps))
@@ -438,12 +439,22 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             byWord = event.isCtrlPressed, toBoundary = event.isAltPressed || event.isMetaPressed)
     }
 
-    internal fun moveEditorCursor(steps: Int, selecting: Boolean = false, onStep: () -> Unit = {}) =
-        editCursor(preeditKey = "preedit_cursor:$steps") {
-            if (service.isTerminalEditor()) TerminalEditor.sendKeys(it,
-                if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT, abs(steps), onStep)
-            else editorCursor.moveWithFeedback(it, steps, selecting, onStep)
+    /**
+     * 拖动移光标（长按空格、键盘区滑动）的每一格。每格仍排一个队列任务，但轮到的任务把攒下的格子一次做完，
+     * 见 [PendingCursorSteps]：宿主回话慢时不再一格等一格（用户 10-31：长按空格滑动延迟很大）。
+     */
+    internal fun moveEditorCursor(steps: Int, selecting: Boolean = false, onStep: () -> Unit = {}) {
+        if (steps == 0) return
+        val session = service.uiState.value.inputSessionId
+        pendingCursorSteps.add(steps, selecting, session)
+        editCursor(preeditKey = { pendingCursorSteps.drainNet(session)?.let { "preedit_cursor:$it" } }) { ic ->
+            for (run in pendingCursorSteps.drain(session)) {
+                if (service.isTerminalEditor()) TerminalEditor.sendKeys(ic,
+                    if (run.steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT, abs(run.steps), onStep)
+                else editorCursor.moveWithFeedback(ic, run.steps, run.selecting, onStep)
+            }
         }
+    }
 
     /** 已在按键队列中，不能再次排队，否则长按方向键会积压到后续操作之后。 */
     internal suspend fun moveJapaneseCursorFromKeyQueue(steps: Int) {

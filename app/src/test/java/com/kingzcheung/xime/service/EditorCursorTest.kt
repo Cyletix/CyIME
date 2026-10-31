@@ -125,6 +125,59 @@ class EditorCursorTest {
         assertEquals(7, ticks)
     }
 
+    // 用户 10-31：长按空格滑动延迟很大。每格都向宿主要一次全文，宿主主线程忙时一次约 130 ms，
+    // 一格等一格越拖越远。拖动中只读一次文字，之后每格只发 setSelection，逐格照样走。
+    @Test fun `space drag reads the editor text once and then moves one character per step`() {
+        val ic = editor(0, text = "abcdefghij")
+        val cursor = EditorCursor()
+        var ticks = 0
+        repeat(6) { step ->
+            cursor.moveWithFeedback(ic, 1) { ticks++ }
+            // 宿主报回的是自己刚设的位置：缓存继续用。
+            cursor.observeSelection(ic, step + 1, step + 1)
+        }
+        cursor.moveWithFeedback(ic, -2) { ticks++ }
+        verify(ic, times(1)).getExtractedText(any(), any())
+        for (position in listOf(1, 2, 3, 6)) verify(ic).setSelection(position, position)
+        verify(ic, times(2)).setSelection(5, 5)
+        verify(ic, times(2)).setSelection(4, 4)
+        assertEquals(8, ticks)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `space drag rereads the editor after a foreign selection, another edit or a long pause`() {
+        var now = 0L
+        val ic = editor(0, text = "abcdefghij")
+        val cursor = EditorCursor { now }
+        cursor.moveWithFeedback(ic, 2) {}
+        verify(ic, times(1)).getExtractedText(any(), any())
+        // 用户点了输入框别处（宿主报来不是自己设的选区）。
+        cursor.observeSelection(ic, 7, 7)
+        cursor.moveWithFeedback(ic, 1) {}
+        verify(ic, times(2)).getExtractedText(any(), any())
+        // 编辑面板等别的操作之后，拖动重新读。
+        cursor.move(ic, 1)
+        cursor.moveWithFeedback(ic, 1) {}
+        verify(ic, times(4)).getExtractedText(any(), any())
+        // 停顿超过 1.5 秒。
+        now += 1_501
+        cursor.moveWithFeedback(ic, 1) {}
+        verify(ic, times(5)).getExtractedText(any(), any())
+        cursor.moveWithFeedback(ic, 1) {}
+        verify(ic, times(5)).getExtractedText(any(), any())
+    }
+
+    @Test fun `space drag with cached text still stops at the document edge without focus keys`() {
+        val ic = editor(8, text = "abcdefghij")
+        val cursor = EditorCursor()
+        var ticks = 0
+        cursor.moveWithFeedback(ic, 5) { ticks++ }
+        assertEquals(2, ticks)
+        verify(ic).setSelection(9, 9)
+        verify(ic, atLeastOnce()).setSelection(10, 10)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
     @Test fun `rejected editor operations do not report cursor feedback`() {
         val ic = editor(1)
         doReturn(false).whenever(ic).setSelection(any(), any())
