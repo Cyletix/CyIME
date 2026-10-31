@@ -8,6 +8,9 @@ package com.kingzcheung.xime.service
  * - 退格：照常删掉这个空格；其他键照常，空格保留。
  * Shift、切换数字/符号页这些不打字的键不算，选完词切到符号页打 ? ! 照样换位置。
  * 光标前已经不是刚上屏的“词+空格”（挪了光标、宿主改了文字）就当没补过，这个键照常处理。
+ *
+ * 英文标点后自动加空格（另一个开关，默认关，别人请求，10-31）：英文键盘在字母后面打 , . ? ! : ; 时上屏“标点+空格”，
+ * 补的空格同样只管紧接着的一个键（[arm] 传标点本身），所以按空格不多打、连打 ... ?! 空格留在最后。
  */
 internal class EnglishAutoSpace {
     /** 刚上屏的“词+空格”；null 表示没有待处理的自动空格。按键线程读、主线程写。 */
@@ -38,6 +41,30 @@ internal class EnglishAutoSpace {
          * 紧跟自动空格的键要怎么改：返回替换光标前那个空格的文字（空串表示空格键本身，什么都不用再打）；
          * null 表示这个键照常处理、空格保留。
          */
+        /** 英文标点后自动加空格的设置键，默认关。 */
+        const val PUNCTUATION_PREF_KEY = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ENGLISH_PUNCTUATION_SPACE_KEY
+
+        /** 数字里也会用的 , . :（3.14、1,000、10:30）只跟在字母或右括号、引号后面才补空格。 */
+        private const val SPACE_AFTER_WORD = ".,:"
+        /** ? ! ; 不会出现在数字中间，跟在数字后面也补。 */
+        private const val SPACE_AFTER_ANY = "?!;"
+        private const val CLOSERS = ")]}\"'\u2019\u201d"
+
+        /**
+         * 英文标点后要不要自动补空格：[before] 是光标前一个字，[after] 是光标后一个字。
+         * 光标前是空白、标点、汉字或输入框开头不补；光标后已经是空白（在句中补标点）不补。
+         */
+        fun spacesAfterPunctuation(key: String, before: CharSequence?, after: CharSequence?): Boolean {
+            if (key.length != 1) return false
+            val p = key[0]
+            if (p !in SPACE_AFTER_WORD && p !in SPACE_AFTER_ANY) return false
+            val prev = before?.lastOrNull() ?: return false
+            val latinLetter = prev.isLetter() && Character.UnicodeScript.of(prev.code) == Character.UnicodeScript.LATIN
+            val ok = latinLetter || prev in CLOSERS || (p in SPACE_AFTER_ANY && prev in '0'..'9')
+            if (!ok) return false
+            return after?.firstOrNull()?.isWhitespace() != true
+        }
+
         fun replacementFor(key: String): String? = when {
             key == "space" || key == " " -> ""
             key.length == 1 && key[0] in MOVE_BEFORE -> "$key "
