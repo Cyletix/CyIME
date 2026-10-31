@@ -3,5 +3,6 @@
     <cache-path name="document_ocr" path="document_ocr/" />
     <cache-path name="emoji_cache" path="emoji_cache/" />
     <cache-path name="clipboard_images" path="clipboard_images/" />
+    <cache-path name="updates" path="updates/" />
     <files-path name="files" path="." />
 </paths>

@@ -274,6 +274,8 @@ fun AboutContent(
                     onClick = { uriHandler.openUri("https://github.com/kingzcheung") },
                 )
 
+                AppUpdateSection()
+
             // 链接项
                 SettingsSection(title = "信息与工具") {
                         SettingsItem(
@@ -505,7 +507,7 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "网络权限",
-                            content = "网络权限用于下载输入方案和模型，以及您主动启用的在线服务。本地 Rime、手写和离线语音模型在设备上运行。"
+                            content = "网络权限用于下载输入方案和模型、检查和下载新版本，以及您主动启用的在线服务。检查更新只向 GitHub 查询版本号，不发送输入内容；只有您点「检查更新」或打开「自动检查更新」时才联网查询，新版本由系统安装程序安装。本地 Rime、手写和离线语音模型在设备上运行。"
                         )
                         
                         PrivacySection(
