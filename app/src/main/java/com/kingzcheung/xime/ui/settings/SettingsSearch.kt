@@ -111,6 +111,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("语言与方案", input, "languages", "语言 输入方案 键盘布局 切换方式 双拼 日语 英语 九键 26键 14键 语言管理 中文 日文 英文 拼音"),
         page("键盘布局", input, layoutIndex, "布局 26键 九键 14键 布局与显示 自定义布局 按键符号 分体"),
         page("按键与手势", input, gesturePage, "手势 角标 光标 空格 长按 上滑 下滑 滑动"),
+        page("按键技巧", gestures, layoutPage("key_tips"), "技巧 说明 教程 帮助 Shift Ctrl 大写 锁定 快捷键 复制 粘贴 隐藏 功能 拖动"),
         page("物理键盘", input, SettingsRoutes.HardwareKeyboard, "实体键盘 蓝牙键盘 外接键盘 硬键盘 语言切换快捷键 候选跟随 浮条 浮窗"),
         page("主题与外观", look, SettingsRoutes.Theme, "主题 皮肤 颜色 配色 深色 浅色 夜间 玻璃 背景 外观 视觉样式 定制"),
         page("候选词", look, candidatePage, "候选 候选栏 字号 候选注释 每页候选数"),
