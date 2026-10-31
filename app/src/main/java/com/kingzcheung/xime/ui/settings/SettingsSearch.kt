@@ -128,6 +128,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 输入 › 语言与方案
         SettingsSearchEntry("语言键切换方式", languages, "languages", "语言键 切换语言 中英切换 循环切换 指定语言 英文 地球键 点按语言键"),
         SettingsSearchEntry("繁体输出", languages, "languages", "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换"),
+        SettingsSearchEntry("时间日期候选", languages, "languages", "时间 日期 星期 今天 几点 当前时间 当前日期 年月日 联想 候选"),
         page("已安装的方案", languages, SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序 方案资源 启用14键 中文14键"),
         page("双拼方案", languages, SettingsRoutes.DoublePinyin, "双拼 自定义双拼 首道双拼 小鹤双拼 自然码 智能ABC 拼音加加 微软双拼 分号 九键双拼 14键双拼 键位 韵母 零声母 新建 编辑"),
         // 输入 › 键盘布局

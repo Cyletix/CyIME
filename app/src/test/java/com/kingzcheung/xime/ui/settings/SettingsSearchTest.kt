@@ -74,6 +74,12 @@ class SettingsSearchTest {
         assertTrue("剪贴板卡片最多显示" in titles("剪貼板"))
     }
 
+    /** 「时间日期候选」按说法能搜到（用户 10-31 要的功能）。 */
+    @Test fun timeAndDateCandidatesAreSearchable() {
+        assertTrue("时间日期候选" in titles("当前时间"))
+        assertTrue("时间日期候选" in titles("日期"))
+    }
+
     /** 14 键默认没启用：搜“14键”要能找到启用它的「已安装的方案」，不只是 14 键的手势设置。 */
     @Test fun fourteenKeySearchFindsWhereToEnableIt() {
         assertTrue("已安装的方案" in titles("14键"))

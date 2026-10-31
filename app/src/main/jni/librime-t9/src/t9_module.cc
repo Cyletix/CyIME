@@ -7,6 +7,7 @@
 #include "t9_date_translator.h"
 #include "t9_sentence_scorer.h"
 #include "t9_english_translator.h"
+#include "datetime_filter.h"
 
 using namespace rime;
 
@@ -19,6 +20,8 @@ static void rime_t9_initialize() {
     r.Register("t9_filter", new Component<T9Filter>);
     r.Register("t9_date_translator", new Component<T9DateTranslator>);
     r.Register("t9_english_translator", new Component<T9EnglishTranslator>);
+    // Current time/date after 时间/日期/星期 on every Chinese pinyin layout (datetime_filter.h).
+    r.Register("cyime_datetime", new Component<DatetimeFilter>);
 }
 
 static void rime_t9_finalize() {
