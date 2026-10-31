@@ -39,6 +39,13 @@ class SettingsSearchTest {
         assertEquals(pages, linked)
     }
 
+    /** 「时长与距离」默认收起：里面每一项搜到都要能让它自动展开（用户 10-31）。 */
+    @Test fun foldedTimingItemsExpandOnSearch() {
+        val folded = SettingsSearchIndex.filter { it.section == "时长与距离" }.map { it.title }
+        assertEquals(5, folded.size)
+        assertTrue("没登记自动展开：${folded - TIMING_SEARCH_KEYS}", TIMING_SEARCH_KEYS.containsAll(folded))
+    }
+
     /** 新设置树：每项只出现一处，路径都从首页五组之一开始。 */
     @Test fun everySettingLivesInOnePlaceUnderTheNewGroups() {
         val dup = SettingsSearchIndex.groupBy { it.title }.filterValues { it.size > 1 }.keys

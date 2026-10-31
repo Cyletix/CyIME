@@ -537,9 +537,14 @@ private fun LayoutDisplayPage(
             if (page == "key_tips") item { KeyTipsSettings() }
             if (page == "gestures") item { GesturePresetSettings() }
             if (page == "gestures") item {
-                InputExperienceSettings(setOf(InputExperiencePart.SYMBOLS, InputExperiencePart.LANGUAGE_HOLD), "角标与长按")
+                InputExperienceSettings(setOf(InputExperiencePart.SYMBOLS), "角标与长按")
             }
             if (page == "gestures") item { InputExperienceSettings(setOf(InputExperiencePart.CURSOR), "光标与空格") }
+            // 大多数人不会去调的时长、距离滑条收在一起，默认收起（用户 10-31）；设置搜索点中会自动展开。
+            if (page == "gestures") item {
+                InputExperienceSettings(setOf(InputExperiencePart.TIMING), "时长与距离",
+                    collapsedSummary = "长按空格、光标移动距离、长按语言键、!@# 松手时限")
+            }
             // 隐藏操作的说明（用户 10-31）：这一页最下面一行，点进去是「按键技巧」；它不是设置，不占上面的位置。
             if (page == "gestures") item {
                 SettingsSection(title = "说明", searchKey = "按键技巧入口", content = {

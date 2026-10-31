@@ -27,18 +27,40 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.settings.SettingsPreferences
 
 /** Groups of [InputExperienceSettings]; the 布局与显示 sub-pages each show some of them. */
-internal enum class InputExperiencePart { SYMBOLS, FLICK_DISC, KANA, CURSOR, LANGUAGE_HOLD, HANDWRITING, KEY_TEXT }
+internal enum class InputExperiencePart { SYMBOLS, FLICK_DISC, KANA, CURSOR, TIMING, HANDWRITING, KEY_TEXT }
+
+/** 「时长与距离」里的几项（设置搜索点中其中一项时自动展开，见 [InputExperienceSettings] 的 collapsedSummary）。 */
+internal val TIMING_SEARCH_KEYS = setOf("长按空格多久开始", "从中间滑到边缘走几行", "光标每移动一字所需距离",
+    "长按语言键弹出列表", "符号键松手打开符号的时限", "时长与距离")
 
 @Composable
 internal fun InputExperienceSettings(
     parts: Set<InputExperiencePart> = InputExperiencePart.entries.toSet(),
     title: String = "共通输入",
+    /** 默认收起，点标题行展开（用户 10-31：「按键与手势」的时长、距离滑条收起来）；设置搜索点中里面的项时自动展开。 */
+    collapsedSummary: String? = null,
 ) {
     val context = LocalContext.current
     val saved = rememberKeyboardInputPreferences()
     var settings by remember(saved) { mutableStateOf(saved) }
+    var expanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(collapsedSummary == null) }
+    val searchRequest = SettingsSearchFocus.request
+    LaunchedEffect(searchRequest) {
+        if (searchRequest != null && searchRequest.keys.any { it in TIMING_SEARCH_KEYS } &&
+            InputExperiencePart.TIMING in parts) expanded = true
+    }
     SettingsSection(title = title, content = {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (collapsedSummary != null) {
+            Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(16.dp)
+                .testTag("settings-fold:$title"), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (expanded) "收起" else collapsedSummary, modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(if (expanded) androidx.compose.material.icons.Icons.Default.ExpandLess
+                    else androidx.compose.material.icons.Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "收起$title" else "展开$title")
+            }
+        }
+        if (expanded) Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             var first = true
             @Composable fun divider() { if (!first) HorizontalDivider(); first = false }
             if (InputExperiencePart.SYMBOLS in parts) {
@@ -193,33 +215,7 @@ internal fun InputExperienceSettings(
                 Switch(checked = settings.bottomLiftCursor, modifier = Modifier.testTag("bottom-lift-cursor-switch"),
                     onCheckedChange = { settings = settings.copy(bottomLiftCursor = it); settings.save(context) })
             }
-            // 只显示当前生效的项：滑动移动光标关闭且底部留白滑动也关着时不显示光标距离。
-            // 触发时长跟着空格当前的长按功能放，标题写明它控制的是哪个功能。
-            @Composable fun spaceHoldSlider() {
-                val actionText = when (settings.effectiveSpaceHold) {
-                    SpaceHoldAction.CURSOR -> "移动光标"; SpaceHoldAction.REPEAT -> "连续输入空格"; SpaceHoldAction.VOICE_TOGGLE -> "说话"
-                }
-                Column(Modifier.settingsSearchAnchor("长按空格多久开始", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("长按空格多久开始$actionText：${"%.1f".format(settings.cursorHoldSeconds)} 秒")
-                    Slider(value = settings.cursorHoldSeconds, modifier = Modifier.testTag("cursor-hold-slider"),
-                        onValueChange = { settings = settings.copy(cursorHoldSeconds = normalizeCursorHoldSeconds(it)) },
-                        onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..1f, steps = 8)
-                    Text("默认 0.2 秒，每档 0.1 秒。语言键的长按单独设置。", style = MaterialTheme.typography.bodySmall)
-                }
-            }
             if (settings.cursorGesture != CursorGestureMode.NONE || settings.bottomLiftCursor) {
-                Column(Modifier.settingsSearchAnchor("从中间滑到边缘走几行", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("从中间滑到屏幕边缘走：${"%.2f".format(settings.cursorSwipeLines).trimEnd('0').trimEnd('.')} 行")
-                    Text("按当前输入框一行能放几个字换算，字号、屏幕大小、横竖屏自动对上，手机和平板不用分别调", style = MaterialTheme.typography.bodySmall)
-                    Slider(value = settings.cursorSwipeLines, onValueChange = { settings = settings.copy(cursorSwipeLines = normalizeCursorSwipeLines(it)) },
-                        onValueChangeFinished = { settings.save(context) }, valueRange = 0.5f..3f, steps = 9)
-                }
-                Column(Modifier.settingsSearchAnchor("光标每移动一字所需距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档（约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米）")
-                    Text("少数输入框不提供排版，读不到一行几个字时用这个距离；距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
-                    Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
-                        onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
-                }
                 // 只在总开关打开时显示：「按键效果」里关了振动或按键音，这里的开关不起作用。
                 @Composable fun cursorStepSwitch(title: String, description: String, checked: Boolean, tag: String,
                     update: (Boolean) -> KeyboardInputPreferences) {
@@ -264,10 +260,38 @@ internal fun InputExperienceSettings(
                     }
                 }
             }
-            spaceHoldSlider()
             }
-            if (InputExperiencePart.LANGUAGE_HOLD in parts) {
+            if (InputExperiencePart.TIMING in parts) {
             divider()
+            // 触发时长跟着空格当前的长按功能放，标题写明它控制的是哪个功能。
+            @Composable fun spaceHoldSlider() {
+                val actionText = when (settings.effectiveSpaceHold) {
+                    SpaceHoldAction.CURSOR -> "移动光标"; SpaceHoldAction.REPEAT -> "连续输入空格"; SpaceHoldAction.VOICE_TOGGLE -> "说话"
+                }
+                Column(Modifier.settingsSearchAnchor("长按空格多久开始", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("长按空格多久开始$actionText：${"%.1f".format(settings.cursorHoldSeconds)} 秒")
+                    Slider(value = settings.cursorHoldSeconds, modifier = Modifier.testTag("cursor-hold-slider"),
+                        onValueChange = { settings = settings.copy(cursorHoldSeconds = normalizeCursorHoldSeconds(it)) },
+                        onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..1f, steps = 8)
+                    Text("默认 0.2 秒，每档 0.1 秒。语言键的长按单独设置。", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            spaceHoldSlider()
+            // 只显示当前生效的项：滑动移动光标关闭且底部留白滑动也关着时不显示光标距离。
+            if (settings.cursorGesture != CursorGestureMode.NONE || settings.bottomLiftCursor) {
+                Column(Modifier.settingsSearchAnchor("从中间滑到边缘走几行", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("从中间滑到屏幕边缘走：${"%.2f".format(settings.cursorSwipeLines).trimEnd('0').trimEnd('.')} 行")
+                    Text("按当前输入框一行能放几个字换算，字号、屏幕大小、横竖屏自动对上，手机和平板不用分别调", style = MaterialTheme.typography.bodySmall)
+                    Slider(value = settings.cursorSwipeLines, onValueChange = { settings = settings.copy(cursorSwipeLines = normalizeCursorSwipeLines(it)) },
+                        onValueChangeFinished = { settings.save(context) }, valueRange = 0.5f..3f, steps = 9)
+                }
+                Column(Modifier.settingsSearchAnchor("光标每移动一字所需距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档（约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米）")
+                    Text("少数输入框不提供排版，读不到一行几个字时用这个距离；距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
+                    Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
+                        onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
+                }
+            }
             Column(Modifier.settingsSearchAnchor("长按语言键弹出列表", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("长按语言键弹出列表：${"%.2f".format(settings.languageMenuHoldSeconds)} 秒")
                 Text("默认 0.15 秒，每档 0.05 秒；按住语言键达到时长后弹出语言列表，与空格长按分开设置。", style = MaterialTheme.typography.bodySmall)
