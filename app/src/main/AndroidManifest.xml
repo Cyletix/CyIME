@@ -39,6 +39,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Xime"
         tools:targetApi="31">
+
+        <!-- RichTap HD vibration support (Xiaomi/HyperOS). Optional library; app works without it. -->
+        <uses-library
+            android:name="richtap-api"
+            android:required="false" />
         
         <!-- Developer tool for test scripts (does nothing outside 装到我的设备 builds); only adb (DUMP) may send it. -->
         <receiver
