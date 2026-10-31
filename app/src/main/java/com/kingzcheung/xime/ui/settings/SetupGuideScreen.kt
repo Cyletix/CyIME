@@ -239,7 +239,7 @@ private fun DeviceSection(facts: SetupFacts, onOpenPerformance: (() -> Unit)?) {
                 .clickable(role = Role.Button, onClick = open).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("性能与省电", style = GuideText.optionTitle())
-                    Text("按键动效、炫光和语音模型常驻多久在那一页调，马上生效；这一页只管用哪些模型", style = GuideText.body(),
+                    Text("按键动效、炫光和语音模型常驻多久", style = GuideText.body(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.width(12.dp))

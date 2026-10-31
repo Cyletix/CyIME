@@ -358,7 +358,7 @@ private fun LayoutDisplayPage(
                     Column(Modifier.settingsSearchAnchor("候选注释")) {
                         Text("候选注释", style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                        Text("26／14／九键和手写共用；中文手写的注释是读音（选了释义也是）。显示：始终显示；自动：宽时显示、窄时隐藏；隐藏：始终不显示。",
+                        Text("26／14／九键和手写共用；自动：宽时显示、窄时隐藏。中文手写的注释总是读音。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp))
                         Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
@@ -387,7 +387,7 @@ private fun LayoutDisplayPage(
                         Column(Modifier.settingsSearchAnchor("候选注释内容")) {
                             Text("候选注释内容", style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                            Text("拼音：显示拼音或编码。释义：中文候选显示英文，中文键盘里混出的英文候选显示中文，九键长按「下一项」或按住 Shift 再选候选就上屏英文单词；选释义时会自动下载释义词典（也在扩展商店的模型“其他”里），上面的「自动」也改成「显示」（手机竖屏的「自动」不显示注释），查不到的候选仍显示拼音。",
+                            Text("释义：中文候选显示英文，混出的英文候选显示中文，九键长按「下一项」或按住 Shift 再选候选就上屏英文单词；选释义会自动下载释义词典，并把上面的「自动」改成「显示」，查不到的候选仍显示拼音。",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 16.dp))
                             var glossDownloadRequest by remember { mutableStateOf(0) }
@@ -588,7 +588,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键上方的符号提示，输入方式和滑动方向在「按键与手势」设置；上下两项都关就是不带角标的干净键盘",
+                                text = "输入方式和滑动方向在「按键与手势」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -622,7 +622,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键下方的提示内容，输入方式和滑动方向在「按键与手势」设置",
+                                text = "输入方式和滑动方向在「按键与手势」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -656,7 +656,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "默认关闭以减少动画开销；开启后点按会显示字符气泡",
+                                text = "点按时显示按下的字符，多一点动画开销",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

@@ -91,7 +91,7 @@ class SettingsListPagesRenderTest {
                                     onToggle = {}, onSelect = {}, isBuiltIn = english,
                                     groupIndex = index, groupSize = schemas.size)
                             }
-                            SettingsNote("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备。")
+                            SettingsNote("长按可排序；语言和默认组合在「语言与方案」选择。")
                         }
                     }
                     Spacer(Modifier.width(20.dp))
