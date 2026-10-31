@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -322,15 +325,45 @@ fun SchemaSettingsContent(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                val disabledSchemas = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas &&
-                    (showExtraSchemas || it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.listedWhenOff) }
-                item {
-                    TextButton(onClick = { showExtraSchemas = !showExtraSchemas }) {
-                        Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）")
+                // 关着的方案：常用的（14 键、双拼）一直列出；其余收在「其他已安装方案（高级）」里，折叠行写明有几个、带展开箭头。
+                // 以前按收起后的列表判断，收起时写「没有其他可用方案」，点开却是一长串（用户 10-31）。
+                val disabledAll = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas }
+                val listedOff = disabledAll.filter { it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.listedWhenOff }
+                val extraOff = disabledAll.filterNot { it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.listedWhenOff }
+
+                itemsIndexed(listedOff, key = { _, schema -> schema.schemaId }) { row, schema ->
+                    SchemaToggleItem(
+                        schema = schema,
+                        enabled = false,
+                        isCompiled = SchemaManager.isSchemaCompiled(context, schema.schemaId),
+                        isCurrent = false,
+                        onToggle = { viewModel.toggleSchema(schema) },
+                        onSelect = { viewModel.selectSchema(schema) },
+                        groupIndex = row,
+                        groupSize = listedOff.size,
+                    )
+                }
+
+                if (extraOff.isNotEmpty()) item(key = "extra-schemas-fold") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(12.dp))
+                            .clickable { showExtraSchemas = !showExtraSchemas }
+                            .testTag("extra-schemas-fold")
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）",
+                            modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary)
+                        Text("${extraOff.size} 个", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(if (showExtraSchemas) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (showExtraSchemas) "收起" else "展开",
+                            tint = MaterialTheme.colorScheme.primary)
                     }
                 }
 
-                if (disabledSchemas.isEmpty()) {
+                if (disabledAll.isEmpty()) {
                     item {
                         Text(
                             text = "没有其他可用方案",
@@ -341,7 +374,7 @@ fun SchemaSettingsContent(
                     }
                 }
 
-                itemsIndexed(disabledSchemas, key = { _, schema -> schema.schemaId }) { row, schema ->
+                if (showExtraSchemas) itemsIndexed(extraOff, key = { _, schema -> schema.schemaId }) { row, schema ->
                     SchemaToggleItem(
                         schema = schema,
                         enabled = false,
@@ -350,7 +383,7 @@ fun SchemaSettingsContent(
                         onToggle = { viewModel.toggleSchema(schema) },
                         onSelect = { viewModel.selectSchema(schema) },
                         groupIndex = row,
-                        groupSize = disabledSchemas.size,
+                        groupSize = extraOff.size,
                     )
                 }
                 // 导入和从「扩展 › 方案」获取的方案包：卸载在这里；同名文件没确认的包留着，可以再装或删。
