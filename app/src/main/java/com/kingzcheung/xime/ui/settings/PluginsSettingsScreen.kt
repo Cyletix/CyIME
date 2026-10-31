@@ -543,7 +543,7 @@ private fun ExtensionItem(
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
-                        Switch(checked = isEnabled, enabled = hostCompatible, onCheckedChange = {
+                        Switch(checked = isEnabled, enabled = hostCompatible, colors = settingsSwitchColors(), onCheckedChange = {
                             isEnabled = it
                             viewModel.setPluginEnabled(extension.id, it)
                         })

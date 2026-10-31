@@ -107,7 +107,7 @@ internal fun OfflineModelCard() {
                                 else -> "停顿后由 SenseVoice 复核主模型结果，会增加内存占用和等待时间。"
                             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Switch(checked = enabled, enabled = available, onCheckedChange = null)
+                        Switch(checked = enabled, enabled = available, onCheckedChange = null, colors = settingsSwitchColors())
                     }
                 }
                 // 整句定稿只对中文生效：中文开着校正，或中文直接用 SenseVoice 时可用（英文的校正不受它影响）。
@@ -142,7 +142,8 @@ internal fun OfflineModelCard() {
                         if (finalizerNote != null) Text(finalizerNote,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null)
+                    Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null,
+                        colors = settingsSwitchColors())
                 }
                 if (chineseCorrection && !xasrReady) {
                     ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }

@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -277,10 +279,25 @@ fun SettingsToggleItem(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = !locked,
-            // Same Material on-primary thumb / primary track as the readable refinement switch.
-            colors = SwitchDefaults.colors()
+            colors = settingsSwitchColors()
         )
     }
+}
+
+/**
+ * 设置里所有可能不能拨的开关（英文始终开启、被别的设置锁住、条件不满足、正在保存）都用这套颜色：
+ * Material 默认「不能拨且开着」是灰底深色滑块，深色主题下看着像关着。这里开着时保留主题色只调淡，
+ * 关着的禁用样式不变，一眼能分清开关状态，也能看出现在拨不动。
+ */
+@Composable
+internal fun settingsSwitchColors(): SwitchColors {
+    val scheme = MaterialTheme.colorScheme
+    return SwitchDefaults.colors(
+        disabledCheckedThumbColor = scheme.onPrimary,
+        disabledCheckedTrackColor = scheme.primary.copy(alpha = 0.55f).compositeOver(scheme.surface),
+        disabledCheckedIconColor = scheme.primary.copy(alpha = 0.55f).compositeOver(scheme.surface),
+        disabledCheckedBorderColor = Color.Transparent,
+    )
 }
 
 /** 被锁住的设置下面那一行「已被…锁定」，各页统一样式。 */

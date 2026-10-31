@@ -516,6 +516,7 @@ internal fun SchemaToggleItem(
                 checked = enabled,
                 enabled = !isBuiltIn,
                 onCheckedChange = { if (!isBuiltIn) onToggle() },
+                colors = settingsSwitchColors(),
                 modifier = Modifier.testTag("schema-toggle:${schema.schemaId}")
             )
         }
