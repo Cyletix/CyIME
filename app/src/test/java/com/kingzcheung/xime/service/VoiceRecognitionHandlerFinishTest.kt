@@ -56,6 +56,7 @@ class VoiceRecognitionHandlerFinishTest {
     private var voiceCompleteCount = 0
     private var currentState = InputUIState(currentSchemaId = "rime_ice")
     private var wholeSentence = false
+    private var autoPunctuation = false
 
     /** mock mainHandler 的 postDelayed 队列，可手动推进超时。 */
     private val posted = mutableListOf<Runnable>()
@@ -76,6 +77,9 @@ class VoiceRecognitionHandlerFinishTest {
         // 整句定稿默认开；这些用例断言的是关闭时（每 6 秒校正、标点变空格）的行为，开启时的用例单独设 wholeSentence = true。
         whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_WHOLE_SENTENCE), any<Boolean>()))
             .thenAnswer { wholeSentence }
+        // 自动加标点默认关（1.15.0 以前的习惯）；保留模型标点的用例单独设 autoPunctuation = true。
+        whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_AUTO_PUNCTUATION), any<Boolean>()))
+            .thenAnswer { autoPunctuation }
         whenever(mockManager.finishTimeoutMs).thenReturn(8000L)
         whenever(mockMainHandler.postDelayed(any<Runnable>(), anyLong())).thenAnswer {
             posted.add(it.getArgument(0))
@@ -466,8 +470,9 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(1, voiceCompleteCount)
     }
 
-    @Test fun `whole sentence keeps the local model's Chinese punctuation`() {
+    @Test fun `whole sentence with auto punctuation keeps the local model's Chinese punctuation`() {
         wholeSentence = true
+        autoPunctuation = true
         startToolbar()
         onPartial("今天天气不错，我们去公园吧。")
         assertEquals("今天天气不错，我们去公园吧。", editor.toString())
@@ -477,8 +482,27 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(1, voiceCompleteCount)
     }
 
+    @Test fun `whole sentence without auto punctuation turns model marks into spaces like before 1_15`() {
+        wholeSentence = true
+        startToolbar()
+        onPartial("今天天气不错，我们去公园吧。")
+        assertEquals("今天天气不错 我们去公园吧", editor.toString())
+        handler.finishRecognition()
+        onResult("今天天气不错，我们去公园吧。明天见。")
+        assertEquals("今天天气不错 我们去公园吧 明天见", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `whole sentence without auto punctuation still writes dictated marks`() {
+        wholeSentence = true
+        startToolbar()
+        onPartial("我到了，逗号，马上下来句号。")
+        assertEquals("我到了，马上下来。", editor.toString())
+    }
+
     @Test fun `whole sentence leaves the English side of a Chinese pair with spaces`() {
         wholeSentence = true
+        autoPunctuation = true
         currentState = currentState.copy(isAsciiMode = true)
         startToolbar()
         onPartial("Hello, world!")
@@ -490,6 +514,7 @@ class VoiceRecognitionHandlerFinishTest {
 
     @Test fun `whole sentence leaves a standalone English profile with the old spacing`() {
         wholeSentence = true
+        autoPunctuation = true
         currentState = currentState.copy(currentSchemaId = "english", isAsciiMode = true)
         startToolbar()
         onPartial("How are you? Fine.")
@@ -498,6 +523,7 @@ class VoiceRecognitionHandlerFinishTest {
 
     @Test fun `whole sentence leaves Japanese with the old spacing`() {
         wholeSentence = true
+        autoPunctuation = true
         currentState = currentState.copy(currentSchemaId = "japanese")
         startToolbar()
         onPartial("今日は、東京です。")

@@ -74,6 +74,7 @@ object SettingsPreferences {
     const val KEY_STT_ENGINE_IDLE_MINUTES = "stt_engine_idle_minutes"
     const val KEY_STT_DEBUG_RECORD = "stt_debug_record"
     const val KEY_STT_WHOLE_SENTENCE = "stt_whole_sentence"
+    const val KEY_STT_AUTO_PUNCTUATION = "stt_auto_punctuation"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
@@ -750,6 +751,19 @@ object SettingsPreferences {
 
     fun setSttWholeSentence(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STT_WHOLE_SENTENCE, enabled).apply()
+    }
+
+    /**
+     * 语音自动加标点：整句定稿时保留模型打的标点。默认关，和 1.15.0 以前一样：模型的标点变成空格，
+     * 只有口述「逗号」「句号」「问号」「感叹号」出标点。1.15.0–1.15.21 把标点绑在整句定稿上、
+     * 又默认开，用户没法只去掉标点（2026-10-31 用户：「不要改我的习惯」）。
+     */
+    fun isSttAutoPunctuation(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_STT_AUTO_PUNCTUATION, false)
+    }
+
+    fun setSttAutoPunctuation(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_STT_AUTO_PUNCTUATION, enabled).apply()
     }
 
     /**
