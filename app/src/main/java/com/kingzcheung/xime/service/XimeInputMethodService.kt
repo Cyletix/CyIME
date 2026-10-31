@@ -3134,6 +3134,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (voiceFieldCleared(voiceFieldHadText, text)) stopVoiceBeforeLeaving()
             else if (!text.isNullOrEmpty()) voiceFieldHadText = true
         }
+        // 验证码已经进了输入框（手打、系统粘贴或应用自动填充）：候选栏不再提示它。
+        val smsCode = if (::clipboardManager.isInitialized) clipboardManager.verificationCode.value?.text else null
+        if (smsCode != null && com.kingzcheung.xime.clipboard.ClipboardManager.smsCodeEntered(smsCode,
+                runCatching { currentInputConnection?.getTextBeforeCursor(smsCode.length, 0) }.getOrNull())) {
+            clipboardManager.dismissVerificationCode()
+        }
         val current = candidateState.value
         if (!current.isComposing && current.inputText.isEmpty() &&
             (predictionManager.hasPendingPrediction || current.associationCandidates.isNotEmpty())) {
