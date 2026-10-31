@@ -149,24 +149,8 @@ class CandidateBarOptionsTest {
         rule.runOnIdle { assertTrue(SettingsPreferences.shouldShowCandidateCancelButton(context)) }
     }
 
-    @Test fun inputBoxModeNeverShowsPreeditBubble() {
-        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
-        rule.setContent {
-            CompositionLocalProvider(LocalContext provides context) {
-                MaterialTheme {
-                    Box(Modifier.fillMaxSize().padding(top = 100.dp)) {
-                        CandidateBar(composing.copy(inputText = "nihao", preeditText = "ni hao"), visuals = visuals,
-                            callbacks = CandidateBarCallbacks(onCandidateSelect = {}), modifier = Modifier.width(300.dp),
-                            onEditPreedit = {})
-                    }
-                }
-            }
-        }
-        rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
-    }
-
     @Test fun preeditShowsSyllableSeparatorsAtEditorFontSizeAndRemainsClickable() {
-        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR)
+        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
         val showPreview = mutableStateOf(true)
         var edits = 0
         rule.setContent {

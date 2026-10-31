@@ -39,7 +39,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
@@ -774,9 +773,7 @@ fun CodeDisplayCard(
                                 verticalArrangement = Arrangement.Center,
                                 modifier = Modifier.padding(vertical = 0.dp)
                             ) {
-                                // 显示在输入框时编码只在输入框里，这里留空位让两张卡的候选对齐。
-                                Row(modifier = Modifier.padding(vertical = 2.dp)
-                                    .alpha(if (showCodeInInputBox) 0f else 1f)) {
+                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
                                     Text(
                                         "shu ru fa",
                                         fontSize = 10.sp,
