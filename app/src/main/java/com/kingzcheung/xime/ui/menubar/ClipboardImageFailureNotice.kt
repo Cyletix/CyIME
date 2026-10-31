@@ -49,6 +49,30 @@ internal fun ClipboardImageFailureNotice(
     }
 }
 
+/**
+ * 手动无痕开着时剪贴板顶上的一行：新复制的内容不记录，已有记录照常用，一点「关闭无痕」就恢复记录。
+ * 和图片粘贴失败提示同一种小条，不另起样式。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ClipboardIncognitoNotice(onIncognitoOff: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxWidth()) {
+        Row(Modifier.widthIn(max = 480.dp).clip(RoundedCornerShape(8.dp))
+            .keyboardPanelBackground(colors.surfaceContainerHigh)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .testTag("clipboard-incognito"), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(Modifier.weight(1f, fill = false), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("无痕模式开着，新复制的内容不会记进来", color = colors.onSurfaceVariant, fontSize = 12.sp,
+                    lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(vertical = 5.dp))
+                NoticeAction("关闭无痕", "clipboard-incognito-off", onIncognitoOff)
+            }
+        }
+    }
+}
+
 @Composable
 private fun NoticeAction(label: String, tag: String, onClick: () -> Unit) {
     Text(label, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, lineHeight = 18.sp,
