@@ -3633,6 +3633,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             page = keyboardViewModel.page.value
         }
         calculatorEngine.clear()
+        keyRouter.englishAutoSpace.disarm()
         inputCommands.submit { rimeEngine.clearQueuedComposition(); rimeEngine.clearQueuedT9Composition() }
         t9PartialSegments.clear()
         // 录音已在本方法入口停止；这里仅重置语音 UI。

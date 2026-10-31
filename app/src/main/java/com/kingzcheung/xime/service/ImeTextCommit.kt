@@ -216,6 +216,8 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 service.keyRouter.commitDirectFieldLiteral(literal)
                 return@literal
             }
+            // 角标、符号面板打的标点同样跟英文选词后自动补的空格换位置（默认关）。
+            if (service.keyRouter.englishAutoSpace.isArmed && service.keyRouter.consumeEnglishAutoSpace(literal)) return@literal
             val engine = service.rimeEngine
             if (isT9Schema(service.uiState.value.currentSchemaId)) {
                 // 前驱九键已结束，但它的候选刷新在 Main 队列；先让这一帧同步落地。

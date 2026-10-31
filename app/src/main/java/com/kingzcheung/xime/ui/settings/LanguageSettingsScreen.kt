@@ -8,6 +8,7 @@ import androidx.compose.material.icons.twotone.ViewModule
 import androidx.compose.material.icons.twotone.Inventory
 import androidx.compose.material.icons.twotone.Schedule
 import androidx.compose.material.icons.twotone.Translate
+import androidx.compose.material.icons.twotone.SpaceBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
@@ -134,6 +135,15 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                     SettingsToggleItem(Icons.TwoTone.Schedule, "时间日期候选",
                         "打“时间”“日期”“星期”时，词后面紧跟着给设备当前的时间和日期（15:35、2026-10-31、星期六），词本身的位置不变；全拼、双拼、九键、14 键都适用。",
                         checked = input.datetimeCandidates, onCheckedChange = { input.copy(datetimeCandidates = it).save(context) })
+                }
+            }
+            item(key = "english-input") {
+                val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
+                SettingsSection(title = "英文输入") {
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "选词后自动加空格",
+                        "英文（含西班牙语）点候选栏的词后自动补一个空格，接着打下一个词不用再按空格。紧接着按空格不会多出一个；" +
+                            "打 , . ? ! : ; 时标点挪到空格前面；退格删掉这个空格。",
+                        checked = input.englishAutoSpace, onCheckedChange = { input.copy(englishAutoSpace = it).save(context) })
                 }
             }
             item(key = "language-key-switch") {
