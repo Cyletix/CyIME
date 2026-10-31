@@ -8,12 +8,14 @@ import com.charleskorn.kaml.YamlScalar
 import java.io.File
 
 /**
- * 模糊音（中文全拼 26 键）。改的是方案的拼写规则，只能写进 `<方案>.custom.yaml` 再部署；
+ * 模糊音（中文全拼 26 键）和双拼邻键纠错（双拼 26 键）。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
  * 这里只增删自己标记的一段，个人词库、分类词库、短语等其他补丁原样保留。
  * 别人提的需求（B 站评论 10-31），默认全关；全关时不写任何文件，九键、14 键、双拼、注音不碰。
  */
 object SpellingPatches {
     const val FUZZY_KEY = "fuzzy_pinyin"
+    /** 与 KeyboardInputPreferences.doublePinyinCorrection 同一个键：键盘按它决定是否把键位邻接表交给纠错。 */
+    const val DOUBLE_PINYIN_CORRECTION_KEY = "double_pinyin_neighbor_correction"
     /** 设置页写好补丁后递增；输入法服务据此重新部署并切回当前方案。 */
     const val REVISION = "spelling_patches_revision"
     private const val START = "# BEGIN CYIME SPELLING"
@@ -49,12 +51,22 @@ object SpellingPatches {
         SettingsPreferences.getPrefsPublic(context).edit().putStringSet(FUZZY_KEY, ids).apply()
     }
 
+    fun doublePinyinCorrection(context: Context): Boolean =
+        SettingsPreferences.getPrefsPublic(context).getBoolean(DOUBLE_PINYIN_CORRECTION_KEY, false)
+
     /**
      * 中文全拼 26 键：雾凇拼音、内置字母排列和自建布局。自建合并键布局把字母换成代表键的规则在拼写规则最后，
      * 模糊音排在最前，仍按拼音派生。14/17/18 键、九键各有自己的拼写规则，不加。
      */
     internal fun fullPinyinSchemas(context: Context): List<String> = (listOf("rime_ice") + BuiltinLetterLayouts.ids +
         runCatching { CustomKeyboardLayouts.load(context).map { it.id } }.getOrDefault(emptyList())).distinct()
+
+    /**
+     * 双拼 26 键：小鹤和其他内置、自定义双拼。九键、14 键版本不加（一个键不止一个字母）。
+     * 小鹤方案构建时已带 cyime_neighbor_correction，其他双拼由它生成，同样带着；缺的只是 enable_correction。
+     */
+    internal fun doublePinyinSchemas(context: Context): List<String> = (DoublePinyinScheme.BUILTINS.map { it.id } +
+        runCatching { DoublePinyinSchemes.load(context).map { it.id } }.getOrDefault(emptyList())).distinct()
 
     /** 设置页改完开关后在后台线程调用：写补丁，有改动就通知输入法重新部署。 */
     @Synchronized fun apply(context: Context) {
@@ -71,10 +83,16 @@ object SpellingPatches {
      */
     @Synchronized fun sync(context: Context, rimeDir: File = SchemaManager.getRimeDir(context)): Boolean {
         val fuzzy = fuzzy(context)
+        val correction = doublePinyinCorrection(context)
         var changed = false
         for (id in fullPinyinSchemas(context)) {
             changed = write(rimeDir, id, "speller/algebra") { schema ->
                 if (fuzzy.isEmpty()) emptyList() else algebraOf(schema())?.let { fuzzyLines(it, fuzzy) }
+            } || changed
+        }
+        for (id in doublePinyinSchemas(context)) {
+            changed = write(rimeDir, id, "translator/enable_correction") {
+                if (correction) listOf("\"translator/enable_correction\": true") else emptyList()
             } || changed
         }
         return changed

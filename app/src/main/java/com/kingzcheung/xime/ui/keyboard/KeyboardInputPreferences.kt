@@ -70,6 +70,8 @@ data class KeyboardInputPreferences(
     val sideSymbols: Map<String, String> = emptyMap(),
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
     val neighborCorrection: Boolean = true,
+    /** 双拼 26 键邻键纠错，默认关；方案补丁见 SpellingPatches。 */
+    val doublePinyinCorrection: Boolean = false,
     /** 中文全拼 26 键中英混输（nihaohello → 你好hello），默认关；见 app/data/cyime_mixed_input.lua。 */
     val mixedInput: Boolean = false,
     /** 中文全拼 26 键补出生僻字（瀺 chan），默认关；见 app/data/cyime_rare_chars.lua。 */
@@ -131,7 +133,7 @@ data class KeyboardInputPreferences(
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -181,6 +183,7 @@ data class KeyboardInputPreferences(
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
                 symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(prefs.getFloat("symbol_key_hold_seconds", 1f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
+                doublePinyinCorrection = prefs.getBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, false),
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
                 rareCharacters = prefs.getBoolean(RARE_CHARACTERS_KEY, false),
                 traditionalOutput = prefs.getBoolean(TRADITIONAL_OUTPUT_KEY, false),
@@ -216,6 +219,7 @@ data class KeyboardInputPreferences(
             .putFloat("language_key_hold_seconds", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
             .putFloat("symbol_key_hold_seconds", normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds))
             .putBoolean("neighbor_correction", neighborCorrection)
+            .putBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, doublePinyinCorrection)
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
             .putBoolean(RARE_CHARACTERS_KEY, rareCharacters)
             .putBoolean(TRADITIONAL_OUTPUT_KEY, traditionalOutput)

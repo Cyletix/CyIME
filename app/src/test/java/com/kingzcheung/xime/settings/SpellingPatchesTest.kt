@@ -59,6 +59,14 @@ class SpellingPatchesTest {
         assertNull(SpellingPatches.patch("patch:\n  # BEGIN CYIME SPELLING\n", listOf("\"translator/enable_correction\": true")))
     }
 
+    @Test fun doublePinyinCorrectionIsOneTranslatorKey() {
+        val patched = SpellingPatches.patch("", listOf("\"translator/enable_correction\": true"))!!
+        val root = SchemaManager.yaml.parseToYamlNode(patched) as YamlMap
+        val patch = root.entries.entries.single { it.key.content == "patch" }.value as YamlMap
+        assertEquals("true", (patch.entries.entries.single { it.key.content == "translator/enable_correction" }.value as YamlScalar).content)
+        assertEquals("", SpellingPatches.patch(patched, emptyList())!!.replace("patch:\n", ""))
+    }
+
     @Test fun anAndAngLeaveIanAndUanToTheirOwnGroups() {
         val toAn = Regex("(^|[^iu])ang$")
         val toAng = Regex("(^|[^iu])an$")
