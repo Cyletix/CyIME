@@ -49,8 +49,10 @@ import java.io.File
 
 /**
  * B站反馈（10-31）的候选栏开关，默认都关、关着时样子不变：
- * 「联想时关闭键放右边」——上屏后的联想不在第一个联想词旁放「<」，改在右边放 ⊗。
- * 设了 CYIME_RENDER_OUT=<目录> 时出对照图 candidate-feedback-0.png（原样）、-1.png（开关打开），各主题。
+ * 「联想时关闭键放右边」——上屏后的联想不在第一个联想词旁放「<」，改在右边放 ⊗；
+ * 「候选词间距加宽」——候选之间约空出一个字。
+ * 设了 CYIME_RENDER_OUT=<目录> 时出对照图 candidate-feedback-0.png（原样）、-1.png（关闭键放右边）、
+ * -2.png（再加宽间距），各主题。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w900dp-h1400dp-hdpi")
@@ -67,7 +69,8 @@ class CandidateBarFeedbackTest {
         KeyboardThemes.initFromConfig(context)
         SettingsPreferences.getPrefsPublic(context).edit()
             .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON)
-            .remove(SettingsPreferences.KEY_ASSOCIATION_CANCEL_ON_RIGHT).commit()
+            .remove(SettingsPreferences.KEY_ASSOCIATION_CANCEL_ON_RIGHT)
+            .remove(SettingsPreferences.KEY_WIDE_CANDIDATE_SPACING).commit()
     }
 
     private fun toolbarActions() = com.kingzcheung.xime.keyboard.ToolbarButton.entries.take(7).map {
@@ -138,13 +141,37 @@ class CandidateBarFeedbackTest {
         assertEquals(0, countTag("association-cancel-right"))
     }
 
+    /** 相邻两个候选的起点距离（像素，留白算在候选里）：打字候选和联想各量一次。 */
+    private fun gaps(): Pair<Float, Float> {
+        fun gap(a: String, b: String): Float {
+            val left = rule.onNodeWithTag(a, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val right = rule.onNodeWithTag(b, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            return right.left - left.left
+        }
+        return gap("bar-candidate:1", "bar-candidate:2") to gap("bar-association:0", "bar-association:1")
+    }
+
+    @Test fun wideSpacingIsOffByDefaultAndWidensBothRows() {
+        assertFalse(SettingsPreferences.isWideCandidateSpacing(context))
+        rule.setContent { Column { Bar(composing); Bar(association) } }
+        rule.waitForIdle()
+        val (typingBefore, associationBefore) = gaps()
+        rule.runOnIdle { SettingsPreferences.setWideCandidateSpacing(context, true) }
+        rule.waitForIdle()
+        val (typingAfter, associationAfter) = gaps()
+        // 默认 19sp：每侧 4dp → 4 + 5.7dp，候选之间多出约 11dp（这里 hdpi，1dp = 1.5px）。
+        val extra = 2 * 19f * 0.3f * rule.density.density
+        assertEquals(typingBefore + extra, typingAfter, 2f)
+        assertEquals(associationBefore + extra, associationAfter, 2f)
+    }
+
     @Test fun renderCandidateFeedback() {
         val out = System.getenv("CYIME_RENDER_OUT")
         org.junit.Assume.assumeTrue(!out.isNullOrEmpty())
         com.kingzcheung.xime.ui.keyboard.AppFonts.initialize(context)
         val themes = listOf(Triple("soft_blue", false, "柔和蓝·浅"), Triple("soft_blue", true, "柔和蓝·深"),
             Triple("pure_black", false, "黑白·纯白"), Triple("pure_black", true, "黑白·纯黑"))
-        val variants = listOf("原样" to false, "关闭键放右边" to true)
+        val variants = listOf("原样" to false, "关闭键放右边" to true, "加宽间距" to true)
         val root = rule.activity.window.decorView
         val shown = androidx.compose.runtime.mutableIntStateOf(-1)
         rule.setContent {
@@ -167,6 +194,7 @@ class CandidateBarFeedbackTest {
         variants.forEachIndexed { index, (_, right) ->
             rule.runOnIdle {
                 SettingsPreferences.setAssociationCancelOnRight(context, right)
+                SettingsPreferences.setWideCandidateSpacing(context, index == 2)
                 shown.intValue = index
             }
             rule.waitForIdle()

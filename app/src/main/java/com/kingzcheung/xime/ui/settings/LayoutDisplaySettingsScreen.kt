@@ -246,6 +246,40 @@ private fun LayoutDisplayPage(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
 
+                    var wideCandidateSpacing by remember {
+                        mutableStateOf(SettingsPreferences.isWideCandidateSpacing(context))
+                    }
+                    Row(
+                        modifier = Modifier.settingsSearchAnchor("候选词间距加宽")
+                            .fillMaxWidth()
+                            .testTag("wide-candidate-spacing-setting")
+                            .toggleable(
+                                value = wideCandidateSpacing,
+                                role = Role.Switch,
+                                onValueChange = {
+                                    wideCandidateSpacing = it
+                                    SettingsPreferences.setWideCandidateSpacing(context, it)
+                                },
+                            )
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("候选词间距加宽", style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium)
+                            Text("候选栏里候选之间空出约一个字，单字候选不挤在一起",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = wideCandidateSpacing, onCheckedChange = null)
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
                     var showCandidateCancel by remember {
                         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
                     }

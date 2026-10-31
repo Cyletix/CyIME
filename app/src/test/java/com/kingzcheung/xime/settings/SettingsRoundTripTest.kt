@@ -58,6 +58,7 @@ class SettingsRoundTripTest {
         Case("点按弹出气泡", true, false, S::setShowPressBubble, S::shouldShowPressBubble),
         Case("每页候选词数", 35, 25, S::setPageSize, S::getPageSize),
         Case("候选字大小", 15, 21, S::setCandidateTextSize, S::getCandidateTextSize),
+        Case("候选词间距加宽", true, false, S::setWideCandidateSpacing, S::isWideCandidateSpacing),
         Case("短信验证码", true, false, S::setSmsCodeEnabled, S::isSmsCodeEnabled),
         Case("备份包含个人数据", true, false, BackupChoices::setIncludePersonal, BackupChoices::includePersonal),
     )

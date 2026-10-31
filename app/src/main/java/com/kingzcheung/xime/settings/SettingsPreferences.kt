@@ -259,6 +259,7 @@ object SettingsPreferences {
     private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     private const val KEY_PAGE_SIZE = "page_size"
     private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
+    const val KEY_WIDE_CANDIDATE_SPACING = "wide_candidate_spacing"
     const val INPUT_TEXT_INPUT_BOX = "input_box"
     const val INPUT_TEXT_CANDIDATE_BAR = "candidate_bar"
     const val DEFAULT_PAGE_SIZE = 20 // 手机候选栏每页候选词数；schema 里的 page_size 来自 PC 版（5），太短，默认用 20
@@ -313,6 +314,17 @@ object SettingsPreferences {
 
     fun setAssociationCancelOnRight(context: Context, onRight: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_ASSOCIATION_CANCEL_ON_RIGHT, onRight).apply()
+    }
+
+    /**
+     * 候选词间距加宽（B站反馈 10-31，别人的需求，默认关）：候选栏里两个候选之间约空出一个字，
+     * 单字候选不挤在一起。关着时间距不变。
+     */
+    fun isWideCandidateSpacing(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_WIDE_CANDIDATE_SPACING, false)
+
+    fun setWideCandidateSpacing(context: Context, wide: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_WIDE_CANDIDATE_SPACING, wide).apply()
     }
 
     fun getInputTextLocation(context: Context): String {
