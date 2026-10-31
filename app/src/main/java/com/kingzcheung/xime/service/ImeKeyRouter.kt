@@ -750,33 +750,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val geometry = letterNeighbors
             service.rimeEngine.setNeighborMap(
                 if (hardwareEvent == null && geometry.first == service.uiState.value.currentSchemaId) geometry.second else "")
-            // 中英混输（默认关）：Rime 选项随会话重建而清零，按键前补设；只在变了时写，免得每键触发选项通知。
-            if (key.length == 1 && key[0].isLetter()) {
-                val mixed = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY, false)
-                if (service.rimeEngine.getOption("cyime_mixed_input") != mixed) service.rimeEngine.setOption("cyime_mixed_input", mixed)
-            }
-            // 繁体输出（默认关）：同上，按键前补设 traditionalization（仓颉是 simplification）；九键数字键也走这里。
-            // 设置一变也会立刻写一次（XimeInputMethodService 的设置监听），这里兜住会话重建。
-            if (key.length == 1 && key[0].isLetterOrDigit()) {
-                service.sessionController.applyTraditionalOutput()
-                // 时间日期候选（默认关）：同上；选项是反的，会话重建清零后仍是开。
-                val datetimeOff = !com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false)
-                if (service.rimeEngine.getOption("_cyime_datetime_off") != datetimeOff) service.rimeEngine.setOption("_cyime_datetime_off", datetimeOff)
-                // 候选里显示表情（默认关）：同上。打开输入框时 restorePersistedSchemaOptions 会把方案里的 emoji 开关清成 false，这里按设置补回。
-                val emoji = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CANDIDATE_EMOJI_KEY, false)
-                if (service.rimeEngine.getOption("emoji") != emoji) service.rimeEngine.setOption("emoji", emoji)
-                // 打符号名出符号（默认关）：同上，方案里的 simplifier@cyime_symbols 只在这个选项开着时工作。
-                val symbolNames = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.SYMBOL_NAMES_KEY, false)
-                if (service.rimeEngine.getOption("cyime_symbol_names") != symbolNames) service.rimeEngine.setOption("cyime_symbol_names", symbolNames)
-                // 生僻字（默认关）：同上，26 键全拼和九键都用。
-                val rare = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY, false)
-                if (service.rimeEngine.getOption("cyime_rare_chars") != rare) service.rimeEngine.setOption("cyime_rare_chars", rare)
-            }
+            // 设置页的候选开关（中英混输、繁体输出、时间日期、表情、符号名、生僻字）：设置一变已由
+            // XimeInputMethodService 的设置监听立刻写进引擎；Rime 选项随会话重建而清零，按键前再补一次。
+            // 只在变了时写，免得每键触发选项通知；九键数字键也走这里。
+            if (key.length == 1 && key[0].isLetterOrDigit()) service.sessionController.applyCandidateOptions()
             if (service.japaneseInputController.handleKey(key)) return@command
             val state = service.uiState.value
             val candState = service.candidateState.value

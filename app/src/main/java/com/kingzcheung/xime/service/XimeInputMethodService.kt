@@ -745,10 +745,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 SettingsPreferences.KEY_INCOGNITO -> {
                     privacy.setManual(SettingsPreferences.isIncognito(this))
                 }
-                // 繁体输出：工具栏、菜单的简繁按钮或设置页一改就写进引擎；正在打的拼音当场换成新写法，
-                // 不用等下一个字母键（以前关掉后直接点候选或空格，上屏的还是繁体）。
-                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY -> inputCommands.submit {
-                    if (sessionController.applyTraditionalOutput(persist = true)) withContext(Dispatchers.Main) { updateUI() }
+                // 候选开关（繁体输出、表情、时间日期、符号名、生僻字、中英混输）：工具栏、菜单按钮或设置页一改就写进引擎，
+                // 正在打的拼音当场按新设置出候选，不用等下一个字母键（以前关了繁体直接点候选或空格，上屏的还是繁体）。
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY,
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CANDIDATE_EMOJI_KEY,
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY,
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.SYMBOL_NAMES_KEY,
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY,
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY -> inputCommands.submit {
+                    if (sessionController.applyCandidateOptions(persist = true)) withContext(Dispatchers.Main) { updateUI() }
                 }
                 SettingsPreferences.KEY_KEY_SHAPE -> {
                     com.kingzcheung.xime.ui.theme.KeyShapes.current = SettingsPreferences.getKeyShape(this@XimeInputMethodService)
