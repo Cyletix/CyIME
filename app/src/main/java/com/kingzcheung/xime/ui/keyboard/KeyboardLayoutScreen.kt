@@ -126,6 +126,7 @@ fun KeyboardLayoutScreen(
                         uiState = uiState,
                         isAsciiMode = false,
                         modifier = modifier,
+                        candidateState = candidateState,
                     )
                 }
             }

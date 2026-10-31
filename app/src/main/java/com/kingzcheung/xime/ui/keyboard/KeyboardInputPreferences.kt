@@ -90,6 +90,11 @@ data class KeyboardInputPreferences(
     val doublePinyinCorrection: Boolean = false,
     /** 双拼 26 键每个键上写出翘舌声母和韵母（双拼键位提示），默认关；见 DoublePinyinKeyHints。 */
     val doublePinyinKeyHints: Boolean = false,
+    /**
+     * 微软双拼的 ing 放在 Shift 键上（和多数手机输入法一样），默认关：第二排不补分号键、L 在最右边，
+     * 打了声母等韵母时左下角的 Shift 键变成 ing；见 KeysConfigHelper.setSemicolonOnShift、[SemicolonShiftKey]。
+     */
+    val doublePinyinSemicolonOnShift: Boolean = false,
     /** 中文全拼 26 键中英混输（nihaohello → 你好hello），默认关；见 app/data/cyime_mixed_input.lua。 */
     val mixedInput: Boolean = false,
     /** 中文全拼 26 键补出生僻字（瀺 chan），默认关；见 app/data/cyime_rare_chars.lua。 */
@@ -178,6 +183,8 @@ data class KeyboardInputPreferences(
         const val CHINESE_GLIDE_KEY = "glide_typing_chinese"
         /** 双拼键位提示开关；设置在「双拼方案」页。 */
         const val DOUBLE_PINYIN_KEY_HINTS_KEY = "double_pinyin_key_hints"
+        /** ing 放在 Shift 键上开关；设置在「双拼方案」页的微软双拼一栏。新键，读不到就是关。 */
+        const val DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY = "double_pinyin_semicolon_on_shift"
         /** 英文选词后自动加空格开关；输入法选词时读它，改了下一次选词就生效。 */
         const val ENGLISH_AUTO_SPACE_KEY = "english_auto_space"
         /** 英文标点后自动加空格开关；输入法打标点时读它，改了下一个标点就生效。新键，读不到就是关。 */
@@ -198,7 +205,7 @@ data class KeyboardInputPreferences(
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
-                DOUBLE_PINYIN_KEY_HINTS_KEY,
+                DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 BOTTOM_LIFT_CURSOR_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
@@ -254,6 +261,7 @@ data class KeyboardInputPreferences(
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 doublePinyinCorrection = prefs.getBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, false),
                 doublePinyinKeyHints = prefs.getBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, false),
+                doublePinyinSemicolonOnShift = prefs.getBoolean(DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY, false),
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
                 rareCharacters = prefs.getBoolean(RARE_CHARACTERS_KEY, false),
                 traditionalOutput = prefs.getBoolean(TRADITIONAL_OUTPUT_KEY, false),
@@ -302,6 +310,7 @@ data class KeyboardInputPreferences(
             .putBoolean("neighbor_correction", neighborCorrection)
             .putBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, doublePinyinCorrection)
             .putBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, doublePinyinKeyHints)
+            .putBoolean(DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY, doublePinyinSemicolonOnShift)
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
             .putBoolean(RARE_CHARACTERS_KEY, rareCharacters)
             .putBoolean(TRADITIONAL_OUTPUT_KEY, traditionalOutput)
