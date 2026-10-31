@@ -93,8 +93,8 @@ def main():
     finally:
         restored = dev_op(args.serial, "restore")
         # Right after an install the new process is still deploying and the user dictionary is not open yet:
-        # that restore fails once and succeeds a little later (10-31, both devices).
-        for _ in range(6):
+        # that restore fails once and succeeds a little later (10-31, both devices; once it took about 4 minutes).
+        for _ in range(18):
             if restored.endswith("OK"):
                 break
             time.sleep(20)
