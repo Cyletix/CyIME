@@ -8,6 +8,7 @@ import androidx.compose.material.icons.twotone.Gesture
 import androidx.compose.material.icons.twotone.Abc
 import androidx.compose.material.icons.twotone.Spellcheck
 import androidx.compose.material.icons.twotone.FontDownload
+import androidx.compose.material.icons.twotone.Hearing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -18,11 +19,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.SpellingPatches
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.kingzcheung.xime.ui.keyboard.normalizeLetterSwipeDistance
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 internal enum class LayoutInputCategory(val route: String, val title: String, val description: String) {
-    Qwerty("layout_input_qwerty", "26 键", "邻键纠错、滑行输入、分体键盘、字母键符号"),
+    Qwerty("layout_input_qwerty", "26 键", "邻键纠错、模糊音、滑行输入、分体键盘、字母键符号"),
     Nine("layout_input_nine", "九键与 14 键", "拂动或滑动选字母、触发距离（含日语假名）、假名提示、侧栏符号"),
 }
 
@@ -40,7 +44,8 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
         Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             when (category) {
-                LayoutInputCategory.Qwerty -> SettingsSection(title = "26 键输入", content = {
+                LayoutInputCategory.Qwerty -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SettingsSection(title = "26 键输入", content = {
                     SettingsToggleItem(Icons.TwoTone.Spellcheck, "邻键纠错",
                         "仅用于中文全拼 26 键；按实际键位补充候选，保留原输入，不用于双拼。",
                         checked = settings.neighborCorrection, onCheckedChange = {
@@ -88,6 +93,8 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             settings = settings.copy(qwertyPeriodKey = it); settings.save(context)
                         })
                 })
+                FuzzyPinyinSection()
+                }
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsSection(title = "九键与笔画", content = {
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
@@ -132,6 +139,31 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
     }
 }
 
+
+/** 模糊音：每组一行开关，默认全关；改了在后台写方案补丁，输入法重新部署后生效（见 [SpellingPatches]）。 */
+@Composable
+private fun FuzzyPinyinSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var enabled by remember { mutableStateOf(SpellingPatches.fuzzy(context)) }
+    Column(Modifier.settingsSearchAnchor("模糊音")) {
+        SettingsSection(title = "模糊音", content = {
+            Text("仅用于中文全拼 26 键（含 QWJRTK 等字母排列和自建布局），九键、14 键、双拼不变。" +
+                "打开一组后两边的读音都能打出对方的字，候选会多一些近音字；改动后方案重新部署，要几秒。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            SpellingPatches.Fuzzy.entries.forEachIndexed { index, item ->
+                if (index > 0) HorizontalDivider()
+                SettingsToggleItem(Icons.TwoTone.Hearing, item.title, item.example,
+                    checked = item in enabled, onCheckedChange = { on ->
+                        SpellingPatches.setFuzzy(context, item, on)
+                        enabled = SpellingPatches.fuzzy(context)
+                        scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
+                    })
+            }
+        })
+    }
+}
 
 @Composable
 private fun QwertyStaggerSettings(

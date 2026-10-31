@@ -203,6 +203,23 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
+    /** 模糊音等拼写补丁已由设置页写好：增量部署改过的方案，再切回当前方案让会话用上新规则。 */
+    internal fun applySpellingPatches() {
+        service.keyRouter.postRimeJob {
+            try {
+                check(RimeConfigHelper.ensureDeployment(service)) { "方案部署失败" }
+                val id = SettingsPreferences.getCurrentSchema(service)
+                check(service.rimeEngine.switchSchema(id)) { "无法恢复当前输入方案" }
+                withContext(Dispatchers.Main) {
+                    service.sessionController.updateSchemaName()
+                    service.updateUI()
+                }
+            } catch (e: Exception) {
+                FileLogger.e(XimeInputMethodService.TAG, "Failed to apply spelling patches", e)
+            }
+        }
+    }
+
     internal fun reloadConfig() {
         
         service.mainHandler.post {

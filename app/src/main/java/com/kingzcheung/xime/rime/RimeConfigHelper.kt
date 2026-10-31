@@ -147,6 +147,12 @@ object RimeConfigHelper {
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 为所有启用方案打个人词库补丁
         PersonalDictManager.ensureSchemaPacks(context)
+        // 模糊音等拼写补丁：新建的布局、随版本更新的方案规则都按当前开关重写一遍，没变不写。
+        try {
+            com.kingzcheung.xime.settings.SpellingPatches.sync(context, rimeDir)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "Failed to sync spelling patches", e)
+        }
         // 内置分类词库（如明日方舟）随 APK 更新，首次默认开启；失败不影响输入法启动。
         try {
             com.kingzcheung.xime.settings.CellDictionaryManager.syncBuiltins(context)
