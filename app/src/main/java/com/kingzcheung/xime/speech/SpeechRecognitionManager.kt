@@ -45,6 +45,8 @@ class SpeechRecognitionManager(
         private const val BACKEND_RELEASE_DELAY_MS = 3500L
         // 覆盖按需加载本地模型的等待（实测约 2 秒）再留余量
         private const val PRE_START_BUFFER_SECS = 6f
+        /** 加载中停止时，松手之后再多留这么长的音，最后一个字的尾音不被剪掉。 */
+        private const val STOP_TAIL_MS = 300L
     }
 
     @Volatile private var backend: AsrBackend? = null
@@ -83,6 +85,14 @@ class SpeechRecognitionManager(
     private var loadingInProgress = false
     @Volatile
     private var loadingCancelled = false
+    // 等模型加载完才开始录音线程：从按需加载开始，到加载完在主线程启动录音（或放弃）为止
+    @Volatile private var loadPending = false
+    // 模型还在加载时用户已松手或再点停止：加载完把已录下的音认完再结束，不丢
+    // （2026-10-31 平板用户：刚唤出键盘第一次说话不出字）
+    @Volatile private var stopAfterLoad = false
+    @Volatile private var stopRequestedAtNs = 0L
+    // 预启动麦克风开始录音的时刻，用来剪掉松手之后多录的部分
+    @Volatile private var preStartedAtNs = 0L
 
     private var resultCallback: ((String) -> Unit)? = null
     private var partialResultCallback: ((String) -> Unit)? = null
@@ -97,7 +107,7 @@ class SpeechRecognitionManager(
 
     // 预启动的 AudioRecord：手指按下 150ms 后启动，语音激活时直接交给录音线程
     private var preStartedRecord: AudioRecord? = null
-    private val preStartTimeoutRunnable = Runnable { cancelPreStart() }
+    private val preStartTimeoutRunnable = Runnable { releasePreStart() }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startRecognition(language: InputLanguage = InputLanguage.CHINESE) {
@@ -110,7 +120,7 @@ class SpeechRecognitionManager(
         if (language == InputLanguage.UNSPECIFIED ||
             language != InputLanguage.CHINESE && !SettingsPreferences.isSttUseLocal(context) &&
             !OnlineSpeechApi.isUsable(context) && backendFactory == null) {
-            cancelPreStart()
+            releasePreStart()
             errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言"
                 else "当前在线语音插件尚未声明${language.displayName}支持，请使用本地多语言模型", true)
             setState(RecognitionState.ERROR)
@@ -119,6 +129,7 @@ class SpeechRecognitionManager(
         recognitionLanguage = language
 
         loadingCancelled = false
+        stopAfterLoad = false
         FileLogger.i(TAG, "Starting speech recognition")
         setState(RecognitionState.PROCESSING)
 
@@ -129,10 +140,12 @@ class SpeechRecognitionManager(
                 if (loadingInProgress) {
                     // 已有加载进行中（如设置开启触发的预加载），等待其完成
                     loadingCancelled = false
+                    loadPending = true
                     return
                 }
                 loadingInProgress = true
                 loadingCancelled = false
+                loadPending = true
             }
             // 模型按需加载约 2 秒：期间保留预启动的麦克风，加载完由录音线程接着读缓冲，开头不丢。
             mainHandler.removeCallbacks(preStartTimeoutRunnable)
@@ -141,7 +154,9 @@ class SpeechRecognitionManager(
                     val ok = preload(warmUp = false)
                     if (!ok || synchronized(preloadLock) { backend } == null) {
                         mainHandler.post {
-                            cancelPreStart()
+                            loadPending = false
+                            stopAfterLoad = false
+                            releasePreStart()
                             errorCallback?.invoke("语音引擎没能启动：本地语音模型没下载或加载失败，请到 设置 → 语音转文本 检查模型", true)
                             setState(RecognitionState.ERROR)
                         }
@@ -149,12 +164,15 @@ class SpeechRecognitionManager(
                     }
                     if (loadingCancelled || released) {
                         mainHandler.post {
-                            cancelPreStart()
+                            loadPending = false
+                            stopAfterLoad = false
+                            releasePreStart()
                             if (!released) { scheduleBackendRelease(sessionId); setState(RecognitionState.IDLE) }
                         }
                         return@Thread
                     }
                     mainHandler.post {
+                        loadPending = false
                         if (recordingThread == null && !loadingCancelled && !released) {
                             startRecording()
                         }
@@ -189,9 +207,22 @@ class SpeechRecognitionManager(
         }
         mainHandler.removeCallbacks(preStartTimeoutRunnable)
 
+        // 加载中已经停止：只把麦克风里存着的音（到松手为止）认完就结束，不再接着录
+        val drainBytes = if (stopAfterLoad) {
+            stopAfterLoad = false
+            if (preStarted == null) {
+                setState(RecognitionState.IDLE)
+                scheduleBackendRelease(sessionId)
+                return
+            }
+            val startedAt = preStartedAtNs
+            if (startedAt == 0L) Long.MAX_VALUE
+            else (TimeUnit.NANOSECONDS.toMillis(stopRequestedAtNs - startedAt).coerceAtLeast(0L) + STOP_TAIL_MS) * SAMPLE_RATE / 1000 * 2
+        } else -1L
+
         // Capture can resume while the previous result is finishing. Backend ownership remains
         // serialized, so an old stop/cancel can never terminate the new recognition session.
-        recordingThread = RecordingThread(currentBackend, preStarted, sessionId, recognitionLanguage, recordingThread)
+        recordingThread = RecordingThread(currentBackend, preStarted, sessionId, recognitionLanguage, recordingThread, drainBytes)
         recordingThread!!.start()
     }
 
@@ -218,8 +249,15 @@ class SpeechRecognitionManager(
     }
 
     fun stopRecognition() {
+        if (recordingThread == null && loadPending && !released && synchronized(this) { preStartedRecord != null }) {
+            // 模型还在加载：麦克风里已经存着刚才说的话，加载完认完再结束（原来这里直接丢掉，什么都不出）
+            stopAfterLoad = true
+            stopRequestedAtNs = System.nanoTime()
+            FileLogger.i(TAG, "Stop during model load: recognizing the captured audio once loaded")
+            return
+        }
         loadingCancelled = true
-        cancelPreStart()
+        releasePreStart()
         Log.d(TAG, "Stopping recognition")
         val thread = recordingThread
         if (thread == null) {
@@ -242,7 +280,8 @@ class SpeechRecognitionManager(
         // Invalidate callbacks immediately, including results already posted to the UI thread.
         synchronized(preloadLock) { sessionId++ }
         loadingCancelled = true
-        cancelPreStart()
+        stopAfterLoad = false
+        releasePreStart()
         Log.d(TAG, "Canceling recognition")
         val thread = recordingThread
         if (thread == null) {
@@ -287,11 +326,12 @@ class SpeechRecognitionManager(
     }
 
     fun startPreStart() {
-        cancelPreStart()
+        releasePreStart()
         if (released || recordingThread != null) return
         val record = createAudioRecord(PRE_START_BUFFER_SECS) ?: return
         try {
             record.startRecording()
+            preStartedAtNs = System.nanoTime()
             synchronized(this) { preStartedRecord = record }
         } catch (error: Exception) {
             try { record.release() } catch (_: Exception) { }
@@ -302,7 +342,19 @@ class SpeechRecognitionManager(
         if (!loadingInProgress) mainHandler.postDelayed(preStartTimeoutRunnable, 2000)
     }
 
+    /**
+     * 键盘这边结束语音（松手、换输入框）时调用。模型还在加载时麦克风里存着刚说的话，交给随后的
+     * stop/cancel 决定认完还是丢弃，这里不先关掉（原来先关了，加载中松手总是一个字都不出）。
+     */
     fun cancelPreStart() {
+        if (loadPending) {
+            mainHandler.removeCallbacks(preStartTimeoutRunnable)
+            return
+        }
+        releasePreStart()
+    }
+
+    private fun releasePreStart() {
         mainHandler.removeCallbacks(preStartTimeoutRunnable)
         synchronized(this) {
             val record = preStartedRecord
@@ -317,7 +369,7 @@ class SpeechRecognitionManager(
     fun release() {
         released = true
         Log.d(TAG, "Releasing speech recognition")
-        cancelPreStart()
+        releasePreStart()
         mainHandler.removeCallbacks(pendingBackendRelease)
         pendingReleaseSession = -1
         cancelRecognition()
@@ -446,6 +498,8 @@ class SpeechRecognitionManager(
         private val session: Int,
         private val language: InputLanguage,
         private val previousRecording: RecordingThread?,
+        /** ≥ 0：模型加载中已停止，只读麦克风里存着的这么多字节就结束；-1：正常录音直到停止。 */
+        private val drainBytes: Long = -1L,
     ) : Thread("AsrRecording") {
 
         private val spectrumAnalyzer = SpectrumAnalyzer()
@@ -615,9 +669,11 @@ class SpeechRecognitionManager(
                 FileLogger.i(TAG, "Microphone ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
                 deliveryThread = Thread(::deliverAudio, "AsrAudioDelivery").also { it.start() }
                 deliveryStarted = true
-                mainHandler.post {
+                val draining = drainBytes >= 0
+                if (!draining) mainHandler.post {
                     if (!released && !stopRequested && recordingThread === this) setState(RecognitionState.LISTENING)
                 }
+                var drained = 0L
 
                 val buffer = ShortArray((SAMPLE_RATE * BUFFER_SIZE_SECONDS).toInt())
                 val byteBuffer = ByteArray(buffer.size * 2)
@@ -628,8 +684,13 @@ class SpeechRecognitionManager(
                 val maxPreSpeechChunks = 4  // 0.4s 语音前缓冲
 
                 while (!interrupted() && !stopRequested) {
-                    val nread = audioRecord.read(buffer, 0, buffer.size)
+                    val want = if (draining) minOf(buffer.size.toLong(), (drainBytes - drained) / 2).toInt() else buffer.size
+                    if (want <= 0) break
+                    // 收尾：不等新声音，存着的读完（或读到松手那一刻）就停
+                    val nread = if (draining) audioRecord.read(buffer, 0, want, AudioRecord.READ_NON_BLOCKING)
+                        else audioRecord.read(buffer, 0, buffer.size)
                     if (nread > 0) {
+                        drained += nread * 2L
                         var peak = 0
                         for (i in 0 until nread) {
                             val s = buffer[i].toInt()
@@ -667,10 +728,12 @@ class SpeechRecognitionManager(
                         } else {
                             enqueue(chunk)
                         }
-                    } else if (nread < 0) {
+                    } else if (nread < 0 || draining) {
                         break
                     }
                 }
+                // 收尾时整段都不到语音前缓冲的长度：剩下的也送去认，不因没过音量门槛丢掉
+                if (draining) while (preSpeechBuffer.isNotEmpty()) enqueue(preSpeechBuffer.removeFirst())
             } catch (error: Exception) {
                 reportFailure(error)
                 cancelRequested = true

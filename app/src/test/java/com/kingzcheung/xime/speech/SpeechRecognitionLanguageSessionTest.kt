@@ -34,6 +34,8 @@ class SpeechRecognitionLanguageSessionTest {
         @Volatile var allowClose = CountDownLatch(1)
         @Volatile var startGate: CountDownLatch? = null
         @Volatile var startSucceeds = true
+        /** Holds on-demand model loading until the test opens it. */
+        @Volatile var initGate: CountDownLatch? = null
         var compatibleLanguages = emptySet<InputLanguage>()
         override fun canContinueIn(language: InputLanguage) = language in compatibleLanguages
         @Volatile private var language = InputLanguage.UNSPECIFIED
@@ -47,6 +49,7 @@ class SpeechRecognitionLanguageSessionTest {
         }
         override fun initialize(language: InputLanguage): Boolean {
             initializations.put(language)
+            initGate?.await(5, TimeUnit.SECONDS)
             return initialize()
         }
         override fun start(): Boolean = error("The product language must reach the backend")
@@ -106,6 +109,18 @@ class SpeechRecognitionLanguageSessionTest {
                     val length = it.getArgument<Int>(2)
                     check(chunk.size <= length)
                     chunk.copyInto(target, destinationOffset = offset)
+                    reads.incrementAndGet()
+                    chunk.size
+                }
+            }
+            // Non-blocking read (draining what was captured while the model loaded): 0 once nothing is buffered.
+            whenever(record.read(any<ShortArray>(), any(), any(), any())).thenAnswer {
+                val chunk = input.poll() ?: return@thenAnswer 0
+                if (released.get() || chunk.isEmpty()) -1 else {
+                    val target = it.getArgument<ShortArray>(0)
+                    val length = it.getArgument<Int>(2)
+                    check(chunk.size <= length)
+                    chunk.copyInto(target, destinationOffset = it.getArgument<Int>(1))
                     reads.incrementAndGet()
                     chunk.size
                 }
@@ -253,6 +268,49 @@ class SpeechRecognitionLanguageSessionTest {
         f.drain()
         assertEquals(listOf("日本語"), f.results)
     }
+
+    // 2026-10-31 tablet user: right after the keyboard opens, the first short phrase gave no text.
+    // Releasing (or tapping stop) while the model still loaded threw the captured audio away.
+    @Test fun stoppingWhileTheModelLoadsStillRecognizesWhatWasSaid() = Fixture(preload = false).use { f ->
+        f.backend.initGate = CountDownLatch(1)
+        f.manager.startRecognition()
+        f.manager.startPreStart()
+        val mic = f.microphones.single()
+        mic.feed(1000)
+        mic.feed(1001)
+        // The keyboard ends the voice session the same way endVoiceSession does: pre-start first, then stop.
+        f.manager.cancelPreStart()
+        f.manager.stopRecognition()
+        assertFalse("The captured audio must survive until the model is ready", mic.released.get())
+
+        f.backend.initGate?.countDown()
+        f.session()
+        f.backend.allowClose.countDown()
+        f.await { f.backend.completedStops.get() == 1 }
+        assertEquals(listOf(1000.toShort(), 1001.toShort()), f.backend.audio.map { (_, pcm) -> pcm.toShortSample() })
+        assertEquals(listOf("closing result"), f.results)
+        f.await { mic.released.get() }
+        assertTrue(f.errors.isEmpty())
+    }
+
+    @Test fun cancellingWhileTheModelLoadsStillDiscardsTheAudio() = Fixture(preload = false).use { f ->
+        f.backend.initGate = CountDownLatch(1)
+        f.manager.startRecognition()
+        f.manager.startPreStart()
+        val mic = f.microphones.single()
+        mic.feed(1000)
+        f.manager.cancelPreStart()
+        f.manager.cancelRecognition()
+        assertTrue(mic.released.get())
+
+        f.backend.initGate?.countDown()
+        f.await { f.manager.getState() == RecognitionState.IDLE }
+        assertTrue(f.backend.sessions.isEmpty())
+        assertTrue(f.backend.audio.isEmpty())
+        assertTrue(f.results.isEmpty())
+    }
+
+    private fun ByteArray.toShortSample(): Short = ((this[1].toInt() shl 8) or (this[0].toInt() and 0xFF)).toShort()
 
     @Test fun cancelledLanguageCannotWriteIntoQueuedNewLanguage() = Fixture().use { f ->
         f.manager.startRecognition(InputLanguage.CHINESE)
