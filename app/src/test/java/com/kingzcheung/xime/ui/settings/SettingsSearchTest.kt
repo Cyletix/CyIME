@@ -74,6 +74,12 @@ class SettingsSearchTest {
         assertTrue("剪贴板卡片最多显示" in titles("剪貼板"))
     }
 
+    /** 14 键默认没启用：搜“14键”要能找到启用它的「已安装的方案」，不只是 14 键的手势设置。 */
+    @Test fun fourteenKeySearchFindsWhereToEnableIt() {
+        assertTrue("已安装的方案" in titles("14键"))
+        assertTrue("已安装的方案" in titles("启用14键"))
+    }
+
     /** 词没有连着出现时按相邻两字近似匹配：“候选字号”“按键声音大小”这类自己组的说法。 */
     @Test fun nearMatchesFindSettingsWithoutExactWords() {
         assertEquals("候选字大小", titles("候选字号").first())
