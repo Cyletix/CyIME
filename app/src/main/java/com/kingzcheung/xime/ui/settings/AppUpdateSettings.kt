@@ -68,7 +68,7 @@ private fun updateStatus(state: AppUpdateState): Pair<String, SettingsStatusTone
     is AppUpdateState.Failed -> "失败" to SettingsStatusTone.WARNING
 }
 
-/** 关于页「版本更新」：手动检查更新随时可点；自动检查默认关。 */
+/** 关于页「版本更新」：手动检查更新随时可点；自动检查默认开。 */
 @Composable
 internal fun AppUpdateSection() {
     if (!AppUpdater.supported) return
