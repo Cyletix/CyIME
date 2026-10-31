@@ -75,6 +75,13 @@ object CustomImageTheme {
     internal fun preview(themes: List<KeyboardColorScheme>, baseId: String, src: String, placement: ThemeImagePlacement) =
         resolveBase(themes, baseId)?.let { scheme(it, src, placement) }
 
+    /**
+     * 调整页预览取键色、字色用的主题 id：预览主题还没存进主题表，按 [ID] 取色会落到全局默认色；
+     * 它的键色、字色都抄自沿用的主题，按那个主题取色与存好后的键盘一致。
+     */
+    internal fun previewColorThemeId(themes: List<KeyboardColorScheme>, baseId: String): String =
+        resolveBase(themes, baseId)?.id ?: ID
+
     private fun resolveBase(themes: List<KeyboardColorScheme>, baseId: String?) =
         themes.firstOrNull { it.id == baseId && usableBase(it) } ?: themes.firstOrNull { it.id == SoftBlueTheme.ID }
 

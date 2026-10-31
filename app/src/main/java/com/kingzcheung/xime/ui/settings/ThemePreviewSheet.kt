@@ -280,6 +280,9 @@ internal fun ThemeKeyboardPreview(
     theme: KeyboardColorScheme,
     isDark: Boolean,
     modifier: Modifier = Modifier,
+    // 键色、字色按这个 id 去主题表里取。还没存的主题（「我的图片」调整页）表里没有，
+    // 按 theme.id 取会落到全局默认色（深色是半透明白键），要传它沿用的主题。
+    colorThemeId: String = theme.id,
 ) {
     val bgColor = if (isDark) theme.keyboardBgDark else theme.keyboardBgLight
     val accent = if (isDark) theme.accentDark else theme.accentLight
@@ -288,16 +291,16 @@ internal fun ThemeKeyboardPreview(
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
     val specialKeyColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(theme, isDark,
         (if (isDark) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor))
-    val enterKeyColor = KeyboardThemes.getEnterKeyColor(theme.id, isDark)
-    val specialTextColor = if (isDark) Color.White else KeyboardThemes.getSpecialKeyTextColor(theme.id, false)
-    val textColor = KeyboardThemes.getKeyTextColorOverride(theme.id, isDark)
+    val enterKeyColor = KeyboardThemes.getEnterKeyColor(colorThemeId, isDark)
+    val specialTextColor = if (isDark) Color.White else KeyboardThemes.getSpecialKeyTextColor(colorThemeId, false)
+    val textColor = KeyboardThemes.getKeyTextColorOverride(colorThemeId, isDark)
         ?: if (isDark) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
-    val keyColor = KeyboardThemes.getKeyBgColorOverride(theme.id, isDark)
+    val keyColor = KeyboardThemes.getKeyBgColorOverride(colorThemeId, isDark)
         ?: if (isDark) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
-    val candidateTextColor = KeyboardThemes.getCandidateTextColorOverride(theme.id, isDark)
+    val candidateTextColor = KeyboardThemes.getCandidateTextColorOverride(colorThemeId, isDark)
         ?: if (isDark) longToColor(kbColors.candidateTextColorDark)
         else longToColor(kbColors.candidateTextColor)
-    val selectedTextColor = KeyboardThemes.getCandidateSelectedTextColorOverride(theme.id, isDark)
+    val selectedTextColor = KeyboardThemes.getCandidateSelectedTextColorOverride(colorThemeId, isDark)
         ?: if (isDark) theme.candidateSelectedTextColorDark else theme.candidateSelectedTextColorLight
     val context = LocalContext.current
     val candidateTextSize = SettingsPreferences.getCandidateTextSize(context)
