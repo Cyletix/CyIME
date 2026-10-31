@@ -1624,7 +1624,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
         bottomInsetPxState.value = getActiveBottomInsetPx(window.window)
         keyboardContainer.setOnApplyWindowInsetsListener { v, insets ->
-            val px = extractBottomInset(insets)
+            val px = extractBottomInset(insets, window.window)
             if (px != bottomInsetPxState.value) {
                 bottomInsetPxState.value = px
             }

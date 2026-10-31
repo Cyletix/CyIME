@@ -34,7 +34,7 @@ internal fun tryGetNavBarHeightDp(context: Context, imeWindow: Window?): Int {
     }
 }
 
-/** 获取可见导航栏高度（dp）。 */
+/** 获取可见导航栏高度（dp）；手势导航时只算手势条，与 [extractBottomInset] 同一规则。 */
 internal fun tryGetVisibleNavBarHeightDp(context: Context, imeWindow: Window?): Int {
     return try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -42,9 +42,9 @@ internal fun tryGetVisibleNavBarHeightDp(context: Context, imeWindow: Window?): 
             if (decorView != null) {
                 val insets = decorView.rootWindowInsets
                 if (insets != null) {
-                    val px = insets.getInsets(
+                    val px = gestureAwareBottom(insets, imeWindow, insets.getInsets(
                         WindowInsets.Type.navigationBars()
-                    ).bottom
+                    ).bottom)
                     val dp = if (px > 0) (px / context.resources.displayMetrics.density).roundToInt() else 0
                     return dp
                 }
@@ -83,9 +83,12 @@ internal fun tryGetStatusBarHeightDp(context: Context, imeWindow: Window?): Int 
  * 全部为空时再回退 systemGestures。
  * 手势导航下 navigationBars 通常为 0，但 mandatorySystemGestures / systemGestures
  * 会返回手势条高度（约 20~32dp），阈值不能过滤掉它们，否则底部手势条区域会露出窗口背景。
+ * 手势导航时系统给输入法窗口的 navigationBars 是整条按钮框（48dp，给返回/切换输入法按钮留的），
+ * 这里没有按钮时只留手势条高度，见 [imeBottomInsetPx]。
  */
 internal fun extractBottomInset(
-    insets: WindowInsets
+    insets: WindowInsets,
+    imeWindow: Window? = null,
 ): Int {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
         @Suppress("DEPRECATION")
@@ -98,17 +101,90 @@ internal fun extractBottomInset(
     val gestures = insets.getInsets(WindowInsets.Type.systemGestures()).bottom
     val primary = maxOf(nav, mandatory, tappable)
     val fallback = gestures
-    val pick = if (primary > 0) primary else fallback
+    val full = if (primary > 0) primary else fallback
+    val pick = gestureAwareBottom(insets, imeWindow, full)
     Log.d(INSETS_TAG, "bottom: sys=$sys nav=$nav tappable=$tappable mandatory=$mandatory gestures=$gestures pick=$pick")
     return pick
 }
+
+/** 底部系统栏能不能缩到手势条：读系统导航模式、本窗口有没有系统画的输入法导航按钮。 */
+private fun gestureAwareBottom(insets: WindowInsets, imeWindow: Window?, fullPx: Int): Int {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || imeWindow == null || fullPx <= 0) return fullPx
+    val context = imeWindow.context
+    val tappable = insets.getInsets(WindowInsets.Type.tappableElement()).bottom
+    val navigationMode = readSetting { android.provider.Settings.Secure.getInt(context.contentResolver, "navigation_mode") }
+    // 三星手势导航：「手势提示」关掉时底部既没有手势条也没有「隐藏键盘」按钮；
+    // 提示开着且「显示隐藏键盘按钮」开着时，按钮画在键盘下面这条里，整条都要留。
+    val gestureHint = readSetting {
+        android.provider.Settings.Global.getInt(context.contentResolver, "navigation_bar_gesture_hint")
+    }
+    val hideKeyboardButton = gestureHint != 0 && readSetting {
+        android.provider.Settings.Global.getInt(context.contentResolver, "navigation_bar_button_to_hide_keyboard")
+    } == 1
+    // 平板手势导航时任务栏在键盘下面画返回/切换输入法按钮，整条留着（未在平板上核对前不缩）。
+    val taskbarScreen = context.resources.configuration.smallestScreenWidthDp >= 600
+    val pick = imeBottomInsetPx(fullPx, tappable, navigationMode,
+        imeNavButtons = taskbarScreen || hideKeyboardButton || imeWindowDrawsNavButtons(imeWindow),
+        gestureBarPx = gestureBarHeightPx(context, hintHidden = gestureHint == 0))
+    if (pick != fullPx) {
+        Log.d(INSETS_TAG, "gesture nav: full=$fullPx mode=$navigationMode tappable=$tappable hint=$gestureHint hideButton=$hideKeyboardButton pick=$pick")
+    }
+    return pick
+}
+
+/** 手势导航时键盘下面最多留多高（dp）：手势条本身。 */
+internal const val GESTURE_BAR_MAX_DP = 24
+
+/** 手势提示（手势条）隐藏时只留一小截，让最下一排避开屏幕圆角。 */
+internal const val GESTURE_HINT_HIDDEN_DP = 12
+
+/**
+ * 输入法底部要让出的系统栏高度（px）。
+ * 三键导航（导航模式 0/1；读不到模式时底部有可点的系统按钮）整条留着；手势导航时系统按 48dp 按钮框给输入法 inset，
+ * 但那里没有按钮（系统没在输入法窗口里画返回/切换键）就只让出手势条 [gestureBarPx]，键盘贴着手势条。
+ * [navigationMode] 读不到时为 null，这时底部没有可点的系统元素才算手势导航。
+ */
+internal fun imeBottomInsetPx(
+    fullPx: Int,
+    tappablePx: Int,
+    navigationMode: Int?,
+    imeNavButtons: Boolean,
+    gestureBarPx: Int,
+): Int {
+    if (fullPx <= 0) return 0
+    // 系统的输入法 inset 可能把 tappableElement 也覆盖成按钮框高，读得到导航模式时以它为准。
+    val gesture = if (navigationMode != null) navigationMode == 2 else tappablePx <= 0
+    if (!gesture || imeNavButtons || gestureBarPx <= 0) return fullPx
+    return minOf(fullPx, gestureBarPx)
+}
+
+/** 系统的手势条高度：手势导航时 navigation_bar_height 是手势条那一小条，限制在 [GESTURE_BAR_MAX_DP] 内。 */
+private fun gestureBarHeightPx(context: Context, hintHidden: Boolean): Int {
+    val max = ((if (hintHidden) GESTURE_HINT_HIDDEN_DP else GESTURE_BAR_MAX_DP) *
+        context.resources.displayMetrics.density).roundToInt()
+    val resId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+    val px = if (resId > 0) runCatching { context.resources.getDimensionPixelSize(resId) }.getOrDefault(0) else 0
+    return if (px in 1..max) px else max
+}
+
+/** Pixel 等机型手势导航时，系统在输入法窗口底部自己画返回/切换输入法按钮（NavigationBarFrame）。 */
+private fun imeWindowDrawsNavButtons(imeWindow: Window): Boolean {
+    fun find(view: android.view.View): Boolean {
+        if (view.javaClass.name == "android.inputmethodservice.NavigationBarFrame") return view.isShown && view.height > 0
+        if (view is android.view.ViewGroup) for (i in 0 until view.childCount) if (find(view.getChildAt(i))) return true
+        return false
+    }
+    return runCatching { find(imeWindow.decorView) }.getOrDefault(false)
+}
+
+private inline fun readSetting(read: () -> Int): Int? = try { read() } catch (_: Exception) { null }
 
 /** 获取当前活跃的底部 inset（px）。 */
 internal fun getActiveBottomInsetPx(imeWindow: Window?): Int {
     return try {
         val decorView = imeWindow?.decorView ?: return 0
         val insets = decorView.rootWindowInsets ?: return 0
-        val px = extractBottomInset(insets)
+        val px = extractBottomInset(insets, imeWindow)
         Log.d(INSETS_TAG, "getActiveBottomInsetPx=$px (rootWindowInsets)")
         px
     } catch (e: Exception) { 0 }
