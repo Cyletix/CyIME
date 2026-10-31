@@ -327,16 +327,15 @@ fun KeyboardLayout(
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
-    // 滑行：英文 26 键出整词；中文全拼、双拼 26 键（含分体、自定义字母排列）出一个词的编码交给 Rime。
-    // 整键盘滑动移动光标与其冲突时让位。
+    // 滑行：英文 26 键出整词（「滑行输入」）；中文全拼、双拼 26 键（含分体、自定义字母排列）出一个词的编码交给 Rime
+    // （「中文滑行输入」，单独的开关，默认关）。整键盘滑动移动光标与其冲突时让位。
+    // 角标照常按两个角标提示开关显示，滑行不改它（用户 10-31：不能改他的习惯）。
     val glidePrefs = LocalKeyboardInputPreferences.current
     val glideProfile = uiState.inputProfile
-    val chineseGlide = !isAsciiMode && com.kingzcheung.xime.glide.chineseGlideSupported(glideProfile, uiState.currentSchemaId)
-    val glideEnabled = (isAsciiMode && callbacks.onGlideWord != null || chineseGlide && callbacks.onGlideCode != null) &&
-        glidePrefs.glideTyping && glidePrefs.cursorGesture != CursorGestureMode.KEYBOARD && !(isVoiceMode && !isVoiceSticky)
-    // 开着滑行时这块键盘不画上下角标（用户 10-30）：与两个角标提示开关都关掉一样，只是不显示，滑动出符号照常。
-    val keySwipeUpHints = swipeUpHintsEnabled && !glideEnabled
-    val keySwipeDownHints = swipeDownHintsEnabled && !glideEnabled
+    val chineseGlide = !isAsciiMode && glidePrefs.chineseGlideTyping &&
+        com.kingzcheung.xime.glide.chineseGlideSupported(glideProfile, uiState.currentSchemaId)
+    val glideEnabled = (isAsciiMode && glidePrefs.glideTyping && callbacks.onGlideWord != null || chineseGlide && callbacks.onGlideCode != null) &&
+        glidePrefs.cursorGesture != CursorGestureMode.KEYBOARD && !(isVoiceMode && !isVoiceSticky)
     val glideTrail = remember { GlideTrail() }
     val glideScope = rememberCoroutineScope()
     val glideContext = LocalContext.current.applicationContext
@@ -524,8 +523,8 @@ fun KeyboardLayout(
                                 },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = keySwipeDownHints,
-                                swipeUpHintsEnabled = keySwipeUpHints,
+                                swipeDownHintsEnabled = swipeDownHintsEnabled,
+                                swipeUpHintsEnabled = swipeUpHintsEnabled,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
@@ -580,8 +579,8 @@ fun KeyboardLayout(
                                 },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = keySwipeDownHints,
-                                swipeUpHintsEnabled = keySwipeUpHints,
+                                swipeDownHintsEnabled = swipeDownHintsEnabled,
+                                swipeUpHintsEnabled = swipeUpHintsEnabled,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
@@ -626,8 +625,8 @@ fun KeyboardLayout(
                                 onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = keySwipeDownHints,
-                                swipeUpHintsEnabled = keySwipeUpHints,
+                                swipeDownHintsEnabled = swipeDownHintsEnabled,
+                                swipeUpHintsEnabled = swipeUpHintsEnabled,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
@@ -678,11 +677,11 @@ fun KeyboardLayout(
                                 segmentKeys.forEach { key ->
                                     val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
                                     val swipeUpText =
-                                        if (keySwipeUpHints) rawSwipeUpLabel else null
+                                        if (swipeUpHintsEnabled) rawSwipeUpLabel else null
                                     val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
                                     val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
                                     val swipeUpKeyLabel =
-                                        if (swipeUpDisplay != DisplayMode.BUBBLE && keySwipeUpHints) swipeUpText else ""
+                                        if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
                                     val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
                                     val swipeDownRaw =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
@@ -691,7 +690,7 @@ fun KeyboardLayout(
                                     val swipeDownAction = swipeDownRaw?.action
                                     val swipeDownValue = swipeDownRaw?.value
                                     val swipeDownDisplay = swipeDownRaw?.display ?: DisplayMode.BOTH
-                                    val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY && keySwipeDownHints) swipeDownLabel else null
+                                    val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY && swipeDownHintsEnabled) swipeDownLabel else null
                                     val longPressConfig =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
                                     val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
@@ -759,7 +758,7 @@ fun KeyboardLayout(
                     .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
-                                        swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && keySwipeDownHints) swipeDownLabel else null,
+                                        swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && swipeDownHintsEnabled) swipeDownLabel else null,
                                         onSwipe = if (swipeUpCommitValue != null && swipeUpAction != GestureAction.NONE) { {
                     if (swipeUpAction == null || swipeUpAction == GestureAction.COMMIT) {
                         (onCommitText ?: onKeyPress)(swipeUpCommitValue)
@@ -812,8 +811,8 @@ fun KeyboardLayout(
                                 onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = keySwipeDownHints,
-                                swipeUpHintsEnabled = keySwipeUpHints,
+                                swipeDownHintsEnabled = swipeDownHintsEnabled,
+                                swipeUpHintsEnabled = swipeUpHintsEnabled,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,

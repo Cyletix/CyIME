@@ -34,8 +34,9 @@ import org.robolectric.annotation.Config
 import java.util.Collections
 
 /**
- * 滑行输入（用户 10-30）：中文全拼、双拼 26 键也能滑，划出的是一个词的编码；
- * 开着滑行时这块 26 键不画上下角标，竖着滑仍出角标符号；14 键不滑行，角标照旧。
+ * 滑行输入：英文滑行和中文滑行（全拼、双拼 26 键划一个词的编码）是两个开关，中文默认关；
+ * 用户 10-31：滑行开着也照常画上下角标（只听两个角标提示开关），开着英文滑行的老用户中文键盘不能变。
+ * 竖着滑仍出角标符号；14 键不滑行。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "w400dp-h800dp-xhdpi")
@@ -47,13 +48,13 @@ class GlideCornerHintTest {
     private var schema by mutableStateOf("rime_ice")
     private var ascii by mutableStateOf(false)
 
-    private fun show(glide: Boolean = true) {
+    private fun show(glide: Boolean = true, chinese: Boolean = true) {
         val app = ApplicationProvider.getApplicationContext<Application>()
         KeysConfigHelper.loadConfig(app)
         com.kingzcheung.xime.ui.theme.KeyboardThemes.initFromConfig(app)
         AppFonts.initialize(app)
         val vm = KeyboardViewModel(app)
-        val preferences = KeyboardInputPreferences(glideTyping = glide)
+        val preferences = KeyboardInputPreferences(glideTyping = glide, chineseGlideTyping = chinese)
         rule.setContent {
             CompositionLocalProvider(LocalKeyboardExplicitWidth provides true, LocalKeyboardInputPreferences provides preferences) {
                 MaterialTheme {
@@ -99,19 +100,29 @@ class GlideCornerHintTest {
         return typed.toList()
     }
 
-    @Test fun glidingBoardsDrawNoCornerHintsButVerticalSwipesStillType() {
+    @Test fun glidingBoardsKeepCornerHintsAndVerticalSwipesStillType() {
         show()
         for ((id, english) in listOf("rime_ice" to false, "double_pinyin_flypy" to false, "rime_ice" to true)) {
             use(id, english)
             for (key in listOf("q", "f", "m")) {
-                assertEquals("$id english=$english $key", emptyList<String>(), hints(key))
+                assertTrue("$id english=$english $key 角标照常", hints(key).isNotEmpty())
                 assertEquals("$id english=$english $key 下拉仍出一个符号", 1, pullDown(key).size)
             }
         }
     }
 
     @Test fun cornerHintsStayWithoutGlide() {
-        show(glide = false)
+        show(glide = false, chinese = false)
+        assertTrue(hints("q").isNotEmpty())
+    }
+
+    @Test fun englishGlideAloneLeavesTheChineseBoardAsBefore() {
+        show(glide = true, chinese = false)
+        glide("nihao")
+        rule.waitForIdle()
+        Thread.sleep(300)
+        rule.waitForIdle()
+        assertEquals("中文滑行没开，中文 26 键不滑行", emptyList<String>(), codes.toList())
         assertTrue(hints("q").isNotEmpty())
     }
 
@@ -122,16 +133,20 @@ class GlideCornerHintTest {
         assertTrue("14 键不滑行，角标照旧", hints(first).isNotEmpty())
     }
 
-    @Test fun chineseGlideTypesThePinyinOfOneWord() {
-        show()
+    private fun glide(word: String) {
         val host = rule.onRoot().fetchSemanticsNode().boundsInRoot
         fun letter(char: Char) = rule.onNodeWithTag("qwerty-key:$char", true).fetchSemanticsNode().boundsInRoot.center - host.topLeft
-        val path = "nihao".map(::letter)
+        val path = word.map(::letter)
         rule.onRoot().performTouchInput {
             down(path.first())
             path.zipWithNext().forEach { (a, b) -> for (step in 1..6) moveTo(a + (b - a) * (step / 6f)) }
             up()
         }
+    }
+
+    @Test fun chineseGlideTypesThePinyinOfOneWord() {
+        show(glide = false, chinese = true)
+        glide("nihao")
         rule.waitUntil(5000) { codes.isNotEmpty() }
         assertEquals(listOf("nihao"), codes.toList())
         assertEquals("滑行不出单个字母", emptyList<String>(), typed.toList())

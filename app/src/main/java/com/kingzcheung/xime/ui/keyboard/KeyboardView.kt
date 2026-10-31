@@ -606,10 +606,9 @@ fun KeyboardView(
                     ToolbarButton.GLIDE, ToolbarButton.T9_FLICK, ToolbarButton.FOURTEEN_SWIPE,
                     ToolbarButton.KANA_HINTS, ToolbarButton.FLICK_DISC ->
                         if (item.button.appliesTo(state.inputProfile.layout.kind) &&
-                            // 滑行只在英文 26 键和中文全拼、双拼字母键盘上、且没被「键盘滑动」占用时生效，否则不显示这个开关。
+                            // 这个开关是英文滑行：只在英文 26 键、且没被「键盘滑动」占用时显示（中文滑行在设置里单独开）。
                             (item.button != ToolbarButton.GLIDE ||
-                                (com.kingzcheung.xime.glide.glideSupported(state.isAsciiMode, state.inputProfile, state.currentSchemaId) &&
-                                    inputPreferences.cursorGesture != CursorGestureMode.KEYBOARD)))
+                                (state.isAsciiMode && inputPreferences.cursorGesture != CursorGestureMode.KEYBOARD)))
                             ({ item.button.flipGesture(quickContext, inputPreferences) }) else return null
                     ToolbarButton.SOUND -> ({
                         val on = !(quickToggles.sound || quickToggles.vibration)

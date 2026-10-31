@@ -94,6 +94,28 @@ class KeyboardInputPreferencesTest {
         assertEquals(listOf("glide_typing_v2", "glide_typing"), com.kingzcheung.xime.keyboard.ToolbarButton.GLIDE.gestureKeys())
     }
 
+    @Test fun `chinese glide has its own switch and an english glide user does not get it`() {
+        // 用户 10-31：老版本开着英文滑行，升级后中文 26 键不能跟着滑行。
+        values["glide_typing_v2"] = true
+        values["glide_typing"] = true
+        val upgraded = KeyboardInputPreferences.read(context)
+        assertEquals(true, upgraded.glideTyping)
+        assertEquals(false, upgraded.chineseGlideTyping)
+        upgraded.save(context)
+        assertEquals(false, KeyboardInputPreferences.read(context).chineseGlideTyping)
+        // 自己打开中文滑行后保持打开，英文滑行原样不动。
+        KeyboardInputPreferences.read(context).copy(chineseGlideTyping = true).save(context)
+        val chinese = KeyboardInputPreferences.read(context)
+        assertEquals(true, chinese.chineseGlideTyping)
+        assertEquals(true, chinese.glideTyping)
+        // 只开中文滑行时同样锁住键盘滑动移光标。
+        val onlyChinese = KeyboardInputPreferences(chineseGlideTyping = true)
+        assertEquals("已被「中文滑行输入」锁定", InputGestureLocks.lockFor(onlyChinese,
+            InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD)?.message)
+        // 手势预设不管中文滑行：开着它，「滑动」预设照样认得出。
+        assertEquals(InputGesturePreset.SWIPE, InputGesturePreset.of(InputGesturePreset.SWIPE.applyTo(onlyChinese)))
+    }
+
     @Test fun `comma and period keys are both on by default and the old saved period default does not turn it off`() {
         val fresh = KeyboardInputPreferences.read(context)
         assertEquals(true, fresh.qwertyCommaKey)
