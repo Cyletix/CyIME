@@ -88,6 +88,10 @@ internal fun ConnectedClipboardBoard(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { store.refresh() }
     LaunchedEffect(Unit) { store.refresh() }
     val manager = remember(context) { ClipboardManager.getInstance(context) }
+    val groupStore = remember(context) { ClipboardGroupStore.getInstance(context) }
+    val groups by groupStore.state.collectAsState()
+    // Back from the add / edit form: the board opens on the tab it was closed from.
+    val returnTab = remember(groupStore) { if (showControls) groupStore.takeReturnTab() else null }
     val unpinnedTotal by manager.unpinnedCount.collectAsState()
     val room by manager.room.collectAsState()
     // Older history is read page by page while open; closing returns to the first page.
@@ -124,6 +128,8 @@ internal fun ConnectedClipboardBoard(
                     ?.let { id -> id to (key in updated) }
             }.toMap()
             pendingTextPins = pendingTextPins + changedTextPins
+            // A group holds fixed records: unfixing (or deleting) a record takes it out of its group.
+            groupStore.assign(pins - updated, null)
             storedPins = updated.filterTo(mutableSetOf()) { it.startsWith("image:") }
             synchronized(prefs) {
                 val unmigratedTextPins = prefs.getStringSet("pins", emptySet()).orEmpty()
@@ -171,6 +177,16 @@ internal fun ConnectedClipboardBoard(
         closeAfterPaste = closeAfterPaste, onCloseAfterPasteChange = { value ->
             closeAfterPaste = value
             prefs.edit().putBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, value).apply()
+        },
+        groups = groups, initialTabKey = returnTab,
+        onAssignGroup = groupStore::assign,
+        onManageGroups = {
+            context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
+                com.kingzcheung.xime.ui.settings.SettingsRoutes.ClipboardGroups))
+        },
+        onFormOpen = { tab, adding ->
+            groupStore.setReturnTab(tab.key)
+            if (adding) groupStore.setAddTarget((tab as? ClipboardTab.Group)?.group?.id)
         })
 }
 
@@ -223,9 +239,24 @@ internal fun ClipboardBoardView(
     /** The "close after paste" switch shown in the more menu; null hides it. */
     closeAfterPaste: Boolean? = null,
     onCloseAfterPasteChange: (Boolean) -> Unit = {},
+    /** The user's groups: tabs after the built-in categories, and what is in each. */
+    groups: ClipboardGroupState = ClipboardGroupState(),
+    /** Tab key to open on instead of 全部 / 图片 (back from the add / edit form). */
+    initialTabKey: String? = null,
+    /** Puts records into a group (null: out of their group); the board fixes them first. */
+    onAssignGroup: (Set<String>, String?) -> Unit = { _, _ -> },
+    /** Opens the group settings (new, rename, delete); null hides those entries. */
+    onManageGroups: (() -> Unit)? = null,
+    /** The add (true) or edit form is about to open from this tab. */
+    onFormOpen: (ClipboardTab, Boolean) -> Unit = { _, _ -> },
 ) {
     val colors = MaterialTheme.colorScheme
-    var filter by remember(initialImages) { mutableStateOf(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL) }
+    val tabs = remember(groups) { clipboardTabs(groups) }
+    var chosenTab by remember(initialImages) { mutableStateOf<ClipboardTab>(
+        tabs.firstOrNull { it.key == initialTabKey }
+            ?: ClipboardTab.Category(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL)) }
+    // A renamed group keeps its tab; a deleted group or hidden category falls back to 全部.
+    val tab = tabs.resolve(chosenTab)
     var menu by remember { mutableStateOf(false) }
     var moreAnchor by remember { mutableStateOf(ClipboardMenuAnchor()) }
     var deleteAnchor by remember { mutableStateOf(ClipboardMenuAnchor()) }
@@ -243,6 +274,8 @@ internal fun ClipboardBoardView(
     var selecting by remember { mutableStateOf(false) }
     var pinsExpanded by remember(initialImages) { mutableStateOf(false) }
     var itemMenu by remember { mutableStateOf<ClipboardItemMenuAnchor?>(null) }
+    // The 分组 choice opened from a record's menu, in the same place.
+    var groupMenu by remember { mutableStateOf<ClipboardItemMenuAnchor?>(null) }
     // Physical-keyboard focus inside an open record menu or confirmation, and its entries.
     var menuFocus by remember { mutableStateOf(0) }
     val keyboardMenuEntries = remember { arrayOf<List<com.kingzcheung.xime.ui.common.CompactActionMenuEntry>>(emptyList()) }
@@ -256,9 +289,9 @@ internal fun ClipboardBoardView(
         if (removing.isNotEmpty()) removing = removing.intersect(
             clipboardCards(textItems, images, ClipboardFilter.ALL, pins).mapTo(mutableSetOf()) { it.key })
     }
-    val cards = remember(all, filter) { all.filter { clipboardMatches(it, filter) } }
+    val cards = remember(all, tab, groups) { all.filter { clipboardMatches(it, tab, groups) } }
     val keyboard = LocalClipboardKeyboardNavigation.current
-    var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
+    var focusedKey by remember(keyboard?.active, tab.key) { mutableStateOf<String?>(null) }
     val gridState = rememberLazyStaggeredGridState()
     // Near the end of what is loaded, read the next page of older history (again after each page
     // arrives, so a sparse category keeps filling until the whole history is read).
@@ -280,7 +313,7 @@ internal fun ClipboardBoardView(
         }
         return ClipboardMenuAnchor(anchorInRoot.translate(-boardOrigin), visible, preferSide)
     }
-    LaunchedEffect(filter) { gridState.scrollToItem(0) }
+    LaunchedEffect(tab.key) { gridState.scrollToItem(0) }
     fun changePinsExpansion(value: Boolean) {
         scope.launch {
             // Reset the scroll anchor before changing the keyed rows. A scrollToItem
@@ -294,18 +327,25 @@ internal fun ClipboardBoardView(
     LaunchedEffect(cards) {
         selected = selected.intersect(cards.mapTo(mutableSetOf()) { it.key })
     }
-    LaunchedEffect(all, filter, pinsExpanded, failure) {
+    LaunchedEffect(all, tab.key, pinsExpanded, failure) {
         // Anchors capture the visible grid at opening time. A background copy/update
         // can move a surviving record too; do not keep an obsolete source rectangle.
-        menu = false; itemMenu = null; deleting = null
+        menu = false; itemMenu = null; groupMenu = null; deleting = null
     }
+    fun assignGroup(keys: Set<String>, groupId: String?) {
+        // Group records are fixed ones, so a group never loses a record to history trimming.
+        if (groupId != null && keys.any { it !in pins }) onPinsChange(pins + keys)
+        onAssignGroup(keys, groupId)
+    }
+    val addPinned = onAddPinned?.let { add -> { onFormOpen(tab, true); add() } }
+    val editText = onEditText?.let { edit -> { id: Long, text: String, code: String -> onFormOpen(tab, false); edit(id, text, code) } }
     DisposableEffect(keyboard) { onDispose { keyboard?.attach(null) } }
     BoxWithConstraints(modifier.fillMaxSize().keyboardPanelBackground(colors.surface).testTag("clipboard-board")
         .onGloballyPositioned { boardCoordinates[0] = it }) {
         val menuDensity = LocalDensity.current
         LaunchedEffect(constraints.maxWidth, constraints.maxHeight, menuDensity.density, menuDensity.fontScale) {
             // The source rectangles are opening-time snapshots. Resizing must not reuse stale anchors.
-            menu = false; itemMenu = null; deleting = null
+            menu = false; itemMenu = null; groupMenu = null; deleting = null
         }
         val columns = clipboardColumnCount(maxWidth.value)
         val compactControls = maxWidth.value / LocalDensity.current.fontScale < 360f
@@ -347,7 +387,7 @@ internal fun ClipboardBoardView(
                 val focusedCard = visibleCards.firstOrNull { it.key == (focusedKey?.takeIf { key -> key in gridKeys } ?: focused) }
                 // Physical keys: Space opens the record menu, arrows move inside it, Enter runs the
                 // highlighted action, Delete asks to delete the record, Esc closes the menu first.
-                val openMenu = itemMenu
+                val openMenu = itemMenu ?: groupMenu
                 if (openMenu != null || deleting != null) {
                     val entries = keyboardMenuEntries[0]
                     when (action) {
@@ -356,9 +396,9 @@ internal fun ClipboardBoardView(
                         ClipboardNavigation.DOWN, ClipboardNavigation.RIGHT ->
                             menuFocus = (menuFocus + 1).coerceAtMost((entries.size - 1).coerceAtLeast(0))
                         ClipboardNavigation.CONFIRM -> entries.getOrNull(menuFocus)?.takeIf { it.enabled }?.let { entry ->
-                            itemMenu = null; deleting = null; menuFocus = 0; entry.onClick()
+                            itemMenu = null; groupMenu = null; deleting = null; menuFocus = 0; entry.onClick()
                         }
-                        ClipboardNavigation.CANCEL -> { itemMenu = null; deleting = null }
+                        ClipboardNavigation.CANCEL -> { itemMenu = null; groupMenu = null; deleting = null }
                         else -> Unit
                     }
                     return@attach true
@@ -382,7 +422,7 @@ internal fun ClipboardBoardView(
                     }
                     return@attach true
                 }
-                if (!menu && !selecting && itemMenu == null && deleting == null) {
+                if (!menu && !selecting && itemMenu == null && groupMenu == null && deleting == null) {
                     if (action == ClipboardNavigation.CONFIRM) {
                         visibleCards.firstOrNull { it.key == (focusedKey?.takeIf { key -> key in gridKeys } ?: focused) }?.let { card ->
                             when (card) {
@@ -441,9 +481,9 @@ internal fun ClipboardBoardView(
                             CompactClipboardFilter("🔍 $query ✕", true, onClearSearch,
                                 Modifier.testTag("clipboard-search-chip"))
                         }
-                        ClipboardFilter.entries.forEach { item ->
-                            CompactClipboardFilter(item.label, filter == item, { filter = item },
-                                Modifier.testTag("clipboard-filter:${item.name}"))
+                        tabs.forEach { item ->
+                            CompactClipboardFilter(item.label, tab.key == item.key, { chosenTab = item },
+                                Modifier.testTag("clipboard-filter:${item.key}"))
                         }
                     }
                     if (content.pinsCollapsible) {
@@ -462,8 +502,10 @@ internal fun ClipboardBoardView(
                     onOpenSearch?.let {
                         CompactClipboardAction(Icons.Default.Search, "搜索剪贴板", it, "clipboard-search")
                     }
-                    onAddPinned?.let {
-                        CompactClipboardAction(Icons.Default.Add, "新增固定内容", it, "clipboard-add-pinned")
+                    addPinned?.let {
+                        CompactClipboardAction(Icons.Default.Add,
+                            (tab as? ClipboardTab.Group)?.let { group -> "新增到「${group.label}」" } ?: "新增固定内容",
+                            it, "clipboard-add-pinned")
                     }
                     CompactClipboardAction(Icons.Default.MoreHoriz, "更多操作", {
                         moreAnchor = menuPosition(moreBounds[0], false); menu = !menu
@@ -472,11 +514,11 @@ internal fun ClipboardBoardView(
             }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().testTag("clipboard-records-region")
                 .onGloballyPositioned { recordsCoordinates[0] = it }
-                .clipboardPanelCollapseGesture(!selecting && !menu && itemMenu == null && deleting == null) {
+                .clipboardPanelCollapseGesture(!selecting && !menu && itemMenu == null && groupMenu == null && deleting == null) {
                     !gridState.canScrollBackward
                 }
-                .clipboardCategorySwipe(!selecting && !menu && itemMenu == null && deleting == null) { delta ->
-                    filter = filter.afterSwipe(delta)
+                .clipboardCategorySwipe(!selecting && !menu && itemMenu == null && groupMenu == null && deleting == null) { delta ->
+                    chosenTab = tabs.afterSwipe(tab, delta)
                 }) {
                 val expansion = LocalClipboardPanelExpansion.current
                 val density = LocalDensity.current
@@ -501,8 +543,11 @@ internal fun ClipboardBoardView(
                         ClipboardImageFailureNotice(failure, onSystemPaste, onShare, onDismissFailure)
                     }
                     if (cards.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
-                        Text(if (searchQuery != null) "没有找到「$searchQuery」" else
-                            "暂无${if (filter == ClipboardFilter.ALL) "剪贴板记录" else filter.label}，复制后会显示在这里。",
+                        Text(if (searchQuery != null) "没有找到「$searchQuery」" else when (val shown = tab) {
+                            is ClipboardTab.Group -> "「${shown.label}」里还没有内容。长按记录选「分组」放进来，或点 + 新增。"
+                            is ClipboardTab.Category ->
+                                "暂无${if (shown.filter == ClipboardFilter.ALL) "剪贴板记录" else shown.label}，复制后会显示在这里。"
+                        },
                             Modifier.padding(vertical = 24.dp), color = colors.onSurfaceVariant, fontSize = 14.sp)
                     }
                     fun LazyStaggeredGridScope.records(records: List<ClipboardCard>, fixedRecords: Boolean) {
@@ -555,9 +600,13 @@ internal fun ClipboardBoardView(
                 add(LongPressMenuEntry(Icons.Default.PushPin, if (card.key in pins) "取消固定" else "固定") {
                     onPinsChange(if (card.key in pins) pins - card.key else pins + card.key)
                 })
+                if (groups.groups.isNotEmpty() || onManageGroups != null) {
+                    add(LongPressMenuEntry(Icons.Default.Folder, groups.groupOf(card.key)?.let { "分组：${it.name}" } ?: "分组",
+                        tag = "clipboard-item-group") { menuFocus = 0; groupMenu = anchor })
+                }
                 if (card is ClipboardCard.Text) {
                     add(LongPressMenuEntry(Icons.Default.ContentCut, "分词") { onSplit(card.item.text, card.item.id) })
-                    onEditText?.let { edit -> add(LongPressMenuEntry(Icons.Default.Edit, "编辑") {
+                    editText?.let { edit -> add(LongPressMenuEntry(Icons.Default.Edit, "编辑") {
                         edit(card.item.id, card.item.text, card.item.code)
                     }) }
                 }
@@ -573,18 +622,43 @@ internal fun ClipboardBoardView(
                 onDismiss = { itemMenu = null }, menuItems = actions, highlightCorner = anchor.position.corner,
                 focusedIndex = menuFocus.takeIf { keyboard?.active == true })
         }
+        groupMenu?.let { anchor ->
+            val key = anchor.card.key
+            val current = groups.groupOf(key)?.id
+            val actions = buildList {
+                groups.groups.forEach { group ->
+                    add(LongPressMenuEntry(if (group.id == current) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        group.name, tag = "clipboard-group:${group.id}") { assignGroup(setOf(key), group.id) })
+                }
+                if (current != null) add(LongPressMenuEntry(Icons.Default.Close, "移出分组", tag = "clipboard-group-leave") {
+                    assignGroup(setOf(key), null)
+                })
+                onManageGroups?.let { manage ->
+                    add(LongPressMenuEntry(if (groups.groups.isEmpty()) Icons.Default.Add else Icons.Default.Settings,
+                        if (groups.groups.isEmpty()) "新建分组" else "管理分组", tag = "clipboard-group-manage", onClick = manage))
+                }
+            }
+            keyboardMenuEntries[0] = actions
+            LongPressMenuOverlay(anchor.position.bounds, anchor.position.occupied,
+                onDismiss = { groupMenu = null }, menuItems = actions, title = "放入分组",
+                message = if (key !in pins) "放进分组的记录会固定下来" else null,
+                highlightCorner = anchor.position.corner, tag = "clipboard-group-menu",
+                focusedIndex = menuFocus.takeIf { keyboard?.active == true })
+        }
         if (menu) {
             val actions = buildList {
                 add(CompactActionMenuEntry(Icons.Default.DoneAll, "多选", enabled = cards.isNotEmpty(), tag = "clipboard-select") {
                     selecting = true; selected = emptySet()
                 })
-                onAddPinned?.let { action -> add(CompactActionMenuEntry(Icons.Default.Edit, "新增固定内容", tag = "clipboard-add-text", onClick = action)) }
+                addPinned?.let { action -> add(CompactActionMenuEntry(Icons.Default.Edit, "新增固定内容", tag = "clipboard-add-text", onClick = action)) }
                 add(CompactActionMenuEntry(Icons.Default.Image, "添加图片", tag = "clipboard-pick", onClick = onPick))
                 onRecognizeDocument?.let { action -> add(CompactActionMenuEntry(Icons.Default.DocumentScanner,
                     "拍照识别", tag = "clipboard-ocr", onClick = action)) }
                 add(CompactActionMenuEntry(Icons.Default.PhotoLibrary, if (photoAccess) "关闭最近截图" else "启用最近截图",
                     tag = "clipboard-photos", onClick = onPhotoAccess))
                 onPullRemote?.let { action -> add(CompactActionMenuEntry(Icons.Default.Sync, "同步", tag = "clipboard-sync", onClick = action)) }
+                onManageGroups?.let { action -> add(CompactActionMenuEntry(Icons.Default.Folder, "管理分组",
+                    tag = "clipboard-manage-groups", onClick = action)) }
                 closeAfterPaste?.let { on -> add(CompactActionMenuEntry(
                     if (on) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "上屏后自动关闭剪贴板",
                     tag = "clipboard-close-after-paste") { onCloseAfterPasteChange(!on) }) }

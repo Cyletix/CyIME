@@ -541,14 +541,16 @@ class ClipboardManager private constructor(private val context: Context) {
         addPinnedText(text, code)
     }
 
-    fun addPinnedText(text: String, code: String = "") {
+    /** [groupId]: the clipboard group the fixed record goes into (added from that group's tab). */
+    fun addPinnedText(text: String, code: String = "", groupId: String? = null) {
         if (text.isBlank() || !ClipboardCapacity.fitsRow(text)) return
         scope.launch {
             clipboardPinsReady.await()
             val key = searchKey(text)
             // Text already saved is fixed in place and needs no room.
             if (dao.findSameText(text) == null && !hasRoomFor(text, key)) return@launch
-            dao.addPinned(text, code.trim(), System.currentTimeMillis(), key)
+            val id = dao.addPinned(text, code.trim(), System.currentTimeMillis(), key)
+            groupId?.let { ClipboardGroupStore.getInstance(context).assign(setOf("text:$id"), it) }
         }
     }
 

@@ -804,8 +804,8 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         updateClipboardItem(id, text, code)
     }
 
-    fun addPinnedText(text: String, code: String = "") {
-        clipboardManager.addPinnedText(text, code)
+    fun addPinnedText(text: String, code: String = "", groupId: String? = null) {
+        clipboardManager.addPinnedText(text, code, groupId)
     }
 
     fun updateClipboardItem(id: Long, text: String, code: String? = null): Boolean =

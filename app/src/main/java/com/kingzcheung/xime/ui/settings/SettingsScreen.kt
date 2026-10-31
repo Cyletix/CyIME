@@ -256,8 +256,12 @@ fun SettingsScreen(
         composable(SettingsRoutes.ClipboardSync) {
             ClipboardSyncSettingsContent(
                 onBack = { navController.popBackStack() },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
+                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                onNavigateToGroups = { navController.navigate(SettingsRoutes.ClipboardGroups) },
             )
+        }
+        composable(SettingsRoutes.ClipboardGroups) {
+            ClipboardGroupSettingsContent(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoutes.KeyboardResize) {
             KeyboardPanelSettingsContent(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE) { navController.popBackStack() }
