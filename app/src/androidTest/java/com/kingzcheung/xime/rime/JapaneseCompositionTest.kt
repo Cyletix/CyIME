@@ -42,6 +42,21 @@ class JapaneseCompositionTest {
                 assertEquals("预览不得提交", "", engine.commit())
                 assertEquals("预览保留全部原编码", "naniwoshimasuka", engine.getInput())
                 assertEquals("可撤回原假名", "なにをしますか", engine.japaneseReading(engine.getInput()))
+                engine.setInput("naniwoshimasuka")
+                val caret = JapaneseConversion(engine, engine.getInput(), converted = false)
+                caret.refresh()
+                assertFalse("光标在末尾", caret.partial)
+                assertTrue(caret.moveRange(-4))
+                assertEquals("左右键只挪光标、不转换", "なにを|しますか", caret.preview)
+                assertTrue("候选只给光标前那段: ${caret.segment}", caret.segment.startsWith("何"))
+                assertEquals("光标后的读音留着", "しますか", engine.japaneseReading(caret.rest))
+                val (deleted, kana) = caret.withoutKanaBeforeCaret()
+                assertEquals("退格删光标前的假名", "なにしますか", engine.japaneseReading(deleted))
+                assertEquals(2, kana)
+                engine.setInput("naniwoshimasuka")
+                caret.convert()
+                assertTrue("変換把光标前那段转成首选: ${caret.preview}", caret.preview.startsWith("何") && caret.preview.endsWith("しますか"))
+                assertFalse("右键到末尾后不再动", JapaneseConversion(engine, engine.getInput(), converted = false).moveRange(1))
             }
         } finally { engine.clearComposition(); if (previous.isNotBlank()) engine.switchSchema(previous) }
     }
