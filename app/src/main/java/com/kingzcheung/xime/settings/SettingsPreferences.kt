@@ -225,8 +225,7 @@ object SettingsPreferences {
             val menu = raw.split(",").filter { it.isNotEmpty() }
             if (id !in menu) {
                 val arrange = com.kingzcheung.xime.keyboard.ToolbarButton.ARRANGE.id
-                val at = after?.let { menu.indexOf(it) }?.takeIf { it >= 0 }?.plus(1)
-                    ?: menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
+                val at = menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
                 editor.putString(KEY_MENU_BUTTONS, (menu.take(at) + id + menu.drop(at)).joinToString(","))
             }
         }
@@ -247,7 +246,8 @@ object SettingsPreferences {
             val menu = raw.split(",").filter { it.isNotEmpty() }
             if (id !in menu) {
                 val arrange = com.kingzcheung.xime.keyboard.ToolbarButton.ARRANGE.id
-                val at = menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
+                val at = after?.let { menu.indexOf(it) }?.takeIf { it >= 0 }?.plus(1)
+                    ?: menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
                 editor.putString(KEY_MENU_BUTTONS, (menu.take(at) + id + menu.drop(at)).joinToString(","))
             }
         }
