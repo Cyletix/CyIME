@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.speech
 
+import com.kingzcheung.xime.service.VoiceMarks
 import com.kingzcheung.xime.service.normalizeVoiceText
 import com.kingzcheung.xime.settings.InputLanguage
 import org.junit.Assert.*
@@ -36,6 +37,24 @@ class SpeechPunctuationTest {
         assertEquals("你吃饭了吗？", normalizeVoiceText("你吃饭了吗问号。", InputLanguage.CHINESE, keepMarks = true))
         assertEquals("你好，我在", normalizeVoiceText("你好逗号我在")) // switch off: dictated marks still work
         assertEquals("你好 我在", normalizeVoiceText("你好，我在。")) // switch off: model marks become spacing
+    }
+
+    @Test fun `auto punctuation can keep only some kinds of marks`() {
+        fun norm(text: String, marks: VoiceMarks) = normalizeVoiceText(text, InputLanguage.CHINESE, keepMarks = true, marks = marks)
+        val text = "你好，我在这里。你呢？"
+        assertEquals("你好，我在这里。你呢？", norm(text, VoiceMarks()))
+        assertEquals("你好 我在这里。你呢？", norm(text, VoiceMarks(comma = false)))
+        assertEquals("你好，我在这里 你呢？", norm(text, VoiceMarks(period = false)))
+        assertEquals("你好，我在这里。你呢", norm(text, VoiceMarks(question = false)))
+        assertEquals("你好 我在这里 你呢", norm(text, VoiceMarks(comma = false, period = false, question = false)))
+        assertEquals("我用 iPhone 很好用。", norm("我用 iPhone，很好用。", VoiceMarks(comma = false)))
+    }
+
+    @Test fun `dropping marks never touches numbers or dictated marks`() {
+        fun norm(text: String, marks: VoiceMarks) = normalizeVoiceText(text, InputLanguage.CHINESE, keepMarks = true, marks = marks)
+        assertEquals("体温36.5度 会议10:30开始 花了1,200元。", norm("体温36.5度，会议10:30开始，花了1,200元。", VoiceMarks(comma = false)))
+        assertEquals("版本是1.14", norm("版本是1.14.", VoiceMarks(period = false)))
+        assertEquals("你好，我在这里", norm("你好，逗号，我在这里。", VoiceMarks(comma = false, period = false)))
     }
 
     @Test fun `regions never repeat a mark and need no space after a mark`() {

@@ -349,7 +349,7 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it)) }
+        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it), voiceMarks()) }
         if (toolbarSession) {
             // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
             if (cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：") &&
@@ -427,10 +427,13 @@ class VoiceRecognitionHandler(
         SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context) &&
         SettingsPreferences.isSttAutoPunctuation(context)
 
+    private fun voiceMarks() = VoiceMarks(comma = SettingsPreferences.isSttPunctuationComma(context),
+        period = SettingsPreferences.isSttPunctuationPeriod(context), question = SettingsPreferences.isSttPunctuationQuestion(context))
+
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it)) }
+        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it), voiceMarks()) }
         if (cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")

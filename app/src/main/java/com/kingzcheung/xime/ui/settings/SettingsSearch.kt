@@ -257,7 +257,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("开车连续语音", speech, SettingsRoutes.SpeechToText, "开车 驾驶 免手 连续 自动 接着听 悬浮条 浮窗 发送 语音", section = "语音输入"),
         SettingsSearchEntry("保存语音调优录音", speech, SettingsRoutes.SpeechToText, "录音 保存 调优 回放 分析", section = "本地识别"),
         SettingsSearchEntry("整句定稿", speech, SettingsRoutes.SpeechToText, "整句 定稿 校正 断句 分段 准确 SenseVoice X-ASR 说完", section = "二次校正"),
-        SettingsSearchEntry("自动加标点", speech, SettingsRoutes.SpeechToText, "标点 逗号 句号 问号 自动标点 去掉标点 不加标点 空格 语音", section = "二次校正"),
+        SettingsSearchEntry("自动加标点", speech, SettingsRoutes.SpeechToText, "标点 逗号 句号 问号 感叹号 顿号 分号 自动标点 去掉标点 不加标点 部分标点 只要逗号 不要句号 空格 语音", section = "二次校正"),
         SettingsSearchEntry("字幕", speech, SettingsRoutes.SpeechToText, "字幕 听障 老人 对话 实时字幕"),
         SettingsSearchEntry("桌面显示“字幕”图标", speech, SettingsRoutes.SpeechToText, "字幕 桌面图标 快捷方式"),
         SettingsSearchEntry("后台浮窗", speech, SettingsRoutes.SpeechToText, "字幕 浮窗 后台 悬浮 其他应用"),
