@@ -73,6 +73,7 @@ object SettingsPreferences {
     const val KEY_STT_ENGINE_IDLE_MINUTES = "stt_engine_idle_minutes"
     const val KEY_STT_DEBUG_RECORD = "stt_debug_record"
     const val KEY_STT_WHOLE_SENTENCE = "stt_whole_sentence"
+    const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
@@ -692,6 +693,18 @@ object SettingsPreferences {
 
     fun setSttWholeSentence(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STT_WHOLE_SENTENCE, enabled).apply()
+    }
+
+    /**
+     * 开车连续语音：语音悬浮条听写时发出消息或离开输入框，回到同一应用的输入框自动接着听。
+     * 别人提的需求，默认关（用户 10-30 规则）；见 VoicePillResume。
+     */
+    fun isSttPillResume(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_STT_PILL_RESUME, false)
+    }
+
+    fun setSttPillResume(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_STT_PILL_RESUME, enabled).apply()
     }
 
     // ---- 插件网络授权（per plugin per host） ----

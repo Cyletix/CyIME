@@ -59,6 +59,8 @@ import kotlin.math.floor
 @Composable
 internal fun VoiceCollapsedPill(
     listening: Boolean,
+    /** 这段听写是开车连续语音自动续上的：写明，点麦克风就停。 */
+    autoResumed: Boolean = false,
     /** 实时麦克风峰值（0~1）；只在绘制阶段读取，音量变化不触发重组。 */
     amplitude: () -> Float,
     languageLabel: String,
@@ -109,7 +111,11 @@ internal fun VoiceCollapsedPill(
                 HardwareToolbarLanguageKey(color, languageActions, languageLabel, onSwitchLanguage)
                 HardwareToolbarAction(Icons.Default.Keyboard, "展开键盘", "voice-pill-keyboard", color, onClick = onShowKeyboard)
                 Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                    Text(if (listening) "正在听取…" else "点按麦克风说话", color = color, fontSize = 14.sp,
+                    Text(when {
+                        listening && autoResumed -> "已自动接着听…"
+                        listening -> "正在听取…"
+                        else -> "点按麦克风说话"
+                    }, color = color, fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 // 麦克风在右数第二个，与展开后工具栏里麦克风的位置一致。
