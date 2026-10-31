@@ -83,6 +83,8 @@ fun CommonSymbolKeyboardLayout(
     specialKeyTextColor: Color = Color.White,
     /** 进入面板时的初始模式（来自 ascii 记忆状态机），为 null 时退回 [isAsciiMode]。 */
     initialAsciiMode: Boolean? = null,
+    /** 回车键动作名（换行、发送、搜索等），与主键盘同一来源，决定回车键图标。 */
+    enterKeyText: String = "回车",
 ) {
     KeyboardKeySpacingScope(modifier, policy = KeyVisualPolicy.Qwerty,
         allowShrink = isFloatingMode, applyGutter = true,
@@ -158,6 +160,7 @@ fun CommonSymbolKeyboardLayout(
                 },
                 keySpacingX = keySpacingX,
                 keySpacingY = keySpacingY,
+                enterKeyText = enterKeyText,
             )
         } else {
             CompositionLocalProvider(
@@ -343,7 +346,7 @@ fun CommonSymbolKeyboardLayout(
                                 fontSize = 12.sp,
                             )
                             ActionKeyButton(
-                                text = "回车",
+                                text = enterKeyText,
                                 onClick = { onKeyPress("enter") },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
@@ -386,6 +389,7 @@ internal fun CommonSymbolLandscapeContent(
     onToggleAsciiMode: (() -> Unit)? = null,
     keySpacingX: Dp? = null,
     keySpacingY: Dp? = null,
+    enterKeyText: String = "回车",
 ) {
     val keyVisualPadding = PaddingValues(
         horizontal = keySpacingX ?: 2.dp,
@@ -643,7 +647,7 @@ internal fun CommonSymbolLandscapeContent(
                         fontSize = 12.sp,
                     )
                     ActionKeyButton(
-                        text = "回车",
+                        text = enterKeyText,
                         onClick = { onKeyPress("enter") },
                         backgroundColor = specialKeyBackgroundColor,
                         textColor = specialKeyTextColor,

@@ -1594,6 +1594,7 @@ fun KeyboardView(
                         keySpacingX = numberSpacing.first?.dp,
                         keySpacingY = numberSpacing.second?.dp,
                         isJapaneseKana = japaneseNumberPage,
+                        enterKeyText = state.enterKeyText,
                         onKeyPressDown = callbacks.onKeyPressDown,
                         isFloatingMode = state.isFloatingMode,
                         specialKeyTextColor = specialKeyTextColor,
@@ -1619,6 +1620,7 @@ fun KeyboardView(
                             }
                         },
                         isAsciiMode = state.isAsciiMode,
+                        enterKeyText = state.enterKeyText,
                         initialAsciiMode = viewModel.asciiStateMachine.targetFor(
                             AsciiKeyboardContext.SYMBOL_PANEL, state.isAsciiMode
                         ) ?: state.isAsciiMode,
