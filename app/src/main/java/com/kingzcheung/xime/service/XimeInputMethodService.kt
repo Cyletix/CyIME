@@ -2415,12 +2415,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         when (actionId) {
             android.R.id.undo, android.R.id.redo ->
                 currentInputConnection?.let { sendUndoShortcut(it, redo = actionId == android.R.id.redo) }
+            android.R.id.paste -> if (!pasteIntoTerminal()) currentInputConnection?.performContextMenuAction(actionId)
             else -> currentInputConnection?.performContextMenuAction(actionId)
         }
     }
 
     /** performContextMenuAction 对 undo 支持不一致，改用 Ctrl+Z / Ctrl+Shift+Z 键盘快捷键。 */
     internal fun sendUndoShortcut(connection: InputConnection, redo: Boolean) {
+        // 终端里 Ctrl+Z 是挂起前台程序，不是撤销。
+        if (isTerminalEditor()) return
         val now = SystemClock.uptimeMillis()
         val meta = KeyEvent.META_CTRL_ON or if (redo) KeyEvent.META_SHIFT_ON else 0
         connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, meta))
@@ -3569,6 +3572,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         editorRestricted = EditorInfoClassifier.isRestrictedEditor(attribute)
         // 秘密输入框判定（密码/终端，不含 NO_SUGGESTIONS）：英文联想/回删替换的禁用线
         editorSecret = EditorInfoClassifier.isSecretEditor(attribute)
+        TerminalEditor.active = EditorInfoClassifier.isTerminalEditor(attribute)
         return editorInputPolicy.begin(attribute, restarting, uiState.value.isAsciiMode, uiState.value.currentSchemaId)
     }
 
@@ -3704,6 +3708,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun isEditorRestricted(): Boolean = editorRestricted
 
     internal fun isSecretEditor(): Boolean = editorSecret
+
+    /** 宿主输入框是终端（见 [TerminalEditor]）；键盘自己的输入框（剪贴板搜索等）不算。 */
+    internal fun isTerminalEditor(): Boolean = TerminalEditor.active && !uiState.value.inputTarget.isInternal
+
+    /** 终端不接系统粘贴菜单：直接上屏剪贴板文字。不是终端返回 false，由调用方照常交给宿主。 */
+    internal fun pasteIntoTerminal(): Boolean {
+        if (!isTerminalEditor()) return false
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val text = runCatching { clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this) }
+            .getOrNull()?.toString().orEmpty()
+        if (text.isNotEmpty()) {
+            dismissPredictionsForPaste()
+            commitPastedText(text)
+        }
+        return true
+    }
 
     /**
      * 当前宿主是否支持英文候选的"回删替换"机制。
@@ -4240,7 +4260,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 退格：开着「输入成对符号」且光标夹在一对空符号中间时两边一起删，否则照常发退格键。 */
     internal fun sendDeleteKey() {
-        if (SettingsPreferences.isPairedSymbolsEnabled(this) && deleteEmptyPairAroundCursor()) return
+        if (SettingsPreferences.isPairedSymbolsEnabled(this) && !isTerminalEditor() && deleteEmptyPairAroundCursor()) return
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
 

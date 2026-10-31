@@ -453,7 +453,7 @@ internal fun rememberImeKeyboardCallbacks(
                 // 候选栏模式只在候选栏显示，输入框模式写在 composing 区里，**都没有写入正文**。
                 // 历史实现把 C++ 的"撤销段数"当成正文字符数调用 deleteBeforeCursor(count)，
                 // 直接把光标前的正文删掉（2026-09-25 真机实证：选词后退格删掉正文）。
-                if (SettingsPreferences.getInputTextLocation(service)
+                if (TerminalEditor.inputTextLocation(service)
                     == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                     service.endComposingInputBox()
                 }
