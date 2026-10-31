@@ -535,10 +535,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
         if (!templateHandwriting && !com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service, recognitionLanguage!!)) {
             Toast.makeText(service, "请先下载手写模型", Toast.LENGTH_SHORT).show()
-            service.startActivity(android.content.Intent(service, com.kingzcheung.xime.MainActivity::class.java).apply {
-                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra("open_fragment", "model_management")
-            })
+            service.startActivity(settingsActivityIntent(service, "model_management"))
             return
         }
         service.editorInputPolicy.choose(false)
@@ -578,13 +575,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 android.widget.Toast.makeText(
                     service, "请先下载手写模型", android.widget.Toast.LENGTH_LONG
                 ).show()
-                val intent = android.content.Intent(
-                    service, com.kingzcheung.xime.MainActivity::class.java
-                ).apply {
-                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                    putExtra("open_fragment", "model_management")
-                }
-                service.startActivity(intent)
+                service.startActivity(settingsActivityIntent(service, "model_management"))
                 return
             }
             service.keyboardViewModel.discardTemporaryHandwriting()
