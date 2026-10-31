@@ -194,4 +194,13 @@ class CtrlSymbolKeyTest {
         assertTrue("字母带 Ctrl", events[1].isCtrlPressed && events[2].isCtrlPressed)
         assertEquals(KeyEvent.KEYCODE_Z, CtrlShortcuts.keyEvents('z', 0L)[1].keyCode)
     }
+
+    // 「Z X C V 角标做撤销、剪切、复制、粘贴」默认关：关着时没有键换角标；开着只换单字母 z x c v。
+    @Test fun zxcvEditCornersOnlyWhenEnabled() {
+        for (key in listOf("z", "x", "c", "v", "Z")) assertEquals(null, CtrlShortcuts.editCornerLetter(key, enabled = false))
+        assertEquals(listOf('z', 'x', 'c', 'v'), listOf("z", "x", "c", "V").map { CtrlShortcuts.editCornerLetter(it, enabled = true) })
+        for (key in listOf("a", "b", "zx", "cv", "", "1")) assertEquals(key, null, CtrlShortcuts.editCornerLetter(key, enabled = true))
+        assertEquals(listOf("撤销", "剪切", "复制", "粘贴"), listOf('z', 'x', 'c', 'v').map { CtrlShortcuts.label(it) })
+        assertEquals(false, KeyboardInputPreferences().zxcvEditShortcuts)
+    }
 }
