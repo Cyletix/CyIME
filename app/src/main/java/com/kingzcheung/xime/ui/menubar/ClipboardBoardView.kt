@@ -94,6 +94,8 @@ internal fun ConnectedClipboardBoard(
     val returnTab = remember(groupStore) { if (showControls) groupStore.takeReturnTab() else null }
     val unpinnedTotal by manager.unpinnedCount.collectAsState()
     val room by manager.room.collectAsState()
+    // 手动开的无痕（不含密码框、剪贴板搜索自动生效的那种）：面板顶上说明新复制的为什么没进来。
+    val incognito = com.kingzcheung.xime.ui.keyboard.rememberQuickToggleStates().incognito
     // Older history is read page by page while open; closing returns to the first page.
     DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
     val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
@@ -174,6 +176,8 @@ internal fun ConnectedClipboardBoard(
         searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
         onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
         onOpenSearch = onOpenSearch, full = room.full, showControls = showControls,
+        incognito = incognito && showControls,
+        onIncognitoOff = { com.kingzcheung.xime.settings.SettingsPreferences.setIncognito(context, false) },
         closeAfterPaste = closeAfterPaste, onCloseAfterPasteChange = { value ->
             closeAfterPaste = value
             prefs.edit().putBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, value).apply()
@@ -234,6 +238,9 @@ internal fun ClipboardBoardView(
     searchChip: Boolean = true,
     /** History has reached its capacity: new copies are not being saved. */
     full: Boolean = false,
+    /** The manual incognito switch is on: new copies are not being saved; existing records still work. */
+    incognito: Boolean = false,
+    onIncognitoOff: () -> Unit = {},
     /** False hides the category / actions row (a short search results area). */
     showControls: Boolean = true,
     /** The "close after paste" switch shown in the more menu; null hides it. */
@@ -356,8 +363,9 @@ internal fun ClipboardBoardView(
         val visibleCards = remember(content) { content.visible }
         val focused = focusedKey?.takeIf { key -> visibleCards.any { it.key == key } }
             ?: visibleCards.firstOrNull()?.key
-        val gridKeys = remember(content, failure != null, full) {
+        val gridKeys = remember(content, failure != null, full, incognito) {
             buildList {
+                if (incognito) add("incognito")
                 if (full) add("full")
                 if (failure != null) add("failure")
                 addAll(content.pinned.map { it.key })
@@ -534,6 +542,9 @@ internal fun ClipboardBoardView(
                     state = gridState,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalItemSpacing = 6.dp) {
+                    if (incognito) item(key = "incognito", span = StaggeredGridItemSpan.FullLine) {
+                        ClipboardIncognitoNotice(onIncognitoOff)
+                    }
                     if (full) item(key = "full", span = StaggeredGridItemSpan.FullLine) {
                         Text("剪贴板已满，新复制的内容不再保存。删掉一些记录后恢复。",
                             Modifier.padding(horizontal = 4.dp, vertical = 6.dp).testTag("clipboard-full"),
