@@ -9,7 +9,8 @@ import java.util.Locale
 
 /**
  * Clipboard text records written out as a file the user saves. Fixed records come first, then
- * history, newest first. Images are not exported (they are files of their own).
+ * history, newest first. Images are not exported (they are files of their own). Markdown and JSON
+ * also name each fixed record's group, so [ClipboardImport] can put it back.
  */
 internal enum class ClipboardExportFormat(val label: String, val extension: String, val mimeType: String) {
     TXT("TXT", "txt", "text/plain"),
@@ -28,7 +29,9 @@ internal object ClipboardExport {
     fun fileName(format: ClipboardExportFormat, now: Long): String =
         "CyIME剪贴板-${SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(now))}.${format.extension}"
 
-    fun write(items: List<ClipboardItem>, format: ClipboardExportFormat, out: Writer, now: Long) {
+    /** [groupOf]: the name of the clipboard group a record is in, null when it is in none. */
+    fun write(items: List<ClipboardItem>, format: ClipboardExportFormat, out: Writer, now: Long,
+        groupOf: (ClipboardItem) -> String? = { null }) {
         when (format) {
             ClipboardExportFormat.TXT -> items.forEachIndexed { i, item ->
                 if (i > 0) out.write("\n\n----------\n\n")
@@ -41,7 +44,8 @@ internal object ClipboardExport {
                     if (group.isEmpty()) continue
                     out.write("\n## $title\n")
                     for (item in group) {
-                        out.write("\n### ${time(item.timestamp)}${if (item.code.isNotEmpty()) "（编码 ${item.code}）" else ""}\n\n")
+                        val groupNote = groupOf(item)?.let { "（分组 $it）" }.orEmpty()
+                        out.write("\n### ${time(item.timestamp)}${if (item.code.isNotEmpty()) "（编码 ${item.code}）" else ""}$groupNote\n\n")
                         // A fence longer than any backtick run inside keeps the text verbatim.
                         val fence = "`".repeat(maxOf(3, longestRun(item.text, '`') + 1))
                         out.write("$fence\n${item.text}\n$fence\n")
@@ -54,6 +58,7 @@ internal object ClipboardExport {
                     put("text", item.text)
                     put("pinned", item.isPinned)
                     if (item.code.isNotEmpty()) put("code", item.code)
+                    groupOf(item)?.let { put("group", it) }
                     put("time", time(item.timestamp))
                     put("timestamp", item.timestamp)
                 })

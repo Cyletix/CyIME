@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import com.kingzcheung.xime.clipboard.db.ClipboardDatabase
 import com.kingzcheung.xime.clipboard.db.ClipboardEntry
+import com.kingzcheung.xime.clipboard.db.ClipboardImportRow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -297,6 +298,44 @@ class ClipboardManager private constructor(private val context: Context) {
     suspend fun exportItems(): List<ClipboardItem> {
         clipboardPinsReady.await()
         return dao.observeAll().first().map { it.toClipboardItem() }
+    }
+
+    /**
+     * Records read from an import file the user chose. Fixed records go in first, then history in
+     * file order, so a full clipboard leaves out the oldest history. Records keep their own time;
+     * text already here is not added twice. A record in a group is a fixed one; a group missing here
+     * is made. Nothing is sent to clipboard sync: this is not a copy.
+     */
+    internal suspend fun importItems(clips: List<ImportedClip>): ClipboardImportResult {
+        clipboardPinsReady.await()
+        val capacity = ClipboardCapacity.capacity(context.filesDir.usableSpace)
+        var stored = dao.observeStoredBytes().first()
+        val now = System.currentTimeMillis()
+        val joins = linkedMapOf<String, MutableList<String>>()
+        var added = 0; var pinned = 0; var existing = 0; var notSaved = 0
+        val ordered = clips.withIndex().sortedByDescending { it.value.pinned || it.value.group != null }
+        for ((index, clip) in ordered) {
+            if (!ClipboardCapacity.fitsRow(clip.text)) { notSaved++; continue }
+            val fixed = clip.pinned || clip.group != null
+            val key = searchKey(clip.text)
+            val bytes = ClipboardCapacity.recordBytes(clip.text, key)
+            val row = dao.importRecord(clip.text, clip.code, clip.timestamp.takeIf { it > 0 } ?: (now - index),
+                fixed, key, ClipboardCapacity.accepts(stored, bytes, capacity))
+            when (row.outcome) {
+                ClipboardImportRow.ADDED -> { added++; if (fixed) pinned++; stored += bytes }
+                ClipboardImportRow.EXISTING -> existing++
+                else -> { notSaved++; continue }
+            }
+            clip.group?.let { joins.getOrPut(it) { mutableListOf() }.add("text:${row.id}") }
+        }
+        val groups = ClipboardGroupStore.getInstance(context)
+        for ((name, keys) in joins) {
+            val id = groups.idForName(name) ?: continue
+            // A record already in a group stays where the user put it.
+            val members = groups.state.value.members
+            groups.assign(keys.filter { it !in members }, id)
+        }
+        return ClipboardImportResult(added, pinned, existing, notSaved)
     }
 
     private fun searchKey(text: String) = ClipboardSearch.key(text, AndroidPinyinInitials::initialOf)
