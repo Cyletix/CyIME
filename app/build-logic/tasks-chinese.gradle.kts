@@ -29,7 +29,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("typewisePreset", 1)
     inputs.property("t9EnglishIndex", 9)
     inputs.file(file("src/main/assets/english.txt"))
-    inputs.property("measuredNeighborCorrection", 2)
+    inputs.property("measuredNeighborCorrection", 3)
     inputs.property("candidatePolicy", 3)
     inputs.property("pinyin26WordModel", 5)
     inputs.property("candidateComments", 1)
@@ -286,6 +286,10 @@ val prepareChineseDictionaries by tasks.registering {
             // One letter typed too many inside a syllable (zhonng → 中, shhi → 是), only as an extra key press
             // (same key twice or a neighbour); same 20x gate, never first (docs/development/typo-correction-20261021.md).
             "  cyime_extra_letter_correction: true\n" +
+            // Typed letters that read only with an initial standing alone before the last syllable (zhe'b'zhe'b'g), when
+            // neighbour corrections read them in full (zhen'zheng): such an initial weighs as a slip and the corrected
+            // sentence comes first; long input is corrected from its start (docs/development/typo-correction-20261021.md).
+            "  cyime_stray_initial_correction: true\n" +
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
             "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
             // 把/被 open a verb phrase and never end a sentence: shuoshuobei is 说说呗, not 说说被.
