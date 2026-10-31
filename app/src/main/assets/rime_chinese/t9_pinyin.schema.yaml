@@ -120,6 +120,8 @@ engine:
     - t9_date_translator
     - punct_translator
     - script_translator
+    # 生僻字（设置「生僻字」，默认关；关着时只看一下开关就返回），见 lua/cyime_rare_chars.lua。
+    - lua_translator@*cyime_rare_chars
     - t9_english_translator@t9_english
   filters:
     - cyime_candidate_policy

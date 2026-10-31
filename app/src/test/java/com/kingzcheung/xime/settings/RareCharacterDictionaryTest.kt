@@ -5,7 +5,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
-/** Rare characters generated from rime-ice 41448.dict.yaml (tasks-chinese.gradle.kts, user 2026-10-30: 瀺 was missing). */
+/** Rare characters generated from rime-ice 41448.dict.yaml (tasks-chinese.gradle.kts; 瀺 2026-10-30, 槻 2026-10-31 were missing). */
 class RareCharacterDictionaryTest {
     private val root = File("build/generated/chinese-assets/rime_ice")
 
@@ -16,7 +16,9 @@ class RareCharacterDictionaryTest {
         assertFalse(File(root, "cn_dicts/41448.dict.yaml").exists())
         assertTrue(File(root, "rime_ice.schema.yaml").readText().contains("    - lua_translator@*cyime_rare_chars\n"))
         assertTrue(File(root, "lua/cyime_rare_chars.lua").isFile)
-        assertFalse(File("src/main/assets/rime_chinese/t9_pinyin.schema.yaml").readText().contains("cyime_rare_chars"))
+        // Nine-key full pinyin reads it too (digits of one syllable); 14 keys and double pinyin do not.
+        assertTrue(File("src/main/assets/rime_chinese/t9_pinyin.schema.yaml").readText().contains("    - lua_translator@*cyime_rare_chars\n"))
+        assertFalse(File("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText().contains("cyime_rare_chars"))
     }
 
     @Test fun onlyMissingBmpCharactersWithKnownReadings() {
@@ -26,6 +28,7 @@ class RareCharacterDictionaryTest {
         val commonCodes = common.map { it[1] }.toSet()
         val rare = File(root, "cyime_rare.txt").readLines().filter { it.isNotEmpty() }.map { it.split('\t') }
         assertTrue(listOf("瀺", "chan") in rare)
+        assertTrue(listOf("槻", "gui") in rare)
         rare.forEach { row ->
             assertEquals(row.toString(), 2, row.size)
             assertEquals(row.toString(), 1, row[0].length)

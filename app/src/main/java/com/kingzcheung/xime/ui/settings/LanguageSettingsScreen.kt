@@ -11,6 +11,7 @@ import androidx.compose.material.icons.twotone.Translate
 import androidx.compose.material.icons.twotone.SpaceBar
 import androidx.compose.material.icons.twotone.EmojiEmotions
 import androidx.compose.material.icons.twotone.Functions
+import androidx.compose.material.icons.twotone.FontDownload
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
@@ -133,6 +134,10 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                     SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
                         "候选和上屏改用台湾正体（台灣、計畫、了解），全拼、双拼、九键、14 键和仓颉都适用（关着时仓颉也出简体）；注音始终出正体。词库和学习记录不变，开启时不给中文联想。",
                         checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) })
+                    HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.FontDownload, "生僻字",
+                        "全拼 26 键和九键打一个完整拼音（chan、gui）时，在常用字后面补上约 1.8 万个生僻字（瀺、槻）；双拼、14 键不适用。",
+                        checked = input.rareCharacters, onCheckedChange = { input.copy(rareCharacters = it).save(context) })
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.Schedule, "时间日期候选",
                         "打“时间”“日期”“星期”时，词后面紧跟着给设备当前的时间和日期（15:35、2026-10-31、星期六），词本身的位置不变；全拼、双拼、九键、14 键都适用。",

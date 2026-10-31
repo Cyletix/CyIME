@@ -129,6 +129,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 输入 › 语言与方案
         SettingsSearchEntry("语言键切换方式", languages, "languages", "语言键 切换语言 中英切换 循环切换 指定语言 英文 地球键 点按语言键"),
         SettingsSearchEntry("繁体输出", languages, "languages", "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换"),
+        SettingsSearchEntry("生僻字", languages, "languages", "生僻字 罕用字 缺字 打不出 大字表 扩展字 字库 冷僻字"),
         SettingsSearchEntry("时间日期候选", languages, "languages", "时间 日期 星期 今天 几点 当前时间 当前日期 年月日 联想 候选"),
         SettingsSearchEntry("选词后自动加空格", languages, "languages", "英文 英语 空格 自动空格 自动加空格 补全 标点 iOS 苹果 西班牙语"),
         SettingsSearchEntry("标点后自动加空格", languages, "languages", "英文 英语 空格 自动空格 自动加空格 标点 逗号 句号 问号 英文标点 标点空格 西班牙语"),

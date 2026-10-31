@@ -755,10 +755,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val mixed = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY, false)
                 if (service.rimeEngine.getOption("cyime_mixed_input") != mixed) service.rimeEngine.setOption("cyime_mixed_input", mixed)
-                // 生僻字（默认关）：同上。
-                val rare = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY, false)
-                if (service.rimeEngine.getOption("cyime_rare_chars") != rare) service.rimeEngine.setOption("cyime_rare_chars", rare)
             }
             // 繁体输出（默认关）：同上，按键前补设 traditionalization；九键数字键也走这里。
             if (key.length == 1 && key[0].isLetterOrDigit()) {
@@ -777,6 +773,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val symbolNames = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.SYMBOL_NAMES_KEY, false)
                 if (service.rimeEngine.getOption("cyime_symbol_names") != symbolNames) service.rimeEngine.setOption("cyime_symbol_names", symbolNames)
+                // 生僻字（默认关）：同上，26 键全拼和九键都用。
+                val rare = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY, false)
+                if (service.rimeEngine.getOption("cyime_rare_chars") != rare) service.rimeEngine.setOption("cyime_rare_chars", rare)
                 // 仓颉码表本身是繁体，反过来：simplification 开着时转简体。
                 if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE &&
                     service.rimeEngine.getOption("simplification") == traditional) service.rimeEngine.setOption("simplification", !traditional)

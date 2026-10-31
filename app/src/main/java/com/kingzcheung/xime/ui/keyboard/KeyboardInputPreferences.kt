@@ -97,7 +97,7 @@ data class KeyboardInputPreferences(
     val doublePinyinSemicolonOnShift: Boolean = false,
     /** 中文全拼 26 键中英混输（nihaohello → 你好hello），默认关；见 app/data/cyime_mixed_input.lua。 */
     val mixedInput: Boolean = false,
-    /** 中文全拼 26 键补出生僻字（瀺 chan），默认关；见 app/data/cyime_rare_chars.lua。 */
+    /** 中文全拼 26 键和九键补出生僻字（瀺 chan、槻 gui），默认关；见 app/data/cyime_rare_chars.lua。 */
     val rareCharacters: Boolean = false,
     /** 中文候选和上屏用台湾正体（台灣、計畫），默认关；Rime 选项 traditionalization，转换表见 assets/rime_chinese/opencc。 */
     val traditionalOutput: Boolean = false,
@@ -167,7 +167,7 @@ data class KeyboardInputPreferences(
     companion object {
         /** 中英混输开关；输入法每次按字母键读它（ImeKeyRouter），改了下一键就生效。 */
         const val MIXED_INPUT_KEY = "mixed_input"
-        /** 生僻字开关；同中英混输，输入法按字母键前读它（ImeKeyRouter）。 */
+        /** 生僻字开关；同繁体输出，输入法按字母、数字键前读它（ImeKeyRouter）。 */
         const val RARE_CHARACTERS_KEY = "rare_characters"
         /** Z X C V 上角标改成撤销/剪切/复制/粘贴，默认关。 */
         const val ZXCV_EDIT_SHORTCUTS_KEY = "zxcv_edit_shortcuts"
