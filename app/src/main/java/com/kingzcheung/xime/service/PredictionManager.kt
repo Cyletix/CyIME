@@ -36,11 +36,15 @@ class PredictionManager(
      * 使所有在途的异步预测结果失效。否则长按退格删除时，旧的联想结果会迟到并反复
      * 回填 associationCandidates，候选栏在"显示联想词 ↔ 空"之间闪动（一闪一闪）。
      */
+    /** 最近一次请求的上文，当它是在整段上屏之后发出的（见 [getPrediction] 的 afterWholeWord）。 */
+    @Volatile
+    private var wholeWordContext: String? = null
+
     private val latest = LatestPrediction(serviceScope, predict = { text ->
         try {
             if (!SettingsPreferences.isSmartPredictionEnabled(context)) emptyList()
             else if (!AssociationManager.isInitialized() && !AssociationManager.initialize(context)) emptyList()
-            else AssociationManager.predict(text, MAX_ASSOCIATION_COUNT).map { it.text }
+            else AssociationManager.predict(text, MAX_ASSOCIATION_COUNT, afterWholeWord = text == wholeWordContext).map { it.text }
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (error: Exception) { Log.e(TAG, "Prediction failed", error); emptyList() }
     }, deliver = onPredictionResult)
@@ -137,7 +141,8 @@ class PredictionManager(
         }
     }
     
-    fun getPrediction(contextText: String) {
+    /** [afterWholeWord]: 这次上屏的是两个字以上的一段（[endsWithWholeWord]），联想不再补最后一个字开头的词。 */
+    fun getPrediction(contextText: String, afterWholeWord: Boolean = false) {
         latest.invalidate()
         // 单次联想：消费抑制标志——联想上屏引发的本轮推理不执行，回调空结果清空候选栏
         if (suppressNextPrediction) {
@@ -156,6 +161,7 @@ class PredictionManager(
             return
         }
         
+        wholeWordContext = if (afterWholeWord) contextText else null
         latest.submit(contextText)
     }
     
