@@ -60,7 +60,9 @@ class MainActivity : ComponentActivity() {
         handleSharedIntent(intent)
         // A plain Settings tap only brings this instance forward. Do not reset its
         // navigation, focused test field or text. Explicit shortcuts still navigate.
-        intent.getStringExtra("open_fragment")?.let { route ->
+        // 插件授权页：冷启动走 initialPluginId，已打开时直接进该插件的详情页。
+        (intent.getStringExtra("open_plugin_id")?.let { "plugin_detail/$it" }
+            ?: intent.getStringExtra("open_fragment"))?.let { route ->
             settingsNavigationRequest = SettingsNavigationRequest(
                 route, (settingsNavigationRequest?.id ?: 0) + 1,
             )
@@ -77,7 +79,8 @@ class MainActivity : ComponentActivity() {
             return Intent(context, MainActivity::class.java).apply {
                 putExtra("open_fragment", "plugins")
                 putExtra("open_plugin_id", pluginId)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // 设置已打开时只带 NEW_TASK 不会调 onNewIntent，停在旧页面；和 settingsActivityIntent 一样复用。
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
         }
     }
