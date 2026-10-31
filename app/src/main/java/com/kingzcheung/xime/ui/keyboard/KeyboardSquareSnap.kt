@@ -5,7 +5,9 @@ import com.kingzcheung.xime.settings.LayoutKind
 /** Visual cap geometry, sharing the renderer's gutters and adaptive gaps. */
 internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, val keypad: Boolean,
     /** 分体中缝占整张键盘宽度的比例。 */
-    val gapFraction: Float = 0.1f) {
+    val gapFraction: Float = 0.1f,
+    /** 「加宽按键」：与渲染同一套留白和键缝（分体不加宽）。 */
+    val wideKeys: Boolean = false) {
     val section get() = if (keypad) "t9" else "qwerty"
 
     fun capDifference(rect: ResizeRect, density: Float, extra: Float,
@@ -15,9 +17,12 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
         val bodyHeight = panelHeight - candidateBarHeightDp(candidateBarScale(width, panelHeight))
         val fraction = if (split) SplitKeyboardGeometry.keyWidthFraction(width, gapFraction,
             SplitKeyboardGeometry.gutterDp(floating)) else 1f
+        val widened = wideKeys && !split
         val policy = (if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty)
+            .let { if (widened) it.widened() else it }
             .copy(maxKeyWidth = Float.MAX_VALUE)
         val metrics = keyboardGridMetrics(policy, width, bodyHeight, columns,
+            horizontalInsetDp = if (widened) KeyVisualPolicy.WideKeysGutter else 8f,
             allowShrink = floating, widthFraction = fraction, growthSpacing = spacing)
         val cellWidth = metrics.cellWidthDp
         return cellWidth - resolvedVisualGap(spacing.first, metrics.insetX ?: 0f) -
@@ -45,9 +50,10 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
     }
 
     companion object {
-        fun forLayout(kind: LayoutKind, split: Boolean, gapFraction: Float = 0.1f): KeyboardSquareSnap? = when (kind) {
-            LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false, gapFraction)
-            LayoutKind.T9 -> KeyboardSquareSnap(5f * 3f / 3.4f, false, true)
+        fun forLayout(kind: LayoutKind, split: Boolean, gapFraction: Float = 0.1f,
+            wideKeys: Boolean = false): KeyboardSquareSnap? = when (kind) {
+            LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false, gapFraction, wideKeys)
+            LayoutKind.T9 -> KeyboardSquareSnap(5f * 3f / 3.4f, false, true, wideKeys = wideKeys)
             else -> null
         }
     }

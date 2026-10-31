@@ -54,16 +54,23 @@ internal fun KeyboardKeySpacingScope(
     applyGutter: Boolean = false,
     /** Four-row typing grids opt in with their existing X/Y spacing overrides. */
     growthSpacing: Pair<Float?, Float?>? = null,
+    /** 「加宽按键」：只作用于铺 gutter 的主键盘体（见 [KeyVisualPolicy.widened]）。 */
+    widenKeys: Boolean = LocalKeyboardInputPreferences.current.wideKeys,
     content: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(modifier) {
+        val widened = widenKeys && applyGutter
+        val basePolicy = if (widened) policy.widened() else policy
         // 不铺 gutter 时（嵌套面板/编辑盘）：不加键宽上限，度量按真实格宽算，
         // 避免"按上限缩格"却又不把多出的宽度变成留白。
         val effectivePolicy = when {
-            !applyGutter -> policy.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f)
-            LocalKeyboardExplicitWidth.current -> policy.copy(maxKeyWidth = Float.MAX_VALUE)
-            else -> policy
+            !applyGutter -> basePolicy.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f)
+            LocalKeyboardExplicitWidth.current -> basePolicy.copy(maxKeyWidth = Float.MAX_VALUE)
+            else -> basePolicy
         }
+        // 调用方声明的 horizontalInset 是 gutter 下限；加宽按键时下限同样收到 WideKeysGutter。
+        val insetFloor = if (widened) minOf(horizontalInset.value, KeyVisualPolicy.WideKeysGutter)
+            else horizontalInset.value
         val metrics = keyboardGridMetrics(
             policy = effectivePolicy,
             availableWidthDp = maxWidth.value,
@@ -72,7 +79,7 @@ internal fun KeyboardKeySpacingScope(
             rows = rows,
             verticalInsetDp = verticalInset.value,
             allowShrink = allowShrink,
-            horizontalInsetDp = horizontalInset.value,
+            horizontalInsetDp = insetFloor,
             applyGutter = applyGutter,
             widthFraction = widthFraction,
             growthSpacing = growthSpacing,
