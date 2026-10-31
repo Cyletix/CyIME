@@ -68,18 +68,19 @@ internal fun KeyboardBackdropHost(
 ) {
     val density = LocalDensity.current
     val windowRoot = LocalView.current.rootView
+    val backdropGlass = glass.forBackground(background)
     var origin by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() })
     val image = if (enabled) {
-        rememberFrostedBackgroundImage(background, isDark, fallback, glass, frame.size, clipboardInMotion)
+        rememberFrostedBackgroundImage(background, isDark, fallback, backdropGlass, frame.size, clipboardInMotion)
     } else null
     val backdrop = if (enabled) {
         SharedKeyboardBackdrop(
             frame = frame,
             image = image,
             fallback = fallback,
-            opacity = glass.normalized().backgroundOpacity,
+            opacity = backdropGlass.normalized().backgroundOpacity,
             windowRoot = windowRoot,
         )
     } else null
