@@ -51,6 +51,8 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
         DOUBLE_PINYIN_KEY_HINTS, CORNER_HINTS,
         /** Shift 键分词 ↔ ing 放在 Shift 键上。 */
         SHIFT_SYLLABLE_SPLIT, SEMICOLON_ON_SHIFT,
+        /** 字母键显示大写 ↔ 中文键盘字母显示大写。 */
+        UPPERCASE_KEY_LABELS, CHINESE_UPPERCASE_KEY_LABELS,
     }
 
     /** 设置页在被锁的那一项下面显示这句。 */
@@ -64,6 +66,7 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
  * - 角标“长按”时九键拂动必须开：长按被数字占了，不开拂动就没法指定字母。
  * - 双拼键位提示 ↔ 上方/下方角标提示：都写在键面四角，一起开会把符号挡住（用户 10-31「这个开了那个就开不了」）。
  * - Shift 键分词 ↔ ing 放在 Shift 键上：打字时都把 Shift 键换成别的键。
+ * - 字母键显示大写 ↔ 中文键盘字母显示大写：前者一律大写，后者就分不出中英文了。
  * 角标“滑动” + 字母气泡不锁：这正是用户要的可选项，慢拖会被打断已写在说明里。
  * 两项都已开着（加锁以前开的）时都不锁，关掉哪个都行；设置页只在被锁的一项关着时置灰它。
  */
@@ -95,6 +98,11 @@ object InputGestureLocks {
             add(InputGestureLock(InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true, "ing 放在 Shift 键上"))
         } else if (settings.shiftSyllableSplit) {
             add(InputGestureLock(InputGestureLock.Option.SEMICOLON_ON_SHIFT, true, "Shift 键分词"))
+        }
+        if (settings.uppercaseKeyLabels) {
+            add(InputGestureLock(InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true, "字母键显示大写"))
+        } else if (settings.chineseUppercaseKeyLabels) {
+            add(InputGestureLock(InputGestureLock.Option.UPPERCASE_KEY_LABELS, true, "中文键盘字母显示大写"))
         }
     }
 

@@ -55,6 +55,8 @@ data class KeyboardInputPreferences(
     val keyTextScale: Float = 1.15f,
     /** 字母键帽一律显示大写（只改显示，输入照旧跟 Shift）；默认关，保持小写。 */
     val uppercaseKeyLabels: Boolean = false,
+    /** 像搜狗：中文时字母键显示大写，英文时照 Shift 显示（平时小写），只改显示（默认关）。 */
+    val chineseUppercaseKeyLabels: Boolean = false,
     val fixedSymbols: String = "",
     val keyGlowEnabled: Boolean = false,
     val keyAnimationEnabled: Boolean = false,
@@ -185,6 +187,7 @@ data class KeyboardInputPreferences(
         const val CLEAR_ALL_WHILE_COMPOSING_KEY = "clear_all_while_composing"
         /** 字母键帽显示大写。 */
         const val UPPERCASE_KEY_LABELS_KEY = "uppercase_key_labels"
+        const val CHINESE_UPPERCASE_KEY_LABELS_KEY = "chinese_uppercase_key_labels"
         /** 时间日期候选开关；同中英混输，输入法按键前读它（ImeKeyRouter），关掉时设 Rime 选项 _cyime_datetime_off。 */
         const val DATETIME_CANDIDATES_KEY = "datetime_candidates"
         /** 中文滑行输入；新键，旧版本没写过，读不到就是关。 */
@@ -209,7 +212,7 @@ data class KeyboardInputPreferences(
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, SYMBOL_NAMES_KEY,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -301,6 +304,7 @@ data class KeyboardInputPreferences(
                 zxcvEditShortcuts = prefs.getBoolean(ZXCV_EDIT_SHORTCUTS_KEY, false),
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 uppercaseKeyLabels = prefs.getBoolean(UPPERCASE_KEY_LABELS_KEY, false),
+                chineseUppercaseKeyLabels = prefs.getBoolean(CHINESE_UPPERCASE_KEY_LABELS_KEY, false),
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
                 handwritingRecognizeWhileWriting = prefs.getBoolean(HANDWRITING_RECOGNIZE_EARLY_KEY, false),
                 formulaDelimiter = FormulaDelimiter.entries.firstOrNull { it.name == prefs.getString("handwriting_formula_delimiter", null) }
@@ -352,6 +356,7 @@ data class KeyboardInputPreferences(
             .putBoolean(BOTTOM_LIFT_CURSOR_KEY, bottomLiftCursor)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
             .putBoolean(UPPERCASE_KEY_LABELS_KEY, uppercaseKeyLabels)
+            .putBoolean(CHINESE_UPPERCASE_KEY_LABELS_KEY, chineseUppercaseKeyLabels)
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
             .putFloat("handwriting_pause_seconds", normalizeHandwritingPause(handwritingPauseSeconds))
             .putBoolean(HANDWRITING_RECOGNIZE_EARLY_KEY, handwritingRecognizeWhileWriting)

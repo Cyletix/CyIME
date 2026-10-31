@@ -64,6 +64,14 @@ internal fun syllableSplitActive(setting: Boolean, ascii: Boolean, profile: com.
     setting && !ascii && profile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
         profile.capabilities.editablePinyin
 
+/**
+ * 字母键帽这次显示大写吗（只管显示，送出的字母不变）：「字母键显示大写」一律大写；
+ * 「中文键盘字母显示大写」只在中文（非英文模式）时大写，英文照 Shift，一看键帽就知道是中文还是英文。
+ */
+internal fun letterLabelsUppercase(prefs: KeyboardInputPreferences, ascii: Boolean, profile: com.kingzcheung.xime.settings.InputProfile): Boolean =
+    prefs.uppercaseKeyLabels || prefs.chineseUppercaseKeyLabels && !ascii &&
+        profile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE
+
 /** 哪个标点键带分词角标：有逗号键放逗号键，只开句号键放句号键，两个都关就没有（first 左、second 右）。 */
 internal fun syllableSplitOnPunctuation(active: Boolean, left: SpacePunctuationKey?, right: SpacePunctuationKey?): Pair<Boolean, Boolean> =
     if (!active) false to false else if (left != null) true to false else false to (right != null)
