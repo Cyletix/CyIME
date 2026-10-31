@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -501,6 +504,9 @@ fun SwipeableKeyButton(
     val doublePinyinHints = LocalDoublePinyinKeyHints.current
     val doublePinyinHint = doublePinyinHints?.forKey(letterGroup ?: text)
     val dpHidesCorners = doublePinyinHints?.hidesCornerLabels(letterGroup ?: text) == true
+    // 「和角标一起显示」（默认关）：角标不藏，和提示分层排开，由 DoublePinyinCornerFace 一起画；紧凑键面不支持，照旧藏角标。
+    val dpWithCorners = dpHidesCorners && layoutMode != ButtonLayout.COMPACT &&
+        LocalKeyboardInputPreferences.current.doublePinyinKeyHintsWithCorners
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val hexagonal = LocalHoneycombKeys.current && (letterGroup ?: text).let { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }
@@ -570,7 +576,16 @@ fun SwipeableKeyButton(
         val keyHeight = maxHeight
         // 快捷键键面画在里层 Box 里，那里拿不到 BoxWithConstraints 的 maxWidth，先取出来。
         val keyWidthDp = maxWidth.value
-        val dpHint = doublePinyinHint?.takeIf { hintsVisible }
+        // 和角标一起显示时键面实际写的上下角标（截短规则同下面单独画角标时）。
+        val dpUpCorner = (swipeUpKeyLabel ?: swipeText)?.takeIf { it.isNotEmpty() && it != badgeText }
+            ?.let { punctuationKeyLabel(if (it.length <= 4) it else it.take(4)) }
+        val dpDownCorner = swipeDownKeyLabel?.takeIf { it.isNotEmpty() }
+            ?.let { punctuationKeyLabel(if (it.length <= 4) it else it.take(4)) }
+        // 放不下（键太小）时为 null：这个键退回只画键位提示、不画角标，不让两者重叠。
+        val dpCornerLayout = if (dpWithCorners && hintsVisible) fitDoublePinyinWithCorners(
+            doublePinyinHint?.initial, doublePinyinHint?.finals.orEmpty(), dpUpCorner, dpDownCorner,
+            maxWidth.value, maxHeight.value, effectiveSwipeFontSize.value, labelSize, density.fontScale) else null
+        val dpHint = doublePinyinHint?.takeIf { hintsVisible && dpCornerLayout == null }
         val dpFinals = dpHint?.let { fitDoublePinyinFinals(it.finals, maxWidth.value - 6f, maxHeight.value * 0.42f,
             effectiveSwipeFontSize.value, density.fontScale) }
         Box(Modifier.fillMaxSize().graphicsLayer {
@@ -662,11 +677,16 @@ fun SwipeableKeyButton(
                     Text(
                         text = customLayoutLabel(customLayout, punctuationKeyLabel(text), glassLabelSurface ?: resolvedBackground, customAccent, textColor),
                         // 双拼键位提示的韵母在字母下面：字母上移半个提示高，两者一起居中。
-                        modifier = Modifier.fillMaxWidth().offset(y = if (dpHint != null) (-(dpFinals?.heightDp ?: 0f) / 2f).dp
-                            else if (hintsVisible && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp),
+                        modifier = Modifier.fillMaxWidth().offset(y = if (dpCornerLayout != null) dpCornerLayout.letterOffsetDp.dp
+                            else if (dpHint != null) (-(dpFinals?.heightDp ?: 0f) / 2f).dp
+                            else if (hintsVisible && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp)
+                            // 和角标一起显示：字母框固定为 1.2 倍字号高、居中、超出裁掉，备用字体（全角分号等）不会伸进上下层。
+                            .then(if (dpCornerLayout != null) Modifier
+                                .height((dpCornerLayout.letterSp * 1.2f * density.fontScale).dp)
+                                .clipToBounds().wrapContentHeight(unbounded = true) else Modifier),
                         color = resolvedText,
-                        fontSize = labelSize.sp,
-                        lineHeight = (labelSize * 1.2f).sp,
+                        fontSize = (dpCornerLayout?.letterSp ?: labelSize).sp,
+                        lineHeight = ((dpCornerLayout?.letterSp ?: labelSize) * 1.2f).sp,
                         fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -722,6 +742,13 @@ fun SwipeableKeyButton(
                     )
                 }
             }
+            if (dpCornerLayout != null) DoublePinyinCornerFace(doublePinyinHint, dpCornerLayout,
+                upCorner = dpUpCorner?.takeIf { flickPreview?.fromTop != true },
+                downCorner = dpDownCorner?.takeIf { flickPreview?.fromTop != false },
+                initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f),
+                finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f),
+                upColor = keyHintColor(resolvedText, frostedGlass, 0.6f),
+                downColor = keyHintColor(resolvedText, frostedGlass, 0.5f), fontFamily = keyLabelFontFamily)
             if (dpHint != null) DoublePinyinKeyHintFace(dpHint, dpFinals, effectiveSwipeFontSize,
                 initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f),
                 finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f), fontFamily = keyLabelFontFamily)

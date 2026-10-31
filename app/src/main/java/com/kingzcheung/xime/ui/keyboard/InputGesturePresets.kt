@@ -65,6 +65,7 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
  * - 英文、中文滑行输入 ↔ 键盘区滑动移光标：都是在字母上拖动。
  * - 角标“长按”时九键拂动必须开：长按被数字占了，不开拂动就没法指定字母。
  * - 双拼键位提示 ↔ 上方/下方角标提示：都写在键面四角，一起开会把符号挡住（用户 10-31「这个开了那个就开不了」）。
+ *   打开「和角标一起显示」后不锁：键面分上中下三层排开（声母、上角标在上，韵母、下角标在下），见 fitDoublePinyinWithCorners。
  * - Shift 键分词 ↔ ing 放在 Shift 键上：打字时都把 Shift 键换成别的键。
  * - 字母键显示大写 ↔ 中文键盘字母显示大写：前者一律大写，后者就分不出中英文了。
  * 角标“滑动” + 字母气泡不锁：这正是用户要的可选项，慢拖会被打断已写在说明里。
@@ -87,7 +88,9 @@ object InputGestureLocks {
         if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
             add(InputGestureLock(InputGestureLock.Option.GLIDE_TYPING, true, "滑动移光标：键盘滑动"))
         }
-        if (settings.doublePinyinKeyHints) {
+        // 「和角标一起显示」开着时键位提示和角标分层排开、不重叠，两边都不锁。
+        if (settings.doublePinyinKeyHintsWithCorners) Unit
+        else if (settings.doublePinyinKeyHints) {
             add(InputGestureLock(InputGestureLock.Option.CORNER_HINTS, true, "双拼键位提示"))
         } else if (settings.swipeUpHints || settings.swipeDownHints) {
             val corners = listOfNotNull("上方".takeIf { settings.swipeUpHints }, "下方".takeIf { settings.swipeDownHints })
