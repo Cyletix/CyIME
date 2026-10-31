@@ -122,6 +122,12 @@ internal fun InputExperienceSettings(
                     Text("假名方向提示", style = MaterialTheme.typography.titleSmall)
                     Text("日语九键按键四周显示上下左右的灰色假名；按住时的方向圆盘由「拂动时显示方向圆盘」控制。",
                         style = MaterialTheme.typography.bodySmall)
+                    // 日语没启用时没有假名九键，这一项不起作用：写明，免得以为开关坏了。
+                    if (com.kingzcheung.xime.settings.InputLanguage.JAPANESE in com.kingzcheung.xime.settings.InputLanguage.supported &&
+                        com.kingzcheung.xime.settings.InputLanguage.JAPANESE !in
+                        com.kingzcheung.xime.settings.LanguagePreferences.enabled(context))
+                        Text("日语未启用：在「语言与方案」打开日语后才有假名九键。", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = settings.kanaDirectionHints,
                     modifier = Modifier.testTag("kana-direction-hints"), onCheckedChange = {
@@ -253,6 +259,10 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("手写公式两边的标记", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("手写公式两边的标记", style = MaterialTheme.typography.titleSmall)
                 Text("公式模式选中候选后上屏的样子，例如 x^{2} 上屏为 \$x^{2}\$ 或 \\[x^{2}\\]。", style = MaterialTheme.typography.bodySmall)
+                // 没装公式手写模型时手写板没有公式模式，这一项暂时不起作用：照常显示并写明。
+                val formulaReady = remember { com.kingzcheung.xime.handwriting.FormulaRecognizer.isAvailable(context) }
+                if (!formulaReady) Text("公式手写模型还没下载，下载后（手写 › 已安装的手写模型）英文手写里才有公式模式，这里的标记才用得上。",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FormulaDelimiter.entries.forEach { option ->
                     Row(Modifier.fillMaxWidth().clickable { settings = settings.copy(formulaDelimiter = option); settings.save(context) }
                         .padding(vertical = 4.dp).testTag("formula-delimiter:${option.name}"),
