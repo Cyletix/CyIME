@@ -72,6 +72,10 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
             if (selection.secondDir != null && selection.finalizerDir == null) {
                 if (japanese) punctuator = createSenseVoice(selection.secondDir)
                 else if (online == null) offline = createSenseVoice(selection.secondDir)
+            } else if (selection.finalizerDir != null && online == null && !japanese) {
+                // SenseVoice alone with X-ASR downloaded: X-ASR decodes every Chinese sentence, so it loads now
+                // (instead of SenseVoice) and the first pause does not wait for it.
+                finalizer = createXasr(selection.finalizerDir)
             }
             vad = Vad(context.assets, if (japanese) japaneseVadConfig() else VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
                 model = "speech/silero_vad.onnx", threshold = .6f, minSilenceDuration = .064f,

@@ -133,10 +133,8 @@ internal fun OfflineModelCard() {
                         // 定稿模型写的是实际在用的那个：同一个 pipeline()，与上面主模型一行一致。
                         val finalizerNote = when {
                             pipeline(InputLanguage.CHINESE).finalizer == SpeechModelCatalog.XASR -> "中文整句定稿使用 X-ASR 模型。"
-                            chineseCorrection && xasrReady -> "X-ASR 已下载；打开整句定稿后中文改用它定稿。"
-                            chineseCorrection -> "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。"
-                            senseVoiceChinese -> "中文整句定稿使用 SenseVoice。X-ASR 只在中文主模型是 Paraformer 或 Zipformer、并开着二次校正时使用" +
-                                if (xasrReady) "，已下载的 X-ASR 现在不用。" else "。"
+                            wholeSentenceAvailable && xasrReady -> "X-ASR 已下载；打开整句定稿后中文改用它定稿。"
+                            wholeSentenceAvailable -> "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。"
                             else -> null
                         }
                         if (finalizerNote != null) Text(finalizerNote,
@@ -164,7 +162,8 @@ internal fun OfflineModelCard() {
                     Switch(checked = autoPunctuation, enabled = autoPunctuationAvailable, onCheckedChange = null,
                         colors = settingsSwitchColors())
                 }
-                if (chineseCorrection && !xasrReady) {
+                // 整句定稿能用的地方（含只用 SenseVoice 的中文）都能接 X-ASR，下载入口跟着整句定稿走。
+                if (wholeSentenceAvailable && !xasrReady) {
                     ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }
                 }
                 if (!senseReady) {
