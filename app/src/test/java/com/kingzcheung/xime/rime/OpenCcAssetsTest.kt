@@ -12,6 +12,9 @@ import java.io.File
  */
 class OpenCcAssetsTest {
     private val opencc = File("src/main/assets/rime_chinese/opencc")
+    // 雾凇自带的 opencc（表情 emoji.json + emoji.txt/others.txt）由 tasks-chinese.gradle.kts 生成到这里，
+    // 和 rime_chinese/opencc 一起由 BundledRimeSync 装进同一个 rime/opencc，九键、14 键方案也能引用。
+    private val iceOpencc = File("build/generated/chinese-assets/rime_ice/opencc")
     private val configPattern = Regex("""^\s*opencc_config:\s*(\S+\.json)""", RegexOption.MULTILINE)
     private val tablePattern = Regex(""""file":\s*"([^"]+)"""")
 
@@ -24,11 +27,12 @@ class OpenCcAssetsTest {
         // 26 键和双拼由 tasks-chinese.gradle.kts 从 rime-ice 生成，同样改成这张表。
         assertTrue(File("build-logic/tasks-chinese.gradle.kts").readText().contains("opencc_config: cyime_s2tw.json"))
         for (config in referenced + setOf("s2t.json", "s2tw.json", "s2hk.json", "cyime_s2tw.json")) {
-            val file = File(opencc, config)
-            assertTrue("缺少 $config", file.isFile)
+            val dir = listOf(opencc, iceOpencc).firstOrNull { File(it, config).isFile }
+            assertTrue("缺少 $config", dir != null)
+            val file = File(dir!!, config)
             val tables = tablePattern.findAll(file.readText()).map { it.groupValues[1] }.toList()
             assertTrue("$config 没有引用任何表", tables.isNotEmpty())
-            tables.forEach { assertTrue("$config 用到的 $it 没有随包", File(opencc, it).isFile) }
+            tables.forEach { assertTrue("$config 用到的 $it 没有随包", File(dir, it).isFile) }
         }
     }
 

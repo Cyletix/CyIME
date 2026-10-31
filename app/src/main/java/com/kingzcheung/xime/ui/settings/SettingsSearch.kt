@@ -131,6 +131,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("繁体输出", languages, "languages", "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换"),
         SettingsSearchEntry("时间日期候选", languages, "languages", "时间 日期 星期 今天 几点 当前时间 当前日期 年月日 联想 候选"),
         SettingsSearchEntry("选词后自动加空格", languages, "languages", "英文 英语 空格 自动空格 自动加空格 补全 标点 iOS 苹果 西班牙语"),
+        SettingsSearchEntry("候选里显示表情", languages, "languages", "表情 emoji 联想表情 候选表情 开心 爱心 笑脸"),
         page("已安装的方案", languages, SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序 方案资源 启用14键 中文14键"),
         page("双拼方案", languages, SettingsRoutes.DoublePinyin, "双拼 自定义双拼 首道双拼 小鹤双拼 自然码 智能ABC 拼音加加 微软双拼 分号 九键双拼 14键双拼 键位 韵母 零声母 新建 编辑"),
         SettingsSearchEntry("双拼键位提示", "$languages › 双拼方案", SettingsRoutes.DoublePinyin, "双拼 键位 提示 键位图 记不住 韵母 声母 显示 键盘上 主题 双拼主题 小鹤 自然码"),
