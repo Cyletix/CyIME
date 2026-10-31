@@ -8,12 +8,14 @@ import com.charleskorn.kaml.YamlScalar
 import java.io.File
 
 /**
- * 模糊音（中文全拼 26 键）和双拼邻键纠错（双拼 26 键）。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
+ * 模糊音（中文全拼 26 键；另开「模糊音也用于双拼」时双拼 26 键）和双拼邻键纠错（双拼 26 键）。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
  * 这里只增删自己标记的一段，个人词库、分类词库、短语等其他补丁原样保留。
- * 别人提的需求（B 站评论 10-31），默认全关；全关时不写任何文件，九键、14 键、双拼、注音不碰。
+ * 别人提的需求（B 站评论 10-31），默认全关；全关时不写任何文件，九键、14 键、注音不碰。
  */
 object SpellingPatches {
     const val FUZZY_KEY = "fuzzy_pinyin"
+    /** 模糊音也用于双拼 26 键：单独的开关，默认关，原来开着模糊音的人双拼照旧（用户 10-31）。 */
+    const val FUZZY_DOUBLE_PINYIN_KEY = "fuzzy_pinyin_double_pinyin"
     /** 与 KeyboardInputPreferences.doublePinyinCorrection 同一个键：键盘按它决定是否把键位邻接表交给纠错。 */
     const val DOUBLE_PINYIN_CORRECTION_KEY = "double_pinyin_neighbor_correction"
     /** 设置页写好补丁后递增；输入法服务据此重新部署并切回当前方案。 */
@@ -51,6 +53,13 @@ object SpellingPatches {
         SettingsPreferences.getPrefsPublic(context).edit().putStringSet(FUZZY_KEY, ids).apply()
     }
 
+    fun fuzzyDoublePinyin(context: Context): Boolean =
+        SettingsPreferences.getPrefsPublic(context).getBoolean(FUZZY_DOUBLE_PINYIN_KEY, false)
+
+    fun setFuzzyDoublePinyin(context: Context, enabled: Boolean) {
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(FUZZY_DOUBLE_PINYIN_KEY, enabled).apply()
+    }
+
     fun doublePinyinCorrection(context: Context): Boolean =
         SettingsPreferences.getPrefsPublic(context).getBoolean(DOUBLE_PINYIN_CORRECTION_KEY, false)
 
@@ -84,19 +93,30 @@ object SpellingPatches {
     @Synchronized fun sync(context: Context, rimeDir: File = SchemaManager.getRimeDir(context)): Boolean {
         val fuzzy = fuzzy(context)
         val correction = doublePinyinCorrection(context)
+        val doublePinyinFuzzy = if (fuzzyDoublePinyin(context)) fuzzy else emptySet()
         var changed = false
         for (id in fullPinyinSchemas(context)) {
-            changed = write(rimeDir, id, "speller/algebra") { schema ->
-                if (fuzzy.isEmpty()) emptyList() else algebraOf(schema())?.let { fuzzyLines(it, fuzzy) }
-            } || changed
+            changed = write(rimeDir, id) { schema -> listOf(fuzzyPart(schema, fuzzy) ?: return@write null) } || changed
         }
+        // 双拼：拼写规则先按全拼派生模糊音，再换成双拼编码（同雾凇双拼方案注释里的位置），所以两段写在同一个文件里。
         for (id in doublePinyinSchemas(context)) {
-            changed = write(rimeDir, id, "translator/enable_correction") {
-                if (correction) listOf("\"translator/enable_correction\": true") else emptyList()
+            changed = write(rimeDir, id) { schema ->
+                listOf(fuzzyPart(schema, doublePinyinFuzzy) ?: return@write null,
+                    Part(CORRECTION, if (correction) listOf("\"$CORRECTION\": true") else emptyList()))
             } || changed
         }
         return changed
     }
+
+    private const val ALGEBRA = "speller/algebra"
+    private const val CORRECTION = "translator/enable_correction"
+
+    /** 补丁里的一个键：[lines] 为空表示不写这个键。 */
+    private class Part(val key: String, val lines: List<String>)
+
+    /** 读不出方案的拼写规则时为 null（整个文件保持原样）。 */
+    private fun fuzzyPart(schema: () -> String, fuzzy: Set<Fuzzy>): Part? =
+        if (fuzzy.isEmpty()) Part(ALGEBRA, emptyList()) else algebraOf(schema())?.let { Part(ALGEBRA, fuzzyLines(it, fuzzy)) }
 
     /** 补丁内容：模糊音派生排在原有拼写规则前面（同雾凇注释的位置），整张规则表一起写。 */
     internal fun fuzzyLines(algebra: List<String>, items: Set<Fuzzy>): List<String> =
@@ -111,15 +131,16 @@ object SpellingPatches {
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
     /**
-     * [lines] 返回 null 表示读不出方案，保持原样；空表表示去掉自己的那一段。
-     * 方案自定义文件在我们这段之外已经改了同一个键（[key]）时不动它，以用户自己写的为准。
+     * [parts] 返回 null 表示读不出方案，保持原样；全空表示去掉自己的那一段。
+     * 方案自定义文件在我们这段之外已经改了同一个键时不写这个键，以用户自己写的为准；别的键照写。
      */
-    private fun write(rimeDir: File, id: String, key: String, lines: (schema: () -> String) -> List<String>?): Boolean {
+    private fun write(rimeDir: File, id: String, parts: (schema: () -> String) -> List<Part>?): Boolean {
         val schema = File(rimeDir, "$id.schema.yaml").takeIf { it.isFile } ?: return false
         val custom = File(rimeDir, "$id.custom.yaml")
         val original = if (custom.isFile) custom.readText() else ""
-        val wanted = lines { schema.readText() } ?: return false
-        if (wanted.isNotEmpty() && withoutBlock(original).contains(key)) return false
+        val outside = withoutBlock(original)
+        val wanted = (parts { schema.readText() } ?: return false)
+            .filterNot { it.lines.isNotEmpty() && outside.contains(it.key) }.flatMap { it.lines }
         val updated = patch(original, wanted) ?: return false
         if (updated == original) return false
         if (updated.lineSequence().none { it.isNotBlank() && !it.trimStart().startsWith('#') && it.trim() != "patch:" }) {
