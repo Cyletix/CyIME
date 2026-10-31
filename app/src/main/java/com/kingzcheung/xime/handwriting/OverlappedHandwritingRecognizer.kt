@@ -93,6 +93,24 @@ class OverlappedHandwritingRecognizer(
         val n = bounded.size
         if (n == 0) return Result(emptyList(), 0f, 0f)
         val layout = if (sideBySide || lettersApart) SideBySide(bounded) else null
+        val startedAt = System.nanoTime()
+        val cachedBefore = segCache.size
+
+        // 叠写（中文）先认整段：没有换字停顿、整段当一个字的分数够高时，下面的 DP 不管怎么切，
+        // 最后都会被“一个字”先验改回这一整段（见 DP 之后的合并判断），结果完全一样。
+        // 先认这一段就够了，不必把每个子段都送模型（n 笔要认 n(n+1)/2 次，10 笔 55 次）。
+        if (layout == null && !hasPauseBoundary(gaps)) {
+            val merged = segmentCandidates(0, n, bounded, predictFn)
+            val mergedScore = merged.firstOrNull()?.score ?: 0f
+            if (mergedScore >= MERGED_CHAR_MIN_SCORE) {
+                android.util.Log.i(
+                    "HandwritingChain",
+                    "recognize→single char first strokes=$n score=$mergedScore predicts=${segCache.size - cachedBefore}" +
+                        " ms=${(System.nanoTime() - startedAt) / 1_000_000}"
+                )
+                return Result(listOf(Segment(0, n, merged)), mergedScore, mergedScore)
+            }
+        }
 
         val neg = Float.NEGATIVE_INFINITY
         // best[k][i]：前 i 笔切成 k 段的最大识别分总和（含时间间隔偏置）
@@ -148,7 +166,8 @@ class OverlappedHandwritingRecognizer(
         android.util.Log.i(
             "HandwritingChain",
             "recognize strokes=$n gaps=$gaps bestK=$bestK norm=$bestNorm pauseBoundary=${hasPauseBoundary(gaps)}" +
-                " sideBySide=${layout?.hasBoundary()}"
+                " sideBySide=${layout?.hasBoundary()} predicts=${segCache.size - cachedBefore}" +
+                " ms=${(System.nanoTime() - startedAt) / 1_000_000}"
         )
 
         // "一个字"先验：DP 选出多段时，必须存在"显著换字停顿"才信任切分。

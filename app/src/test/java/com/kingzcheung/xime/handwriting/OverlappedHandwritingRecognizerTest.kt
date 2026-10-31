@@ -250,6 +250,43 @@ class OverlappedHandwritingRecognizerTest {
     }
 
     @Test
+    fun `叠写单字整段够像时只认一次`() {
+        // 12 笔匀速写一个字：以前每个子段都送模型（78 次），结果仍是整段这一个字
+        var calls = 0
+        val fake: (List<List<Pair<Float, Float>>>, Int) -> List<HandwritingCandidate> = { seg, _ ->
+            calls++
+            if (seg.size == 12) listOf(HandwritingCandidate("赢", 0.6f), HandwritingCandidate("嬴", 0.3f))
+            else cand("部", 0.9f)
+        }
+        val result = OverlappedHandwritingRecognizer().recognize(strokesOf(12), List(12) { if (it == 0) 0L else 200L }, fake)
+        assertEquals(1, calls)
+        assertEquals(1, result.segments.size)
+        assertEquals(listOf("赢", "嬴"), result.segments[0].candidates.map { it.char })
+    }
+
+    @Test
+    fun `整段不像一个字或有换字停顿时照旧逐段切分`() {
+        var calls = 0
+        val weak: (List<List<Pair<Float, Float>>>, Int) -> List<HandwritingCandidate> = { seg, _ ->
+            calls++
+            when {
+                seg.size == 5 && seg[0][0].second.toInt() == 0 -> cand("你", 0.9f)
+                seg.size == 5 && seg[0][0].second.toInt() == 5 -> cand("好", 0.85f)
+                seg.size == 10 -> cand("伪", 0.2f)
+                else -> emptyList()
+            }
+        }
+        OverlappedHandwritingRecognizer().recognize(strokesOf(10), List(10) { if (it == 0) 0L else 80L }, weak)
+        assertTrue("整段分数低时要逐段认，实际 $calls 次", calls > 1)
+        // 英文、日语并排书写不走整段捷径
+        calls = 0
+        val sideBySide = OverlappedHandwritingRecognizer(maxSegments = 12, sideBySide = true)
+            .recognize(strokesOf(3)) { _, _ -> calls++; cand("あ", 0.9f) }
+        assertTrue(sideBySide.segments.isNotEmpty())
+        assertTrue("并排书写要逐段认，实际 $calls 次", calls > 1)
+    }
+
+    @Test
     fun `空输入返回空结果`() {
         val recognizer = OverlappedHandwritingRecognizer()
         val result = recognizer.recognize(emptyList()) { _, _ -> cand("字", 0.9f) }
