@@ -86,8 +86,11 @@ fun SymbolKeyboardLayout(
     }
     val textLabel = LocalTextModeLabel.current
     val japanese = LocalKeyboardPunctuation.current?.japanese == true
-    val displayCategories = remember(recentSymbols, textLabel, japanese) {
-        listOf(SymbolCategory(name = "常用", id = "common", symbols = commonSymbolsFor(textLabel)),
+    // 「按键符号 › 常用符号栏」里自己填的符号、短语排在「常用」页最前面，按原样上屏（默认的「符号」键进的就是这个面板）。
+    val ownCommon = LocalKeyboardInputPreferences.current.symbolsFor(SideSymbolTarget.COMMON).orEmpty()
+    val displayCategories = remember(recentSymbols, textLabel, japanese, ownCommon) {
+        listOf(SymbolCategory(name = "常用", id = "common",
+                symbols = ownCommon + commonSymbolsFor(textLabel).filterNot { it in ownCommon }),
             SymbolCategory(name = "最近", id = "recentSymbols", symbols = recentSymbols)) +
             SymbolData.categories.map { category ->
                 if (japanese && category.id == "punctuationSymbols") category.copy(name = "全")
@@ -170,7 +173,8 @@ fun SymbolKeyboardLayout(
                                             recentSymbols = RecentUsageStore.record(
                                                 context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
                                             )
-                                            if (preserveWidth) onSelectExact(symbol) else onSelect(symbol)
+                                            if (preserveWidth || (category.id == "common" && symbol in ownCommon)) onSelectExact(symbol)
+                                            else onSelect(symbol)
                                         },
                                         modifier = Modifier.weight(1f).height(grid.rowHeightDp.dp).testTag("symbol-key:$symbol"),
                                         fontSize = symbolFontSize,
