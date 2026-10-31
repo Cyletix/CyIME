@@ -782,7 +782,9 @@ object KeysConfigHelper {
     fun previewKeyRows(layout: InputLayout, language: InputLanguage): List<List<String>> =
         CustomKeyboardLayouts.find(layout.id)?.typingRows() ?: when {
             layout.kind == LayoutKind.MERGED || layout.kind == LayoutKind.ZHUYIN -> _mergedRows[layout.id].orEmpty()
-            layout.kind == LayoutKind.ALPHABETIC -> if (language == InputLanguage.ENGLISH) _enRowsBase else _zhRowsBase
+            // 有自己排列的字母键盘（西班牙语多一个 ñ）按它自己的行画。
+            layout.kind == LayoutKind.ALPHABETIC -> _mergedRows[layout.id]
+                ?: if (language == InputLanguage.ENGLISH) _enRowsBase else _zhRowsBase
             else -> emptyList()
         }
     
@@ -1722,6 +1724,13 @@ object KeysConfigHelper {
         }
     }
 
+    /**
+     * 西班牙语键盘：长按元音和 n 总是弹出 á é í ó ú ü ñ（打西语离不开重音），不受「长按弹出字母气泡」开关影响；
+     * 在它上面切到英文时照英文键盘的规则。
+     */
+    fun accentLongPress(isAsciiMode: Boolean): Boolean =
+        !isAsciiMode && InputLanguage.forSchema(_activeSchemaId) == InputLanguage.SPANISH
+
     /** 获取某个按键的手势配置。 */
     fun getKeyGesture(key: String): KeyGestureConfig? = getKeyGesture(key, false)
 
@@ -1730,7 +1739,9 @@ object KeysConfigHelper {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
         val normalized = key.lowercase()
         val profile = InputProfiles.current(_activeSchemaId, isAsciiMode)
-        if (profile.language !in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)) return config[normalized]
+        if (profile.language !in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH, InputLanguage.SPANISH)) return config[normalized]
+        // 西班牙语键盘用英文键盘的角标（同一位置同一个半角符号）；多出来的 ñ 键不在 26 格里，不带角标。
+        val english = isAsciiMode || profile.language == InputLanguage.SPANISH
         val custom = letterLayout(_activeSchemaId, isAsciiMode)
         // 所有字母布局的角标都由下面两条规则出，不再各布局各配一套（用户 10-30：模式太多难免疏忽，统一）。
         return when (profile.layout.kind) {
@@ -1740,8 +1751,8 @@ object KeysConfigHelper {
                 if (custom != null && normalized == ";" && custom.hasSemicolon())
                     return config[normalized]?.copy(swipeUp = null, swipeDown = null)
                 val owner = custom?.positionLetter(normalized) ?: normalized
-                QwertySwipeSymbols.apply(owner, config[normalized], if (isAsciiMode) symbolOverridesEn else symbolOverridesZh,
-                    (if (isAsciiMode) symbolCustomEn else symbolCustomZh)[owner], isAsciiMode)
+                QwertySwipeSymbols.apply(owner, config[normalized], if (english) symbolOverridesEn else symbolOverridesZh,
+                    (if (english) symbolCustomEn else symbolCustomZh)[owner], english)
             }
             // 合并键（14/17/18 键、自建双字母布局）：按键的读顺序用同一张表（MergedKeySymbols），14 键可在设置页改。
             // Shift 或分体把双字母键拆成单字母时，两个字母都沿用原来那个键的角标，符号位置不跟着变。

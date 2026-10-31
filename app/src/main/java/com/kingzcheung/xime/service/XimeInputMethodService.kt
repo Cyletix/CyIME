@@ -549,6 +549,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     candidateState.value.inputText.isEmpty() && canPredictAfter(predictionManager.lastCommittedText)) candidates else emptyList()
             )
         },
+        completionLanguage = { uiState.value.let { if (it.isAsciiMode) com.kingzcheung.xime.settings.InputLanguage.ENGLISH else it.inputProfile.language } },
     )
     
     internal val voiceRecognitionHandler = VoiceRecognitionHandler(
@@ -1818,7 +1819,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 Modifier.keyboardBackground(rootTheme.keyboardBackground, isDark, cardBg,
                                     frostedGlass = glass, translucentSurface = true)
                             }
-                            val hardwareEnglish = state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
+                            val hardwareEnglish = state.isAsciiMode || state.inputProfile.language.typesLettersDirectly
                             val pendingPrediction by predictionManager.pendingRequest.collectAsState()
                             // The toolbar numbers 10 candidates; a longer engine page is shown in windows of 10.
                             // 候选只在实体键盘浮条这里读；放在外层会让每次候选变化都重组整个键盘。
@@ -1838,7 +1839,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 }
                             val hardwareHighlight = keyRouter.hardwareCandidateHighlight(cand, hardwareEnglish,
                                 predictionPending = pendingPrediction != 0L)
-                            val hardwareLanguage = if (hardwareEnglish) "EN" else when (state.inputProfile.language) {
+                            val hardwareLanguage = if (state.isAsciiMode) "EN" else when (state.inputProfile.language) {
+                                com.kingzcheung.xime.settings.InputLanguage.ENGLISH -> "EN"
+                                com.kingzcheung.xime.settings.InputLanguage.SPANISH -> "ES"
                                 com.kingzcheung.xime.settings.InputLanguage.CHINESE -> "中"
                                 com.kingzcheung.xime.settings.InputLanguage.JAPANESE -> "あ"
                                 else -> state.inputProfile.language.displayName
@@ -1960,6 +1963,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 listening = state.isVoiceMode,
                                 amplitude = { voiceAmplitudeState.floatValue },
                                 languageLabel = if (pillEnglish) "EN" else when (state.inputProfile.language) {
+                                    com.kingzcheung.xime.settings.InputLanguage.SPANISH -> "ES"
                                     com.kingzcheung.xime.settings.InputLanguage.CHINESE -> "中"
                                     com.kingzcheung.xime.settings.InputLanguage.JAPANESE -> "あ"
                                     else -> state.inputProfile.language.displayName
@@ -2279,7 +2283,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             KeyboardView(
                                 hardwareKeyboardConnected = hasHardwareKeyboard,
                                 hardwareCandidateHighlight = if (hasHardwareKeyboard) keyRouter.hardwareCandidateSelection(
-                                    candidateState.value, state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH,
+                                    candidateState.value, state.isAsciiMode || state.inputProfile.language.typesLettersDirectly,
                                     predictionManager.hasPendingPrediction) else null,
                                 inputSessionManagedByHost = true,
                                 resizeOverlay = resizeControls,

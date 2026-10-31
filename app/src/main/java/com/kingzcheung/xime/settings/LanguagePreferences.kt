@@ -51,10 +51,16 @@ object LanguagePreferences {
         val before = this.enabled(context)
         val next = before.toMutableSet().apply { if (enabled) add(language) else remove(language) }
         if (enabled && language !in before) InputModes.moveLanguageLast(context, language)
-        if (language == InputLanguage.JAPANESE) {
+        // Bundled languages bring their own schemas; others only show what is already installed.
+        val bundled = when (language) {
+            InputLanguage.JAPANESE -> JapaneseSchemas.ids
+            InputLanguage.SPANISH -> SpanishSchemas.ids
+            else -> null
+        }
+        if (bundled != null) {
             val schemas = SchemaManager.getEnabledSchemas(context)
-            SchemaManager.setEnabledSchemas(context, if (enabled) (schemas + JapaneseSchemas.ids).distinct()
-                else schemas.filterNot { InputLanguage.forSchema(it) == InputLanguage.JAPANESE })
+            SchemaManager.setEnabledSchemas(context, if (enabled) (schemas + bundled).distinct()
+                else schemas.filterNot { InputLanguage.forSchema(it) == language })
         }
         // The English entry is virtual. Keep a real Rime schema as the engine fallback.
         val current = SettingsPreferences.getCurrentSchema(context)

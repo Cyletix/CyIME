@@ -80,3 +80,16 @@ derived (counts only, no text) by tools/glide_lab/build_english_bigrams.py from:
   Copyright (c) 2010-2017 Peter Norvig: https://github.com/norvig/pytudes
 - Cornell Movie-Dialogs Corpus, Cristian Danescu-Niculescu-Mizil and Lillian Lee (2011):
   https://www.cs.cornell.edu/~cristian/Cornell_Movie-Dialogs_Corpus.html
+
+================================================================================
+Spanish word list
+================================================================================
+
+spanish/words.txt is the Spanish completion word list (one word per line, most frequent first),
+built by tools/spanish/build_words.py:
+- Word frequencies: Hermit Dave, FrequencyWords (content/2018/es/es_50k.txt, from OpenSubtitles 2018),
+  commit 525f9b560de45753a5ea01069454e72e9aa541c6. Code MIT; word lists CC-BY-SA-4.0.
+  https://github.com/hermitdave/FrequencyWords
+- Spelling filter only (not shipped): LibreOffice Spanish spelling dictionary as packaged in
+  the npm module dictionary-es 4.0.0 (GPL-3.0 OR LGPL-3.0 OR MPL-1.1), checked with spylls.
+  https://github.com/wooorm/dictionaries

@@ -67,4 +67,20 @@ class EnglishLiteralInputTest {
         assertEquals(text, state.pendingEnglishText)
         assertEquals(1, probes)
     }
+
+    @Test fun spanishLettersJoinTheWordOnlyOnTheSpanishKeyboard() {
+        for (letter in listOf("ñ", "á", "é", "í", "ó", "ú", "ü", "Ñ", "É")) {
+            assertTrue(letter, isDirectLetter(letter, spanish = true))
+            assertFalse(letter, isDirectLetter(letter, spanish = false))
+        }
+        for (key in listOf("a", "Z")) assertTrue(key, isDirectLetter(key, spanish = false))
+        for (key in listOf("¿", ",", "1", "space", "è", "")) assertFalse(key, isDirectLetter(key, spanish = true))
+        var state = CandidateState()
+        val editor = StringBuilder()
+        for ((letter, shifted) in listOf("n" to true, "i" to false, "ñ" to false, "o" to false)) {
+            state = requireNotNull(commitEnglishLetter(state, letter, shifted, { true }) { editor.append(it); true })
+        }
+        assertEquals("Niño", editor.toString())
+        assertEquals("Niño", state.pendingEnglishText)
+    }
 }

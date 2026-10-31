@@ -602,9 +602,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 return@command
             }
             val english = service.uiState.value.let {
-                it.isAsciiMode || it.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
+                it.isAsciiMode || it.inputProfile.language.typesLettersDirectly
             }
-            if (english && key.length == 1 && (key[0] in 'a'..'z' || key[0] in 'A'..'Z')) {
+            // 西班牙语键盘上 ñ、á 这些也是字母：同样逐字上屏、参与补全。
+            val spanish = service.uiState.value.let {
+                !it.isAsciiMode && it.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.SPANISH
+            }
+            if (english && isDirectLetter(key, spanish)) {
                 val next = withEditor {
                     // Clear and commit in the same Main visit, including when the
                     // previous letter already has completions on screen.
@@ -632,7 +636,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         val words = service.predictionManager.getEnglishAssociations(pending)
                         withEditor {
                             val current = service.candidateState.value
-                            if (current.pendingEnglishText == pending && service.uiState.value.isAsciiMode) {
+                            if (current.pendingEnglishText == pending && service.uiState.value.let {
+                                    it.isAsciiMode || it.inputProfile.language.typesLettersDirectly }) {
                                 service.candidateState.value = current.copy(associationCandidates = words)
                             }
                         }
@@ -793,8 +798,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val engineInput = service.rimeEngine.getInput()
                     // UI publication may lag the FIFO. Enter consumes unfinished input;
                     // only a subsequent, idle Enter may invoke the editor action.
+                    // 西班牙语的字母已逐字上屏，没有可提交的输入：回车照常换行或执行动作。
                     if (engineInput.isNotEmpty() || candState.isComposing ||
-                        (!state.isAsciiMode && candState.pendingEnglishText.isNotEmpty())) {
+                        (!state.isAsciiMode && !state.inputProfile.language.typesLettersDirectly &&
+                            candState.pendingEnglishText.isNotEmpty())) {
                         // T9 和 14 键提交屏上的解码拼音（T9 含 partial commit 累积），其他用 RIME input。
                         val isT9 = isT9Schema(state.currentSchemaId)
                         val input = rawCompositionCommitText(engineInput, candState.shownPreedit(state.inputProfile), isT9,
@@ -1300,7 +1307,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val snapshot = withEditor {
             val ui = service.uiState.value
             hardwareCandidateSnapshot(service.candidateState.value,
-                ui.isAsciiMode || ui.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH,
+                ui.isAsciiMode || ui.inputProfile.language.typesLettersDirectly,
                 service.predictionManager.hasPendingPrediction)
         }
         val engineHasInput = composition

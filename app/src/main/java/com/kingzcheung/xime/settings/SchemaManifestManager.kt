@@ -634,7 +634,7 @@ object SchemaManifestManager {
         return false
     }
 
-    internal val bundledAssetRoots = listOf("rime", "rime_chinese", "rime_japanese", "rime_ice")
+    internal val bundledAssetRoots = listOf("rime", "rime_chinese", "rime_japanese", "rime_spanish", "rime_ice")
 
     internal fun matchesBundledAsset(context: Context, path: String, file: File): Boolean {
         val currentHash = fileSha256(file) ?: return false
