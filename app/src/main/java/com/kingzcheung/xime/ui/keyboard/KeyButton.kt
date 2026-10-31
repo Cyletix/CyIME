@@ -410,9 +410,10 @@ fun SwipeableKeyButton(
         onDown = onSwipeDown,
         longPressItems = longPressItems.orEmpty(),
         onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
-        leftText = letters?.first ?: swipeLeftText,
+        // 「字母键显示大写」只改显示：方向提示跟键帽一样大写，送出的仍是 letters 原样。
+        leftText = letters?.first?.let { if (inputPreferences.uppercaseKeyLabels) it.uppercase() else it } ?: swipeLeftText,
         onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } } ?: onSwipeRight,
-        rightText = letters?.second ?: swipeRightText,
+        rightText = letters?.second?.let { if (inputPreferences.uppercaseKeyLabels) it.uppercase() else it } ?: swipeRightText,
         horizontalThresholdDp = if (letters != null) normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp) else 50f,
         reserveHorizontalSwipe = letters != null,
         // With the four-way disc shown, 14-key pairs re-aim freely like kana and nine-key flicks;

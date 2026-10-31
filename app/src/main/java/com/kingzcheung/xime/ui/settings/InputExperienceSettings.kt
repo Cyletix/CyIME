@@ -293,6 +293,18 @@ internal fun InputExperienceSettings(
                 Slider(value = settings.keyTextScale, onValueChange = { settings = settings.copy(keyTextScale = it) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.8f..1.6f, steps = 15)
             }
+            divider()
+            Row(Modifier.settingsSearchAnchor("字母键显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("字母键显示大写", style = MaterialTheme.typography.titleSmall)
+                    Text("26 键、14 键等字母键帽一律写大写字母，只改显示：中文照常打拼音，英文大小写仍看 Shift 键上的箭头（空心小写、实心单次大写、带底线大写锁定）。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.uppercaseKeyLabels,
+                    modifier = Modifier.testTag("uppercase-key-labels"), onCheckedChange = {
+                        settings = settings.copy(uppercaseKeyLabels = it); settings.save(context)
+                    })
+            }
             }
         }
     })

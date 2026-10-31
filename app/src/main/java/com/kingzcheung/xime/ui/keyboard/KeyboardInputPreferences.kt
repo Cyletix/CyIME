@@ -53,6 +53,8 @@ data class KeyboardInputPreferences(
     val spaceHold: SpaceHoldAction = SpaceHoldAction.CURSOR,
     val cursorStepDp: Float = 10f,
     val keyTextScale: Float = 1.15f,
+    /** 字母键帽一律显示大写（只改显示，输入照旧跟 Shift）；默认关，保持小写。 */
+    val uppercaseKeyLabels: Boolean = false,
     val fixedSymbols: String = "",
     val keyGlowEnabled: Boolean = false,
     val keyAnimationEnabled: Boolean = false,
@@ -138,12 +140,14 @@ data class KeyboardInputPreferences(
         const val TRADITIONAL_OUTPUT_KEY = "traditional_output"
         /** 打字中清空整个输入框；输入法在清空时读它（ImeKeyRouter）。 */
         const val CLEAR_ALL_WHILE_COMPOSING_KEY = "clear_all_while_composing"
+        /** 字母键帽显示大写。 */
+        const val UPPERCASE_KEY_LABELS_KEY = "uppercase_key_labels"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -214,6 +218,7 @@ data class KeyboardInputPreferences(
                 letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
+                uppercaseKeyLabels = prefs.getBoolean(UPPERCASE_KEY_LABELS_KEY, false),
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
                 formulaDelimiter = FormulaDelimiter.entries.firstOrNull { it.name == prefs.getString("handwriting_formula_delimiter", null) }
                     ?: FormulaDelimiter.DOLLAR,
@@ -253,6 +258,7 @@ data class KeyboardInputPreferences(
             .putBoolean("cursor_step_haptic", cursorStepHaptic)
             .putBoolean("cursor_step_sound", cursorStepSound)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
+            .putBoolean(UPPERCASE_KEY_LABELS_KEY, uppercaseKeyLabels)
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
             .putFloat("handwriting_pause_seconds", normalizeHandwritingPause(handwritingPauseSeconds))
             .putString("handwriting_formula_delimiter", formulaDelimiter.name)
