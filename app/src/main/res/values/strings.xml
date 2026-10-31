@@ -1,9 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-<string name="app_name">CyIME</string>
-    <string name="subtype_label_wubi">CyIME</string>
+    <!-- 产品名不翻译。其余文字的繁体、英文、日文在 values-b+zh+Hant、values-en、values-ja，加新文字时四个一起加。 -->
+    <string name="app_name" translatable="false">CyIME</string>
+    <string name="subtype_label_wubi" translatable="false">CyIME</string>
+    <string name="keyboard_name" translatable="false">CyIME</string>
+    <string name="ime_service_label" translatable="false">CyIME</string>
+    <string name="settings_title">CyIME 设置</string>
+    <string name="section_model_download">模型下载</string>
+    <string name="item_wait_wifi_title">等连上 Wi-Fi 再下载模型</string>
+    <string name="item_wait_wifi_summary">语音、联想、手写等模型共约 %1$s；现在用的是移动数据，点这里用流量下载</string>
+    <string name="status_wait_wifi">等 Wi-Fi</string>
+    <string name="section_setup">配置选择</string>
+    <string name="item_enable_ime_title">启用输入法</string>
+    <string name="item_enable_ime_summary">在系统设置中启用 CyIME</string>
+    <string name="item_select_ime_title">选择输入法</string>
+    <string name="item_select_ime_summary">将 CyIME 设为当前输入法</string>
+    <string name="status_set">已设置</string>
+    <string name="status_not_set">未设置</string>
+    <string name="item_setup_guide_title">按设备推荐配置</string>
+    <string name="item_setup_guide_summary">问打字习惯、看设备性能和空间，设好全拼、双拼或五笔，推荐语音、九键、联想用哪些模型，删掉用不到的</string>
+    <string name="test_input_hint">点击此处开始输入测试...</string>
+    <string name="action_clear">清除</string>
+    <string name="section_input">输入</string>
+    <string name="item_languages_title">语言与方案</string>
+    <string name="item_languages_summary">语言、每种语言的布局和输入方案、语言键切换方式</string>
+    <string name="item_layouts_title">键盘布局</string>
+    <string name="item_layouts_summary">26 键、九键与 14 键、自定义布局、按键符号、分体</string>
+    <string name="item_gestures_title">按键与手势</string>
+    <string name="item_gestures_summary">角标输入、长按语言键、滑动移动光标、长按空格</string>
+    <string name="item_hardware_title">物理键盘</string>
+    <string name="item_hardware_summary">语言切换快捷键、候选跟随与浮条</string>
+    <string name="status_connected">已连接</string>
+    <string name="status_not_connected">未连接</string>
+    <string name="section_look">外观</string>
+    <string name="item_theme_title">主题与外观</string>
+    <string name="item_theme_summary">配色、玻璃、视觉样式、按键字号与角标提示</string>
+    <string name="status_glass_suffix">%1$s · 玻璃</string>
+    <string name="item_candidates_title">候选词</string>
+    <string name="item_candidates_summary">字号、候选注释、每页候选数</string>
+    <string name="item_key_effect_title">按键效果</string>
+    <string name="item_key_effect_summary">按键音效和振动反馈</string>
+    <string name="section_smart">智能</string>
+    <string name="item_dictionary_title">词库</string>
+    <string name="item_dictionary_summary">我的短语、导入的词库、删掉的候选、查词</string>
+    <string name="item_prediction_title">智能联想</string>
+    <string name="item_prediction_summary">基础联想、个人学习与可选模型增强</string>
+    <string name="item_speech_title">语音转文本</string>
+    <string name="item_speech_summary">本地模型或在线服务，下载并选择识别方式</string>
+    <string name="item_handwriting_title">手写</string>
+    <string name="item_handwriting_summary">停顿识别、公式标记、手写模型</string>
+    <string name="section_system">系统</string>
+    <string name="item_clipboard_title">剪贴板与同步</string>
+    <string name="item_clipboard_summary">验证码自动复制、与电脑等设备同步剪贴板</string>
+    <string name="item_extensions_title">扩展</string>
+    <string name="item_extensions_summary">输入方案、模型和插件：下载、已安装、导入</string>
+    <string name="item_backup_title">备份与恢复</string>
+    <string name="item_backup_summary">把设置导出为本地文件，或从备份文件恢复</string>
+    <string name="item_performance_title">性能与省电</string>
+    <string name="item_performance_summary">高配、中配、低配一键切换，语音模型占用内存</string>
+    <string name="item_about_title">关于 CyIME</string>
+    <string name="item_about_summary">版本信息、开发者、联系方式</string>
+    <string name="settings_app_language">界面语言 · Language</string>
+    <string name="settings_app_language_summary">设置页显示的文字：简体中文、繁體中文、English、日本語</string>
+    <string name="settings_app_language_summary_old_android">这台设备的系统版本不能单独设置，跟随系统语言；点这里打开系统语言设置</string>
+    <string name="settings_app_language_system">跟随系统</string>
+    <string name="settings_app_language_note">目前只有设置首页和智能联想的模型选择已翻译，其余页面先显示简体中文，之后的版本补齐。只改界面文字，不影响输入语言和繁体输出。</string>
+    <string name="action_close">关闭</string>
+    <string name="section_choose_model">选择模型</string>
+    <string name="model_prediction_base_name">智能联想模型（完整）</string>
+    <string name="model_prediction_small_name">智能联想模型（轻量）</string>
+    <string name="model_prediction_choose_note">怎么选：大多数手机选「完整」，联想更准；内存 4 GB 以下或空间不够选「轻量」，只有一半大。两个只用装一个，都很快。</string>
+    <string name="model_downloaded">已下载</string>
+    <string name="model_not_downloaded">未下载</string>
+    <string name="model_in_use">使用中</string>
+    <string name="model_use">使用</string>
+    <string name="model_go_to_store">去商店</string>
     <string name="subtype_label_pinyin">拼音</string>
-    <string name="keyboard_name">CyIME</string>
-    <string name="ime_service_label">CyIME</string>
     <string name="call_caption_service_label">CyIME 通话字幕</string>
     <string name="call_caption_service_description">打电话、微信语音或视频时，在屏幕底部自动显示对方说的话（字幕），挂断后自动消失。需要开免提或外放。声音只在本机识别，不录音、不上传，也不读取屏幕内容。</string>
 </resources>
