@@ -97,6 +97,11 @@ class InputGesturePresetsTest {
         assertEquals("已被「双拼键位提示」锁定", InputGestureLocks.lockFor(clean.copy(doublePinyinKeyHints = true),
             InputGestureLock.Option.CORNER_HINTS, true)?.message)
         assertNull(InputGestureLocks.lockFor(clean, InputGestureLock.Option.CORNER_HINTS, true))
+        // 用户 10-31：「和角标一起显示」开着时分层排开，两边都不锁。
+        val together = base.copy(doublePinyinKeyHintsWithCorners = true)
+        assertNull(InputGestureLocks.lockFor(together, InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true))
+        assertNull(InputGestureLocks.lockFor(together.copy(doublePinyinKeyHints = true, swipeUpHints = false,
+            swipeDownHints = false), InputGestureLock.Option.CORNER_HINTS, true))
         // Shift：先开的锁住另一个。
         assertEquals("已被「ing 放在 Shift 键上」锁定", InputGestureLocks.lockFor(base.copy(doublePinyinSemicolonOnShift = true),
             InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true)?.message)

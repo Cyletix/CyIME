@@ -237,13 +237,20 @@ private fun DoublePinyinKeyHintsSwitch() {
     SettingsSection(title = "键盘上的提示") {
         SettingsToggleItem(Icons.TwoTone.Keyboard, "双拼键位提示",
             "双拼 26 键每个键上写出它代表的 zh、ch、sh 和韵母，和下面的键位图一样，记不住键位时打开。" +
-                "提示写在按键角上，和上下角标提示不能同时开：先在 主题与外观 › 角标与气泡 关掉两个角标提示；" +
-                "滑动照常出符号。14 键、九键和自己排的合并键布局不显示。",
+                "提示写在按键角上，和上下角标提示不能同时开：先在 主题与外观 › 角标与气泡 关掉两个角标提示，" +
+                "或打开下面的「和角标一起显示」；滑动照常出符号。14 键、九键和自己排的合并键布局不显示。",
             checked = saved.doublePinyinKeyHints,
             onCheckedChange = { saved.copy(doublePinyinKeyHints = it).save(context) },
             // 和上下角标提示互锁（InputGestureLocks）；两个都已开着时不锁，关哪个都行。
             lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(saved, com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true)
                 ?.takeIf { !saved.doublePinyinKeyHints }?.message)
+        androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        // 默认关：开着时键面分上中下三层，提示和角标不重叠，两边不再互锁（InputGestureLocks、fitDoublePinyinWithCorners）。
+        SettingsToggleItem(Icons.TwoTone.Keyboard, "和角标一起显示",
+            "键位提示和上下角标一起写在键上：zh、ch、sh 和上角标在上面，韵母和下角标在下面，字母在中间、稍小一点，" +
+                "谁也不挡谁。手机竖屏键小，字会小一些；个别实在放不下的键只写键位提示。",
+            checked = saved.doublePinyinKeyHintsWithCorners,
+            onCheckedChange = { saved.copy(doublePinyinKeyHintsWithCorners = it).save(context) })
     }
 }
 

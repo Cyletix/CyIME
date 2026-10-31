@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -113,5 +114,72 @@ class DoublePinyinKeyHintsRenderTest {
         rule.waitForIdle()
         assertFalse("全拼不显示双拼键位提示", shown("zh"))
         shot(out, "rime_ice-360-hints-ignored", "layout-body")
+    }
+
+    /**
+     * 「和角标一起显示」：声母、上角标在上，字母居中，韵母、下角标在下。手机、平板宽度，ZXCV 编辑角标开/关；
+     * 每个字母键上的这些字互不重叠（按文字框算，比字形本身更严）。设了 CYIME_RENDER_OUT 时另外出图。
+     */
+    @Test fun keyHintsWithCornersNeverOverlap() {
+        val out = System.getenv("CYIME_RENDER_OUT")
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        KeysConfigHelper.loadConfig(app)
+        KeyboardThemes.initFromConfig(app)
+        com.kingzcheung.xime.ui.keyboard.AppFonts.initialize(app)
+        val vm = KeyboardViewModel(app)
+        var schema by mutableStateOf("double_pinyin_flypy")
+        var edit by mutableStateOf(false)
+        var width by mutableIntStateOf(360)
+        var height by mutableIntStateOf(240)
+        rule.setContent {
+            val palette = resolveKeyboardPalette("soft_blue", false)
+            val config = FrostedGlassConfig.defaults(false, enabled = false)
+            CompositionLocalProvider(LocalKeyboardExplicitWidth provides true,
+                LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config,
+                    doublePinyinKeyHints = true, doublePinyinKeyHintsWithCorners = true, zxcvEditShortcuts = edit)) {
+                MaterialTheme {
+                    Box(Modifier.requiredSize(width.dp, height.dp).testTag("layout-body")
+                        .keyboardBackground(KeyboardThemes.getRenderingScheme("soft_blue").keyboardBackground, false,
+                            palette.background, config)) {
+                        KeyboardLayout({}, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
+                            KeyboardUiState(currentSchemaId = schema, themeId = "soft_blue", isDarkTheme = false),
+                            false, Modifier.requiredSize(width.dp, height.dp))
+                    }
+                }
+            }
+        }
+        out?.let { File(it).mkdirs() }
+        // 字母键上会出现的字：字母、声母和韵母（只含拼音字母和空格）、26 键默认上角标、ZXCV 编辑角标。
+        val cornerLabels = setOf("～", "／", "：", "；", "“", "”", "－", "（", "）", "＊", "＠", "、", "？", "！", "％", "＃",
+            "~", "/", ":", ";", "-", "(", ")", "*", "@", "?", "!", "%", "#", "撤销", "剪切", "复制", "粘贴") + (0..9).map { "$it" }
+        fun onLetterKey(text: String) = text.isNotEmpty() && (text.all { it in 'a'..'z' || it in 'A'..'Z' || it == 'ü' || it == ' ' } ||
+            text in cornerLabels)
+        val failures = mutableListOf<String>()
+        for (id in listOf("double_pinyin_flypy", "double_pinyin_microsoft")) {
+            KeysConfigHelper.setActiveKeyboardSchema(id)
+            for ((w, h) in listOf(360 to 240, 800 to 300)) for (e in listOf(false, true)) {
+                rule.runOnIdle { schema = id; width = w; height = h; edit = e }
+                rule.waitForIdle()
+                out?.let { shot(it, "$id-$w-corners-${if (e) "edit" else "plain"}", "layout-body") }
+                val texts = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(
+                    androidx.compose.ui.semantics.SemanticsProperties.Text), useUnmergedTree = true).fetchSemanticsNodes()
+                    .map { it.config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString("") to it.boundsInRoot }
+                    .filter { (text, b) -> onLetterKey(text) && b.width > 0f && b.height > 0f }
+                if (texts.none { it.first == "zh" }) failures += "$id $w 没有声母 zh"
+                if (texts.none { it.first == "1" }) failures += "$id $w 没有上角标 1"
+                // 角标和声母按它们的固定框算（框里的字居中、超出裁掉）；字母、韵母按文字框算。
+                val corners = rule.onAllNodesWithTag(com.kingzcheung.xime.ui.keyboard.DOUBLE_PINYIN_CORNER_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNodes().mapIndexed { i, node -> "角标框$i" to node.boundsInRoot }
+                if (corners.isEmpty()) failures += "$id $w 没有角标框"
+                val boxes = texts.filter { it.first !in cornerLabels && it.first !in setOf("zh", "ch", "sh") } + corners
+                for (i in boxes.indices) for (j in i + 1 until boxes.size) {
+                    val (ta, a) = boxes[i]; val (tb, b) = boxes[j]
+                    val overlap = a.intersect(b)
+                    if (overlap.width > 0.5f && overlap.height > 0.5f) failures += "$id ${w}dp edit=$e「$ta」$a 和「$tb」$b 重叠"
+                }
+            }
+        }
+        // 所有图出完再判，一处失败也能拿到整套图。
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
 }

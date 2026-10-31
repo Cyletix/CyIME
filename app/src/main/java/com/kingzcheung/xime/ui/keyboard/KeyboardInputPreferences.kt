@@ -94,6 +94,8 @@ data class KeyboardInputPreferences(
     val doublePinyinCorrection: Boolean = false,
     /** 双拼 26 键每个键上写出翘舌声母和韵母（双拼键位提示），默认关；见 DoublePinyinKeyHints。 */
     val doublePinyinKeyHints: Boolean = false,
+    /** 双拼键位提示和上下角标一起显示（声母、上角标在上，韵母、下角标在下），默认关；开着时两者不再互锁。 */
+    val doublePinyinKeyHintsWithCorners: Boolean = false,
     /**
      * 上方、下方角标提示（主题与外观 › 角标与气泡）。只读：由 SettingsPreferences 自己保存，[save] 不写；
      * 放在这里是为了设置互锁（InputGestureLocks：和双拼键位提示占同一块键面）。
@@ -198,6 +200,8 @@ data class KeyboardInputPreferences(
         const val CHINESE_GLIDE_KEY = "glide_typing_chinese"
         /** 双拼键位提示开关；设置在「双拼方案」页。 */
         const val DOUBLE_PINYIN_KEY_HINTS_KEY = "double_pinyin_key_hints"
+        /** 双拼键位提示和角标一起显示；设置在「双拼方案」页。新键，读不到就是关。 */
+        const val DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY = "double_pinyin_key_hints_with_corners"
         /** ing 放在 Shift 键上开关；设置在「双拼方案」页的微软双拼一栏。新键，读不到就是关。 */
         const val DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY = "double_pinyin_semicolon_on_shift"
         /** 英文选词后自动加空格开关；输入法选词时读它，改了下一次选词就生效。 */
@@ -220,7 +224,7 @@ data class KeyboardInputPreferences(
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
-                DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
+                DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
                 SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 BOTTOM_LIFT_CURSOR_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
@@ -278,6 +282,7 @@ data class KeyboardInputPreferences(
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 doublePinyinCorrection = prefs.getBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, false),
                 doublePinyinKeyHints = prefs.getBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, false),
+                doublePinyinKeyHintsWithCorners = prefs.getBoolean(DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, false),
                 swipeUpHints = SettingsPreferences.isSwipeUpHintsEnabled(context),
                 swipeDownHints = SettingsPreferences.isSwipeDownHintsEnabled(context),
                 doublePinyinSemicolonOnShift = prefs.getBoolean(DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY, false),
@@ -331,6 +336,7 @@ data class KeyboardInputPreferences(
             .putBoolean("neighbor_correction", neighborCorrection)
             .putBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, doublePinyinCorrection)
             .putBoolean(DOUBLE_PINYIN_KEY_HINTS_KEY, doublePinyinKeyHints)
+            .putBoolean(DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, doublePinyinKeyHintsWithCorners)
             .putBoolean(DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY, doublePinyinSemicolonOnShift)
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
             .putBoolean(RARE_CHARACTERS_KEY, rareCharacters)
