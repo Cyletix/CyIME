@@ -44,3 +44,23 @@ internal fun voiceKeepsListeningAfter(end: VoiceSessionEnd): Boolean =
 /** 听写中输入框从有字变成空（读不到时不算）。 */
 internal fun voiceFieldCleared(hadText: Boolean, textNow: CharSequence?): Boolean =
     hadText && textNow != null && textNow.isEmpty()
+
+/** 开车连续语音的记号：哪个应用里的悬浮条听写被打断、什么时候（elapsedRealtime）。 */
+internal data class VoicePillResumeMark(val packageName: String, val atMs: Long)
+
+/** 打断后多久内回来还自动续听：等对方回消息够用，又不至于隔很久突然开麦。 */
+internal const val VOICE_PILL_RESUME_WINDOW_MS = 10 * 60_000L
+
+/** 悬浮条听写结束时是否记下续听：只有用户自己收起的悬浮条、因发送或焦点离开而停下才算。 */
+internal fun voicePillResumeArmsAfter(end: VoiceSessionEnd, pillByUser: Boolean, enabled: Boolean): Boolean =
+    enabled && pillByUser && (end == VoiceSessionEnd.FIELD_CLEARED || end == VoiceSessionEnd.FOCUS_LEAVES ||
+        end == VoiceSessionEnd.FOCUS_TO_OTHER_FIELD)
+
+/** 回到输入框时是否自动续听：同一个应用、还在有效期内。 */
+internal fun voicePillResumeApplies(mark: VoicePillResumeMark?, packageName: String?, nowMs: Long): Boolean =
+    mark != null && packageName != null && mark.packageName == packageName &&
+        nowMs - mark.atMs in 0..VOICE_PILL_RESUME_WINDOW_MS
+
+/** 输入框本身是否允许自动开麦：密码等敏感框、不许语音的框、通话中都不开。 */
+internal fun voicePillResumeFieldAllows(sensitive: Boolean, locksNativeInput: Boolean, inCall: Boolean, hasMicPermission: Boolean): Boolean =
+    !sensitive && !locksNativeInput && !inCall && hasMicPermission
