@@ -353,7 +353,9 @@ fun SwipeableKeyButton(
     val resolvedText = resolvedColors.second
     val symbolInputMode = LocalKeyboardInputPreferences.current.symbolInputMode
     val inputPreferences = LocalKeyboardInputPreferences.current
-    val letters = fourteenKeyLetters(letterGroup, LocalFourteenKeyLayout.current &&
+    val letterSwipeLayout = letterSwipeAvailable(LocalFourteenKeyLayout.current,
+        customLayout?.mergedGroups?.isNotEmpty() == true)
+    val letters = fourteenKeyLetters(letterGroup, letterSwipeLayout &&
         inputPreferences.fourteenLetterSwipe && onLetterSelection != null)
     var isPressed by remember { mutableStateOf(false) }
     var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
