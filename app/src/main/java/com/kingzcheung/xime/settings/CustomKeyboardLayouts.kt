@@ -5,6 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,11 +16,34 @@ data class CustomKeyboardLayout(
     val rows: List<List<String>>,
     val redVowels: Boolean = false,
     val redMoved: Boolean = true,
+    /**
+     * 单独调过的按键宽度，单位是 26 键的一格；没有条目时按字母数（单字母 1 格、合并键 2 格）。
+     * 只存差异，旧布局和内置排列读出来仍是空的，行为和以前完全一样。
+     */
+    val widths: Map<String, Float> = emptyMap(),
 ) {
     /** Precomputed for the per-key preedit path; copies rebuild it with the new rows. */
     val mergedGroups: List<String> = rows.flatten().filter { it.length > 1 }
     /** Four staggered rows of single letters (6/7/6/7, Typewise): a honeycomb, not the ten-unit frame. */
     val honeycomb: Boolean get() = rows.map { it.size } == HONEYCOMB_ROWS
+
+    /** 这个键占几格：用户调过就按调过的，否则按字母数。 */
+    fun widthOf(key: String): Float = widths[key] ?: key.length.toFloat()
+    /**
+     * 一排按键按原本的格数（10/9/7）等比缩放后的宽度：调宽一个键，同排其它键按比例让出，
+     * 整排仍占原来那么多格。键盘、编辑器和缩略预览共用这一份算法，三者看到的宽窄一致。
+     */
+    fun rowWidths(row: List<String>): List<Float> {
+        val nominal = row.sumOf { it.length }.toFloat().coerceAtLeast(0.001f)
+        val total = row.sumOf { widthOf(it).toDouble() }.toFloat().coerceAtLeast(0.001f)
+        return row.map { widthOf(it) * nominal / total }
+    }
+    /** 调宽一个键，按 0.1 格取整并限制在可用的范围；调回默认宽度就删掉条目。 */
+    fun withWidth(key: String, width: Float): CustomKeyboardLayout {
+        if (rows.none { key in it }) return this
+        val rounded = (width.coerceIn(MIN_WIDTH, MAX_WIDTH) * 10f).roundToInt() / 10f
+        return copy(widths = if (rounded == key.length.toFloat()) widths - key else widths + (key to rounded))
+    }
 
     fun valid(): Boolean {
         if (name.isBlank() || name.length > 32) return false
@@ -43,9 +67,15 @@ data class CustomKeyboardLayout(
         copy(rows = rows.mapIndexed { index, row -> if (index == 1) row + EMPTY_SLOT else row })
     fun setSemicolonEnabled(enabled: Boolean): CustomKeyboardLayout {
         val layout = withSpareSlot()
-        return layout.copy(rows = layout.rows.map { row -> row.map {
+        val newRows = layout.rows.map { row -> row.map {
             if (enabled && it == EMPTY_SLOT) ";" else if (!enabled && it == ";") EMPTY_SLOT else it
-        } })
+        } }
+        // 空位和分号是同一格换了个内容，调过的宽度跟着走。
+        val newWidths = when {
+            enabled -> layout.widths[EMPTY_SLOT]?.let { layout.widths - EMPTY_SLOT + (";" to it) } ?: layout.widths
+            else -> layout.widths[";"]?.let { layout.widths - ";" + (EMPTY_SLOT to it) } ?: layout.widths
+        }
+        return layout.copy(rows = newRows, widths = newWidths)
     }
     private fun referenceRows() = when {
         id == Cyletix10Layout.ID -> Cyletix10Layout.referenceRows
@@ -65,14 +95,31 @@ data class CustomKeyboardLayout(
         if (a < 0 || b < 0 || (a != b && first.length != second.length)) return this
         return copy(rows = rows.map { row -> row.map { when(it) { first -> second; second -> first; else -> it } } })
     }
-    fun merge(left: String): CustomKeyboardLayout = copy(rows = rows.map { row ->
+    fun merge(left: String): CustomKeyboardLayout {
+        val rowIndex = rows.indexOfFirst { left in it }
+        val row = rows.getOrNull(rowIndex) ?: return this
         val index = row.indexOf(left)
-        if (index < 0 || index == row.lastIndex || left.length != 1 || row[index + 1].length != 1 || left[0] !in 'a'..'z' || row[index + 1][0] !in 'a'..'z') row
-        else row.take(index) + (left + row[index + 1]) + row.drop(index + 2)
-    })
-    fun split(key: String): CustomKeyboardLayout = copy(rows = rows.map { row -> row.flatMap {
-        if (it == key) it.map(Char::toString) else listOf(it)
-    } })
+        val right = row.getOrNull(index + 1)
+        if (index < 0 || right == null || left.length != 1 || right.length != 1 || left[0] !in 'a'..'z' || right[0] !in 'a'..'z') return this
+        val merged = left + right
+        // 合并键接过左右两格的宽度，合并后这一片还是原来那么大。
+        val width = widthOf(left) + widthOf(right)
+        val kept = widths - left - right
+        return copy(
+            rows = rows.mapIndexed { i, r -> if (i == rowIndex) r.take(index) + merged + r.drop(index + 2) else r },
+            widths = if (width == merged.length.toFloat()) kept else kept + (merged to width),
+        )
+    }
+    fun split(key: String): CustomKeyboardLayout {
+        if (rows.none { key in it }) return this
+        // 拆开的两格平分原来那一格的宽度；默认 2 格的合并键拆完各 1 格。
+        val each = widthOf(key) / key.length
+        val kept = widths - key
+        return copy(
+            rows = rows.map { row -> row.flatMap { if (it == key) it.map(Char::toString) else listOf(it) } },
+            widths = if (each == 1f) kept else kept + key.map { it.toString() to each },
+        )
+    }
     /**
      * 这个单字母键在 26 键上占的那一格的字母（和 [gestures] 同一套位置），角标按这一格出；
      * 蜂窝没有对应的 26 键位置，按字母自己。分号键挪进字母区时（Cyletix10），被挤到多出来那一格的字母
@@ -139,6 +186,9 @@ data class CustomKeyboardLayout(
 
     companion object {
         const val EMPTY_SLOT = "_"
+        /** 单键可调的最窄/最宽格数；再宽会挤压同排其它键的可点区域。 */
+        const val MIN_WIDTH = 0.5f
+        const val MAX_WIDTH = 3f
         /** 1.15.19 及以前生成的整表替换规则（字母表 → 代表字母），初始化时换成 [mergedRules]。 */
         fun legacyRule(layout: CustomKeyboardLayout) = "    - xlit/abcdefghijklmnopqrstuvwxyz/${layout.encode("abcdefghijklmnopqrstuvwxyz")}/\n"
         val HONEYCOMB_ROWS = listOf(6, 7, 6, 7)
@@ -165,20 +215,35 @@ object CustomKeyboardLayouts {
             val array = JSONArray(file.readText())
             cached = (0 until array.length()).map { i ->
                 val o = array.getJSONObject(i)
+                val version = o.optInt("formatVersion", 1)
                 val savedRows = o.getString("rows").split('/').map { it.split(',') }
-                val migratedRows = if (o.optInt("formatVersion", 1) < 2 && savedRows.getOrNull(1)?.lastOrNull() == ";")
+                val migratedRows = if (version < 2 && savedRows.getOrNull(1)?.lastOrNull() == ";")
                     savedRows.mapIndexed { index, row -> if (index == 1) row.dropLast(1) + CustomKeyboardLayout.EMPTY_SLOT else row }
                 else savedRows
+                // 版本 3 才有键宽；旧布局按字母数占位，读出来和以前一样。
+                val widths = if (version >= 3) {
+                    val cells = migratedRows.flatten()
+                    val saved = o.optJSONObject("widths")
+                    buildMap {
+                        saved?.keys()?.forEach { key ->
+                            val width = saved.optDouble(key).toFloat()
+                            if (key in cells && width.isFinite() && width > 0f)
+                                put(key, width.coerceIn(CustomKeyboardLayout.MIN_WIDTH, CustomKeyboardLayout.MAX_WIDTH))
+                        }
+                    }
+                } else emptyMap()
                 CustomKeyboardLayout(o.getString("id"), o.getString("name"),
-                    migratedRows, o.optBoolean("redVowels"), o.optBoolean("redMoved", true))
+                    migratedRows, o.optBoolean("redVowels"), o.optBoolean("redMoved", true), widths)
             }.also { list -> require(list.all { it.valid() } && list.map { it.id }.distinct().size == list.size) }
         }
         return cached
     }
     private fun persist(context: Context, layouts: List<CustomKeyboardLayout>) {
         val array = JSONArray()
-        layouts.forEach { layout -> array.put(JSONObject().put("formatVersion", 2).put("id", layout.id).put("name", layout.name)
-            .put("rows", layout.rows.joinToString("/") { it.joinToString(",") }).put("redVowels", layout.redVowels).put("redMoved", layout.redMoved)) }
+        layouts.forEach { layout -> array.put(JSONObject().put("formatVersion", 3).put("id", layout.id).put("name", layout.name)
+            .put("rows", layout.rows.joinToString("/") { it.joinToString(",") }).put("redVowels", layout.redVowels)
+            .put("redMoved", layout.redMoved)
+            .put("widths", JSONObject().apply { layout.widths.forEach { (key, width) -> put(key, width.toDouble()) } })) }
         writeAtomically(File(context.filesDir, "custom-keyboard-layouts.json"), array.toString())
     }
     private fun writeAtomically(file: File, content: String) {

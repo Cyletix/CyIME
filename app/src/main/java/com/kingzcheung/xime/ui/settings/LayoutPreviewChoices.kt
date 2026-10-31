@@ -89,6 +89,8 @@ internal fun LayoutPreviewChoices(
                     val chosen = layout.id == selectedId
                     // Custom layouts are observable; do not cache their rows across an edit.
                     val rows = previewRows(layout, language, revision)
+                    val custom = CustomKeyboardLayouts.find(layout.id)?.takeIf { it.widths.isNotEmpty() }
+                    val widthOf = custom?.let { l -> { key: String -> l.widthOf(key) } }
                     PreviewChoiceCard(layout.displayName, chosen, width, previewHeight,
                         containerColor, contentColor, accentColor, "$itemTagPrefix${layout.id}", { onSelect(layout.id) },
                         unavailable = layout.id in unavailableIds) {
@@ -97,7 +99,7 @@ internal fun LayoutPreviewChoices(
                                     contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isNearBlack(),
                                     equalMergedKeys = layout.kind == LayoutKind.MERGED && CustomKeyboardLayouts.find(layout.id) == null,
                                     evenMergedKeys = evenMergedKeys && CustomKeyboardLayouts.find(layout.id) != null,
-                                    qwertyStagger = qwertyPreviewStagger)
+                                    qwertyStagger = qwertyPreviewStagger, widthOf = widthOf)
                     }
                 }
                 if (onManage != null) item(key = "layout-management") {
@@ -151,7 +153,7 @@ private fun previewRows(layout: InputLayout, language: InputLanguage, @Suppress(
 private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, contentColor: Color, modifier: Modifier,
     fillKeys: Boolean = true, equalMergedKeys: Boolean = false, qwertyStagger: Float = 0f,
     /** 「合并键均匀排布」：行宽不变，行内按 [letterKeySpan] 分键宽，同键盘。 */
-    evenMergedKeys: Boolean = false) {
+    evenMergedKeys: Boolean = false, widthOf: ((String) -> Float)? = null) {
     val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER } }
     val frame = if (letterLayout) letterKeyboardFrame(rows) else null
     val columns = rows.maxOfOrNull { it.sumOf { key -> if (letterLayout) key.length.coerceAtLeast(1) else 1 } } ?: 1
@@ -169,7 +171,14 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
         val geometry = frame?.geometry(unit + gap, qwertyStagger)
         val h = (size.height - gap * (rows.size - 1)) / rows.size
         rows.forEachIndexed { r, row ->
-            val units = row.sumOf { if (letterLayout) it.length.coerceAtLeast(1) else 1 }
+            // 单独调过宽度的键在缩略图里也按实际比例画；整排仍归一到原来的格数。
+            val customSpans = if (letterLayout && widthOf != null) {
+                val nominal = row.sumOf { it.length.coerceAtLeast(1) }.toFloat().coerceAtLeast(0.001f)
+                val raw = row.map { widthOf(it).coerceAtLeast(0.05f) }
+                val total = raw.sum().coerceAtLeast(0.001f)
+                raw.map { it * nominal / total }
+            } else null
+            val units = customSpans?.sum() ?: row.sumOf { if (letterLayout) it.length.coerceAtLeast(1) else 1 }.toFloat()
             // Typing compacts an editor-only spare cell; the first row still fills the frame.
             val rowUnit = if (frame != null && r == 0) (size.width - gap * (units - 1)) / units else unit
             val rowWidth = units * rowUnit + (units - 1) * gap
@@ -181,9 +190,9 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
                     else -> 0f
                 }
             }
-            val evenSpans = if (evenMergedKeys && letterLayout) row.map { letterKeySpan(it, true, true) } else null
+            val evenSpans = if (customSpans == null && evenMergedKeys && letterLayout) row.map { letterKeySpan(it, true, true) } else null
             row.forEachIndexed { index, key ->
-                val span = if (letterLayout) key.length.coerceAtLeast(1) else 1
+                val span = customSpans?.get(index) ?: if (letterLayout) key.length.coerceAtLeast(1).toFloat() else 1f
                 val w = when {
                     equalMergedKeys -> (rowWidth - gap * (row.size - 1)) / row.size
                     evenSpans != null -> (rowWidth - gap * (row.size - 1)) * evenSpans[index] / evenSpans.sum()
