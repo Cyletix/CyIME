@@ -850,9 +850,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             isShowingRecentClipboard = false,
                             candidateActions = emptyList()
                         )
+                        var rejected: String? = null
                         withEditor {
                             service.lastClearedText = ""
                             service.lastClearedDocument = null
+                            rejected = rejectedCommitBefore(clearing = true)
                             service.currentInputConnection?.let { ic ->
                                 service.endComposingInputBox()
                                 val limit = XimeInputMethodService.SAFE_TEXT_LIMIT
@@ -863,6 +865,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             }
                             if (service.lastClearedDocument == null) service.lastClearedText = composedText
                         }
+                        rejected?.let(::unlearnRejectedCommit)
                     }
                     needsUIUpdate = true
                 }
@@ -1643,6 +1646,31 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /**
+     * 「删掉刚上屏的词不学习」（默认关）：这一下退格（或上滑清空）把 Rime 刚上屏的那段整个删掉时，返回要减去学习的词。
+     * 开关关着、没有在跟踪时不读输入框。主线程调用。
+     */
+    private fun rejectedCommitBefore(clearing: Boolean): String? {
+        val tracker = service.rimeEngine.rejectedCommit
+        val needed = tracker.neededLength()
+        if (needed == 0) return null
+        val ic = service.currentInputConnection
+        if (!SettingsPreferences.isUnlearnRejectedCommit(service) || service.uiState.value.inputTarget.isInternal || ic == null) {
+            tracker.clear()
+            return null
+        }
+        val before = runCatching { ic.getTextBeforeCursor(needed, 0) }.getOrNull()
+        if (clearing) return tracker.beforeClear(before)
+        val selected = runCatching { !ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(true)
+        return tracker.beforeBackspace(before, selected)
+    }
+
+    /** 在引擎线程上从用户词库减去刚被删掉的那一次上屏。 */
+    private fun unlearnRejectedCommit(word: String) {
+        val taken = service.rimeEngine.unlearn("$word\t1")
+        Log.d(XimeInputMethodService.TAG, "rejected commit unlearned: $taken")
+    }
+
     /** Each tap keeps its FIFO position; a hold allows only one outstanding repeat. */
     internal fun handleDeleteKey() {
         // Keep this physical action at its original position, including D-D-A and D-A-D.
@@ -1811,11 +1839,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             else -> {
                 service.predictionManager.deleteLastChar()
 
-                withEditor {
+                val rejected = withEditor {
 
-                    if (owner != service.uiState.value.inputSessionId) return@withEditor
+                    if (owner != service.uiState.value.inputSessionId) return@withEditor null
+                    val word = rejectedCommitBefore(clearing = false)
                     service.sendDeleteKey()
+                    word
                 }
+                rejected?.let(::unlearnRejectedCommit)
 
                 service.candidateState.value = service.candidateState.value.copy(
                     candidates = emptyList(),

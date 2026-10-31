@@ -1192,8 +1192,9 @@ private class HighlightMove {
 /** Layout history only; updating it after composition must not schedule another recomposition. */
 private class CandidateStripViewport { var firstIndex: Int = 0 }
 
-/** 平时显示的那几个候选；[oversized]：只有一个且比整条还宽（放不全，展开页里要再给它完整的一格）。 */
-private class CandidateStripWindow(val split: CandidateWindowSplit, val oversized: Boolean)
+/** 平时显示的那几个候选；[oversized]：只有一个且比整条还宽（放不全，展开页里要再给它完整的一格）。
+ * [tailPadding]：能滑的候选行末尾补的空白（像素），滑到最末时最后一屏也从一个完整的候选开始。 */
+private class CandidateStripWindow(val split: CandidateWindowSplit, val oversized: Boolean, val tailPadding: Int = 0)
 
 /** One measured row. Keyboard focus can move its window without changing candidate identities. */
 @Composable
@@ -1297,7 +1298,9 @@ internal fun FixedCandidateStrip(
                 val range = candidateWindow(all.size, focused, constraints.maxWidth,
                     with(density) { itemSpacing.roundToPx() }, windowStart = viewport.firstIndex, widthAt = widthAt)
                 CandidateStripWindow(CandidateWindowSplit(range, Int.MAX_VALUE),
-                    oversized = range.count() == 1 && widthAt(range.first) > constraints.maxWidth)
+                    oversized = range.count() == 1 && widthAt(range.first) > constraints.maxWidth,
+                    tailPadding = if (scrollable) candidateTailPadding(all.size, constraints.maxWidth,
+                        with(density) { itemSpacing.roundToPx() }, widthAt) else 0)
             }
         }
         val visibleIndices = window.split.range
@@ -1319,7 +1322,7 @@ internal fun FixedCandidateStrip(
         val shiftDragFree = CandidateDropTargets.shared.hoveredBounds == null
         if (scrollable && localGap == null) {
             ScrollableCandidateRow(candidates, all, shownComments, visuals, callbacks, fontSize, focused, showNumberLabels,
-                itemSpacing, itemPadding, visibleIndices, scrollKey, onUserScroll, onNearEnd,
+                itemSpacing, itemPadding, visibleIndices, window.tailPadding, scrollKey, onUserScroll, onNearEnd,
                 selectionFill = shiftDragFree && !highlightShown,
                 onFocusedBounds = { focusedBounds = it; focusedOnScreen = true },
                 onFocusedGone = { focusedOnScreen = false })
@@ -1354,13 +1357,16 @@ internal fun FixedCandidateStrip(
 /**
  * 能左右滑的候选行（用户 10-23）：平时和原来一样只显示放得下的那几个（[shown]），后面的先藏着；
  * 手指一滑就全部露出来，可以一直滑到展开列表里的候选。长候选不截断，滑过去就能看完。
+ * 松手后对齐到候选开头，停下时两边被栏边切掉一半的候选先藏起来（用户 10-31：滑动后左边的候选显示不全）；
+ * 末尾补 [tailPaddingPx] 的空白，滑到最末时也能从一个完整的候选开始。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ScrollableCandidateRow(
     candidates: List<String>, all: List<String>, comments: List<String>, visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit, focused: Int,
     showNumberLabels: Boolean, itemSpacing: androidx.compose.ui.unit.Dp, itemPadding: androidx.compose.ui.unit.Dp,
-    shown: IntRange, scrollKey: Any?,
+    shown: IntRange, tailPaddingPx: Int, scrollKey: Any?,
     onUserScroll: (() -> Unit)?, onNearEnd: (() -> Unit)?, selectionFill: Boolean,
     onFocusedBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
     onFocusedGone: () -> Unit,
@@ -1385,12 +1391,42 @@ private fun ScrollableCandidateRow(
             revealed && (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= candidateCount - 4
         }.collect { if (it) currentNearEnd?.invoke() }
     }
+    // 停稳后被栏边切掉一部分的候选（滑动、对齐途中为空，全部照常显示）。比整条还宽的长候选不算，要能滑着看完。
+    val cutAtEdge by remember(listState) {
+        androidx.compose.runtime.derivedStateOf {
+            if (listState.isScrollInProgress) emptySet<Int>() else {
+                val info = listState.layoutInfo
+                val viewport = info.viewportEndOffset - info.viewportStartOffset
+                info.visibleItemsInfo.filter {
+                    it.size <= viewport &&
+                        (it.offset < info.viewportStartOffset || it.offset + it.size > info.viewportEndOffset)
+                }.mapTo(HashSet()) { it.index }
+            }
+        }
+    }
+    // 露出长候选时不对齐，停在手指松开的地方，才能看到长候选中间的字。
+    val longVisible by remember(listState) {
+        androidx.compose.runtime.derivedStateOf {
+            val info = listState.layoutInfo
+            val viewport = info.viewportEndOffset - info.viewportStartOffset
+            info.visibleItemsInfo.any { it.size > viewport }
+        }
+    }
+    val snapFling = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(listState,
+        androidx.compose.foundation.gestures.snapping.SnapPosition.Start)
+    val freeFling = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
+    val tailPadding = with(LocalDensity.current) { tailPaddingPx.toDp() }
     LazyRow(Modifier.fillMaxWidth().testTag("candidate-scroll-row"), state = listState,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(end = tailPadding),
+        flingBehavior = if (longVisible) freeFling else snapFling,
         horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
         items(all.size) { index ->
-            val hidden = !revealed && index !in shown
+            val cutOff = revealed && index in cutAtEdge
+            val hidden = (!revealed && index !in shown) || cutOff
             val numbered = index < candidates.size
             if (index == focused) DisposableEffect(Unit) { onDispose { onFocusedGone() } }
+            // 选中的候选停在栏边被藏起来：选中底色也先不画。
+            if (index == focused && hidden) SideEffect { onFocusedGone() }
             CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && numbered), index, {
                 if (numbered) callbacks.onCandidateSelect(index)
                 else callbacks.onAssociationSelect?.invoke(index - candidates.size)

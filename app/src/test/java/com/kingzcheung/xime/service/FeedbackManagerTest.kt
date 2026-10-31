@@ -146,6 +146,32 @@ class FeedbackManagerTest {
         org.junit.Assert.assertFalse(prefers(custom = true, systemOn = false))
     }
 
+    @Test fun `held delete vibrates like a tap with pauses instead of a continuous buzz`() {
+        val view = mock<View>()
+        val m = manager(HapticMode.Enabled)
+        // 单点：两下相隔 150 ms，每下都震。
+        m.performKeyPressDownEffect("delete", view, nowUptime = 1_000L)
+        m.performKeyPressDownEffect("delete", view, nowUptime = 1_150L)
+        verify(view, times(2)).performHapticFeedback(eq(HapticFeedbackConstants.KEYBOARD_TAP), any())
+        clearInvocations(view)
+        // 按住：每 30 ms 连删一下，振动隔开到至少 100 ms 一下，每下仍是按键的 KEYBOARD_TAP。
+        (1..10).forEach { m.performKeyPressDownEffect("delete", view, nowUptime = 1_150L + it * 30L) }
+        verify(view, times(2)).performHapticFeedback(eq(HapticFeedbackConstants.KEYBOARD_TAP), any())
+        // 其他键不受影响。
+        clearInvocations(view)
+        m.performKeyPressDownEffect("a", view, nowUptime = 2_000L)
+        m.performKeyPressDownEffect("a", view, nowUptime = 2_010L)
+        verify(view, times(2)).performHapticFeedback(eq(HapticFeedbackConstants.KEYBOARD_TAP), any())
+    }
+
+    @Test fun `delete repeat timing`() {
+        org.junit.Assert.assertFalse(FeedbackManager.isDeleteRepeat(500L, 0L))
+        org.junit.Assert.assertTrue(FeedbackManager.isDeleteRepeat(530L, 500L))
+        org.junit.Assert.assertFalse(FeedbackManager.isDeleteRepeat(600L, 500L))
+        org.junit.Assert.assertFalse(FeedbackManager.deleteRepeatHapticDue(560L, 500L))
+        org.junit.Assert.assertTrue(FeedbackManager.deleteRepeatHapticDue(600L, 500L))
+    }
+
     @Test fun `only repeated delete sounds cut off the previous one`() {
         org.junit.Assert.assertTrue(FeedbackManager.chokesPrevious("delete"))
         listOf("standard", "space", "enter", "voice_start").forEach {

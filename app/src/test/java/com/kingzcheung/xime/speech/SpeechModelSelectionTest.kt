@@ -49,8 +49,11 @@ class SpeechModelSelectionTest {
         assertEquals(c.XASR, final(c.ZIPFORMER_TWO_PASS, whole = true, xasr = true))
         assertEquals(c.SENSEVOICE, final(c.TWO_PASS, whole = false, xasr = true))
         assertEquals(c.SENSEVOICE, final(c.TWO_PASS, whole = true, xasr = false))
-        // SenseVoice alone (lite default) never hands Chinese to X-ASR, even when it is downloaded.
-        assertEquals(c.SENSEVOICE, final(c.SENSEVOICE, whole = true, xasr = true))
+        // SenseVoice alone (public default): X-ASR, once downloaded, decodes Chinese whenever 整句定稿 is on.
+        assertEquals(c.XASR, final(c.SENSEVOICE, whole = true, xasr = true))
+        assertEquals(c.SENSEVOICE, final(c.SENSEVOICE, whole = false, xasr = true))
+        assertEquals(c.SENSEVOICE, final(c.SENSEVOICE, whole = true, xasr = false))
+        assertEquals(c.SENSEVOICE, final(c.SENSEVOICE, whole = true, xasr = true, chinese = false))
         assertEquals(c.PARAFORMER, final(c.PARAFORMER, whole = true, xasr = true))
         // English corrects with SenseVoice; X-ASR is Chinese only.
         assertEquals(c.SENSEVOICE, final(c.TWO_PASS, whole = true, xasr = true, chinese = false))

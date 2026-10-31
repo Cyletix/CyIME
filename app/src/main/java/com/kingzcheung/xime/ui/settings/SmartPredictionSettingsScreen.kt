@@ -312,9 +312,27 @@ fun SmartPredictionSettingsContent(
                     SettingsToggleItem(
                         icon = Icons.TwoTone.VisibilityOff,
                         title = "无痕模式",
-                        subtitle = "打字不学新词和选词顺序，复制的内容不进剪贴板记录、不同步；密码框始终自动无痕",
+                        subtitle = "打字不学新词和选词顺序；复制的内容不记进键盘剪贴板、不同步，系统的复制粘贴照常能用；密码框始终自动无痕",
                         checked = toggles.incognito,
                         onCheckedChange = { SettingsPreferences.setIncognito(context, it) }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    // 删掉刚上屏的词不学习（B站反馈 10-31，默认关）；无痕开着时本来就什么都不学，置灰。
+                    var unlearnRejected by remember { mutableStateOf(SettingsPreferences.isUnlearnRejectedCommit(context)) }
+                    SettingsToggleItem(
+                        icon = Icons.AutoMirrored.TwoTone.Backspace,
+                        title = "删掉刚打的词不学习",
+                        subtitle = "词一上屏就整个删掉（退格删完或上滑清空），这一次不记进词库，误触打出的怪词不会排到前面",
+                        checked = unlearnRejected,
+                        onCheckedChange = {
+                            unlearnRejected = it
+                            SettingsPreferences.setUnlearnRejectedCommit(context, it)
+                        },
+                        lockMessage = if (toggles.incognito) "无痕模式开着时什么都不学，不需要这项" else null,
                     )
                 })
             }

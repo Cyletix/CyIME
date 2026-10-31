@@ -44,9 +44,13 @@ internal object SpeechModelSelection {
     fun wholeSentenceApplies(mode: String, chinese: Boolean): Boolean =
         chinese && (hasCorrection(mode) || primary(mode) == SpeechModelCatalog.SENSEVOICE)
 
-    /** X-ASR (when downloaded) finalizes instead of SenseVoice only for Chinese preview + correction with 整句定稿 on. */
+    /**
+     * X-ASR (when downloaded) writes the final Chinese text wherever 整句定稿 applies: after a streaming preview with
+     * SenseVoice correction, and for SenseVoice alone (the public default), where it then decodes every sentence.
+     * 2026-10-30 same-path test, 83 clips: X-ASR whole 5.6 % CER, SenseVoice whole 8.1 %, 豆包 5.7 %.
+     */
     fun xasrFinalizes(mode: String, chinese: Boolean, wholeSentenceOn: Boolean): Boolean =
-        wholeSentenceOn && chinese && hasCorrection(mode)
+        wholeSentenceOn && wholeSentenceApplies(mode, chinese)
 
     /** What decodes one language's dictation; the :asr service and every line of the voice settings page use this. */
     data class Pipeline(
@@ -60,8 +64,8 @@ internal object SpeechModelSelection {
     fun pipeline(mode: String, chinese: Boolean, wholeSentenceOn: Boolean, xasrReady: Boolean): Pipeline {
         val primary = primary(mode)
         val finalizer = when {
-            !hasCorrection(mode) -> primary
             xasrReady && xasrFinalizes(mode, chinese, wholeSentenceOn) -> SpeechModelCatalog.XASR
+            !hasCorrection(mode) -> primary
             else -> SpeechModelCatalog.SENSEVOICE
         }
         val streaming = primary == SpeechModelCatalog.PARAFORMER || primary == SpeechModelCatalog.ZIPFORMER
