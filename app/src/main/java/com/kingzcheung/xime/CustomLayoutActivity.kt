@@ -184,6 +184,8 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
             SettingsSection(title = "按键排列") {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("长按0.3秒，拖到另一按键后松手交换。点选一个单键，可与右侧单键合并；合并键可拆回。", style = MaterialTheme.typography.bodySmall)
+            if (layout.mergedGroups.isNotEmpty()) Text("合并键点按按这一格的代表字母处理；左滑输入前一个字母、右滑输入后一个字母，可在「按键与手势」里关掉。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             CustomLayoutGrid(layout, selected, !busy, themeId, dark, { selected = it }, { from, to ->
                 val changed = layout.swap(from, to)
                 if (changed == layout && from != to) message = "跨行交换需要相同宽度；请先拆分合并键。"

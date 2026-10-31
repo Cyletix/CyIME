@@ -147,9 +147,10 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     })
-                    SettingsSection(title = "14 键双字母键", content = {
+                    SettingsSection(title = "双字母键", content = {
                         SettingsToggleItem(Icons.TwoTone.SwapHoriz, "左右滑动选字母",
-                            "例如 qw：左滑输入 q，右滑输入 w，松手确认；点按仍使用合并键。适用于拼音和小鹤双拼 14 键。",
+                            "例如 qw：左滑输入 q，右滑输入 w，松手确认；点按仍使用合并键。" +
+                                "适用于拼音和小鹤双拼 14 键，以及自己合并成一格的两个字母（如自建 18 键的 as）。",
                             checked = settings.fourteenLetterSwipe, onCheckedChange = {
                                 settings = settings.copy(fourteenLetterSwipe = it); settings.save(context)
                             })
@@ -162,7 +163,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 valueRange = 12f..72f, steps = 29,
                                 onValueChange = { settings = settings.copy(fourteenLetterSwipeDp = normalizeLetterSwipeDistance(it)) },
                                 onValueChangeFinished = { settings.save(context) })
-                            Text("默认 24 dp，越大越不易误触。九键拂动选字母、14 键左右滑选字母和日语九键假名拂动共用。",
+                            Text("默认 24 dp，越大越不易误触。九键拂动选字母、14 键和自建合并键左右滑选字母、日语九键假名拂动共用。",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     })

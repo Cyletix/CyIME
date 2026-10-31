@@ -13,6 +13,12 @@ class FourteenKeyInputTest {
         for (group in listOf(null, "", "l", "m", "space", "12", "?!", "a1", "qw ")) assertNull(fourteenKeyLetters(group, true))
     }
 
+    @Test fun customMergedLayoutsAlsoEnableLetterSwipe() {
+        assertTrue(letterSwipeAvailable(fourteenKey = true, customHasMergedGroups = false))
+        assertTrue(letterSwipeAvailable(fourteenKey = false, customHasMergedGroups = true))
+        assertFalse(letterSwipeAvailable(fourteenKey = false, customHasMergedGroups = false))
+    }
+
     @Test fun distanceBoundsAndStepAreStableForInvalidAndRestoredValues() {
         assertEquals(24f, normalizeLetterSwipeDistance(Float.NaN), 0f)
         assertEquals(24f, normalizeLetterSwipeDistance(Float.POSITIVE_INFINITY), 0f)
