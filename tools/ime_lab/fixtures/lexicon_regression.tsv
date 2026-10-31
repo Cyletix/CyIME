@@ -1143,3 +1143,7 @@ demo-meigejian	26	meigejian	每个键	1	demo-misses	2026-10-26	演示打字：�
 demo-bicejian	26	bicejian	笔侧键	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
 demo-zhenjiyanshi	26	zhenjiyanshi	真机演示	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
 demo-meugejuab	14	mEUGEJUAB	每个键	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+user-nage-1	26	nage	那个	1	user	2026-10-31	陈述语气比疑问语气常用：那个首选
+user-nage-2	26	nage	哪个	2	user	2026-10-31	哪个第二
+user-14-nage-1	14	BAGE	那个	1	user	2026-10-31	陈述语气比疑问语气常用：那个首选（14 键）
+user-win-nage-1	win26	nage	那个	1	user	2026-10-31	陈述语气比疑问语气常用：那个首选（Windows）

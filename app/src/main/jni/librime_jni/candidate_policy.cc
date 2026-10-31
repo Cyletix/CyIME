@@ -111,6 +111,7 @@ class PolicyTranslation : public Translation {
         std::rotate(weaker, sentence, sentence + 1);
     }
     for (size_t i = 0; i < slots.size(); ++i) head_[slots[i]] = ranked[i].candidate;
+    KeepFixedOrder();
     // A whole English word should not lose to guessed Chinese abbreviations.
     // Fully spelled Chinese (e.g. you -> 有) and explicit non-dictionary entries
     // retain their native priority. No word list or fixed candidate is injected.
@@ -144,6 +145,21 @@ class PolicyTranslation : public Translation {
   bool Next() override { current_.reset(); Advance(); return !exhausted(); }
   an<Candidate> Peek() override { return current_; }
  private:
+  // Pairs the user ranks for himself, whatever was learned (2026-10-31): the plain 那个 comes
+  // before the question 哪个 on the same span, even after picking 哪个 more often. Only the
+  // first word moves, to just before the second; nothing else changes place.
+  void KeepFixedOrder() {
+    static const std::pair<const char*, const char*> kPairs[] = {{"那个", "哪个"}};
+    for (const auto& pair : kPairs) {
+      const auto find = [&](const char* text) {
+        return std::find_if(head_.begin(), head_.end(), [&](const auto& c) { return c->text() == text; });
+      };
+      const auto first = find(pair.first), second = find(pair.second);
+      if (first == head_.end() || second == head_.end() || first < second) continue;
+      if ((*first)->start() != (*second)->start() || (*first)->end() != (*second)->end()) continue;
+      std::rotate(second, first, first + 1);
+    }
+  }
   an<Candidate> Prepare(an<Candidate> cand) {
     if (!cand || hidden.count(cand->text())) return nullptr;
     // Keep the engine's complete predictive word and identity. Trimming to the
