@@ -301,7 +301,7 @@ private fun LayoutDisplayPage(
                         Column(Modifier.settingsSearchAnchor("候选注释内容")) {
                             Text("候选注释内容", style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                            Text("拼音：显示拼音或编码。释义：中文候选显示英文，中文键盘里混出的英文候选显示中文，九键长按「下一项」或按住 Shift 再选候选就上屏英文单词；选释义时会自动下载释义词典（也在扩展商店的模型“其他”里），查不到的候选仍显示拼音。",
+                            Text("拼音：显示拼音或编码。释义：中文候选显示英文，中文键盘里混出的英文候选显示中文，九键长按「下一项」或按住 Shift 再选候选就上屏英文单词；选释义时会自动下载释义词典（也在扩展商店的模型“其他”里），上面的「自动」也改成「显示」（手机竖屏的「自动」不显示注释），查不到的候选仍显示拼音。",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 16.dp))
                             var glossDownloadRequest by remember { mutableStateOf(0) }
@@ -319,6 +319,13 @@ private fun LayoutDisplayPage(
                                             // 刚选释义且词典没下载：直接开始下载，不让用户去商店找。
                                             if (content == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS &&
                                                 commentContent != content) glossDownloadRequest++
+                                            // 「自动」在手机竖屏（候选栏不到 480dp）不显示注释，选了释义也看不到英文（B 站反馈 10-31）。
+                                            // 选释义就是要看释义：自动改成显示，上面的选择跟着变，想窄屏隐藏可以再改回自动。
+                                            if (content == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS &&
+                                                commentMode == com.kingzcheung.xime.settings.CandidateCommentMode.AUTO) {
+                                                commentMode = com.kingzcheung.xime.settings.CandidateCommentMode.SHOW
+                                                SettingsPreferences.setCandidateCommentMode(context, commentMode)
+                                            }
                                             commentContent = content
                                             SettingsPreferences.setCandidateCommentContent(context, content)
                                             com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
