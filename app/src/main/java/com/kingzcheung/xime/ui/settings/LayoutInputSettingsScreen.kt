@@ -173,6 +173,8 @@ private fun FuzzyPinyinSection() {
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(SpellingPatches.fuzzy(context)) }
     var doublePinyin by remember { mutableStateOf(SpellingPatches.fuzzyDoublePinyin(context)) }
+    // 现在打的是双拼而开关关着：下面各组对双拼不起作用（10-31 反馈小鹤 bkgr 出不来宾馆，开关默认关）。
+    val usingDoublePinyin = remember { runCatching { SpellingPatches.usingDoublePinyin(context) }.getOrDefault(false) }
     Column(Modifier.settingsSearchAnchor("模糊音")) {
         SettingsSection(title = "模糊音", content = {
             Text("用于中文全拼 26 键（含 QWJRTK 等字母排列和自建布局）；双拼 26 键要另外打开下面的「模糊音也用于双拼」。" +
@@ -187,6 +189,9 @@ private fun FuzzyPinyinSection() {
                     doublePinyin = on
                     scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
                 })
+            if (usingDoublePinyin && !doublePinyin) Text("你现在用的是双拼：要打开上面这个开关，下面打开的各组才对双拼起作用。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp).testTag("fuzzy-double-pinyin-hint"))
             SpellingPatches.Fuzzy.entries.forEach { item ->
                 HorizontalDivider()
                 SettingsToggleItem(Icons.TwoTone.Hearing, item.title, item.example,
