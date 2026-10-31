@@ -367,7 +367,7 @@ private fun LayoutDisplayPage(
                     Column(Modifier.settingsSearchAnchor("候选注释")) {
                         Text("候选注释", style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                        Text("26／14／九键和手写共用；自动：宽时显示、窄时隐藏。中文手写的注释总是读音。",
+                        Text("26／14／九键和手写共用；自动：宽时显示、窄时隐藏，手写里照样显示。中文手写的注释总是读音。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp))
                         Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
