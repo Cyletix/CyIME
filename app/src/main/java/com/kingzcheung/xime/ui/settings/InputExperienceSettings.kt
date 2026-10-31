@@ -136,6 +136,17 @@ internal fun InputExperienceSettings(
                         settings = settings.copy(clearAllWhileComposing = it); settings.save(context)
                     })
             }
+            Row(Modifier.settingsSearchAnchor("只清空光标前的内容", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("只清空光标前的内容", style = MaterialTheme.typography.titleSmall)
+                    Text("删除键清空时光标后面的字留着，只清光标前面和选中的；撤回照样放回。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.clearBeforeCursorOnly, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("clear-before-cursor-only"), onCheckedChange = {
+                        settings = settings.copy(clearBeforeCursorOnly = it); settings.save(context)
+                    })
+            }
             divider()
             Row(Modifier.settingsSearchAnchor("Z X C V 角标做撤销、剪切、复制、粘贴", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

@@ -177,6 +177,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长按弹出字母气泡", gestures, gesturePage, "长按 字母 大写 小写 音调 气泡 弹出 拼音声调 九键 字母键长按弹出大小写 字母菜单"),
         SettingsSearchEntry("反转上下滑方向", gestures, gesturePage, "反转 方向 上滑 下滑 上拉 下拉 删除键 清空 撤销"),
         SettingsSearchEntry("打字中清空整个输入框", gestures, gesturePage, "清空 删除键 上滑 拼音 候选 输入框 全部 一次 跳过候选"),
+        SettingsSearchEntry("只清空光标前的内容", gestures, gesturePage, "清空 删除键 上滑 下滑 光标前 光标后 保留 部分 一半"),
         SettingsSearchEntry("Z X C V 角标做撤销、剪切、复制、粘贴", gestures, gesturePage, "zxcv 撤销 剪切 复制 粘贴 下滑 快捷键 Ctrl 百度"),
         SettingsSearchEntry("长按语言键弹出列表", gestures, gesturePage, "语言键 切换语言 长按 时长 语言列表 秒", section = "时长与距离"),
         SettingsSearchEntry("符号键松手打开符号的时限", gestures, gesturePage, "符号键 !@# Ctrl 控制键 快捷键 复制 粘贴 剪切 撤销 全选 长按 时长 时限 过期 秒", section = "时长与距离"),

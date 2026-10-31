@@ -65,7 +65,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 service.lastClearedText = ""
                 service.lastClearedDocument = null
                 service.currentInputConnection?.let { connection ->
-                    if (connection.performContextMenuAction(android.R.id.selectAll)) connection.commitText("", 1)
+                    if (com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service).getBoolean(
+                            com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)) {
+                        // 「只清空光标前的内容」：不读密码，删掉选中的和光标前的，光标后的留着。
+                        connection.beginBatchEdit()
+                        try {
+                            connection.commitText("", 1)
+                            connection.deleteSurroundingText(XimeInputMethodService.SAFE_TEXT_LIMIT, 0)
+                        } finally {
+                            connection.endBatchEdit()
+                        }
+                    } else if (connection.performContextMenuAction(android.R.id.selectAll)) connection.commitText("", 1)
                 }
             }
             key == "undo_clear" || key == "clear_composition" || key == "emoji" -> Unit
@@ -776,8 +786,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 引擎繁忙时不把未知状态当成空闲，更不能清正文。
                     if (service.rimeEngine.compositionActiveForDeletion() == null) return@command
                     // 「打字中清空整个输入框」（默认关）：打字中也直接清整个输入框，没上屏的拼音丢掉，撤回只放回输入框原来的字。
-                    val wholeField = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service).getBoolean(
+                    val clearPrefs = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    val wholeField = clearPrefs.getBoolean(
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_ALL_WHILE_COMPOSING_KEY, false)
+                    // 「只清空光标前的内容」（默认关）：清输入框时光标后的字留着。
+                    val beforeOnly = clearPrefs.getBoolean(
+                        com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
                     val scope = ClearAllScope.of(hasInputState(candState), wholeField)
                     if (!scope.field) {
                         service.lastClearedDocument = null
@@ -832,9 +846,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 service.endComposingInputBox()
                                 val limit = XimeInputMethodService.SAFE_TEXT_LIMIT
                                 val document = ic.readDocumentForClear(limit) ?: return@let
-                                service.lastClearedDocument = ic.clearDocument(document, limit) {
-                                    service.currentInputConnection === ic
-                                }
+                                service.lastClearedDocument = ic.clearDocument(document, limit,
+                                    stillCurrent = { service.currentInputConnection === ic }, beforeOnly = beforeOnly)
                             }
                             if (service.lastClearedDocument == null) service.lastClearedText = composedText
                         }

@@ -126,6 +126,8 @@ data class KeyboardInputPreferences(
     val reverseSymbolSwipe: Boolean = false,
     /** 打字中（有拼音、候选或联想）清空时连同整个输入框一起清，默认关只清拼音（10-31 别人提的需求）。 */
     val clearAllWhileComposing: Boolean = false,
+    /** 删除键清空只清光标前（和选中）的字，光标后的留着，默认关（10-31 用户要求）。 */
+    val clearBeforeCursorOnly: Boolean = false,
     val cursorHoldSeconds: Float = 0.2f,
     /** 移动光标时每走一字轻震一下；原来一直有，默认开保持手感（2026-10-22 起可关）。 */
     val cursorStepHaptic: Boolean = true,
@@ -185,6 +187,8 @@ data class KeyboardInputPreferences(
         const val TRADITIONAL_OUTPUT_KEY = "traditional_output"
         /** 打字中清空整个输入框；输入法在清空时读它（ImeKeyRouter）。 */
         const val CLEAR_ALL_WHILE_COMPOSING_KEY = "clear_all_while_composing"
+        /** 只清空光标前的内容；输入法在清空时读它（ImeKeyRouter）。 */
+        const val CLEAR_BEFORE_CURSOR_ONLY_KEY = "clear_before_cursor_only"
         /** 字母键帽显示大写。 */
         const val UPPERCASE_KEY_LABELS_KEY = "uppercase_key_labels"
         const val CHINESE_UPPERCASE_KEY_LABELS_KEY = "chinese_uppercase_key_labels"
@@ -213,7 +217,7 @@ data class KeyboardInputPreferences(
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, SYMBOL_NAMES_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
+                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
@@ -292,6 +296,7 @@ data class KeyboardInputPreferences(
                 } ?: SymbolInputMode.SWIPE_UP,
                 reverseSymbolSwipe = prefs.getBoolean("reverse_symbol_swipe", false),
                 clearAllWhileComposing = prefs.getBoolean(CLEAR_ALL_WHILE_COMPOSING_KEY, false),
+                clearBeforeCursorOnly = prefs.getBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, false),
                 kanaDirectionHints = prefs.getBoolean("kana_direction_hints", false),
                 // 10.11 的默认关已写进旧键；v2 一次性恢复为开，之后用户手动关闭的保留。
                 flickDirectionDisc = prefs.getBoolean("flick_direction_disc_v2", true),
@@ -340,6 +345,7 @@ data class KeyboardInputPreferences(
             .putString("symbol_input_mode", symbolInputMode.name)
             .putBoolean("reverse_symbol_swipe", reverseSymbolSwipe)
             .putBoolean(CLEAR_ALL_WHILE_COMPOSING_KEY, clearAllWhileComposing)
+            .putBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, clearBeforeCursorOnly)
             .putBoolean("kana_direction_hints", kanaDirectionHints)
             .putBoolean("flick_direction_disc_v2", flickDirectionDisc)
             .putBoolean("flick_direction_disc", flickDirectionDisc)

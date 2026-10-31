@@ -121,6 +121,44 @@ class DocumentClearTest {
         assertEquals("新", field.text)
     }
 
+    private fun clearBefore(field: Field) = runBlocking {
+        field.connection.readDocumentForClear(100)?.let { field.connection.clearDocument(it, 100, beforeOnly = true) }
+    }
+
+    /** 10-31「只清空光标前的内容」：光标后的留着；撤回原样放回，光标回原处。 */
+    @Test fun beforeCursorOnlyKeepsTextAfterTheCaret() {
+        for (caret in 0..6) {
+            val field = Field("abcdef", caret)
+            val cleared = clearBefore(field)
+            assertEquals("caret $caret", "abcdef".substring(caret), field.text)
+            assertEquals(0, field.start)
+            if (caret == 0) { assertNull(cleared); continue }
+            assertEquals("abcdef".substring(0, caret), cleared!!.text)
+            assertTrue(field.connection.restoreDocument(cleared, 100))
+            assertEquals("abcdef", field.text)
+            assertEquals(caret, field.start); assertEquals(caret, field.end)
+        }
+        // 用户举的例子。
+        val field = Field("这是光标前面要清空的这是光标后面", 10)
+        val cleared = clearBefore(field)!!
+        assertEquals("这是光标后面", field.text)
+        assertTrue(field.connection.restoreDocument(cleared, 100))
+        assertEquals("这是光标前面要清空的这是光标后面", field.text); assertEquals(10, field.start)
+    }
+
+    @Test fun beforeCursorOnlyClearsTheSelectionAndLongTextBefore() {
+        val before = (0 until 345).joinToString("") { "${'a' + it % 26}" }
+        val after = "后".repeat(250)
+        val field = Field(before + "选中" + after, before.length, before.length + 2)
+        val cleared = clearBefore(field)!!
+        assertEquals(after, field.text)
+        assertEquals(before + "选中", cleared.text)
+        assertTrue(field.connection.restoreDocument(cleared, 100))
+        assertEquals(before + "选中" + after, field.text)
+        assertEquals(before.length, field.start); assertEquals(before.length + 2, field.end)
+        assertFalse(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences().clearBeforeCursorOnly)
+    }
+
     /** 10-31：打字中清空默认只清拼音（原行为）；开了「打字中清空整个输入框」拼音和输入框一起清；空闲时总是清输入框。 */
     @Test fun whatClearAllClears() {
         assertEquals(ClearAllScope.COMPOSITION, ClearAllScope.of(composing = true, wholeFieldWhileComposing = false))
