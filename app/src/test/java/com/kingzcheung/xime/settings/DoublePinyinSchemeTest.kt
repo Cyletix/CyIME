@@ -561,7 +561,7 @@ class DoublePinyinSchemeTest {
     @Test fun flypyFourteenKeyAssetMatchesTheGeneratedRules() {
         // 随应用内置的 14 键小鹤双拼和由键位表生成的 14 键版本打出同样的编码（内置的另外多一组 ju→jv 的写法）。
         val asset = base14.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") || it.startsWith("    #") }
-            .filter { it.startsWith("    - ") }.map { it.removePrefix("    - ") }
+            .filter { it.startsWith("    - ") }.map { it.removePrefix("    - ").removeSurrounding("\"") }
         val generated = DoublePinyinScheme.FLYPY.copy(id = DoublePinyinScheme.ZIRANMA_ID).k14Schema(base14)
             .substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
             .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
