@@ -106,4 +106,14 @@ class CustomImageThemeTest {
         assertFalse(CustomImageTheme.hasImage(context))
         assertNull(CustomImageTheme.build(context, themes))
     }
+
+    /** 第一次选图时主题表里还没有「我的图片」：调整页预览按沿用的主题取键色，不能落到全局的半透明白键。 */
+    @Test fun previewTakesKeyColoursFromTheBaseBeforeTheImageIsSaved() {
+        val id = CustomImageTheme.previewColorThemeId(themes, PureBlackTheme.ID)
+        assertEquals(PureBlackTheme.ID, id)
+        val base = themes.first { it.id == PureBlackTheme.ID }
+        assertEquals(base.keyBgDark, KeyboardThemes.getKeyBgColorOverride(id, true))
+        assertEquals(base.keyTextColorDark, KeyboardThemes.getKeyTextColorOverride(id, true))
+        assertEquals(SoftBlueTheme.ID, CustomImageTheme.previewColorThemeId(themes, TransparentGlassTheme.ID))
+    }
 }

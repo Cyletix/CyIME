@@ -208,7 +208,8 @@ private fun CustomImageEditorCanvas(
 
     val isDark = remember { FrostedGlassPreferences.isDark(context) }
     val glass = remember { FrostedGlassPreferences.readProfiles(context) }
-    val previewGlass = glass.forAppearance(isDark).legibleForTheme(CustomImageTheme.ID, isDark)
+    val colorThemeId = remember(baseThemeId) { CustomImageTheme.previewColorThemeId(KeyboardThemes.themes, baseThemeId) }
+    val previewGlass = glass.forAppearance(isDark).legibleForTheme(colorThemeId, isDark)
     val previewTheme = remember(src, baseThemeId, placement) {
         CustomImageTheme.preview(KeyboardThemes.themes, baseThemeId, src, placement)
     }
@@ -296,7 +297,8 @@ private fun CustomImageEditorCanvas(
                 ) {
                     CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(
                         frostedGlass = previewGlass)) {
-                        ThemeKeyboardPreview(theme = previewTheme, isDark = isDark, modifier = Modifier.fillMaxSize())
+                        ThemeKeyboardPreview(theme = previewTheme, isDark = isDark, modifier = Modifier.fillMaxSize(),
+                            colorThemeId = colorThemeId)
                     }
                 }
             }
