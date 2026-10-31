@@ -352,8 +352,9 @@ fun CandidateBar(
     val preeditText = (state as? CandidateBarState.ChineseCandidates)?.let {
         it.preeditText.ifEmpty { it.inputText }
     }.orEmpty()
-    val showPreedit = showPreeditPreview && showInputTextRow && preeditText.isNotEmpty() &&
-        (!showInputBoxStyle || onEditPreedit != null)
+    // 编码显示在输入框时只在输入框里显示，候选栏上方不再另起拼音气泡（用户 10-31）；
+    // 改拼音仍可长按空格滑动打开编辑条。
+    val showPreedit = showPreeditPreview && showInputTextRow && preeditText.isNotEmpty() && !showInputBoxStyle
     // 分体时工具栏和候选栏也分到中缝两侧；剪贴板预览与自动填充建议仍是整条。
     // 编码预览浮在栏上方，不受中缝裁剪影响。
     val splitGap = LocalSplitKeyboardGap.current
