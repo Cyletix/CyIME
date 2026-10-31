@@ -15,6 +15,11 @@ internal fun rememberRoundedKeyboardBottom(): Boolean =
 internal fun rememberRoundedKeyboardTop(): Boolean =
     rememberCornerChoice(SettingsPreferences.KEY_ROUNDED_KEYBOARD_TOP, SettingsPreferences::roundedKeyboardTop)
 
+/** 玻璃「柔化顶部边缘」开关，同一种读法（设置页改了键盘立刻跟）。 */
+@Composable
+internal fun rememberGlassSoftTopEdge(): Boolean =
+    rememberCornerChoice(SettingsPreferences.KEY_GLASS_SOFT_TOP_EDGE, SettingsPreferences::glassSoftTopEdge)
+
 @Composable
 private fun rememberCornerChoice(prefKey: String, read: (android.content.Context) -> Boolean): Boolean {
     val context = LocalContext.current

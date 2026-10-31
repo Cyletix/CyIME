@@ -70,10 +70,13 @@ internal fun Modifier.frostedGlassBackground(
     // Embedded keyboard surfaces sample the same window-space image. Popup windows
     // have their own coordinate origin and must keep their independent backdrop.
     val shared = LocalSharedKeyboardBackdrop.current
-    if (!translucentSurface && shared != null && LocalView.current.rootView === shared.windowRoot) {
+    val root = LocalView.current.rootView
+    // 「柔化顶部边缘」：只对输入法窗口里的固定键盘；弹窗另有坐标原点，不跟。
+    val feather = LocalGlassTopFeather.current?.takeIf { !translucentSurface && it.windowRoot === root }
+    if (!translucentSurface && shared != null && root === shared.windowRoot) {
         var origin by remember { mutableStateOf(Offset.Zero) }
         return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
-            if (shared.opacity > 0f) {
+            if (shared.opacity > 0f) drawUnderTopFeather(feather?.top?.value?.minus(origin.y), feather?.heightPx ?: 0f) {
                 val image = shared.image?.takeIf { shared.frame.size.width > 0 && shared.frame.size.height > 0 }
                 if (image == null) drawRect(shared.fallback, alpha = shared.opacity)
                 else {
@@ -95,11 +98,14 @@ internal fun Modifier.frostedGlassBackground(
     val renderSize = if (translucentSurface) IntSize(512, 256) else targetSize
     val blurredImage = rememberFrostedBackgroundImage(background, isDark, fallbackColor, normalized, renderSize)
 
-    return onSizeChanged { targetSize = it }.drawWithContent {
+    // 底部圆角时没有共用背景，各层自己画；柔化上沿要知道自己在窗口里的位置。
+    var featherOrigin by remember { mutableStateOf(0f) }
+    val positioned = if (feather == null) this else onGloballyPositioned { featherOrigin = it.positionInWindow().y }
+    return positioned.onSizeChanged { targetSize = it }.drawWithContent {
         // The cached theme bitmap is opaque. Draw exactly one source with material alpha,
         // or its fallback while loading; labels and keycaps remain outside this operation.
         val opacity = normalized.backgroundOpacity
-        if (opacity > 0f) {
+        if (opacity > 0f) drawUnderTopFeather(feather?.top?.value?.minus(featherOrigin), feather?.heightPx ?: 0f) {
             val image = blurredImage
             if (image == null) drawRect(fallbackColor, alpha = opacity)
             else drawImage(

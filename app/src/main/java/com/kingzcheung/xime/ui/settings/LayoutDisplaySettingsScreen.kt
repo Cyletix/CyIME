@@ -689,9 +689,13 @@ internal fun KeyboardAppearanceSettings() {
                 })
                 SettingsSection(title = "键盘顶部样式", content = {
                     var roundedTop by remember { mutableStateOf(SettingsPreferences.roundedKeyboardTop(context)) }
+                    // 玻璃「柔化顶部边缘」开着时上沿是渐变，不能再开圆角（互锁，见主题页「材质效果」）。
+                    val softTopEdge = com.kingzcheung.xime.ui.keyboard.rememberGlassSoftTopEdge()
+                    val glassOn = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().frostedGlass.enabled
+                    val softTopEdgeLock = softTopEdge && glassOn && !roundedTop
                     Row(
                         Modifier.settingsSearchAnchor("顶部圆角").fillMaxWidth().testTag("rounded-keyboard-top-setting")
-                            .toggleable(value = roundedTop, role = Role.Switch, onValueChange = {
+                            .toggleable(value = roundedTop, role = Role.Switch, enabled = !softTopEdgeLock, onValueChange = {
                                 roundedTop = it
                                 SettingsPreferences.setRoundedKeyboardTop(context, it)
                             }).padding(16.dp),
@@ -704,9 +708,10 @@ internal fun KeyboardAppearanceSettings() {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            if (softTopEdgeLock) SettingsLockNote("玻璃「柔化顶部边缘」开着时不能用，先在本页「材质效果」关掉")
                         }
                         Spacer(Modifier.width(12.dp))
-                        Switch(checked = roundedTop, onCheckedChange = null)
+                        Switch(checked = roundedTop, onCheckedChange = null, enabled = !softTopEdgeLock, colors = settingsSwitchColors())
                     }
                 })
                 SettingsSection(title = "键盘底部样式", content = {

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.twotone.Apps
 import androidx.compose.material.icons.twotone.Opacity
 import androidx.compose.material.icons.twotone.BlurOn
+import androidx.compose.material.icons.twotone.Gradient
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Crop
@@ -186,6 +187,15 @@ private fun ThemeSettingsPage(
                         SettingsItem(icon = Icons.TwoTone.Opacity, title = "透明度与模糊",
                             subtitle = "切换深浅时，背景与按键透明度互换", showArrow = true,
                             onClick = { showGlassSettings = true })
+                        // 和「顶部圆角」互锁：圆角缺口里露着应用，没法渐变（两边都在本页）。
+                        val softTopEdge = com.kingzcheung.xime.ui.keyboard.rememberGlassSoftTopEdge()
+                        val roundedTop = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardTop()
+                        SettingsToggleItem(icon = Icons.TwoTone.Gradient, title = "柔化顶部边缘",
+                            subtitle = if (softTopEdge && roundedTop) "「顶部圆角」开着，暂不生效"
+                                else "固定键盘上沿一小段由透明渐变到玻璃，和应用界面接得更自然；悬浮键盘不变",
+                            checked = softTopEdge,
+                            onCheckedChange = { SettingsPreferences.setGlassSoftTopEdge(context, it) },
+                            lockMessage = if (roundedTop && !softTopEdge) "「顶部圆角」开着时不能用，先在本页「键盘顶部样式」关掉" else null)
                     }
                 }
             }

@@ -64,6 +64,8 @@ internal fun KeyboardBackdropHost(
     backdropHeight: Dp,
     modifier: Modifier = Modifier,
     clipboardInMotion: Boolean = false,
+    /** 「柔化顶部边缘」生效时固定卡片上沿在窗口里的 y，见 [GlassTopFeatherSource]。 */
+    topFeather: androidx.compose.runtime.State<Float?>? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -91,9 +93,14 @@ internal fun KeyboardBackdropHost(
         }
     } else Modifier
 
+    val featherHeightPx = with(density) { GLASS_TOP_FEATHER_HEIGHT.roundToPx().toFloat() }
+    val feather = remember(windowRoot, topFeather, featherHeightPx) {
+        topFeather?.let { GlassTopFeatherSource(windowRoot, it, featherHeightPx) }
+    }
     Box(modifier.then(positionModifier)) {
         CompositionLocalProvider(LocalSharedKeyboardBackdrop provides backdrop,
-            LocalClipboardBackdropMotion provides clipboardInMotion) { content() }
+            LocalClipboardBackdropMotion provides clipboardInMotion,
+            LocalGlassTopFeather provides feather) { content() }
     }
 }
 
