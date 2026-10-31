@@ -355,8 +355,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             ImeGlassBlurWindow(this, name) { window.window?.decorView }.also { glassBlurWindows[name] = it }
         } else return
         val density = resources.displayMetrics.density
+        // 固定键盘关了顶部圆角时卡片顶边是直角，模糊也用直角，顶角不露出没模糊的应用。
+        val squareTop = !uiState.value.isFloatingMode && !SettingsPreferences.roundedKeyboardTop(this)
         surface.configure(glassConfig.enabled, (glassConfig.blurRadiusDp * density).roundToInt(),
-            if (name == "navigation" || name.startsWith("keyboard-side")) 0f else 16f * density)
+            if (name == "navigation" || name.startsWith("keyboard-side") || squareTop && name.startsWith("keyboard")) 0f
+            else 16f * density)
         surface.setOpacity(glassOpacity)
         surface.setRegion(glassSurfaceBounds[name])
         surface.setVisible(glassWindowVisible)

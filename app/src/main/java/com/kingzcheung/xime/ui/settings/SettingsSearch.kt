@@ -187,6 +187,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("上方角标提示", theme, SettingsRoutes.Theme, "角标 提示 符号 显示 上方 干净 干净模式 简洁 隐藏"),
         SettingsSearchEntry("下方角标提示", theme, SettingsRoutes.Theme, "角标 提示 符号 显示 下方 干净 干净模式 简洁 隐藏"),
         SettingsSearchEntry("点按弹出气泡", theme, SettingsRoutes.Theme, "气泡 预览 弹出 按键放大"),
+        SettingsSearchEntry("顶部圆角", theme, SettingsRoutes.Theme, "圆角 顶部 上圆角 直角 方角 关闭圆角 键盘顶部样式"),
         SettingsSearchEntry("底部圆角与透明导航栏", theme, SettingsRoutes.Theme, "圆角 导航栏 底部 直角 键盘底部样式"),
         SettingsSearchEntry("图标设置", theme, SettingsRoutes.Theme, "桌面图标 应用图标 底板 图标样式 图标联动 跟随主题色 同步图标 恢复原有图标"),
         // 外观 › 候选词
