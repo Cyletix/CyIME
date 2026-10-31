@@ -2971,7 +2971,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         lastEditorIdentity = identity
         // Search belongs to the field it was opened in; another field starts without it.
         if (!sameField) closeClipboardSearch(openBoard = false)
-        inlineComposition.detach()?.let { removeDetachedComposition(it, attribute, restarting, sameField) }
+        val detachedComposition = inlineComposition.detach()
+        detachedComposition?.let { removeDetachedComposition(it, attribute, restarting, sameField) }
         englishEditorReadCapability.clear()
         if (inputStallWatchdog == null) inputStallWatchdog = InputStallWatchdog(serviceScope, mainHandler) { keyProcessingThread }
         inputStallWatchdog?.start()
@@ -3004,6 +3005,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         loadDarkModePreference()
 
         val editorPresentation = beginEditorField(attribute, restarting)
+        // 新输入框从框架给的初始光标开始记；刚撤掉过定格的编码时光标已变，等宿主报来。密码框、终端不记。
+        (currentInputConnection as? TrackedInputConnection)?.memory?.started(
+            if (detachedComposition == null) attribute?.initialSelStart ?: -1 else -1,
+            if (detachedComposition == null) attribute?.initialSelEnd ?: -1 else -1,
+            enabled = !editorSecret && !TerminalEditor.active)
         voicePillResumePending = voicePillResumeEnabled() && voicePillResume.appliesTo(attribute?.packageName) &&
             voicePillResumeFieldAllowed()
         lastClearedText = ""
@@ -3151,9 +3157,29 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         debugLog("Hardware cursor request package=${currentInputEditorInfo?.packageName} mode=$acceptedMode")
     }
 
+    private val trackedConnectionLock = Any()
+    private var trackedConnection: TrackedInputConnection? = null
+
+    /**
+     * 宿主连接包一层 [TrackedInputConnection]：光标前文字已知时不再同步等宿主（宿主忙时每次 100 多毫秒）。
+     * 同一个连接始终给同一个包装，`currentInputConnection !== original` 这类比较照旧成立。
+     */
+    override fun getCurrentInputConnection(): InputConnection? {
+        val base = super.getCurrentInputConnection() ?: return null
+        if (base is TrackedInputConnection) return if (TrackedInputConnection.wantsRaw) base.base else base
+        if (TrackedInputConnection.wantsRaw) return base
+        synchronized(trackedConnectionLock) {
+            trackedConnection?.takeIf { it.base === base }?.let { return it }
+            return TrackedInputConnection(base).also { trackedConnection = it }
+        }
+    }
+
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        // 先对上回执，下面再问光标前文字时才知道记住的那份还算不算数。
+        (currentInputConnection as? TrackedInputConnection)?.memory
+            ?.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
         if (uiState.value.isVoiceMode && uiState.value.voiceSticky && !voiceStopRequested) {
             // 听写中输入框从有字变成空：多半是点了发送，听写结束。
@@ -3235,7 +3261,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         clearHardwareSurfaceBounds()
         uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         updateHardwareKeyboardConnection()
-        super.onConfigurationChanged(newConfig)
+        // 框架在这里用 currentInputConnection 重启输入并把它存成当前连接：给原连接，别把包装存进去。
+        // 期间经原连接做的编辑不会记进光标前文字，结束后整份作废，下次照旧去读。
+        TrackedInputConnection.withRawConnection { super.onConfigurationChanged(newConfig) }
+        trackedConnection?.memory?.edited()
         if (newConfig.screenWidthDp > newConfig.screenHeightDp) {
             closeToolPanel()
         }
