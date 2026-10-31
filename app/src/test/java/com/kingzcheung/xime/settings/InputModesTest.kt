@@ -58,6 +58,17 @@ class InputModesTest {
         assertEquals(listOf("zh", "en", "ja", "es"), InputModes.orderWithLanguageLast(listOf("zh", "en", "ja"), InputLanguage.SPANISH))
     }
 
+    /** 没排过序时字母排列（Colemak、Cyletix10、Typewise、QWJRTK、自定义）排在其他方案后面，排过的不动。 */
+    @Test fun letterArrangementsGoLastUnlessTheUserOrderedThem() {
+        val ids = listOf("pinyin_colemak", "rime_ice", QwjrtkLayout.ID, "cyime_cangjie", "custom_pinyin_0123",
+            "t9_pinyin", "pinyin_typewise", "japanese_kana", "japanese")
+        val schemas = ids.map { SchemaInfo(it, it, "", "", "") }
+        assertEquals(listOf("rime_ice", "t9_pinyin", "japanese", "japanese_kana", InputModes.ENGLISH, "cyime_cangjie",
+            "pinyin_colemak", QwjrtkLayout.ID, "custom_pinyin_0123", "pinyin_typewise"),
+            InputModes.available(schemas, InputModes.defaultModeOrder).map { it.schemaId })
+        assertEquals(ids + InputModes.ENGLISH, InputModes.available(schemas, ids).map { it.schemaId })
+    }
+
     @Test fun englishIsAvailableWithNoEnabledSchemas() {
         assertEquals(listOf(InputModes.english), InputModes.available(emptyList()))
     }

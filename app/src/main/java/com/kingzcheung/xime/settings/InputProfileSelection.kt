@@ -78,9 +78,17 @@ object InputProfileSelection {
     }
 
     /** 当前语言所有方案提供的布局；没有当前方案的布局由界面标灰，点了换方案并提示。 */
-    fun languageLayouts(entries: List<SchemaInfo>, current: SchemaInfo): List<InputLayout> = entries
-        .filter { it.profile.language == current.profile.language && it.profile.mode == InputMode.KEYBOARD }
-        .flatMap { layoutsOf(it, entries) }.distinctBy { it.id }
+    fun languageLayouts(entries: List<SchemaInfo>, current: SchemaInfo): List<InputLayout> = layoutRow(entries
+        .filter { it.profile.language == current.profile.language && it.profile.mode == InputMode.KEYBOARD }, entries)
+
+    /**
+     * 布局栏的顺序：每个条目自己的布局按条目顺序排（中文、日语一样是 26 键、九键……），
+     * 英文、日语罗马字、双拼借用的字母排列排在最后，不插到九键前面。
+     */
+    fun layoutRow(group: List<SchemaInfo>, all: List<SchemaInfo>): List<InputLayout> {
+        val offered = group.map { layoutsOf(it, all) }
+        return (offered.map { it.first() } + offered.flatten()).distinctBy { it.id }
+    }
 
     fun switchHint(layout: InputLayout, current: SchemaInfo, target: SchemaInfo): String =
         "${layout.displayName}没有${current.schemeLabel}，已换成${target.schemeLabel}"
