@@ -156,7 +156,7 @@ internal fun InputExperienceSettings(
             Row(Modifier.settingsSearchAnchor("拂动时显示方向圆盘", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("拂动时显示方向圆盘", style = MaterialTheme.typography.titleSmall)
-                    Text("日语假名、九键拂动选字母和 14 键字母对按住时在键上方显示；关掉后和 26 键一样在键内提示。",
+                    Text("日语假名、九键拂动选字母和 14 键／自建合并键的字母对按住时在键上方显示；关掉后和 26 键一样在键内提示。",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.flickDirectionDisc,
