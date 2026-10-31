@@ -134,7 +134,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("26 键", layouts, qwerty, "26键 全键盘 全拼 qwerty 邻键纠错 滑行输入"),
         page("九键与 14 键", layouts, nine, "九键 9键 14键 拂动 假名 触发距离"),
         SettingsSearchEntry("自定义布局", layouts, SEARCH_TARGET_CUSTOM_LAYOUT, "自定义按键布局 布局管理 新建布局 复制 编辑按键排列", anchor = null),
-        SettingsSearchEntry("按键符号", layouts, layoutIndex, "角标 符号编辑 字母键符号 上下角标 侧栏 笔画 短语 常用符号栏 手写符号"),
+        SettingsSearchEntry("按键符号", layouts, layoutIndex, "角标 符号编辑 字母键符号 上下角标 下滑符号 14键符号 自定义布局符号 侧栏 笔画 短语 常用符号栏 手写符号"),
         SettingsSearchEntry("输入成对符号", layouts, layoutIndex, "成对 配对 括号 引号 书名号 自动补全 闭合 光标中间"),
         SettingsSearchEntry("分体键盘", layouts, layoutIndex, "分体 分离 拆分 平板 两手 双手 间距"),
         SettingsSearchEntry("填满留空处", layouts, layoutIndex, "一体 一体式 镂空 中缝 两侧 空白 留空 透明 遮住 背景 连起来 分体"),

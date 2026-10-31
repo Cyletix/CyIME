@@ -824,10 +824,12 @@ object KeysConfigHelper {
     private var symbolCustomZh: Map<String, KeyGestureConfig> = emptyMap()
     private var symbolCustomEn: Map<String, KeyGestureConfig> = emptyMap()
     private var symbolOverridesK14: Map<String, String> = emptyMap()
+    /** 自建双字母布局各自的角标修改，按布局 id。 */
+    private var symbolOverridesCustom: Map<String, Map<String, String>> = emptyMap()
 
     private fun loadXimeConfig(context: Context) {
         try {
-            CustomKeyboardLayouts.load(context)
+            val customLayouts = CustomKeyboardLayouts.load(context)
             LetterLayouts.load(context)
             val symbolCustomText = readCustomText(context)
             symbolCustomZh = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty") } ?: emptyMap()
@@ -840,6 +842,8 @@ object KeysConfigHelper {
             // 英文26键有自己的半角预设，只用英文页的修改。
             symbolOverridesEn = QwertySwipeSymbols.load(context, true)
             symbolOverridesK14 = FourteenKeySymbols.load(context)
+            symbolOverridesCustom = customLayouts.filter(CustomLayoutSymbols::editable)
+                .associate { it.id to CustomLayoutSymbols.load(context, it) }
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
             _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
@@ -1712,6 +1716,19 @@ object KeysConfigHelper {
         }
     }
 
+    internal fun customLayoutSymbolEditorValues(context: Context, layout: CustomKeyboardLayout): Map<String, String> {
+        val overrides = CustomLayoutSymbols.load(context, layout)
+        val keys = CustomLayoutSymbols.keys(layout)
+        return buildMap {
+            for (key in keys) {
+                // 和键盘上一样：自建布局的手势表按旧位置填过 swipe，不算用户写的，只看预设和这里的修改。
+                val gesture = MergedKeySymbols.apply(keys, key, null, overrides)!!
+                put("up.$key", gesture.swipeUp!!.value)
+                put("down.$key", gesture.swipeDown!!.value)
+            }
+        }
+    }
+
     internal fun fourteenSymbolEditorValues(context: Context): Map<String, String> {
         val overrides = FourteenKeySymbols.load(context)
         val custom = _mergedGestureConfigs[InputLayout.MERGED14.id].orEmpty()
@@ -1765,7 +1782,9 @@ object KeysConfigHelper {
                 if (owner !in keys) return config[normalized]
                 // 自建布局的手势表按旧的位置填过 swipe，不算用户写的；内置 14/17/18 键只认 xime.custom.yaml 写的。
                 val configured = config[owner]?.let { if (custom != null) it.copy(swipeUp = null, swipeDown = null) else it }
-                val symbols = MergedKeySymbols.apply(keys, owner, configured, if (fourteen) symbolOverridesK14 else emptyMap())
+                // 14 键和自建布局在符号设置页改的；17/18 键没有设置页。
+                val overrides = if (fourteen) symbolOverridesK14 else custom?.let { symbolOverridesCustom[it.id] }.orEmpty()
+                val symbols = MergedKeySymbols.apply(keys, owner, configured, overrides)
                 if (owner == normalized) symbols
                 else (config[normalized] ?: KeyGestureConfig()).copy(swipeUp = symbols?.swipeUp, swipeDown = symbols?.swipeDown)
             }

@@ -131,7 +131,7 @@ private fun LayoutDisplayPage(
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
                         showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    SettingsItem(Icons.TwoTone.EmojiSymbols, "按键符号", "26 键上下角标、九键与笔画侧栏、手写和常用符号栏，一处按位置编辑",
+                    SettingsItem(Icons.TwoTone.EmojiSymbols, "按键符号", "26 键、14 键和自定义布局的上下角标，九键与笔画侧栏、手写和常用符号栏，一处按位置编辑",
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
                             .putExtra("edit_symbols", true)) },
                         showArrow = true)
