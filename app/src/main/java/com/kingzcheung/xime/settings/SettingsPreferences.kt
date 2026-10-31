@@ -64,6 +64,7 @@ object SettingsPreferences {
     private const val KEY_PREDICTION_SELECTED_MODEL = "prediction_selected_model"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
+    private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
     
     const val KEY_STT_ENABLED = "stt_enabled"
     const val KEY_STT_ONLINE_PLUGIN_ID = "stt_online_plugin_id"
@@ -616,6 +617,17 @@ object SettingsPreferences {
 
     fun setAssociationSingleMode(context: Context, single: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_ASSOCIATION_SINGLE_MODE, single).apply()
+    }
+
+    /**
+     * 退格直接删字（B站反馈 10-31，别人的需求，默认关）：联想词出现时退格直接删掉刚上屏的字、顺手收起联想，
+     * 不用先按一下收起联想。关着时照旧：第一下收起联想，第二下才删字。
+     */
+    fun isDeleteSkipsAssociation(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_DELETE_SKIPS_ASSOCIATION, false)
+
+    fun setDeleteSkipsAssociation(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_DELETE_SKIPS_ASSOCIATION, enabled).apply()
     }
     
     fun isSttEnabled(context: Context): Boolean {
