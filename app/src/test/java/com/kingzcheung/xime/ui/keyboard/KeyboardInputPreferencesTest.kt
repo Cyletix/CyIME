@@ -48,6 +48,18 @@ class KeyboardInputPreferencesTest {
         }
     }
 
+    @Test fun `uppercase key labels default off and persist without touching other settings`() {
+        val before = KeyboardInputPreferences.read(context)
+        assertEquals(false, before.uppercaseKeyLabels)
+        assertTrue(KeyboardInputPreferences.UPPERCASE_KEY_LABELS_KEY in KeyboardInputPreferences.watchedKeys)
+        for (enabled in listOf(true, false)) {
+            before.copy(uppercaseKeyLabels = enabled).save(context)
+            val after = KeyboardInputPreferences.read(context)
+            assertEquals(enabled, after.uppercaseKeyLabels)
+            assertEquals(before, after.copy(uppercaseKeyLabels = false))
+        }
+    }
+
     @Test fun `symbol direction defaults to pulling into key and persists either habit`() {
         assertEquals(false, KeyboardInputPreferences.read(context).reverseSymbolSwipe)
         for (reversed in listOf(true, false)) {

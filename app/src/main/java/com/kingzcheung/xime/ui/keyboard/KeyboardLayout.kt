@@ -700,7 +700,8 @@ fun KeyboardLayout(
                                     val rawCommitValue = KeysConfigHelper.getKeyCommitValue(key, isAsciiMode)
                                     val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
                 key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
-                                    val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode, isShifted)
+                                    val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode,
+                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels)
 
                                     val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
                                     val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
@@ -1367,7 +1368,8 @@ fun KeyboardRowWithConfig(
             val rawCommitValue = KeysConfigHelper.getKeyCommitValue(key, isAsciiMode)
             val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
                 key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
-            val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode, isShifted)
+            val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode,
+                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels)
 
             val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
@@ -1674,7 +1676,8 @@ fun CompactKeyboardRowWithConfig(
             val rawCommitValue = KeysConfigHelper.getKeyCommitValue(key, isAsciiMode)
             val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
                 key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
-            val compactDisplayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode, isShifted)
+            val compactDisplayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode,
+                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels)
             val compactOnClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val compactOnPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
             val compactOnRelease: (() -> Unit)? = remember(key, onKeyRelease) { { onKeyRelease?.invoke(key); Unit } }
