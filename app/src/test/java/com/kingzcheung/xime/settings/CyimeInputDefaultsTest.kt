@@ -19,4 +19,23 @@ class CyimeInputDefaultsTest {
         assertEquals(listOf("rime_ice", "t9_pinyin"), CyimeInputDefaults.recommended)
         assertFalse(CyimeInputDefaults.recommended.any { it in CyimeInputDefaults.dependencies })
     }
+    @Test fun builtinDoublePinyinGoesRightAfterFullPinyinWithoutMovingOtherChoices() {
+        val dp = CyimeInputDefaults.doublePinyin
+        assertEquals(listOf("double_pinyin_flypy", "double_pinyin_shoudao", "double_pinyin_ziranma",
+            "double_pinyin_znabc", "double_pinyin_jiajia"), dp)
+        val available = setOf("rime_ice", "t9_pinyin", "japanese") + dp
+        assertEquals(listOf("rime_ice") + dp + listOf("t9_pinyin", "japanese"),
+            CyimeInputDefaults.withDoublePinyin(listOf("rime_ice", "t9_pinyin", "japanese"), available))
+        // 已经开着小鹤的不重复、不挪位置；没有中文26键时排在最后。
+        assertEquals(listOf("t9_pinyin", "double_pinyin_flypy") + dp.drop(1),
+            CyimeInputDefaults.withDoublePinyin(listOf("t9_pinyin", "double_pinyin_flypy"), available))
+    }
+    @Test fun doublePinyinWaitsUntilItsSchemasAreGeneratedAndBringsFourteenKeyCompanions() {
+        val dp = CyimeInputDefaults.doublePinyin
+        assertNull(CyimeInputDefaults.withDoublePinyin(listOf("rime_ice"), setOf("rime_ice", "double_pinyin_flypy")))
+        val k14 = dp.map { DoublePinyinScheme.k14Id(it) }
+        val available = setOf("rime_ice", "pinyin_14jian") + dp + k14
+        assertEquals(listOf("rime_ice") + dp + listOf("pinyin_14jian") + k14,
+            CyimeInputDefaults.withDoublePinyin(listOf("rime_ice", "pinyin_14jian"), available))
+    }
 }

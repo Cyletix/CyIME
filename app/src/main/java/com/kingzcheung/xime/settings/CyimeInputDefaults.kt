@@ -16,6 +16,21 @@ object CyimeInputDefaults {
 
     fun isCompanion(id: String) = companionNeeds(id) != null
 
+    /** 内置的 26 键双拼（小鹤、首道、自然码、智能ABC、拼音加加）。 */
+    val doublePinyin: List<String> get() = DoublePinyinScheme.BUILTINS.map { it.id }
+
+    /**
+     * 双拼默认显示在方案栏（用户 10-31：放在「其他已安装方案」里很多人找不到）：缺的内置双拼排在中文26键后面，
+     * 已有顺序和当前方案不变。双拼方案文件还没生成时返回 null，留到下次再补。
+     */
+    fun withDoublePinyin(enabled: List<String>, available: Set<String>): List<String>? {
+        if (!available.containsAll(doublePinyin)) return null
+        val missing = doublePinyin.filterNot { it in enabled }
+        val after = enabled.indexOf("rime_ice")
+        val merged = if (after < 0) enabled + missing else enabled.take(after + 1) + missing + enabled.drop(after + 1)
+        return withCompanions(merged, available)
+    }
+
     fun withCompanions(ids: List<String>, available: Set<String>): List<String> {
         val base = ids.filterNot(::isCompanion)
         // 按双拼方案在列表里的顺序排列，结果不随已安装文件的枚举顺序变化。

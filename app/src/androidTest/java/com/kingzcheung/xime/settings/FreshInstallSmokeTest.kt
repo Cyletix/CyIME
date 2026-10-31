@@ -12,7 +12,8 @@ class FreshInstallSmokeTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         org.junit.Assume.assumeTrue("Use the isolated freshcheck APK", context.packageName.endsWith(".freshcheck"))
         val (user, shared) = RimeConfigHelper.initializeRimeData(context)
-        assertEquals(listOf("rime_ice", "t9_pinyin"), SchemaManager.getEnabledSchemas(context))
+        // 内置双拼默认显示在方案栏，排在中文26键后面；当前方案仍是全拼。
+        assertEquals(listOf("rime_ice") + CyimeInputDefaults.doublePinyin + "t9_pinyin", SchemaManager.getEnabledSchemas(context))
         val engine = RimeEngine.getInstance()
         engine.initialize(user, shared)
         assertTrue("Offline deployment", RimeConfigHelper.ensureDeployment(context))
@@ -30,7 +31,7 @@ class FreshInstallSmokeTest {
         engine.clearQueuedT9Composition()
         engine.clearComposition()
         assertTrue(engine.switchSchema("rime_ice"))
-        assertEquals(listOf("rime_ice", "t9_pinyin", InputModes.ENGLISH),
+        assertEquals(listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", InputModes.ENGLISH) + CyimeInputDefaults.doublePinyin.drop(1),
             InputModes.ordered(context, SchemaManager.discoverSchemas(context)
                 .filter { it.schemaId in SchemaManager.getEnabledSchemas(context) && SchemaManager.isSchemaCompiled(context, it.schemaId) }
                 .map { SchemaInfo(it.schemaId, it.name, it.version, it.author, it.description) }).map { it.schemaId })
