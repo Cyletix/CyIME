@@ -73,3 +73,9 @@ internal fun syllableSplitOnPunctuation(active: Boolean, left: SpacePunctuationK
  * 没在打拼音时照旧上屏 '。其他角标符号不受影响。
  */
 internal fun cornerTypesSeparator(active: Boolean, value: String): Boolean = active && value == SYLLABLE_SEPARATOR
+
+/**
+ * 「Shift 键分词」（默认关，B 站评论要的）：只在打拼音时把点按 Shift 换成分词；没在打拼音时、
+ * 按住 Shift 打大写、拖到字母上都照旧。生效范围和逗号键分词一样，见 [syllableSplitActive]。
+ */
+internal fun shiftTapTypesSeparator(active: Boolean, composing: Boolean): Boolean = active && composing

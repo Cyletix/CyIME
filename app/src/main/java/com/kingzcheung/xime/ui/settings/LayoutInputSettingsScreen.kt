@@ -26,7 +26,7 @@ import com.kingzcheung.xime.ui.keyboard.normalizeCandidateDragPercent
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 internal enum class LayoutInputCategory(val route: String, val title: String, val description: String) {
-    Qwerty("layout_input_qwerty", "26 键", "纠错、中英混输、生僻字、滑行输入、中文滑行、模糊音、字母错位、空格两侧标点、逗号键分词"),
+    Qwerty("layout_input_qwerty", "26 键", "纠错、中英混输、生僻字、滑行输入、中文滑行、模糊音、字母错位、空格两侧标点、逗号键和 Shift 分词"),
     Nine("layout_input_nine", "九键与 14 键", "拂动或滑动选字母、触发距离（含日语假名）、方向圆盘、假名提示"),
 }
 
@@ -110,6 +110,12 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             "没在打拼音时输入 '。九键照旧用 1 键分词。",
                         checked = settings.syllableSplitKey, onCheckedChange = {
                             settings = settings.copy(syllableSplitKey = it); settings.save(context)
+                        })
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "Shift 键分词",
+                        "中文全拼、双拼的 26 键和 14 键：打拼音时 Shift 键写「分词」，点一下插入分词（xi'an）；" +
+                            "没在打拼音时照旧切换大小写，按住 Shift 打大写也不变。",
+                        checked = settings.shiftSyllableSplit, onCheckedChange = {
+                            settings = settings.copy(shiftSyllableSplit = it); settings.save(context)
                         })
                 })
                 FuzzyPinyinSection()
