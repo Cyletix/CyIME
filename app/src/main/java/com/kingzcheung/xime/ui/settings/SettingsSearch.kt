@@ -172,6 +172,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("工具快捷键", hardware, SettingsRoutes.HardwareKeyboard, "快捷键 ctrl alt 标点 剪贴板 语音 alt+v alt+h"),
         SettingsSearchEntry("候选翻页", hardware, SettingsRoutes.HardwareKeyboard, "翻页 上一页 下一页 减号 等号 中括号 逗号 句号"),
         SettingsSearchEntry("候选跟随光标", hardware, SettingsRoutes.HardwareKeyboard, "候选 跟随 光标 浮窗 浮条 位置"),
+        SettingsSearchEntry("联想也显示在候选窗", hardware, SettingsRoutes.HardwareKeyboard, "联想 候选 位置 浮窗 工具条 跳 换位置 便携键盘 蓝牙键盘"),
         SettingsSearchEntry("自动避开输入区域", hardware, SettingsRoutes.HardwareKeyboard, "避让 遮挡 输入框 浮窗 浮条"),
         SettingsSearchEntry("靠边停靠", hardware, SettingsRoutes.HardwareKeyboard, "停靠 吸附 边缘 竖条 浮窗 浮条"),
         SettingsSearchEntry("底边使用三星式通栏", hardware, SettingsRoutes.HardwareKeyboard, "三星 通栏 底部 底边 候选栏 编号"),

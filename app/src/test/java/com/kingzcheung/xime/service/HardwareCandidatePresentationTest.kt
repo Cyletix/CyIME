@@ -57,6 +57,16 @@ class HardwareCandidatePresentationTest {
         assertTrue(result.standaloneWords.isEmpty())
     }
 
+    @Test fun associationJoinsTheCandidateWindowOnlyWhenTheOptionIsOn() {
+        val result = hardwareCandidatePresentation(CandidateState(
+            associationCandidates = listOf("你好", "世界", "朋友")), false)
+        assertTrue(result.windowWords(associationInWindow = false).isEmpty())
+        assertEquals(listOf("你好", "世界", "朋友"), result.windowWords(associationInWindow = true))
+        val composing = hardwareCandidatePresentation(CandidateState(candidates = listOf("敬酒"), inputText = "jingjiu"), false)
+        assertEquals(composing.words, composing.windowWords(associationInWindow = false))
+        assertEquals(composing.words, composing.windowWords(associationInWindow = true))
+    }
+
     @Test fun horizontalSuggestionsIncludeTenSelectableWordsRatherThanThree() {
         val words = (1..20).map { "词$it" }
         assertEquals(words.take(10), hardwareCandidatePresentation(CandidateState(associationCandidates = words), false).words)

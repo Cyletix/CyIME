@@ -37,6 +37,12 @@ class HardwareKeyboardPreferencesTest {
         assertEquals(original, values)
     }
 
+    @Test fun associationInWindowIsOffByDefaultAndPersists() {
+        assertFalse(HardwareKeyboardPreferences.read(context).associationInWindow)
+        HardwareKeyboardPreferences.set(context, "association_in_window", true)
+        assertEquals(HardwareKeyboardOptions(associationInWindow = true), HardwareKeyboardPreferences.read(context))
+    }
+
     @Test fun eachPagingChoicePersistsIndependentlyAndDoesNotChangeShortcuts() {
         for (mask in 0..7) {
             HardwareKeyboardPreferences.set(context, "page_minus_equals", mask and 1 != 0)
