@@ -209,7 +209,7 @@ private fun renderFrostedBackground(
             canvas.scale(width.toFloat() / targetSize.width, height.toFloat() / targetSize.height)
             canvas.drawBitmap(
                 image.bitmap, null,
-                frostedImageBounds(image, targetSize, background.fit ?: "cover"), paint,
+                frostedImageBounds(image, targetSize, background), paint,
             )
             canvas.restore()
             // 与非玻璃时相同的图片遮罩，否则玻璃下图片原样露出，键面文字压在花图上。
@@ -235,20 +235,16 @@ private fun renderFrostedBackground(
     }
 }
 
-private fun frostedImageBounds(image: FrostedSourceImage, size: IntSize, fit: String): RectF {
+private fun frostedImageBounds(image: FrostedSourceImage, size: IntSize, background: BackgroundConfig): RectF {
     val width = size.width.toFloat()
     val height = size.height.toFloat()
     val sourceWidth = image.originalWidth.toFloat()
     val sourceHeight = image.originalHeight.toFloat()
+    val fit = background.fit ?: "cover"
     if (fit == "fill") return RectF(0f, 0f, width, height)
     if (fit == "none") return RectF(0f, 0f, sourceWidth, sourceHeight)
-    val scale = when (fit) {
-        "contain" -> min(width / sourceWidth, height / sourceHeight)
-        "fit_width" -> width / sourceWidth
-        "fit_height" -> height / sourceHeight
-        else -> max(width / sourceWidth, height / sourceHeight)
-    }
-    val left = (width - sourceWidth * scale) / 2f
-    val top = (height - sourceHeight * scale) / 2f
-    return RectF(left, top, left + sourceWidth * scale, top + sourceHeight * scale)
+    // 与不开玻璃时同一套摆放（含「我的图片」的缩放与对齐）；没盖满处是上面先铺的底色。
+    val frame = placeThemeImage(sourceWidth, sourceHeight, width, height, fit,
+        background.zoom, background.alignX, background.alignY)
+    return RectF(frame.left, frame.top, frame.right, frame.bottom)
 }
