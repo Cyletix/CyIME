@@ -98,7 +98,8 @@ fun SmartPredictionSettingsContent(
 
     // 模型清单来自远程 index，响应式收集以在加载完成后刷新（仅 PREDICTION 类别）
     val allModels by ModelManager.modelsFlow.collectAsStateWithLifecycle()
-    val predictionModels = allModels.filter { it.category == ModelCategory.PREDICTION }
+    // 联想关着时选模型不起作用：「选择模型」和「联想行为」一样只在开着时显示（列表为空就不画这一组）。
+    val predictionModels = allModels.filter { it.category == ModelCategory.PREDICTION }.takeIf { uiState.isEnabled }.orEmpty()
 
     val savedModelId = remember {
         SettingsPreferences.getPredictionSelectedModel(context)
