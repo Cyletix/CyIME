@@ -87,7 +87,8 @@ object DoublePinyinSchemes {
         if (scheme.id != BASE) {
             writeIfChanged(File(rimeDir, "${scheme.id}.schema.yaml"), scheme.schema(base.readText()))
             val base14 = File(rimeDir, "${DoublePinyinScheme.k14Id(BASE)}.schema.yaml")
-            if (base14.isFile) writeIfChanged(File(rimeDir, "${DoublePinyinScheme.k14Id(scheme.id)}.schema.yaml"),
+            // 14 键、九键没有分号键，ing 在分号上的方案（微软双拼）不生成这两个版本。
+            if (base14.isFile && !scheme.usesSemicolon) writeIfChanged(File(rimeDir, "${DoublePinyinScheme.k14Id(scheme.id)}.schema.yaml"),
                 scheme.k14Schema(base14.readText()))
             val flypyTable = File(rimeDir, "en_dicts/cn_en_flypy.txt")
             if (flypyTable.isFile) {
@@ -95,7 +96,7 @@ object DoublePinyinSchemes {
                 writeIfChanged(table, scheme.cnEnTable(flypyTable.readText()))
             }
         }
-        writeIfChanged(File(rimeDir, "${DoublePinyinScheme.t9Id(scheme.id)}.schema.yaml"), scheme.t9Schema())
+        if (!scheme.usesSemicolon) writeIfChanged(File(rimeDir, "${DoublePinyinScheme.t9Id(scheme.id)}.schema.yaml"), scheme.t9Schema())
     }
 
     /** 初始化时调用：小鹤双拼方案随版本更新后，其他内置、自定义方案和各九键、14 键版本跟着更新。 */

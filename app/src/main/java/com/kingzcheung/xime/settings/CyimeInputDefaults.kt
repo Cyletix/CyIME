@@ -16,7 +16,7 @@ object CyimeInputDefaults {
 
     fun isCompanion(id: String) = companionNeeds(id) != null
 
-    /** 内置的 26 键双拼（小鹤、首道、自然码、智能ABC、拼音加加）。 */
+    /** 内置的 26 键双拼（小鹤、首道、自然码、智能ABC、拼音加加、微软）。 */
     val doublePinyin: List<String> get() = DoublePinyinScheme.BUILTINS.map { it.id }
 
     /**

@@ -96,8 +96,10 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                 scheme.collisions().size.let { if (it > 0) " · $it 组同码" else "" },
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             DoublePinyinKeyMap(scheme)
-                            listOf(Triple(scheme.id, "在方案栏显示", "打开后可在「语言与方案」里选它"),
+                            // 九键没有分号键，ing 在分号上的方案（微软双拼）没有九键版本。
+                            listOfNotNull(Triple(scheme.id, "在方案栏显示", "打开后可在「语言与方案」里选它"),
                                 Triple(DoublePinyinScheme.t9Id(scheme.id), "九键版本", "用九键打${scheme.name}：每个字按两个双拼键所在的数字键")
+                                    .takeUnless { scheme.usesSemicolon }
                             ).forEach { (id, title, subtitle) ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
@@ -216,8 +218,10 @@ internal fun DoublePinyinKeyMap(scheme: DoublePinyinScheme, highlight: Char? = n
         val gap = 3.dp
         val slot = (maxWidth - gap * 9) / 10
         Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-            listOf("qwertyuiop", "asdfghjkl", "zxcvbnm").forEachIndexed { row, letters ->
-                Row(Modifier.padding(start = (slot + gap) * (row * 0.5f)), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            // ing 在分号上的方案第二排多一个分号键，和键盘上一样排满十格。
+            listOf("qwertyuiop", if (';' in labels) "asdfghjkl;" else "asdfghjkl", "zxcvbnm").forEachIndexed { row, letters ->
+                Row(Modifier.padding(start = (slot + gap) * (if (letters.length == 10) 0f else row * 0.5f)),
+                    horizontalArrangement = Arrangement.spacedBy(gap)) {
                     letters.forEach { key ->
                         val (initial, finals) = labels.getValue(key)
                         val chosen = key == highlight

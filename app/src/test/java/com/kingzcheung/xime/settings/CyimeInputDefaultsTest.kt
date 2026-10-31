@@ -22,7 +22,7 @@ class CyimeInputDefaultsTest {
     @Test fun builtinDoublePinyinGoesRightAfterFullPinyinWithoutMovingOtherChoices() {
         val dp = CyimeInputDefaults.doublePinyin
         assertEquals(listOf("double_pinyin_flypy", "double_pinyin_shoudao", "double_pinyin_ziranma",
-            "double_pinyin_znabc", "double_pinyin_jiajia"), dp)
+            "double_pinyin_znabc", "double_pinyin_jiajia", "double_pinyin_microsoft"), dp)
         val available = setOf("rime_ice", "t9_pinyin", "japanese") + dp
         assertEquals(listOf("rime_ice") + dp + listOf("t9_pinyin", "japanese"),
             CyimeInputDefaults.withDoublePinyin(listOf("rime_ice", "t9_pinyin", "japanese"), available))
@@ -33,7 +33,8 @@ class CyimeInputDefaultsTest {
     @Test fun doublePinyinWaitsUntilItsSchemasAreGeneratedAndBringsFourteenKeyCompanions() {
         val dp = CyimeInputDefaults.doublePinyin
         assertNull(CyimeInputDefaults.withDoublePinyin(listOf("rime_ice"), setOf("rime_ice", "double_pinyin_flypy")))
-        val k14 = dp.map { DoublePinyinScheme.k14Id(it) }
+        // 微软双拼没有 14 键版本（没有分号键），文件不存在就不补。
+        val k14 = dp.filterNot { it == DoublePinyinScheme.MICROSOFT_ID }.map { DoublePinyinScheme.k14Id(it) }
         val available = setOf("rime_ice", "pinyin_14jian") + dp + k14
         assertEquals(listOf("rime_ice") + dp + listOf("pinyin_14jian") + k14,
             CyimeInputDefaults.withDoublePinyin(listOf("rime_ice", "pinyin_14jian"), available))

@@ -12,6 +12,9 @@ data class DoublePinyinScheme(
     val finals: Map<String, Char>,
     val zero: Map<String, String>,
 ) {
+    /** 微软、搜狗双拼把 ing 放在分号键上：Rime 字母表加分号，26 键第二排补一个分号键，不生成九键、14 键版本。 */
+    val usesSemicolon: Boolean get() = ';' in finals.values
+
     /** 音节的双拼编码；表里缺键或不是标准音节时为空。 */
     fun code(syllable: String): String? {
         zero[syllable]?.let { return it }
@@ -36,7 +39,7 @@ data class DoublePinyinScheme(
             else if (key in PLAIN_INITIALS) add("$initial 不能用 ${key.uppercaseChar()} 键：${key.uppercaseChar()} 本身是声母")
         }
         if (SPECIAL_INITIALS.mapNotNull { initials[it] }.toSet().size < SPECIAL_INITIALS.size) add("zh、ch、sh 需要三个不同的键")
-        FINALS.filter { finals[it]?.let { key -> key in 'a'..'z' } != true }.takeIf { it.isNotEmpty() }
+        FINALS.filter { finals[it]?.let { key -> key in 'a'..'z' || key == ';' } != true }.takeIf { it.isNotEmpty() }
             ?.let { add("这些韵母还没有按键：${it.joinToString("、")}") }
         ZERO_SYLLABLES.filter { zero[it]?.matches(Regex("[a-z]{2}")) != true }.takeIf { it.isNotEmpty() }
             ?.let { add("这些零声母音节需要两个字母的编码：${it.joinToString("、")}") }
@@ -45,7 +48,7 @@ data class DoublePinyinScheme(
     fun valid() = problems().isEmpty()
 
     /** 键位图：每个键上的翘舌声母和韵母。 */
-    fun keyLabels(): Map<Char, Pair<String?, List<String>>> = ('a'..'z').associateWith { key ->
+    fun keyLabels(): Map<Char, Pair<String?, List<String>>> = (('a'..'z') + listOfNotNull(';'.takeIf { usesSemicolon })).associateWith { key ->
         SPECIAL_INITIALS.firstOrNull { initials[it] == key } to FINALS.filter { finals[it] == key }
     }
 
@@ -61,7 +64,7 @@ data class DoublePinyinScheme(
         for (syllable in ZERO_SYLLABLES) add("xform/^$syllable$/${zero.getValue(syllable).upperCircled()}/")
         for (final in FINALS) add("xform/^(zh|ch|sh|[$PLAIN_INITIALS])$final$/\$1${finals.getValue(final).upperCircled()}/")
         for (initial in SPECIAL_INITIALS) add("xform/^$initial/${initials.getValue(initial).upperCircled()}/")
-        add("xlit/$UPPER_CIRCLED/$LETTERS/")
+        add(if (usesSemicolon) "xlit/$UPPER_CIRCLED$SEMICOLON_PLACEHOLDER/$LETTERS;/" else "xlit/$UPPER_CIRCLED/$LETTERS/")
     }
 
     /**
@@ -69,8 +72,10 @@ data class DoublePinyinScheme(
      * 结果先写成带圈小写字母，避免被后面的规则再次匹配。
      */
     fun preeditFormat(): List<String> = buildList {
+        // 编码里的键：字母，ing 在分号键上的方案还有分号。
+        val keys = if (usesSemicolon) "[a-z;]" else "[a-z]"
         // 连续输入的字母按两个一组隔开，与 Rime 在音节间插入的分隔符一样处理。
-        add("xform/([a-z]{2})(?=[a-z])/\$1 /")
+        add("xform/($keys{2})(?=$keys)/\$1 /")
         for (syllable in ZERO_SYLLABLES) add("xform/(^|[ '])${zero.getValue(syllable)}(?=$|[ '])/\$1${syllable.lowerCircled()}/")
         val readings = LinkedHashMap<Pair<Char, Char>, String>()
         for (syllable in SYLLABLES) {
@@ -83,7 +88,7 @@ data class DoublePinyinScheme(
             val (key, final) = keyAndFinal
             add("xform/(^|[ '])([${firsts.sorted().joinToString("")}])$key(?=$|[ '])/\$1\$2${final.lowerCircled()}/")
         }
-        for (initial in SPECIAL_INITIALS) add("xform/(^|[ '])${initials.getValue(initial)}(?![a-z])/\$1${initial.lowerCircled()}/")
+        for (initial in SPECIAL_INITIALS) add("xform/(^|[ '])${initials.getValue(initial)}(?!$keys)/\$1${initial.lowerCircled()}/")
         add("xlit/$LOWER_CIRCLED/$LETTERS/")
         add("xform/(?<=[A-Z])\\s(?=[A-Z])//")
     }
@@ -104,6 +109,12 @@ data class DoublePinyinScheme(
         check(schemaBlock.contains("  schema_id: $id\n")) { "小鹤双拼方案缺少 schema_id" }
         text = text.replaceRange(header.range, schemaBlock)
         text = replaceList(text, "speller", "algebra", algebra())
+        if (usesSemicolon) {
+            // 分号只进字母表、不进 initials：没在打字时按分号仍是标点。
+            val alphabet = Regex("(?m)^(  alphabet: )(\"?)([^\\s#\"]+)(\"?)").find(text) ?: error("小鹤双拼方案缺少 alphabet")
+            if (';' !in alphabet.groupValues[3]) text = text.replaceRange(alphabet.range,
+                alphabet.groupValues[1] + alphabet.groupValues[2] + alphabet.groupValues[3] + ";" + alphabet.groupValues[4])
+        }
         text = replaceList(text, "translator", "preedit_format", preeditFormat())
         val prism = Regex("(?m)^  prism: double_pinyin_flypy\\b.*$")
         check(prism.containsMatchIn(text)) { "小鹤双拼方案缺少 prism" }
@@ -289,7 +300,9 @@ data class DoublePinyinScheme(
         const val ZIRANMA_ID = "double_pinyin_ziranma"
         const val ZNABC_ID = "double_pinyin_znabc"
         const val JIAJIA_ID = "double_pinyin_jiajia"
-        private val ID_PATTERN = Regex("$SHOUDAO_ID|$ZIRANMA_ID|$ZNABC_ID|$JIAJIA_ID|${CUSTOM_PREFIX}[a-f0-9]{32}")
+        /** 不用 Rime 的 double_pinyin_mspy，免得和导入的同名方案冲突。 */
+        const val MICROSOFT_ID = "double_pinyin_microsoft"
+        private val ID_PATTERN = Regex("$SHOUDAO_ID|$ZIRANMA_ID|$ZNABC_ID|$JIAJIA_ID|$MICROSOFT_ID|${CUSTOM_PREFIX}[a-f0-9]{32}")
         val SPECIAL_INITIALS = listOf("zh", "ch", "sh")
         const val PLAIN_INITIALS = "bpmfdtnlgkhjqxrzcsyw"
         /** 按词库拼写列出的韵母；jue 的 ue 与 lüe 的 ve、ju 的 u 与 lü 的 v 分开设置。 */
@@ -300,7 +313,9 @@ data class DoublePinyinScheme(
         private const val LETTERS = "abcdefghijklmnopqrstuvwxyz"
         private val UPPER_CIRCLED = String(CharArray(26) { (0x24B6 + it).toChar() })
         private val LOWER_CIRCLED = String(CharArray(26) { (0x24D0 + it).toChar() })
-        private fun Char.upperCircled() = UPPER_CIRCLED[this - 'a']
+        /** 分号的占位符（带圈字母只有 26 个）。 */
+        private const val SEMICOLON_PLACEHOLDER = '\u24EA'
+        private fun Char.upperCircled() = if (this == ';') SEMICOLON_PLACEHOLDER else UPPER_CIRCLED[this - 'a']
         private fun String.upperCircled() = map { it.upperCircled() }.joinToString("")
         private fun String.lowerCircled() = map { LOWER_CIRCLED[it - 'a'] }.joinToString("")
         fun cnEnName(id: String) = "cn_en_$id"
@@ -387,7 +402,17 @@ data class DoublePinyinScheme(
             mapOf("a" to "aa", "o" to "oo", "e" to "ee", "ai" to "as", "ei" to "ew", "ao" to "ad", "ou" to "op",
                 "an" to "af", "en" to "er", "ang" to "ag", "eng" to "et", "er" to "eq"))
 
-        val BUILTINS = listOf(FLYPY, SHOUDAO, ZIRANMA, ZNABC, JIAJIA)
+        /** 微软双拼：zh→V、ch→I、sh→U，ing 在分号键；零声母以 O 开头再加韵母键（爱 OL、而 OR），与 Windows 自带的微软拼音一致。 */
+        val MICROSOFT = DoublePinyinScheme(MICROSOFT_ID, "微软双拼", mapOf("zh" to 'v', "ch" to 'i', "sh" to 'u'),
+            mapOf("a" to 'a', "o" to 'o', "e" to 'e', "i" to 'i', "u" to 'u', "v" to 'y', "ai" to 'l', "ei" to 'z',
+                "ui" to 'v', "ao" to 'k', "ou" to 'b', "iu" to 'q', "ie" to 'x', "ue" to 't', "ve" to 't', "an" to 'j',
+                "en" to 'f', "in" to 'n', "un" to 'p', "ang" to 'h', "eng" to 'g', "ing" to ';', "ong" to 's', "ia" to 'w',
+                "ua" to 'w', "uo" to 'o', "iao" to 'c', "ian" to 'm', "uan" to 'r', "iang" to 'd', "uang" to 'd',
+                "iong" to 's', "uai" to 'y'),
+            mapOf("a" to "oa", "o" to "oo", "e" to "oe", "ai" to "ol", "ei" to "oz", "ao" to "ok", "ou" to "ob",
+                "an" to "oj", "en" to "of", "ang" to "oh", "eng" to "og", "er" to "or"))
+
+        val BUILTINS = listOf(FLYPY, SHOUDAO, ZIRANMA, ZNABC, JIAJIA, MICROSOFT)
 
         /** 小鹤双拼编码 → 音节；lo 与 luo 同码时取 luo。 */
         private val FLYPY_DECODE: Map<String, String> = HashMap<String, String>().apply {

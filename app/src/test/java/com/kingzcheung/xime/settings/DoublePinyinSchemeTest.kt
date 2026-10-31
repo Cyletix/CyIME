@@ -146,7 +146,8 @@ class DoublePinyinSchemeTest {
     @Test fun t9VersionTypesEachSyllableOnTwoDigitKeys() {
         val digits = mapOf("abc" to '2', "def" to '3', "ghi" to '4', "jkl" to '5', "mno" to '6', "pqrs" to '7', "tuv" to '8', "wxyz" to '9')
         fun t9(code: String) = code.map { c -> digits.entries.first { c in it.key }.value }.joinToString("")
-        for (scheme in DoublePinyinScheme.BUILTINS + custom) {
+        // 九键没有分号键，微软双拼没有九键版本。
+        for (scheme in DoublePinyinScheme.BUILTINS.filterNot { it.usesSemicolon } + custom) {
             val id = DoublePinyinScheme.t9Id(scheme.id)
             val text = scheme.t9Schema()
             assertTrue(text.startsWith(DoublePinyinScheme.GENERATED_MARK + id + "\n"))
@@ -275,6 +276,40 @@ class DoublePinyinSchemeTest {
             xform/in$/L/
             xlit/QWRTYUIOPSDFGHMJCKLZXVBN/qwrtyuiopsdfghmjcklzxvbn/
         """,
+        DoublePinyinScheme.MICROSOFT to """
+            erase/^xx$/
+            derive/^([jqxy])u$/$1v/
+            derive/^([aoe].*)$/o$1/
+            xform/^([ae])(.*)$/$1$1$2/
+            xform/iu$/Q/
+            xform/[iu]a$/W/
+            xform/er$|[uv]an$/R/
+            xform/[uv]e$/T/
+            xform/v$|uai$/Y/
+            xform/^sh/U/
+            xform/^ch/I/
+            xform/^zh/V/
+            xform/uo$/O/
+            xform/[uv]n$/P/
+            xform/i?ong$/S/
+            xform/[iu]ang$/D/
+            xform/(.)en$/$1F/
+            xform/(.)eng$/$1G/
+            xform/(.)ang$/$1H/
+            xform/ian$/M/
+            xform/(.)an$/$1J/
+            xform/iao$/C/
+            xform/(.)ao$/$1K/
+            xform/(.)ai$/$1L/
+            xform/(.)ei$/$1Z/
+            xform/ie$/X/
+            xform/ui$/V/
+            derive/T$/V/
+            xform/(.)ou$/$1B/
+            xform/in$/N/
+            xform/ing$/;/
+            xlit/QWRTYUIOPSDFGHMJCKLZXVBN/qwrtyuiopsdfghmjcklzxvbn/
+        """,
     ).mapValues { (_, rules) -> rules.trimIndent().lines().filter { it.isNotBlank() } }
 
     @Test fun builtinsTypeWhatTheOfficialRimeSchemesType() {
@@ -291,6 +326,32 @@ class DoublePinyinSchemeTest {
         assertEquals("ud'pn", z.preview())
         assertEquals(listOf("oa", "ol", "or"), listOf("a", "ai", "er").map { DoublePinyinScheme.ZNABC.code(it) })
         assertEquals(listOf("as", "eq", "op"), listOf("ai", "er", "ou").map { DoublePinyinScheme.JIAJIA.code(it) })
+        val m = DoublePinyinScheme.MICROSOFT
+        assertTrue(m.usesSemicolon)
+        assertFalse(DoublePinyinScheme.BUILTINS.filter { it != m }.any { it.usesSemicolon })
+        assertEquals(listOf("l;", "x;", "ud", "vs", "ly", "lt", "iy", "ol", "or", "ob"),
+            listOf("ling", "xing", "shuang", "zhong", "lv", "lve", "chuai", "ai", "er", "ou").map { m.code(it) })
+        assertEquals("ud'pn", m.preview())
+        assertEquals(setOf("ing"), m.keyLabels().getValue(';').second.toSet())
+    }
+
+    @Test fun microsoftPreeditAndSchemaTakeTheSemicolon() {
+        val m = DoublePinyinScheme.MICROSOFT
+        val rules = m.preeditFormat()
+        assertEquals("ling xing", apply(rules, "l;x;"))
+        assertEquals("shuang'pin", apply(rules, "ud'pn"))
+        assertEquals("ai er ou", apply(rules, "ol or ob"))
+        assertEquals("zhong sh", apply(rules, "vsu"))
+        // 分号进字母表（引号里的也认），不进 initials；其他方案的字母表不变。
+        val base = "schema:\n  schema_id: double_pinyin_flypy\n  name: 小鹤双拼\n  description: |\n    x\n" +
+            "translator:\n  prism: double_pinyin_flypy\n  preedit_format:\n    - xform/a/b/\n" +
+            "speller:\n  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA`  # 注释\n" +
+            "  initials: zyxwvutsrqponmlkjihgfedcba\n  algebra:\n    - erase/^xx$/\n"
+        val text = m.schema(base)
+        assertTrue(text.contains("  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA`;  # 注释\n"))
+        assertTrue(text.contains("  initials: zyxwvutsrqponmlkjihgfedcba\n"))
+        assertTrue(m.schema(base.replace("alphabet: zyx", "alphabet: \"zyx").replace("`  #", "`\"  #")).contains("A`;\"  #"))
+        assertTrue(DoublePinyinScheme.ZIRANMA.schema(base).contains("A`  # 注释\n"))
     }
 
     @Test fun builtinPreeditShowsPinyin() {
@@ -309,7 +370,7 @@ class DoublePinyinSchemeTest {
         val groups = mapOf("qw" to 'Q', "er" to 'E', "ty" to 'T', "ui" to 'U', "op" to 'O', "as" to 'A', "df" to 'D',
             "gh" to 'G', "jk" to 'J', "zx" to 'Z', "cv" to 'C', "bn" to 'B')
         fun merged(c: Char) = groups.entries.firstOrNull { c in it.key }?.value ?: c
-        for (scheme in DoublePinyinScheme.BUILTINS.drop(1) + custom) {
+        for (scheme in DoublePinyinScheme.BUILTINS.drop(1).filterNot { it.usesSemicolon } + custom) {
             val id = DoublePinyinScheme.k14Id(scheme.id)
             val text = scheme.k14Schema(base14)
             assertTrue(text.startsWith(DoublePinyinScheme.GENERATED_MARK + id + "\n"))
