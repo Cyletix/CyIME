@@ -283,6 +283,42 @@ private fun LayoutDisplayPage(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     )
+                    // 只在取消按钮开着时起作用，关着就不显示。
+                    if (showCandidateCancel) {
+                        var associationCancelRight by remember {
+                            mutableStateOf(SettingsPreferences.isAssociationCancelOnRight(context))
+                        }
+                        Row(
+                            modifier = Modifier.settingsSearchAnchor("联想时关闭键放右边")
+                                .fillMaxWidth()
+                                .testTag("association-cancel-right-setting")
+                                .toggleable(
+                                    value = associationCancelRight,
+                                    role = Role.Switch,
+                                    onValueChange = {
+                                        associationCancelRight = it
+                                        SettingsPreferences.setAssociationCancelOnRight(context, it)
+                                    },
+                                )
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("联想时关闭键放右边", style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium)
+                                Text("上屏后出联想词时，左箭头换成右边的 ⊗，点第一个联想词不会点到关闭",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Switch(checked = associationCancelRight, onCheckedChange = null)
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+                    }
 
                     var commentMode by remember { mutableStateOf(SettingsPreferences.candidateCommentMode(context)) }
                     Column(Modifier.settingsSearchAnchor("候选注释")) {
