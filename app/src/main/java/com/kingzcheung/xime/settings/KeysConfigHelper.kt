@@ -738,10 +738,19 @@ object KeysConfigHelper {
         } else {
             // Double pinyin and code tables type on the arrangement chosen for them (QWJRTK, Colemak, the user's own …); pinyin has none.
             val arranged = letterLayout(schemaId, false)
-            _zhRows = arranged?.typingRows() ?: _zhRowsBase
+            val rows = arranged?.typingRows() ?: _zhRowsBase
+            _zhRows = if (DoublePinyinSchemes.find(schemaId)?.usesSemicolon == true) withSemicolonKey(rows) else rows
             _keyGestureConfig.value = arranged?.gestures(_keyGestureConfigZhBase) ?: _keyGestureConfigZhBase
         }
     }
+
+    /**
+     * ing 在分号上的双拼（微软双拼）：排列里没有分号键时在第二排末尾补一个，第二排正好排满十格；
+     * 排不下（第二排已满、蜂窝排列）就保持原样，换个带分号的排列再打。分号键按下时送进 Rime，由方案组成编码。
+     */
+    internal fun withSemicolonKey(rows: List<List<String>>): List<List<String>> =
+        if (rows.size != 3 || rows.any { ";" in it } || rows[1].sumOf { it.length } != 9) rows
+        else rows.mapIndexed { index, row -> if (index == 1) row + ";" else row }
 
     /**
      * The letter layout the keyboard is typing on: a Chinese layout schema, or the arrangement chosen

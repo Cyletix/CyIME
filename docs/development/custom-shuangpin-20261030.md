@@ -35,7 +35,8 @@
 
 ## 还没做
 
-- 微软双拼、搜狗双拼：ing 在分号键上。需要键位表允许分号、Rime `alphabet` 加分号（`initials` 不加）、键盘把分号键送进 Rime 而不是直接上屏，以及 26 键上要有分号键（Colemak 和带分号格的自建布局有）。14 键、九键版本无分号键，不生成。
+- ~~微软双拼~~（2026-10-31 已做，内置 `double_pinyin_microsoft`）：键位表允许 ing 放分号（`usesSemicolon`），生成的方案字母表加分号、`initials` 不加（没在打字时分号仍是标点）；26 键排列没有分号键时第二排末尾补一个（`KeysConfigHelper.withSemicolonKey`），分号键照常送进 Rime；14 键、九键版本不生成。零声母按微软拼音的 O 开头（爱 OL、而 OR）。官方 rime-double-pinyin `double_pinyin_mspy` 拼写运算交叉检查见 `DoublePinyinSchemeTest`。
+- 搜狗双拼：同样 ing 在分号上，加一张键位表即可。
 - 双拼在自己建的合并键布局上打（目前只有内置 14 键）：需要按那个布局的合并组生成 derive 规则，每个（方案 × 布局）一个 Rime 方案。
 - 从拼音切到双拼时保持当前字母排列（现在点方案后排列回到双拼自己的选择，点布局时保持方案）。
 - 导入的方案没写 `language` 时没法在应用里指定语言（只能改 yaml 加 `language: zh`），这类方案用不了中文的字母布局、语音、手写。
