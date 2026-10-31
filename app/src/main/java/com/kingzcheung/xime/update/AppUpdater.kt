@@ -43,7 +43,7 @@ sealed interface AppUpdateState {
 
 /**
  * 应用内检查更新：查 GitHub Releases，下载同版本类型（轻量版 / 完整版）的安装包，核对哈希和签名后交给系统安装程序。
- * Android 不允许普通应用静默安装，每次都由用户在系统界面里点「安装」。自动检查默认关闭。
+ * Android 不允许普通应用静默安装，每次都由用户在系统界面里点「安装」。自动检查默认打开（只查不下载），手动关过的保持关。
  */
 object AppUpdater {
     private const val TAG = "AppUpdater"
@@ -74,7 +74,7 @@ object AppUpdater {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun isAutoCheckEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO, false)
+    fun isAutoCheckEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO, true)
 
     fun setAutoCheckEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_AUTO, enabled).apply()
