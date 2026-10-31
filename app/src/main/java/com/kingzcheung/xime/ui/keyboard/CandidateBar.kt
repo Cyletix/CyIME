@@ -104,6 +104,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -1086,6 +1087,9 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         RotatedPreeditPreview(text, visuals, onEdit, rotation, gap, screenWidth)
         return
     }
+    // 气泡在键盘外面（上方），键盘的玻璃模糊盖不到它：开玻璃时给气泡单独垫一块同样的实时模糊（用户反馈 10-31
+    // 「字母显示栏的模糊会消失」：气泡底色和按键一样半透明，后面却是没模糊的应用）。区域按气泡在输入法窗口里的位置算。
+    val bubbleBounds = remember { mutableStateOf<IntRect?>(null) }
     // 气泡贴着键盘左边（用户 10-20 要求恢复）：不跟光标，所有应用位置一样。
     val positionProvider = remember(margin, gap) {
         object : PopupPositionProvider {
@@ -1096,9 +1100,19 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
                         (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)),
                     (anchorBounds.top - popupContentSize.height - gap).coerceIn(0,
                         (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
-                )
+                ).also { offset ->
+                    val bounds = IntRect(offset, popupContentSize)
+                    if (bubbleBounds.value != bounds) bubbleBounds.value = bounds
+                }
             }
         }
+    }
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass.normalized()
+    if (glass.enabled && glass.blurRadiusDp >= 1f) {
+        // 气泡内容是 44dp 高、上下各留 6dp，真正的底色块在中间，圆角 4dp（见下面 PreeditLabel 和 preeditSurface）。
+        val inset = with(density) { 6.dp.roundToPx() }
+        PreeditBubbleBlur(bubbleBounds.value?.let { IntRect(it.left, it.top + inset, it.right, it.bottom - inset) },
+            glass.blurRadiusDp, with(density) { 4.dp.toPx() })
     }
     Popup(popupPositionProvider = positionProvider,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
@@ -1106,6 +1120,26 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
             .height(44.dp).padding(vertical = 6.dp)
         )
+    }
+}
+
+/** 拼音气泡下面的实时模糊：和键盘卡片的玻璃同一种子窗口，放在输入法窗口下面，只模糊气泡那一块应用画面。 */
+@Composable
+private fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadiusPx: Float) {
+    val view = LocalView.current
+    val context = LocalContext.current
+    // 模糊半径按屏幕真实密度算，和键盘卡片那块一样；候选栏放大只放大气泡，不改模糊强度。
+    val radiusPx = (blurRadiusDp * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(1)
+    val blur = remember(view) {
+        com.kingzcheung.xime.service.ImeGlassBlurWindow(context, "preedit-bubble") { view.rootView }
+    }
+    DisposableEffect(blur) {
+        blur.setVisible(true)
+        onDispose { blur.dispose() }
+    }
+    SideEffect {
+        blur.configure(true, radiusPx, cornerRadiusPx)
+        blur.setRegion(region?.let { android.graphics.Rect(it.left, it.top, it.right, it.bottom) })
     }
 }
 
