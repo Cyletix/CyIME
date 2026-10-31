@@ -18,7 +18,7 @@ class KeyboardSurfaceConsistencyTest {
 
     /** 盖在键盘上的整块面板和覆盖层：底色都走 keyboardPanelBackground（主题底色、渐变/图片、毛玻璃），不用固定颜色。 */
     private val panels = listOf(
-        "ui/keyboard/CursorControlOverlay.kt", "ui/keyboard/RejectedCommitOverlay.kt",
+        "ui/keyboard/RejectedCommitOverlay.kt",
         "ui/keyboard/EmojiKeyboardLayout.kt", "ui/keyboard/SymbolKeyboardLayout.kt",
         "ui/keyboard/EditKeyboardLayout.kt", "ui/keyboard/SplitWordsView.kt", "ui/keyboard/InfoPanel.kt",
         "ui/keyboard/HandwritingKeyboardLayout.kt", "ui/keyboard/MenuBar.kt", "ui/keyboard/CandidatePage.kt",
@@ -34,11 +34,16 @@ class KeyboardSurfaceConsistencyTest {
             source(path).lines().mapIndexedNotNull { i, line -> if (fixed.containsMatchIn(line)) "$path:${i + 1}" else null }
         }
         assertEquals("面板底色写死了黑/白/灰，不跟主题", emptyList<String>(), scrims)
-        // 玻璃下面板底是透的：盖在按键上的覆盖层要么用 keyboardOverlayBackground 挡住，要么把下面的按键藏起来，
-        // 否则按键和字叠在一起。光标调整走后一种（保留玻璃观感，空格仍收拖动）。
+        // 玻璃下面板底是透的：盖在按键上的覆盖层要么用 keyboardOverlayBackground 挡住，要么把下面的按键压淡，
+        // 否则按键和字叠在一起。光标调整走后一种（空格仍收拖动）。
         assertTrue(source("ui/keyboard/RejectedCommitOverlay.kt").contains("keyboardOverlayBackground("))
-        assertTrue("光标调整时键盘内容没藏起来",
+        assertTrue("光标调整时键盘内容没压淡",
             source("ui/keyboard/KeyboardView.kt").contains(".hiddenDuringCursorControl(cursorControlActive)"))
+        // 光标调整不铺底：键盘自己的背景（主题、渐变、图片、玻璃）照常显示。铺不透明主题底色时深色主题整个键盘变黑。
+        val cursorOverlay = source("ui/keyboard/CursorControlOverlay.kt")
+        assertTrue("光标调整遮罩又铺了底色", listOf("keyboardPanelBackground(", "keyboardOverlayBackground(", ".background(")
+            .none { cursorOverlay.contains(it) })
+        assertTrue("光标调整时按键被整个藏掉", cursorOverlay.contains("CURSOR_CONTROL_KEY_ALPHA = 0.22f"))
     }
 
     @Test fun cardsAndDimsOverTheKeyboardShareTheKeyboardCardColors() {
