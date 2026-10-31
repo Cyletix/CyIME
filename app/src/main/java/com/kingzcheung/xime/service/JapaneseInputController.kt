@@ -42,13 +42,13 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
         if (!available() || session != service.uiState.value.inputSessionId || schema != engine.getCurrentSchema() || conversion?.input != engine.getInput()) conversion = null
         return conversion
     }
-    private fun start(): JapaneseConversion? {
+    private fun start(converted: Boolean = true, caretKana: Int? = null): JapaneseConversion? {
         current()?.let { return it }
         val input = engine.getInput()
         if (input.isEmpty()) return null
         session = service.uiState.value.inputSessionId
         schema = engine.getCurrentSchema()
-        return JapaneseConversion(engine, input).also { conversion = it; it.refresh() }
+        return JapaneseConversion(engine, input, converted, caretKana).also { conversion = it; it.refresh() }
     }
     private suspend fun show() {
         val active = current()
@@ -64,32 +64,73 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
         }
     }
     suspend fun cancel() { conversion = null; show() }
-    fun conversionPreview(): String? = current()?.preview
+    /** 只挪了光标、没转换时没有转换预览（预览里有光标竖线，不能上屏）。 */
+    fun conversionPreview(): String? = current()?.takeIf { it.converted }?.preview
     suspend fun commit(index: Int? = null): Boolean {
         val active = current() ?: return false
-        if (index != null) active.choose(index)
+        // 点候选：只上屏这一段，后面的读音留着接着打。
+        if (index != null) return confirmSegment(index)
+        // 只挪了光标：回到平常的打字状态，由回车等按键按原来的规则结束。
+        if (!active.converted) { conversion = null; return false }
         val text = active.preview
         val owner = session
         conversion = null
         if (owner == service.uiState.value.inputSessionId) service.keyRouter.commitSelectedText(text)
         return true
     }
+
+    /**
+     * 确认当前段（空格、点候选）：上屏光标前或转换段转出的字，后面的读音留在编码里接着打、接着转换
+     * （Gboard、iOS 日文键盘同样）。当前段已到末尾时与整段上屏相同。
+     */
+    private suspend fun confirmSegment(index: Int? = null): Boolean {
+        val active = current() ?: return false
+        if (index != null) active.choose(index)
+        val text = active.segment
+        val rest = active.rest
+        val owner = session
+        conversion = null
+        if (owner != service.uiState.value.inputSessionId) return true
+        if (rest.isEmpty()) { service.keyRouter.commitSelectedText(text); return true }
+        if (service.keyRouter.commitPreparedText(text, t9 = false).accepted && owner == service.uiState.value.inputSessionId) {
+            engine.setInput(rest)
+            show()
+        }
+        return true
+    }
     suspend fun prepareKana(modify: Boolean) { if (current() != null) { if (modify) cancel() else commit() } }
     suspend fun handleKey(key: String): Boolean {
         if (!available()) { conversion = null; return false }
         when (key) {
-            "japanese_convert" -> { val old = current(); val active = start(); if (old != null) active?.cycle(); show(); return true }
+            // 已转换：再按换下一个候选；只挪过光标：把光标前那段转成首选。
+            "japanese_convert" -> {
+                val old = current(); val active = start()
+                if (old != null) { if (old.converted) active?.cycle() else active?.convert() }
+                show(); return true
+            }
             "japanese_undo" -> { cancel(); return true }
+            // 日文翻页键盘的左右键：没在打字时移动正文光标；打字中按假名移动读音里的光标（候选只给光标前那段）；
+            // 按过変換后调整转换段长短。光标回到末尾时回到平常的打字状态。
             "japanese_left", "japanese_right" -> {
                 val steps = if (key.endsWith("left")) -1 else 1
-                val active = start()
-                if (active == null) service.schemaController.moveJapaneseCursorFromKeyQueue(steps)
-                else { active.moveRange(steps); show() }
+                val old = current()
+                if (old == null && engine.getInput().isEmpty()) {
+                    service.schemaController.moveJapaneseCursorFromKeyQueue(steps)
+                    return true
+                }
+                // 光标已在读音末尾，右键无处可去。
+                if (old == null && steps > 0) return true
+                val active = old ?: start(converted = false) ?: return true
+                val moved = active.moveRange(steps)
+                if (!active.converted && !active.partial) conversion = null
+                if (moved || old == null) show()
                 return true
             }
             "delete", "clear_composition", "clear_all" -> conversion = null
-            "space", "enter" -> if (commit()) return true
-            else -> if (current() != null) commit()
+            "space" -> if (confirmSegment()) return true
+            "enter" -> if (commit()) return true
+            // 只挪过光标时不上屏，先收起光标再交给原来的按键处理。
+            else -> current()?.let { if (it.converted) commit() else cancel() }
         }
         return false
     }
@@ -97,7 +138,17 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
         if (!available()) return false
         val input = engine.getInput()
         if (input.isEmpty()) { conversion = null; return false }
+        val active = current()
         conversion = null
+        if (active != null && !active.converted && active.partial) {
+            // 光标在读音中间：删光标前的那个假名，光标留在原处（到了开头就回到末尾）。
+            val (next, caretKana) = active.withoutKanaBeforeCaret()
+            engine.setInput(next)
+            if (caretKana > 0) start(converted = false, caretKana = caretKana)
+            if (conversion?.partial == false) conversion = null
+            show()
+            return true
+        }
         // 删除单位与显示同源（romajiDeleteStart）：未拼完的罗马音只删一个字母，
         // 已拼完的假名整体删。不能再用引擎读音长度探测边界——ん 与 っ 等长时
         // 判不出假名边界，会把整串一次删光（2026-09-25 复现）。
