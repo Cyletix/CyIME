@@ -331,10 +331,7 @@ fun HandwritingKeyboardLayout(
             if (formulaShown) Surface(
                 onClick = {
                     if (!formulaAvailable) {
-                        context.startActivity(android.content.Intent(context, com.kingzcheung.xime.MainActivity::class.java).apply {
-                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                            putExtra("open_fragment", "model_management")
-                        })
+                        context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context, "model_management"))
                         return@Surface
                     }
                     session.clear()
