@@ -146,6 +146,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("工具栏与菜单排列", layouts, SettingsRoutes.ToolbarArrange, "工具栏 菜单 排列 顺序 入口 图标 按钮 自定义工具栏"),
         SettingsSearchEntry("邻键纠错", qwertyPath, qwerty, "纠错 打错 误触 全拼 按错 相邻"),
         SettingsSearchEntry("双拼邻键纠错", qwertyPath, qwerty, "双拼 纠错 打错 误触 按错 相邻 小鹤 自然码"),
+        SettingsSearchEntry("模糊音也用于双拼", qwertyPath, qwerty, "双拼模糊音 双拼 模糊音 小鹤 自然码 in ing 前后鼻音"),
         SettingsSearchEntry("模糊音", qwertyPath, qwerty, "模糊音 模糊 平翘舌 前后鼻音 z zh c ch s sh n l f h r an ang en eng in ing 分不清 口音 方言"),
         SettingsSearchEntry("滑行输入", qwertyPath, qwerty, "滑行 划词 滑动输入 手势输入 英文 整词 swype"),
         SettingsSearchEntry("中文滑行输入", qwertyPath, qwerty, "滑行 划词 中文滑行 拼音滑行 双拼滑行 手势输入 swype"),

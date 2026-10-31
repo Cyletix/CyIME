@@ -143,6 +143,30 @@ class DoublePinyinSchemeTest {
         else set.map { apply(listOf(rule), it) }.filter { it.isNotEmpty() }.toSet()
     }
 
+    /** 模糊音（[SpellingPatches.Fuzzy]）写在双拼拼写规则前面：先按读音派生，再换成本方案的双拼编码。 */
+    @Test fun fuzzyPinyinReachesEveryDoublePinyinScheme() {
+        for (scheme in DoublePinyinScheme.BUILTINS + custom) {
+            fun typed(fuzzy: SpellingPatches.Fuzzy, syllable: String) = spellings(fuzzy.rules + scheme.algebra(), syllable)
+            fun code(syllable: String) = scheme.code(syllable)!!
+            assertTrue(scheme.id, code("xin") in typed(SpellingPatches.Fuzzy.IN, "xing"))
+            assertTrue(scheme.id, code("xing") in typed(SpellingPatches.Fuzzy.IN, "xin"))
+            assertTrue(scheme.id, code("yin") in typed(SpellingPatches.Fuzzy.IN, "ying"))
+            assertTrue(scheme.id, code("zi") in typed(SpellingPatches.Fuzzy.Z, "zhi"))
+            assertTrue(scheme.id, code("shi") in typed(SpellingPatches.Fuzzy.S, "si"))
+            assertTrue(scheme.id, code("lan") in typed(SpellingPatches.Fuzzy.NL, "nan"))
+            assertTrue(scheme.id, code("fan") in typed(SpellingPatches.Fuzzy.AN, "fang"))
+            assertFalse(scheme.id, code("xian") in typed(SpellingPatches.Fuzzy.AN, "xiang"))
+            // 不开模糊音：每个音节只有自己的编码。
+            assertEquals(scheme.id, setOf(code("xing")), spellings(scheme.algebra(), "xing"))
+            // 11 组全开：每个音节派生出的拼写仍然都是两键编码，不多出没换成双拼的长拼写。
+            val all = SpellingPatches.Fuzzy.entries.flatMap { it.rules } + scheme.algebra()
+            for (syllable in DoublePinyinScheme.SYLLABLES) {
+                val odd = spellings(all, syllable).filterNot { it.matches(Regex("[a-z;]{2}")) }
+                assertTrue("${scheme.id} $syllable $odd", odd.isEmpty())
+            }
+        }
+    }
+
     @Test fun t9VersionTypesEachSyllableOnTwoDigitKeys() {
         val digits = mapOf("abc" to '2', "def" to '3', "ghi" to '4', "jkl" to '5', "mno" to '6', "pqrs" to '7', "tuv" to '8', "wxyz" to '9')
         fun t9(code: String) = code.map { c -> digits.entries.first { c in it.key }.value }.joinToString("")

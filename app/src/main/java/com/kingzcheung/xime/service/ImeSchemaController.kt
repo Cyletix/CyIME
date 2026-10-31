@@ -189,6 +189,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             val prefs = SettingsPreferences.getPrefsPublic(service)
             try {
                 KeysConfigHelper.loadConfig(service)
+                // 布局、双拼键位改过，方案的拼写规则就变了：模糊音补丁里抄的那份规则跟着重写，免得盖住新键位。
+                runCatching { com.kingzcheung.xime.settings.SpellingPatches.sync(service) }
+                    .onFailure { FileLogger.e(XimeInputMethodService.TAG, "Failed to sync spelling patches", it) }
                 check(RimeConfigHelper.ensureDeployment(service)) { "方案部署失败" }
                 val id = SettingsPreferences.getCurrentSchema(service)
                 check(service.rimeEngine.switchSchema(id)) { "无法恢复当前输入方案" }

@@ -175,14 +175,23 @@ private fun FuzzyPinyinSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(SpellingPatches.fuzzy(context)) }
+    var doublePinyin by remember { mutableStateOf(SpellingPatches.fuzzyDoublePinyin(context)) }
     Column(Modifier.settingsSearchAnchor("模糊音")) {
         SettingsSection(title = "模糊音", content = {
-            Text("仅用于中文全拼 26 键（含 QWJRTK 等字母排列和自建布局），九键、14 键、双拼不变。" +
-                "打开一组后两边的读音都能打出对方的字，候选会多一些近音字；改动后方案重新部署，要几秒。",
+            Text("用于中文全拼 26 键（含 QWJRTK 等字母排列和自建布局）；双拼 26 键要另外打开下面的「模糊音也用于双拼」。" +
+                "九键、14 键不变。打开一组后两边的读音都能打出对方的字，候选会多一些近音字；改动后方案重新部署，要几秒。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            SpellingPatches.Fuzzy.entries.forEachIndexed { index, item ->
-                if (index > 0) HorizontalDivider()
+            SettingsToggleItem(Icons.TwoTone.Hearing, "模糊音也用于双拼",
+                "下面打开的各组也用于双拼 26 键（小鹤、自然码、自定义双拼等），按读音算：打开 in 和 ing 后，" +
+                    "按 in 的双拼键也出 ing 的字。默认关，双拼照旧。",
+                checked = doublePinyin, onCheckedChange = { on ->
+                    SpellingPatches.setFuzzyDoublePinyin(context, on)
+                    doublePinyin = on
+                    scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
+                })
+            SpellingPatches.Fuzzy.entries.forEach { item ->
+                HorizontalDivider()
                 SettingsToggleItem(Icons.TwoTone.Hearing, item.title, item.example,
                     checked = item in enabled, onCheckedChange = { on ->
                         SpellingPatches.setFuzzy(context, item, on)

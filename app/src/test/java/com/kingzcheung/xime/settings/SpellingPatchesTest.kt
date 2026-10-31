@@ -67,6 +67,20 @@ class SpellingPatchesTest {
         assertEquals("", SpellingPatches.patch(patched, emptyList())!!.replace("patch:\n", ""))
     }
 
+    @Test fun doublePinyinFuzzyAndCorrectionShareOneBlock() {
+        val flypy = listOf("erase/^xx$/", "derive/^([jqxy])u$/\$1v/", "xform/ing$/Ⓚ/", "xlit/Ⓚ/k/")
+        val lines = SpellingPatches.fuzzyLines(flypy, setOf(SpellingPatches.Fuzzy.IN)) + "\"translator/enable_correction\": true"
+        val patched = SpellingPatches.patch("", lines)!!
+        assertEquals(SpellingPatches.Fuzzy.IN.rules + flypy, algebraIn(patched))
+        val root = SchemaManager.yaml.parseToYamlNode(patched) as YamlMap
+        val patch = root.entries.entries.single { it.key.content == "patch" }.value as YamlMap
+        assertEquals("true", (patch.entries.entries.single { it.key.content == "translator/enable_correction" }.value as YamlScalar).content)
+        // 关掉模糊音只留纠错：同一段整段换掉，不留旧规则。
+        val correctionOnly = SpellingPatches.patch(patched, listOf("\"translator/enable_correction\": true"))!!
+        assertFalse(correctionOnly.contains("speller/algebra"))
+        assertEquals(SpellingPatches.patch("", listOf("\"translator/enable_correction\": true")), correctionOnly)
+    }
+
     @Test fun anAndAngLeaveIanAndUanToTheirOwnGroups() {
         val toAn = Regex("(^|[^iu])ang$")
         val toAng = Regex("(^|[^iu])an$")
