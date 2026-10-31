@@ -114,6 +114,8 @@ fun KeyboardLayout(
     uiState: KeyboardUiState,
     isAsciiMode: Boolean,
     modifier: Modifier = Modifier,
+    /** 打字中的编码；只给「ing 放在 Shift 键上」判断 Shift 键要不要换成 ing。 */
+    candidateState: androidx.compose.runtime.State<com.kingzcheung.xime.service.CandidateState>? = null,
 ) {
     // 配置或方案变化时，行列与间距一起更新。
     val cfgVer by KeysConfigHelper.configVersion.collectAsState()
@@ -149,6 +151,16 @@ fun KeyboardLayout(
     val dpKeyHints = if (doublePinyin && !isAsciiMode && !fourteenKey &&
         LocalKeyboardInputPreferences.current.doublePinyinKeyHints) remember(uiState.currentSchemaId, cfgVer) {
         com.kingzcheung.xime.settings.DoublePinyinSchemes.find(uiState.currentSchemaId)?.let(::doublePinyinKeyHints)
+    } else null
+    // 「ing 放在 Shift 键上」（默认关）：第二排不补分号键（KeysConfigHelper.setSemicolonOnShift，KeyboardView 交给它），
+    // 微软双拼打了声母等韵母时，左下角的 Shift 键换成 ing（SemicolonShiftKey）。
+    val semicolonOnShift = LocalKeyboardInputPreferences.current.doublePinyinSemicolonOnShift
+    val schemeUsesSemicolon = remember(uiState.currentSchemaId, cfgVer) {
+        com.kingzcheung.xime.settings.DoublePinyinSchemes.find(uiState.currentSchemaId)?.usesSemicolon == true
+    }
+    val ingOnShift = if (semicolonOnShift && schemeUsesSemicolon && doublePinyin && !isAsciiMode && !fourteenKey &&
+        candidateState != null) remember(candidateState) {
+        androidx.compose.runtime.derivedStateOf { awaitsDoublePinyinFinal(candidateState.value.inputText) }
     } else null
     // 注音（大千）：11 列，下面三行 10 键缩进半键，没有 Shift，删除键在第四行末尾。
     val zhuyin = !isAsciiMode && uiState.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ZHUYIN
@@ -656,6 +668,17 @@ fun KeyboardLayout(
                                 .fillMaxHeight(),
                         ) {
                             CompositionLocalProvider(LocalHoneycombEdge provides if (honeycomb) HoneycombEdge.START else null) {
+                            val shiftSlot = Modifier.weight(letterSideKeyWeight)
+                            SemicolonShiftKey(
+                                ingActive = ingOnShift,
+                                onKeyPress = onKeyPress,
+                                backgroundColor = specialKeyBackgroundColor,
+                                textColor = specialKeyTextColor,
+                                modifier = shiftSlot,
+                                shadowEnabled = shadowEnabled,
+                                shadowElevation = shadowElevation,
+                                shadowShapeRadius = shadowShapeRadius,
+                            ) {
                             ShiftCapsKeyButton(
                                 viewModel = viewModel,
                                 shiftMode = shiftMode,
@@ -665,13 +688,13 @@ fun KeyboardLayout(
                                 iconColor = specialKeyTextColor,
                                 accentColor = KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme),
                                 panelColor = keyboardBackgroundColor,
-                                modifier = Modifier
-                                    .weight(letterSideKeyWeight)
+                                modifier = shiftSlot
                                     .fillMaxHeight(),
                                 shadowEnabled = shadowEnabled,
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
                             )
+                            }
                             }
 
                                 val bottomKeys = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }

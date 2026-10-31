@@ -279,6 +279,10 @@ fun KeyboardView(
     val opacityEditingState = remember(resizeActive) { mutableStateOf(false) }
     val resizeControlDensity = LocalDensity.current
     val inputPreferences = rememberKeyboardInputPreferences(state.isDarkTheme)
+    // 「ing 放在 Shift 键上」决定 26 键第二排补不补分号键；只由输入法自己的键盘交给 KeysConfigHelper（设置页的预览不改它）。
+    LaunchedEffect(inputPreferences.doublePinyinSemicolonOnShift) {
+        com.kingzcheung.xime.settings.KeysConfigHelper.setSemicolonOnShift(inputPreferences.doublePinyinSemicolonOnShift)
+    }
     // 分体中缝：服务提供同一份测量，触摸区与玻璃模糊也据此避开中缝。
     val splitKeyboardGap = LocalSplitKeyboardGap.current ?: remember { SplitKeyboardGap() }
     val splitGapPreview = remember(resizeActive) { mutableStateOf<Float?>(null) }

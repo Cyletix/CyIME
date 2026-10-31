@@ -748,9 +748,22 @@ object KeysConfigHelper {
             // Double pinyin and code tables type on the arrangement chosen for them (QWJRTK, Colemak, the user's own …); pinyin has none.
             val arranged = letterLayout(schemaId, false)
             val rows = arranged?.typingRows() ?: _zhRowsBase
-            _zhRows = if (DoublePinyinSchemes.find(schemaId)?.usesSemicolon == true) withSemicolonKey(rows) else rows
+            _zhRows = if (!semicolonOnShift && DoublePinyinSchemes.find(schemaId)?.usesSemicolon == true) withSemicolonKey(rows) else rows
             _keyGestureConfig.value = arranged?.gestures(_keyGestureConfigZhBase) ?: _keyGestureConfigZhBase
         }
+    }
+
+    /**
+     * 「ing 放在 Shift 键上」（默认关，[com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.doublePinyinSemicolonOnShift]）：
+     * 开着时不补第二排的分号键，L 留在最右边，分号由打字中的 Shift 键送出（KeyboardLayout）。
+     */
+    @Volatile private var semicolonOnShift = false
+
+    /** 开关变了就重排当前键盘；没变什么都不做。 */
+    fun setSemicolonOnShift(on: Boolean) {
+        if (semicolonOnShift == on) return
+        semicolonOnShift = on
+        applyLetterLayouts()
     }
 
     /**
@@ -840,6 +853,8 @@ object KeysConfigHelper {
         try {
             val customLayouts = CustomKeyboardLayouts.load(context)
             LetterLayouts.load(context)
+            semicolonOnShift = SettingsPreferences.getPrefsPublic(context).getBoolean(
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY, false)
             val symbolCustomText = readCustomText(context)
             symbolCustomZh = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty") } ?: emptyMap()
             symbolCustomEn = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty_en") } ?: emptyMap()

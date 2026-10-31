@@ -81,6 +81,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
         Column(Modifier.fillMaxSize().padding(padding).imePadding().settingsVerticalScroll()
             .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val current = draft
+            val keyboardPrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
             if (current == null) {
                 Text("在「语言与方案」的方案一栏切换双拼。内置方案可以复制后修改键位，保存为自己的方案；" +
                     "符号和词库与中文26键相同。在「语言与方案」点 QWJRTK、Colemak 或自己的字母布局，双拼也按那个排列打；" +
@@ -122,6 +123,18 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                             }
                                         })
                                 }
+                            }
+                            // ing 在分号上的方案（微软双拼）：ing 改放 Shift 键，多数手机输入法这样做；所有这类方案共用这一个开关。
+                            if (scheme.usesSemicolon) Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("ing 放在 Shift 键上", style = MaterialTheme.typography.bodyLarge)
+                                    Text("和多数手机输入法一样：不加分号键，L 在第二排最右边；打了声母后左下角的 Shift 键变成 ing",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Switch(keyboardPrefs.doublePinyinSemicolonOnShift, enabled = !busy, colors = settingsSwitchColors(),
+                                    modifier = Modifier.testTag("double-pinyin-semicolon-on-shift:${scheme.id}"),
+                                    onCheckedChange = { keyboardPrefs.copy(doublePinyinSemicolonOnShift = it).save(context) })
                             }
                             Row {
                                 if (custom) TextButton(onClick = { edit(scheme) }, enabled = !busy) { Text("编辑") }
