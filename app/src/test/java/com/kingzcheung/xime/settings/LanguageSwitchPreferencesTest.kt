@@ -55,6 +55,23 @@ class LanguageSwitchPreferencesTest {
         assertNull(LanguageSwitchPreferences.target(en, zh, options, listOf(en), setOf(en)))
     }
 
+    @Test fun specificChoicesListEveryNonEnglishLanguageNotOnlyChineseAndJapanese() {
+        val choices = LanguageSwitchPreferences.specificChoices(listOf(zh, en))
+        assertFalse(en in choices)
+        assertEquals(zh, choices.first())
+        assertEquals(InputLanguage.supported.filterNot { it == en }.toSet(), choices.toSet())
+        if (InputLanguage.SPANISH in InputLanguage.supported) assertTrue(InputLanguage.SPANISH in choices)
+    }
+
+    @Test fun specificSpanishAndEnglishSwitchesBothWays() {
+        val es = InputLanguage.SPANISH
+        val options = LanguageSwitchOptions(LanguageSwitchMode.SPECIFIC_ENGLISH, es)
+        val available = setOf(zh, en, es)
+        assertEquals(es, LanguageSwitchPreferences.target(zh, zh, options, listOf(zh, en, es), available))
+        assertEquals(en, LanguageSwitchPreferences.target(es, es, options, listOf(zh, en, es), available))
+        assertEquals(es, LanguageSwitchPreferences.target(en, zh, options, listOf(zh, en, es), available))
+    }
+
     @Test fun switchingLanguageDoesNotOverrideSelectedSchemeOrLayout() {
         val entries = listOf("rime_ice", "t9_pinyin", "japanese", "japanese_kana").map { SchemaInfo(it, it, "", "", "") }
         val options = LanguageSwitchOptions(LanguageSwitchMode.SPECIFIC_ENGLISH, ja)

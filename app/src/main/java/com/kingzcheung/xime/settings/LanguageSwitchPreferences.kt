@@ -30,6 +30,13 @@ internal object LanguageSwitchPreferences {
             .putString(LANGUAGE_KEY, options.language?.id).apply()
     }
 
+    /**
+     * 「指定语言与英文切换」列出的语言：每种已支持的非英文语言都列出（中文、日语、西班牙语……），按语言顺序，
+     * 没在顺序里的（未启用的）排在后面。哪些此刻能选由设置页按启用和方案就绪另外判断，不在这里漏掉语言。
+     */
+    fun specificChoices(order: List<InputLanguage>): List<InputLanguage> = (order + InputLanguage.supported).distinct()
+        .filter { it in InputLanguage.supported && it != InputLanguage.ENGLISH && it != InputLanguage.UNSPECIFIED }
+
     /** Hardware shortcuts have fixed meanings without changing the user's language-key choice. */
     fun forRequest(configured: LanguageSwitchOptions, overrideMode: LanguageSwitchMode?): LanguageSwitchOptions =
         overrideMode?.let { LanguageSwitchOptions(it) } ?: configured
