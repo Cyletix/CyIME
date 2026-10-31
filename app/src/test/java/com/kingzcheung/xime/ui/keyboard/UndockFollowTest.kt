@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -47,6 +49,8 @@ class UndockFollowTest {
     private var dx = 0f
     private var dy = 0f
     private var dragEnds = 0
+    /** 键盘内容（工具栏按钮）收到的点按。 */
+    private var taps = 0
     private val follow = KeyboardUndockFollow()
     /** 固定键盘这一层在把手之后（Main 轮由内往外）看到的触摸：落点和是否已被把手消费。只用于失败信息。 */
     private val seen = mutableListOf<String>()
@@ -76,7 +80,7 @@ class UndockFollowTest {
                                 offsetX = 0, offsetY = 0,
                                 onDrag = { x, y -> dx += x; dy += y }, onDragEnd = { dragEnds++ },
                                 onUndock = { floating = true },
-                            ) { Box(Modifier.fillMaxSize()) }
+                            ) { Box(Modifier.fillMaxSize().clickable { taps++ }) }
                         }
                     }
                 }
@@ -119,8 +123,20 @@ class UndockFollowTest {
         // 相对原来的悬浮位置（120..480 × 422..600）：右移 100dp，上移 285dp。
         val finger = start / density + Offset(100f, -250f)
         assertEquals(1, dragEnds)
+        assertEquals("pulling must not also click the toolbar under the handle", 0, taps)
         assertEquals(finger.x - 180f - 120f, dx, 1.5f)
         assertEquals(422f - (finger.y - UNDOCK_FOLLOW_GRAB_DP), dy, 1.5f)
+    }
+
+    /** 用户 10-31：把手一直画着像三星分屏把手，又压着工具栏按钮上沿点不动。平时不画，点按落到下面的按钮。 */
+    @Test fun theHandleIsHiddenAndATapThereReachesTheToolbar() {
+        show()
+        rule.onNodeWithTag("fixed-undock-indicator", useUnmergedTree = true).assertDoesNotExist()
+        val start = handleStart()
+        rule.onNodeWithTag("host").performTouchInput { click(start) }
+        rule.waitForIdle()
+        assertEquals(1, taps)
+        assertEquals(false, floating)
     }
 
     @Test fun aShortPullStaysDocked() {
