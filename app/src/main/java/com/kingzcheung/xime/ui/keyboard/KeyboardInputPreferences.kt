@@ -82,6 +82,8 @@ data class KeyboardInputPreferences(
     val qwertyPeriodKey: Boolean = true,
     /** 逗号键分词（默认关）：空格旁的标点键左下角放 '，打拼音时它和字母键角标里的 ' 都是分词，见 [syllableSplitActive]。 */
     val syllableSplitKey: Boolean = false,
+    /** Shift 键分词（默认关）：打拼音时点 Shift 插入 '，键面写「分词」；没在打拼音时照旧大小写。 */
+    val shiftSyllableSplit: Boolean = false,
     /** 各固定栏按位置保存的符号（每行一个位置）；未设置的沿用旧的共用列表。 */
     val sideSymbols: Map<String, String> = emptyMap(),
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
@@ -202,7 +204,7 @@ data class KeyboardInputPreferences(
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, SYMBOL_NAMES_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
+                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
@@ -243,6 +245,7 @@ data class KeyboardInputPreferences(
                 // 分不出是不是用户自己关的，所以只认新键；没有新键就是默认开。
                 qwertyPeriodKey = prefs.getBoolean("qwerty_period_key_v2", true),
                 syllableSplitKey = prefs.getBoolean("syllable_split_key", false),
+                shiftSyllableSplit = prefs.getBoolean("shift_syllable_split", false),
                 sideSymbols = SideSymbolTarget.entries.mapNotNull { target ->
                     prefs.getString(target.prefKey, null)?.let { target.key to it }
                 }.toMap(),
@@ -350,6 +353,7 @@ data class KeyboardInputPreferences(
             .putBoolean("qwerty_comma_key", qwertyCommaKey)
             .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)
             .putBoolean("syllable_split_key", syllableSplitKey)
+            .putBoolean("shift_syllable_split", shiftSyllableSplit)
             .putBoolean("qwerty_period_key", qwertyPeriodKey).apply()
     }
 
