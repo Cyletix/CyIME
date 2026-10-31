@@ -12,6 +12,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.theme.CyMotion
 import com.kingzcheung.xime.model.BuiltinModelCatalog
-import com.kingzcheung.xime.model.DeviceModelTier
 import com.kingzcheung.xime.model.FuzzyHabit
 import com.kingzcheung.xime.model.InputPlan
 import com.kingzcheung.xime.model.SetupAnswers
@@ -64,7 +65,7 @@ import kotlinx.coroutines.withContext
  * 过渡放慢到看得清（[CyMotion.GUIDE]），不靠小圆点或开关位置让人猜选了哪个。
  */
 @Composable
-fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit) {
+fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (() -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var facts by remember { mutableStateOf<SetupFacts?>(null) }
@@ -88,6 +89,7 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit) {
         facts = facts, plan = plan, removeIds = removeIds, allowMetered = allowMetered,
         applying = applying, result = result, firstRun = firstRun,
         hideDoublePinyin = hideDoublePinyin, onHideDoublePinyin = { hideDoublePinyin = it },
+        onOpenPerformance = onOpenPerformance,
         onAnswers = { answers = it },
         onToggleRemove = { id, on -> removeIds = if (on) removeIds + id else removeIds - id },
         onAllowMetered = { allowMetered = it },
@@ -125,6 +127,8 @@ internal fun SetupGuideContent(
     onDone: () -> Unit,
     hideDoublePinyin: Boolean = true,
     onHideDoublePinyin: (Boolean) -> Unit = {},
+    /** 首次设置时不给：先走完这一页。 */
+    onOpenPerformance: (() -> Unit)? = null,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -155,11 +159,11 @@ internal fun SetupGuideContent(
             if (facts == null || plan == null) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
             } else if (result != null) {
-                DeviceSection(facts)
+                DeviceSection(facts, onOpenPerformance)
                 ResultSection(result, onDone)
                 Spacer(Modifier.height(24.dp))
             } else {
-                DeviceSection(facts)
+                DeviceSection(facts, onOpenPerformance)
                 AnswerSection(facts, plan.answers, onAnswers)
                 InputSection(plan.input, hideDoublePinyin, onHideDoublePinyin)
                 KeepSection(plan.keep, facts.device)
@@ -208,15 +212,14 @@ private fun GuideCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun DeviceSection(facts: SetupFacts) {
+private fun DeviceSection(facts: SetupFacts, onOpenPerformance: (() -> Unit)?) {
     GuideHeading("这台${facts.device}")
     GuideCard {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(when (facts.tier) {
-                DeviceModelTier.ENHANCED -> "性能较强"
-                DeviceModelTier.STANDARD -> "性能中等"
-                DeviceModelTier.LIGHT -> "入门配置，优先省内存"
-            }, style = GuideText.optionTitle())
+            // 和「性能与省电」的“本机配置推荐”同一个判断、同一个叫法。
+            Text(tierNames.getValue(facts.performanceTier) +
+                if (facts.performanceTier == com.kingzcheung.xime.runtime.adaptation.PerformanceTier.LOW) "，优先省内存" else "",
+                style = GuideText.optionTitle())
             val hardware = buildList {
                 facts.memoryBytes?.let { add("内存 ${(it + SetupGuidePlanner.GIB / 2) / SetupGuidePlanner.GIB} GB") }
                 facts.cores?.let { add("$it 核") }
@@ -227,6 +230,20 @@ private fun DeviceSection(facts: SetupFacts) {
             facts.freeBytes?.let { FactLine("剩余空间 ${SetupGuidePlanner.gbText(it)}") }
             FactLine("网络 " + when { !facts.online -> "未联网"; facts.metered -> "移动数据"; else -> "Wi-Fi" })
             facts.language?.let { FactLine("系统语言 $it") }
+        }
+        onOpenPerformance?.let { open ->
+            GuideDivider()
+            Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).testTag("setup-open-performance")
+                .clickable(role = Role.Button, onClick = open).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("性能与省电", style = GuideText.optionTitle())
+                    Text("按键动效、炫光和语音模型常驻多久在那一页调，马上生效；这一页只管用哪些模型", style = GuideText.body(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(12.dp))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

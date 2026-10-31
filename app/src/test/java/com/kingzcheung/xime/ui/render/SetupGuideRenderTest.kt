@@ -68,7 +68,8 @@ class SetupGuideRenderTest {
             SpeechModelCatalog.XASR to 136 * mb, DeviceModelProfiles.BASE to 35 * mb, DeviceModelProfiles.SMALL to 19 * mb,
             BuiltinModelCatalog.SPEAKER_MODEL to 27 * mb, "ochwpro" to 7 * mb, CandidateModelCatalog.NGRAM to 203 * mb,
             CandidateModelCatalog.NGRAM_SMALL to 105 * mb)
-        return SetupFacts(DeviceModelTier.ENHANCED, memoryBytes = 8 * 1024 * mb, cores = 8, maxCpuKHz = 3_200_000,
+        return SetupFacts(DeviceModelTier.ENHANCED, performanceTier = com.kingzcheung.xime.runtime.adaptation.PerformanceTier.HIGH,
+            memoryBytes = 8 * 1024 * mb, cores = 8, maxCpuKHz = 3_200_000,
             soc = "Qualcomm SM8550", freeBytes = 45 * 1024 * mb, metered = true, language = "中文",
             installed = bundled.associateWith { sizes.getValue(it) }, inPackage = bundled, sizes = sizes,
             doublePinyinChoices = doublePinyins, shownDoublePinyin = doublePinyins.map { it.id }.toSet())
@@ -168,7 +169,7 @@ class SetupGuideRenderTest {
                     Box(Modifier.width(420.dp).fillMaxHeight()) {
                         SetupGuideContent(facts, plan, plan.remove.map { it.id }.toSet(), allowMetered = false, applying = false,
                             result = null, firstRun = true, onAnswers = {}, onToggleRemove = { _, _ -> }, onAllowMetered = {},
-                            onApply = {}, onSkip = {}, onDone = {})
+                            onApply = {}, onSkip = {}, onDone = {}, onOpenPerformance = {})
                     }
                     Spacer(Modifier.width(40.dp))
                     Box(Modifier.width(420.dp).fillMaxHeight()) {
