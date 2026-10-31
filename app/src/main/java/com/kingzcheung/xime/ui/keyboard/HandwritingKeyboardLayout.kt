@@ -54,6 +54,7 @@ import com.kingzcheung.xime.handwriting.rememberSPenInk
 import com.kingzcheung.xime.model.ModelDownloadState
 import com.kingzcheung.xime.model.ModelManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -232,6 +233,8 @@ fun HandwritingKeyboardLayout(
                         OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
                         else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true)
                     val segments = recognizer.recognize(points, gaps, predictFn = { seg, k ->
+                        // 接着落笔、删除或切走时这次识别已作废：下一段推理前就停，不再占着锁让下一个字排队
+                        ensureActive()
                         // 模板分数 (cos+1)/2 换回余弦，乱切的段明显更低，切分才分得开
                         HandwritingTemplates.recognize(context, script, seg, k, remember = false)
                             .map { (text, score) -> HandwritingCandidate(text, (2f * score - 1f).coerceAtLeast(0.0001f)) }
@@ -265,7 +268,8 @@ fun HandwritingKeyboardLayout(
                                 lettersApart = recognitionLanguage == InputLanguage.ENGLISH,
                                 letterCost = OverlappedHandwritingRecognizer.MODEL_LETTER_COST)).recognize(
                             points, gaps,
-                            predictFn = { seg, topK -> HandwritingEngine.predict(seg, topK, recognitionLanguage) },
+                            // 作废的识别在下一段推理前就停（见上），不会跑完整个切分再放锁
+                            predictFn = { seg, topK -> ensureActive(); HandwritingEngine.predict(seg, topK, recognitionLanguage) },
                         ).segments, startsWord)
                     }
                 }
