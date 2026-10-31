@@ -69,7 +69,7 @@ data class KeyboardInputPreferences(
     val fillBlankAreas: Boolean = false,
     /** 加宽按键：两侧留白和横向键缝变小，键帽更宽（默认关，见 [KeyVisualPolicy.widened]）。 */
     val wideKeys: Boolean = false,
-    /** 合并键均匀排布：自建合并键布局里合并键只比单字母键宽三分之一（默认关，见 [letterKeySpan]）。 */
+    /** 合并键均匀排布：14 键和自建合并键布局里合并键只比单字母键宽三分之一（默认关，见 [letterKeySpan]）。 */
     val evenMergedKeys: Boolean = false,
     /** 分体中缝比例（竖屏/横屏），null 为自动。 */
     val splitGapPortrait: Float? = null,

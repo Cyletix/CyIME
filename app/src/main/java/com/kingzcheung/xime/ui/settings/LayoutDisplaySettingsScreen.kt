@@ -169,8 +169,8 @@ private fun LayoutDisplayPage(
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val evenMerged = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().evenMergedKeys
                     SettingsToggleItem(Icons.TwoTone.ViewWeek, "合并键均匀排布",
-                        "自己排的合并键布局（如 17、18、20 键）里，合并键只比单字母键宽三分之一，单字母键跟着变宽，每排更匀，" +
-                            "小屏上好按。关闭时合并键严格占两个 26 键的位置。14 键和分体键盘不变。",
+                        "14 键和自己排的合并键布局（如 17、18、20 键）里，合并键只比单字母键宽三分之一，单字母键跟着变宽，" +
+                            "每排更匀，小屏上好按。关闭时合并键严格占两个 26 键的位置。分体键盘不变。",
                         checked = evenMerged, onCheckedChange = { SettingsPreferences.setEvenMergedKeysEnabled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingsItem(Icons.TwoTone.AspectRatio, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),

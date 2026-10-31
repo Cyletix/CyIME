@@ -52,7 +52,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 「合并键均匀排布」改前 / 改后：自建 18 键（参考图的 Q WE RT Y U IO P）和 20 键布局，手机竖屏 320dp、360dp 宽，
+ * 「合并键均匀排布」改前 / 改后：自建 18 键（参考图的 Q WE RT Y U IO P）、20 键布局和内置 14 键，手机竖屏 320dp、360dp 宽，
  * 键盘体高 232dp。列是 宽度-strict（严格对齐 26 键）/ 宽度-even（均匀排布）/ 宽度-even-rounder（再加大圆角）。
  * 每个主题组合一张总图。只在设了 CYIME_RENDER_OUT 时出图。
  */
@@ -69,6 +69,8 @@ class EvenMergedKeysRenderTest {
     private val layouts = listOf(
         Triple(eighteenId, "k18", "q,we,rt,y,u,io,p/a,sd,fg,h,jk,l/z,xc,v,bn,m"),
         Triple(twentyId, "k20", "q,we,r,t,yu,i,op/as,d,f,g,h,jk,l/z,x,cv,b,n,m"),
+        // 内置 14 键：不写进自建布局文件，用它自己的方案。
+        Triple("pinyin_14jian", "k14", ""),
     )
     /** 宽度、均匀排布、按键形状。 */
     private val columns = listOf(320, 360).flatMap { w ->
@@ -82,7 +84,7 @@ class EvenMergedKeysRenderTest {
         assumeTrue(!out.isNullOrEmpty())
         val app = ApplicationProvider.getApplicationContext<Application>()
         File(app.filesDir, "custom-keyboard-layouts.json").writeText(org.json.JSONArray().apply {
-            layouts.forEach { (id, name, rows) -> put(org.json.JSONObject().put("formatVersion", 2).put("id", id)
+            layouts.filter { it.third.isNotEmpty() }.forEach { (id, name, rows) -> put(org.json.JSONObject().put("formatVersion", 2).put("id", id)
                 .put("name", name).put("rows", rows).put("redVowels", false).put("redMoved", false)) }
         }.toString())
         CustomKeyboardLayouts.load(app)

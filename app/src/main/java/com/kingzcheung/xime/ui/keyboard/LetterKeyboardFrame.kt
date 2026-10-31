@@ -52,7 +52,16 @@ internal fun letterKeySpan(key: String, weighted: Boolean, evenMerged: Boolean =
     else -> key.length.toFloat()
 }
 
-/** 当前键盘是否按「合并键均匀排布」分键宽：只对自建/内置字母排列生效，14 键和分体键盘照旧严格对齐。 */
+/**
+ * 14 键大写、按住 Shift 拖动或按住符号键当 Ctrl 时，双字母键拆成两个单字母键（同 KeyboardLayout 的 renderRows）；
+ * 拆开的两半各占原合并键的一半，拆开前后每个字母的位置和宽度不变。严格对齐时两半各 1 份，与单字母键相同。
+ */
+internal fun splitPairSpans(pairedRow: List<String>, evenMerged: Boolean): List<Float> = pairedRow.flatMap { key ->
+    val span = letterKeySpan(key, true, evenMerged)
+    if (key.length == 2 && key.all { it.lowercaseChar() in 'a'..'z' }) listOf(span / 2, span / 2) else listOf(span)
+}
+
+/** 当前键盘是否按「合并键均匀排布」分键宽：自建/内置字母排列和 14 键生效，分体键盘照旧严格对齐。 */
 internal val LocalEvenMergedKeys = staticCompositionLocalOf { false }
 
 /** 14 键末尾单字母 m 从删除键借的宽度。无错位时删除键与 Shift 等宽，m 不借，与 26 键 m 对齐；
