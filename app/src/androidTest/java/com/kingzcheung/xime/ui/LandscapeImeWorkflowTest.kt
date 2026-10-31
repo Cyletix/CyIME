@@ -42,8 +42,12 @@ class LandscapeImeWorkflowTest {
             assertTrue(engine.switchSchema("t9_pinyin")); engine.setOption("ascii_mode", false)
             engine.setUserConfigBool("var/option/ascii_mode", false)
             SettingsPreferences.setCurrentSchema(context, "t9_pinyin")
+            // 横屏新装默认固定、不透明（用户 10-31）；本用例测横屏悬浮流程，自己开悬浮、设半透明。
             prefs.edit().remove("landscape_layout_v2").remove("keyboard_opacity_landscape")
-                .putBoolean("floating_mode_landscape", false).putInt("keyboard_height_dp_landscape", 60).commit()
+                .remove("floating_mode_landscape").putInt("keyboard_height_dp_landscape", 60).commit()
+            assertFalse(SettingsPreferences.isFloatingMode(context, true))
+            assertEquals(1f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
+            prefs.edit().putBoolean("floating_mode_landscape", true).putFloat("keyboard_opacity_landscape", 0.5f).commit()
             assertTrue(SettingsPreferences.isFloatingMode(context, true))
             assertEquals(0.5f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
             assertTrue(SettingsPreferences.getKeyboardHeightDp(context, true) >= 228)

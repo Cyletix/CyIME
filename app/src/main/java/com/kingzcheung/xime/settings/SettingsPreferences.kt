@@ -774,7 +774,6 @@ object SettingsPreferences {
     }
 
     fun getKeyboardHeightDp(context: Context, isLandscape: Boolean): Int {
-        if (isLandscape) ensureLandscapeDefaults(context)
         val key = if (isLandscape) KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE else KEY_KEYBOARD_HEIGHT_DP
         val alt = if (isLandscape) KEY_KEYBOARD_HEIGHT_DP else KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE
         val stored = getPrefs(context).getInt(key, -1)
@@ -831,17 +830,11 @@ object SettingsPreferences {
     private const val KEY_FLOATING_WIDTH_DP_LANDSCAPE = "floating_width_dp_landscape"
     private const val KEY_KEYBOARD_OPACITY = "keyboard_opacity"
 
-    private fun ensureLandscapeDefaults(context: Context) {
-        val prefs = getPrefs(context)
-        if (!prefs.getBoolean("landscape_layout_v2", false)) prefs.edit()
-            .putBoolean("landscape_layout_v2", true).putBoolean(KEY_FLOATING_MODE_LANDSCAPE, true)
-            .putFloat("keyboard_opacity_landscape", 0.5f).apply()
-    }
-
     fun getKeyboardOpacity(context: Context): Float {
         val landscape = context.resources.configuration.screenWidthDp > context.resources.configuration.screenHeightDp
-        if (landscape) ensureLandscapeDefaults(context)
-        return getPrefs(context).getFloat(if (landscape) "keyboard_opacity_landscape" else KEY_KEYBOARD_OPACITY, if (landscape) 0.5f else 1f).coerceIn(0.3f, 1f)
+        // 横屏新装和竖屏一样固定、不透明（用户 10-31）。早先版本第一次横屏时写入了半透明悬浮（landscape_layout_v2），
+        // 写过的人保留原值；没写过的按这里的默认。
+        return getPrefs(context).getFloat(if (landscape) "keyboard_opacity_landscape" else KEY_KEYBOARD_OPACITY, 1f).coerceIn(0.3f, 1f)
     }
 
     fun setKeyboardOpacity(context: Context, opacity: Float) {
@@ -850,7 +843,6 @@ object SettingsPreferences {
     }
 
     fun isFloatingMode(context: Context, isLandscape: Boolean = false): Boolean {
-        if (isLandscape) ensureLandscapeDefaults(context)
         val key = if (isLandscape) KEY_FLOATING_MODE_LANDSCAPE else KEY_FLOATING_MODE
         return getPrefs(context).getBoolean(key, false)
     }
