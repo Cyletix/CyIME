@@ -312,7 +312,7 @@ fun SmartPredictionSettingsContent(
                     SettingsToggleItem(
                         icon = Icons.TwoTone.VisibilityOff,
                         title = "无痕模式",
-                        subtitle = "打字不学新词和选词顺序，复制的内容不进剪贴板记录、不同步；密码框始终自动无痕",
+                        subtitle = "打字不学新词和选词顺序；复制的内容不记进键盘剪贴板、不同步，系统的复制粘贴照常能用；密码框始终自动无痕",
                         checked = toggles.incognito,
                         onCheckedChange = { SettingsPreferences.setIncognito(context, it) }
                     )

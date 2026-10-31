@@ -60,6 +60,10 @@ class ClipboardManager private constructor(private val context: Context) {
         /** 候选栏只在短信到达后的 3 分钟内提示验证码；之后仍可从系统剪贴板粘贴，直到 10 分钟清掉。 */
         internal const val SMS_CODE_SUGGESTION_MS = 3 * 60_000L
 
+        /** 开着无痕时第一次复制的提示（剪贴板面板顶上另有一行同样意思的说明）。 */
+        internal const val INCOGNITO_COPY_NOTICE =
+            "无痕模式开着：复制的内容不记进键盘剪贴板，粘贴照常能用。在键盘菜单点「无痕」可以关掉"
+
         /** The candidate-bar pill shows a code only shortly after the SMS arrived. */
         internal fun smsCodeSuggested(timestamp: Long, now: Long): Boolean =
             now - timestamp < SMS_CODE_SUGGESTION_MS
@@ -88,6 +92,31 @@ class ClipboardManager private constructor(private val context: Context) {
         readClipboard()
     }
 
+    /** 这次开着无痕后已经提示过「复制的内容没记进来」；无痕开关一变就重新算。 */
+    @Volatile private var incognitoCopyNoticed = false
+    private val incognitoSwitchListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == com.kingzcheung.xime.settings.SettingsPreferences.KEY_INCOGNITO) incognitoCopyNoticed = false
+    }
+
+    init {
+        com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context)
+            .registerOnSharedPreferenceChangeListener(incognitoSwitchListener)
+    }
+
+    /**
+     * 好多人开了无痕以为复制坏了（用户 10-31）：无痕只是不记进键盘剪贴板、不同步，系统复制粘贴照常。
+     * 开着无痕后第一次复制时提示一次，不每次都弹。
+     */
+    private fun noticeIncognitoCopy() {
+        if (incognitoCopyNoticed) return
+        incognitoCopyNoticed = true
+        Handler(Looper.getMainLooper()).post {
+            runCatching {
+                android.widget.Toast.makeText(context, INCOGNITO_COPY_NOTICE, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun readClipboard(retries: Int = 3) {
         try {
             val clipData = androidClipboardManager.primaryClip
@@ -96,12 +125,18 @@ class ClipboardManager private constructor(private val context: Context) {
                 // 系统标记为敏感（如密码管理器复制的密码）或无痕中：不进入历史、图片预览与同步。
                 val clipKey = PrivateClipMemory.key(clipData.description.timestamp,
                     item.text ?: item.uri?.toString() ?: item.intent?.toUri(0))
-                val privateNow = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
-                    com.kingzcheung.xime.settings.IncognitoState.active ||
-                    com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(context)
+                val sensitive = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true
+                val manualIncognito = com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(context)
+                val privateNow = sensitive || com.kingzcheung.xime.settings.IncognitoState.active || manualIncognito
+                // 手动无痕挡下的一次新复制（不是密码、不是本来就私密的那条）：第一次提示为什么没记进来。
+                val incognitoCopy = manualIncognito && !sensitive && clipKey !in privateClips &&
+                    clipData.description.label != INTERNAL_IMAGE_CLIP_LABEL &&
+                    clipData.description.label != VerificationCodeSmsReceiver.CLIP_LABEL &&
+                    clipData.description.label != RECEIVED_CLIP_LABEL
                 // A clip copied in a password field (or incognito) stays private: re-reading it within
                 // the next 30 s from a normal field once saved it to history.
                 if (privateNow) privateClips.remember(clipKey)
+                if (incognitoCopy) noticeIncognitoCopy()
                 val private = privateNow || clipKey in privateClips
                 val imageMime = (0 until clipData.description.mimeTypeCount).map { clipData.description.getMimeType(it) }
                     .firstOrNull { it.startsWith("image/") }
