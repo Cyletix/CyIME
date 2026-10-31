@@ -196,6 +196,12 @@ object SettingsPreferences {
         val toolbar = getToolbarButtons(context)
         restoreFullShapeMenuItemOnce(context, toolbar)
         insertMenuItemOnce(context, toolbar, com.kingzcheung.xime.keyboard.ToolbarButton.CAPTION.id, KEY_CAPTION_MENU_INSERTED)
+        // 悬浮、简繁：放在全角/半角后面（不在菜单里就放在“排列”前），与新装默认菜单同一位置。
+        var after = com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE.id
+        com.kingzcheung.xime.keyboard.QuickActionLayout.MENU_TOGGLES_1031.forEach {
+            insertMenuItemOnce(context, toolbar, it.id, "quick_actions_${it.id}_inserted", after)
+            after = it.id
+        }
         com.kingzcheung.xime.keyboard.ToolbarButton.LAYOUT_GESTURES.forEach {
             insertMenuItemOnce(context, toolbar, it.id, "quick_actions_${it.id}_inserted")
         }
@@ -219,7 +225,8 @@ object SettingsPreferences {
             val menu = raw.split(",").filter { it.isNotEmpty() }
             if (id !in menu) {
                 val arrange = com.kingzcheung.xime.keyboard.ToolbarButton.ARRANGE.id
-                val at = menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
+                val at = after?.let { menu.indexOf(it) }?.takeIf { it >= 0 }?.plus(1)
+                    ?: menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
                 editor.putString(KEY_MENU_BUTTONS, (menu.take(at) + id + menu.drop(at)).joinToString(","))
             }
         }
@@ -227,8 +234,11 @@ object SettingsPreferences {
     }
     private const val KEY_FULL_SHAPE_MENU_RESTORED = "quick_actions_full_shape_restored"
 
-    /** A new built-in entry joins an already saved menu once (before 排列); removing it later is kept. */
-    private fun insertMenuItemOnce(context: Context, toolbar: List<String>, id: String, flagKey: String) {
+    /**
+     * A new built-in entry joins an already saved menu once, right after [after] when that is in
+     * the menu, otherwise before 排列; removing it later is kept.
+     */
+    private fun insertMenuItemOnce(context: Context, toolbar: List<String>, id: String, flagKey: String, after: String? = null) {
         val prefs = getPrefs(context)
         if (prefs.getBoolean(flagKey, false)) return
         val raw = prefs.getString(KEY_MENU_BUTTONS, null)
