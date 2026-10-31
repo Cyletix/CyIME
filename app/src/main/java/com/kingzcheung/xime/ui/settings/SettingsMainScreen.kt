@@ -214,7 +214,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.Tune,
                         title = "按设备推荐配置",
-                        subtitle = "看设备性能和空间，推荐语音、九键、联想用哪些模型，删掉用不到的",
+                        subtitle = "问打字习惯、看设备性能和空间，设好全拼、双拼或五笔，推荐语音、九键、联想用哪些模型，删掉用不到的",
                         onClick = { onNavigateToRoute(SettingsRoutes.SetupGuide) },
                         showArrow = true
                     )

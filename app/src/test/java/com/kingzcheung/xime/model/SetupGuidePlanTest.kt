@@ -141,4 +141,68 @@ class SetupGuidePlanTest {
             SetupAnswers(VoiceUse.OFTEN, t9 = false, caption = false))
         assertTrue(light.notes.toString(), light.notes.any { "这台平板" in it })
     }
+
+    private val doublePinyins = listOf("double_pinyin_flypy" to "小鹤双拼", "double_pinyin_shoudao" to "首道双拼",
+        "double_pinyin_ziranma" to "自然码", "double_pinyin_znabc" to "智能ABC双拼", "double_pinyin_jiajia" to "拼音加加",
+        "double_pinyin_microsoft" to "微软双拼").map { (id, name) -> DoublePinyinChoice(id, name, "xx'xx") }
+    /** 新装：全拼 26 键，六种内置双拼都在方案栏里，没开模糊音。 */
+    private fun typingFacts() = facts(DeviceModelTier.ENHANCED).copy(doublePinyinChoices = doublePinyins,
+        shownDoublePinyin = doublePinyins.map { it.id }.toSet())
+
+    @Test fun keepingEveryAnswerChangesNoInputSetting() {
+        val f = typingFacts().copy(fuzzy = setOf("z_zh"))
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input
+        assertNull(input.switchTo)
+        assertTrue(input.fuzzyOn.isEmpty() && input.fuzzyOff.isEmpty())
+        assertFalse(input.downloadWubi)
+        assertEquals(listOf("打字方式还是全拼，不变。"), input.lines)
+        // 全拼的人方案栏里用不到双拼：推荐藏起来，页面上是一个默认打开的开关。
+        assertEquals(doublePinyins.map { it.id }, input.hideDoublePinyin)
+    }
+
+    @Test fun choosingADoublePinyinSwitchesToItAndHidesTheOthers() {
+        val f = typingFacts()
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN,
+            doublePinyin = "double_pinyin_ziranma")).input
+        assertEquals("double_pinyin_ziranma", input.switchTo)
+        assertEquals("double_pinyin_ziranma", input.showDoublePinyin)
+        assertEquals(doublePinyins.map { it.id } - "double_pinyin_ziranma", input.hideDoublePinyin)
+        assertTrue(input.lines.toString(), "中文 26 键改用自然码。" in input.lines)
+        assertTrue(input.hideLine!!.startsWith("方案栏里藏起用不到的 5 种双拼：小鹤双拼、首道双拼、智能ABC双拼"))
+    }
+
+    @Test fun onNineKeysTheSchemeIsShownButNotSwitched() {
+        val f = typingFacts().copy(onLetterKeyboard = false, usesT9 = true)
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.WUBI)).input
+        assertNull(input.switchTo)
+        assertTrue(input.useWubi && input.downloadWubi)
+        assertTrue(input.lines.toString(), input.lines.any { it.startsWith("方案栏里打开五笔86") })
+        // 已经在用五笔（如五笔98）就不装、不切。
+        val wubi = typingFacts().copy(typing = TypingWay.WUBI)
+        val same = SetupGuidePlanner.plan(wubi, SetupGuidePlanner.suggest(wubi)).input
+        assertFalse(same.useWubi || same.downloadWubi)
+        assertNull(same.switchTo)
+    }
+
+    @Test fun fuzzyOnlyChangesTheGroupsWhoseAnswerChanged() {
+        // 现在开着 z/zh 和 r/l：选平翘舌＋n/l → 只加 n/l，不把 c/ch、s/sh 也补上，r/l 不在向导里，不动。
+        val f = typingFacts().copy(fuzzy = setOf("z_zh", "r_l"))
+        val more = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(fuzzy = setOf(FuzzyHabit.RETROFLEX, FuzzyHabit.NL))).input
+        assertEquals(setOf("n_l"), more.fuzzyOn)
+        assertTrue(more.fuzzyOff.isEmpty())
+        val none = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(fuzzy = emptySet())).input
+        assertEquals(setOf("z_zh"), none.fuzzyOff)
+        // 双拼、五笔不用模糊音：不改。
+        val double = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN, fuzzy = emptySet())).input
+        assertTrue(double.fuzzyOn.isEmpty() && double.fuzzyOff.isEmpty())
+    }
+
+    @Test fun otherInputWaysAreKeptAsTheyAre() {
+        val f = typingFacts().copy(typing = TypingWay.KEEP, typingName = "仓颉", onLetterKeyboard = false)
+        assertEquals(TypingWay.KEEP, SetupGuidePlanner.suggest(f).typing)
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input
+        assertNull(input.switchTo)
+        assertTrue(input.hideDoublePinyin.isEmpty())
+        assertTrue(input.lines.isEmpty())
+    }
 }

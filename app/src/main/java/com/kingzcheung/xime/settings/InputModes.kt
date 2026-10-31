@@ -117,9 +117,11 @@ object InputModes {
     }
 
     /** Explicit product choice; passive session persistence must not overwrite this selection. */
-    fun selectProfile(context: Context, entry: SchemaInfo) {
+    fun selectProfile(context: Context, entry: SchemaInfo) = selectProfile(context, entry.schemaId, entry.profile.language)
+
+    fun selectProfile(context: Context, schemaId: String, language: InputLanguage = languageOf(schemaId)) {
         SettingsPreferences.getPrefsPublic(context).edit()
-            .putString("selected_input_profile_${entry.profile.language.id}", entry.schemaId).apply()
+            .putString("selected_input_profile_${language.id}", schemaId).apply()
     }
 
     fun rememberMode(context: Context, schemaId: String, language: InputLanguage = languageOf(schemaId)) {

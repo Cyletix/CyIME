@@ -5,6 +5,24 @@ import com.kingzcheung.xime.speech.SpeechModelCatalog
 /** 语音输入打算怎么用：向导里的三个选项，说法面向不懂模型名的人。 */
 enum class VoiceUse { OFTEN, SOMETIMES, NEVER }
 
+/** 打中文的方式。[KEEP] 只在现在用的是别的方式（仓颉、注音、笔画等）时出现，表示不改。 */
+enum class TypingWay { FULL_PINYIN, DOUBLE_PINYIN, WUBI, KEEP }
+
+/**
+ * 常见的分不清的读音，一项对应模糊音设置里的一组或几组（[SpellingPatches.Fuzzy] 的 id）。
+ * r 和 l 不常见，不在这里问，向导不动它。
+ */
+enum class FuzzyHabit(val title: String, val example: String, val fuzzyIds: List<String>) {
+    RETROFLEX("平翘舌：z 和 zh、c 和 ch、s 和 sh", "zi 也出“知”，si 也出“是”", listOf("z_zh", "c_ch", "s_sh")),
+    NL("n 和 l", "nan 也出“蓝”，lan 也出“南”", listOf("n_l")),
+    NASAL("前后鼻音：an 和 ang、en 和 eng、in 和 ing", "fan 也出“方”，xin 也出“星”",
+        listOf("an_ang", "en_eng", "in_ing", "ian_iang", "uan_uang")),
+    FH("f 和 h", "fu 也出“湖”，hu 也出“福”", listOf("f_h")),
+}
+
+/** 一种可选的双拼：[example] 是“双拼”两个字的打法，如 ul'pb。 */
+data class DoublePinyinChoice(val id: String, val name: String, val example: String, val builtin: Boolean = true)
+
 /** 一台设备在向导眼里的样子；大小都是字节，读不到的为 null。 */
 data class SetupFacts(
     val tier: DeviceModelTier,
@@ -35,9 +53,56 @@ data class SetupFacts(
     val inPackage: Set<String> = emptySet(),
     /** 各模型下载（或从安装包取出）后的大小。 */
     val sizes: Map<String, Long> = emptyMap(),
+    /** 现在打中文的方式；九键拼音算全拼，九键、14 键双拼算双拼。 */
+    val typing: TypingWay = TypingWay.FULL_PINYIN,
+    /** [typing] 是 [TypingWay.KEEP] 时现在那种方式的名字（如“仓颉”）。 */
+    val typingName: String = "",
+    /** 现在用的双拼（26 键那个方案的 id）；没在用双拼时为 null。 */
+    val doublePinyin: String? = null,
+    /** 现在是不是中文 26 键（含 QWJRTK 等字母排列）：只有这时才替人切换方案，九键、14 键、手写不动。 */
+    val onLetterKeyboard: Boolean = true,
+    /** 方案栏里显示着的内置双拼（26 键）。 */
+    val shownDoublePinyin: Set<String> = emptySet(),
+    /** 能选的双拼：内置的在前，自己建的在后。 */
+    val doublePinyinChoices: List<DoublePinyinChoice> = emptyList(),
+    /** 五笔86 已经装在手机上。 */
+    val wubiInstalled: Boolean = false,
+    /** 已打开的模糊音（[SpellingPatches.Fuzzy] 的 id）。 */
+    val fuzzy: Set<String> = emptySet(),
 )
 
-data class SetupAnswers(val voice: VoiceUse, val t9: Boolean, val caption: Boolean)
+data class SetupAnswers(
+    val voice: VoiceUse,
+    val t9: Boolean,
+    val caption: Boolean,
+    val typing: TypingWay = TypingWay.FULL_PINYIN,
+    /** 选双拼时用哪一种。 */
+    val doublePinyin: String = FLYPY,
+    /** 全拼时分不清的读音（打开模糊音）。 */
+    val fuzzy: Set<FuzzyHabit> = emptySet(),
+) {
+    companion object { const val FLYPY = "double_pinyin_flypy" }
+}
+
+/**
+ * 打字方式这一块要改什么。全是“和现在不一样才改”：回答没变的项不动，不会把用户细调过的设置冲掉。
+ * [lines] 是给人看的每一项改动，[hideLine] 是“方案栏里隐藏用不到的双拼”那一行（页面上单独一个开关）。
+ */
+data class InputPlan(
+    /** 设成当前方案；null 不切。 */
+    val switchTo: String? = null,
+    /** 要在方案栏打开的双拼。 */
+    val showDoublePinyin: String? = null,
+    /** 可以从方案栏隐藏的内置双拼。 */
+    val hideDoublePinyin: List<String> = emptyList(),
+    /** 打字方式选了五笔：没装就下载，没在方案栏就打开。 */
+    val useWubi: Boolean = false,
+    val downloadWubi: Boolean = false,
+    val fuzzyOn: Set<String> = emptySet(),
+    val fuzzyOff: Set<String> = emptySet(),
+    val lines: List<String> = emptyList(),
+    val hideLine: String? = null,
+)
 
 enum class SetupSource { ON_PHONE, IN_PACKAGE, DOWNLOAD }
 
@@ -64,6 +129,7 @@ data class SetupPlan(
     /** 建议删掉的：已经在手机上的，或安装包里带着、还没解压出来的。 */
     val remove: List<SetupItem>,
     val notes: List<String>,
+    val input: InputPlan = InputPlan(),
 ) {
     val downloadBytes: Long get() = keep.filter { it.source == SetupSource.DOWNLOAD }.sumOf { it.bytes }
     val freedBytes: Long get() = remove.filter { it.source == SetupSource.ON_PHONE }.sumOf { it.bytes }
@@ -118,7 +184,72 @@ object SetupGuidePlanner {
         },
         t9 = facts.usesT9,
         caption = facts.usesCaption,
+        typing = facts.typing,
+        doublePinyin = facts.doublePinyin ?: facts.doublePinyinChoices.firstOrNull()?.id ?: SetupAnswers.FLYPY,
+        fuzzy = FuzzyHabit.entries.filterTo(linkedSetOf()) { habit -> habit.fuzzyIds.any { it in facts.fuzzy } },
     )
+
+    /** 五笔86 的方案 id（「扩展 › 方案」里审过的那份，约 2 MB）。 */
+    const val WUBI = "wubi86"
+    const val FULL_PINYIN = "rime_ice"
+
+    fun inputPlan(facts: SetupFacts, answers: SetupAnswers): InputPlan {
+        val lines = mutableListOf<String>()
+        val typing = answers.typing
+        val choice = facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }
+        val target = when (typing) {
+            TypingWay.FULL_PINYIN -> FULL_PINYIN
+            TypingWay.DOUBLE_PINYIN -> answers.doublePinyin
+            TypingWay.WUBI -> WUBI
+            TypingWay.KEEP -> null
+        }
+        val current = when (facts.typing) {
+            TypingWay.DOUBLE_PINYIN -> facts.doublePinyin
+            TypingWay.FULL_PINYIN -> FULL_PINYIN
+            TypingWay.WUBI -> WUBI
+            TypingWay.KEEP -> null
+        }
+        val name = when (typing) {
+            TypingWay.FULL_PINYIN -> "全拼"
+            TypingWay.DOUBLE_PINYIN -> choice?.name ?: "双拼"
+            TypingWay.WUBI -> "五笔86"
+            TypingWay.KEEP -> facts.typingName
+        }
+        val changed = target != null && target != current
+        // 已经显示着时再打开一次什么也不改（DoublePinyinSchemes.setEnabled 内容没变不写）。
+        val showDoublePinyin = answers.doublePinyin.takeIf { typing == TypingWay.DOUBLE_PINYIN }
+        // 已经在用五笔（86、98 或五笔拼音）就不动；从别的方式改成五笔才装、才打开五笔86。
+        val useWubi = typing == TypingWay.WUBI && facts.typing != TypingWay.WUBI
+        val downloadWubi = useWubi && !facts.wubiInstalled
+        if (downloadWubi) lines += "下载五笔86方案（约 2 MB，要联网），装好后在方案栏里打开。"
+        val switchTo = target.takeIf { changed && facts.onLetterKeyboard }
+        when {
+            switchTo != null -> lines += "中文 26 键改用$name。"
+            // 全拼（雾凇）一直在方案栏里，不在 26 键上时没有要改的。
+            changed && typing != TypingWay.FULL_PINYIN -> lines += "方案栏里打开$name，在键盘上切到中文 26 键就能用；现在的九键、14 键或手写不变。"
+            !changed && target != null -> lines += "打字方式还是$name，不变。"
+        }
+        // 方案栏只留用得到的：内置双拼里除了选中的那种都可以藏起来，自己建的双拼不动。
+        val hide = if (typing == TypingWay.KEEP) emptyList()
+            else facts.shownDoublePinyin.filter { it != showDoublePinyin }
+                .sortedBy { id -> facts.doublePinyinChoices.indexOfFirst { it.id == id } }
+        val hideLine = if (hide.isEmpty()) null else {
+            val names = hide.map { id -> facts.doublePinyinChoices.firstOrNull { it.id == id }?.name ?: id }
+            "方案栏里藏起用不到的 ${hide.size} 种双拼：${names.joinToString("、")}。以后想用，在 设置 → 双拼 里再打开。"
+        }
+
+        // 模糊音只对全拼 26 键起作用；只改回答和现在不一样的那几项。
+        val fuzzyOn = mutableSetOf<String>()
+        val fuzzyOff = mutableSetOf<String>()
+        if (typing == TypingWay.FULL_PINYIN) for (habit in FuzzyHabit.entries) {
+            val now = habit.fuzzyIds.any { it in facts.fuzzy }
+            val wanted = habit in answers.fuzzy
+            if (wanted && !now) { fuzzyOn += habit.fuzzyIds; lines += "打开模糊音：${habit.title}。" }
+            if (!wanted && now) { fuzzyOff += habit.fuzzyIds.filter { it in facts.fuzzy }; lines += "关掉模糊音：${habit.title}。" }
+        }
+        return InputPlan(switchTo, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
+            lines, hideLine)
+    }
 
     fun plan(facts: SetupFacts, answers: SetupAnswers): SetupPlan {
         val free = facts.freeBytes
@@ -216,7 +347,8 @@ object SetupGuidePlanner {
             streaming -> SpeechModelCatalog.TWO_PASS
             else -> SpeechModelCatalog.SENSEVOICE
         }
-        return SetupPlan(answers, answers.voice != VoiceUse.NEVER, voiceMode, prediction, t9Model, keep, remove, notes)
+        return SetupPlan(answers, answers.voice != VoiceUse.NEVER, voiceMode, prediction, t9Model, keep, remove, notes,
+            inputPlan(facts, answers))
     }
 
     private fun keepReason(id: String, facts: SetupFacts, answers: SetupAnswers, streaming: Boolean): String = when (id) {
