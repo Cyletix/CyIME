@@ -340,6 +340,11 @@ class FeedbackManager(private val context: Context) {
         }
 
         val light = keyUp || hfc == HapticFeedbackConstants.TEXT_HANDLE_MOVE
+
+        // RichTap HD 优先；失败时继续走原来的系统链路。
+        // 第一版只在「启用」模式下使用，避免改变「跟随系统」的厂商默认调校。
+        if (custom && RichTapKeyHaptics.play(type, amplitude, longPress, keyUp)) return
+
         if (prefersSystemHaptic(samsungTuned, custom, duration, amplitude, primitivesSupported, systemEnabled)) {
             view.performHapticFeedback(hfc, systemHapticFlags())
             return
@@ -454,6 +459,10 @@ class FeedbackManager(private val context: Context) {
         if (!vibrator.hasVibrator()) return
         val custom = hapticMode == HapticMode.Enabled
         val pressAmp = if (custom) pressAmplitude else 0
+
+        // RichTap HD 优先；失败时继续走原来的系统链路。
+        if (custom && RichTapKeyHaptics.play(KeyFeedbackType.TOOLBAR, pressAmp)) return
+
         if (vibratePrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, pressAmp)) return
         if (!samsungTuned && pressAmp == 0 && !(custom && pressDuration != 0L) &&
             vibratePredefined(VibrationEffect.EFFECT_CLICK)) return
