@@ -111,6 +111,16 @@ class HandwritingPinyinRenderTest {
         assertEquals(1, shown("dī"))
     }
 
+    // 「自动」在手机宽度（392dp，不到 480dp）会藏起打字候选的注释，手写的读音照样显示（用户 10-31：25 版手写看不到拼音）。
+    @Test fun autoCommentsStillShowHandwritingReadingsOnPhoneWidth() {
+        SettingsPreferences.setCandidateCommentMode(context(), CandidateCommentMode.AUTO)
+        KeyboardThemes.initFromConfig(context())
+        rule.setContent { Bar() }
+        rule.waitForIdle()
+        assertTrue(shown("dí") >= 1)
+        assertEquals(1, shown("xíng/háng"))
+    }
+
     @Test fun hiddenCommentsHideHandwritingReadings() {
         SettingsPreferences.setCandidateCommentMode(context(), CandidateCommentMode.HIDE)
         KeyboardThemes.initFromConfig(context())

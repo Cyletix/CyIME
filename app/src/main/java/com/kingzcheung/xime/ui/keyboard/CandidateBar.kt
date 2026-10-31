@@ -124,6 +124,7 @@ import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.PanelType
 import com.kingzcheung.xime.keyboard.ToolbarAction
+import com.kingzcheung.xime.settings.CandidateCommentMode
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.speech.RecognitionState
 
@@ -258,7 +259,11 @@ fun CandidateBar(
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     // 设置「联想时关闭键放右边」：上屏后的联想不在第一个联想词旁边放「<」，改在右边放 ⊗（同一个动作）。
     val associationCancelRight = showCompositionCancel && associationCancelOnRight && state is CandidateBarState.AssociationOnly
-    val commentsAllowed = rememberCandidateCommentsAllowed()
+    // 手写候选的注释是读音，单字也放得下：「自动」在手写里照样显示，只有「隐藏」才不显示
+    // （用户 10-31：手机竖屏「自动」把手写读音藏掉了，忘了读音的字正要靠它）。
+    val commentsAllowed = rememberCandidateCommentsAllowed().let {
+        if (it == CandidateCommentMode.AUTO && page is KeyboardPage.Main && page.type == MainType.HANDWRITING) CandidateCommentMode.SHOW else it
+    }
     // 终端里编码一律显示在候选栏（见 TerminalEditor）。
     val inputTextLocation = com.kingzcheung.xime.service.TerminalEditor.inputTextLocation(context)
     val showInputBoxStyle = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX
@@ -516,6 +521,7 @@ fun CandidateBar(
                     visuals = protectedVisuals, callbacks = callbacks,
                     fontSize = candidateTextSize.sp,
                     modifier = Modifier.weight(1f),
+                    commentMode = commentsAllowed,
                     highlightIndex = (state as? CandidateBarState.ChineseCandidates)?.highlightIndex ?: 0,
                     showNumberLabels = showNumberLabels,
                     gapWindowX = splitGapX,
@@ -1251,12 +1257,14 @@ internal fun FixedCandidateStrip(
     scrollKey: Any? = null,
     /** 每个候选左右的留白，见 [rememberCandidateItemPadding]。 */
     itemPadding: androidx.compose.ui.unit.Dp = CANDIDATE_ITEM_PADDING,
+    /** 候选栏已按页面定好的注释显示方式（手写里「自动」按显示）；不传就按设置。 */
+    commentMode: CandidateCommentMode? = null,
 ) {
     val measurer = rememberTextMeasurer()
     var stripOriginX by remember { mutableStateOf(Float.NaN) }
     val density = LocalDensity.current
     val inheritedTextStyle = LocalTextStyle.current
-    val commentsAllowed = rememberCandidateCommentsAllowed()
+    val commentsAllowed = rememberCandidateCommentsAllowed().let { commentMode ?: it }
     // 选中底色由整条统一画，换选中的候选时从旧候选滑到新候选（用户 10-21 选 1）；
     // 候选一变（打字、翻页）就直接落到新位置，打字时什么都不动。
     var stripRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
