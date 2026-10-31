@@ -11,7 +11,7 @@ enum class SideSymbolTarget(val key: String, val label: String, val where: Strin
     STROKE("stroke", "笔画侧栏", "笔画键盘左侧一列", null, true),
     HANDWRITING("handwriting", "手写侧栏", "手写键盘右侧删除键下方的三格", 3, true),
     HANDWRITING_ROW("handwriting_row", "手写展开栏", "全屏手写底部删除键左侧的一排", 6, false),
-    COMMON("common", "常用符号栏", "常用符号键盘顶部一排，留空不显示", null, false);
+    COMMON("common", "常用符号栏", "点键盘「符号」键，排在「常用」页最前面，留空只显示默认符号", null, false);
 
     val prefKey: String get() = "side_symbols_$key"
 
