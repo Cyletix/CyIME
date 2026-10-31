@@ -55,8 +55,18 @@ class ClipboardManager private constructor(private val context: Context) {
         private const val INTERNAL_IMAGE_CLIP_LABEL = "cyime_image"
         /** Label of text written by clipboard sync, so history files it as received from another device. */
         internal const val RECEIVED_CLIP_LABEL = "cyime_received"
-        /** 短信验证码只用一次：自动复制 10 分钟后从候选栏和系统剪贴板删掉。 */
+        /** 短信验证码只用一次：自动复制 10 分钟后从系统剪贴板删掉。 */
         internal const val SMS_CODE_LIFETIME_MS = 10 * 60_000L
+        /** 候选栏只在短信到达后的 3 分钟内提示验证码；之后仍可从系统剪贴板粘贴，直到 10 分钟清掉。 */
+        internal const val SMS_CODE_SUGGESTION_MS = 3 * 60_000L
+
+        /** The candidate-bar pill shows a code only shortly after the SMS arrived. */
+        internal fun smsCodeSuggested(timestamp: Long, now: Long): Boolean =
+            now - timestamp < SMS_CODE_SUGGESTION_MS
+
+        /** The code already sits right before the cursor: typed, pasted or filled in some other way. */
+        internal fun smsCodeEntered(code: String, textBeforeCursor: CharSequence?): Boolean =
+            code.isNotEmpty() && textBeforeCursor != null && textBeforeCursor.endsWith(code)
 
         @Volatile
         private var instance: ClipboardManager? = null
@@ -128,8 +138,14 @@ class ClipboardManager private constructor(private val context: Context) {
                             expireSmsCode(timestamp)
                         } else if (lastSmsClipTimestamp != timestamp) {
                             lastSmsClipTimestamp = timestamp
-                            _verificationCode.value = ClipboardItem(text = text, timestamp = timestamp)
-                            Handler(Looper.getMainLooper()).postDelayed({ expireSmsCode(timestamp) }, remaining)
+                            val handler = Handler(Looper.getMainLooper())
+                            val now = System.currentTimeMillis()
+                            if (smsCodeSuggested(timestamp, now)) {
+                                _verificationCode.value = ClipboardItem(text = text, timestamp = timestamp)
+                                handler.postDelayed({ dismissVerificationCode(timestamp) },
+                                    timestamp + SMS_CODE_SUGGESTION_MS - now)
+                            }
+                            handler.postDelayed({ expireSmsCode(timestamp) }, remaining)
                         }
                         return
                     }
@@ -148,6 +164,15 @@ class ClipboardManager private constructor(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error reading clipboard", e)
         }
+    }
+
+    /**
+     * Stops suggesting the SMS code on the candidate bar (dismissed, entered, or shown long enough).
+     * The system clipboard keeps it until [expireSmsCode], so a manual paste still works.
+     */
+    fun dismissVerificationCode(timestamp: Long? = null) {
+        val code = _verificationCode.value ?: return
+        if (timestamp == null || code.timestamp == timestamp) _verificationCode.value = null
     }
 
     /** Drops an expired SMS code; clears the system clipboard only while it still holds that same code. */
@@ -579,7 +604,7 @@ class ClipboardManager private constructor(private val context: Context) {
         val now = System.currentTimeMillis()
         val cutoff = now - seconds * 1000L
         // 候选栏只展示未消费的最近剪贴板项（用户点选上屏后标记 consumed 不再显示）
-        val sms = _verificationCode.value?.takeIf { it.timestamp >= now - SMS_CODE_LIFETIME_MS }
+        val sms = _verificationCode.value?.takeIf { smsCodeSuggested(it.timestamp, now) }
         return listOfNotNull(sms) + _clipboardItems.value.filter { it.timestamp >= cutoff && !it.consumed && it.text != sms?.text }
     }
 
