@@ -27,8 +27,8 @@ import com.kingzcheung.xime.ui.keyboard.normalizeCandidateDragPercent
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 internal enum class LayoutInputCategory(val route: String, val title: String, val description: String) {
-    Qwerty("layout_input_qwerty", "26 键", "邻键纠错、模糊音、滑行输入、分体键盘、字母键符号"),
-    Nine("layout_input_nine", "九键与 14 键", "拂动或滑动选字母、触发距离（含日语假名）、假名提示、侧栏符号"),
+    Qwerty("layout_input_qwerty", "26 键", "纠错、中英混输、生僻字、滑行输入、模糊音、字母错位、空格两侧标点"),
+    Nine("layout_input_nine", "九键与 14 键", "拂动或滑动选字母、触发距离（含日语假名）、方向圆盘、假名提示"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,7 +105,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 FuzzyPinyinSection()
                 }
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    SettingsSection(title = "九键与笔画", content = {
+                    SettingsSection(title = "九键", content = {
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
                             "左、上、右、下依次输入键上的第 1～4 个字母（7、9 用到下），点按仍是九键输入；" +
                                 "开启后长按输入数字、不再弹出字母菜单，与「长按输入」角标的方式一致。触发距离在下方「滑动触发距离」设置。",
