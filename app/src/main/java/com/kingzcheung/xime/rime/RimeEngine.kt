@@ -441,7 +441,7 @@ class RimeEngine {
 
     private fun withDisplayPreedit(result: RimeProcessResult): RimeProcessResult = result.copy(
         preeditText = displayPreedit(result.inputText, result.preeditText, result.candidates.firstOrNull()?.comment.orEmpty()),
-        engineRevision = candidateRevision.get())
+        engineRevision = candidateRevision.get()).also { noteCommit(it.committedText) }
 
     /** For destructive routing: null means busy/unavailable, never an empty composition. */
     internal fun compositionActiveForDeletion(): Boolean? {
@@ -469,6 +469,7 @@ class RimeEngine {
         return tryLocked(RimeComposition("", "", "", emptyArray(), false, false, false)) {
             nativeGetComposition().let { result -> result.copy(preedit = displayPreedit(
                 result.input, result.preedit, result.candidates.firstOrNull()?.comment.orEmpty()), engineRevision = candidateRevision.get()) }
+                .also { noteCommit(it.committedText) }
         }
     }
 
@@ -544,7 +545,7 @@ class RimeEngine {
 
     fun commit(): String {
         return tryMutating("") {
-            nativeCommit() ?: ""
+            (nativeCommit() ?: "").also(::noteCommit)
         }
     }
 
@@ -775,7 +776,20 @@ class RimeEngine {
     }
 
     /** 无痕：引擎不从上屏学习；会话重建后由原生层自动补设。 */
-    fun setIncognito(on: Boolean) = locked { nativeSetIncognito(on) }
+    fun setIncognito(on: Boolean) = locked {
+        learningOff = on
+        nativeSetIncognito(on)
+    }
+
+    @Volatile private var learningOff = false
+
+    /** 最近一次上屏，供「删掉刚上屏的词不学习」判断（见 [RejectedCommit]）。 */
+    internal val rejectedCommit = RejectedCommit()
+
+    /** 每段 Rime 上屏文字只从原生层取出一次，在这里记下；没有上屏时不动。 */
+    private fun noteCommit(text: String) {
+        if (text.isNotEmpty()) rejectedCommit.committed(text, learned = !learningOff)
+    }
 
     fun getOption(option: String): Boolean {
         if (!nativeHasSession()) return false
@@ -1308,7 +1322,10 @@ class RimeEngine {
         nativeRestoreUserDict(file)
     }
 
-    /** Developer tool: takes back learned commits (rows "text<TAB>commits") from the current schema's user dictionary. */
+    /**
+     * Takes back learned commits (rows "text<TAB>commits") from the current schema's user dictionary: the developer
+     * tool, and「删掉刚上屏的词不学习」 (one commit of the word just deleted).
+     */
     @androidx.annotation.WorkerThread
     fun unlearn(rows: String): Int = locked {
         if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked -1
@@ -1395,6 +1412,7 @@ class RimeEngine {
     internal fun readQueuedComposition(): RimeComposition? = locked {
         if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked null
         val result = nativeGetComposition()
+        noteCommit(result.committedText)
         result.copy(preedit = displayPreedit(result.input, result.preedit, result.candidates.firstOrNull()?.comment.orEmpty()),
             engineRevision = candidateRevision.get())
     }

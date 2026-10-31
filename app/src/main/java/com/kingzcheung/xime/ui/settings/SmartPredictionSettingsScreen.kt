@@ -316,6 +316,24 @@ fun SmartPredictionSettingsContent(
                         checked = toggles.incognito,
                         onCheckedChange = { SettingsPreferences.setIncognito(context, it) }
                     )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    // 删掉刚上屏的词不学习（B站反馈 10-31，默认关）；无痕开着时本来就什么都不学，置灰。
+                    var unlearnRejected by remember { mutableStateOf(SettingsPreferences.isUnlearnRejectedCommit(context)) }
+                    SettingsToggleItem(
+                        icon = Icons.AutoMirrored.TwoTone.Backspace,
+                        title = "删掉刚打的词不学习",
+                        subtitle = "词一上屏就整个删掉（退格删完或上滑清空），这一次不记进词库，误触打出的怪词不会排到前面",
+                        checked = unlearnRejected,
+                        onCheckedChange = {
+                            unlearnRejected = it
+                            SettingsPreferences.setUnlearnRejectedCommit(context, it)
+                        },
+                        lockMessage = if (toggles.incognito) "无痕模式开着时什么都不学，不需要这项" else null,
+                    )
                 })
             }
 

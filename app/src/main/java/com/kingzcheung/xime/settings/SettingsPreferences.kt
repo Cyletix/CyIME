@@ -65,6 +65,7 @@ object SettingsPreferences {
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
+    private const val KEY_UNLEARN_REJECTED_COMMIT = "unlearn_rejected_commit"
     
     const val KEY_STT_ENABLED = "stt_enabled"
     const val KEY_STT_ONLINE_PLUGIN_ID = "stt_online_plugin_id"
@@ -675,6 +676,17 @@ object SettingsPreferences {
 
     fun setDeleteSkipsAssociation(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_DELETE_SKIPS_ASSOCIATION, enabled).apply()
+    }
+
+    /**
+     * 删掉刚上屏的词不学习（B站反馈 10-31，别人的需求，默认关）：刚上屏的词紧接着被整个删掉（退格或上滑清空），
+     * 用户词库减去这一次学习，误触打出的怪词不会因此排到前面。见 RejectedCommit。
+     */
+    fun isUnlearnRejectedCommit(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_UNLEARN_REJECTED_COMMIT, false)
+
+    fun setUnlearnRejectedCommit(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_UNLEARN_REJECTED_COMMIT, enabled).apply()
     }
     
     fun isSttEnabled(context: Context): Boolean {
