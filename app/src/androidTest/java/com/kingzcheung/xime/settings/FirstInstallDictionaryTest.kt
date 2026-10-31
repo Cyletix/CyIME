@@ -28,7 +28,7 @@ class FirstInstallDictionaryTest {
         engine.initialize(user, shared)
         assertTrue(RimeConfigHelper.ensureDeployment(context))
         assertTrue(engine.ensureSession())
-        assertFalse(SettingsPreferences.shouldShowCandidateCancelButton(context))
+        assertTrue(SettingsPreferences.shouldShowCandidateCancelButton(context))
         assertFalse(SettingsPreferences.isSmartPredictionEnabled(context))
         val samples = mapOf(
             "rime_ice" to listOf("zenme" to "怎么", "zenm" to "怎么", "dazi" to "打字"),

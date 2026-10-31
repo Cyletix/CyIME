@@ -237,7 +237,8 @@ private fun LayoutDisplayPage(
                     var showCandidateCancel by remember {
                         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
                     }
-                    Row(
+                    // 图例放在开关下面，随开关实时变化；整块都可点。
+                    Column(
                         modifier = Modifier.settingsSearchAnchor("候选栏取消按钮")
                             .fillMaxWidth()
                             .testTag("candidate-cancel-setting")
@@ -250,17 +251,20 @@ private fun LayoutDisplayPage(
                                 },
                             )
                             .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("候选栏取消按钮", style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium)
-                            Text("默认关闭，候选词从左侧开始；开启后可点左箭头取消当前输入",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("候选栏取消按钮", style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium)
+                                Text("点候选栏最左边的左箭头，取消当前输入",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Switch(checked = showCandidateCancel, onCheckedChange = null)
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Switch(checked = showCandidateCancel, onCheckedChange = null)
+                        Spacer(Modifier.height(10.dp))
+                        CandidateCancelIllustration(showCandidateCancel)
                     }
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 16.dp),
