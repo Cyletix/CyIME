@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,10 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.CtrlShortcuts
 import com.kingzcheung.xime.settings.FrostedGlassConfig
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
- * 符号键按住当 Ctrl（用户 10-24）。按下字母键立刻换成快捷键键面；拖到字母上松手发 Ctrl+字母，
- * 拖法和 Shift 拖动一样；也可以另一根手指直接点字母（见 [ShiftSlideTargets.ctrlTap]）。
+ * 符号键按住当 Ctrl（用户 10-24）。拖到字母上松手发 Ctrl+字母，拖法和 Shift 拖动一样；
+ * 也可以另一根手指直接点字母（见 [ShiftSlideTargets.ctrlTap]），都是按下就生效。
+ * 字母键的快捷键键面要按满 [holdMillis]（同长按）或拖出符号键才渐变出来，点一下开符号不闪（用户 10-31）。
  * 没拖动、没点过字母、在 [holdMillis] 内松手才是点按，打开符号面板；
  * 超过时限或拖出去以后松手都不打开，没落在字母上就什么都不做。
  */
@@ -50,6 +54,7 @@ internal fun Modifier.ctrlSymbolKeyGesture(
     val open by rememberUpdatedState(onOpenSymbols)
     val shortcut by rememberUpdatedState(onShortcut)
     val pressed by rememberUpdatedState(onPressedChange)
+    val scope = rememberCoroutineScope()
     onGloballyPositioned { bounds = it.boundsInRoot() }.pointerInput(targets) {
         awaitEachGesture {
             // 先于键帽自己的手势拿到按下（Initial），键帽只负责画。
@@ -58,6 +63,10 @@ internal fun Modifier.ctrlSymbolKeyGesture(
             pressed(true)
             down()
             targets.beginCtrl { shortcut(it) }
+            val faces = scope.launch {
+                delay(hold)
+                targets.showCtrlFaces()
+            }
             var dragged = false
             var tap = false
             try {
@@ -76,6 +85,7 @@ internal fun Modifier.ctrlSymbolKeyGesture(
                     }
                 }
             } finally {
+                faces.cancel()
                 targets.finish()
                 pressed(false)
             }
@@ -83,6 +93,9 @@ internal fun Modifier.ctrlSymbolKeyGesture(
         }
     }
 }
+
+/** 快捷键键面渐变出来的时长；松手不渐变，立刻换回字母。 */
+internal const val CTRL_FACE_FADE_MS = 250
 
 /** Ctrl 键面：中间写用途，左上角小字母；没有常用用途的字母只淡淡写字母，拖上去照样发 Ctrl+字母。 */
 @Composable

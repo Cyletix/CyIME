@@ -46,8 +46,8 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
             KeyTip("长按空格移光标时按住 Shift", "选中文字，和电脑上 Shift 加方向键一样。"),
         )),
         KeyTipGroup("Ctrl（26 键左下角 !@# 键）", buildList {
-            add(KeyTip("按住 !@#", "字母键改成显示快捷键：全选、复制、粘贴、剪切、撤销、重做、保存、查找等。"))
-            add(KeyTip("按住 !@# 拖到字母上松手", "发送 Ctrl 加这个字母，和实体键盘一样；也可以另一根手指直接点字母。"))
+            add(KeyTip("按住 !@#", "按满 $hold 秒，字母键渐变成显示快捷键：全选、复制、粘贴、剪切、撤销、重做、保存、查找等；点一下开符号时键面不变。"))
+            add(KeyTip("按住 !@# 拖到字母上松手", "发送 Ctrl 加这个字母，和实体键盘一样；也可以另一根手指直接点字母。不用等快捷键显示出来。"))
             add(KeyTip("点一下 !@#", "$hold 秒内、没拖动就松手才打开符号面板；时限在「按键与手势」里调。"))
             add(if (settings.zxcvEditShortcuts) KeyTip("${upper} Z X C V", "撤销、剪切、复制、粘贴（「Z X C V 角标做撤销、剪切、复制、粘贴」已打开）。")
                 else KeyTip("想${upper} Z X C V 直接撤销、剪切、复制、粘贴", "在「按键与手势」打开「Z X C V 角标做撤销、剪切、复制、粘贴」，默认关。"))
