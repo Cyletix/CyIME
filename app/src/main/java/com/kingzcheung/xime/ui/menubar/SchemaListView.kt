@@ -35,7 +35,7 @@ fun SchemaListView(
     val current = all.firstOrNull { it.schemaId == currentSchemaId }
     val entries = all.filter { current != null && it.profile.language == current.profile.language }
     var layoutId by remember(currentSchemaId, current?.profile) { mutableStateOf(current?.profile?.layout?.id) }
-    val layouts = entries.flatMap { InputProfileSelection.layoutsOf(it, all) }.distinctBy { it.id }
+    val layouts = InputProfileSelection.layoutRow(entries, all)
     val schemes = entries.filter { entry -> layoutId?.let { InputProfileSelection.offers(entry, it, all) } == true }
     BoxWithConstraints(modifier.fillMaxWidth().keyboardPanelBackground(backgroundColor).testTag("input-profile-panel")) {
     val density = LocalDensity.current

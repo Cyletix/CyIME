@@ -76,6 +76,25 @@ class SchemaForLayoutTest {
             InputProfileSelection.switchLayout(chinese, all.first { it.schemaId == "rime_ice" }, "pinyin_cyletix10", all)?.entry?.schemaId)
     }
 
+    /** 用户 10-31：假名九键跟中文九键一样排在 26 键后面；Colemak 这类借来的字母排列排最后。 */
+    @Test fun layoutRowPutsEveryLanguagesOwnLayoutsBeforeLetterArrangements() {
+        val rare = listOf("pinyin_cyletix10", "pinyin_colemak").map { SchemaInfo(it, it, "", "", "") }
+        val japanese = listOf("japanese", "japanese_kana").map { SchemaInfo(it, it, "", "", "") }
+        val all = InputModes.available(entries + japanese + rare, InputModes.defaultModeOrder)
+        fun row(language: InputLanguage) =
+            InputProfileSelection.layoutRow(all.filter { it.language == language }, all).map { it.id }
+        assertEquals(listOf(InputLayout.QWERTY.id, InputLayout.T9.id, InputLayout.MERGED14.id, "pinyin_cyletix10", "pinyin_colemak"),
+            row(InputLanguage.CHINESE))
+        assertEquals(listOf(InputLayout.QWERTY.id, InputLayout.KANA.id, "pinyin_cyletix10", "pinyin_colemak"),
+            row(InputLanguage.JAPANESE))
+        assertEquals(listOf(InputLayout.QWERTY.id, "pinyin_cyletix10", "pinyin_colemak"), row(InputLanguage.ENGLISH))
+        assertEquals(row(InputLanguage.JAPANESE), InputProfileSelection.languageLayouts(all, all.first { it.schemaId == "japanese" }).map { it.id })
+        // 自己排过的顺序照旧：Colemak 拖到最前，布局栏也在最前。
+        val saved = InputModes.available(entries + rare, listOf("pinyin_colemak") + entries.map { it.schemaId })
+        assertEquals("pinyin_colemak",
+            InputProfileSelection.layoutRow(saved.filter { it.language == InputLanguage.CHINESE }, saved).first().id)
+    }
+
     @Test fun unknownLayoutSwitchesNothing() {
         assertNull(switch("rime_ice", "japanese_kana"))
     }
