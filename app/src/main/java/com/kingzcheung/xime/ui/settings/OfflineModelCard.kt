@@ -162,6 +162,27 @@ internal fun OfflineModelCard() {
                     Switch(checked = autoPunctuation, enabled = autoPunctuationAvailable, onCheckedChange = null,
                         colors = settingsSwitchColors())
                 }
+                // 只带一部分标点：自动加标点开着时逐项一行开关，默认全开；关掉的那类在停顿处留空格。
+                if (autoPunctuationAvailable && autoPunctuation) listOf(
+                    Triple("逗号、顿号、分号", SettingsPreferences::isSttPunctuationComma, SettingsPreferences::setSttPunctuationComma),
+                    Triple("句号", SettingsPreferences::isSttPunctuationPeriod, SettingsPreferences::setSttPunctuationPeriod),
+                    Triple("问号、感叹号", SettingsPreferences::isSttPunctuationQuestion, SettingsPreferences::setSttPunctuationQuestion),
+                ).forEach { (title, read, write) ->
+                    var kept by remember(title) { mutableStateOf(read(context)) }
+                    HorizontalDivider(modifier = Modifier.padding(start = 32.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Row(Modifier.fillMaxWidth().testTag("speech-auto-punctuation:$title")
+                        .toggleable(value = kept, role = Role.Switch, onValueChange = { kept = it; write(context, it) })
+                        .padding(start = 32.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(title, style = MaterialTheme.typography.bodyLarge)
+                            Text(if (kept) "保留模型打的$title。" else "不带$title，停顿处留空格；口述照样出。",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = kept, onCheckedChange = null, colors = settingsSwitchColors())
+                    }
+                }
                 // 整句定稿能用的地方（含只用 SenseVoice 的中文）都能接 X-ASR，下载入口跟着整句定稿走。
                 if (wholeSentenceAvailable && !xasrReady) {
                     ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }

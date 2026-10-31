@@ -76,6 +76,9 @@ object SettingsPreferences {
     const val KEY_STT_DEBUG_RECORD = "stt_debug_record"
     const val KEY_STT_WHOLE_SENTENCE = "stt_whole_sentence"
     const val KEY_STT_AUTO_PUNCTUATION = "stt_auto_punctuation"
+    const val KEY_STT_PUNCTUATION_COMMA = "stt_punctuation_comma"
+    const val KEY_STT_PUNCTUATION_PERIOD = "stt_punctuation_period"
+    const val KEY_STT_PUNCTUATION_QUESTION = "stt_punctuation_question"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
@@ -799,6 +802,17 @@ object SettingsPreferences {
     fun setSttAutoPunctuation(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STT_AUTO_PUNCTUATION, enabled).apply()
     }
+
+    /** 自动加标点开着时逐项选留哪些模型标点；默认全留（打开自动加标点就和原来一样带全部标点）。 */
+    fun isSttPunctuationComma(context: Context) = getPrefs(context).getBoolean(KEY_STT_PUNCTUATION_COMMA, true)
+    fun setSttPunctuationComma(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_STT_PUNCTUATION_COMMA, enabled).apply()
+    fun isSttPunctuationPeriod(context: Context) = getPrefs(context).getBoolean(KEY_STT_PUNCTUATION_PERIOD, true)
+    fun setSttPunctuationPeriod(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_STT_PUNCTUATION_PERIOD, enabled).apply()
+    fun isSttPunctuationQuestion(context: Context) = getPrefs(context).getBoolean(KEY_STT_PUNCTUATION_QUESTION, true)
+    fun setSttPunctuationQuestion(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_STT_PUNCTUATION_QUESTION, enabled).apply()
 
     /**
      * 开车连续语音：语音悬浮条听写时发出消息或离开输入框，回到同一应用的输入框自动接着听。
