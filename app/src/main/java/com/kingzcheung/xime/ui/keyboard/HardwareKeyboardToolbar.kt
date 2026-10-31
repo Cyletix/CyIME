@@ -263,7 +263,8 @@ internal fun HardwareKeyboardToolbar(
                     currentBoundsCallback(Rect(floor(bounds.left).toInt(), floor(bounds.top).toInt(), ceil(bounds.right).toInt(), ceil(bounds.bottom).toInt()))
                 }
                 .clip(shape).then(surface?.invoke() ?: Modifier.background(backgroundColor))
-                .testTag("hardware-keyboard-toolbar").padding(padding),
+                .testTag("hardware-keyboard-toolbar").padding(padding)
+                .glassTextHalo(textSurface?.halo),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val auxiliaryActions: @Composable () -> Unit = {

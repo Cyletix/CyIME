@@ -183,7 +183,8 @@ fun HardwareKeyboardCandidateBar(
                     .clip(shape)
                     .then(surface?.invoke() ?: Modifier.background(preeditBackgroundColor))
                     .testTag("hardware-preedit-card")
-                    .onGloballyPositioned { reportPreeditBounds(it.boundsInWindow().toAndroidBounds()) }) {
+                    .onGloballyPositioned { reportPreeditBounds(it.boundsInWindow().toAndroidBounds()) }
+                    .glassTextHalo(textSurface?.halo)) {
                     PreeditLabel(displayText, visuals.copy(preeditBackgroundColor = Color.Transparent),
                         followTextTail = true)
                 }
@@ -196,7 +197,8 @@ fun HardwareKeyboardCandidateBar(
                     .onGloballyPositioned { reportBounds(it.boundsInWindow().toAndroidBounds()) }
                     // 展开、收起和屏幕键盘的候选展开同一套动效：卡片高度按面板时长过渡，内容交叉淡入（用户 10-21）。
                     .animateContentSize(com.kingzcheung.xime.ui.theme.CyMotion.panel(expanded))
-                    .padding(horizontal = 6.dp, vertical = 4.dp)) {
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .glassTextHalo(textSurface?.halo)) {
                     androidx.compose.animation.Crossfade(expanded,
                         animationSpec = com.kingzcheung.xime.ui.theme.CyMotion.enter(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM),
                         label = "hardware-candidate-expand") { open ->
