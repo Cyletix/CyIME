@@ -12,4 +12,6 @@ CyIME Windows 用同一版本的同一张表。
 - `cyime_cangjie.schema.yaml` 参照 rime/rime-cangjie（LGPL-3.0）`cangjie5.schema.yaml` 的写法：编码显示成字根、
   x/z/yyy 码不进自动造词。去掉拼音反查与「常用/增廣」开关；简繁跟 CyIME 的「繁体输出」设置走（繁转简用 `opencc/cyime_t2s.json`）。
 
+- `cyime_quick.dict.yaml`（仓颉速成）由同一任务从上面的单字码生成：取首尾两码，不另外下载。
+
 来源：https://github.com/Jackchows/Cangjie5/tree/c9b64e77951cba48bdfa5de8eaedd1a908666b9b

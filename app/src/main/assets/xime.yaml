@@ -379,7 +379,7 @@ keyboard:
   # 仓颉五代（对应方案 cyime_cangjie，默认不启用）：同 26 键排列，键帽是仓颉字根，点按送字母码。
   # 字根同方案 preedit_format 的 xlit（z 在五仓里是符号码，键帽「符」）。上下角标同 26 键（QwertySwipeSymbols），这里不配。
   qwerty_cangjie:
-    schemas: [cyime_cangjie]
+    schemas: [cyime_cangjie, cyime_quick]
     button_layout: standard
     layout:
       rows:

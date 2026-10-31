@@ -89,9 +89,29 @@ class CangjieSchemeTest {
         assertTrue(weight("「", "yyyaa") > 0)
     }
 
+    @Test fun `quick shares the cangjie keyboard and cuts codes to first and last letter`() {
+        assertEquals("qwerty_cangjie", KeysConfigHelper.parseSchemaBindingsYamlText(ximeYaml)["cyime_quick"])
+        val profile = InputProfiles.describe("cyime_quick")
+        assertEquals(InputLanguage.CHINESE, profile.language)
+        assertEquals(InputScheme.CANGJIE, profile.scheme)
+        val quick = repoFile("src/main/assets/rime_chinese/cyime_quick.schema.yaml").readText()
+        assertTrue(quick.contains("dictionary: cyime_quick"))
+        // 键帽、编码栏字根与仓颉同一套
+        for (format in listOf("preedit_format:", "comment_format:"))
+            assertEquals(schema.substringAfter(format).lines()[1], quick.substringAfter(format).lines()[1])
+        val dict = repoFile("build/generated/cangjie-assets/rime_chinese/cyime_quick.dict.yaml").readLines()
+        val rows = dict.dropWhile { it.trim() != "..." }.drop(1).filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split('\t') }
+        assertTrue(rows.size > 25000)
+        assertTrue(rows.all { it[1].length in 1..2 && it[1][0] !in "xz" })
+        fun first(code: String) = rows.filter { it[1] == code }.maxBy { it[2].toLong() }[0]
+        assertEquals("日", first("a"))
+        assertEquals("的", first("hi")) // 的 hapi
+        assertTrue(rows.any { it[0] == "我" && it[1] == "hi" }) // 我 hqi
+    }
+
     /** 单字提前放在去重后面会先取走一批候选，傳、传都转成「传」时去不掉，同一码出两个「传」。 */
     @Test fun `single characters are lifted before duplicates are removed`() {
-        for (file in listOf("cyime_cangjie")) {
+        for (file in listOf("cyime_cangjie", "cyime_quick")) {
             val filters = repoFile("src/main/assets/rime_chinese/$file.schema.yaml").readText()
                 .substringAfter("  filters:\n").substringBefore("\n\n").lines().filter { it.trim().startsWith("- ") }.map { it.trim().removePrefix("- ") }
             assertEquals(file, listOf("simplifier", "single_char_filter", "uniquifier"), filters)

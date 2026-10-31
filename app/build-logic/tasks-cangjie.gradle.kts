@@ -6,6 +6,7 @@ import java.security.MessageDigest
 // the official manuals) and McBopomofo's Taiwan corpus counts (MIT) for character and word weights, both pinned.
 // CyIME Windows builds the same table (one code table on both). The schema lives in
 // src/main/assets/rime_chinese/cyime_cangjie.schema.yaml; only the table is generated here.
+// 仓颉速成 (cyime_quick) gets its table from the same rows: each code cut to its first and last letter.
 val cangjieRevision = "c9b64e77951cba48bdfa5de8eaedd1a908666b9b"
 val cangjieTableSha = "9ef8b462ad0f7c70463307aa81c1110d28650b9cdbd76905d0f2362a362fcbcc"
 val mcBopomofoRevision = "18e2060dd5d0b511753ad79a8fe0d112e944f1af"
@@ -41,7 +42,7 @@ val prepareCangjieDictionary by tasks.registering {
     inputs.property("sha256", cangjieTableSha)
     inputs.property("countsRevision", mcBopomofoRevision)
     inputs.property("countsSha256", mcBopomofoCountsSha)
-    inputs.property("policy", 2)
+    inputs.property("policy", 3)
     val charWeights = file("data/rime_ice_8105_weights.tsv.gz")
     inputs.file(charWeights)
     outputs.dir(cangjieAssetRoot)
@@ -124,6 +125,25 @@ val prepareCangjieDictionary by tasks.registering {
         }
         val root = cangjieAssetRoot.get().asFile.apply { mkdirs() }
         File(root, "cyime_cangjie.dict.yaml").writeText(out.toString())
+        // 速成: first and last letter of the 仓颉 code, single characters only. x codes (alternative codes of
+        // hard characters), z and yyy (symbols) have no 速成 form; punctuation comes from the punctuation keys.
+        val quick = StringBuilder()
+        quick.append("# Rime dictionary\n# encoding: utf-8\n#\n")
+        quick.append("# 仓颉速成码表，由 CyIME app/build-logic/tasks-cangjie.gradle.kts 从 cyime_cangjie 的同一份单字码生成，勿手改。\n")
+        quick.append("# 速成码取仓颉码的首尾两码；字频同仓颉。\n\n---\n")
+        quick.append("name: cyime_quick\nversion: \"1.0-cyime1\"\nsort: by_weight\nuse_preset_vocabulary: false\n")
+        quick.append("columns:\n  - text\n  - code\n  - weight\n...\n\n")
+        val quickPlace = HashMap<String, Int>()
+        var quickRows = 0
+        for ((text, code) in rows.filterNot { (_, code) -> code[0] == 'x' || code[0] == 'z' || code.startsWith("yyy") }
+            .map { (text, code) -> text to (if (code.length <= 2) code else "${code.first()}${code.last()}") }.distinct()) {
+            val place = quickPlace.merge(code, 1, Int::plus)!! - 1
+            quick.append(text).append('\t').append(code).append('\t')
+                .append(characterCount(text) * 20 + (9 - place).coerceAtLeast(0)).append('\n')
+            quickRows++
+        }
+        check(quickRows > 25000) { "Unexpected quick table: rows=$quickRows" }
+        File(root, "cyime_quick.dict.yaml").writeText(quick.toString())
     }
 }
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareCangjieDictionary) }

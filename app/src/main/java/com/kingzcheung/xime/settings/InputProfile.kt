@@ -94,7 +94,8 @@ object InputProfiles {
         InputScheme.WUBI, InputScheme.WUBI_PINYIN -> "字根编码"
         InputScheme.EXTERNAL -> "自定义编码"
         InputScheme.ZHUYIN -> "ㄓㄨˋㄧㄣ"
-        InputScheme.CANGJIE -> "人戈日口"
+        // 倉：仓颉 oiar，速成取首尾 or
+        InputScheme.CANGJIE -> if ((profile.engineProfile as? EngineProfile.Rime)?.schemaId == "cyime_quick") "人口" else "人戈日口"
     }
     private val descriptions = java.util.concurrent.ConcurrentHashMap<String, InputProfile>()
     @Volatile private var installed: Map<String, InputProfile> = emptyMap()
@@ -144,7 +145,7 @@ object InputProfiles {
             id == "japanese" || id == "jaroomaji" -> InputScheme.ROMAJI
             id == "japanese_kana" -> InputScheme.KANA
             id == "cyime_zhuyin" -> InputScheme.ZHUYIN
-            id == "cyime_cangjie" -> InputScheme.CANGJIE
+            id == "cyime_cangjie" || id == "cyime_quick" -> InputScheme.CANGJIE
             else -> InputScheme.EXTERNAL
         }
         val inputLanguage = when {

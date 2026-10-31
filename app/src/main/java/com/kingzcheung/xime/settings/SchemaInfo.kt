@@ -36,12 +36,13 @@ data class SchemaInfo(
         else InputProfiles.describe(schemaId, language, scheme)
     /** Encoding choices must not inherit legacy keyboard labels such as 中文26键. */
     val schemeLabel: String get() = when (scheme) {
-        InputScheme.EXTERNAL, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN ->
+        // 仓颉五代和仓颉速成同一编码类，方案行里按方案名分开
+        InputScheme.EXTERNAL, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN, InputScheme.CANGJIE ->
             name.ifBlank { schemaId }
         else -> scheme.displayName
     }
     val selectionLabel: String get() = when (scheme) {
-        InputScheme.EXTERNAL, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN ->
+        InputScheme.EXTERNAL, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN, InputScheme.CANGJIE ->
             "$name · ${profile.layout.displayName}"
         else -> profile.summary
     }
