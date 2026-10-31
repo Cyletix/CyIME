@@ -189,9 +189,13 @@ fun KeyboardLayout(
     val splitGapFraction = if (splitKeyboard) SplitKeyboardGeometry.resolvedGap(
         splitGapSetting, maxWidth.value, splitGutterDp, physicalTargetCellDp) else 0f
     val splitGapDp = (splitGapFraction * maxWidth.value).dp
+    // 「中文键盘字母显示大写」：键盘里读 uppercaseKeyLabels 的地方（26 键三种行、14 键左右滑提示）按当前语言取值，只用于显示，不保存。
+    val keyLabelPrefs = LocalKeyboardInputPreferences.current.let {
+        it.copy(uppercaseKeyLabels = letterLabelsUppercase(it, isAsciiMode, uiState.inputProfile))
+    }
     // 分体两半贴住左右边：不套用居中的键宽上限。
     CompositionLocalProvider(LocalKeyboardExplicitWidth provides (LocalKeyboardExplicitWidth.current || splitKeyboard),
-        LocalDoublePinyinKeyHints provides dpKeyHints) {
+        LocalDoublePinyinKeyHints provides dpKeyHints, LocalKeyboardInputPreferences provides keyLabelPrefs) {
     KeyboardKeySpacingScope(Modifier.fillMaxSize(),
         columns = letterKeyboardColumns(keyRows, fourteenKey),
         widthFraction = if (splitKeyboard) SplitKeyboardGeometry.keyWidthFraction(

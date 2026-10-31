@@ -70,6 +70,23 @@ class QwertyRowOptionsTest {
             assertFalse(id, syllableSplitActive(true, ascii = false, profile = InputProfiles.describe(id)))
     }
 
+    @Test fun chineseUppercaseLabelsShowTheLanguageOnTheKeys() {
+        val pinyin = InputProfiles.describe("rime_ice")
+        val off = KeyboardInputPreferences()
+        val chinese = off.copy(chineseUppercaseKeyLabels = true)
+        // 默认关：中英文都和以前一样小写（大写只看 Shift）。
+        assertFalse(letterLabelsUppercase(off, ascii = false, profile = pinyin))
+        // 开了：中文大写，切到英文回到小写；双拼、14 键也是中文。
+        assertTrue(letterLabelsUppercase(chinese, ascii = false, profile = pinyin))
+        assertFalse(letterLabelsUppercase(chinese, ascii = true, profile = pinyin))
+        for (id in listOf("double_pinyin_flypy", "pinyin_14jian"))
+            assertTrue(id, letterLabelsUppercase(chinese, ascii = false, profile = InputProfiles.describe(id)))
+        // 日文罗马字不是中文：照旧小写。
+        assertFalse(letterLabelsUppercase(chinese, ascii = false, profile = InputProfiles.describe("japanese")))
+        // 「字母键显示大写」一律大写，英文也大写（与以前相同）。
+        assertTrue(letterLabelsUppercase(off.copy(uppercaseKeyLabels = true), ascii = true, profile = pinyin))
+    }
+
     @Test fun syllableSplitSitsOnTheCommaKeyOrTheOnlyPunctuationKey() {
         val (comma, period) = spacePunctuationKeys(comma = true, period = true, fullWidth = true)
         assertEquals(true to false, syllableSplitOnPunctuation(true, comma, period))

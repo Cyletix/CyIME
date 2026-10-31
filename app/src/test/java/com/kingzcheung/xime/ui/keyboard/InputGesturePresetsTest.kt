@@ -61,6 +61,8 @@ class InputGesturePresetsTest {
                     InputGestureLock.Option.CORNER_HINTS -> settings.swipeUpHints || settings.swipeDownHints
                     InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT -> settings.shiftSyllableSplit
                     InputGestureLock.Option.SEMICOLON_ON_SHIFT -> settings.doublePinyinSemicolonOnShift
+                    InputGestureLock.Option.UPPERCASE_KEY_LABELS -> settings.uppercaseKeyLabels
+                    InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS -> settings.chineseUppercaseKeyLabels
                 }
                 assertTrue("${preset.name} ${lock.option}", value != lock.lockedValue)
             }
@@ -102,6 +104,13 @@ class InputGesturePresetsTest {
             InputGestureLock.Option.SEMICOLON_ON_SHIFT, true)?.message)
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true))
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.SEMICOLON_ON_SHIFT, true))
+        // 字母键大写：一律大写和中文大写只能开一个，先开的锁住另一个。
+        assertEquals("已被「字母键显示大写」锁定", InputGestureLocks.lockFor(base.copy(uppercaseKeyLabels = true),
+            InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true)?.message)
+        assertEquals("已被「中文键盘字母显示大写」锁定", InputGestureLocks.lockFor(base.copy(chineseUppercaseKeyLabels = true),
+            InputGestureLock.Option.UPPERCASE_KEY_LABELS, true)?.message)
+        assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.UPPERCASE_KEY_LABELS, true))
+        assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true))
     }
 
     @Test fun `choosing long press turns nine key flick on`() {

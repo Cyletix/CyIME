@@ -357,16 +357,38 @@ internal fun InputExperienceSettings(
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.8f..1.6f, steps = 15)
             }
             divider()
-            Row(Modifier.settingsSearchAnchor("字母键显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("字母键显示大写", style = MaterialTheme.typography.titleSmall)
-                    Text("只改键帽显示；英文大小写仍看 Shift 键上的箭头。",
-                        style = MaterialTheme.typography.bodySmall)
+            run {
+                val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.UPPERCASE_KEY_LABELS, true)
+                    ?.takeIf { !settings.uppercaseKeyLabels }
+                Row(Modifier.settingsSearchAnchor("字母键显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("字母键显示大写", style = MaterialTheme.typography.titleSmall)
+                        Text("只改键帽显示；英文大小写仍看 Shift 键上的箭头。",
+                            style = MaterialTheme.typography.bodySmall)
+                        if (lock != null) SettingsLockNote(lock.message)
+                    }
+                    Switch(checked = settings.uppercaseKeyLabels, enabled = lock == null, colors = settingsSwitchColors(),
+                        modifier = Modifier.testTag("uppercase-key-labels"), onCheckedChange = {
+                            settings = settings.copy(uppercaseKeyLabels = it); settings.save(context)
+                        })
                 }
-                Switch(checked = settings.uppercaseKeyLabels,
-                    modifier = Modifier.testTag("uppercase-key-labels"), onCheckedChange = {
-                        settings = settings.copy(uppercaseKeyLabels = it); settings.save(context)
-                    })
+            }
+            divider()
+            run {
+                val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true)
+                    ?.takeIf { !settings.chineseUppercaseKeyLabels }
+                Row(Modifier.settingsSearchAnchor("中文键盘字母显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("中文键盘字母显示大写", style = MaterialTheme.typography.titleSmall)
+                        Text("像搜狗：中文时字母键显示大写，切到英文显示小写（按 Shift 才大写），不看空格键也知道现在是中文还是英文。只改键帽显示，26 键和 14 键都适用。",
+                            style = MaterialTheme.typography.bodySmall)
+                        if (lock != null) SettingsLockNote(lock.message)
+                    }
+                    Switch(checked = settings.chineseUppercaseKeyLabels, enabled = lock == null, colors = settingsSwitchColors(),
+                        modifier = Modifier.testTag("chinese-uppercase-key-labels"), onCheckedChange = {
+                            settings = settings.copy(chineseUppercaseKeyLabels = it); settings.save(context)
+                        })
+                }
             }
             }
         }
