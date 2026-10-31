@@ -92,6 +92,7 @@ git submodule update --init --recursive
 - 源码 fork 自 [Xime](https://github.com/ximeiorg/Xime)（Kingz Cheung / kingzcheung 及贡献者），分叉点是 2026-09-21 的上游提交 `9452b16`。
 - 为了方便对照上游，源码包名 `com.kingzcheung.xime`、插件标识、`xime.yaml` / `xime.custom.yaml`、扩展商店协议都没改，只有安装身份独立。取舍见 [命名与身份记录](docs/cyime-identity.md)。
 - 作者自己的前作：[Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard)（2024 年的键盘布局研究，Cyletix10 布局出自这里）、ASRInput（电脑上的语音字幕，字幕逐字出现的节奏沿用它）。
+- 社区 Linux 版：[tuxKOH/CyIME 的 linux-desktop-preview 分支](https://github.com/tuxKOH/CyIME/tree/feat/linux-desktop-preview)（IBus 拼音 + 电脑剪贴板，tuxKOH 维护）。欢迎 Linux 版本的魔改，但由于本人精力有限，暂时不会维护 Linux 版本。
 
 ## 贡献
 
