@@ -417,6 +417,9 @@ fun KeyboardLayout(
         LocalFourteenKeyLayout provides fourteenKey,
         LocalLetterGeometry provides geometry,
         LocalCustomLayout provides letterLayout,
+        // 「合并键均匀排布」只改自建/内置字母排列；14 键（大写时拆键要原位）和分体（按中线拆半）仍严格对齐。
+        LocalEvenMergedKeys provides (letterLayout != null && !fourteenKey && !splitKeyboard &&
+            LocalKeyboardInputPreferences.current.evenMergedKeys),
         LocalHoneycombKeys provides honeycomb,
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
         LocalShiftSlideTargets provides shiftSlideTargets,
@@ -758,7 +761,7 @@ fun KeyboardLayout(
                                         onClick = onClick,
                                         backgroundColor = keyBackgroundColor,
                                         textColor = keyTextColor,
-                                        modifier = Modifier.weight(if (bottomWeighted) key.length.toFloat() +
+                                        modifier = Modifier.weight(if (bottomWeighted) letterKeySpan(key, true, LocalEvenMergedKeys.current) +
                                             (if (key === bottomKeys.last()) fourteenMExtra else 0f) else 1f)
                                             .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
@@ -1249,7 +1252,7 @@ private fun DummyKeyboardRow(
                 if (index == splitAt) SplitGapSpacer(splitRow, splitGap)
                 DummyKeyButton(
                     backgroundColor = keyBackgroundColor,
-                    modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
+                    modifier = Modifier.weight(letterKeySpan(key, weightedLetters, LocalEvenMergedKeys.current))
                 )
             }
             if (splitAt == keys.size) SplitGapSpacer(splitRow, splitGap)
@@ -1266,7 +1269,7 @@ private fun DummyKeyboardRow(
                 if (index == splitAt) SplitGapSpacer(splitRow, homeRow.gap.dp)
                 DummyKeyButton(
                     backgroundColor = keyBackgroundColor,
-                    modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
+                    modifier = Modifier.weight(letterKeySpan(key, weightedLetters, LocalEvenMergedKeys.current))
                 )
             }
             if (splitAt == homeRow.keys.size) SplitGapSpacer(splitRow, homeRow.gap.dp)
@@ -1307,7 +1310,7 @@ private fun DummyBottomRow(
                 segmentKeys.forEach { key ->
                     DummyKeyButton(
                         backgroundColor = keyBackgroundColor,
-                        modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
+                        modifier = Modifier.weight(letterKeySpan(key, weightedLetters, LocalEvenMergedKeys.current))
                     )
                 }
             }
@@ -1364,8 +1367,10 @@ fun KeyboardRowWithConfig(
     val customLayout = LocalCustomLayout.current
     // 14 键合并键与自定义布局一样按字母数占位，和 26 键同一网格对齐。
     val weighted = customLayout != null || LocalFourteenKeyLayout.current
+    // 「合并键均匀排布」打开时合并键少占、单字母键多占，整行宽度不变（见 [letterKeySpan]）。
+    val evenMerged = LocalEvenMergedKeys.current
     BoxWithConstraints(modifier.fillMaxWidth()) {
-    val totalWeight = keys.sumOf { if (weighted) it.length else 1 }.coerceAtLeast(1)
+    val totalWeight = keys.sumOf { letterKeySpan(it, weighted, evenMerged).toDouble() }.toFloat().coerceAtLeast(1f)
     val startInset = edgeStartInset.coerceAtMost(maxWidth / 4)
     val endInset = edgeEndInset.coerceAtMost(maxWidth / 4)
     val gap = if (splitAt in 0..keys.size) splitGap.coerceAtMost(maxWidth) else 0.dp
@@ -1460,7 +1465,7 @@ fun KeyboardRowWithConfig(
                 onClick = onClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
-                modifier = Modifier.weight((unitWidth * (if (weighted) key.length else 1) +
+                modifier = Modifier.weight((unitWidth * letterKeySpan(key, weighted, evenMerged) +
                     (if (index == 0) startInset else 0.dp) + (if (index == rowKeys.lastIndex) rowEndInset else 0.dp)).value.coerceAtLeast(1f))
                     .testTag(if (index == homeRow.mirrorIndex) "qwerty-key-right:$key" else "qwerty-key:$key"),
                 edgeContentPadding = PaddingValues(

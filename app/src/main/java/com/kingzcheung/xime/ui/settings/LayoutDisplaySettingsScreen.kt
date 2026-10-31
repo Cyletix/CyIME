@@ -20,6 +20,7 @@ import androidx.compose.material.icons.twotone.DashboardCustomize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Straighten
+import androidx.compose.material.icons.twotone.ViewWeek
 import androidx.compose.material.icons.twotone.Padding
 import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material.icons.twotone.Lightbulb
@@ -165,6 +166,12 @@ private fun LayoutDisplayPage(
                     SettingsToggleItem(Icons.TwoTone.Straighten, "加宽按键",
                         "键盘两侧留白和按键之间的横向缝变窄，每个键更宽，手机上不容易按到旁边的键；分体键盘不变。",
                         checked = wideKeys, onCheckedChange = { SettingsPreferences.setWideKeysEnabled(context, it) })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    val evenMerged = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().evenMergedKeys
+                    SettingsToggleItem(Icons.TwoTone.ViewWeek, "合并键均匀排布",
+                        "自己排的合并键布局（如 17、18、20 键）里，合并键只比单字母键宽三分之一，单字母键跟着变宽，每排更匀，" +
+                            "小屏上好按。关闭时合并键严格占两个 26 键的位置。14 键和分体键盘不变。",
+                        checked = evenMerged, onCheckedChange = { SettingsPreferences.setEvenMergedKeysEnabled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingsItem(Icons.TwoTone.AspectRatio, keyboardPanelTitle(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE),
                         "高度、宽度、悬浮与分体、透明度，打开键盘菜单里同一个调节面板",
