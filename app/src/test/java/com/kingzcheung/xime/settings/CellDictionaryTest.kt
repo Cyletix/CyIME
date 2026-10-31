@@ -123,6 +123,22 @@ class CellDictionaryTest {
         assertTrue(store.englishWords(entry.id).isEmpty())
     }
 
+    /** 「我的短语」有词条时 CyIME 自己往方案里追加 custom_phrase 翻译器；和带英文词的词库同时开时不能互相挡住。 */
+    @Test fun `english words merge beside the custom phrase translator`() {
+        val phrase = "patch:\n  \"engine/translators/+\":\n    - table_translator@custom_phrase\n  \"custom_phrase\":\n    dictionary: \"\"\n"
+        for (kind in CellDictionaryEnglish.Kind.entries) {
+            val patched = CellDictionaryRime.patch(phrase, pack, kind)
+            assertTrue(patched.contains("table_translator@custom_phrase"))
+            assertTrue(patched.contains("${kind.translator}@cyime_cells_en"))
+            if (kind != CellDictionaryEnglish.Kind.T9) assertTrue(patched.contains("\"engine/translators/@next\": \"${kind.translator}@cyime_cells_en\""))
+            assertEquals(patched, CellDictionaryRime.patch(patched, pack, kind))
+            assertEquals(phrase, CellDictionaryRime.patch(patched, null))
+        }
+        val full = phrase + "  \"engine/translators/@next\": other\n"
+        assertThrows(IllegalArgumentException::class.java) { CellDictionaryRime.patch(full, pack, CellDictionaryEnglish.Kind.ALPHABETIC) }
+        assertTrue(CellDictionaryRime.patch(full, pack, CellDictionaryEnglish.Kind.T9).contains("@before last"))
+    }
+
     @Test fun `unsupported later schema does not leave earlier schema partially edited`() {
         val rime = temp.newFolder()
         val store = store()
