@@ -263,6 +263,8 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("语音模型空闲后全部释放", performance, SettingsRoutes.Performance, "Paraformer 释放 常驻 空闲 内存 语音 永不"),
         // 系统 › 关于 CyIME
         SettingsSearchEntry("使用文档", about, SettingsRoutes.About, "说明 帮助 文档 教程 用法"),
+        SettingsSearchEntry("检查更新", about, SettingsRoutes.About, "更新 升级 新版本 最新版本 下载 安装 版本号"),
+        SettingsSearchEntry("自动检查更新", about, SettingsRoutes.About, "自动 更新 升级 新版本 提醒"),
         page("隐私策略", about, SettingsRoutes.Privacy, "隐私 数据 联网 收集"),
         page("开源许可证", about, SettingsRoutes.Licenses, "许可 开源 license 第三方"),
         page("日志查看器", about, SettingsRoutes.LogViewer, "日志 log 崩溃 错误"),
@@ -272,6 +274,9 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // are hidden in public, elder and friend packages.
         (it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.HandwritingCapture, SettingsRoutes.RimeFileBrowser) &&
             it.title != "保存语音调优录音") || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
+    }.filter {
+        // The elder package has no update entry (AppUpdater.supported).
+        com.kingzcheung.xime.update.AppUpdater.supported || it.title !in setOf("检查更新", "自动检查更新")
     }
 }
 
