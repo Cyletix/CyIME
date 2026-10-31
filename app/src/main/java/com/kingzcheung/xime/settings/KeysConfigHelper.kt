@@ -733,7 +733,8 @@ object KeysConfigHelper {
         if (schemaId == _appliedLayoutSchemaId && section == _activeMergedSection) return
         _appliedLayoutSchemaId = schemaId
         _activeMergedSection = section
-        val custom = CustomKeyboardLayouts.find(schemaId)
+        // 自建布局的拼音方案，或双拼在自建合并键布局上的版本：按那个布局的键和手势。
+        val custom = CustomKeyboardLayouts.forSchema(schemaId)
         if (custom != null) {
             _zhRows = custom.typingRows()
             _keyGestureConfig.value = custom.gestures(_keyGestureConfigZhBase)

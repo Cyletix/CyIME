@@ -36,7 +36,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             val unsupportedCode = rawText.any { it !in 'a'..'z' && it !in 'A'..'Z' && it != '\'' && !it.isWhitespace() && it != 'ü' }
             val prefix = if (t9) service.t9PartialSegments.joinToString("") { it.text }
                 else snapshot.getOrNull(3).orEmpty()
-            val display = PinyinEditDisplay(normalized, snapshot.getOrNull(4).orEmpty().removePrefix(prefix).trim(), t9, isMerged14 = com.kingzcheung.xime.settings.InputProfiles.describe(state.currentSchemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, groups = com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(state.currentSchemaId)?.rows?.flatten() ?: if (com.kingzcheung.xime.settings.InputProfiles.describe(state.currentSchemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) com.kingzcheung.xime.rime.merged14Groups else emptyList())
+            val display = PinyinEditDisplay(normalized, snapshot.getOrNull(4).orEmpty().removePrefix(prefix).trim(), t9, isMerged14 = com.kingzcheung.xime.settings.InputProfiles.describe(state.currentSchemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, groups = com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(state.currentSchemaId)?.rows?.flatten() ?: if (com.kingzcheung.xime.settings.InputProfiles.describe(state.currentSchemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) com.kingzcheung.xime.rime.merged14Groups else emptyList())
             val text = display.text
             // Keep the visible separators in the editor buffer. Merely opening/moving
             // does not rewrite Rime or lock a nine-key translation; a real edit does.
@@ -120,7 +120,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 else {
                     val engineText = if (changed) session.protectedInput + (com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(session.schemaId)?.encode(text) ?: text) else session.expectedInput
                     val engineCaret = if (changed) caret else PinyinEditDisplay(
-                        session.expectedInput.drop(session.protectedInput.length), session.text, isMerged14 = com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, groups = com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(session.schemaId)?.rows?.flatten() ?: if (com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) com.kingzcheung.xime.rime.merged14Groups else emptyList()).rawOffset(caret)
+                        session.expectedInput.drop(session.protectedInput.length), session.text, isMerged14 = com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, groups = com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(session.schemaId)?.rows?.flatten() ?: if (com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) com.kingzcheung.xime.rime.merged14Groups else emptyList()).rawOffset(caret)
                     engine.applyPinyinEdit(session.expectedInput, engineText,
                         session.protectedInput.length + engineCaret, session.protectedInput.length,
                         session.protectedText, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
