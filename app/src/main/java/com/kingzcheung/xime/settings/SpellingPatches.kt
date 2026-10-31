@@ -85,6 +85,12 @@ object SpellingPatches {
         .mapNotNull { file -> file.name.removeSuffix(".schema.yaml").takeIf { file.isFile && file.name.endsWith(".schema.yaml") } }
         .filter { DoublePinyinScheme.splitLayoutVariant(it) != null }.sorted()
 
+    /** 现在用的是双拼 26 键或它在自建布局上的版本：模糊音设置据此提醒打开「模糊音也用于双拼」。 */
+    fun usingDoublePinyin(context: Context): Boolean {
+        val id = SettingsPreferences.getCurrentSchema(context)
+        return id in doublePinyinSchemas(context) || DoublePinyinScheme.splitLayoutVariant(id) != null
+    }
+
     /** 设置页改完开关后在后台线程调用：写补丁，有改动就通知输入法重新部署。 */
     @Synchronized fun apply(context: Context) {
         if (!sync(context)) return
