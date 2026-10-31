@@ -2,6 +2,8 @@
 
 2026-10-30：中文滑行已接入应用。中文词表 `app/src/main/assets/glide_pinyin.txt` 由 `python -B tools/glide_lab/build_pinyin_lexicon.py` 从 `app/data` 的雾凇词频生成（同音合并、取前 30000 个编码并补齐单音节），双拼在应用里按方案逐音节换码；回归见 `app/src/test/.../glide/GlideChineseLexiconTest.kt`。以下为 10-03 原型说明。
 
+2026-10-31：英文滑行连着划时前后两个词一起选（i 划到 m、n 之间再划 done → I'm done），缩写上屏带撇号。`english_bigrams.txt`、`english_contractions.txt` 由 `python -B tools/glide_lab/build_english_bigrams.py --norvig <count_1w/2w 所在目录> --cornell <movie_lines.txt>` 生成（原始语料不进仓库，来源见脚本和 NOTICE）；加 `--holdout` 留出十分之一对白做回放。留出 1.3 万句、合成轨迹（键位抖动 ±¼/±½/±¾ 键宽）每词首选：各划各的 98.4/94.5/77.6%，按上下文连同前一个词 99.4/98.4/90.8%（SHAPE_SCALE=32）。回归见 `GlidePairCorrectionTest`。
+
 2026-10-03：**仅电脑离线原型，未接入 Android，未验收。** 本目录不在应用 source set 内，不修改键盘、候选、Rime、配置或词库，不运行 Gradle，不打包、不安装、不联系设备，不自动联网或下载依赖。
 
 ## 本轮具备什么

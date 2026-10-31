@@ -1,0 +1,60 @@
+# 滑行用的英文缩写，由 tools/glide_lab/build_english_bigrams.py 生成。
+# 去撇号写法 缩写 [插入排名] [?]：有排名的是 english.txt 没有的词，按排名插进滑行词表；? 表示原词也常用，缩写只排进候选。
+im i'm
+ive i've 99
+ill i'll
+id i'd
+youre you're 38
+youve you've 149
+youll you'll 184
+youd you'd 249
+hes he's 79
+hell he'll 141 ?
+hed he'd 619
+shes she's 143
+shell she'll
+shed she'd
+its it's
+itll it'll 496
+were we're ?
+weve we've 260
+well we'll ?
+wed we'd
+theyre they're 141
+theyve they've 623
+theyll they'll 422
+theyd they'd 834
+thats that's
+thatll that'll 1245
+whats what's
+whatre what're 934
+whatd what'd 754
+whos who's 306
+whod who'd 2194
+wheres where's 368
+whered where'd 1079
+hows how's 516
+howd how'd 710
+theres there's 123
+heres here's 599
+lets let's
+dont don't
+doesnt doesn't 182
+didnt didn't 92
+cant can't
+couldnt couldn't 274
+wont won't 164
+wouldnt wouldn't 196
+shouldnt shouldn't 515
+isnt isn't 179
+arent aren't 345
+wasnt wasn't 229
+werent weren't 574
+havent haven't 260
+hasnt hasn't 739
+hadnt hadn't 934
+aint ain't 208
+cmon c'mon 654
+yknow y'know 974
+oclock o'clock 843
+maam ma'am 875

@@ -301,26 +301,48 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /** 紧挨着的上一笔英文滑行（候选、大小写），连着划时连同它一起选；屏上不再紧跟它就作废。 */
+    private var lastGlide: com.kingzcheung.xime.glide.PreviousGlide? = null
+
     /**
      * 英文滑行整词上屏：与逐字母英文输入同一提交边界。前面紧挨文字时补空格；
-     * 上屏后记为当前英文词，其余候选沿用英文候选的回删替换。
+     * 按光标前的词选这一笔的词，紧挨着上一笔滑行时前后两个词一起选，必要时先改掉上一个词（I'm done）。
+     * 上屏后记为当前英文词，其余候选沿用英文候选的回删替换；整对候选连上一个词一起替换。
      */
-    internal fun commitGlideWord(word: String, alternatives: List<String>) {
-        if (word.isEmpty() || hasPendingCandidateCommit) return
+    internal fun commitGlideWord(candidates: List<com.kingzcheung.xime.glide.GlideCandidate>, case: (String) -> String) {
+        if (candidates.isEmpty() || hasPendingCandidateCommit) return
         postRimeJob {
             withEditor {
                 if (!service.uiState.value.isAsciiMode) return@withEditor
                 service.predictionManager.invalidatePendingPredictions()
                 val state = service.candidateState.value
+                val textBefore = service.currentInputConnection?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+                val replaceSupported = service.supportsEnglishCandidateReplace()
+                val previous = lastGlide?.takeIf {
+                    replaceSupported && state.glidedWord.isNotEmpty() && it.text == state.glidedWord &&
+                        state.pendingEnglishText.endsWith(state.glidedWord) && textBefore.endsWith(state.glidedWord)
+                }
+                fun planFor(previous: com.kingzcheung.xime.glide.PreviousGlide?) = com.kingzcheung.xime.glide.planGlideCommit(
+                    candidates, case, previous,
+                    com.kingzcheung.xime.glide.glideContextWord(if (previous != null) textBefore.dropLast(previous.text.length) else textBefore),
+                    com.kingzcheung.xime.glide.GlideLexicon.loadedBigrams(), com.kingzcheung.xime.glide.GlideLexicon.loadedContractions())
+                var plan = planFor(previous)
+                val head = if (previous == null) null else plan.replacePrevious?.let { replacement ->
+                    if (service.replaceBeforeCursor(previous.text, replacement)) replacement else null
+                } ?: previous?.text
+                // 换上一个词没成功（宿主拒绝）就只选这一笔，不留整对候选。
+                if (previous != null && plan.replacePrevious != null && head == previous.text) plan = planFor(null)
+                val word = plan.word
                 val before = service.currentInputConnection?.getTextBeforeCursor(1, 0)?.lastOrNull()
                 val text = com.kingzcheung.xime.glide.glideCommitText(word, before)
                 if (!service.commitTextAndPredict(text, isPaste = false, allowPrediction = false).accepted) return@withEditor
+                lastGlide = com.kingzcheung.xime.glide.PreviousGlide(word, candidates.take(com.kingzcheung.xime.glide.PAIR_TOP), case)
                 service.candidateState.value = state.copy(
                     inputText = "", preeditText = "", isComposing = false,
                     candidates = emptyList(), candidateComments = emptyList(), candidateActions = emptyList(),
-                    pendingEnglishText = word, glidedWord = word,
-                    associationCandidates = if (service.isSecretEditor()) emptyList() else alternatives.filter { it != word },
-                    englishReplaceSupported = service.supportsEnglishCandidateReplace(),
+                    pendingEnglishText = if (plan.pair && head != null) head + text else word, glidedWord = word,
+                    associationCandidates = if (service.isSecretEditor()) emptyList() else plan.alternatives,
+                    englishReplaceSupported = replaceSupported,
                     hasNextPage = false, hasPrevPage = false, isShowingRecentClipboard = false,
                 )
             }
@@ -590,7 +612,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
                     val current = service.candidateState.value
                     // 滑行出词后直接点字母：光标仍紧跟那个词时自动补空格；空格、删除或标点之后不补。
-                    val afterGlide = current.glidedWord.isNotEmpty() && current.pendingEnglishText == current.glidedWord &&
+                    // 连着划两个词时当前英文词是整对（I'm done），光标仍紧跟这一笔的词就算。
+                    val afterGlide = current.glidedWord.isNotEmpty() && current.pendingEnglishText.endsWith(current.glidedWord) &&
                         service.currentInputConnection?.getTextBeforeCursor(current.glidedWord.length, 0)
                             ?.toString() == current.glidedWord
                     // Japanese 英数 follows 全角／半角, so full-width letters can be typed directly.

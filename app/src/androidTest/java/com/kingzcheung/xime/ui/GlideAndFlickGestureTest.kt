@@ -98,7 +98,7 @@ class GlideAndFlickGestureTest {
                                 KeyboardCallbacks(onKeyPress = { text, _ -> commits += "key:$text" },
                                     onCandidateSelect = {}, onCommitText = { commits += "literal:$it" },
                                     onPreeditKeyInput = { commits += "preedit:$it"; true },
-                                    onGlideWord = { word, _ -> commits += "glide:$word" },
+                                    onGlideWord = { words, case -> commits += "glide:${case(words.first().word)}" },
                                     onCursorMove = { commits += "cursor" }),
                                 modifier = Modifier.size(520.dp, 320.dp))
                         }

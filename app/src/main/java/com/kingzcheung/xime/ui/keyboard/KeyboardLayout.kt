@@ -353,9 +353,9 @@ fun KeyboardLayout(
                 kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word) }
                 return@launch
             }
-            val words = candidates.map { com.kingzcheung.xime.glide.glideCased(it.word, shift.isShifted,
+            val case: (String) -> String = { word -> com.kingzcheung.xime.glide.glideCased(word, shift.isShifted,
                 shift == com.kingzcheung.xime.viewmodel.ShiftMode.CAPS) }
-            kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideWord?.invoke(words.first(), words.drop(1)) }
+            kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideWord?.invoke(candidates, case) }
         }
     }
     // 提前读入词表，第一次滑行不必等待。
@@ -363,7 +363,10 @@ fun KeyboardLayout(
         if (glideEnabled) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
                 if (chineseGlide) com.kingzcheung.xime.glide.GlideLexicon.pinyin(glideContext)
-                else com.kingzcheung.xime.glide.GlideLexicon.words(glideContext)
+                else {
+                    com.kingzcheung.xime.glide.GlideLexicon.words(glideContext)
+                    com.kingzcheung.xime.glide.GlideLexicon.bigrams(glideContext)
+                }
             }
         }
     }
