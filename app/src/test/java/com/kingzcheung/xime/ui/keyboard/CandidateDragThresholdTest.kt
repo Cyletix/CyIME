@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /** 0 键拖动选词：离按下点超过键盘区宽或高的一半才算拖动，之内都是键自己的滑动（用户 10-25）。 */
 class CandidateDragThresholdTest {
@@ -22,5 +23,12 @@ class CandidateDragThresholdTest {
 
     @Test fun unknownKeyboardAreaNeverDrags() {
         assertFalse(isCandidateDrag(Offset(-2000f, -2000f), Size.Zero))
+    }
+
+    // 用户 10-31：注释是拼音（没装释义词典）时九键拖不动了。拖动选词跟着「下一项」，不跟词典。
+    @Test fun nineKeyDragFollowsTheNextKeyNotTheGlossDictionary() {
+        val source = File("src/main/java/com/kingzcheung/xime/ui/keyboard/T9KeyboardLayout.kt").readText()
+        assertTrue(source.contains(".dragToCandidate(nextCandidate,"))
+        assertFalse(source.contains(".dragToCandidate(glossHoldEnabled"))
     }
 }
