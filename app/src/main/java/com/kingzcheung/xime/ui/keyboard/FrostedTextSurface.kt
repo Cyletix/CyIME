@@ -15,6 +15,8 @@ internal data class FrostedTextSurface(
     val selectedText: Color,
     val shadow: Shadow,
     val controlBackground: Color,
+    /** 宿主换成反差色时托住字的光晕（见 [glassTextHalo]）；白、黑宿主上都已清楚时为 null。 */
+    val halo: GlassTextHalo? = null,
 )
 
 internal val LocalFrostedTextSurface = staticCompositionLocalOf<FrostedTextSurface?> { null }
@@ -30,7 +32,8 @@ internal fun CandidateBarVisuals.withTextSurface(surface: FrostedTextSurface?): 
 
 /**
  * Preserve readable theme colors and use only a small opposing glyph shadow for live content.
- * No extra rail tint is painted and no arbitrary-host contrast guarantee is made at low opacity.
+ * No extra rail tint is painted. When the rail's glass is too thin for a white or black host,
+ * an opposing glyph halo of just the needed strength keeps the text at the keycap label contrast.
  * Existing round toolbar controls use the same key opacity as ordinary keycaps.
  */
 internal fun resolveFrostedTextSurface(
@@ -47,9 +50,9 @@ internal fun resolveFrostedTextSurface(
     val normalText = readableThemeText(text, surface)
     val activeText = readableThemeText(selectedText, highlight.compositeOver(surface))
     return FrostedTextSurface(normalText, activeText,
-        Shadow(color = (if (normalText.luminance() > 0.5f) Color.Black else Color.White).copy(alpha = 0.8f),
-            blurRadius = shadowRadiusPx),
-        frostedKeyColor(keyBackground, normalText, config))
+        Shadow(color = glassHaloColor(normalText).copy(alpha = 0.8f), blurRadius = shadowRadiusPx),
+        frostedKeyColor(keyBackground, normalText, config),
+        glassTextHalo(listOf(normalText, activeText), surface, config.normalized().backgroundOpacity))
 }
 private fun readableThemeText(color: Color, background: Color): Color {
     val opaque = color.copy(alpha = 1f)

@@ -238,7 +238,13 @@ private fun CandidatePageContent(
         pageScrollEvents?.collect { direction -> scrollPage(direction) }
     }
 
-    Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)) {
+    // 与候选栏同一规则：玻璃太薄时候选字垫反色光晕（侧栏键帽本身已够清楚，不生晕）。
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    val halo = remember(glass, state.backgroundColor, state.textColor) {
+        if (glass.enabled) glassTextHalo(listOf(state.textColor), state.backgroundColor.copy(alpha = 1f),
+            glass.normalized().backgroundOpacity) else null
+    }
+    Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor).glassTextHalo(halo)) {
         BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val t9 = state.matchT9Geometry
             val qwerty = state.qwertyGeometry

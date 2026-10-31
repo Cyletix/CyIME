@@ -386,7 +386,9 @@ fun CandidateBar(
             .then(if (glassEnabled) Modifier else Modifier.visualMaterial(VisualStyles.current, cardTopCorner,
                 level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING
                     else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE, bottomRadius = 0.dp))
-            .padding(horizontal = horizontalPadding),
+            .padding(horizontal = horizontalPadding)
+            // 玻璃太薄时字和图标垫反色光晕，宿主是黑是白都看得清（用户 10-31 黑色背景截图）。
+            .glassTextHalo(textSurface?.halo),
         verticalArrangement = Arrangement.Center,
     ) {
         if (showPreedit) {

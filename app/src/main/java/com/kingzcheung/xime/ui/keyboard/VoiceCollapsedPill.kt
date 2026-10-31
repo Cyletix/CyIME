@@ -102,7 +102,8 @@ internal fun VoiceCollapsedPill(
                         currentBoundsCallback(Rect(floor(bounds.left).toInt(), floor(bounds.top).toInt(), ceil(bounds.right).toInt(), ceil(bounds.bottom).toInt()))
                     }
                     .clip(RoundedCornerShape(HardwareCandidateCornerRadius)).then(surface())
-                    .testTag("voice-collapsed-pill").padding(4.dp),
+                    .testTag("voice-collapsed-pill").padding(4.dp)
+                    .glassTextHalo(textSurface?.halo),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 HardwareToolbarLanguageKey(color, languageActions, languageLabel, onSwitchLanguage)
