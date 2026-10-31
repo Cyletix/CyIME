@@ -169,8 +169,12 @@ internal fun FloatingKeyboardContainer(
     if (!isFloatingMode) {
         if (previewRect == null) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
+                // 宽度按整 dp 存，屏幕宽多半不是整 dp（1080px / 2.625 = 411.43dp → 411dp = 1079px）：
+                // 差不到 1dp 时卡片居中会把多出的 1px 放在左边，透出后面的应用，看着像左边一条缝、右边没有。
+                // 差不到 1dp 就是要铺满整宽。
                 val width = (resolvedWidthDp.takeIf { it > 0 }
                     ?: resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), fixedWidthDp)).dp.coerceAtMost(maxWidth)
+                    .let { if (maxWidth - it < 1.dp) maxWidth else it }
                 val travel = ((maxWidth - width) / 2f).value
                 val undockPull = remember { UndockPullState() }
                 Box(Modifier.align(Alignment.TopCenter)
