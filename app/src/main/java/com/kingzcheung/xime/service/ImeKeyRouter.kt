@@ -301,6 +301,38 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /** 英文选词后自动补的空格（默认关），只管紧接着的一个键，见 [EnglishAutoSpace]。 */
+    internal val englishAutoSpace = EnglishAutoSpace()
+
+    /**
+     * 紧跟自动空格的键：空格不再多打，句末标点放到空格前面，右括号去掉空格；返回 true 表示这个键已处理完。
+     * 其他键、或光标前已不是刚上屏的“词+空格”时返回 false，键照常处理、空格保留。
+     */
+    internal suspend fun consumeEnglishAutoSpace(key: String): Boolean {
+        if (EnglishAutoSpace.isNeutral(key)) return false
+        val armed = englishAutoSpace.take() ?: return false
+        val replacement = EnglishAutoSpace.replacementFor(key) ?: return false
+        return withEditor {
+            if (service.uiState.value.inputTarget.isInternal) return@withEditor false
+            val ic = service.currentInputConnection ?: return@withEditor false
+            if (!ic.getSelectedText(0).isNullOrEmpty()) return@withEditor false
+            val before = runCatching { ic.getTextBeforeCursor(armed.length, 0)?.toString() }.getOrNull()
+            if (before != armed) return@withEditor false
+            if (replacement.isEmpty()) return@withEditor true
+            ic.beginBatchEdit()
+            try {
+                if (!ic.deleteSurroundingText(1, 0)) return@withEditor false
+                // 宿主不收标点就把空格放回去，什么都不丢。
+                if (!service.commitTextAndPredict(replacement, isPaste = false, allowPrediction = false).accepted) ic.commitText(" ", 1)
+            } finally {
+                ic.endBatchEdit()
+            }
+            service.candidateState.value = service.candidateState.value.copy(
+                pendingEnglishText = "", associationCandidates = emptyList())
+            true
+        }
+    }
+
     /** 紧挨着的上一笔英文滑行（候选、大小写），连着划时连同它一起选；屏上不再紧跟它就作废。 */
     private var lastGlide: com.kingzcheung.xime.glide.PreviousGlide? = null
 
@@ -542,6 +574,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command
             if (usesDirectFieldInput && routeDirectFieldKey(key, isShifted, hardwareEvent)) return@command
+            if (englishAutoSpace.isArmed && consumeEnglishAutoSpace(key)) return@command
             if (hardwareEvent != null) {
                 // Idle Tab belongs to the editor: single-line fields move focus (Shift+Tab backwards),
                 // multi-line ones insert a tab. Only an unfinished composition keeps Tab in the IME.
@@ -1513,13 +1546,20 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (usesDirectFieldInput) return false
         val state = service.candidateState.value
         service.predictionManager.invalidatePendingPredictions()
+        englishAutoSpace.disarm()
+        // 英文选词后自动加空格（默认关）：只跟在英文补全词后面，中文联想不加。
+        val autoSpace = state.pendingEnglishText.isNotEmpty() &&
+            service.uiState.value.let { (it.isAsciiMode || it.inputProfile.language.typesLettersDirectly) && !it.inputTarget.isInternal } &&
+            SettingsPreferences.getPrefsPublic(service).getBoolean(EnglishAutoSpace.PREF_KEY, false)
         val accepted = commitAssociationSelection(state, index,
             commit = { text ->
                 service.commitTextAndPredict(text, isPaste = false,
                     allowPrediction = !SettingsPreferences.isSingleAssociationMode(service)).accepted
             },
-            replace = service::replaceBeforeCursor)
+            replace = service::replaceBeforeCursor,
+            suffix = if (autoSpace) " " else "")
         if (!accepted) return false
+        if (autoSpace) associationWordAt(state, index)?.let(englishAutoSpace::arm)
         service.candidateState.value = service.candidateState.value.copy(
             pendingEnglishText = "", associationCandidates = emptyList())
         hardwareNavigation.clear()
@@ -1556,6 +1596,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     /** 单次退格处理（service.keyProcessingDispatcher 上执行）。 */
     internal suspend fun processDeleteKey() {
         val owner = service.uiState.value.inputSessionId
+        // 退格照常删掉自动补的空格；之后再打标点、空格不再按自动空格处理。
+        englishAutoSpace.disarm()
         // 快捷发送表单显示：退格按焦点路由到表单内 EditText（与单击退格同一路径），不进入 Rime
         if (service.uiState.value.showQuickSendForm) {
             withEditor {
