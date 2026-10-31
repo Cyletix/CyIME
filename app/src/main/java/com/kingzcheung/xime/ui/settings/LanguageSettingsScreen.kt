@@ -97,7 +97,7 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                                 Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                     if (expanded) "收起${language.displayName}设置" else "展开${language.displayName}设置")
                             }
-                            Switch(checked, enabled = canChange, modifier = Modifier.testTag("language-toggle:${language.id}"),
+                            Switch(checked, enabled = canChange, colors = settingsSwitchColors(), modifier = Modifier.testTag("language-toggle:${language.id}"),
                                 onCheckedChange = { enabled ->
                                 scope.launch {
                                     saving = true

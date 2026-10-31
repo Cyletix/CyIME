@@ -10,6 +10,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import com.kingzcheung.xime.ui.settings.settingsSwitchColors
 import kotlin.math.roundToInt
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowInsetsControllerCompat
@@ -190,7 +191,8 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
             })
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("独立分号键", modifier = Modifier.weight(1f))
-                Switch(checked = layout.hasSemicolon(), onCheckedChange = { update(layout.setSemicolonEnabled(it)); selected = null }, enabled = !busy)
+                Switch(checked = layout.hasSemicolon(), onCheckedChange = { update(layout.setSemicolonEnabled(it)); selected = null }, enabled = !busy,
+                    colors = settingsSwitchColors())
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { selected?.let { update(layout.merge(it)) }; selected = null },
@@ -205,11 +207,11 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("强调元音 A E I O U", modifier = Modifier.weight(1f))
-                Switch(checked = red, onCheckedChange = { red = it }, enabled = !busy)
+                Switch(checked = red, onCheckedChange = { red = it }, enabled = !busy, colors = settingsSwitchColors())
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("强调改位字母", modifier = Modifier.weight(1f))
-                Switch(checked = redMoved, onCheckedChange = { redMoved = it }, enabled = !busy)
+                Switch(checked = redMoved, onCheckedChange = { redMoved = it }, enabled = !busy, colors = settingsSwitchColors())
             }
             Text("开启后，对应字母的文字和按键底色随主题强调；两个选项均关闭时使用普通按键颜色。备用空位不显示在键盘中。只有开启“独立分号键”才增加分号按键。", style = MaterialTheme.typography.bodySmall)
             }

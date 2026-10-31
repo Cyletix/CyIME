@@ -193,6 +193,7 @@ private fun DictionaryRow(
     val removable = installed != null && onRemove != null && !selected && !applied
     SettingsListRow(item.name, detail) {
         if (installed != null) Switch(checked = selected, onCheckedChange = onSelect, enabled = !busy,
+            colors = settingsSwitchColors(),
             modifier = Modifier.semantics { contentDescription = "启用${item.name}" })
         else TextButton(onClick = onDownload, enabled = !busy) { Text("下载") }
         if (onSource != null || removable) Box {

@@ -76,7 +76,7 @@ internal fun InputExperienceSettings(
                             style = MaterialTheme.typography.bodySmall)
                         if (lock != null) SettingsLockNote(lock.message)
                     }
-                    Switch(checked = settings.letterLongPressMenu, enabled = lock == null,
+                    Switch(checked = settings.letterLongPressMenu, enabled = lock == null, colors = settingsSwitchColors(),
                         modifier = Modifier.testTag("letter-long-press-menu"), onCheckedChange = {
                             settings = settings.copy(letterLongPressMenu = it); settings.save(context)
                         })

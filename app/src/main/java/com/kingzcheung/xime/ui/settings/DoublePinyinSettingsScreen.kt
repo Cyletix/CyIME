@@ -107,7 +107,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                         Text(subtitle, style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    Switch(id in enabled, enabled = !busy, modifier = Modifier.testTag("double-pinyin-enabled:$id"),
+                                    Switch(id in enabled, enabled = !busy, colors = settingsSwitchColors(), modifier = Modifier.testTag("double-pinyin-enabled:$id"),
                                         onCheckedChange = { on ->
                                             busy = true
                                             scope.launch {
