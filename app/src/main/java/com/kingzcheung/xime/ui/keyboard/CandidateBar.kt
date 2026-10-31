@@ -262,6 +262,7 @@ fun CandidateBar(
     val inputTextLocation = com.kingzcheung.xime.service.TerminalEditor.inputTextLocation(context)
     val showInputBoxStyle = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX
     val candidateTextSize = rememberCandidateTextSize()
+    val candidateItemPadding = rememberCandidateItemPadding(candidateTextSize.sp)
     val candidateFontFamily = AppFonts.candidateFontFamily
     val commentFontFamily = AppFonts.commentFontFamily
 
@@ -522,6 +523,7 @@ fun CandidateBar(
                     onUserScroll = callbacks.onCandidateStripScrolled,
                     onNearEnd = callbacks.onCandidateStripNearEnd,
                     scrollKey = (state as? CandidateBarState.ChineseCandidates)?.let { it.inputText to it.candidates.firstOrNull() },
+                    itemPadding = candidateItemPadding,
                 )
             } else if (state !is CandidateBarState.Idle) BoxWithConstraints(Modifier.weight(1f)) {
                 val showComments = candidateCommentsVisible(maxWidth.value, density.fontScale,
@@ -557,6 +559,7 @@ fun CandidateBar(
                             commentFontFamily = commentFontFamily,
                             learned = state is CandidateBarState.ChineseCandidates && candidate in LocalLearnedCandidates.current,
                             correction = if (state is CandidateBarState.ChineseCandidates) LocalCorrectedCandidates.current[candidate].orEmpty() else "",
+                            horizontalPadding = candidateItemPadding,
                         )
                     }
 
@@ -593,6 +596,7 @@ fun CandidateBar(
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
                             modifier = Modifier.testTag("bar-association:$index"),
+                            horizontalPadding = candidateItemPadding,
                         )
                     }
                 }
@@ -946,6 +950,8 @@ fun CandidateItem(
     selectionFill: Boolean = true,
     /** 候选栏还没滑动时藏起来的候选：不能点，也不接 Shift 拖动。 */
     interactive: Boolean = true,
+    /** 左右留白（含在点按范围和选中底色里），见 [rememberCandidateItemPadding]。 */
+    horizontalPadding: androidx.compose.ui.unit.Dp = CANDIDATE_ITEM_PADDING,
 ) {
     // 登记位置给 Shift 拖动：从 Shift 拖到这里松手，按住 Shift 选它（释义模式上屏英文）。
     val dropId = remember { Any() }
@@ -967,7 +973,7 @@ fun CandidateItem(
                 onClick = onClick,
                 onLongClick = onLongClick
             ) else Modifier)
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            .padding(horizontal = horizontalPadding, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -1006,6 +1012,31 @@ fun CandidateItem(
             )
         }
     }
+}
+
+/** 候选两侧的默认留白。 */
+internal val CANDIDATE_ITEM_PADDING = 4.dp
+
+/** 「候选词间距加宽」时每侧留白：按字号加大，两个候选之间（含 4dp 间隔）约空出 1.2 个字。 */
+internal fun wideCandidateItemPadding(fontSize: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    CANDIDATE_ITEM_PADDING + fontSize * 0.3f
+
+/** 候选两侧留白，随设置「候选词间距加宽」实时变化（默认关，B站反馈 10-31）。 */
+@Composable
+internal fun rememberCandidateItemPadding(fontSize: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.Dp {
+    val context = LocalContext.current
+    val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
+    var wide by remember(preferences) { mutableStateOf(SettingsPreferences.isWideCandidateSpacing(context)) }
+    DisposableEffect(preferences) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == SettingsPreferences.KEY_WIDE_CANDIDATE_SPACING)
+                wide = SettingsPreferences.isWideCandidateSpacing(context)
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    val fontDp = with(LocalDensity.current) { fontSize.toDp() }
+    return if (wide) wideCandidateItemPadding(fontDp) else CANDIDATE_ITEM_PADDING
 }
 
 /** Reserve the same text height before asynchronous candidates arrive. */
@@ -1176,6 +1207,8 @@ internal fun FixedCandidateStrip(
     onNearEnd: (() -> Unit)? = null,
     /** 换了这个值（新的编码）就回到最前面。 */
     scrollKey: Any? = null,
+    /** 每个候选左右的留白，见 [rememberCandidateItemPadding]。 */
+    itemPadding: androidx.compose.ui.unit.Dp = CANDIDATE_ITEM_PADDING,
 ) {
     val measurer = rememberTextMeasurer()
     var stripOriginX by remember { mutableStateOf(Float.NaN) }
@@ -1230,7 +1263,7 @@ internal fun FixedCandidateStrip(
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
-        val window = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap) {
+        val window = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap) {
             val widthAt: (Int) -> Int = { index ->
                 val text = candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size)
                 val primary = measurer.measure(AnnotatedString(text),
@@ -1241,7 +1274,7 @@ internal fun FixedCandidateStrip(
                     inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
                         fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
                 // Padding rounds each side independently at fractional device densities.
-                primary + secondary + with(density) { 2 * 4.dp.roundToPx() }
+                primary + secondary + with(density) { 2 * itemPadding.roundToPx() }
             }
             if (localGap != null) {
                 CandidateStripWindow(splitCandidateWindow(all.size, focused, localGap.first, constraints.maxWidth - localGap.second,
@@ -1272,7 +1305,7 @@ internal fun FixedCandidateStrip(
         val shiftDragFree = CandidateDropTargets.shared.hoveredBounds == null
         if (scrollable && localGap == null) {
             ScrollableCandidateRow(candidates, all, shownComments, visuals, callbacks, fontSize, focused, showNumberLabels,
-                itemSpacing, visibleIndices, scrollKey, onUserScroll, onNearEnd,
+                itemSpacing, itemPadding, visibleIndices, scrollKey, onUserScroll, onNearEnd,
                 selectionFill = shiftDragFree && !highlightShown,
                 onFocusedBounds = { focusedBounds = it; focusedOnScreen = true },
                 onFocusedGone = { focusedOnScreen = false })
@@ -1297,7 +1330,7 @@ internal fun FixedCandidateStrip(
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     learned = index < candidates.size && all[index] in LocalLearnedCandidates.current,
                     correction = if (index < candidates.size) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
-                    selectionFill = shiftDragFree && !highlightShown)
+                    selectionFill = shiftDragFree && !highlightShown, horizontalPadding = itemPadding)
             }
         }
         }
@@ -1312,7 +1345,8 @@ internal fun FixedCandidateStrip(
 private fun ScrollableCandidateRow(
     candidates: List<String>, all: List<String>, comments: List<String>, visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit, focused: Int,
-    showNumberLabels: Boolean, itemSpacing: androidx.compose.ui.unit.Dp, shown: IntRange, scrollKey: Any?,
+    showNumberLabels: Boolean, itemSpacing: androidx.compose.ui.unit.Dp, itemPadding: androidx.compose.ui.unit.Dp,
+    shown: IntRange, scrollKey: Any?,
     onUserScroll: (() -> Unit)?, onNearEnd: (() -> Unit)?, selectionFill: Boolean,
     onFocusedBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
     onFocusedGone: () -> Unit,
@@ -1359,7 +1393,7 @@ private fun ScrollableCandidateRow(
                 learned = numbered && all[index] in LocalLearnedCandidates.current,
                 correction = if (numbered) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
                 selectionFill = selectionFill,
-                interactive = !hidden)
+                interactive = !hidden, horizontalPadding = itemPadding)
         }
     }
 }
