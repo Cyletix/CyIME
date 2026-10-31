@@ -38,6 +38,28 @@ object PerformanceProfile {
             SettingsPreferences.getSttRefinerIdleMinutes(context), SettingsPreferences.getSttEngineIdleMinutes(context))
     }
 
+    /** 空闲释放时间的几个档：1、5、10、30、60 分钟和“永不”（0）。明细滑条和 [score] 共用。 */
+    val idleLevels = listOf(1, 5, 10, 30, 60, 0)
+
+    /** 落在第几档；旧设置里不在档上的值算最接近的那档（与滑条显示一致）。 */
+    fun idleLevelIndex(minutes: Int): Int = idleLevels.indexOf(minutes).takeIf { it >= 0 }
+        ?: idleLevels.indices.filter { idleLevels[it] != 0 }.minBy { kotlin.math.abs(idleLevels[it] - minutes) }
+
+    /**
+     * 配置高低，0～100：0 = 这页能调到的最省（低配），100 = 全开。按这页管的几项算：
+     * 语音模型全部释放前常驻多久 40 分，二次校正模型常驻多久 30 分（最多跟全部释放一样久），
+     * 按键动效 15 分，炫光 15 分；释放时间按滑条档位等分。三档都用同一算法，所以选中某档时正好落在那档的刻度上。
+     */
+    fun score(settings: PerformanceSettings): Int {
+        val top = (idleLevels.size - 1).toDouble()
+        val engine = idleLevelIndex(settings.speechEngineIdleMinutes) / top
+        // 全部释放时校正模型也一起卸掉，比全部释放更晚的设置不多算。
+        val refiner = minOf(idleLevelIndex(settings.speechRefinerIdleMinutes) / top, engine)
+        val points = 40 * engine + 30 * refiner +
+            (if (settings.keyAnimation) 15 else 0) + (if (settings.keyGlow) 15 else 0)
+        return Math.round(points).toInt().coerceIn(0, 100)
+    }
+
     /** 当前值对应的档位；null = 自定义。 */
     fun matching(settings: PerformanceSettings): PerformanceTier? =
         presets.entries.firstOrNull { it.value == settings }?.key

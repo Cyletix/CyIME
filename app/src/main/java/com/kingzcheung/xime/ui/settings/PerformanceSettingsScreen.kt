@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,10 +34,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilities
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
@@ -52,6 +57,23 @@ private val tierHints = mapOf(
     PerformanceTier.LOW to "关闭动效和炫光，语音用完 1 分钟就释放，内存最省",
 )
 private fun idleLabel(minutes: Int) = if (minutes == 0) "永不" else "$minutes 分钟"
+
+private val ladder = listOf(PerformanceTier.LOW, PerformanceTier.MEDIUM, PerformanceTier.HIGH)
+
+/** 「配置高低」标题后那句：几分，落在哪一档或哪两档之间。 */
+internal fun positionText(settings: PerformanceSettings): String {
+    val score = PerformanceProfile.score(settings)
+    PerformanceProfile.matching(settings)?.let { return "$score 分，就是${tierNames.getValue(it)}" }
+    val ticks = ladder.map { it to PerformanceProfile.score(PerformanceProfile.presets.getValue(it)) }
+    ticks.firstOrNull { it.second == score }?.let { return "$score 分，和${tierNames.getValue(it.first)}一样高" }
+    val lower = ticks.lastOrNull { it.second < score }
+    val upper = ticks.firstOrNull { it.second > score }
+    return when {
+        lower == null -> "$score 分，比低配还省"
+        upper == null -> "$score 分，比高配还高"
+        else -> "$score 分，在${tierNames.getValue(lower.first)}和${tierNames.getValue(upper.first)}之间"
+    }
+}
 
 /** 性能与省电：一键选档；改任何一项自动变成“自定义”。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +111,9 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
             }
             item {
                 SettingsSection(title = "档位") {
+                    PerformanceScale(settings)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     TierRow("自动（推荐）", "按本机配置自动选档 · 本机配置推荐：${tierNames.getValue(detected)}", auto) {
                         PerformanceProfile.applyAuto(context); refresh()
                     }
@@ -98,11 +123,11 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
                             PerformanceProfile.applyPreset(context, tier); refresh()
                         }
                     }
-                    // 「自定义」不是可点的档位：只有手动改过明细或动效时才显示，表示当前状态。
-                    if (!auto && current == null) {
-                        RowDivider()
-                        TierRow("自定义", "已单独调整明细或「按键效果」里的动效、炫光", true, enabled = false) {}
-                    }
+                    // 「自定义」一直列着但不能点：手动改过明细或动效、值对不上任何一档时自动选中，表示当前状态。
+                    val isCustom = !auto && current == null
+                    RowDivider()
+                    TierRow("自定义", if (isCustom) "已单独调整明细或「按键效果」里的动效、炫光"
+                        else "单独调整下面的明细或「按键效果」里的动效、炫光后，自动选中这一项", isCustom, enabled = false) {}
                 }
             }
             item {
@@ -155,14 +180,12 @@ internal fun TierRow(title: String, subtitle: String, selected: Boolean, enabled
     }
 }
 
-/** 空闲释放时间的几个档：1、5、10、30、60 分钟和“永不”（0）。 */
-private val idleLevels = listOf(1, 5, 10, 30, 60, 0)
+private val idleLevels = PerformanceProfile.idleLevels
 
 @Composable
 private fun IdleLevelSlider(title: String, minutes: Int, description: String, tag: String, onChoose: (Int) -> Unit) {
     // 旧设置里可能有不在档位上的值：落到最接近的档显示，拖动后才改。
-    val index = idleLevels.indexOf(minutes).takeIf { it >= 0 }
-        ?: idleLevels.indices.filter { idleLevels[it] != 0 }.minBy { kotlin.math.abs(idleLevels[it] - minutes) }
+    val index = PerformanceProfile.idleLevelIndex(minutes)
     var position by remember(minutes) { mutableStateOf(index.toFloat()) }
     val shown = idleLevels[position.roundToInt().coerceIn(idleLevels.indices)]
     // 和「按键效果」里的滑条同一写法：标题 + 主题色当前值一行，说明，滑条；两端标出最短和“永不”。
@@ -181,6 +204,72 @@ private fun IdleLevelSlider(title: String, minutes: Int, description: String, ta
             Text(idleLabel(idleLevels.first()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             Text(idleLabel(idleLevels.last()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** 刻度条两端各留半个圆点宽，0 分和 100 分的圆点不出界；文字按同一位置对齐。 */
+private val scaleInset = 10.dp
+
+/**
+ * 档位卡片顶上的刻度条：标题写几分、落在哪里，下面一条和滑条同色的横条，低配、中配、高配三档按同一算法标刻度，
+ * 实心圆点是当前设置。选中某档时圆点正好压在那档的刻度上；自定义时落在两档之间。
+ */
+@Composable
+private fun PerformanceScale(settings: PerformanceSettings) {
+    val colors = MaterialTheme.colorScheme
+    val score = PerformanceProfile.score(settings)
+    val current = PerformanceProfile.matching(settings)
+    val ticks = ladder.map { it to PerformanceProfile.score(PerformanceProfile.presets.getValue(it)) }
+    Column(Modifier.fillMaxWidth().testTag("performance-scale").padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("配置高低", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.width(8.dp))
+            Text(positionText(settings), style = MaterialTheme.typography.bodyMedium, color = colors.primary)
+        }
+        Text("0 最省，100 全开：语音模型常驻时长占 70 分，按键动效、炫光各 15 分。分越高，按麦克风越快，占内存和电越多",
+            style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        ScaleLabels(listOf(score)) {
+            Text("当前", style = MaterialTheme.typography.labelSmall, color = colors.primary, fontWeight = FontWeight.Medium)
+        }
+        val inactive = colors.secondaryContainer
+        val tickIdle = colors.outline
+        Canvas(Modifier.fillMaxWidth().height(20.dp)) {
+            val inset = scaleInset.toPx()
+            val y = size.height / 2
+            fun x(points: Int) = inset + (size.width - 2 * inset) * points / 100f
+            val line = 4.dp.toPx()
+            drawLine(inactive, Offset(x(0), y), Offset(x(100), y), strokeWidth = line, cap = StrokeCap.Round)
+            if (score > 0) drawLine(colors.primary, Offset(x(0), y), Offset(x(score), y), strokeWidth = line, cap = StrokeCap.Round)
+            ticks.forEach { (_, points) -> drawCircle(if (points <= score) colors.primary else tickIdle, 4.dp.toPx(), Offset(x(points), y)) }
+            drawCircle(colors.primary, 9.dp.toPx(), Offset(x(score), y))
+            drawCircle(colors.onPrimary, 3.5.dp.toPx(), Offset(x(score), y))
+        }
+        ScaleLabels(ticks.map { it.second }) {
+            ticks.forEach { (tier, points) ->
+                val here = tier == current
+                Text("${tierNames.getValue(tier)} $points", style = MaterialTheme.typography.labelSmall,
+                    color = if (here) colors.primary else colors.onSurfaceVariant,
+                    fontWeight = if (here) FontWeight.SemiBold else FontWeight.Normal)
+            }
+        }
+    }
+}
+
+/** 一行文字，每个按 [points]（0～100）对准刻度条上的位置居中，靠边时收在行内。 */
+@Composable
+private fun ScaleLabels(points: List<Int>, inset: Dp = scaleInset, content: @Composable () -> Unit) {
+    Layout(content, Modifier.fillMaxWidth()) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
+        val width = constraints.maxWidth
+        val start = inset.roundToPx()
+        val track = width - 2 * start
+        layout(width, placeables.maxOfOrNull { it.height } ?: 0) {
+            placeables.forEachIndexed { index, placeable ->
+                val center = start + track * points[index] / 100f
+                placeable.placeRelative((center - placeable.width / 2f).roundToInt().coerceIn(0, maxOf(0, width - placeable.width)), 0)
+            }
         }
     }
 }

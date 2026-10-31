@@ -260,7 +260,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("导出备份", backup, SettingsRoutes.Backup, "导出 备份 zip 换机", anchor = "操作"),
         SettingsSearchEntry("从备份恢复", backup, SettingsRoutes.Backup, "恢复 导入 还原 备份文件", anchor = "操作"),
         // 系统 › 性能与省电
-        SettingsSearchEntry("性能档位", performance, SettingsRoutes.Performance, "档位 自动 推荐 高配 中配 低配 自定义 省电", anchor = "档位"),
+        SettingsSearchEntry("性能档位", performance, SettingsRoutes.Performance, "档位 自动 推荐 高配 中配 低配 自定义 省电 配置高低 分数 当前位置 刻度", anchor = "档位"),
         SettingsSearchEntry("语音二次校正空闲后释放", performance, SettingsRoutes.Performance, "SenseVoice X-ASR 释放 空闲 内存 语音"),
         SettingsSearchEntry("语音模型空闲后全部释放", performance, SettingsRoutes.Performance, "Paraformer 释放 常驻 空闲 内存 语音 永不"),
         // 系统 › 关于 CyIME
