@@ -1034,7 +1034,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                     } else if (!state.isAsciiMode &&
                         hardwareEvent == null && SettingsPreferences.isSpaceCommitAssociationEnabled(service) &&
-                        candState.associationCandidates.isNotEmpty()
+                        candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery
                     ) {
                         // 空格上屏联想候选（中文模式 + 开关开启 + 联想候选存在）：上屏第一个联想词。
                         // 仅中文联想——英文模式此分支不生效，空格保持上屏空格字符；
@@ -1647,6 +1647,23 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /**
+     * 「删字后给同音字」（默认关）：这一下退格要删掉的字和删后光标前的文字（主线程调用）。开关关着、英文、密码框、
+     * 实体键盘紧凑模式、有选区（退格删的是选区）时不读输入框，返回 null。
+     */
+    private fun characterAboutToBeDeleted(): Pair<String, String>? {
+        val state = service.uiState.value
+        if (!SettingsPreferences.isDeleteRecovery(service) || state.isAsciiMode || !service.isChineseMode ||
+            state.isCompact || state.inputTarget.isInternal || service.isSecretEditor()) return null
+        val ic = service.currentInputConnection ?: return null
+        if (runCatching { !ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(true)) return null
+        // 多读两格：删掉的是代理对时，删后剩下的仍有联想上下文那么长（25）。
+        val before = runCatching { ic.getTextBeforeCursor(27, 0)?.toString() }.getOrNull()
+        if (before.isNullOrEmpty()) return null
+        val remaining = before.dropLastCharacter()
+        return before.substring(remaining.length) to remaining
+    }
+
+    /**
      * 「删掉刚上屏的词不学习」（默认关）：这一下退格（或上滑清空）把 Rime 刚上屏的那段整个删掉时，返回要减去学习的词。
      * 开关关着、没有在跟踪时不读输入框。主线程调用。
      */
@@ -1723,7 +1740,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             uiComposing = candState.isComposing || candState.inputText.isNotEmpty() || candState.preeditText.isNotEmpty(),
             partialSegments = service.t9PartialSegments.isNotEmpty(),
             pendingEnglish = candState.pendingEnglishText.isNotEmpty(),
-            candidatesVisible = candState.associationCandidates.isNotEmpty() || candState.isShowingRecentClipboard,
+            // 删字后放回的那一组不挡退格：接着删照常删字（见 DeletionRecovery）。
+            candidatesVisible = (candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery) ||
+                candState.isShowingRecentClipboard,
             predictionPending = predictionWasPending,
         ).skippingAssociation(SettingsPreferences.isDeleteSkipsAssociation(service), candState.isShowingRecentClipboard)
         if (target == DeletionTarget.WAIT) return
@@ -1839,19 +1858,31 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             else -> {
                 service.predictionManager.deleteLastChar()
 
+                var deletedBefore: Pair<String, String>? = null
                 val rejected = withEditor {
 
                     if (owner != service.uiState.value.inputSessionId) return@withEditor null
                     val word = rejectedCommitBefore(clearing = false)
+                    deletedBefore = characterAboutToBeDeleted()
                     service.sendDeleteKey()
                     word
                 }
                 rejected?.let(::unlearnRejectedCommit)
 
+                val recovery = deletedBefore?.let { (deleted, remaining) ->
+                    val run = DeletionRecovery.nextRun(
+                        candState.takeIf { it.isDeletionRecovery }?.deletionRecovery?.firstOrNull(), deleted) ?: return@let null
+                    val homophones = if (service.traditionalChineseOutput()) emptyList()
+                        else DeletionHomophones.homophones(service, deleted)
+                    // 删后的上下文以输入框为准，选区回报时不会把这一组当成上下文变了而清掉。
+                    service.predictionManager.replaceCommittedText(remaining)
+                    DeletionRecovery.words(run, homophones)
+                }.orEmpty()
                 service.candidateState.value = service.candidateState.value.copy(
                     candidates = emptyList(),
                     candidateComments = emptyList(),
-                    associationCandidates = emptyList(),
+                    associationCandidates = recovery,
+                    deletionRecovery = recovery,
                     isShowingRecentClipboard = false
                 )
                 // 候选展开页：无候选无编码，收起
@@ -2090,7 +2121,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             candState.pendingEnglishText.isNotEmpty() ||
             service.t9PartialSegments.isNotEmpty() ||
             service.rimeEngine.compositionActiveForDeletion() != false ||
-            candState.associationCandidates.isNotEmpty() || candState.isShowingRecentClipboard ||
+            (candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery) ||
+            candState.isShowingRecentClipboard ||
             service.predictionManager.hasPendingPrediction
 
     /** Ends the composition in the input FIFO, T9's own digit state included (see [com.kingzcheung.xime.rime.RimeEngine.endQueuedComposition]). */

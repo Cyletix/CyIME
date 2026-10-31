@@ -30,7 +30,8 @@ fun CandidateState.usesT9CandidateNavigation(profile: InputProfile): Boolean =
     profile.language == InputLanguage.CHINESE && profile.scheme == InputScheme.PINYIN &&
         profile.layout.kind == LayoutKind.T9 && profile.mode == InputMode.KEYBOARD &&
         ((isComposing && inputText.isNotEmpty()) ||
-            (!isComposing && inputText.isEmpty() && candidates.isEmpty() && associationCandidates.isNotEmpty())) &&
+            (!isComposing && inputText.isEmpty() && candidates.isEmpty() && associationCandidates.isNotEmpty() &&
+                !isDeletionRecovery)) &&
         pendingEnglishText.isEmpty() && !isShowingRecentClipboard
 
 internal val CandidateState.t9NavigationWords get() = if (isComposing) candidates else associationCandidates

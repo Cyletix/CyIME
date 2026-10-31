@@ -65,6 +65,7 @@ object SettingsPreferences {
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
+    private const val KEY_DELETE_RECOVERY = "delete_recovery_candidates"
     private const val KEY_UNLEARN_REJECTED_COMMIT = "unlearn_rejected_commit"
     
     const val KEY_STT_ENABLED = "stt_enabled"
@@ -679,6 +680,17 @@ object SettingsPreferences {
 
     fun setDeleteSkipsAssociation(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_DELETE_SKIPS_ASSOCIATION, enabled).apply()
+    }
+
+    /**
+     * 删字后给同音字（用户反馈 10-31，别人的需求，默认关）：退格删掉一个字后，候选栏先放回删掉的字，后面跟同音字，
+     * 删错了点一下补回来，打错了同音字直接点对的。不挡接着删。见 DeletionRecovery。
+     */
+    fun isDeleteRecovery(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_DELETE_RECOVERY, false)
+
+    fun setDeleteRecovery(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_DELETE_RECOVERY, enabled).apply()
     }
 
     /**

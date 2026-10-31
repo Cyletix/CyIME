@@ -20,6 +20,7 @@ import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.twotone.Backspace
+import androidx.compose.material.icons.automirrored.twotone.Undo
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
@@ -220,6 +221,9 @@ fun SmartPredictionSettingsContent(
                     var deleteSkipsAssociation by remember {
                         mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context))
                     }
+                    var deleteRecovery by remember {
+                        mutableStateOf(SettingsPreferences.isDeleteRecovery(context))
+                    }
                     SettingsSection(title = "联想行为", content = {
                         SettingsToggleItem(
                             icon = Icons.TwoTone.AutoAwesome,
@@ -244,6 +248,21 @@ fun SmartPredictionSettingsContent(
                             onCheckedChange = {
                                 deleteSkipsAssociation = it
                                 SettingsPreferences.setDeleteSkipsAssociation(context, it)
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsToggleItem(
+                            icon = Icons.AutoMirrored.TwoTone.Undo,
+                            title = "删字后给同音字",
+                            subtitle = "退格删掉字后，候选栏先放回删掉的字，后面跟同音字，删错了点一下补回来",
+                            checked = deleteRecovery,
+                            onCheckedChange = {
+                                deleteRecovery = it
+                                SettingsPreferences.setDeleteRecovery(context, it)
                             }
                         )
                         HorizontalDivider(
