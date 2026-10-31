@@ -125,8 +125,8 @@ internal fun OfflineModelCard() {
                     Column(Modifier.weight(1f)) {
                         Text("整句定稿", style = MaterialTheme.typography.bodyLarge)
                         Text(when {
-                            chineseCorrection -> "中文说完一整句（停顿约 1 秒或点结束）再统一校正一次，保留标点，更准，说完要多等一会儿；关闭时每 6 秒校正一次。只对中文生效。"
-                            senseVoiceChinese -> "中文用 SenseVoice 时保留标点，说完（点结束）把整段再识别一次，更准，说完要多等一会儿。只对中文生效。"
+                            chineseCorrection -> "中文说完一整句（停顿约 1 秒或点结束）再统一校正一次，更准，说完要多等一会儿；关闭时每 6 秒校正一次。只对中文生效。"
+                            senseVoiceChinese -> "中文用 SenseVoice 时，说完（点结束）把整段再识别一次，更准，说完要多等一会儿。只对中文生效。"
                             else -> "只对中文生效：先为中文开启上面的 SenseVoice 二次校正。"
                         },
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -143,6 +143,25 @@ internal fun OfflineModelCard() {
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null,
+                        colors = settingsSwitchColors())
+                }
+                // 自动加标点和整句定稿分开：关掉标点照样整句定稿（默认关，和 1.15.0 以前一样不自动加标点）。
+                val autoPunctuationAvailable = wholeSentenceAvailable && wholeSentence
+                var autoPunctuation by remember { mutableStateOf(SettingsPreferences.isSttAutoPunctuation(context)) }
+                HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Row(Modifier.fillMaxWidth().settingsSearchAnchor("自动加标点").testTag("speech-auto-punctuation")
+                    .toggleable(value = autoPunctuation, enabled = autoPunctuationAvailable, role = Role.Switch,
+                        onValueChange = { autoPunctuation = it; SettingsPreferences.setSttAutoPunctuation(context, it) })
+                    .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("自动加标点", style = MaterialTheme.typography.bodyLarge)
+                        Text(if (autoPunctuationAvailable) "保留模型打的逗号、句号、问号；关闭时停顿处留空格。说「逗号」「句号」「问号」「感叹号」始终出标点。"
+                            else "只在整句定稿开着时可用；现在停顿处留空格，说「逗号」「句号」「问号」「感叹号」出标点。",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = autoPunctuation, enabled = autoPunctuationAvailable, onCheckedChange = null,
                         colors = settingsSwitchColors())
                 }
                 if (chineseCorrection && !xasrReady) {
