@@ -52,7 +52,8 @@ class CangjieSchemeTest {
         assertEquals(InputScheme.CANGJIE, profile.scheme)
         assertEquals(LayoutKind.ALPHABETIC, profile.layout.kind)
         assertFalse("仓颉没有拼音编辑", profile.capabilities.editablePinyin)
-        assertEquals(LayoutKind.ALPHABETIC, InputProfiles.resolveLayout("qwerty_cangjie").kind)
+        // 字根键帽的 26 键就是中文的 26 键，否则布局面板多出一个「26键」，方案行里也没有仓颉（用户 10-31）
+        assertEquals(InputLayout.QWERTY, InputProfiles.resolveLayout("qwerty_cangjie"))
         assertTrue("仓颉跟随中文码表的字母排列", LetterLayouts.appliesTo(InputLanguage.CHINESE, InputScheme.CANGJIE))
     }
 
