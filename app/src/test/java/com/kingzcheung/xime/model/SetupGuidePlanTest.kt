@@ -145,15 +145,16 @@ class SetupGuidePlanTest {
     private val doublePinyins = listOf("double_pinyin_flypy" to "小鹤双拼", "double_pinyin_shoudao" to "首道双拼",
         "double_pinyin_ziranma" to "自然码", "double_pinyin_znabc" to "智能ABC双拼", "double_pinyin_jiajia" to "拼音加加",
         "double_pinyin_microsoft" to "微软双拼").map { (id, name) -> DoublePinyinChoice(id, name, "xx'xx") }
-    /** 新装：全拼 26 键，六种内置双拼都在方案栏里，没开模糊音。 */
+    /** 新装：全拼 26 键，六种内置双拼都在方案栏里，没开模糊音，没有字幕图标。 */
     private fun typingFacts() = facts(DeviceModelTier.ENHANCED).copy(doublePinyinChoices = doublePinyins,
         shownDoublePinyin = doublePinyins.map { it.id }.toSet())
 
     @Test fun keepingEveryAnswerChangesNoInputSetting() {
-        val f = typingFacts().copy(fuzzy = setOf("z_zh"))
+        val f = typingFacts().copy(fuzzy = setOf("z_zh"), usesCaption = true)
         val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input
         assertNull(input.switchTo)
         assertTrue(input.fuzzyOn.isEmpty() && input.fuzzyOff.isEmpty())
+        assertNull(input.captionIcon)
         assertFalse(input.downloadWubi)
         assertEquals(listOf("打字方式还是全拼，不变。"), input.lines)
         // 全拼的人方案栏里用不到双拼：推荐藏起来，页面上是一个默认打开的开关。
@@ -195,6 +196,16 @@ class SetupGuidePlanTest {
         // 双拼、五笔不用模糊音：不改。
         val double = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN, fuzzy = emptySet())).input
         assertTrue(double.fuzzyOn.isEmpty() && double.fuzzyOff.isEmpty())
+    }
+
+    @Test fun captionAnswerAddsOrRemovesTheHomeScreenIcon() {
+        val f = typingFacts()
+        assertEquals(true, SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(caption = true)).input.captionIcon)
+        val on = f.copy(usesCaption = true)
+        assertEquals(false, SetupGuidePlanner.plan(on, SetupGuidePlanner.suggest(on).copy(caption = false)).input.captionIcon)
+        // 老人包固定有图标。
+        val elder = on.copy(captionIconChangeable = false)
+        assertNull(SetupGuidePlanner.plan(elder, SetupGuidePlanner.suggest(elder).copy(caption = false)).input.captionIcon)
     }
 
     @Test fun otherInputWaysAreKeptAsTheyAre() {
