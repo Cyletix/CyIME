@@ -6,7 +6,8 @@ import com.kingzcheung.xime.settings.DoublePinyinScheme
 
 /**
  * 滑行词表与模板缓存。
- * - 英文：随包的 english.txt（按词频排序的常用英文词），与英文补全共用。
+ * - 英文：随包的 english.txt（按词频排序的常用英文词，与英文补全共用）加上缩写的去撇号写法；
+ *   连着划时用 english_bigrams.txt 给前后两个词整对打分（[rankGlideChoices]）。
  * - 中文：随包的 glide_pinyin.txt（雾凇词频合并同音后的常用拼音编码，音节用空格隔开，
  *   由 tools/glide_lab/build_pinyin_lexicon.py 生成）。全拼直接连写；双拼按当前方案逐音节换码。
  * 每种词表按布局缓存一份模板。
@@ -16,16 +17,35 @@ object GlideLexicon {
     private const val PINYIN_FILE = "glide_pinyin.txt"
     @Volatile private var words: List<String>? = null
     @Volatile private var pinyin: List<List<String>>? = null
+    private const val CONTRACTIONS_FILE = "english_contractions.txt"
+    private const val BIGRAMS_FILE = "english_bigrams.txt"
+    @Volatile private var contractions: EnglishContractions? = null
+    @Volatile private var bigrams: EnglishBigrams? = null
     /** 英文、全拼、双拼各留一份；双拼换方案（或改了键位）时按方案内容重建。 */
     private val cached = HashMap<String, Pair<Any?, GlideDecoder>>()
 
     fun words(context: Context): List<String> = words ?: synchronized(this) {
-        words ?: context.applicationContext.assets.open(FILE).bufferedReader().useLines { lines ->
-            lines.map { it.trim().lowercase() }
-                .filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } }
-                .distinct().toList()
-        }.also { words = it }
+        words ?: vocabulary(context).filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } }.also { words = it }
     }
+
+    /** english.txt 加上插进去的缩写写法（didnt、youre），滑行词表和双词表共用这一个排名。 */
+    private fun vocabulary(context: Context): List<String> = contractions(context).vocabulary(
+        context.applicationContext.assets.open(FILE).bufferedReader().useLines { it.toList() })
+
+    fun contractions(context: Context): EnglishContractions = contractions ?: synchronized(this) {
+        contractions ?: context.applicationContext.assets.open(CONTRACTIONS_FILE).bufferedReader()
+            .useLines { EnglishContractions(it.toList().asSequence()) }.also { contractions = it }
+    }
+
+    /** 英文双词表；须在后台线程调用。 */
+    fun bigrams(context: Context): EnglishBigrams = bigrams ?: synchronized(this) {
+        bigrams ?: context.applicationContext.assets.open(BIGRAMS_FILE).bufferedReader()
+            .useLines { EnglishBigrams(vocabulary(context), it) }.also { bigrams = it }
+    }
+
+    /** 已读入的双词表与缩写表；还没读完时为空，这一笔就不按上下文重排、不换缩写。 */
+    fun loadedBigrams(): EnglishBigrams? = bigrams
+    fun loadedContractions(): EnglishContractions? = contractions
 
     /** 常用拼音编码，每项是一个词的音节，按常用程度排列。 */
     fun pinyin(context: Context): List<List<String>> = pinyin ?: synchronized(this) {

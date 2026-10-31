@@ -25,7 +25,8 @@ class GlideKeyboard(val keyUnit: Float, val centers: Map<Char, Pair<Float, Float
     }
 }
 
-data class GlideCandidate(val word: String, val cost: Float)
+/** [cost] 含词频先验，用来排序；[shape] 只算轨迹（形状与起止点），按上下文重排时与双词表相加。 */
+data class GlideCandidate(val word: String, val cost: Float, val shape: Float = cost)
 
 class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
     private class Template(val word: String, val prior: Float, val xs: FloatArray, val ys: FloatArray)
@@ -66,8 +67,8 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
             if (end > MAX_ENDPOINT) continue
             val shape = shapes.getOrPut(collapseRepeats(template.word)) { dtw(sx, sy, template.xs, template.ys) }
             if (shape > MAX_SHAPE) continue
-            results += GlideCandidate(template.word,
-                shape + (start + end) / 2f * ENDPOINT_WEIGHT + template.prior * PRIOR_WEIGHT)
+            val geometry = shape + (start + end) / 2f * ENDPOINT_WEIGHT
+            results += GlideCandidate(template.word, geometry + template.prior * PRIOR_WEIGHT, geometry)
         }
         return results.sortedWith(compareBy<GlideCandidate> { it.cost }.thenBy { it.word }).take(limit)
     }

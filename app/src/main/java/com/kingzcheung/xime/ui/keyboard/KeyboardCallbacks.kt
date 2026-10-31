@@ -8,8 +8,11 @@ import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 data class KeyboardCallbacks(
     val onKeyPress: (String, Boolean) -> Unit,
     val onLetterNeighbors: ((String, String) -> Unit)? = null,
-    /** 英文滑行：首选整词上屏，其余作为可替换的英文候选。 */
-    val onGlideWord: ((String, List<String>) -> Unit)? = null,
+    /**
+     * 英文滑行：识别出的候选（去撇号的小写写法和轨迹代价）与按 Shift 改大小写的规则；
+     * 输入法按上下文（连着划时连同上一个词）选出上屏的词，其余作为可替换的英文候选。
+     */
+    val onGlideWord: ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> Unit)? = null,
     /** 中文滑行：识别出的一个词的编码（全拼或双拼），按点按同一路径接进当前编码。 */
     val onGlideCode: ((String) -> Unit)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },

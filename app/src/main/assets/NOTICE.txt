@@ -69,3 +69,14 @@ Models are downloaded on first use, or bundled in the offline edition only:
 - 3D-Speaker CAM++ speaker embedding zh-cn 16k-common (Alibaba 3D-Speaker), Apache-2.0;
   ONNX export published by sherpa-onnx. Used only to tell speakers apart in caption mode;
   voiceprints stay on the device.
+
+================================================================================
+English glide typing word-pair statistics
+================================================================================
+
+english_bigrams.txt and english_contractions.txt hold word and word-pair frequencies
+derived (counts only, no text) by tools/glide_lab/build_english_bigrams.py from:
+- Peter Norvig, Natural Language Corpus Data (count_1w.txt, count_2w.txt), MIT License,
+  Copyright (c) 2010-2017 Peter Norvig: https://github.com/norvig/pytudes
+- Cornell Movie-Dialogs Corpus, Cristian Danescu-Niculescu-Mizil and Lillian Lee (2011):
+  https://www.cs.cornell.edu/~cristian/Cornell_Movie-Dialogs_Corpus.html
