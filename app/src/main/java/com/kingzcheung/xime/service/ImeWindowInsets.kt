@@ -187,6 +187,34 @@ private fun imeWindowDrawsNavButtons(imeWindow: Window): Boolean {
     return runCatching { find(imeWindow.decorView) }.getOrDefault(false)
 }
 
+/**
+ * 手势导航时系统底部手势区的上沿（px，[view] 所在窗口的坐标）：从这里往下按住上滑会被系统当成回桌面。
+ * 三键导航、Android 9 或读不到时为 null。判断手势导航的规则与 [imeBottomInsetPx] 相同。
+ */
+internal fun bottomGestureZoneTopInWindowPx(view: android.view.View): Int? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+    return try {
+        val insets = view.rootWindowInsets ?: return null
+        val zone: Int
+        val tappable: Int
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            zone = insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
+            tappable = insets.getInsets(WindowInsets.Type.tappableElement()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            zone = insets.mandatorySystemGestureInsets.bottom
+            @Suppress("DEPRECATION")
+            tappable = insets.tappableElementInsets.bottom
+        }
+        if (zone <= 0) return null
+        val navigationMode = readSetting {
+            android.provider.Settings.Secure.getInt(view.context.contentResolver, "navigation_mode")
+        }
+        val gesture = if (navigationMode != null) navigationMode == 2 else tappable <= 0
+        if (!gesture) null else view.rootView.height - zone
+    } catch (e: Exception) { null }
+}
+
 private inline fun readSetting(read: () -> Int): Int? = try { read() } catch (_: Exception) { null }
 
 /** 获取当前活跃的底部 inset（px）。 */

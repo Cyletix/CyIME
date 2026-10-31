@@ -213,6 +213,15 @@ internal fun KeyboardResizeOverlay(
         }
         val currentViewRect by rememberUpdatedState(viewRect)
         val currentPreviewState by rememberUpdatedState(previewState)
+        // 固定键盘底边把手：手势导航时抬到系统底部手势区上面，往上拖不会触发回桌面。
+        val gestureZoneTopPx = remember(hostView, floatingMode, maxHeight, overlayOrigin) {
+            if (floatingMode) null else com.kingzcheung.xime.service.bottomGestureZoneTopInWindowPx(hostView)
+                ?.let { it - overlayOrigin.y }
+        }
+        val bottomHandleClearancePx = BOTTOM_HANDLE_GESTURE_CLEARANCE_DP * density.density
+        val bottomHandleY = if (floatingMode) frame.bottom
+            else fixedBottomHandleY(frame, gestureZoneTopPx, bottomHandleClearancePx)
+        val currentGestureZoneTop by rememberUpdatedState(gestureZoneTopPx)
         fun splitGapFraction(rect: ResizeRect): Float = SplitKeyboardGeometry.resolvedGap(
             previewState.splitGapFraction, rect.width / density.density,
             SplitKeyboardGeometry.gutterDp(floatingMode), previewState.splitPitchDp)
@@ -376,7 +385,16 @@ internal fun KeyboardResizeOverlay(
                         }
                         pill(cardSize.width / 2f + cardLeft, cardTop, true, emphasis(ResizeHandle.TOP))
                         // 悬浮键盘的底边中段是移动条，不是缩放把手；固定键盘的底边调底部留白。
-                        if (!floatingMode) pill(cardSize.width / 2f + cardLeft, cardBottom, true, emphasis(ResizeHandle.BOTTOM))
+                        if (!floatingMode && bottomHandleY >= frame.bottom) {
+                            pill(cardSize.width / 2f + cardLeft, cardBottom, true, emphasis(ResizeHandle.BOTTOM))
+                        } else if (!floatingMode) {
+                            // 抬离手势区的把手整条画在框里，粗细、长度与贴边时露出的一样。
+                            val grow = emphasis(ResizeHandle.BOTTOM)
+                            val thickness = pillThickness * grow
+                            val length = pillLength * grow
+                            drawRoundRect(accentColor, Offset(cardSize.width / 2f + cardLeft - length / 2f,
+                                bottomHandleY - thickness / 2f), Size(length, thickness), CornerRadius(thickness / 2f))
+                        }
                         if (splitGapPx > 0f) {
                             // 分体：外侧贴边不可拖，改为拖内侧两条竖边对称调整中缝。
                             listOf(splitInnerLeft, splitInnerRight).forEach { x ->
@@ -417,7 +435,9 @@ internal fun KeyboardResizeOverlay(
                         val gestureViewRect = currentViewRect
                         val gestureRect = currentPreviewRect ?: dragRect ?: gestureViewRect
                         val gestureFloating = floatingMode && currentPreviewRect != null
-                        dragEdge = resizeHandleAt(gestureRect, down.position, hit, gestureFloating, cornerHit)
+                        val gestureBottomHandleY = if (gestureFloating) gestureRect.bottom else
+                            fixedBottomHandleY(gestureRect, currentGestureZoneTop, BOTTOM_HANDLE_GESTURE_CLEARANCE_DP.dp.toPx())
+                        dragEdge = resizeHandleAt(gestureRect, down.position, hit, gestureFloating, cornerHit, gestureBottomHandleY)
                         // 分体：内侧竖边优先；外侧贴边，左右边与四角只保留高度方向。
                         var splitEdge = 0
                         val splitStartGap = if (splitActive) currentSplitGapFraction(gestureRect) * gestureRect.width else 0f
@@ -674,9 +694,13 @@ internal fun KeyboardResizeOverlay(
 
         // 控件直接占用键盘框内的可用区域；没有第二层小卡片/底板/描边。
         // 顶部工具栏、左右拖边及底部永久移动条均留出命中空间。
-        val defaultControls = resizeControlsRect(frame, density.density, floatingMode,
-            dragAreaHeightPx)
         val handleHitPx = RESIZE_EDGE_HIT_DP * density.density
+        val defaultControls = resizeControlsRect(frame, density.density, floatingMode,
+            dragAreaHeightPx).let { rect ->
+            // 底边把手抬起来时控件让出它的命中区，免得按钮挡住把手。
+            if (bottomHandleY >= frame.bottom) rect
+            else rect.copy(bottom = minOf(rect.bottom, maxOf(rect.top + 1f, bottomHandleY - handleHitPx)))
+        }
         val controls = if (splitGapPx > 0f && splitInnerRight - splitInnerLeft - 2f * handleHitPx >= 240f * density.density)
             defaultControls.copy(left = splitInnerLeft + handleHitPx, right = splitInnerRight - handleHitPx) else defaultControls
         val controlsWidthDp = with(density) { controls.width.toDp() }
