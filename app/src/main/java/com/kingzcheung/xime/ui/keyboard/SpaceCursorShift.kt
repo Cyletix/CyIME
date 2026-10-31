@@ -5,7 +5,7 @@ import com.kingzcheung.xime.viewmodel.ShiftMode
 /**
  * 空格长按移光标时的 Shift 扩选，同电脑 Shift+方向键：从锚点扩选，松开 Shift 后的下一步折叠选区、回到普通移动。
  * 按住 Shift（HELD）逐步实时判断；单次大写（SINGLE）在本次拖动第一步锁定整段扩选并被用掉；大写锁定（CAPS）不扩选。
- * 只在空格移光标期间生效，键盘区滑动移光标等其他来源不受影响。
+ * 只在空格移光标、底部留白滑动移光标（[BottomLiftSpacer]，同一套扩选）期间生效，整个键盘滑动移光标等其他来源不受影响。
  */
 internal object SpaceCursorShift {
     private var active = false

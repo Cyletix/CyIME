@@ -174,6 +174,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长按语言键弹出列表", gestures, gesturePage, "语言键 切换语言 长按 时长 语言列表 秒"),
         SettingsSearchEntry("符号键松手打开符号的时限", gestures, gesturePage, "符号键 !@# Ctrl 控制键 快捷键 复制 粘贴 剪切 撤销 全选 长按 时长 时限 过期 秒"),
         SettingsSearchEntry("滑动移动光标", gestures, gesturePage, "光标 移动 滑动 空格 整个键盘 关闭", section = "光标与空格"),
+        SettingsSearchEntry("底部留白滑动移动光标", gestures, gesturePage, "光标 移动 滑动 底部 留白 抬高 键盘下面 空白 选择 扩选", section = "光标与空格"),
         SettingsSearchEntry("长按空格多久开始", gestures, gesturePage, "长按空格 时长 秒 延迟 移动光标 连续输入空格 开关语音 说话", section = "光标与空格"),
         SettingsSearchEntry("从中间滑到边缘走几行", gestures, gesturePage, "光标 一行 行数 灵敏 灵敏度 速度 平板 大屏 滑到边缘", section = "光标与空格"),
         SettingsSearchEntry("光标每移动一字所需距离", gestures, gesturePage, "光标 距离 灵敏 灵敏度 速度 dp 毫米", section = "光标与空格"),

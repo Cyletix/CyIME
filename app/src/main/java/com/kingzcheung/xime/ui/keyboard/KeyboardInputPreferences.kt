@@ -134,6 +134,8 @@ data class KeyboardInputPreferences(
     val formulaDelimiter: FormulaDelimiter = FormulaDelimiter.DOLLAR,
     /** 移光标时从中间滑到屏幕边缘走几行，按输入框一行能放几个字换算每字距离。 */
     val cursorSwipeLines: Float = 1f,
+    /** 固定键盘底部留白（调节键盘里往上拖出的那一条）上左右滑动移动光标；默认关（用户 10-31 要求新增）。 */
+    val bottomLiftCursor: Boolean = false,
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
@@ -170,6 +172,8 @@ data class KeyboardInputPreferences(
         const val ENGLISH_AUTO_SPACE_KEY = "english_auto_space"
         /** 候选里显示表情开关；同繁体输出，输入法按键前读它（ImeKeyRouter）。 */
         const val CANDIDATE_EMOJI_KEY = "candidate_emoji"
+        /** 底部留白滑动移动光标，见 [bottomLiftCursor]。 */
+        const val BOTTOM_LIFT_CURSOR_KEY = "bottom_lift_cursor"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
@@ -181,6 +185,7 @@ data class KeyboardInputPreferences(
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
+                BOTTOM_LIFT_CURSOR_KEY,
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
         }
 
@@ -225,6 +230,7 @@ data class KeyboardInputPreferences(
                 cursorHoldSeconds = normalizeCursorHoldSeconds(prefs.getFloat("cursor_hold_seconds", 0.2f)),
                 cursorStepHaptic = prefs.getBoolean("cursor_step_haptic", true),
                 cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
+                bottomLiftCursor = prefs.getBoolean(BOTTOM_LIFT_CURSOR_KEY, false),
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
                 symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(prefs.getFloat("symbol_key_hold_seconds", 1f)),
                 candidateDragPercent = normalizeCandidateDragPercent(prefs.getFloat("t9_candidate_drag_percent", 50f)),
@@ -300,6 +306,7 @@ data class KeyboardInputPreferences(
             .putFloat("cursor_swipe_lines", normalizeCursorSwipeLines(cursorSwipeLines))
             .putBoolean("cursor_step_haptic", cursorStepHaptic)
             .putBoolean("cursor_step_sound", cursorStepSound)
+            .putBoolean(BOTTOM_LIFT_CURSOR_KEY, bottomLiftCursor)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
             .putBoolean(UPPERCASE_KEY_LABELS_KEY, uppercaseKeyLabels)
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))

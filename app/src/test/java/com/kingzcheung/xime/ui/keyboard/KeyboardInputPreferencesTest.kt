@@ -139,6 +139,18 @@ class KeyboardInputPreferencesTest {
         assertEquals(true, KeyboardInputPreferences.read(context).datetimeCandidates)
     }
 
+    @Test fun `bottom lift cursor is off by default and persists without touching the cursor gesture choice`() {
+        val before = KeyboardInputPreferences.read(context)
+        assertEquals(false, before.bottomLiftCursor)
+        for (enabled in listOf(true, false)) {
+            before.copy(bottomLiftCursor = enabled).save(context)
+            val after = KeyboardInputPreferences.read(context)
+            assertEquals(enabled, after.bottomLiftCursor)
+            assertEquals(before, after.copy(bottomLiftCursor = false))
+        }
+        assertTrue(KeyboardInputPreferences.BOTTOM_LIFT_CURSOR_KEY in KeyboardInputPreferences.watchedKeys)
+    }
+
     @Test fun `every saved setting refreshes the keyboard already on screen`() {
         // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
         KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)
