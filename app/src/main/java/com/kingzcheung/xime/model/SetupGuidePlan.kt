@@ -501,6 +501,36 @@ object SetupGuidePlanner {
     }
 
     fun mbText(bytes: Long): String = "${(bytes + 524_288) / 1_048_576} MB"
+
+    /** 模型属于哪一类，完成页说「语音、联想模型正在下载」用。 */
+    fun kind(id: String): String = when (id) {
+        SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.XASR, SpeechModelCatalog.ZIPFORMER,
+        SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA -> "语音"
+        BuiltinModelCatalog.SPEAKER_MODEL -> "字幕"
+        DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL -> "联想"
+        CandidateModelCatalog.NGRAM, CandidateModelCatalog.NGRAM_SMALL, CandidateModelCatalog.GRAMMAR -> "九键组词"
+        HANDWRITING -> "手写"
+        else -> ""
+    }
+
+    /** 「语音、联想模型」；认不出类别时就叫「模型」。 */
+    fun kindsText(ids: List<String>): String = ids.map(::kind).filter { it.isNotEmpty() }.distinct().joinToString("、") + "模型"
+
+    /**
+     * 推荐页底部那句占多大：分开写现在占多少、要下载／取出／删掉多少、设好后共占多少。
+     * 不写成「现在占 7 MB，整理后 270 MB」：那样读起来像整理反而变大了（10-31 走查），其实是要下载语音、联想模型。
+     */
+    fun sizeSummary(now: Long, download: Long, unpack: Long, removed: Long): String {
+        val steps = buildList {
+            if (download > 0) add("下载 ${mbText(download)}")
+            if (unpack > 0) add("从安装包取出 ${mbText(unpack)}")
+            if (removed > 0) add("删掉 ${mbText(removed)}")
+        }
+        if (steps.isEmpty()) return "模型现在占 ${mbText(now)}，不用下载，也不用删。"
+        val after = now - removed + download + unpack
+        return "模型现在占 ${mbText(now)}。按推荐要${steps.joinToString("、")}，设好后共占 ${mbText(after)}" +
+            (if (after < now) "，比现在少 ${mbText(now - after)}。" else "。")
+    }
     fun gbText(bytes: Long): String = "%.1f GB".format(bytes.toDouble() / GIB)
     private fun memoryText(bytes: Long?): String = if (bytes == null) "内存读不到" else "内存 ${(bytes + GIB / 2) / GIB} GB"
 }

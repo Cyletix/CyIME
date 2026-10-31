@@ -302,4 +302,22 @@ class SetupGuidePlanTest {
         assertFalse(SetupGuidePlanner.plan(on, SetupGuidePlanner.suggest(on).copy(typing = TypingWay.DOUBLE_PINYIN)).input.keyHintsOn)
         assertFalse(SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f)).input.keyHintsOn)
     }
+
+    @Test fun sizeLineSaysWhatGetsDownloadedInsteadOfLookingLikeTidyingGrowsIt() {
+        // 10-31 走查：「现在占 7 MB，整理后 270 MB」读起来像整理反而变大。
+        assertEquals("模型现在占 7 MB。按推荐要下载 263 MB，设好后共占 270 MB。",
+            SetupGuidePlanner.sizeSummary(now = 7 * mb, download = 263 * mb, unpack = 0, removed = 0))
+        assertEquals("模型现在占 600 MB。按推荐要删掉 360 MB，设好后共占 240 MB，比现在少 360 MB。",
+            SetupGuidePlanner.sizeSummary(now = 600 * mb, download = 0, unpack = 0, removed = 360 * mb))
+        assertEquals("模型现在占 7 MB。按推荐要下载 19 MB、从安装包取出 228 MB，设好后共占 254 MB。",
+            SetupGuidePlanner.sizeSummary(now = 7 * mb, download = 19 * mb, unpack = 228 * mb, removed = 0))
+        assertEquals("模型现在占 7 MB，不用下载，也不用删。", SetupGuidePlanner.sizeSummary(7 * mb, 0, 0, 0))
+    }
+
+    @Test fun donePageNamesTheModelsBeingDownloaded() {
+        assertEquals("语音、联想模型", SetupGuidePlanner.kindsText(listOf(SpeechModelCatalog.SENSEVOICE,
+            SpeechModelCatalog.PARAFORMER, DeviceModelProfiles.SMALL)))
+        assertEquals("九键组词模型", SetupGuidePlanner.kindsText(listOf(CandidateModelCatalog.NGRAM)))
+        assertEquals("模型", SetupGuidePlanner.kindsText(listOf("unknown")))
+    }
 }

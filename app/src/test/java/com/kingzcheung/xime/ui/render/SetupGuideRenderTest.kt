@@ -34,6 +34,7 @@ import com.kingzcheung.xime.model.SetupAnswers
 import com.kingzcheung.xime.model.SetupFacts
 import com.kingzcheung.xime.model.SetupGuide
 import com.kingzcheung.xime.model.SetupGuidePlanner
+import com.kingzcheung.xime.model.SetupSource
 import com.kingzcheung.xime.model.VoiceUse
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.ui.settings.SetupGuideContent
@@ -197,7 +198,8 @@ class SetupGuideRenderTest {
                     Spacer(Modifier.width(40.dp))
                     Box(Modifier.width(420.dp).fillMaxHeight()) {
                         SetupGuideContent(facts, plan, emptySet(), allowMetered = false, applying = false,
-                            result = SetupGuide.Result(3, 249 * mb, 362 * mb, waitingForWifi = true, failed = emptyList()),
+                            result = SetupGuide.Result(3, 249 * mb, 362 * mb, waitingForWifi = true, failed = emptyList(),
+                                downloadingIds = plan.keep.filter { it.source == SetupSource.DOWNLOAD }.map { it.id }),
                             firstRun = true, onAnswers = {}, onToggleRemove = { _, _ -> }, onAllowMetered = {},
                             onApply = {}, onSkip = {}, onDone = {})
                     }

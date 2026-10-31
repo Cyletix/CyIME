@@ -135,7 +135,9 @@ object SetupGuide {
 
     data class Result(val removed: Int, val freedBytes: Long, val downloading: Long, val waitingForWifi: Boolean, val failed: List<String>,
         /** 打字方式这一块改好的、没改成的，白话一句一行。 */
-        val inputDone: List<String> = emptyList(), val inputFailed: List<String> = emptyList())
+        val inputDone: List<String> = emptyList(), val inputFailed: List<String> = emptyList(),
+        /** 在下载的、从安装包取出的模型，完成页写「语音、联想模型正在下载」。 */
+        val downloadingIds: List<String> = emptyList(), val unpackingIds: List<String> = emptyList())
 
     /**
      * 照 [plan] 设置：改语音、联想选项，删掉 [removeIds]（安装包里的不再解压），
@@ -195,7 +197,7 @@ object SetupGuide {
         FileLogger.i("SetupGuide", "按推荐设置：语音=${plan.voiceMode} 联想=${plan.predictionModel} 九键=${plan.t9Model} " +
             "删除=${removing.map { it.id }} 取回=${fromPackage.map { it.id }} 下载=${fromNetwork.map { it.id }} 打字=${plan.input}")
         return Result(removing.count { it.source == SetupSource.ON_PHONE } - failed.size, freed, fromNetwork.sumOf { it.bytes }, waiting, failed,
-            inputDone, inputFailed)
+            inputDone, inputFailed, fromNetwork.map { it.id }, fromPackage.map { it.id })
     }
 
     /**
