@@ -59,6 +59,8 @@ data class KeyboardInputPreferences(
     val keyGlowEnabled: Boolean = false,
     val keyAnimationEnabled: Boolean = false,
     val handwritingPauseSeconds: Float = 0.5f,
+    /** 手写边写边识别：每写完一笔就在后台先认，停顿一到直接出候选（默认关，见 HandwritingInputSession）。 */
+    val handwritingRecognizeWhileWriting: Boolean = false,
     val showPressBubble: Boolean = false,
     val splitKeyboardEnabled: Boolean = false,
     /** 分体 26 键右半中排再放一个 G（默认关）。 */
@@ -184,6 +186,7 @@ data class KeyboardInputPreferences(
         const val SYMBOL_NAMES_KEY = "symbol_name_candidates"
         /** 底部留白滑动移动光标，见 [bottomLiftCursor]。 */
         const val BOTTOM_LIFT_CURSOR_KEY = "bottom_lift_cursor"
+        const val HANDWRITING_RECOGNIZE_EARLY_KEY = "handwriting_recognize_while_writing"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
@@ -195,7 +198,7 @@ data class KeyboardInputPreferences(
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
-                BOTTOM_LIFT_CURSOR_KEY,
+                BOTTOM_LIFT_CURSOR_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
         }
 
@@ -276,6 +279,7 @@ data class KeyboardInputPreferences(
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 uppercaseKeyLabels = prefs.getBoolean(UPPERCASE_KEY_LABELS_KEY, false),
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
+                handwritingRecognizeWhileWriting = prefs.getBoolean(HANDWRITING_RECOGNIZE_EARLY_KEY, false),
                 formulaDelimiter = FormulaDelimiter.entries.firstOrNull { it.name == prefs.getString("handwriting_formula_delimiter", null) }
                     ?: FormulaDelimiter.DOLLAR,
                 fixedSymbols = prefs.getString("fixed_symbols", "").orEmpty(),
@@ -326,6 +330,7 @@ data class KeyboardInputPreferences(
             .putBoolean(UPPERCASE_KEY_LABELS_KEY, uppercaseKeyLabels)
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
             .putFloat("handwriting_pause_seconds", normalizeHandwritingPause(handwritingPauseSeconds))
+            .putBoolean(HANDWRITING_RECOGNIZE_EARLY_KEY, handwritingRecognizeWhileWriting)
             .putString("handwriting_formula_delimiter", formulaDelimiter.name)
             .putString("fixed_symbols", fixedSymbols)
             .putString("qwerty_stagger_mode", qwertyStagger.name)

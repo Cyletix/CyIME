@@ -262,6 +262,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 智能 › 手写
         SettingsSearchEntry("已安装的手写模型", handwriting, SettingsRoutes.Handwriting, "手写模型 公式 个人手写 下载 切换 删除"),
         SettingsSearchEntry("手写停顿识别", handwriting, SettingsRoutes.Handwriting, "手写 停顿 识别 延迟 时长 秒"),
+        SettingsSearchEntry("手写边写边识别", handwriting, SettingsRoutes.Handwriting, "手写 边写边识别 提前 延迟 慢 等待 快"),
         SettingsSearchEntry("手写公式两边的标记", handwriting, SettingsRoutes.Handwriting, "公式 latex 美元 数学"),
         SettingsSearchEntry("手写训练模式", handwriting, SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式", anchor = null),
         SettingsSearchEntry("手写数据采集", handwriting, SettingsRoutes.HandwritingCapture, "手写 采集 样本 笔迹 标注", anchor = null),

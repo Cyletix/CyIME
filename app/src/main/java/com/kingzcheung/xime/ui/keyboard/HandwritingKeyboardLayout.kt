@@ -168,6 +168,7 @@ fun HandwritingKeyboardLayout(
     // here showed as a dark band around the bottom row on gradient themes.
     val functionRowBackground = Color.Transparent
     val pauseMs by rememberUpdatedState((LocalKeyboardInputPreferences.current.handwritingPauseSeconds * 1000).toLong())
+    val recognizeWhileWriting by rememberUpdatedState(LocalKeyboardInputPreferences.current.handwritingRecognizeWhileWriting)
     val recognitionMutex = remember { Mutex() }
     val stylusPresence = remember { StylusPresence() }
     val eraserRadiusPx = with(LocalDensity.current) { com.kingzcheung.xime.handwriting.PenEraser.Radius.toPx() }
@@ -276,7 +277,10 @@ fun HandwritingKeyboardLayout(
             }
         }, onNewCharacter = { newCharacter?.invoke() },
             // 按键（空格、回车、标点…）在本段笔迹认完之后才执行：从这里起下一段不再补空格
-            onRecognition = { result?.invoke(it) }, onKey = { wordSpacing.reset(); keyAction(it) }, keepInk = { formulaActive })
+            onRecognition = { result?.invoke(it) }, onKey = { wordSpacing.reset(); keyAction(it) }, keepInk = { formulaActive },
+            // 边写边识别只给中文、日语：英文要按停顿分词（有状态），公式整段重认，都不能提前认
+            recognizeEarly = { recognizeWhileWriting && !formulaActive &&
+                (recognitionLanguage == InputLanguage.CHINESE || recognitionLanguage == InputLanguage.JAPANESE) })
     }
     val modelDownloaded by remember {
         ModelManager.downloadStates.map { it["ochwpro"] is ModelDownloadState.Complete }.distinctUntilChanged()

@@ -8,7 +8,9 @@ import com.kingzcheung.xime.handwriting.PenEraser
 import com.kingzcheung.xime.handwriting.StrokePoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -27,6 +29,12 @@ internal class HandwritingInputSession(
     private val onKey: (String) -> Unit,
     /** 公式模式：识别后笔迹留在板上，接着写会连同前面的笔迹整段重新识别；删除键撤掉最后一笔。 */
     private val keepInk: () -> Boolean = { false },
+    /**
+     * 边写边识别（默认关）：每写完一笔就在后台先认当前全部笔迹，停顿一到直接用这次的结果，不用停顿后才开始认；
+     * 接着落笔就作废重来。认的是同一份笔迹，结果和停顿后再认完全一样，只是等待藏进了停顿里。
+     * 只给识别没有副作用的书写方式（中文、日语）；英文分词和公式不提前认。
+     */
+    private val recognizeEarly: () -> Boolean = { false },
 ) {
     var strokes: List<List<StrokePoint>> by mutableStateOf(emptyList())
         private set
@@ -36,12 +44,15 @@ internal class HandwritingInputSession(
         private set
     private var revision = 0
     private var job: Job? = null
+    private var early: Deferred<List<Segment>>? = null
     private val pendingKeys = mutableListOf<String>()
     val hasInk get() = strokes.isNotEmpty() || currentStroke.isNotEmpty()
 
     private fun invalidate(): Int {
         job?.cancel()
         job = null
+        early?.cancel()
+        early = null
         pendingKeys.clear()
         return ++revision
     }
@@ -148,12 +159,16 @@ internal class HandwritingInputSession(
         if (after != null) pendingKeys += after
         val snapshot = strokes.map { it.toList() }
         phase = HandwritingPhase.WAITING
+        // 提前认的异常在这里吞掉：async 里的异常会连带取消整个键盘协程作用域
+        val ahead = if (after == null && waitMs > 0 && recognizeEarly()) scope.async {
+            try { recognize(snapshot) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { emptyList() }
+        }.also { early = it } else null
         job = scope.launch {
             delay(waitMs)
             if (token != revision) return@launch
             phase = HandwritingPhase.RECOGNIZING
             val segments = try {
-                recognize(snapshot)
+                ahead?.await() ?: recognize(snapshot)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

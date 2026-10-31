@@ -22,17 +22,49 @@ class HandwritingInputSessionTest {
         assertTrue(f.windows.isEmpty())
     }
 
-    private class Fixture(scope: TestScope, slow: Boolean = false) {
+    private class Fixture(scope: TestScope, slow: Boolean = false, early: Boolean = false) {
         val events = mutableListOf<String>()
         val windows = mutableListOf<Int>()
         val session = HandwritingInputSession(scope, { 1000L }, { strokes ->
             windows += strokes.size
             if (slow) withContext(NonCancellable) { delay(2000) }
             listOf(Segment(0, strokes.size, listOf(HandwritingCandidate("字", 1f))))
-        }, { events += "begin" }, { events += "result" }, { events += it })
+        }, { events += "begin" }, { events += "result" }, { events += it }, recognizeEarly = { early })
         fun stroke(): Int = session.begin(StrokePoint(10f, 10f, 0)).also {
             session.move(it, StrokePoint(30f, 10f, 20)); session.end(it)
         }
+    }
+
+    @Test fun recognizeWhileWritingStartsAtPenUpAndShowsTheSameResultAtThePause() = runTest {
+        val f = Fixture(this, early = true)
+        f.stroke(); runCurrent()
+        // 笔一抬就开始认，不等停顿；候选仍然等停顿到了才出
+        assertEquals(listOf(1), f.windows)
+        assertEquals(listOf("begin"), f.events)
+        advanceTimeBy(999); runCurrent(); assertEquals(listOf("begin"), f.events)
+        advanceTimeBy(1); runCurrent()
+        assertEquals(listOf("begin", "result"), f.events)
+        assertEquals("停顿后不再认第二遍", listOf(1), f.windows)
+        assertFalse(f.session.hasInk)
+    }
+
+    @Test fun recognizeWhileWritingRestartsWithEveryNewStrokeAndKeysStillFlushOnce() = runTest {
+        val f = Fixture(this, early = true)
+        f.stroke(); runCurrent()
+        f.stroke(); runCurrent()
+        assertEquals(listOf(1, 2), f.windows)
+        f.session.press("space"); advanceUntilIdle()
+        // 按键照旧：先认完整笔迹再执行，按键不提前认
+        assertEquals(listOf(1, 2, 2), f.windows)
+        assertEquals(listOf("begin", "result", "space"), f.events)
+    }
+
+    @Test fun recognizeWhileWritingOffKeepsWaitingForThePause() = runTest {
+        val f = Fixture(this)
+        f.stroke(); runCurrent()
+        assertTrue(f.windows.isEmpty())
+        advanceUntilIdle()
+        assertEquals(listOf(1), f.windows)
     }
 
     @Test fun emptyButtonsNeverBecomeWritingOrRecognition() = runTest {

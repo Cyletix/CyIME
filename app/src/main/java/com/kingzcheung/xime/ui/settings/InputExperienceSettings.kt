@@ -319,6 +319,17 @@ internal fun InputExperienceSettings(
                     onValueChange = { settings = settings.copy(handwritingPauseSeconds = normalizeHandwritingPause(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..2.5f, steps = 23)
             }
+            Row(Modifier.settingsSearchAnchor("手写边写边识别", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("手写边写边识别", style = MaterialTheme.typography.titleSmall)
+                    Text("每写完一笔就在后台先认，停顿一到马上出候选，不用停顿后再等识别。中文、日语手写可用；会多用一点电。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.handwritingRecognizeWhileWriting, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("handwriting-recognize-while-writing"), onCheckedChange = {
+                        settings = settings.copy(handwritingRecognizeWhileWriting = it); settings.save(context)
+                    })
+            }
             Column(Modifier.settingsSearchAnchor("手写公式两边的标记", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("手写公式两边的标记", style = MaterialTheme.typography.titleSmall)
                 Text("公式模式选中候选后上屏的样子，例如 x^{2} 上屏为 \$x^{2}\$ 或 \\[x^{2}\\]。", style = MaterialTheme.typography.bodySmall)
