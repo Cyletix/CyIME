@@ -478,12 +478,10 @@ private fun RemoveSection(items: List<SetupItem>, removeIds: Set<String>, onTogg
 private fun SummarySection(facts: SetupFacts, plan: SetupPlan, removeIds: Set<String>) {
     val now = facts.installed.values.sum()
     val removed = plan.remove.filter { it.id in removeIds && it.source == SetupSource.ON_PHONE }.sumOf { it.bytes }
-    val added = plan.keep.filter { it.source != SetupSource.ON_PHONE }.sumOf { it.bytes }
-    val after = now - removed + added
+    val download = plan.keep.filter { it.source == SetupSource.DOWNLOAD }.sumOf { it.bytes }
+    val unpack = plan.keep.filter { it.source == SetupSource.IN_PACKAGE }.sumOf { it.bytes }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("这些模型现在占 ${SetupGuidePlanner.mbText(now)}，整理后 ${SetupGuidePlanner.mbText(after)}" +
-            (if (now > after) "，少占 ${SetupGuidePlanner.mbText(now - after)}。" else "。"),
-            style = GuideText.optionTitle())
+        Text(SetupGuidePlanner.sizeSummary(now, download, unpack, removed), style = GuideText.optionTitle())
         plan.notes.forEach {
             Text(it, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -497,9 +495,12 @@ private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit) {
             Text("✓ 已按推荐设置好", style = GuideText.heading(), color = MaterialTheme.colorScheme.onPrimaryContainer)
             val lines = buildList {
                 if (result.removed > 0) add("删掉了 ${result.removed} 个用不到的模型，空出 ${SetupGuidePlanner.mbText(result.freedBytes)}。")
+                // 写明是哪些模型在下载（语音、联想…），不只写多少 MB。
                 if (result.downloading > 0) add(if (result.waitingForWifi)
-                    "还要下载 ${SetupGuidePlanner.mbText(result.downloading)}，连上 Wi-Fi 后自动下载。"
-                    else "正在后台下载 ${SetupGuidePlanner.mbText(result.downloading)}，下好就能用。")
+                    "${SetupGuidePlanner.kindsText(result.downloadingIds)}还要下载 ${SetupGuidePlanner.mbText(result.downloading)}，连上 Wi-Fi 后自动下载。"
+                    else "${SetupGuidePlanner.kindsText(result.downloadingIds)}正在后台下载（${SetupGuidePlanner.mbText(result.downloading)}），下好就能用。")
+                if (result.unpackingIds.isNotEmpty())
+                    add("${SetupGuidePlanner.kindsText(result.unpackingIds)}正在从安装包取出，取好就能用。")
                 if (result.failed.isNotEmpty()) add("这些没删成：${result.failed.joinToString("、")}，可以在 扩展 → 已安装的模型 里再删。")
                 addAll(result.inputDone)
                 addAll(result.inputFailed)
