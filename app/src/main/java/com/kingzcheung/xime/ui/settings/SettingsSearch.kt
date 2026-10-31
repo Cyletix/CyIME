@@ -148,7 +148,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("右半边也放 G 键", layouts, layoutIndex, "分体 右边 右手 G键 g 重复 两个G 双G 中排 对齐"),
         SettingsSearchEntry("填满留空处", layouts, layoutIndex, "一体 一体式 镂空 中缝 两侧 空白 留空 透明 遮住 背景 连起来 分体"),
         SettingsSearchEntry("加宽按键", layouts, layoutIndex, "按键宽度 键宽 宽键 按键间距 键间距 间隙 缝 留白 边距 误触 按错 手机"),
-        SettingsSearchEntry("合并键均匀排布", layouts, layoutIndex, "合并键 合并 17键 18键 20键 自定义布局 键宽 均匀 等宽 单键 放宽 对齐 小屏 窄屏"),
+        SettingsSearchEntry("合并键均匀排布", layouts, layoutIndex, "合并键 合并 14键 17键 18键 20键 自定义布局 键宽 均匀 等宽 单键 放宽 对齐 小屏 窄屏"),
         SettingsSearchEntry("数字框自动数字键盘", layouts, layoutIndex, "数字 验证码 号码 电话 数字键盘 自动弹出"),
         page("键盘尺寸与位置", layouts, SettingsRoutes.KeyboardResize, "尺寸 大小 高度 宽度 调整尺寸 键盘调节 悬浮 浮动 分体 透明度 底部留白 单手 位置 旋转"),
         page("工具栏与菜单排列", layouts, SettingsRoutes.ToolbarArrange, "工具栏 菜单 排列 顺序 入口 图标 按钮 自定义工具栏"),

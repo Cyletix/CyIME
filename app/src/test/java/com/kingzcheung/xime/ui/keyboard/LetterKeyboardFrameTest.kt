@@ -128,4 +128,24 @@ class LetterKeyboardFrameTest {
         }
         assertTrue(singles.max() / singles.min() < 1.05f)
     }
+
+    /** 14 键大写时拆键：均匀排布下拆开的两个字母各占合并键的一半，每个字母的左边缘与拆开前同位；严格对齐时各 1 份。 */
+    @Test fun fourteenSplitKeepsLetterPositions() {
+        fourteen.forEach { row ->
+            for (even in listOf(false, true)) {
+                val whole = row.map { letterKeySpan(it, true, even) }
+                val split = splitPairSpans(row, even)
+                assertEquals(whole.sum(), split.sum(), 1e-5f)
+                val letterStarts = mutableListOf<Float>()
+                var x = 0f
+                row.forEachIndexed { i, key -> key.forEachIndexed { j, _ -> letterStarts += x + whole[i] / key.length * j }; x += whole[i] }
+                val splitStarts = split.runningFold(0f) { acc, w -> acc + w }.dropLast(1)
+                letterStarts.zip(splitStarts).forEach { (a, b) -> assertEquals(a, b, 1e-5f) }
+                if (!even) split.forEach { assertEquals(1f, it, 0f) }
+            }
+        }
+        // 第二排 as df gh jk l：l 从 1/9 行宽变成 1/(4×4/3+1)。
+        val spans = fourteen[1].map { letterKeySpan(it, true, true) }
+        assertEquals(1f / (16f / 3f + 1f), spans.last() / spans.sum(), 1e-5f)
+    }
 }
