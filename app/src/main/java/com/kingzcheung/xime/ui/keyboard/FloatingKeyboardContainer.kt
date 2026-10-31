@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -72,8 +74,19 @@ internal val FloatingKeyboardCardShape = RoundedCornerShape(FloatingKeyboardCard
 internal val FixedKeyboardCardShape = RoundedCornerShape(
     topStart = FloatingKeyboardCardCorner, topEnd = FloatingKeyboardCardCorner,
 )
-internal fun keyboardPanelShape(isFloating: Boolean, roundedBottom: Boolean = false) =
-    if (isFloating || roundedBottom) FloatingKeyboardCardShape else FixedKeyboardCardShape
+/** 固定键盘顶部圆角关掉、底部圆角开着时，只有底部两角圆。 */
+private val FixedKeyboardBottomRoundedShape = RoundedCornerShape(
+    bottomStart = FloatingKeyboardCardCorner, bottomEnd = FloatingKeyboardCardCorner,
+)
+internal fun keyboardPanelShape(isFloating: Boolean, roundedBottom: Boolean = false, roundedTop: Boolean = true) = when {
+    isFloating || roundedTop && roundedBottom -> FloatingKeyboardCardShape
+    roundedTop -> FixedKeyboardCardShape
+    roundedBottom -> FixedKeyboardBottomRoundedShape
+    else -> RectangleShape
+}
+
+/** 键盘卡片顶部两角的圆角，由裁切卡片的容器提供；候选栏的描边按它画，才不会被卡片圆角切掉。 */
+internal val LocalKeyboardCardTopCorner = compositionLocalOf { FloatingKeyboardCardCorner }
 
 @Composable
 internal fun FloatingKeyboardContainer(
@@ -124,7 +137,9 @@ internal fun FloatingKeyboardContainer(
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
-    val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom())
+    val roundedTop = rememberRoundedKeyboardTop()
+    val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom(), roundedTop)
+    val fixedTopCorner = if (roundedTop) FloatingKeyboardCardCorner else 0.dp
     val dragPalette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
     val dragIndicatorColor = dragIndicatorColor ?: if (dragPalette != null)
         lerp(dragPalette.background.copy(alpha = 1f), dragPalette.text.copy(alpha = 1f), 0.5f)
@@ -163,7 +178,9 @@ internal fun FloatingKeyboardContainer(
                         onCardPositioned(pos.x.roundToInt(), pos.y.roundToInt(),
                             (pos.x + coords.size.width).roundToInt(), (pos.y + coords.size.height).roundToInt())
                     }) {
-                    LanguageMenuPanel { keyboardContent() }
+                    CompositionLocalProvider(LocalKeyboardCardTopCorner provides fixedTopCorner) {
+                        LanguageMenuPanel { keyboardContent() }
+                    }
                     if (onUndock != null) UndockHandle(Modifier.align(Alignment.TopCenter), dragIndicatorColor,
                         highlightColor, onUndock)
                 }
@@ -191,7 +208,7 @@ internal fun FloatingKeyboardContainer(
                         }
                 ) {
                     // Resize controls own input; keep the menu host out of the live preview.
-                    keyboardContent()
+                    CompositionLocalProvider(LocalKeyboardCardTopCorner provides fixedTopCorner) { keyboardContent() }
                 }
             }
         }

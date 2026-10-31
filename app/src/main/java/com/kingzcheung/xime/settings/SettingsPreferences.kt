@@ -16,6 +16,13 @@ object SettingsPreferences {
     fun setRoundedKeyboardBottom(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_ROUNDED_KEYBOARD_BOTTOM, enabled).apply()
     }
+    /** 固定键盘顶部两角是否圆角；默认开（原样）。悬浮键盘是卡片，四角始终圆。 */
+    const val KEY_ROUNDED_KEYBOARD_TOP = "rounded_keyboard_top"
+    fun roundedKeyboardTop(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_ROUNDED_KEYBOARD_TOP, true)
+    fun setRoundedKeyboardTop(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ROUNDED_KEYBOARD_TOP, enabled).apply()
+    }
     const val KEY_PUNCTUATION_FULL_WIDTH = "punctuation_full_width"
     fun punctuationFullWidth(context: Context, default: Boolean): Boolean =
         getPrefs(context).getBoolean(KEY_PUNCTUATION_FULL_WIDTH, default)

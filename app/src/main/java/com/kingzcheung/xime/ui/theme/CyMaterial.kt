@@ -25,8 +25,11 @@ import androidx.compose.ui.unit.Dp
 internal data class MaterialPalette(val surface: Color, val accent: Color)
 internal val LocalMaterialPalette = staticCompositionLocalOf<MaterialPalette?> { null }
 
-/** Draw only the selected surface treatment; theme colors and hit bounds stay unchanged. */
-internal fun Modifier.materialSurface(style: VisualStyle, radius: Dp, level: MaterialLevel): Modifier {
+/**
+ * Draw only the selected surface treatment; theme colors and hit bounds stay unchanged.
+ * [bottomRadius] differs from [radius] only for a bar that sits at the top of a card (the keyboard toolbar).
+ */
+internal fun Modifier.materialSurface(style: VisualStyle, radius: Dp, level: MaterialLevel, bottomRadius: Dp = radius): Modifier {
     if (style == VisualStyle.ORIGINAL) return this
     return composed {
         val colors = MaterialTheme.colorScheme
@@ -42,8 +45,9 @@ internal fun Modifier.materialSurface(style: VisualStyle, radius: Dp, level: Mat
         drawWithCache {
             val inset = .5f * density
             val bounds = Rect(inset, inset, size.width - inset, size.height - inset)
-            val corner = radius.toPx().coerceAtMost(size.minDimension / 2).coerceAtLeast(0f)
-            val path = Path().apply { addRoundRect(RoundRect(bounds, CornerRadius(corner))) }
+            val corner = CornerRadius(radius.toPx().coerceAtMost(size.minDimension / 2).coerceAtLeast(0f))
+            val bottom = CornerRadius(bottomRadius.toPx().coerceAtMost(size.minDimension / 2).coerceAtLeast(0f))
+            val path = Path().apply { addRoundRect(RoundRect(bounds, corner, corner, bottom, bottom)) }
             val topReach = (size.height * recipe.topReach).coerceAtLeast(1f)
             val topColor = if (dark) Color.White else palette.accent
             val top = Brush.verticalGradient(

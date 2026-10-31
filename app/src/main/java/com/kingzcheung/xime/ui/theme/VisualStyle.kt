@@ -25,5 +25,6 @@ object VisualStyles {
         internal set
 }
 
-fun Modifier.visualMaterial(style: VisualStyle, radius: Dp = 12.dp, level: MaterialLevel = MaterialLevel.BASE): Modifier =
-    materialSurface(style, radius, level)
+fun Modifier.visualMaterial(style: VisualStyle, radius: Dp = 12.dp, level: MaterialLevel = MaterialLevel.BASE,
+    bottomRadius: Dp = radius): Modifier =
+    materialSurface(style, radius, level, bottomRadius)

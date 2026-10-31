@@ -463,7 +463,7 @@ internal val LayoutDisplayPages = listOf(
     Triple("gestures", "按键与手势", "角标输入方式、上下滑方向、长按语言键、滑动移动光标、长按空格"),
 )
 
-/** 按键显示：字号、角标提示、点按气泡、底部圆角；放在「主题与外观」。 */
+/** 按键显示：字号、角标提示、点按气泡、顶部和底部圆角；放在「主题与外观」。 */
 @Composable
 internal fun KeyboardAppearanceSettings() {
     val context = LocalContext.current
@@ -566,6 +566,28 @@ internal fun KeyboardAppearanceSettings() {
                                 SettingsPreferences.setShowPressBubble(context, newValue)
                             }
                         )
+                    }
+                })
+                SettingsSection(title = "键盘顶部样式", content = {
+                    var roundedTop by remember { mutableStateOf(SettingsPreferences.roundedKeyboardTop(context)) }
+                    Row(
+                        Modifier.settingsSearchAnchor("顶部圆角").fillMaxWidth().testTag("rounded-keyboard-top-setting")
+                            .toggleable(value = roundedTop, role = Role.Switch, onValueChange = {
+                                roundedTop = it
+                                SettingsPreferences.setRoundedKeyboardTop(context, it)
+                            }).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("顶部圆角", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                if (roundedTop) "固定键盘顶部两角为圆角" else "固定键盘顶部直角；悬浮键盘仍是圆角卡片",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = roundedTop, onCheckedChange = null)
                     }
                 })
                 SettingsSection(title = "键盘底部样式", content = {

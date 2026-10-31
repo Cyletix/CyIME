@@ -7,14 +7,23 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 
 /** Shared persisted choice; independent of keyboard dimensions and insets. */
 @Composable
-internal fun rememberRoundedKeyboardBottom(): Boolean {
+internal fun rememberRoundedKeyboardBottom(): Boolean =
+    rememberCornerChoice(SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, SettingsPreferences::roundedKeyboardBottom)
+
+/** 固定键盘顶部两角是否圆角，和底部圆角同一种读法。 */
+@Composable
+internal fun rememberRoundedKeyboardTop(): Boolean =
+    rememberCornerChoice(SettingsPreferences.KEY_ROUNDED_KEYBOARD_TOP, SettingsPreferences::roundedKeyboardTop)
+
+@Composable
+private fun rememberCornerChoice(prefKey: String, read: (android.content.Context) -> Boolean): Boolean {
     val context = LocalContext.current
-    var rounded by remember(context) { mutableStateOf(SettingsPreferences.roundedKeyboardBottom(context)) }
+    var rounded by remember(context) { mutableStateOf(read(context)) }
     DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == null || key == SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM) {
-                rounded = SettingsPreferences.roundedKeyboardBottom(context)
+            if (key == null || key == prefKey) {
+                rounded = read(context)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)

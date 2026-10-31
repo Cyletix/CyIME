@@ -366,6 +366,7 @@ fun CandidateBar(
     SideEffect { splitGap?.reportBarTop(if (splitGapX != null) barTopInWindow else null) }
     DisposableEffect(splitGap) { onDispose { splitGap?.reportBarTop(null) } }
 
+    val cardTopCorner = LocalKeyboardCardTopCorner.current
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -380,9 +381,10 @@ fun CandidateBar(
             .clipSplitGapColumn(splitGapX) { barOrigin }
             .background(if (glassEnabled) Color.Transparent else protectedVisuals.backgroundColor)
             // Glass rails inherit the keyboard background; only individual controls get a material.
-            .then(if (glassEnabled) Modifier else Modifier.visualMaterial(VisualStyles.current, 0.dp,
+            // 描边的上两角跟键盘卡片同一圆角，否则直角描边在卡片圆角处被切掉（用户 10-31）。
+            .then(if (glassEnabled) Modifier else Modifier.visualMaterial(VisualStyles.current, cardTopCorner,
                 level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING
-                    else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE))
+                    else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE, bottomRadius = 0.dp))
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
     ) {

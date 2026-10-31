@@ -28,6 +28,7 @@ class SettingsRoundTripTest {
     private val S = SettingsPreferences
     private val cases: List<Case<*>> = listOf(
         Case("底部圆角", true, false, S::setRoundedKeyboardBottom, S::roundedKeyboardBottom),
+        Case("顶部圆角", false, true, S::setRoundedKeyboardTop, S::roundedKeyboardTop),
         Case("数字框自动数字键盘", false, true, S::setAutoNumberKeyboardEnabled, S::isAutoNumberKeyboardEnabled),
         Case("分体键盘", true, false, S::setSplitKeyboardEnabled, S::isSplitKeyboardEnabled),
         Case("无痕", true, false, S::setIncognito, S::isIncognito),
