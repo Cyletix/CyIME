@@ -90,8 +90,8 @@ data class KeyboardInputPreferences(
     val rareCharacters: Boolean = false,
     /** 中文候选和上屏用台湾正体（台灣、計畫），默认关；Rime 选项 traditionalization，转换表见 assets/rime_chinese/opencc。 */
     val traditionalOutput: Boolean = false,
-    /** 打出“时间、日期、星期”时紧跟着给当前时间和日期（15:35、2026-10-31），默认开；Rime 滤镜 cyime_datetime（librime-t9 datetime_filter.h）。 */
-    val datetimeCandidates: Boolean = true,
+    /** 打出“时间、日期、星期”时紧跟着给当前时间和日期（15:35、2026-10-31），默认关（更新不改原有习惯，要用在 语言与方案 › 中文输出 打开）；Rime 滤镜 cyime_datetime（librime-t9 datetime_filter.h）。 */
+    val datetimeCandidates: Boolean = false,
     /** 英文选词后自动加空格（别人请求，默认关）；见 service/EnglishAutoSpace.kt。 */
     val englishAutoSpace: Boolean = false,
     val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
@@ -226,7 +226,7 @@ data class KeyboardInputPreferences(
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
                 rareCharacters = prefs.getBoolean(RARE_CHARACTERS_KEY, false),
                 traditionalOutput = prefs.getBoolean(TRADITIONAL_OUTPUT_KEY, false),
-                datetimeCandidates = prefs.getBoolean(DATETIME_CANDIDATES_KEY, true),
+                datetimeCandidates = prefs.getBoolean(DATETIME_CANDIDATES_KEY, false),
                 englishAutoSpace = prefs.getBoolean(ENGLISH_AUTO_SPACE_KEY, false),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
                 fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),

@@ -714,7 +714,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 if (service.rimeEngine.getOption("traditionalization") != traditional) service.rimeEngine.setOption("traditionalization", traditional)
                 // 时间日期候选（默认开）：同上；选项是反的，会话重建清零后仍是开。
                 val datetimeOff = !com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
-                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, true)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false)
                 if (service.rimeEngine.getOption("_cyime_datetime_off") != datetimeOff) service.rimeEngine.setOption("_cyime_datetime_off", datetimeOff)
                 // 仓颉码表本身是繁体，反过来：simplification 开着时转简体。
                 if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE &&
