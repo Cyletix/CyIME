@@ -746,6 +746,7 @@ fun KeyboardView(
                     onRetake = { callbacks.onHideQuickSendForm?.invoke(); viewModel.showOverlay(OverlayRoute.Ocr) },
                 )
             } else if (state.showQuickSendForm) {
+                val clipboardGroups = com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(LocalContext.current)
                 QuickSendFormArea(
                     backgroundColor = Color.Transparent,
                     textColor = keyTextColor,
@@ -759,7 +760,8 @@ fun KeyboardView(
                         android.util.Log.d("QuickSendForm", "onClose: textLen=${text.length}, editingId=${state.quickSendEditingItemId}, showForm=${state.showQuickSendForm}")
                         val result = submitClipboardDraft(
                             text, code, state.quickSendEditingItemId,
-                            add = viewModel::addPinnedText,
+                            // Added from a group's tab: the new fixed record goes into that group.
+                            add = { newText, newCode -> viewModel.addPinnedText(newText, newCode, clipboardGroups.takeAddTarget()) },
                             update = viewModel::updateClipboardItem,
                         )
                         if (result == ClipboardDraftSaveResult.ACCEPTED) {
@@ -771,7 +773,7 @@ fun KeyboardView(
                             }
                         }
                     },
-                    onCancel = { callbacks.onHideQuickSendForm?.invoke() },
+                    onCancel = { clipboardGroups.takeAddTarget(); callbacks.onHideQuickSendForm?.invoke() },
                     onFocusChange = { focused: Boolean ->
                         callbacks.onQuickSendFormFocusChange?.invoke(focused)
                     },

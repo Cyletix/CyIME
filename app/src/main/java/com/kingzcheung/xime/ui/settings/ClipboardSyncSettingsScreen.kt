@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.ContentPaste
+import androidx.compose.material.icons.twotone.Folder
 import androidx.compose.material.icons.twotone.PushPin
 import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material.icons.twotone.Upload
@@ -56,6 +57,7 @@ import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
     onNavigateToPlugins: () -> Unit,
+    onNavigateToGroups: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -202,7 +204,7 @@ fun ClipboardSyncSettingsContent(
             }
             // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
             VerificationCodeSettings()
-            ClipboardCardLinesSetting()
+            ClipboardCardLinesSetting(onNavigateToGroups)
             ClipboardExportSetting()
         }
     }
@@ -217,14 +219,23 @@ internal fun <T> effectiveClipboardSyncPlugin(available: List<Pair<String, T>>, 
 
 /** 剪贴板面板里每张卡片最多显示几行文字（2 / 4 / 8，默认 4）；单选样式和本页「同步服务」一样。 */
 @Composable
-private fun ClipboardCardLinesSetting() {
+private fun ClipboardCardLinesSetting(onNavigateToGroups: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("clipboard_board", android.content.Context.MODE_PRIVATE) }
     val key = com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_MAX_LINES_KEY
     var lines by remember { mutableStateOf(prefs.getInt(key, 4)) }
     // Same switch as the clipboard's own more menu (same preference).
     var closeAfterPaste by remember { mutableStateOf(com.kingzcheung.xime.ui.menubar.clipboardClosesAfterPaste(prefs)) }
+    val groups by remember(context) { com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(context) }.state.collectAsState()
     SettingsSection(title = "剪贴板面板", content = {
+        SettingsItem(
+            icon = Icons.TwoTone.Folder,
+            title = "剪贴板分组",
+            subtitle = "自带分类，和自己建的常用语、工作等分组",
+            onClick = onNavigateToGroups,
+            showArrow = true,
+            status = groups.groups.size.takeIf { it > 0 }?.let { "$it 个" },
+        )
         SettingsToggleItem(
             icon = Icons.TwoTone.ContentPaste,
             title = "上屏后自动关闭剪贴板",

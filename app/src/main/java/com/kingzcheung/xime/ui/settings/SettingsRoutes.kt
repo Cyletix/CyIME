@@ -30,6 +30,7 @@ object SettingsRoutes {
     const val HandwritingTraining = "handwriting_training"
     const val Handwriting = "handwriting_settings"
     const val ClipboardSync = "clipboard_sync"
+    const val ClipboardGroups = "clipboard_groups"
     const val Backup = "backup"
     const val RimeFileBrowser = "rime_file_browser"
     const val KeyboardResize = "keyboard_resize"
