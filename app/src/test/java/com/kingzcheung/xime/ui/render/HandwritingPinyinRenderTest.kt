@@ -66,6 +66,11 @@ class HandwritingPinyinRenderTest {
 
     private fun context() = ApplicationProvider.getApplicationContext<Context>()
 
+    // 和真机一样带一排工具栏按钮：收起按钮占空闲工具栏的一格，没有按钮时这一格会占掉半条候选栏。
+    private fun toolbarActions() = com.kingzcheung.xime.keyboard.ToolbarButton.entries.take(7).map {
+        com.kingzcheung.xime.keyboard.ToolbarAction(com.kingzcheung.xime.keyboard.ToolbarButtonItem.Builtin(it)) {}
+    }
+
     @androidx.compose.runtime.Composable
     private fun Bar(theme: String = "soft_blue", dark: Boolean = false, glass: Boolean = false) {
         val palette = resolveKeyboardPalette(theme, dark)
@@ -79,7 +84,7 @@ class HandwritingPinyinRenderTest {
                 CandidateBar(
                     state = handwriting,
                     page = com.kingzcheung.xime.keyboard.KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.HANDWRITING),
-                    toolbarActions = emptyList(),
+                    toolbarActions = toolbarActions(),
                     visuals = CandidateBarVisuals(Color.Transparent, palette.candidateText,
                         if (dark) Color(0xFF3C4043) else Color(0xFFDADCE0), palette.accent, palette.selectedText, dark, palette.key),
                     callbacks = CandidateBarCallbacks(onCandidateSelect = {}, onCancelInput = {},
@@ -101,6 +106,9 @@ class HandwritingPinyinRenderTest {
         assertTrue(shown("dí") >= 1)
         assertEquals(1, shown("xíng/háng"))
         assertEquals(1, shown("de/dì/dí"))
+        // 带读音后候选变宽，手机宽度的候选栏里仍放得下前四个（第四个是 滴 dī）
+        assertEquals(1, shown("滴"))
+        assertEquals(1, shown("dī"))
     }
 
     @Test fun hiddenCommentsHideHandwritingReadings() {
