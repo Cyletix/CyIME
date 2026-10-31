@@ -29,8 +29,6 @@ import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
@@ -119,10 +117,9 @@ fun Modifier.keyboardBackground(
 
             val bitmap = rememberThemeImage(src)
             if (bitmap != null) {
-                val fit = background.fit ?: "cover"
                 return this.then(
                     Modifier.drawWithContent {
-                        drawImageBackground(bitmap, fit)
+                        drawImageBackground(bitmap, background, fallbackColor)
                         drawImageOverlay(background, isDark)
                         drawContent()
                     }
@@ -207,7 +204,7 @@ fun Modifier.keyboardBackgroundBelowCard(
                 // 卡片底边为轴上下翻转：卡片最后一行正好落在这条第一行。
                 translate(frame.left, frame.bottom + frame.height) {
                     scale(1f, -1f, pivot = Offset.Zero) {
-                        drawImageBackground(bitmap, background.fit ?: "cover", frame.width, frame.height)
+                        drawImageBackground(bitmap, background, fallbackColor, frame.width, frame.height)
                     }
                 }
             }
@@ -265,10 +262,14 @@ internal fun gradientLine(background: BackgroundConfig, frame: Rect): Pair<Offse
         Offset(frame.left + frame.width * endRatio.x, frame.top + frame.height * endRatio.y)
 }
 
-/** 在 DrawScope 内绘制图片背景。 */
+/**
+ * 在 DrawScope 内绘制图片背景。cover/contain/fit_width/fit_height 按 [placeThemeImage] 摆
+ * （含「我的图片」调整页存下的缩放与对齐）；图片没盖满时空出的地方先铺 [fallbackColor]。
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground(
     bitmap: ImageBitmap,
-    fit: String,
+    background: BackgroundConfig,
+    fallbackColor: Color,
     dstW: Float = size.width,
     dstH: Float = size.height,
 ) {
@@ -276,51 +277,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground
     val srcH = bitmap.height.toFloat()
     if (srcW <= 0f || srcH <= 0f || dstW <= 0f || dstH <= 0f) return
 
-    val scale: Float
-    val offsetX: Float
-    val offsetY: Float
-
-    when (fit) {
-        "contain" -> {
-            scale = min(dstW / srcW, dstH / srcH)
-            offsetX = (dstW - srcW * scale) / 2f
-            offsetY = (dstH - srcH * scale) / 2f
-            clipRect(right = dstW, bottom = dstH) {
-                drawImage(
-                    bitmap,
-                    dstOffset = IntOffset(offsetX.roundToInt(), offsetY.roundToInt()),
-                    dstSize = IntSize((srcW * scale).roundToInt(), (srcH * scale).roundToInt()),
-                )
-            }
-        }
+    when (val fit = background.fit ?: "cover") {
         "fill" -> {
             drawImage(
                 bitmap,
                 dstOffset = IntOffset.Zero,
                 dstSize = IntSize(dstW.roundToInt(), dstH.roundToInt()),
             )
-        }
-        "fit_width" -> {
-            scale = dstW / srcW
-            offsetY = (dstH - srcH * scale) / 2f
-            clipRect(right = dstW, bottom = dstH) {
-                drawImage(
-                    bitmap,
-                    dstOffset = IntOffset(0, offsetY.roundToInt()),
-                    dstSize = IntSize((srcW * scale).roundToInt(), (srcH * scale).roundToInt()),
-                )
-            }
-        }
-        "fit_height" -> {
-            scale = dstH / srcH
-            offsetX = (dstW - srcW * scale) / 2f
-            clipRect(right = dstW, bottom = dstH) {
-                drawImage(
-                    bitmap,
-                    dstOffset = IntOffset(offsetX.roundToInt(), 0),
-                    dstSize = IntSize((srcW * scale).roundToInt(), (srcH * scale).roundToInt()),
-                )
-            }
         }
         "none" -> {
             drawImage(
@@ -329,15 +292,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawImageBackground
                 dstSize = IntSize(srcW.roundToInt(), srcH.roundToInt()),
             )
         }
-        else -> { // cover (default)
-            scale = max(dstW / srcW, dstH / srcH)
-            offsetX = (dstW - srcW * scale) / 2f
-            offsetY = (dstH - srcH * scale) / 2f
+        else -> {
+            val frame = placeThemeImage(srcW, srcH, dstW, dstH, fit, background.zoom, background.alignX, background.alignY)
             clipRect(right = dstW, bottom = dstH) {
+                if (!frame.covers(dstW, dstH)) drawRect(fallbackColor, size = androidx.compose.ui.geometry.Size(dstW, dstH))
                 drawImage(
                     bitmap,
-                    dstOffset = IntOffset(offsetX.roundToInt(), offsetY.roundToInt()),
-                    dstSize = IntSize((srcW * scale).roundToInt(), (srcH * scale).roundToInt()),
+                    dstOffset = IntOffset(frame.left.roundToInt(), frame.top.roundToInt()),
+                    dstSize = IntSize(frame.width.roundToInt(), frame.height.roundToInt()),
                 )
             }
         }

@@ -8,7 +8,9 @@ import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -33,7 +35,10 @@ class CustomImageThemeTest {
 
     @After fun clear() {
         SettingsPreferences.getPrefsPublic(context).edit()
-            .remove("custom_theme_image_src").remove("custom_theme_image_base").commit()
+            .remove("custom_theme_image_src").remove("custom_theme_image_base")
+            .remove("custom_theme_image_placement").commit()
+        File(SchemaManager.getRimeDir(context), "themes").listFiles()
+            ?.filter { it.name.startsWith("custom-keyboard-bg-") }?.forEach { it.delete() }
     }
 
     @Test fun absentUntilAnImageIsChosen() {
@@ -60,5 +65,45 @@ class CustomImageThemeTest {
     @Test fun glassHasNoSolidBackgroundSoSoftBlueIsUsed() {
         choose(TransparentGlassTheme.ID)
         assertEquals(themes.first { it.id == SoftBlueTheme.ID }.keyBgLight, CustomImageTheme.build(context, themes)!!.keyBgLight)
+    }
+
+    @Test fun oldSettingsWithoutPlacementStillCoverCentred() {
+        choose("mint_green")
+        val bg = CustomImageTheme.build(context, themes)!!.keyboardBackground!!
+        assertEquals("cover", bg.fit)
+        assertEquals(1f, bg.zoom)
+        assertEquals(0.5f, bg.alignX)
+        assertEquals(0.5f, bg.alignY)
+    }
+
+    @Test fun commitKeepsTheAdjustedPlacementAndRemovesOtherImages() {
+        val old = choose("mint_green")
+        val fresh = File(old.parentFile, "custom-keyboard-bg-2.jpg").apply { writeBytes(byteArrayOf(2)) }
+        CustomImageTheme.commit(context, "themes/custom-keyboard-bg-2.jpg", "mint_green",
+            ThemeImagePlacement("fit_height", 1f, 0f, 0.5f))
+        assertFalse(old.exists())
+        assertTrue(fresh.exists())
+        val bg = CustomImageTheme.build(context, themes)!!.keyboardBackground!!
+        assertEquals("themes/custom-keyboard-bg-2.jpg", bg.src)
+        assertEquals("fit_height", bg.fit)
+        assertEquals(0f, bg.alignX)
+    }
+
+    @Test fun cancellingANewPickDeletesOnlyThatFile() {
+        val inUse = choose("mint_green")
+        val picked = File(inUse.parentFile, "custom-keyboard-bg-3.jpg").apply { writeBytes(byteArrayOf(3)) }
+        CustomImageTheme.discard(context, "themes/custom-keyboard-bg-3.jpg")
+        assertFalse(picked.exists())
+        // 调整已在用的图片后取消，不能把它删掉。
+        CustomImageTheme.discard(context, "themes/custom-keyboard-bg-1.jpg")
+        assertTrue(inUse.exists())
+    }
+
+    @Test fun deleteRemovesTheThemeAndReturnsTheBase() {
+        val file = choose("mint_green")
+        assertEquals("mint_green", CustomImageTheme.delete(context))
+        assertFalse(file.exists())
+        assertFalse(CustomImageTheme.hasImage(context))
+        assertNull(CustomImageTheme.build(context, themes))
     }
 }

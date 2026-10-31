@@ -334,6 +334,14 @@ data class BackgroundConfig(
     @SerialName("src_dark")
     val srcDark: String? = null,
     val fit: String? = null,
+    /** 图片在 [fit] 的基准大小上再放大的倍数（cover 至少 1，contain 可小于 1），未配置为 1。 */
+    val zoom: Float? = null,
+    /** 图片在可移动范围里的横向位置：0 左边对齐，1 右边对齐，未配置居中。 */
+    @SerialName("align_x")
+    val alignX: Float? = null,
+    /** 纵向位置：0 上边对齐，1 下边对齐，未配置居中。 */
+    @SerialName("align_y")
+    val alignY: Float? = null,
     /** 图片背景遮罩：半透明黑色覆盖层降低背景亮度（0~1，如 0.35 表示压暗 35%）。 */
     @SerialName("overlay_alpha")
     val overlayAlpha: Float? = null,

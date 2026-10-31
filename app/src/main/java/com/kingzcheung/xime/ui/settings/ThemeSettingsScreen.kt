@@ -17,13 +17,17 @@ import androidx.compose.material.icons.twotone.Opacity
 import androidx.compose.material.icons.twotone.BlurOn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.Crop
+import androidx.compose.material.icons.twotone.Delete
 import androidx.compose.material.icons.twotone.Image
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -235,12 +239,18 @@ private fun ThemeSettingsPage(
             }
             
             item {
-                CustomImageThemeSection(currentThemeId = uiState.colorTheme) {
+                CustomImageThemeSection(currentThemeId = uiState.colorTheme, onSaved = {
                     viewModel.refreshThemes()
                     changeAppearance(context, onThemeChanged) {
                         viewModel.setColorTheme(com.kingzcheung.xime.ui.theme.CustomImageTheme.ID)
                     }
-                }
+                }, onDeleted = { baseThemeId ->
+                    viewModel.refreshThemes()
+                    // 正在用「我的图片」时换回选图时沿用的主题。
+                    if (uiState.colorTheme == com.kingzcheung.xime.ui.theme.CustomImageTheme.ID) {
+                        changeAppearance(context, onThemeChanged) { viewModel.setColorTheme(baseThemeId) }
+                    } else onThemeChanged()
+                })
             }
 
             // 视觉样式只有一组卡片，直接放在本页；按键显示（字号、角标、气泡、底部）也属于外观。
@@ -301,24 +311,26 @@ private fun ThemeSettingsPage(
     }
 }
 
-/** 「用自己的图片」：从相册选一张图做键盘背景，存好后直接换成「我的图片」主题。 */
+/**
+ * 「用自己的图片」：从相册选一张图，先在调整页拖动、缩放、贴齐边缘，确认后换成「我的图片」主题。
+ * 设置过以后可以再调整或删除。
+ */
 @Composable
-private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit) {
+private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit, onDeleted: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var hasImage by remember { mutableStateOf(com.kingzcheung.xime.ui.theme.CustomImageTheme.hasImage(context)) }
+    // 调整页正在调的图片（刚选的新图或已在用的那张）与要沿用的主题。
+    var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val base = com.kingzcheung.xime.ui.theme.CustomImageTheme.baseFor(context, currentThemeId)
         scope.launch {
-            val saved = withContext(Dispatchers.IO) {
-                runCatching { com.kingzcheung.xime.ui.theme.CustomImageTheme.save(context, uri, base) }
+            val imported = withContext(Dispatchers.IO) {
+                runCatching { com.kingzcheung.xime.ui.theme.CustomImageTheme.importImage(context, uri) }
             }
-            saved.onSuccess {
-                com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
-                hasImage = true
-                onSaved()
-            }.onFailure {
+            imported.onSuccess { editing = it to base }.onFailure {
                 com.kingzcheung.xime.util.FileLogger.e("Appearance", "Custom background failed", it)
                 android.widget.Toast.makeText(context, "这张图片读不出来，换一张试试", android.widget.Toast.LENGTH_LONG).show()
             }
@@ -330,5 +342,74 @@ private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit)
                 else "从相册选一张图片做键盘背景，按键和文字的颜色沿用当前主题",
             onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             showArrow = true)
+        if (hasImage) {
+            SettingsItem(icon = Icons.TwoTone.Crop, title = "调整图片",
+                subtitle = "拖动、缩放，贴齐键盘的边，或让两边、上下留白",
+                onClick = {
+                    com.kingzcheung.xime.ui.theme.CustomImageTheme.imageSource(context)?.let { src ->
+                        editing = src to com.kingzcheung.xime.ui.theme.CustomImageTheme.baseFor(context,
+                            com.kingzcheung.xime.ui.theme.CustomImageTheme.ID)
+                    }
+                },
+                showArrow = true)
+            SettingsItem(icon = Icons.TwoTone.Delete, title = "删除图片",
+                subtitle = "删掉这张图片和「我的图片」配色",
+                onClick = { confirmDelete = true })
+        }
+    }
+    editing?.let { (src, base) ->
+        val existing = src == com.kingzcheung.xime.ui.theme.CustomImageTheme.imageSource(context)
+        CustomImageEditorSheet(
+            src = src,
+            baseThemeId = base,
+            initial = if (existing) com.kingzcheung.xime.ui.theme.CustomImageTheme.placement(context)
+                else com.kingzcheung.xime.ui.theme.ThemeImagePlacement.DEFAULT,
+            onConfirm = { placement ->
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching { com.kingzcheung.xime.ui.theme.CustomImageTheme.commit(context, src, base, placement) }
+                    }
+                    saved.onSuccess {
+                        com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
+                        hasImage = true
+                        editing = null
+                        onSaved()
+                    }.onFailure {
+                        com.kingzcheung.xime.util.FileLogger.e("Appearance", "Custom background save failed", it)
+                        android.widget.Toast.makeText(context, "图片没有保存成功，请重试", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onDismiss = {
+                editing = null
+                scope.launch(Dispatchers.IO) { com.kingzcheung.xime.ui.theme.CustomImageTheme.discard(context, src) }
+            },
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("删除图片") },
+            text = { Text("删掉这张背景图片，「我的图片」配色也一起去掉；正在用它时换回原来的配色。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    scope.launch {
+                        val deleted = withContext(Dispatchers.IO) {
+                            runCatching { com.kingzcheung.xime.ui.theme.CustomImageTheme.delete(context) }
+                        }
+                        deleted.onSuccess { base ->
+                            com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
+                            hasImage = false
+                            onDeleted(base)
+                        }.onFailure {
+                            com.kingzcheung.xime.util.FileLogger.e("Appearance", "Custom background delete failed", it)
+                            android.widget.Toast.makeText(context, "没有删除成功，请重试", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }) { Text("删除") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+        )
     }
 }

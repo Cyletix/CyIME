@@ -276,7 +276,7 @@ private fun PageIndicator(
 }
 
 @Composable
-private fun ThemeKeyboardPreview(
+internal fun ThemeKeyboardPreview(
     theme: KeyboardColorScheme,
     isDark: Boolean,
     modifier: Modifier = Modifier,

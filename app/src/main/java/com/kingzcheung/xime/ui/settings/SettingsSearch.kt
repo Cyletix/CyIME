@@ -183,7 +183,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("玻璃效果", theme, SettingsRoutes.Theme, "玻璃 毛玻璃 透明 材质 磨砂", section = "材质效果"),
         SettingsSearchEntry("透明度与模糊", theme, SettingsRoutes.Theme, "透明度 模糊 模糊强度 背景不透明度 按键不透明度 玻璃", section = "材质效果"),
         SettingsSearchEntry("配色方案", theme, SettingsRoutes.Theme, "配色 颜色 主题色 皮肤 预览"),
-        SettingsSearchEntry("用自己的图片", theme, SettingsRoutes.Theme, "背景图 背景图片 自定义背景 图片 照片 相册 壁纸 我的图片 换背景", section = "背景图片"),
+        SettingsSearchEntry("用自己的图片", theme, SettingsRoutes.Theme, "背景图 背景图片 自定义背景 图片 照片 相册 壁纸 我的图片 换背景 调整图片 裁剪 缩放 对齐 留白 删除图片", section = "背景图片"),
         SettingsSearchEntry("视觉样式", theme, SettingsRoutes.Theme, "样式 圆角 扁平 立体 材质"),
         SettingsSearchEntry("按键形状", theme, SettingsRoutes.Theme, "形状 圆角 方形 方角 直角 方块 键帽 按键外形 iOS"),
         SettingsSearchEntry("按键字号", theme, SettingsRoutes.Theme, "字号 字体 文字大小 按键文字 字体大小"),
