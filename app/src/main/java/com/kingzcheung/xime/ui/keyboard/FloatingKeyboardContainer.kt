@@ -87,6 +87,20 @@ internal fun keyboardPanelShape(isFloating: Boolean, roundedBottom: Boolean = fa
     else -> RectangleShape
 }
 
+/**
+ * 「填满留空处」时固定卡片和两侧拼成一整条键盘：圆角只留在整条的外角上（贴着屏幕边的那几个角），
+ * 卡片和两侧相接的角是直角，否则两侧在卡片圆角那里露出一个台阶（2026-10-31 平板截图）。
+ * 卡片铺满整宽或贴着一边时，贴边那侧照顶部/底部圆角设置。
+ */
+internal fun filledSidesCardShape(touchesLeft: Boolean, touchesRight: Boolean, roundedTop: Boolean, roundedBottom: Boolean) =
+    if (touchesLeft && touchesRight) keyboardPanelShape(false, roundedBottom, roundedTop)
+    else RoundedCornerShape(
+        topStart = if (roundedTop && touchesLeft) FloatingKeyboardCardCorner else 0.dp,
+        topEnd = if (roundedTop && touchesRight) FloatingKeyboardCardCorner else 0.dp,
+        bottomEnd = if (roundedBottom && touchesRight) FloatingKeyboardCardCorner else 0.dp,
+        bottomStart = if (roundedBottom && touchesLeft) FloatingKeyboardCardCorner else 0.dp,
+    )
+
 /** 键盘卡片顶部两角的圆角，由裁切卡片的容器提供；候选栏的描边按它画，才不会被卡片圆角切掉。 */
 internal val LocalKeyboardCardTopCorner = compositionLocalOf { FloatingKeyboardCardCorner }
 
@@ -136,12 +150,20 @@ internal fun FloatingKeyboardContainer(
     onCornerTap: (() -> Unit)? = null,
     /** 角标把手热区（窗口坐标）：露在卡片外的部分要并进输入法触摸区。角标没亮时为空表。 */
     onCornerHandlesPositioned: (List<android.graphics.Rect>) -> Unit = {},
+    /** 「填满留空处」：固定卡片两侧铺了键盘背景，卡片和两侧拼成一整条（全屏手写时两侧不铺）。 */
+    sidesFilled: Boolean = false,
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val roundedTop = rememberRoundedKeyboardTop()
-    val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom(), roundedTop)
+    val roundedBottom = rememberRoundedKeyboardBottom()
+    val fixedCardShape = keyboardPanelShape(false, roundedBottom, roundedTop)
     val fixedTopCorner = if (roundedTop) FloatingKeyboardCardCorner else 0.dp
+    // 两侧铺满时卡片只在贴着屏幕边的角上圆；候选栏描边两角都圆时才跟着圆。
+    fun cardShape(touchesLeft: Boolean, touchesRight: Boolean) = if (!sidesFilled) fixedCardShape
+        else filledSidesCardShape(touchesLeft, touchesRight, roundedTop, roundedBottom)
+    fun cardTopCorner(touchesLeft: Boolean, touchesRight: Boolean) =
+        if (!sidesFilled || touchesLeft && touchesRight) fixedTopCorner else 0.dp
     val dragPalette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
     val dragIndicatorColor = dragIndicatorColor ?: if (dragPalette != null)
         lerp(dragPalette.background.copy(alpha = 1f), dragPalette.text.copy(alpha = 1f), 0.5f)
@@ -176,10 +198,13 @@ internal fun FloatingKeyboardContainer(
                     ?: resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), fixedWidthDp)).dp.coerceAtMost(maxWidth)
                     .let { if (maxWidth - it < 1.dp) maxWidth else it }
                 val travel = ((maxWidth - width) / 2f).value
+                val shift = fixedOffsetX.toFloat().coerceIn(-travel, travel)
+                val touchesLeft = shift <= -travel + 0.5f
+                val touchesRight = shift >= travel - 0.5f
                 val undockPull = remember { UndockPullState() }
                 Box(Modifier.align(Alignment.TopCenter)
-                    .absoluteOffset(x = fixedOffsetX.toFloat().coerceIn(-travel, travel).dp)
-                    .width(width).fillMaxSize().clip(fixedCardShape).testTag("fixed-keyboard-card")
+                    .absoluteOffset(x = shift.dp)
+                    .width(width).fillMaxSize().clip(cardShape(touchesLeft, touchesRight)).testTag("fixed-keyboard-card")
                     .then(if (onUndock != null) Modifier.undockPull(undockPull, onUndock) else Modifier)
                     .onGloballyPositioned { coords ->
                         undockPull.card = coords
@@ -187,7 +212,7 @@ internal fun FloatingKeyboardContainer(
                         onCardPositioned(pos.x.roundToInt(), pos.y.roundToInt(),
                             (pos.x + coords.size.width).roundToInt(), (pos.y + coords.size.height).roundToInt())
                     }) {
-                    CompositionLocalProvider(LocalKeyboardCardTopCorner provides fixedTopCorner) {
+                    CompositionLocalProvider(LocalKeyboardCardTopCorner provides cardTopCorner(touchesLeft, touchesRight)) {
                         LanguageMenuPanel { keyboardContent() }
                     }
                     if (onUndock != null) UndockHandle(Modifier.align(Alignment.TopCenter), undockPull,
@@ -197,13 +222,15 @@ internal fun FloatingKeyboardContainer(
         } else {
             val previewWidth = with(density) { previewRect.width.toDp() }
             val previewHeight = with(density) { previewRect.height.toDp() }
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val touchesLeft = previewRect.left <= 0.5f
+                val touchesRight = previewRect.right >= constraints.maxWidth - 0.5f
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .absoluteOffset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
                         .size(previewWidth, previewHeight)
-                        .clip(fixedCardShape)
+                        .clip(cardShape(touchesLeft, touchesRight))
                         .testTag("fixed-keyboard-resize-preview")
                         .onGloballyPositioned { coords ->
                             val pos = coords.positionInWindow()
@@ -217,7 +244,7 @@ internal fun FloatingKeyboardContainer(
                         }
                 ) {
                     // Resize controls own input; keep the menu host out of the live preview.
-                    CompositionLocalProvider(LocalKeyboardCardTopCorner provides fixedTopCorner) { keyboardContent() }
+                    CompositionLocalProvider(LocalKeyboardCardTopCorner provides cardTopCorner(touchesLeft, touchesRight)) { keyboardContent() }
                 }
             }
         }

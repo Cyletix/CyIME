@@ -12,10 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -23,7 +28,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.BackgroundConfig
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
@@ -182,6 +189,8 @@ fun Modifier.keyboardBackgroundBelowCard(
     fallbackColor: Color,
     card: () -> Rect?,
     frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences(isDark).frostedGlass,
+    /** 「填满留空处」开着：两侧的图是卡片左右镜像，这条在两侧下面也接着镜像。 */
+    filledSides: Boolean = false,
 ): Modifier {
     val continued = background != null && !frostedGlass.enabled && when (background.type) {
         "gradient" -> gradientColors(background, isDark) != null
@@ -207,6 +216,14 @@ fun Modifier.keyboardBackgroundBelowCard(
                         drawImageBackground(bitmap, background, fallbackColor, frame.width, frame.height)
                     }
                 }
+                // 两侧的图沿卡片左右边镜像；这里再上下翻一次，接着两侧的最后一行。
+                if (filledSides) for (x in listOf(frame.left, frame.right + frame.width)) {
+                    translate(x, frame.bottom + frame.height) {
+                        scale(-1f, -1f, pivot = Offset.Zero) {
+                            drawImageBackground(bitmap, background, fallbackColor, frame.width, frame.height)
+                        }
+                    }
+                }
             }
             drawImageOverlay(background, isDark)
         } else {
@@ -218,8 +235,11 @@ fun Modifier.keyboardBackgroundBelowCard(
 
 /**
  * 固定卡片窄于整宽时两侧的留空（设置「填满留空处」打开时）：只在卡片那一段高度里铺满整宽。
- * 渐变沿卡片同一条线延伸；图片没有卡片以外的部分，两侧铺主题底色（与导航条两侧相同）；
- * 纯色和毛玻璃照卡片的画法，毛玻璃的模糊由服务另开两侧的模糊窗口。
+ * 渐变沿卡片同一条线延伸；图片没有卡片以外的部分，沿卡片左右边镜像过来（和导航条沿底边镜像同一做法），
+ * 接缝处和卡片边上那一列同色，两侧比卡片还宽时更远处铺主题底色；
+ * 纯色和毛玻璃照卡片的画法，毛玻璃的模糊由服务把卡片那块模糊窗口放宽到整宽。
+ * 只画卡片左右两块，卡片底下不画：半透明的底色和玻璃叠两层，卡片会比两侧深一截（2026-10-31 平板截图）。
+ * 整条的外角（贴着屏幕边）照顶部/底部圆角设置圆，和整宽键盘一样；卡片那边的角由卡片画成直角。
  * [card] 是卡片在窗口里的位置；还没量到时什么也不画。
  */
 @Composable
@@ -229,21 +249,46 @@ fun Modifier.keyboardBackgroundBesideCard(
     fallbackColor: Color,
     card: () -> Rect?,
     frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences(isDark).frostedGlass,
+    topCorner: Dp = 0.dp,
+    bottomCorner: Dp = 0.dp,
 ): Modifier {
     var origin by remember { mutableStateOf<Offset?>(null) }
     val gradient = background?.takeIf { !frostedGlass.enabled && it.type == "gradient" }?.let { gradientColors(it, isDark) }
     val image = !frostedGlass.enabled && background?.type == "image"
+    val imageBackground = background?.takeIf { image }
+    val bitmap = imageBackground?.let { themeImageSource(it, isDark) }?.takeIf { it.isNotBlank() }?.let { rememberThemeImage(it) }
     fun frame(): Rect? = origin?.let { o -> card()?.takeIf { it.width > 0f && it.height > 0f }?.translate(-o.x, -o.y) }
     val band = onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
         val f = frame() ?: return@drawWithContent
-        clipRect(0f, f.top, size.width, f.bottom) {
-            when {
-                gradient != null -> {
-                    val (start, end) = gradientLine(background!!, f)
-                    drawRect(Brush.linearGradient(gradient, start, end), size = size)
+        val top = CornerRadius(topCorner.toPx())
+        val bottom = CornerRadius(bottomCorner.toPx())
+        val outline = Path().apply {
+            addRoundRect(RoundRect(0f, f.top, size.width, f.bottom,
+                topLeftCornerRadius = top, topRightCornerRadius = top,
+                bottomRightCornerRadius = bottom, bottomLeftCornerRadius = bottom))
+        }
+        clipPath(outline) {
+            clipRect(f.left, f.top, f.right, f.bottom, ClipOp.Difference) {
+                when {
+                    gradient != null -> {
+                        val (start, end) = gradientLine(background!!, f)
+                        drawRect(Brush.linearGradient(gradient, start, end), size = size)
+                    }
+                    image -> {
+                        drawRect(fallbackColor)
+                        if (bitmap != null && imageBackground != null) {
+                            for (x in listOf(f.left, f.right + f.width)) {
+                                translate(x, f.top) {
+                                    scale(-1f, 1f, pivot = Offset.Zero) {
+                                        drawImageBackground(bitmap, imageBackground, fallbackColor, f.width, f.height)
+                                    }
+                                }
+                            }
+                            drawImageOverlay(imageBackground, isDark)
+                        }
+                    }
+                    else -> this@drawWithContent.drawContent()
                 }
-                image -> drawRect(fallbackColor)
-                else -> this@drawWithContent.drawContent()
             }
         }
     }

@@ -360,26 +360,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 固定键盘关了顶部圆角时卡片顶边是直角，模糊也用直角，顶角不露出没模糊的应用。
         val squareTop = !uiState.value.isFloatingMode && !SettingsPreferences.roundedKeyboardTop(this)
         surface.configure(glassConfig.enabled, (glassConfig.blurRadiusDp * density).roundToInt(),
-            if (name == "navigation" || name.startsWith("keyboard-side") || squareTop && name.startsWith("keyboard")) 0f
+            if (name == "navigation" || squareTop && name.startsWith("keyboard")) 0f
             else 16f * density)
         surface.setOpacity(glassOpacity)
         surface.setRegion(glassSurfaceBounds[name])
         surface.setVisible(glassWindowVisible)
     }
 
-    /** 「填满留空处」时固定卡片两侧也是键盘：各开一块直角模糊，与卡片拼成整宽。 */
-    private fun updateKeyboardSideGlass(card: android.graphics.Rect?) {
+    /**
+     * 「填满留空处」时固定卡片两侧也是键盘：卡片那块模糊放宽到整宽，和整宽键盘一样只有一块。
+     * 原来两侧另开直角模糊、卡片那块按 16dp 圆角，卡片顶角处露出一小块没模糊的应用。
+     */
+    private fun withFilledSides(card: android.graphics.Rect?): android.graphics.Rect? {
+        if (card == null || uiState.value.isFloatingMode || uiState.value.handwritingExpanded ||
+            !::keyboardContainer.isInitialized || !SettingsPreferences.isKeyboardBlankFilled(this)) return card
+        val width = keyboardContainer.width
+        if (width <= 0) return card
         val host = IntArray(2)
-        val width = if (::keyboardContainer.isInitialized) keyboardContainer.width.also {
-            keyboardContainer.getLocationInWindow(host) } else 0
-        val left = host[0]
-        val right = left + width
-        val sides = card?.takeIf { !uiState.value.isFloatingMode && !uiState.value.handwritingExpanded &&
-            width > 0 && SettingsPreferences.isKeyboardBlankFilled(this) }
-        updateGlassSurface("keyboard-side-left", sides?.takeIf { it.left > left }
-            ?.let { android.graphics.Rect(left, it.top, it.left, it.bottom) })
-        updateGlassSurface("keyboard-side-right", sides?.takeIf { it.right < right }
-            ?.let { android.graphics.Rect(it.right, it.top, right, it.bottom) })
+        keyboardContainer.getLocationInWindow(host)
+        return android.graphics.Rect(minOf(host[0], card.left), card.top, maxOf(host[0] + width, card.right), card.bottom)
     }
 
     private fun onSplitGapChanged() {
@@ -398,8 +397,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 分体时模糊分三块：上方工具栏整宽，左右两半各一块，中缝保持清晰。 */
     private fun updateKeyboardGlass() {
-        val card = if (uiState.value.handwritingExpanded) handwritingGlassControls else keyboardGlassCard
-        updateKeyboardSideGlass(card)
+        val card = withFilledSides(if (uiState.value.handwritingExpanded) handwritingGlassControls else keyboardGlassCard)
         val hole = card?.let { splitKeyboardGap.hole(it.bottom.toFloat()) }
         if (card == null || hole == null) {
             updateGlassSurface("keyboard", card)
@@ -751,7 +749,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     com.kingzcheung.xime.ui.theme.KeyShapes.current = SettingsPreferences.getKeyShape(this@XimeInputMethodService)
                 }
                 // 卡片顶角由 Compose 跟着改；模糊窗的圆角要在这里重新配一次。
-                SettingsPreferences.KEY_ROUNDED_KEYBOARD_TOP -> updateKeyboardGlass()
+                SettingsPreferences.KEY_ROUNDED_KEYBOARD_TOP, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK -> updateKeyboardGlass()
                 SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
                     com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this@XimeInputMethodService)
                     loadDarkModePreference()
@@ -2019,12 +2017,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         // 「填满留空处」：固定卡片两侧的留空用键盘背景铺满（默认镂空，透出后面的应用）。
                         if (!state.isFloatingMode && !handwritingExpanded &&
                             com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).fillBlankAreas) {
+                            val corner = com.kingzcheung.xime.ui.keyboard.FloatingKeyboardCardCorner
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer { alpha = keyboardLayerOpacity }
                                     .keyboardBackgroundBesideCard(rootTheme.keyboardBackground, isDark, keyboardBgColor,
-                                        card = { navigationStripCard.value })
+                                        card = { navigationStripCard.value },
+                                        topCorner = if (com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardTop()) corner else 0.dp,
+                                        bottomCorner = if (roundedKeyboardBottom) corner else 0.dp)
                             )
                         }
                         if (!state.isFloatingMode && !roundedKeyboardBottom) {
@@ -2042,7 +2043,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     }
                                     .graphicsLayer { alpha = keyboardLayerOpacity }
                                     .keyboardBackgroundBelowCard(rootTheme.keyboardBackground, isDark, keyboardBgColor,
-                                        card = { navigationStripCard.value })
+                                        card = { navigationStripCard.value }, filledSides = !handwritingExpanded &&
+                                            com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).fillBlankAreas)
                             )
                         }
                         Box(
