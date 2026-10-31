@@ -351,7 +351,7 @@ private fun T9KeyboardContent(
     compactMode: Boolean = false,
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
-    /** 键盘区在根布局里的位置：0 键拖动超过它宽或高的一半才算拖动选词。 */
+    /** 键盘区在根布局里的位置：0 键拖动超过它宽或高的一半（设置里可调）才算拖动选词。 */
     dragArea: () -> Rect = { Rect.Zero },
 ) {
     val t9DigitFontSize = if (compactMode) 13.sp else 16.sp
@@ -759,10 +759,11 @@ private fun T9KeyboardContent(
                     } else commitDirect("0")
                 },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                // 拖出超过键盘一半宽或高才算拖动选词（画出拖线），拖到候选上松手等于按住 Shift 选它（有英文上屏英文）；
+                // 拖出超过键盘一半宽或高（设置里可调）才算拖动选词（画出拖线），拖到候选上松手等于按住 Shift 选它（有英文上屏英文）；
                 // 没拖那么远仍是本键的左滑「上一项」等手势（用户 10-25）。拖动选词和 26 键 Shift 拖动一样不看释义词典：
                 // 注释是拼音时照样选中文候选（用户 10-31：九键拖不动了）；只有长按对调中英要等词典。
-                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(nextCandidate, dragArea).t9NextShiftHold(glossHoldEnabled,
+                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(nextCandidate, dragArea,
+                    fraction = LocalKeyboardInputPreferences.current.candidateDragPercent / 100f).t9NextShiftHold(glossHoldEnabled,
                     onDown = { glossHoldUsed = false }, onHeld = { glossHoldUsed = true }),
                 onSwipeLeft = if (nextCandidate) ({
                     callbacks.onDismissPreeditEditor?.invoke()

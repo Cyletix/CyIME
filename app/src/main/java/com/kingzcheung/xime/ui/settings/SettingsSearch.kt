@@ -149,6 +149,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),
         SettingsSearchEntry("空格左侧逗号键", qwertyPath, qwerty, "逗号 空格 加宽 标点"),
         SettingsSearchEntry("空格右侧句号键", qwertyPath, qwerty, "句号 空格 标点"),
+        SettingsSearchEntry("拖到候选选词的距离", ninePath, nine, "九键 0键 零键 拖动 拖拽 托转 选词 候选 距离 阈值 Shift 百分比 拖线"),
         SettingsSearchEntry("拂动选字母", ninePath, nine, "九键 拂动 滑动 长按 数字 字母 字母菜单 上下左右"),
         SettingsSearchEntry("左右滑动选字母", ninePath, nine, "14键 双字母键 滑动 选字母 小鹤 双拼 左滑 右滑"),
         SettingsSearchEntry("滑动触发距离", ninePath, nine, "距离 灵敏度 误触 拂动 滑动 假名 dp"),

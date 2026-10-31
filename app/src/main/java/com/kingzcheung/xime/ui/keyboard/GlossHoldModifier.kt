@@ -68,7 +68,8 @@ internal fun Modifier.t9NextShiftHold(enabled: Boolean, onDown: () -> Unit, onHe
     }
 
 /**
- * 从这个键拖到候选栏上：手指离开按下点超过 [area]（键盘区）宽或高的一半才算拖动选词（用户 10-25），
+ * 从这个键拖到候选栏上：手指离开按下点超过 [area]（键盘区）宽或高的 [fraction]（默认一半，用户 10-25；
+ * 设置里可调，用户 10-31）才算拖动选词，
  * 没过这个距离仍是键自己的左滑、上滑、点按。进入拖动后在 Initial 阶段消费触摸，键自己的手势随即取消
  * （不再出「上一项」等预览，松手也不触发）；候选栏和键盘都画出从键到手指的拖线（[CandidateDropTargets.dragLine]），
  * 指着的候选高亮并中英对调（[CandidateGlossary.t9DragSwap]），在候选上松手就按住 Shift 选它（有英文上屏英文），
@@ -78,9 +79,11 @@ internal fun Modifier.dragToCandidate(
     enabled: Boolean,
     area: () -> Rect,
     targets: CandidateDropTargets = CandidateDropTargets.shared,
+    fraction: Float = 0.5f,
 ): Modifier = if (!enabled) this else composed {
     val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val currentArea by rememberUpdatedState(area)
+    val currentFraction by rememberUpdatedState(fraction)
     onGloballyPositioned { coordinates[0] = it }.pointerInput(targets) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -91,7 +94,7 @@ internal fun Modifier.dragToCandidate(
                     val change = awaitPointerEvent(PointerEventPass.Initial).changes
                         .firstOrNull { it.id == down.id } ?: break
                     val layout = coordinates[0]?.takeIf { it.isAttached }
-                    if (!dragging) dragging = isCandidateDrag(change.position - down.position, currentArea().size)
+                    if (!dragging) dragging = isCandidateDrag(change.position - down.position, currentArea().size, currentFraction)
                     if (!dragging || layout == null) {
                         if (!change.pressed) break
                         continue
@@ -118,6 +121,7 @@ internal fun Modifier.dragToCandidate(
     }
 }
 
-/** 离按下点超过键盘区宽或高的一半：算拖动选词，不再是键内滑动。 */
-internal fun isCandidateDrag(delta: Offset, area: Size): Boolean =
-    area.width > 0f && area.height > 0f && (abs(delta.x) > area.width / 2f || abs(delta.y) > area.height / 2f)
+/** 离按下点超过键盘区宽或高的 [fraction]（默认一半）：算拖动选词，不再是键内滑动。 */
+internal fun isCandidateDrag(delta: Offset, area: Size, fraction: Float = 0.5f): Boolean =
+    area.width > 0f && area.height > 0f &&
+        (abs(delta.x) > area.width * fraction || abs(delta.y) > area.height * fraction)

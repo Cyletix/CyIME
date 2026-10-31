@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,6 +20,18 @@ class CandidateDragThresholdTest {
     @Test fun pastHalfWidthOrHalfHeightIsADrag() {
         assertTrue(isCandidateDrag(Offset(-541f, 0f), keyboard))
         assertTrue(isCandidateDrag(Offset(-100f, -351f), keyboard))
+    }
+
+    // 用户 10-31：距离可调，按键盘区宽或高的比例算；设置存成 20–80%，每档 10%。
+    @Test fun configuredFractionMovesTheThreshold() {
+        assertFalse(isCandidateDrag(Offset(-300f, 0f), keyboard, 0.3f))
+        assertTrue(isCandidateDrag(Offset(-325f, 0f), keyboard, 0.3f))
+        assertFalse(isCandidateDrag(Offset(-600f, -500f), keyboard, 0.8f))
+        assertTrue(isCandidateDrag(Offset(0f, -561f), keyboard, 0.8f))
+        assertEquals(50f, normalizeCandidateDragPercent(Float.NaN))
+        assertEquals(20f, normalizeCandidateDragPercent(5f))
+        assertEquals(80f, normalizeCandidateDragPercent(100f))
+        assertEquals(40f, normalizeCandidateDragPercent(37f))
     }
 
     @Test fun unknownKeyboardAreaNeverDrags() {

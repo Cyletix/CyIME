@@ -30,6 +30,10 @@ internal fun normalizeLanguageMenuHoldSeconds(value: Float): Float =
 internal fun normalizeSymbolKeyHoldSeconds(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 1f).coerceIn(0.3f, 2f) * 10).roundToInt() / 10f
 
+/** 九键「下一项」拖到候选算拖动选词的距离：键盘区宽或高的 20%–80%，每档 10%，默认 50%（用户 10-25 定的一半）。 */
+internal fun normalizeCandidateDragPercent(value: Float): Float =
+    ((value.takeIf { it.isFinite() } ?: 50f).coerceIn(20f, 80f) / 10f).roundToInt() * 10f
+
 /** 手写公式上屏时两边加的 LaTeX 标记。 */
 enum class FormulaDelimiter(val label: String, val open: String, val close: String) {
     NONE("不加", "", ""), DOLLAR("\$…\$", "\$", "\$"), DISPLAY("\\[ … \\]", "\\[", "\\]");
@@ -104,6 +108,8 @@ data class KeyboardInputPreferences(
     val languageMenuHoldSeconds: Float = 0.15f,
     /** 按住符号键当 Ctrl；不拖动且在这个时限内松手才打开符号面板，超过时限松手什么都不做；默认 1 秒（2026-10-24 用户要求）。 */
     val symbolKeyHoldSeconds: Float = 1f,
+    /** 九键从「下一项」拖出超过键盘区宽或高的这个百分比才算拖动选词，没拖这么远仍是键自己的左右滑；默认 50（用户 10-31 要求可调）。 */
+    val candidateDragPercent: Float = 50f,
     /** 手写公式上屏时两边的标记，默认 $…$。 */
     val formulaDelimiter: FormulaDelimiter = FormulaDelimiter.DOLLAR,
     /** 移光标时从中间滑到屏幕边缘走几行，按输入框一行能放几个字换算每字距离。 */
@@ -135,7 +141,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
-                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds",
+                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
@@ -182,6 +188,7 @@ data class KeyboardInputPreferences(
                 cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
                 symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(prefs.getFloat("symbol_key_hold_seconds", 1f)),
+                candidateDragPercent = normalizeCandidateDragPercent(prefs.getFloat("t9_candidate_drag_percent", 50f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 doublePinyinCorrection = prefs.getBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, false),
                 mixedInput = prefs.getBoolean(MIXED_INPUT_KEY, false),
@@ -218,6 +225,7 @@ data class KeyboardInputPreferences(
             .putFloat("language_key_hold_seconds_v2", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
             .putFloat("language_key_hold_seconds", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
             .putFloat("symbol_key_hold_seconds", normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds))
+            .putFloat("t9_candidate_drag_percent", normalizeCandidateDragPercent(candidateDragPercent))
             .putBoolean("neighbor_correction", neighborCorrection)
             .putBoolean(com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, doublePinyinCorrection)
             .putBoolean(MIXED_INPUT_KEY, mixedInput)
