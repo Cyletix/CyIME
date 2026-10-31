@@ -148,6 +148,50 @@ class CustomKeyboardLayoutTest {
         assertEquals("我的双拇指", CustomKeyboardLayouts.find(QwjrtkLayout.ID)?.name)
         assertEquals("Cyletix10（实验）", CustomKeyboardLayouts.find(Cyletix10Layout.ID)?.name)
     }
+    @Test fun perKeyWidthsMoveWithLettersAndScaleWithinTheirRow() {
+        val base = CustomKeyboardLayout.fresh().withSpareSlot()
+        assertTrue(base.widths.isEmpty())
+        val widened = base.withWidth("l", 1.4f)
+        assertEquals(1.4f, widened.widthOf("l"), 0.0001f)
+        assertEquals(1f, widened.widthOf("a"), 0.0001f)
+        assertEquals(1f, widened.widthOf("s"), 0.0001f)
+        assertTrue(widened.valid())
+        val row = widened.rows[1]
+        // 整排仍占原来的 10 格，只是其它键等比让出一点。
+        assertEquals(10f, widened.rowWidths(row).sum(), 0.001f)
+        val at = row.indexOf("l")
+        assertTrue(widened.rowWidths(row)[at] > base.rowWidths(row)[at])
+        assertTrue(widened.rowWidths(row)[at] < 1.4f)
+        assertEquals(emptyMap<String, Float>(), widened.withWidth("l", 1f).widths)
+        // 交换时宽度跟着字母走
+        assertEquals(1.4f, widened.swap("l", "q").widthOf("l"), 0.0001f)
+        // 合并接过两格宽度，拆分平分
+        assertEquals(2f, widened.merge("a").widthOf("as"), 0.0001f)
+        assertEquals(widened, widened.merge("a").split("as"))
+        val wide = widened.withWidth("a", 2.4f).merge("a")
+        assertEquals(3.4f, wide.widthOf("as"), 0.0001f)
+        assertEquals(1.7f, wide.split("as").widthOf("a"), 0.0001f)
+        // 空位和独立分号键是同一格换内容，宽度跟着走
+        assertEquals(1.2f, widened.withWidth(CustomKeyboardLayout.EMPTY_SLOT, 1.2f)
+            .setSemicolonEnabled(true).widthOf(";"), 0.0001f)
+    }
+    @Test fun savedWidthsLoadSanitizedAndOldLayoutsKeepDefaultWidths() {
+        val dir = tmp.newFolder()
+        val context = mock<Context>(); whenever(context.filesDir).thenReturn(dir)
+        val file = File(dir, "custom-keyboard-layouts.json")
+        val id = "custom_pinyin_" + "a".repeat(32)
+        val rows = "q,w,e,r,t,y,u,i,o,p/a,s,d,f,g,h,j,k,l,_/z,x,c,v,b,n,m"
+        file.writeText("""[{"formatVersion":2,"id":"$id","name":"旧布局","rows":"$rows"}]""")
+        val old = CustomKeyboardLayouts.load(context).single()
+        assertTrue(old.widths.isEmpty())
+        assertEquals(1f, old.widthOf("l"), 0.0001f)
+        file.writeText("""[{"formatVersion":3,"id":"$id","name":"调宽","rows":"$rows","widths":{"l":1.4,"zz":9,"s":7}}]""")
+        val loaded = CustomKeyboardLayouts.load(context).single()
+        assertEquals(1.4f, loaded.widthOf("l"), 0.0001f)
+        // 不在布局里的键丢掉，超出范围的收到上限。
+        assertFalse("zz" in loaded.widths)
+        assertEquals(CustomKeyboardLayout.MAX_WIDTH, loaded.widthOf("s"), 0.0001f)
+    }
     @Test fun lightDarkAndColoredThemesHaveReadableVowelsAndMovedKeys() {
         val layout = CustomKeyboardLayout.fresh().swap("e", "j").copy(redVowels = true)
         for (bg in listOf(Color.White, Color(0xFF302D38), Color(0xFFDDEBDD), Color(0xFF463049))) {

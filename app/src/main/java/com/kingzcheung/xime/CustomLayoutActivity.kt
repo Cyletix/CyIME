@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.settings.*
@@ -101,6 +102,7 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
     var id by rememberSaveable { mutableStateOf<String?>(null) }
     var name by rememberSaveable { mutableStateOf("") }
     var rowText by rememberSaveable { mutableStateOf("") }
+    var widthText by rememberSaveable { mutableStateOf("") }
     var red by rememberSaveable { mutableStateOf(false) }
     var redMoved by rememberSaveable { mutableStateOf(true) }
     var selected by remember { mutableStateOf<String?>(null) }
@@ -116,10 +118,15 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
     }
     fun edit(layout: CustomKeyboardLayout) {
         id = layout.id; name = layout.name; rowText = layout.withSpareSlot().rows.joinToString("/") { it.joinToString(",") }
+        widthText = encodeWidths(layout.widths)
         red = layout.redVowels; redMoved = layout.redMoved; selected = null; message = ""
     }
-    fun draft() = CustomKeyboardLayout(id.orEmpty(), name.trim(), rowText.split('/').map { it.split(',') }, red, redMoved)
-    fun update(layout: CustomKeyboardLayout) { rowText = layout.rows.joinToString("/") { it.joinToString(",") } }
+    fun draft() = CustomKeyboardLayout(id.orEmpty(), name.trim(), rowText.split('/').map { it.split(',') }, red, redMoved,
+        decodeWidths(widthText))
+    fun update(layout: CustomKeyboardLayout) {
+        rowText = layout.rows.joinToString("/") { it.joinToString(",") }
+        widthText = encodeWidths(layout.widths)
+    }
     fun back() { if (id != null) discard = true else close() }
     BackHandler { back() }
     LaunchedEffect(Unit) {
@@ -184,6 +191,8 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
             SettingsSection(title = "按键排列") {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("长按0.3秒，拖到另一按键后松手交换。点选一个单键，可与右侧单键合并；合并键可拆回。", style = MaterialTheme.typography.bodySmall)
+            Text("点选按键后可以单独调宽：单字母键默认 1 格、合并键默认 2 格；调宽后同排其它键等比让出，整排格子数不变。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             CustomLayoutGrid(layout, selected, !busy, themeId, dark, { selected = it }, { from, to ->
                 val changed = layout.swap(from, to)
                 if (changed == layout && from != to) message = "跨行交换需要相同宽度；请先拆分合并键。"
@@ -199,7 +208,26 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                     enabled = !busy && selected != null && layout.merge(selected!!) != layout) { Text("合并右侧") }
                 OutlinedButton(onClick = { selected?.let { update(layout.split(it)) }; selected = null },
                     enabled = !busy && selected?.length == 2) { Text("拆分") }
-                TextButton(onClick = { update(layout.copy(rows = listOf("qwertyuiop", "asdfghjkl_", "zxcvbnm").map { it.map(Char::toString) })); selected = null }, enabled = !busy) { Text("恢复原位") }
+                TextButton(onClick = { update(layout.copy(rows = listOf("qwertyuiop", "asdfghjkl_", "zxcvbnm").map { it.map(Char::toString) }, widths = emptyMap())); selected = null }, enabled = !busy) { Text("恢复原位") }
+            }
+            val adjusting = selected?.takeIf { key -> key != CustomKeyboardLayout.EMPTY_SLOT && layout.rows.any { key in it } }
+            if (adjusting != null) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("「${adjusting.uppercase()}」键宽", modifier = Modifier.weight(1f))
+                    Text("${"%.1f".format(layout.widthOf(adjusting))} 格", style = MaterialTheme.typography.labelLarge)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("窄", style = MaterialTheme.typography.labelSmall)
+                    Slider(
+                        value = layout.widthOf(adjusting).coerceIn(CustomKeyboardLayout.MIN_WIDTH, CustomKeyboardLayout.MAX_WIDTH),
+                        onValueChange = { update(layout.withWidth(adjusting, it)) },
+                        valueRange = CustomKeyboardLayout.MIN_WIDTH..CustomKeyboardLayout.MAX_WIDTH,
+                        steps = 24, enabled = !busy,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
+                    Text("宽", style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = { update(layout.withWidth(adjusting, adjusting.length.toFloat())) },
+                        enabled = !busy && layout.widthOf(adjusting) != adjusting.length.toFloat()) { Text("默认") }
+                }
             }
             }
             }
@@ -264,6 +292,9 @@ private fun CustomLayoutRow(layout: CustomKeyboardLayout, enabled: Boolean,
     }
 }
 
+// 编辑器里一个按键的位置和实际宽度；单独调过宽度的键在网格里也是那个宽窄。
+private data class LayoutKeyPlacement(val key: String, val x: Dp, val y: Dp, val width: Dp)
+
 @Composable
 private fun CustomLayoutGrid(layout: CustomKeyboardLayout, selected: String?, enabled: Boolean, theme: String, dark: Boolean,
     onSelect: (String) -> Unit, onSwap: (String, String) -> Unit) {
@@ -285,18 +316,21 @@ private fun CustomLayoutGrid(layout: CustomKeyboardLayout, selected: String?, en
             BoxWithConstraints(Modifier.fillMaxWidth().height(186.dp).onGloballyPositioned { origin = it.boundsInRoot().topLeft }) {
                 val slot = (maxWidth - 27.dp) / 10
                 val positions = layout.rows.flatMapIndexed { rowIndex, row ->
+                    val widths = layout.rowWidths(row)
                     var column = (10 - row.sumOf { it.length }) / 2f
-                    row.map { key ->
+                    row.mapIndexed { index, key ->
                         val x = (slot + 3.dp) * column
-                        column += key.length
-                        Triple(key, x, 64.dp * rowIndex)
+                        column += widths[index]
+                        LayoutKeyPlacement(key, x, 64.dp * rowIndex,
+                            slot * widths[index] + 3.dp * (key.length - 1))
                     }
                 }
-                positions.forEach { (letter, x, y) ->
+                positions.forEach { placement ->
+                    val letter = placement.key
                     key(letter) {
                         val isDragging = dragging == letter
                         val position by animateOffsetAsState(
-                            if (isDragging) pointer - origin - anchor else with(density) { Offset(x.toPx(), y.toPx()) },
+                            if (isDragging) pointer - origin - anchor else with(density) { Offset(placement.x.toPx(), placement.y.toPx()) },
                             animationSpec = if (isDragging) snap() else tween(180), label = "layout-key-position")
                         val scale by animateFloatAsState(if (isDragging) 1.06f else 1f, tween(120), label = "layout-key-lift")
                         val emptyOutline = if (target == letter || selected == letter) accent else MaterialTheme.colorScheme.outlineVariant
@@ -312,7 +346,7 @@ private fun CustomLayoutGrid(layout: CustomKeyboardLayout, selected: String?, en
                                         style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx(),
                                             pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))))
                                 }
-                                .width(slot * letter.length + 3.dp * (letter.length - 1)).height(58.dp)
+                                .width(placement.width).height(58.dp)
                                 .zIndex(if (isDragging) 1f else 0f).graphicsLayer { scaleX = scale; scaleY = scale }
                                 .semantics { contentDescription = if (letter == CustomKeyboardLayout.EMPTY_SLOT) "备用空位，长按拖动" else "按键${letter.uppercase()}，长按拖动" }
                                 .onGloballyPositioned { bounds[letter] = it.boundsInRoot() }
@@ -335,5 +369,17 @@ private fun CustomLayoutGrid(layout: CustomKeyboardLayout, selected: String?, en
             }
             if (dragging != null) Text("${dragging!!.uppercase()} → ${target?.uppercase() ?: "拖到目标按键"}", style = MaterialTheme.typography.labelMedium)
         }
+    }
+}
+
+/** 编辑器里的键宽明细：以 `键=格数` 用分号连接，能直接放进 rememberSaveable。 */
+private fun encodeWidths(widths: Map<String, Float>): String =
+    widths.entries.joinToString(";") { "${it.key}=${it.value}" }
+
+private fun decodeWidths(text: String): Map<String, Float> = buildMap {
+    text.split(';').forEach { entry ->
+        val at = entry.indexOf('=')
+        if (at <= 0) return@forEach
+        entry.substring(at + 1).toFloatOrNull()?.let { put(entry.substring(0, at), it) }
     }
 }

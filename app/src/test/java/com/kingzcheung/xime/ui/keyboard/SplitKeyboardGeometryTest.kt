@@ -35,6 +35,15 @@ class SplitKeyboardGeometryTest {
         assertEquals(2, SplitKeyboardGeometry.leftCount(listOf("qw", "er", "ty", "ui", "op"), 0.5f, true))
     }
 
+    @Test fun customWidthsMoveTheSplitToTheActualFingerBoundary() {
+        // 默认每键一格时 qwert|yuiop；q 调到 2.5 格后 r 的中心已越过中线，缝落在 r 之前。
+        assertEquals(5, SplitKeyboardGeometry.leftCount(top, 0f, true, top.map { 1f }))
+        val widths = top.map { if (it == "q") 2.5f else 1f }
+        assertEquals(4, SplitKeyboardGeometry.leftCount(top, 0f, true, widths))
+        // 没有宽度的行仍按字母数，传入的 null 不改原有结果。
+        assertEquals(5, SplitKeyboardGeometry.leftCount(top, 0f, true, null))
+    }
+
     @Test fun gapKeepsEachHalfIdenticalToTheNormalKeyboard() {
         val g = LetterKeyboardFrame(listOf(10, 9, 7)).geometry(1f, 1f)
         val gap = 3.2f

@@ -254,10 +254,13 @@ fun KeyboardLayout(
     val splitRow1 = renderRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
     val splitRow2 = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
     // 每行左半的键数；-1 表示不分体。
-    val splitAt0 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow0, 0f, splitWeighted) else -1
+    val splitAt0 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow0, 0f, splitWeighted,
+        letterLayout?.rowWidths(splitRow0)) else -1
     val splitAt1 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow1,
-        splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f), splitWeighted) else -1
-    val splitAt2 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow2, letterSideKeyWeight, splitWeighted) else -1
+        splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f), splitWeighted,
+        letterLayout?.rowWidths(splitRow1)) else -1
+    val splitAt2 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow2, letterSideKeyWeight, splitWeighted,
+        letterLayout?.rowWidths(splitRow2)) else -1
     // 「右半边也放 G 键」只在 26 键分体时生效；14 键、注音、蜂窝和不分体的键盘不受影响。
     val splitRightG = splitKeyboard && !fourteenKey && !zhuyin && !honeycomb &&
         LocalKeyboardInputPreferences.current.splitRightG
@@ -717,7 +720,13 @@ fun KeyboardLayout(
                             }
 
                                 val bottomKeys = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
-                                val bottomWeighted = LocalCustomLayout.current != null || fourteenKey
+                                val bottomLayout = LocalCustomLayout.current
+                                val bottomEvenMerged = LocalEvenMergedKeys.current
+                                val bottomWeighted = bottomLayout != null || fourteenKey
+                                // 调过宽度的键按调过的格数，其余仍按字母数/合并键均匀排布的规则。
+                                fun bottomWeight(key: String): Float =
+                                    if (!bottomWeighted) 1f
+                                    else bottomLayout?.widths?.get(key) ?: letterKeySpan(key, true, bottomEvenMerged)
                                 // 14 键的 m 与 26 键的 m 同位同宽；删除键保持与 Shift 对称的宽度。
                                 // 宽屏错位让删除键比 Shift 宽时，m 只借这部分富余的一半，最多一个键宽。
                                 val fourteenMExtra = if (fourteenKey && splitAt2 < 0 && bottomKeys.lastOrNull()?.length == 1)
@@ -729,7 +738,7 @@ fun KeyboardLayout(
                                 Row(
                                     modifier = Modifier
                                         .weight(if (splitAt2 < 0) letterBottomWeight + fourteenMExtra else segmentKeys
-                                            .sumOf { if (splitWeighted) it.length else 1 }.toFloat().coerceAtLeast(0.001f))
+                                            .sumOf { bottomWeight(it).toDouble() }.toFloat().coerceAtLeast(0.001f))
                                         .fillMaxHeight(),
                                 ) {
                                 segmentKeys.forEach { key ->
@@ -811,7 +820,7 @@ fun KeyboardLayout(
                                         backgroundColor = keyBackgroundColor,
                                         textColor = keyTextColor,
                                         modifier = Modifier.weight(if (bottomWeighted) (renderSpans?.getOrNull(2)?.getOrNull(bottomKeys.indexOf(key))
-                                            ?: letterKeySpan(key, true, LocalEvenMergedKeys.current)) +
+                                            ?: bottomWeight(key)) +
                                             (if (key === bottomKeys.last()) fourteenMExtra else 0f) else 1f)
                                             .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
@@ -1301,6 +1310,10 @@ private fun DummyKeyboardRow(
     splitRightG: Boolean = false,
     endInset: Dp = 0.dp,
 ) {
+    val customLayout = LocalCustomLayout.current
+    val evenMerged = LocalEvenMergedKeys.current
+    fun spanOf(key: String): Float =
+        customLayout?.widths?.get(key) ?: letterKeySpan(key, weightedLetters, evenMerged)
     if (!splitRightG) {
         Row(
             modifier = modifier
@@ -1310,7 +1323,7 @@ private fun DummyKeyboardRow(
                 if (index == splitAt) SplitGapSpacer(splitRow, splitGap)
                 DummyKeyButton(
                     backgroundColor = keyBackgroundColor,
-                    modifier = Modifier.weight(keySpans?.getOrNull(index) ?: letterKeySpan(key, weightedLetters, LocalEvenMergedKeys.current))
+                    modifier = Modifier.weight(keySpans?.getOrNull(index) ?: spanOf(key))
                 )
             }
             if (splitAt == keys.size) SplitGapSpacer(splitRow, splitGap)
@@ -1327,7 +1340,7 @@ private fun DummyKeyboardRow(
                 if (index == splitAt) SplitGapSpacer(splitRow, homeRow.gap.dp)
                 DummyKeyButton(
                     backgroundColor = keyBackgroundColor,
-                    modifier = Modifier.weight(letterKeySpan(key, weightedLetters, LocalEvenMergedKeys.current))
+                    modifier = Modifier.weight(spanOf(key))
                 )
             }
             if (splitAt == homeRow.keys.size) SplitGapSpacer(splitRow, homeRow.gap.dp)
@@ -1350,6 +1363,10 @@ private fun DummyBottomRow(
     splitAt: Int = -1,
     splitGap: Dp = 0.dp,
 ) {
+    val customLayout = LocalCustomLayout.current
+    val evenMerged = LocalEvenMergedKeys.current
+    fun spanOf(key: String): Float =
+        customLayout?.widths?.get(key) ?: letterKeySpan(key, weightedLetters, evenMerged)
     Row(
         modifier = Modifier
             .fillMaxWidth(),
@@ -1364,14 +1381,13 @@ private fun DummyBottomRow(
             Row(
                 modifier = Modifier
                     .weight(if (splitAt < 0) letterWeight else segmentKeys
-                        .sumOf { if (weightedLetters) it.length else 1 }.toFloat().coerceAtLeast(0.001f))
+                        .sumOf { spanOf(it).toDouble() }.toFloat().coerceAtLeast(0.001f))
                     .fillMaxHeight(),
             ) {
                 segmentKeys.forEach { key ->
                     DummyKeyButton(
                         backgroundColor = keyBackgroundColor,
-                        modifier = Modifier.weight(keySpans?.getOrNull(keys.indexOf(key))
-                            ?: letterKeySpan(key, weightedLetters, LocalEvenMergedKeys.current))
+                        modifier = Modifier.weight(keySpans?.getOrNull(keys.indexOf(key)) ?: spanOf(key))
                     )
                 }
             }
@@ -1430,9 +1446,11 @@ fun KeyboardRowWithConfig(
     val customLayout = LocalCustomLayout.current
     // 14 键合并键与自定义布局一样按字母数占位，和 26 键同一网格对齐。
     val weighted = customLayout != null || LocalFourteenKeyLayout.current
-    // 「合并键均匀排布」打开时合并键少占、单字母键多占，整行宽度不变（见 [letterKeySpan]）。
+    // 「合并键均匀排布」打开时合并键少占、单字母键多占，整行宽度不变（见 [letterKeySpan]）；
+    // 自建布局单独调过宽度的键优先按调过的格数。
     val evenMerged = LocalEvenMergedKeys.current
-    val spans = keySpans?.takeIf { it.size == keys.size } ?: keys.map { letterKeySpan(it, weighted, evenMerged) }
+    val spans = keySpans?.takeIf { it.size == keys.size }
+        ?: keys.map { customLayout?.widths?.get(it) ?: letterKeySpan(it, weighted, evenMerged) }
     BoxWithConstraints(modifier.fillMaxWidth()) {
     val totalWeight = spans.sum().coerceAtLeast(1f)
     val startInset = edgeStartInset.coerceAtMost(maxWidth / 4)
@@ -1849,7 +1867,8 @@ fun CompactKeyboardRowWithConfig(
                 onClick = compactOnClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
-                modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
+                modifier = Modifier.weight(LocalCustomLayout.current?.widths?.get(key)
+                    ?: if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                 swipeText = swipeUpText,
                 symbolInputText = (if (editCorner != null) swipeUpCommitValue else symbolInputValue(swipeUpCommitValue, swipeUpAction))
                     .takeUnless { longPressLabels != null && KeysConfigHelper.accentLongPress(isAsciiMode) },
