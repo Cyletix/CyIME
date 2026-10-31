@@ -17,9 +17,27 @@ import java.time.Duration
 class VoiceAfterPermissionTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
-    private fun askFromVoiceKey() {
+    private fun askFromVoiceKey(): android.content.Intent {
         PermissionHelper.requestRecordAudioPermission(app)
-        shadowOf(app).nextStartedActivity // the permission page
+        return shadowOf(app).nextStartedActivity // the permission page
+    }
+
+    @Test fun `the request always gets its own task so an open settings task cannot swallow it`() {
+        val flags = askFromVoiceKey().flags
+        assertTrue(flags and android.content.Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertTrue(flags and android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK != 0)
+    }
+
+    @Test fun `no dialog, sent to app settings, allowed there starts voice on return`() {
+        askFromVoiceKey()
+        PermissionHelper.onSentToAppSettings()
+        assertFalse("still not allowed", PermissionHelper.takeVoiceAfterGrant(app))
+        askFromVoiceKey()
+        PermissionHelper.onSentToAppSettings()
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(40)) // finding the switch takes a while
+        shadowOf(app).grantPermissions(PermissionHelper.PERMISSION_RECORD_AUDIO)
+        assertTrue(PermissionHelper.takeVoiceAfterGrant(app))
+        assertFalse("only once", PermissionHelper.takeVoiceAfterGrant(app))
     }
 
     @Test fun `allowed from the voice key starts voice once`() {
