@@ -36,14 +36,14 @@ internal fun LanguageKeySwitchSettings(
         options = LanguageSwitchPreferences.read(context)
     }
     val currentNative = InputModes.languageOf(currentSchema, schemas)
+    // 列出所有非英文语言（原来写死只有中文、日语，西班牙语等选不到）；此刻能选的只是已启用且方案已准备好的。
+    val choices = LanguageSwitchPreferences.specificChoices(languageOrder)
     val nativeLanguages by produceState<List<InputLanguage>>(emptyList(), context, schemas, languageOrder) {
         value = withContext(Dispatchers.IO) {
             val available = schemas.filter {
                 it.profile.mode == InputMode.KEYBOARD && SchemaManager.isSchemaCompiled(context, it.schemaId)
             }.map { it.profile.language }.toSet()
-            languageOrder.filter {
-                it in available && it in listOf(InputLanguage.CHINESE, InputLanguage.JAPANESE)
-            }
+            choices.filter { it in available && it in languageOrder }
         }
     }
     fun save(value: LanguageSwitchOptions) {
@@ -76,17 +76,25 @@ internal fun LanguageKeySwitchSettings(
                 }
             }
             if (options.mode == LanguageSwitchMode.SPECIFIC_ENGLISH) {
-                if (nativeLanguages.isEmpty()) Text("请先在语言设置中启用并准备中文或日语输入资源。",
+                if (nativeLanguages.isEmpty()) Text("先在上面打开一种语言（中文、日语、西班牙语等），等它的输入方案准备好后再选。",
                     style = MaterialTheme.typography.bodyMedium)
-                else Column(Modifier.selectableGroup()) {
-                    for (language in nativeLanguages) {
+                Column(Modifier.selectableGroup()) {
+                    for (language in choices) {
+                        val ready = language in nativeLanguages
                         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
                             .testTag("language-switch-specific:${language.id}")
-                            .selectable(selectedLanguage == language, role = Role.RadioButton) {
+                            .selectable(selectedLanguage == language, enabled = ready, role = Role.RadioButton) {
                                 save(options.copy(language = language))
                             }, verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = selectedLanguage == language, onClick = null)
-                            Text("${language.displayName} ↔ 英文", style = MaterialTheme.typography.bodyMedium)
+                            RadioButton(selected = selectedLanguage == language, onClick = null, enabled = ready)
+                            Column(Modifier.weight(1f)) {
+                                Text("${language.displayName} ↔ 英文", style = MaterialTheme.typography.bodyMedium,
+                                    color = if (ready) MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+                                if (!ready) Text(if (language in languageOrder) "${language.displayName}的输入方案还在准备"
+                                    else "${language.displayName}未启用，在上面打开后可选",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
