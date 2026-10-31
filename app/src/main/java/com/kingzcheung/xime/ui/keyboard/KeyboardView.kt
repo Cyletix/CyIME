@@ -1311,58 +1311,8 @@ fun KeyboardView(
                 val mainType = (underlyingPage as KeyboardPage.Main).type
                 when (mainType) {
                     MainType.FULL -> {
-                        val currentOnCursorMove = rememberUpdatedState(callbacks.onCursorMove)
                         val suppressCursorMove = remember { mutableStateOf(false) }
-                        val cursorUnitPx = rememberCursorUnitPx()
-                        val cursorRootView = LocalView.current.rootView
-                        val cursorMod = if (callbacks.onCursorMove != null && inputPreferences.cursorGesture == CursorGestureMode.KEYBOARD) {
-                            Modifier.pointerInput(inputPreferences.cursorStepDp, inputPreferences.cursorSwipeLines, cursorUnitPx) {
-                                val fallbackStepPx = inputPreferences.cursorStepDp * cursorUnitPx
-                                val activationThresholdPx = 60.dp.toPx()
-                                awaitEachGesture {
-                                    suppressCursorMove.value = false
-                                    val down = awaitFirstDown(requireUnconsumed = false)
-                                    var isCursorGesture = false
-                                    val cursorSteps = CursorStepAccumulator(fallbackStepPx)
-                                    var lastX = down.position.x
-
-                                    do {
-                                        val event = awaitPointerEvent()
-                                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                        val dx = change.position.x - down.position.x
-                                        val dy = change.position.y - down.position.y
-
-                                        if (!change.pressed) {
-                                            if (isCursorGesture) {
-                                                event.changes.forEach { it.consume() }
-                                                SpaceAfterCursorGuard.mark(change.uptimeMillis)
-                                            }
-                                            break
-                                        }
-                                        if (suppressCursorMove.value || change.isConsumed) break
-                                        if (abs(dx) > abs(dy) * 4f) {
-
-                                            if (!isCursorGesture && abs(dx) > activationThresholdPx) {
-                                                isCursorGesture = true
-                                                lastX = change.position.x
-                                                CursorLineMetrics.request()
-                                            }
-
-                                            if (isCursorGesture) {
-                                                event.changes.forEach { it.consume() }
-                                                cursorSteps.stepPx = lineCursorStepPx(cursorRootView.width / 2f,
-                                                    inputPreferences.cursorSwipeLines, CursorLineMetrics.charsPerLine, fallbackStepPx, cursorUnitPx)
-                                                val steps = cursorSteps.move(change.position.x - lastX)
-                                                lastX = change.position.x
-                                                if (steps != 0) currentOnCursorMove.value?.invoke(steps)
-                                            }
-                                        }
-                                    } while (true)
-                                }
-                            }
-                        } else {
-                            Modifier
-                        }
+                        val cursorMod = keyboardSwipeCursor(callbacks.onCursorMove, inputPreferences, suppressCursorMove)
 
                         val fullScreenOnKeyPress: (String) -> Unit = { key ->
                             when (key) {
@@ -1579,6 +1529,9 @@ fun KeyboardView(
                 val japaneseNumberPage = !state.isAsciiMode &&
                     state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD
                 val numberSpacing = kbKey.spacingFor(numberKeyboardSpacingSection(state.inputProfile, state.isAsciiMode))
+                val panelSuppressCursorMove = remember { mutableStateOf(false) }
+                val panelCursorMod = keyboardSwipeCursor(callbacks.onCursorMove, inputPreferences, panelSuppressCursorMove)
+                CompositionLocalProvider(LocalSuppressCursorMove provides panelSuppressCursorMove) {
                 when (panelType) {
                     PanelType.NUMBER -> NumberKeyboardLayout(
                         onKeyPress = { key ->
@@ -1609,7 +1562,7 @@ fun KeyboardView(
                         onKeyPressDown = callbacks.onKeyPressDown,
                         isFloatingMode = state.isFloatingMode,
                         specialKeyTextColor = specialKeyTextColor,
-                        modifier = Modifier.weight(1f).fillMaxWidth()
+                        modifier = Modifier.weight(1f).fillMaxWidth().then(panelCursorMod)
                     )
 
                     PanelType.COMMON_SYMBOL -> CommonSymbolKeyboardLayout(
@@ -1649,9 +1602,10 @@ fun KeyboardView(
                         onKeyPressDown = callbacks.onKeyPressDown,
                         isFloatingMode = state.isFloatingMode,
                         specialKeyTextColor = specialKeyTextColor,
-                        modifier = Modifier.weight(1f).fillMaxWidth()
+                        modifier = Modifier.weight(1f).fillMaxWidth().then(panelCursorMod)
                     )
 
+                }
                 }
                 BottomLiftSpacer(renderedBottomPaddingDp, bottomLiftCursorOn, callbacks.onCursorMove)
             }
@@ -2207,5 +2161,63 @@ private fun ClipboardSearchResults(
             alpha = reveal.value
         },
     )
+    }
+}
+
+/**
+ * 「键盘滑动」移光标：在键盘上横着滑过 60dp 后按格移动光标。字母键盘（含九键、笔画）和数字页、常用符号页共用这一套；
+ * 以前只有字母键盘接了，切到数字页、常用符号页就滑不动（用户反馈 10-31「左右快捷横移在部分界面不可用」）。
+ * [suppressCursorMove] 由页面里的语言键、退格左滑等置位，这一下手势不再当成移光标。
+ */
+@Composable
+private fun keyboardSwipeCursor(onCursorMove: ((Int) -> Unit)?, inputPreferences: KeyboardInputPreferences,
+    suppressCursorMove: androidx.compose.runtime.MutableState<Boolean>): Modifier {
+    val currentOnCursorMove = rememberUpdatedState(onCursorMove)
+    val cursorUnitPx = rememberCursorUnitPx()
+    val cursorRootView = LocalView.current.rootView
+    if (onCursorMove == null || inputPreferences.cursorGesture != CursorGestureMode.KEYBOARD) return Modifier
+    return Modifier.pointerInput(inputPreferences.cursorStepDp, inputPreferences.cursorSwipeLines, cursorUnitPx) {
+        val fallbackStepPx = inputPreferences.cursorStepDp * cursorUnitPx
+        val activationThresholdPx = 60.dp.toPx()
+        awaitEachGesture {
+            suppressCursorMove.value = false
+            val down = awaitFirstDown(requireUnconsumed = false)
+            var isCursorGesture = false
+            val cursorSteps = CursorStepAccumulator(fallbackStepPx)
+            var lastX = down.position.x
+
+            do {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                val dx = change.position.x - down.position.x
+                val dy = change.position.y - down.position.y
+
+                if (!change.pressed) {
+                    if (isCursorGesture) {
+                        event.changes.forEach { it.consume() }
+                        SpaceAfterCursorGuard.mark(change.uptimeMillis)
+                    }
+                    break
+                }
+                if (suppressCursorMove.value || change.isConsumed) break
+                if (abs(dx) > abs(dy) * 4f) {
+
+                    if (!isCursorGesture && abs(dx) > activationThresholdPx) {
+                        isCursorGesture = true
+                        lastX = change.position.x
+                        CursorLineMetrics.request()
+                    }
+
+                    if (isCursorGesture) {
+                        event.changes.forEach { it.consume() }
+                        cursorSteps.stepPx = lineCursorStepPx(cursorRootView.width / 2f,
+                            inputPreferences.cursorSwipeLines, CursorLineMetrics.charsPerLine, fallbackStepPx, cursorUnitPx)
+                        val steps = cursorSteps.move(change.position.x - lastX)
+                        lastX = change.position.x
+                        if (steps != 0) currentOnCursorMove.value?.invoke(steps)
+                    }
+                }
+            } while (true)
+        }
     }
 }
