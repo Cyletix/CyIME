@@ -33,12 +33,33 @@ internal fun clipboardMediaAfterRefreshFailure(
     it.uri !in hiddenUris && (includeRecent || "image:${it.uri}" in pinnedKeys)
 }
 
+internal fun isMediaImageUri(uri: String): Boolean = uri.startsWith("content://media/")
+
+/** One source per copy: a gallery/screenshot source is kept, because the feed hides it by that URI. */
+internal fun preferredImageSource(existing: String?, incoming: String): String =
+    listOfNotNull(existing, incoming).firstOrNull(::isMediaImageUri) ?: existing ?: incoming
+
+/**
+ * A pasted (or copied) screenshot is cached into history while the feed still lists the original:
+ * the same picture would show twice. Keep one card — the fixed one if only one is fixed, else the copy.
+ */
+internal fun withoutFeedDuplicates(
+    copied: List<ClipboardImage>, screenshots: List<ClipboardImage>, pinnedKeys: Set<String>,
+): Pair<List<ClipboardImage>, List<ClipboardImage>> {
+    fun pinned(image: ClipboardImage) = "image:${image.uri}" in pinnedKeys
+    val pinnedShots = screenshots.filter(::pinned).mapTo(mutableSetOf()) { it.uri }
+    val keptCopied = copied.filterNot { image -> image.source?.let { it in pinnedShots } == true && !pinned(image) }
+    val coveredShots = keptCopied.mapNotNullTo(mutableSetOf()) { it.source }
+    return keptCopied to screenshots.filterNot { it.uri in coveredShots && !pinned(it) }
+}
+
 internal fun retainedClipboardImages(
     copied: List<ClipboardImage>, screenshots: List<ClipboardImage>,
     pinnedKeys: Set<String>, hiddenUris: Set<String>,
 ): List<ClipboardImage> {
     var recent = 0
-    return (copied + screenshots).distinctBy { it.uri }
+    val (keptCopied, keptShots) = withoutFeedDuplicates(copied, screenshots, pinnedKeys)
+    return (keptCopied + keptShots).distinctBy { it.uri }
         .filterNot { it.uri in hiddenUris }
         .sortedByDescending { it.timestamp }
         .filter { "image:${it.uri}" in pinnedKeys || recent++ < RECENT_CLIPBOARD_IMAGE_LIMIT }

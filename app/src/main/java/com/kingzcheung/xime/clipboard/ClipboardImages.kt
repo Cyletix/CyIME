@@ -22,9 +22,15 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 
-data class ClipboardImage(val uri: String, val mimeType: String, val timestamp: Long, val label: String = "图片")
+/**
+ * [source] is where a cached copy was read from (another app's clip, a screenshot); [sha256] is its
+ * content hash. Both only exist on copies in history and are what dedup compares, not the URI.
+ */
+data class ClipboardImage(val uri: String, val mimeType: String, val timestamp: Long, val label: String = "图片",
+    val source: String? = null, val sha256: String? = null)
 data class ImagePasteFailure(val image: ClipboardImage, val packageName: String)
 
 /** Copied images stay local; the optional gallery feed contains screenshots, never all photos. */
@@ -80,7 +86,9 @@ class ClipboardImages private constructor(private val context: Context) {
                             val uri = item.getString("uri")
                             val name = Uri.parse(uri).lastPathSegment ?: return@runCatching null
                             if (!File(directory, name).isFile) null
-                            else ClipboardImage(uri, item.getString("mime"), item.getLong("time"))
+                            else ClipboardImage(uri, item.getString("mime"), item.getLong("time"),
+                                source = item.optString("src").ifEmpty { null },
+                                sha256 = item.optString("sha").ifEmpty { null })
                         }.getOrNull()
                     }
                 }.getOrDefault(emptyList())
@@ -159,6 +167,7 @@ class ClipboardImages private constructor(private val context: Context) {
             directory.mkdirs()
             val extension = when (mime) { "image/jpeg" -> "jpg"; "image/gif" -> "gif"; "image/webp" -> "webp"; "image/heic" -> "heic"; "image/avif" -> "avif"; else -> "png" }
             val file = File(directory, "${UUID.randomUUID()}.$extension")
+            val digest = MessageDigest.getInstance("SHA-256")
             try {
                 (context.contentResolver.openInputStream(source) ?: error("Image is unavailable")).use { input ->
                     file.outputStream().use { output ->
@@ -170,11 +179,26 @@ class ClipboardImages private constructor(private val context: Context) {
                             total += count
                             require(total <= MAX_BYTES) { "Image exceeds 32 MiB" }
                             output.write(buffer, 0, count)
+                            digest.update(buffer, 0, count)
                         }
                         require(total > 0) { "Empty image" }
                     }
                 }
-                val cached = image.copy(uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file).toString(), mimeType = mime)
+                val hash = digest.digest().toHex()
+                // 同一张图换了个地址又来（粘贴后宿主又复制一次、同一张截图、再选一次）：
+                // 按内容认出来，只把原来那条挪到最前，不再多出一张。
+                findSameContent(hash, file.length())?.let { same ->
+                    file.delete()
+                    val reused = same.copy(timestamp = image.timestamp, label = image.label,
+                        source = preferredImageSource(same.source, image.uri), sha256 = hash)
+                    history = retainHistory(listOf(reused) + history.filterNot { it.uri == same.uri })
+                    cachedSources[image.uri] = reused
+                    save()
+                    publish()
+                    return@withLock reused
+                }
+                val cached = image.copy(uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file).toString(),
+                    mimeType = mime, source = image.uri, sha256 = hash)
                 history = retainHistory(listOf(cached) + history)
                 cachedSources[image.uri] = cached
                 // Readers may still hold a granted URI. Reclaim only old, unreferenced files.
@@ -196,6 +220,16 @@ class ClipboardImages private constructor(private val context: Context) {
                 cached
             } catch (error: Exception) { file.delete(); throw error }
         }
+    }
+
+    private fun cachedFile(image: ClipboardImage): File? =
+        Uri.parse(image.uri).lastPathSegment?.let { File(directory, it) }
+
+    /** A history copy with the same bytes. Old records without a hash are hashed only when the size matches. */
+    private fun findSameContent(hash: String, size: Long): ClipboardImage? = history.firstOrNull { item ->
+        val file = cachedFile(item)?.takeIf { it.isFile } ?: return@firstOrNull false
+        if (file.length() != size) return@firstOrNull false
+        (item.sha256 ?: runCatching { file.sha256() }.getOrNull()) == hash
     }
 
     // 同步清除，避免快速收起再打开时在后台任务执行前读到旧提示。
@@ -225,7 +259,10 @@ class ClipboardImages private constructor(private val context: Context) {
     /** Hide gallery entries and remove copied references; never delete the user's photos or granted files. */
     fun removeImages(uris: Set<String>) {
         scope.launch { mutex.withLock {
-            hidden = (hidden + uris).toList().takeLast(1024).toSet()
+            // 粘贴过的截图和它的副本只显示一张；删掉这张时连截图一起从列表藏掉（不删相册原图）。
+            val sources = history.filter { it.uri in uris }.mapNotNull { it.source }
+                .filter(::isMediaImageUri)
+            hidden = (hidden + uris + sources).toList().takeLast(1024).toSet()
             prefs.edit().putStringSet("hidden_images", hidden).apply()
             history = history.filterNot { it.uri in uris }
             uris.forEach { dismissPreview(it) }
@@ -323,7 +360,12 @@ class ClipboardImages private constructor(private val context: Context) {
 
     private fun save() {
         val array = JSONArray()
-        history.forEach { array.put(JSONObject().put("uri", it.uri).put("mime", it.mimeType).put("time", it.timestamp)) }
+        history.forEach { item ->
+            array.put(JSONObject().put("uri", item.uri).put("mime", item.mimeType).put("time", item.timestamp).apply {
+                item.source?.let { put("src", it) }
+                item.sha256?.let { put("sha", it) }
+            })
+        }
         prefs.edit().putString("history", array.toString()).apply()
     }
 
@@ -340,4 +382,19 @@ class ClipboardImages private constructor(private val context: Context) {
             refresh()
         }
     }
+}
+
+private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+private fun File.sha256(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    inputStream().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().toHex()
 }

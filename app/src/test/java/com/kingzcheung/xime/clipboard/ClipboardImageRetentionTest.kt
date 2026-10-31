@@ -51,6 +51,37 @@ class ClipboardImageRetentionTest {
         assertEquals(1, actual.count { it.uri == copied.uri })
     }
 
+    @Test fun pastedScreenshotShowsOnceNotAsScreenshotPlusCopy() {
+        val shot = ClipboardImage("content://media/external/images/media/7", "image/png", 500, "截图")
+        val copy = ClipboardImage("content://own/clipboard_images/a.png", "image/png", 500, source = shot.uri)
+        val actual = retainedClipboardImages(listOf(copy), listOf(shot), emptySet(), emptySet())
+        assertEquals(listOf(copy), actual)
+    }
+
+    @Test fun aFixedScreenshotStaysAndItsUnfixedCopyIsTheOneHidden() {
+        val shot = ClipboardImage("content://media/external/images/media/7", "image/png", 500, "截图")
+        val copy = ClipboardImage("content://own/clipboard_images/a.png", "image/png", 500, source = shot.uri)
+        val pins = setOf("image:${shot.uri}")
+        assertEquals(listOf(shot), retainedClipboardImages(listOf(copy), listOf(shot), pins, emptySet()))
+        val both = pins + "image:${copy.uri}"
+        assertEquals(2, retainedClipboardImages(listOf(copy), listOf(shot), both, emptySet()).size)
+    }
+
+    @Test fun copiesFromOtherAppsDoNotHideUnrelatedScreenshots() {
+        val shot = ClipboardImage("content://media/external/images/media/7", "image/png", 500, "截图")
+        val copy = ClipboardImage("content://own/clipboard_images/a.png", "image/png", 600,
+            source = "content://com.other.app/images/9")
+        assertEquals(listOf(copy, shot), retainedClipboardImages(listOf(copy), listOf(shot), emptySet(), emptySet()))
+    }
+
+    @Test fun aGallerySourceIsKeptWhenTheSamePictureArrivesFromAnotherApp() {
+        val media = "content://media/external/images/media/7"
+        assertEquals(media, preferredImageSource(media, "content://com.other.app/9"))
+        assertEquals(media, preferredImageSource("content://com.other.app/9", media))
+        assertEquals("content://com.other.app/9", preferredImageSource("content://com.other.app/9", "content://x/1"))
+        assertEquals("content://x/1", preferredImageSource(null, "content://x/1"))
+    }
+
     @Test fun unpinningOldImagesReappliesTheSharedBudgetWithoutMutatingHistory() {
         val original = (1..limit + 24).map(::image)
         val before = original.toList()
