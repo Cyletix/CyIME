@@ -43,6 +43,7 @@ import com.kingzcheung.xime.ui.theme.CyMotion
 import com.kingzcheung.xime.model.BuiltinModelCatalog
 import com.kingzcheung.xime.model.FuzzyHabit
 import com.kingzcheung.xime.model.InputPlan
+import com.kingzcheung.xime.model.KeyboardWay
 import com.kingzcheung.xime.model.SetupAnswers
 import com.kingzcheung.xime.model.SetupFacts
 import com.kingzcheung.xime.model.SetupGuide
@@ -58,7 +59,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * 按设备推荐配置：首次设置完成后出现一次，之后从设置首页「配置选择」进入。
- * 先问打字习惯（全拼／双拼哪一种／五笔、分不清的读音、九键）和用法（语音、字幕），再按设备情况给出
+ * 先问打字习惯（全拼／双拼哪一种／五笔、26 键／14 键／九键、分不清的读音）和用法（语音、字幕），再按设备情况给出
  * 打字方式要改的几项和要留、要下载、可以删的模型，全部用白话说明；只有点了“按推荐设置”才改设置和删文件。
  *
  * 引导页原则（用户 10-30）：字要大，选项卡要大，选中的那个一目了然（底色、粗边框、打勾三样一起变），
@@ -153,8 +154,8 @@ internal fun SetupGuideContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Spacer(Modifier.height(4.dp))
-            Text("看看这台设备的情况，再告诉 CyIME 你平时怎么打字、打算怎么用，它会照你的习惯设好打字方式，" +
-                "推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
+            Text("告诉 CyIME 你平时怎么打字、打算怎么用，它会照你的习惯设好打字方式和键盘，" +
+                "再看这台设备的情况推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
                 style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (facts == null || plan == null) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
@@ -163,9 +164,10 @@ internal fun SetupGuideContent(
                 ResultSection(result, onDone)
                 Spacer(Modifier.height(24.dp))
             } else {
-                DeviceSection(facts, onOpenPerformance)
+                // 先问怎么打字（打开就看到），设备情况放到模型推荐前面。
                 AnswerSection(facts, plan.answers, onAnswers)
                 InputSection(plan.input, hideDoublePinyin, onHideDoublePinyin)
+                DeviceSection(facts, onOpenPerformance)
                 KeepSection(plan.keep, facts.device)
                 if (plan.remove.isNotEmpty()) RemoveSection(plan.remove, removeIds, onToggleRemove)
                 SummarySection(facts, plan, removeIds)
@@ -328,6 +330,23 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
             Triple(choice.id, choice.name, "“双拼”两个字打 ${choice.example}" + if (choice.builtin) "" else "（你自己建的）")
         }, answers.doublePinyin, "setup-double-pinyin") { onAnswers(answers.copy(doublePinyin = it)) }
     }
+    val keyboards = SetupGuidePlanner.keyboards(facts, answers)
+    val keyboard = SetupGuidePlanner.keyboardOf(facts, answers)
+    if (keyboards.isNotEmpty()) {
+        val double = answers.typing == TypingWay.DOUBLE_PINYIN
+        GuideQuestion("用哪种键盘打？", keyboards.map { way ->
+            Triple(way, if (way == KeyboardWay.KEEP) "保持现在的${facts.keyboardName.ifEmpty { "键盘" }}" else way.title, when (way) {
+                KeyboardWay.QWERTY -> "一个字母一个键，和电脑键盘一样" + if (double) "；每个字按两个键" else ""
+                KeyboardWay.K14 -> "两个字母合用一个键，键更大、更好按；点按自动组词，左右滑选单个字母"
+                KeyboardWay.T9 -> if (double) "按双拼键所在的数字键，每个字按两下；适合单手" else "按字母所在的数字键，像老手机；适合单手"
+                KeyboardWay.KEEP -> "不换键盘"
+            })
+        }, keyboard, "setup-keyboard",
+            note = "以后随时可以在键盘上的「输入方式」里换。".takeIf { keyboards.size > 1 }
+                ?: "${facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }?.name ?: "这种双拼"}只有 26 键（ing 在分号键上，14 键、九键没有分号键）。") {
+            onAnswers(answers.copy(keyboard = it))
+        }
+    }
     if (answers.typing == TypingWay.FULL_PINYIN) {
         // 多选：可以同时分不清几组；“都分得清”和其他互斥，让“一个都不选”也是看得见的选择。
         GuideHeading("有分不清的读音吗？")
@@ -344,7 +363,8 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
             }
         }
     }
-    GuideQuestion("用九键打字吗？", listOf(
+    // 选了九键就不再问一遍：全拼九键要用九键整句组词模型（自动留下），双拼九键只用双拼词库、用不到它。
+    if (keyboard != KeyboardWay.T9) GuideQuestion("也用九键打字吗？", listOf(
         Triple(true, "用九键", "九键按整句常用说法组词，长句更容易一次打对；需要九键整句组词模型"),
         Triple(false, "不用九键", "只用 26 键、14 键或手写，不留九键模型"),
     ), answers.t9, "setup-t9") { onAnswers(answers.copy(t9 = it)) }

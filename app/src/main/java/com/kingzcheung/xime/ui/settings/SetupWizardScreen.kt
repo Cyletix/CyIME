@@ -172,6 +172,9 @@ internal fun SetupWizardContent(
                     }
                     else -> Text(status.schemas.joinToString(" · "))
                 }
+                // 老人包不出下一页（按设备推荐配置）。
+                if (!com.kingzcheung.xime.BuildConfig.ELDER) Text("用全拼、双拼还是五笔，26 键、14 键还是九键，完成后下一页会问你。",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onSchemas, enabled = !status.preparing) { Text("选择其他方案（可选）") }
             }
             SetupCard(3, "切换到 CyIME", status.imeEnabled && status.imeSelected,
