@@ -20,6 +20,12 @@ object DownloadMirrors {
     private const val PREFS = "model_download_source"
     private const val KEY_REGION = "region"
 
+    /**
+     * CyIME 自己在魔搭的模型仓库（用户 10-31 建）：GitHub 在国内常下不动，这里放 GitHub Release `models`
+     * 里同名文件的逐字节副本。下载后仍按目录里的 sha256 校验，不一致就换线路。
+     */
+    const val CYIME_MODELSCOPE = "https://www.modelscope.cn/models/Cyletix/cyime-model/resolve/master/"
+
     /** 国内可直连的主机。 */
     private val domesticHosts = setOf("hf-mirror.com", "www.modelscope.cn", "modelscope.cn")
 
