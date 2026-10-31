@@ -261,18 +261,21 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     service, currentSchemaId
                 ) ?: currentSchemaId
 
+                val problem = RimeConfigHelper.deploymentProblem(service)
                 withContext(Dispatchers.Main) {
                     service.uiState.value = service.uiState.value.copy(
                         schemaName = schemaName,
                         currentSchemaId = currentSchemaId,
                     )
                     service.updateUI()
-                    android.widget.Toast.makeText(service, "方案部署完成", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(service, if (problem.isEmpty()) "方案部署完成"
+                        else "方案部署完成，有方案没编译成功，详情见「已安装的方案」", android.widget.Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 FileLogger.e(XimeInputMethodService.TAG, "Failed to reload config", e)
+                if (RimeConfigHelper.deploymentProblem(service).isEmpty()) RimeConfigHelper.recordFailure(service, e)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(service, "方案部署失败，请在输入方案设置中重试", Toast.LENGTH_LONG).show()
+                    Toast.makeText(service, "方案部署失败，到「已安装的方案」点「应用方案更改」可看原因", Toast.LENGTH_LONG).show()
                 }
             }
         }

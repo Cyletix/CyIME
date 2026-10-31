@@ -31,6 +31,8 @@ data class SchemaUiState(
     val currentSchema: String = "t9_pinyin",
     val isDeploying: Boolean = false,
     val toastMessage: String? = null,
+    /** 部署没过或有方案没编译出来时的说明，页面弹窗显示（Toast 在 Android 12 以后最多两行，放不下方案名和原因）。 */
+    val deployReport: String? = null,
 )
 
 class SchemaSettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -165,13 +167,23 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                 throw cancelled
             } catch (error: Exception) {
                 com.kingzcheung.xime.util.FileLogger.e("SchemaSettings", "Deployment repair failed", error)
+                RimeConfigHelper.recordFailure(context, error)
                 false
             } finally {
                 _uiState.update { it.copy(isDeploying = false) }
             }
-            showToast(if (success) "部署完成" else "部署失败")
+            val problem = RimeConfigHelper.deploymentProblem(context)
+            when {
+                problem.isNotEmpty() -> _uiState.update { it.copy(deployReport = problem) }
+                success -> showToast("部署完成")
+                else -> _uiState.update { it.copy(deployReport = "部署失败，原因见「关于 › 日志查看器」。") }
+            }
             refresh()
         }
+    }
+
+    fun clearDeployReport() {
+        _uiState.update { it.copy(deployReport = null) }
     }
 
     fun clearToast() {

@@ -203,6 +203,15 @@ fun SchemaSettingsContent(
         }
     }
 
+    uiState.deployReport?.let { report ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearDeployReport() },
+            title = { Text(if (report.startsWith("部署失败")) "部署失败" else "部署完成") },
+            text = { Text(report) },
+            confirmButton = { TextButton(onClick = { viewModel.clearDeployReport() }) { Text("知道了") } },
+        )
+    }
+
     if (localUiState.conflictPackageId != null) {
         AlertDialog(
             onDismissRequest = { localViewModel.cancelConflictInstall() },

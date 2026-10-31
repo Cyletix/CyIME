@@ -37,6 +37,8 @@ object RimeConfigHelper {
     private val preparationMutex = kotlinx.coroutines.sync.Mutex()
     private var preparedInProcess = false
     const val DEPLOYMENT_REVISION = "rime_deployment_revision"
+    /** 最近一次部署没过的方案和原因（给设置页、输入法提示用）；空表示上次部署没有问题。 */
+    const val DEPLOYMENT_PROBLEM = "rime_deployment_problem"
 
     /** Retry failures, never queue user keystrokes, and never overlap a running native deployment. */
     suspend fun prepareAutomatically(context: Context, status: (String) -> Unit = {}) {
@@ -59,11 +61,12 @@ object RimeConfigHelper {
     suspend fun redeploy(context: Context): Boolean = preparationMutex.withLock {
         preparedInProcess = false
         SettingsPreferences.setDeploymentDone(context, false)
+        recordProblem(context, "", usable = false)
         val (user, shared) = initializeRimeDataAsync(context)
         val engine = RimeEngine.getInstance()
         engine.initialize(user, shared)
         val success = synchronized(deploymentLock) {
-            val usable = engine.deploy() && hasRequiredBuildArtifacts(context) && liveSchemasReady(context)
+            val usable = engine.deploy() && deploymentUsable(context)
             if (usable) storeDeploymentHash(context)
             SettingsPreferences.setDeploymentDone(context, usable)
             usable
@@ -77,12 +80,70 @@ object RimeConfigHelper {
         success
     }
 
-    private fun liveSchemasReady(context: Context): Boolean {
+    /**
+     * 部署结果能不能用：会话建好，内置方案和当前方案都编译出来了。
+     * 导入、下载的方案（如雾凇原包里的搜狗双拼）编译不出来时只记下来提示用户，不再连累整个输入法
+     * 「部署失败」：以前任何一个启用方案缺产物，切回内置方案也一直失败。
+     */
+    private fun deploymentUsable(context: Context): Boolean {
         val engine = RimeEngine.getInstance()
-        if (!RimeEngine.isInitialized() || !engine.ensureSession(10_000L)) return false
         val enabled = SchemaManager.getEnabledSchemas(context)
+        if (enabled.isEmpty()) return recordProblem(context, "部署失败：没有启用的输入方案", usable = false)
+        if (!RimeEngine.isInitialized() || !engine.ensureSession(10_000L) || engine.getCurrentSchema().isBlank())
+            return recordProblem(context, "部署失败：输入引擎没有建好会话" + storageHint(context), usable = false)
         val available = engine.getAvailableSchemas().toSet()
-        return enabled.isNotEmpty() && enabled.all { it in available } && engine.getCurrentSchema().isNotBlank()
+        val build = File(context.filesDir, "rime/build")
+        val broken = enabled.mapNotNull { id ->
+            (missingBuildArtifact(build, id) ?: if (id !in available) "不在部署结果的方案列表里" else null)?.let { id to it }
+        }.toMap()
+        if (broken.isEmpty()) return recordProblem(context, "", usable = true)
+        val current = SettingsPreferences.getCurrentSchema(context)
+        val usable = enabled.any { it !in broken } && current !in broken && broken.keys.none { isAppSchema(context, it) }
+        val names = broken.entries.joinToString("；") { (id, reason) ->
+            "${SchemaManager.getSchemaDisplayName(context, id) ?: id}（$id，$reason）"
+        }
+        FileLogger.w(TAG, "Deployment problems: $broken, current=$current, usable=$usable, " +
+            "free=${context.filesDir.usableSpace / (1L shl 20)}MB")
+        val message = if (usable) "这些方案没有编译成功，暂时不能用：$names。其他方案正常；可在「已安装的方案」停用或卸载它们。"
+            else "部署失败：$names。" + (if (current in broken && broken.keys.none { isAppSchema(context, it) })
+                "先在「已安装的方案」切到别的方案再部署，或停用、卸载这个方案。" else "") + storageHint(context)
+        return recordProblem(context, message, usable)
+    }
+
+    /** CyIME 自带或自己生成的方案：这些编译失败说明内置资源坏了，必须当作部署失败。 */
+    private fun isAppSchema(context: Context, id: String): Boolean =
+        id in com.kingzcheung.xime.settings.ChineseSchemas.ids || id in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended ||
+            com.kingzcheung.xime.settings.DoublePinyinSchemes.isGenerated(id) ||
+            com.kingzcheung.xime.settings.CustomKeyboardLayouts.isCustom(id) || bundledSchemaIds(context).contains(id)
+
+    @Volatile private var bundledSchemaIdsCache: Set<String>? = null
+    private fun bundledSchemaIds(context: Context): Set<String> = bundledSchemaIdsCache ?: runCatching {
+        context.assets.open("rime-bundled-manifest.tsv").bufferedReader().useLines { lines ->
+            lines.mapNotNull { it.substringAfterLast('\t').takeIf { name -> name.endsWith(".schema.yaml") && '/' !in name } }
+                .map { it.removeSuffix(".schema.yaml") }.toSet()
+        }
+    }.getOrDefault(emptySet()).also { bundledSchemaIdsCache = it }
+
+    /** 剩余空间太少时词库编译会写不完（部署每次都失败、有些字打不出来），提示里带上。 */
+    private fun storageHint(context: Context): String {
+        val freeMb = context.filesDir.usableSpace / (1L shl 20)
+        return if (freeMb < LOW_STORAGE_MB) "手机剩余空间只有 $freeMb MB，词库编译可能写不下，请先清理空间再点「应用方案更改」。" else ""
+    }
+    private const val LOW_STORAGE_MB = 300L
+
+    private fun recordProblem(context: Context, message: String, usable: Boolean): Boolean {
+        if (message.isNotEmpty()) FileLogger.w(TAG, message)
+        SettingsPreferences.getPrefsPublic(context).edit().putString(DEPLOYMENT_PROBLEM, message).apply()
+        return usable
+    }
+
+    /** 上次部署留下的说明；空表示没有问题。 */
+    fun deploymentProblem(context: Context): String =
+        SettingsPreferences.getPrefsPublic(context).getString(DEPLOYMENT_PROBLEM, "").orEmpty()
+
+    /** 部署过程抛出异常（文件读写、内置资源校验等）时也留下原因，不再只显示「部署失败」。 */
+    fun recordFailure(context: Context, error: Throwable) {
+        recordProblem(context, "部署失败：${error.message ?: error.javaClass.simpleName}" + storageHint(context), usable = false)
     }
 
     /** Apply the selected supplemental dictionaries through the same serialized deployment path. */
@@ -99,7 +160,7 @@ object RimeConfigHelper {
                 val bindings = manager.prepare(context, ids)
                 // Recreate the live session, as ordinary incremental maintenance retains loaded tables.
                 // Native compilation still reuses unchanged dictionaries by checksum.
-                val usable = engine.deploy() && hasRequiredBuildArtifacts(context) && liveSchemasReady(context) &&
+                val usable = engine.deploy() && deploymentUsable(context) &&
                     manager.verify(context, bindings)
                 SettingsPreferences.setDeploymentDone(context, usable)
                 check(usable) { "词库编译失败，已保留待应用选择" }
@@ -182,7 +243,7 @@ object RimeConfigHelper {
                 return false
             }
             val currentHash = computeDeploymentHash(context)
-            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && hasRequiredBuildArtifacts(context) && liveSchemasReady(context)) {
+            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && deploymentUsable(context)) {
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
             }
@@ -208,7 +269,7 @@ object RimeConfigHelper {
                 buildDir.mkdirs()
                 deployed = engine.deploy()
             }
-            if (deployed && hasRequiredBuildArtifacts(context) && liveSchemasReady(context)) {
+            if (deployed && deploymentUsable(context)) {
                 storeDeploymentHash(context)
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
@@ -312,18 +373,22 @@ object RimeConfigHelper {
     internal fun hasRequiredBuildArtifacts(context: Context): Boolean {
         val build = File(context.filesDir, "rime/build")
         val enabled = SchemaManager.getEnabledSchemas(context)
-        return enabled.isNotEmpty() && enabled.all { id ->
-            val schema = File(build, "$id.schema.yaml")
-            if (!schema.isFile) return@all false
-            val translator = Regex("""(?ms)^translator:\s*\n(.*?)(?=^\S|\z)""")
-                .find(schema.readText())?.groupValues?.get(1) ?: return@all id !in com.kingzcheung.xime.settings.ChineseSchemas.ids
-            fun value(key: String) = Regex("(?m)^  $key: *([^#\r\n]+)")
-                .find(translator)?.groupValues?.get(1)?.trim()?.trim('"', '\'')
-            val dictionary = value("dictionary")?.takeIf { it.isNotBlank() } ?: return@all id !in com.kingzcheung.xime.settings.ChineseSchemas.ids
-            val prism = value("prism") ?: dictionary
-            listOf(File(build, "$dictionary.table.bin"), File(build, "$prism.prism.bin"))
-                .all { it.isFile && !isBrokenBuildArtifact(it) }
-        }
+        return enabled.isNotEmpty() && enabled.all { missingBuildArtifact(build, it) == null }
+    }
+
+    /** 方案没编译出来时返回缺的是什么（给用户看的一句），齐全时返回 null。 */
+    internal fun missingBuildArtifact(build: File, id: String): String? {
+        val schema = File(build, "$id.schema.yaml")
+        if (!schema.isFile) return "没有编译出 $id.schema.yaml"
+        val chinese = id in com.kingzcheung.xime.settings.ChineseSchemas.ids
+        val translator = Regex("""(?ms)^translator:\s*\n(.*?)(?=^\S|\z)""")
+            .find(schema.readText())?.groupValues?.get(1) ?: return if (chinese) "方案里没有 translator" else null
+        fun value(key: String) = Regex("(?m)^  $key: *([^#\r\n]+)")
+            .find(translator)?.groupValues?.get(1)?.trim()?.trim('"', '\'')
+        val dictionary = value("dictionary")?.takeIf { it.isNotBlank() } ?: return if (chinese) "方案里没有词库" else null
+        val prism = value("prism") ?: dictionary
+        return listOf(File(build, "$dictionary.table.bin"), File(build, "$prism.prism.bin"))
+            .firstOrNull { !it.isFile || isBrokenBuildArtifact(it) }?.let { "缺少 ${it.name}" }
     }
 
     private fun fileUpdateDigest(digest: java.security.MessageDigest, file: File) {
