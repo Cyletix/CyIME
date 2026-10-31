@@ -485,6 +485,34 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         service.rimeEngine.setOption("full_shape", full)
     }
 
+    /**
+     * 「繁体输出」设置写进引擎：雾凇系方案（全拼、双拼、九键、14 键）是 traditionalization；
+     * 仓颉码表本身是繁体，反过来，simplification 开着时转简体。返回引擎选项是否变了。
+     * [persist] 时顺带把 traditionalization 写进 user.yaml：librime 自己重建会话时按 switcher/save_options
+     * 从那里恢复，旧版菜单开关留下的「繁」不能再盖过设置。按键路径不写文件。
+     */
+    internal fun applyTraditionalOutput(
+        cangjie: Boolean = service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE,
+        persist: Boolean = false,
+    ): Boolean {
+        if (!RimeEngine.isInitialized()) return false
+        val traditional = SettingsPreferences.getPrefsPublic(service)
+            .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
+        var changed = false
+        if (service.rimeEngine.getOption("traditionalization") != traditional) {
+            service.rimeEngine.setOption("traditionalization", traditional)
+            changed = true
+        }
+        if (cangjie && service.rimeEngine.getOption("simplification") == traditional) {
+            service.rimeEngine.setOption("simplification", !traditional)
+            changed = true
+        }
+        if (persist && service.rimeEngine.getUserConfigBool("var/option/traditionalization") != traditional) {
+            service.rimeEngine.setUserConfigBool("var/option/traditionalization", traditional)
+        }
+        return changed
+    }
+
     /** 将方案选项状态写入 librime user.yaml（var/option/<name>）。 */
     internal fun persistSchemaOption(name: String, value: Boolean) {
         if (service.editorInputPolicy.scoped && name == "ascii_mode") return
@@ -500,10 +528,14 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (schemaId.isEmpty()) return
         val rimeAsciiBefore = service.rimeEngine.isAsciiMode()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
+        val cangjie = com.kingzcheung.xime.settings.InputProfiles.describe(schemaId).scheme ==
+            com.kingzcheung.xime.settings.InputScheme.CANGJIE
         for (def in defs) {
             // 标点宽度不从 user.yaml 恢复：它的权威来源是用户的「全角／半角」选择，
             // 由 applyPunctuationWidth 统一回写（否则这里会把用户选择覆盖成旧值）。
             if (isPunctuationWidthSwitch(def)) continue
+            // 简繁也不从 user.yaml 恢复：权威来源是「繁体输出」设置，由下面的 applyTraditionalOutput 写回。
+            if (def.name == "traditionalization" || def.name == "simplification" && cangjie) continue
             if (def.name.isNotEmpty()) {
                 service.rimeEngine.setOption(def.name, service.rimeEngine.getUserConfigBool("var/option/${def.name}"))
             } else if (def.options.isNotEmpty()) {
@@ -521,6 +553,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
         service.editorInputPolicy.engineAsciiOverride()?.let { service.rimeEngine.setOption("ascii_mode", it) }
         applyPunctuationWidth(service.rimeEngine.isAsciiMode())
+        // 切方案后 uiState 还没跟上，仓颉按这里的 schemaId 判断。
+        applyTraditionalOutput(cangjie = cangjie, persist = true)
         val rimeAsciiAfter = service.rimeEngine.isAsciiMode()
         if (rimeAsciiBefore != rimeAsciiAfter) {
             FileLogger.i(XimeInputMethodService.TAG, "restorePersistedSchemaOptions: ascii $rimeAsciiBefore -> $rimeAsciiAfter (ui=${service.uiState.value.isAsciiMode})")
