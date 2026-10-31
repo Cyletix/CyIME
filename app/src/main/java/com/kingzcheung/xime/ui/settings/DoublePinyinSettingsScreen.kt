@@ -220,7 +220,7 @@ private fun DoublePinyinKeyHintsSwitch() {
     SettingsSection(title = "键盘上的提示") {
         SettingsToggleItem(Icons.TwoTone.Keyboard, "双拼键位提示",
             "双拼 26 键每个键上写出它代表的 zh、ch、sh 和韵母，和下面的键位图一样，记不住键位时打开。" +
-                "开着时这些键不画上下角标，滑动输入符号照常；14 键、九键不显示。",
+                "开着时字母键都不画上下角标（Z X C V 的撤销、剪切、复制、粘贴也不写），滑动照常；14 键、九键不显示。",
             checked = saved.doublePinyinKeyHints,
             onCheckedChange = { saved.copy(doublePinyinKeyHints = it).save(context) })
     }
