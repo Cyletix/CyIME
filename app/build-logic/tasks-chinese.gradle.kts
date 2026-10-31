@@ -37,6 +37,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("taiwanTraditional", 1)
     inputs.property("rareCharacters", 1)
     inputs.property("datetimeHints", 1)
+    inputs.property("symbolNames", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -280,6 +281,13 @@ val prepareChineseDictionaries by tasks.registering {
         fun withDatetimeHints(schema: String) = schema.replace("\n    - simplifier@traditionalize",
             "\n    - cyime_datetime\n    - simplifier@traditionalize")
             .also { check(it.split("\n    - cyime_datetime\n").size == 2) { "Upstream traditionalize filter changed" } }
+        // 打符号名出符号 (default off, Rime option cyime_symbol_names): 加号 is followed by +, 问号 by ？ and ?.
+        // Table assets/rime_chinese/opencc/cyime_symbols.json, shared with the nine-key and 14-key schemas; after
+        // the emoji filter so the symbols come right after the word, before traditionalize like datetime.
+        fun withSymbolNames(schema: String) = schema.replace("\n    - simplifier@traditionalize",
+            "\n    - simplifier@cyime_symbols\n    - simplifier@traditionalize")
+            .also { check(it.split("\n    - simplifier@cyime_symbols\n").size == 2) { "Upstream traditionalize filter changed" } } +
+            "\ncyime_symbols:\n  option_name: cyime_symbol_names\n  opencc_config: cyime_symbols.json\n  inherit_comment: false\n"
         fun taiwanForms(schema: String) = schema.replace("  opencc_config: s2t.json ", "  opencc_config: cyime_s2tw.json ")
             .also { check(it.contains("  opencc_config: cyime_s2tw.json ")) { "Upstream traditionalize config changed" } }
         val baseSchema = taiwanForms(File(root, "rime_ice.schema.yaml").readText()).replace("\ntranslator:\n",
@@ -310,7 +318,7 @@ val prepareChineseDictionaries by tasks.registering {
                     "    - lua_translator@*cyime_rare_chars") else sequenceOf(it) }
             .joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
-            .let { withDatetimeHints(it) } +
+            .let { withSymbolNames(withDatetimeHints(it)) } +
             "\ncyime:\n  candidate_policy: true\n" +
             // 26-key ranking by the nine-key word n-gram model (docs/development/pinyin26-word-model-20261018.md):
             // same decoder and model file; initials are not penalized (a letter names its initial, unlike a
@@ -360,7 +368,7 @@ val prepareChineseDictionaries by tasks.registering {
         doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  cyime_neighbor_correction: true\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
-            .let { withDatetimeHints(it) }
+            .let { withSymbolNames(withDatetimeHints(it)) }
             .replace("enable_correction: false", "enable_correction: true"))
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",

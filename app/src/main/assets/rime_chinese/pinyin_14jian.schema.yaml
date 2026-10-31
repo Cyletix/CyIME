@@ -53,6 +53,8 @@ engine:
     # 时间、日期、星期后面接当前时间和日期（设置 › 语言与方案 › 中文输出，默认关）。
     - cyime_datetime
     - simplifier@emoji
+    # 打符号名出符号（设置 › 语言与方案 › 中文输出，默认关）：加号后面多出 +。
+    - simplifier@cyime_symbols
     - simplifier@traditionalize
     - uniquifier
 
@@ -233,6 +235,13 @@ k14_english:
 emoji:
   option_name: emoji
   opencc_config: emoji.json
+  inherit_comment: false
+
+# 打符号名出符号（默认关）：打「加号」「问号」「括号」时词后面多出 +、？ ?、（） ()；词本身位置不变。
+# 表与 26 键共用 opencc/cyime_symbols.json；输入法按键前按设置写 cyime_symbol_names 选项（ImeKeyRouter）。
+cyime_symbols:
+  option_name: cyime_symbol_names
+  opencc_config: cyime_symbols.json
   inherit_comment: false
 
 traditionalize:

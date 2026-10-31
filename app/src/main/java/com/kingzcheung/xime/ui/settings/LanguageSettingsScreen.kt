@@ -10,6 +10,7 @@ import androidx.compose.material.icons.twotone.Schedule
 import androidx.compose.material.icons.twotone.Translate
 import androidx.compose.material.icons.twotone.SpaceBar
 import androidx.compose.material.icons.twotone.EmojiEmotions
+import androidx.compose.material.icons.twotone.Functions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
@@ -140,6 +141,10 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                     SettingsToggleItem(Icons.TwoTone.EmojiEmotions, "候选里显示表情",
                         "打「开心」「爱心」这类词时，在词后面多出对应的表情（😄、❤️）；全拼、双拼、九键和 14 键都适用。",
                         checked = input.candidateEmoji, onCheckedChange = { input.copy(candidateEmoji = it).save(context) })
+                    HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.Functions, "打符号名出符号",
+                        "打「加号」「问号」「括号」这类符号名时，在词后面多出对应的符号（+、？、（）），词本身的位置不变；全拼、双拼、九键和 14 键都适用。",
+                        checked = input.symbolNames, onCheckedChange = { input.copy(symbolNames = it).save(context) })
                 }
             }
             item(key = "english-input") {
