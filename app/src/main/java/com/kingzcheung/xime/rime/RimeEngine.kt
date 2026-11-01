@@ -876,15 +876,8 @@ class RimeEngine {
                 FileLogger.w(TAG, "deployIncremental: startMaintenance returned false, falling back to full deploy")
                 return false
             }
-            var waited = 0L
-            while (nativeIsMaintaining() && waited < 180_000L) {
-                Thread.sleep(100)
-                waited += 100
-            }
-            if (nativeIsMaintaining()) {
-                FileLogger.w(TAG, "deployIncremental: maintenance timed out")
-                return false
-            }
+            // A slow native worker still owns build/. Wait before reloading or falling back.
+            nativeJoinMaintenance()
             // 维护完成后更新 last_build_time，避免下次启动增量检测误判需重编译
             nativeUpdateLastBuildTime()
             // Existing sessions retain compiled ConfigData through strong references.
@@ -1107,6 +1100,7 @@ class RimeEngine {
         }
     }
     private external fun nativeStartMaintenance(full: Boolean): Boolean
+    private external fun nativeJoinMaintenance()
     private external fun nativeDeploy(): Boolean
     private external fun nativeDeploySchema(schemaId: String): Boolean
     private external fun nativeLookupText(text: String): String

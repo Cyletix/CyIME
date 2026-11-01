@@ -42,7 +42,7 @@ object RimeConfigHelper {
 
     /** Retry failures, never queue user keystrokes, and never overlap a running native deployment. */
     suspend fun prepareAutomatically(context: Context, status: (String) -> Unit = {}) {
-        retryPreparation(status = status) { prepareEngine(context) }
+        retryPreparation(status = status, problem = { deploymentProblem(context) }) { prepareEngine(context) }
     }
 
     /** Share the entire copy/init/deploy operation, not just the final compilation lock. */
@@ -246,19 +246,24 @@ object RimeConfigHelper {
         synchronized(deploymentLock) {
             if (!RimeEngine.isInitialized()) {
                 SettingsPreferences.setDeploymentDone(context, false)
-                return false
+                return recordProblem(context, "部署失败：输入引擎未初始化" + storageHint(context), usable = false)
+            }
+            val buildDir = File(context.filesDir, "rime/build")
+            val damaged = removeBrokenBuildArtifacts(buildDir)
+            if (damaged.isNotEmpty()) {
+                SettingsPreferences.setDeploymentHash(context, "")
+                FileLogger.w(TAG, "Rebuilding damaged Rime cache: ${damaged.joinToString()}")
             }
             val currentHash = computeDeploymentHash(context)
-            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && deploymentUsable(context)) {
+            if (damaged.isEmpty() && currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && deploymentUsable(context)) {
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
             }
             Log.i(TAG, "Deployment hash mismatch or missing")
-            val buildDir = File(context.filesDir, "rime/build")
             val buildExists = buildDir.exists() && buildDir.listFiles()?.isNotEmpty() == true
             val engine = RimeEngine.getInstance()
             val deployed: Boolean
-            if (buildExists) {
+            if (buildExists && damaged.isEmpty()) {
                 // build 已就位但配置有变化：增量维护，只编译变更的 schema/dict，
                 // 避免 custom.yaml 补丁等小幅改动触发 60MB 词库全量重编译（持锁 30s+）。
                 Log.i(TAG, "Build exists, running incremental maintenance")
@@ -271,11 +276,15 @@ object RimeConfigHelper {
                     deployed = engine.deploy()
                 }
             } else {
-                Log.i(TAG, "Build directory missing or empty, running full deploy")
+                Log.i(TAG, "Build directory missing, empty or damaged, running full deploy")
                 buildDir.mkdirs()
                 deployed = engine.deploy()
             }
-            if (deployed && deploymentUsable(context)) {
+            if (!deployed) {
+                SettingsPreferences.setDeploymentDone(context, false)
+                return recordProblem(context, "部署失败：词库编译未完成" + storageHint(context), usable = false)
+            }
+            if (deploymentUsable(context)) {
                 storeDeploymentHash(context)
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
@@ -329,6 +338,12 @@ object RimeConfigHelper {
         }
     }
 
+    internal fun removeBrokenBuildArtifacts(buildDir: File): List<String> {
+        val damaged = buildDir.listFiles().orEmpty().filter { it.isFile && isBrokenBuildArtifact(it) }
+        for (file in damaged) check(file.delete()) { "无法清理损坏的编译文件 ${file.name}" }
+        return damaged.map { it.name }
+    }
+
     fun isDeploymentComplete(context: Context): Boolean = synchronized(deploymentLock) {
         val rimeDir = File(context.filesDir, "rime")
         val buildDir = File(rimeDir, "build")
@@ -342,13 +357,9 @@ object RimeConfigHelper {
         // 同时清 stored hash，避免 ensureDeployment 因 hash 一致而短路跳过重建。
         // 词典产物按 dictionary 名生成，可能与 schemaId 不同名（如 t9_pinyin 用
         // pinyin_simp 词典），故扫描整个 build 目录而非按方案枚举。
-        buildDir.listFiles()?.forEach { artifact ->
-            if (artifact.isFile && isBrokenBuildArtifact(artifact)) {
-                artifact.delete()
-                SettingsPreferences.setDeploymentHash(context, "")
-                FileLogger.w(TAG, "Broken build artifact removed: ${artifact.name}")
-                return false
-            }
+        if (removeBrokenBuildArtifacts(buildDir).isNotEmpty()) {
+            SettingsPreferences.setDeploymentHash(context, "")
+            return false
         }
 
         for (schemaId in enabledSchemas) {

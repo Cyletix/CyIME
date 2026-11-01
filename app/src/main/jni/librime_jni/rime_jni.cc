@@ -2681,6 +2681,11 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeStartMaintenance(
     return result ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeJoinMaintenance(JNIEnv*, jobject) {
+    rime_get_api()->join_maintenance_thread();
+}
+
 // 更新 last_build_time 为当前时间，避免下次增量检测误判
 JNIEXPORT void JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeUpdateLastBuildTime(

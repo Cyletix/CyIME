@@ -9,13 +9,14 @@ import com.kingzcheung.xime.util.FileLogger
 internal suspend fun retryPreparation(
     status: (String) -> Unit,
     wait: suspend (Long) -> Unit = { delay(it) },
+    problem: () -> String = { "" },
     prepare: suspend () -> Boolean,
 ) {
     var attempt = 0
     while (true) {
         currentCoroutineContext().ensureActive()
         status("正在自动准备中文输入，请稍候…")
-        val error = try { if (prepare()) return else "词库尚未就绪" }
+        val error = try { if (prepare()) return else problem().ifBlank { "词库尚未就绪" } }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
             // 原来异常只取了一句 message，日志里看不到是哪一步失败（GitHub #36 新装一直卡在准备输入方案）。

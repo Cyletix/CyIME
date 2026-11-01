@@ -18,6 +18,12 @@ class AutomaticPreparationTest {
         assertEquals(listOf(3000L, 10000L), waits)
         assertTrue(messages.any { "自动重试" in it })
     }
+    @Test fun failedDeploymentShowsItsRecordedReasonUntilRetry() = runBlocking {
+        val messages = mutableListOf<String>()
+        var tries = 0
+        retryPreparation(messages::add, {}, { "部署失败：方案缺少词典索引" }) { ++tries == 2 }
+        assertTrue(messages.any { "缺少词典索引" in it && "3 秒后自动重试" in it })
+    }
     @Test fun cancellationDoesNotRetryOrPretendReady() = runBlocking {
         var waits = 0
         try {

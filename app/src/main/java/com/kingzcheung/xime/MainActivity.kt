@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
-import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.settings.ImportManager
 import com.kingzcheung.xime.settings.KeysConfigHelper
@@ -120,15 +119,13 @@ class MainActivity : ComponentActivity() {
     
     private val prewarmScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    private fun prewarmRimeEngine() {
+    private fun prewarmKeyboardConfig() {
         if (RimeEngine.isInitialized()) return
         prewarmScope.launch {
             try {
                 KeysConfigHelper.loadConfig(this@MainActivity)
-                val (userDataDir, sharedDataDir) = RimeConfigHelper.initializeRimeDataAsync(this@MainActivity)
-                RimeEngine.getInstance().initialize(userDataDir, sharedDataDir)
             } catch (e: Exception) {
-                Log.w(TAG, "Rime engine pre-warm failed, will init on demand", e)
+                Log.w(TAG, "Keyboard config pre-warm failed, will load on demand", e)
             }
         }
     }
@@ -137,7 +134,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        prewarmRimeEngine()
+        // The Application owns engine preparation, including installation and deployment.
+        prewarmKeyboardConfig()
 
         handleSharedIntent(intent)
         

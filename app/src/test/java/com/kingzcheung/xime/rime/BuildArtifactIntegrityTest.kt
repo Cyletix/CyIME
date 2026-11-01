@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.rime
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -24,6 +25,21 @@ class BuildArtifactIntegrityTest {
 
     private val prismMagic = "Rime::Prism/".toByteArray(Charsets.US_ASCII)
     private val tableMagic = "Rime::Table/".toByteArray(Charsets.US_ASCII)
+
+    @Test
+    fun interruptedBuildRemovesAllBrokenOutputsButPreservesOtherFiles() {
+        val dir = newDir()
+        try {
+            write(dir, "full.table.bin", byteArrayOf())
+            write(dir, "t9.prism.bin", byteArrayOf(1))
+            val good = write(dir, "full.prism.bin", prismMagic + "4.0".toByteArray())
+            val other = write(dir, "notes.userdb", byteArrayOf(23))
+            assertEquals(setOf("full.table.bin", "t9.prism.bin"),
+                RimeConfigHelper.removeBrokenBuildArtifacts(dir).toSet())
+            assertEquals(emptyList<String>(), RimeConfigHelper.removeBrokenBuildArtifacts(dir))
+            assertTrue(good.isFile && other.readBytes().contentEquals(byteArrayOf(23)))
+        } finally { dir.deleteRecursively() }
+    }
 
     @Test
     fun `合法 prism 头不是损坏`() {

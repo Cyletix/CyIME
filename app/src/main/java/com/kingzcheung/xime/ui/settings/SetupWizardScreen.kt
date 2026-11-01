@@ -100,9 +100,7 @@ fun SetupWizardScreen(
             val schemas = withContext(Dispatchers.IO) {
                 // 准备没过时会一直自动重试；把原因摆出来，不再只有一根进度条转十几分钟看不出卡在哪（GitHub #36）。
                 RimeConfigHelper.prepareAutomatically(context) { message ->
-                    preparationDetail = if ("重试" !in message) null else
-                        listOf(RimeConfigHelper.deploymentProblem(context), message)
-                            .filter { it.isNotBlank() }.joinToString("\n")
+                    preparationDetail = message.takeIf { "重试" in it }
                 }
                 // 用方案文件里的名字（小鹤双拼等），和「语言与方案」页一致；读不到才退回内置名或 ID。
                 val names = SchemaManager.discoverSchemas(context).associate { it.schemaId to it.name }
