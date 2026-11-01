@@ -67,6 +67,11 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
         null
     }
 
+    fun selectEnglish(selected: Boolean) = work("保存英文候选设置…") {
+        store.selectEnglish(selected)
+        null
+    }
+
     fun remove(id: String) = work("删除词库…") {
         store.remove(id)
         "已删除"

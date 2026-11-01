@@ -59,9 +59,10 @@ object CellDictionaryManager {
         }
     }
 
-    fun prepare(context: Context, ids: Set<String> = store(context).read().applied): List<CellDictionaryRime.Binding> =
+    fun prepare(context: Context, ids: Set<String> = store(context).read().applied,
+        english: Boolean = store(context).read().appliedEnglish): List<CellDictionaryRime.Binding> =
         CellDictionaryRime.prepare(SchemaManager.getRimeDir(context), store(context),
-            SchemaManager.discoverSchemas(context), ids)
+            SchemaManager.discoverSchemas(context), ids, english)
 
     /** Native deployment can report success even when an optional pack failed to compile. */
     fun verify(context: Context, bindings: List<CellDictionaryRime.Binding>): Boolean {

@@ -80,14 +80,15 @@ object CellDictionaryRime {
     data class Binding(val schemaId: String, val pack: String)
 
     /** Plan all patches before writing anything, so an unsupported custom config cannot half-apply. */
-    fun prepare(rimeDir: File, store: CellDictionaryStore, schemas: List<SchemaMeta>, ids: Set<String>): List<Binding> {
+    fun prepare(rimeDir: File, store: CellDictionaryStore, schemas: List<SchemaMeta>, ids: Set<String>,
+        includeEnglish: Boolean = false): List<Binding> {
         val state = store.read()
         require(ids.all { id -> state.installed.any { it.id == id } && store.dictionaryFile(id).isFile }) {
             "已启用的词库文件缺失，请重新导入"
         }
         val writes = linkedMapOf<File, String>()
         val bindings = mutableListOf<Binding>()
-        val englishWords = ids.sorted().flatMap { store.englishWords(it) }.distinct()
+        val englishWords = if (includeEnglish) ids.sorted().flatMap { store.englishWords(it) }.distinct() else emptyList()
         for (schema in schemas) {
             val customFile = File(rimeDir, "${schema.schemaId}.custom.yaml")
             val original = customFile.takeIf { it.isFile }?.readText().orEmpty()

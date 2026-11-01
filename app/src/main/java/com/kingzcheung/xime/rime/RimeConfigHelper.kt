@@ -54,7 +54,27 @@ object RimeConfigHelper {
         preparedInProcess = false
         val (user, shared) = initializeRimeDataAsync(context)
         RimeEngine.getInstance().initialize(user, shared)
-        ensureDeployment(context).also { preparedInProcess = it }
+        val usable = ensureDeployment(context) || (retryWithoutCellEnglish(context) && ensureDeployment(context))
+        preparedInProcess = usable
+        usable
+    }
+
+    /** Restore Chinese packs without the optional English translator. Keep the user's requested
+     * setting pending so the dictionary screen can explicitly retry it after a successful startup. */
+    private fun retryWithoutCellEnglish(context: Context): Boolean {
+        val manager = com.kingzcheung.xime.settings.CellDictionaryManager
+        return try {
+            val store = manager.store(context)
+            val state = store.read()
+            if (!state.appliedEnglish) return false
+            manager.prepare(context, state.applied, english = false)
+            store.markApplied(state.applied, english = false)
+            FileLogger.w(TAG, "Optional English cell candidates disabled for Chinese startup")
+            true
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "Could not restore Chinese cell packs: ${e.message}")
+            false
+        }
     }
 
     /** Explicit repair from settings: initialize first, then validate both files and the live session. */
@@ -150,14 +170,14 @@ object RimeConfigHelper {
     suspend fun applyCellDictionaries(context: Context): Boolean = preparationMutex.withLock {
         val manager = com.kingzcheung.xime.settings.CellDictionaryManager
         val store = manager.store(context)
-        val selected = store.read().selected
+        val selected = store.read()
         preparedInProcess = false
         val (user, shared) = initializeRimeDataAsync(context, restoreCellDictionaries = false)
         val engine = RimeEngine.getInstance()
         engine.initialize(user, shared)
         synchronized(deploymentLock) {
-            store.activate(selected) { ids ->
-                val bindings = manager.prepare(context, ids)
+            store.activate(selected.selected, selected.selectedEnglish) { ids, english ->
+                val bindings = manager.prepare(context, ids, english)
                 // Recreate the live session, as ordinary incremental maintenance retains loaded tables.
                 // Native compilation still reuses unchanged dictionaries by checksum.
                 val usable = engine.deploy() && deploymentUsable(context) &&
@@ -226,6 +246,7 @@ object RimeConfigHelper {
             com.kingzcheung.xime.settings.CellDictionaryManager.prepare(context)
         } catch (e: Exception) {
             FileLogger.w(TAG, "Cell dictionaries not merged, previous config kept: ${e.message}")
+            retryWithoutCellEnglish(context)
         }
         // 内置资源发生替换时已失效旧编译缓存；其它配置变动仍由 ensureDeployment 增量处理。
 
