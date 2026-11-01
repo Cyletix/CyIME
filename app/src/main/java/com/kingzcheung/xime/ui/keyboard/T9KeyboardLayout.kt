@@ -537,10 +537,7 @@ private fun T9KeyboardContent(
                     digit = "2", letters = "ABC", longPressItems = listOf("A", "B", "C"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("2") != true) controller.onDigitPressed("2") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("2") },
@@ -552,10 +549,7 @@ private fun T9KeyboardContent(
                     digit = "3", letters = "DEF", longPressItems = listOf("D", "E", "F"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("3") != true) controller.onDigitPressed("3") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("3") },
@@ -571,10 +565,7 @@ private fun T9KeyboardContent(
                     digit = "4", letters = "GHI", longPressItems = listOf("G", "H", "I"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("4") != true) controller.onDigitPressed("4") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("4") },
@@ -586,10 +577,7 @@ private fun T9KeyboardContent(
                     digit = "5", letters = "JKL", longPressItems = listOf("J", "K", "L"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("5") != true) controller.onDigitPressed("5") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("5") },
@@ -601,10 +589,7 @@ private fun T9KeyboardContent(
                     digit = "6", letters = "MNO", longPressItems = listOf("M", "N", "O"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("6") != true) controller.onDigitPressed("6") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("6") },
@@ -620,10 +605,7 @@ private fun T9KeyboardContent(
                     digit = "7", letters = "PQRS", longPressItems = listOf("P", "Q", "R", "S"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("7") != true) controller.onDigitPressed("7") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("7") },
@@ -635,10 +617,7 @@ private fun T9KeyboardContent(
                     digit = "8", letters = "TUV", longPressItems = listOf("T", "U", "V"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("8") != true) controller.onDigitPressed("8") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("8") },
@@ -650,10 +629,7 @@ private fun T9KeyboardContent(
                     digit = "9", letters = "WXYZ", longPressItems = listOf("W", "X", "Y", "Z"),
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("9") != true) controller.onDigitPressed("9") },
                     onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true && !controller.onLetterFlicked(letter)) onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
+                    onSwipeStateChange = onSwipeStateChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("9") },
@@ -857,7 +833,12 @@ private fun T9DigitKey(
         onFlickLetter = { letter -> currentOnLongPressSelect?.invoke(letter) },
         onFlickLongPress = currentSwipes.onSwipeUp,
         flickThresholdDp = normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp),
-        onSwipeStateChange = onSwipeStateChange,
+        onSwipeStateChange = { state, bounds ->
+            // 拂动方向盘已经显示按下的键。其余普通点按由全局气泡开关决定。
+            val discPress = flick && inputPreferences.flickDirectionDisc && state.isPressed &&
+                !state.isLongPress && state.pressedText != null
+            if (!discPress) onSwipeStateChange?.invoke(state, bounds)
+        },
         badgeText = digit,
         swipeText = currentSwipes.swipeUpText,
         symbolInputText = currentSwipes.symbolInputText,

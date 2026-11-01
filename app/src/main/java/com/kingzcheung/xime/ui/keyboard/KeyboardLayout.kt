@@ -827,7 +827,6 @@ fun KeyboardLayout(
                                             }
                                         }
                                     } else null
-                                    val onSwipeStateChange = remember(key) { { state: SwipeState, bounds: Rect -> processSwipeState(state, bounds) } }
                                     val onLongPressSelect: ((String) -> Unit)? = remember(key, longPressGestureMap, onGestureAction, onCommitText, onKeyPress) { { selectedLabel: String ->
                                         val gesture = longPressGestureMap?.get(selectedLabel)
                                         if (gesture != null && gesture.action != GestureAction.COMMIT) {
@@ -868,7 +867,7 @@ fun KeyboardLayout(
                     Unit
                 } } else null,
                                         onSwipeDown = onSwipeDown,
-                                        onSwipeStateChange = onSwipeStateChange,
+                                        onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                                         onPress = onPress,
                                         onRelease = onRelease,
                                         onLongPressSelect = onLongPressSelect,

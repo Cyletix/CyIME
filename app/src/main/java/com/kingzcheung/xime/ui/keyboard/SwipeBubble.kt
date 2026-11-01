@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -84,8 +85,9 @@ private const val PRESS_BUBBLE_RELEASE_DELAY_MS = 60L
  */
 class SwipeBubbleController(
     private val scope: CoroutineScope,
-    private val showPressBubble: Boolean = false,
+    showPressBubble: Boolean = false,
 ) {
+    private var pressBubbleEnabled = showPressBubble
     var state by mutableStateOf(SwipeState())
         private set
     var keyBounds by mutableStateOf(Rect(0f, 0f, 0f, 0f))
@@ -95,6 +97,15 @@ class SwipeBubbleController(
     fun dispose() {
         releaseJob?.cancel()
         releaseJob = null
+    }
+
+    fun setPressBubbleEnabled(enabled: Boolean) {
+        if (pressBubbleEnabled == enabled) return
+        pressBubbleEnabled = enabled
+        if (!enabled && state.isPressed && !state.isLongPress && !state.isSwiping) {
+            dispose()
+            state = SwipeState()
+        }
     }
 
     fun update(newState: SwipeState, bounds: Rect) {
@@ -107,7 +118,7 @@ class SwipeBubbleController(
         }
         // 默认关闭时，普通按下/抬起不能让整个键盘重组或启动延迟协程。
         // 拂动/长按是选择反馈，仍需显示；退出这些反馈时只清一次状态。
-        if (!showPressBubble && !newState.isSwiping && !newState.isLongPress) {
+        if (!pressBubbleEnabled && !newState.isSwiping && !newState.isLongPress) {
             dispose()
             if (state.isSwiping || state.isLongPress || state.isPressed) state = SwipeState()
             return
@@ -137,7 +148,8 @@ class SwipeBubbleController(
 fun rememberSwipeBubbleController(): SwipeBubbleController {
     val scope = rememberCoroutineScope()
     val showPressBubble = LocalKeyboardInputPreferences.current.showPressBubble
-    val controller = remember(scope, showPressBubble) { SwipeBubbleController(scope, showPressBubble) }
+    val controller = remember(scope) { SwipeBubbleController(scope, showPressBubble) }
+    SideEffect { controller.setPressBubbleEnabled(showPressBubble) }
     DisposableEffect(controller) { onDispose { controller.dispose() } }
     return controller
 }

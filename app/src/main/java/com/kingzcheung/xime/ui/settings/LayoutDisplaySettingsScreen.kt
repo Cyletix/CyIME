@@ -667,12 +667,13 @@ internal fun KeyboardAppearanceSettings() {
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
-                    var showPressBubble by remember {
-                        mutableStateOf(SettingsPreferences.shouldShowPressBubble(context))
-                    }
+                    val showPressBubble = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().showPressBubble
                     Row(
                         modifier = Modifier.settingsSearchAnchor("点按弹出气泡")
                             .fillMaxWidth()
+                            .toggleable(value = showPressBubble, role = Role.Switch) {
+                                SettingsPreferences.setShowPressBubble(context, it)
+                            }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -688,13 +689,7 @@ internal fun KeyboardAppearanceSettings() {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
-                            checked = showPressBubble,
-                            onCheckedChange = { newValue ->
-                                showPressBubble = newValue
-                                SettingsPreferences.setShowPressBubble(context, newValue)
-                            }
-                        )
+                        Switch(checked = showPressBubble, onCheckedChange = null)
                     }
                 })
                 SettingsSection(title = "键盘顶部样式", content = {
