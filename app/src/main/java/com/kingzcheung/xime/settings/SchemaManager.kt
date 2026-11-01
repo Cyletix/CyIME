@@ -661,7 +661,9 @@ object SchemaManager {
                 version = entry.version,
                 author = author,
                 description = entry.description ?: "",
-                language = entry.language?.let(InputLanguage::fromId) ?: InputProfiles.builtin(entry.schemaId).language,
+                language = entry.language?.let {
+                    InputLanguage.fromId(it.trim().replace('_', '-').substringBefore('-').lowercase(java.util.Locale.ROOT))
+                } ?: InputProfiles.builtin(entry.schemaId).language,
                 scheme = entry.inputScheme?.let(InputScheme::fromId) ?: InputProfiles.builtin(entry.schemaId).scheme,
             )
         } catch (e: Exception) {

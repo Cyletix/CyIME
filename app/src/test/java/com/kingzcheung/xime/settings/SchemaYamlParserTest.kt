@@ -12,6 +12,20 @@ import java.io.File
 
 class SchemaYamlParserTest {
 
+    @Test fun `regional Chinese language tag keeps Chinese services on a reordered imported keyboard`() {
+        val file = writeSchema("""
+            schema:
+              schema_id: my_reordered_layout
+              name: 我的乱序布局
+              language: zh_Hans_CN
+        """.trimIndent())
+        assertEquals(InputLanguage.CHINESE, SchemaManager.parseSchemaYaml(file)!!.toSchemaInfo().profile.language)
+        file.writeText(file.readText().replace("zh_Hans_CN", "ja-JP"))
+        assertEquals(InputLanguage.JAPANESE, SchemaManager.parseSchemaYaml(file)!!.toSchemaInfo().profile.language)
+        file.writeText(file.readText().replace("language: ja-JP", ""))
+        assertEquals(InputLanguage.UNSPECIFIED, SchemaManager.parseSchemaYaml(file)!!.toSchemaInfo().profile.language)
+    }
+
     @Test fun `imported profile carries explicit language and scheme into UI`() {
         val file = writeSchema("""
             schema:
