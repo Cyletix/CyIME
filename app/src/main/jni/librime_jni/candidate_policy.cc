@@ -10,6 +10,9 @@
 #include <rime/context.h>
 #include <rime/engine.h>
 #include <rime/filter.h>
+#include <rime/menu.h>
+#include <rime/schema.h>
+#include <rime/translator.h>
 #include <rime/gear/translator_commons.h>
 #include <rime/language.h>
 #include <rime/registry.h>
@@ -21,6 +24,8 @@ using namespace rime;
 // All access belongs to the serialized Rime engine, including initialization.
 std::set<std::string> hidden;
 std::string hidden_path;
+thread_local Context* omission_context = nullptr;
+thread_local bool omission_inserted = false;
 
 std::vector<std::string> HanCharacters(const std::string& text) {
   std::vector<std::string> chars;
@@ -58,7 +63,7 @@ double SpellingCoverage(const an<Phrase>& phrase) {
 
 class PolicyTranslation : public Translation {
  public:
-  PolicyTranslation(an<Translation> source, const std::string& input, bool numeric) : source_(source), end_(input.size()) {
+  PolicyTranslation(an<Translation> source, const std::string& input, bool numeric, Translator* omission) : source_(source), end_(input.size()) {
     // Bound the work independently of dictionary size. This is native candidate
     // identity-preserving ordering, not a separate UI list with stale indices.
     for (size_t i = 0; i < 64 && !source_->exhausted(); ++i) {
@@ -140,6 +145,32 @@ class PolicyTranslation : public Translation {
       });
       if (chinese != head_.begin() && chinese != head_.end()) std::rotate(head_.begin(), chinese, chinese + 1);
     }
+    if (omission && head_.size() >= 2) {
+      Segment segment(0, input.size());
+      segment.tags.insert("abc");
+      auto alternatives = omission->Query(input, segment);
+      if (alternatives && !alternatives->exhausted() && alternatives->Peek() &&
+          alternatives->Peek()->text() != head_.front()->text()) {
+        const auto original = head_;
+        size_t inserted = 0;
+        for (size_t i = 0; i < 10 && inserted < 2 && !alternatives->exhausted(); ++i) {
+          auto c = alternatives->Peek();
+          alternatives->Next();
+          if (!c || c->start() != 0 || c->end() != input.size() ||
+              hidden.count(c->text()) || HanCharacters(c->text()).empty()) continue;
+          auto same = [&](const auto& item) { return item->text() == c->text(); };
+          auto first_five = original.begin() + std::min<size_t>(5, original.size());
+          if (std::any_of(original.begin(), first_five, same) ||
+              std::any_of(head_.begin() + 2, head_.begin() + 2 + inserted, same)) continue;
+          auto old = std::find_if(head_.begin(), head_.end(), same);
+          if (old != head_.end()) { c = *old; head_.erase(old); }
+          seen_.insert(c->text());
+          head_.insert(head_.begin() + 2 + inserted++,
+                       New<ShadowCandidate>(c, "cyime_omission", c->text(), "纠错", false));
+          omission_inserted = true;
+        }
+      }
+    }
     Advance();
   }
   bool Next() override { current_.reset(); Advance(); return !exhausted(); }
@@ -188,8 +219,25 @@ class CandidatePolicy : public Filter {
   an<Translation> Apply(an<Translation> source, CandidateList*) override {
     const auto& input = engine_->context()->input();
     const bool numeric = !input.empty() && input.find_first_not_of("23456789' ") == std::string::npos;
-    return New<PolicyTranslation>(source, input, numeric);
+    Translator* extra = nullptr;
+    if (omission_context == engine_->context()) {
+      std::string id;
+      if (!omission_ && engine_->schema()->config()->GetString("cyime_omission_schema", &id)) {
+        Schema schema(id);
+        std::string prism;
+        auto component = Translator::Require("script_translator");
+        if (component && schema.config()->GetString("translator/prism", &prism) && prism == id) {
+          Ticket ticket(engine_, "translator");
+          ticket.schema = &schema;
+          omission_.reset(component->Create(ticket));
+        }
+      }
+      extra = omission_.get();
+    }
+    return New<PolicyTranslation>(source, input, numeric, extra);
   }
+ private:
+  the<Translator> omission_;
 };
 
 bool StoreHidden(const std::set<std::string>& next) {
@@ -203,6 +251,34 @@ bool StoreHidden(const std::set<std::string>& next) {
   hidden = next;
   return true;
 }
+}
+
+bool RefineOmission(rime::Context* context) {
+  if (!context || context->input().size() < 4 || context->input().size() > 80 ||
+      context->input().find_first_not_of("abcdefghijklmnopqrstuvwxyz") != std::string::npos ||
+      context->caret_pos() != context->input().size() || context->composition().size() != 1 ||
+      context->composition().back().status >= rime::Segment::kSelected ||
+      context->composition().back().selected_index != 0) return false;
+  const auto original = context->composition().back();
+  if (!original.menu || original.menu->Prepare(2) < 2) return false;
+  struct Scope {
+    explicit Scope(rime::Context* ctx) { omission_context = ctx; omission_inserted = false; }
+    ~Scope() { omission_context = nullptr; }
+  } scope(context);
+  if (!context->RefreshNonConfirmedComposition() || context->composition().empty()) return false;
+  auto menu = context->composition().back().menu;
+  if (!menu) return false;
+  menu->Prepare(5);
+  // Late filters (e.g. simplified/traditional conversion) run after CandidatePolicy.
+  // Keep the menu the user saw if the refresh failed to add anything or displaced a protected choice.
+  bool keep = omission_inserted;
+  for (size_t i = 0; keep && i < 2; ++i) {
+    auto before = original.menu->GetCandidateAt(i);
+    auto after = menu->GetCandidateAt(i);
+    keep = before && after && before->text() == after->text() && before->end() == after->end();
+  }
+  if (!keep) context->composition().back() = original;
+  return keep;
 }
 
 void InitializeCandidatePolicy(const std::string& user_dir) {

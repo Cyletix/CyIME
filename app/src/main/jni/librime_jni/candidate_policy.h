@@ -2,7 +2,10 @@
 #include <string>
 #include <vector>
 
+namespace rime { class Context; }
+
 namespace cyime {
+bool RefineOmission(rime::Context* context);
 // Called under the engine lock, before any schema/session is created.
 void InitializeCandidatePolicy(const std::string& user_dir);
 bool HideCandidate(const std::string& text);

@@ -1395,6 +1395,15 @@ class RimeEngine {
     private external fun nativeReloadSessionAfterMaintenance(): Boolean
     private external fun nativeT9RefinementState(): Int
     private external fun nativeRefineT9Sentences(): Boolean
+    private external fun nativeRefineOmission(): Boolean
+
+    internal fun refineOmission(revision: Long): Boolean = locked {
+        if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining())
+            return@locked false
+        if (!nativeRefineOmission()) return@locked false
+        candidateRevision.incrementAndGet()
+        true
+    }
 
     @androidx.annotation.WorkerThread
     internal fun readQueuedResult(): RimeProcessResult? = locked {

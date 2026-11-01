@@ -30,7 +30,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("t9EnglishIndex", 9)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 3)
-    inputs.property("candidatePolicy", 3)
+    inputs.property("candidatePolicy", 4)
     inputs.property("pinyin26WordModel", 5)
     inputs.property("candidateComments", 1)
     inputs.property("cyimeTerms", 1)
@@ -363,7 +363,30 @@ val prepareChineseDictionaries by tasks.registering {
             .contains("  sentence_position_final_only: [${particles.joinToString(", ")}]\n")) {
             "$schema.schema.yaml sentence_position_final_only differs from app/data particle lists"
         }
-        File(root, "rime_ice.schema.yaml").writeText(baseSchema)
+        val omissionId = "cyime_omission"
+        val syllables = File(root, "cn_dicts/8105.dict.yaml").useLines { lines ->
+            lines.filterNot { it.startsWith("#") }.mapNotNull { it.split('\t').getOrNull(1) }
+                .filter { it.isNotEmpty() && it.all { c -> c in 'a'..'z' } }.toSortedSet()
+        }
+        val algebra = baseSchema.substringAfter("\nspeller:\n").substringAfter("  algebra:\n")
+            .lineSequence().takeWhile { it.isBlank() || it.startsWith(" ") || it.startsWith("#") }.joinToString("\n")
+        check(algebra.contains("derive/"))
+        File(root, "$omissionId.schema.yaml").writeText(buildString {
+            append("schema:\n  schema_id: $omissionId\n  name: 全拼漏键候选\n  version: '1'\n")
+            append("translator:\n  dictionary: rime_ice\n  prism: $omissionId\n  enable_user_dict: false\n")
+            append("  enable_correction: true\n  cyime_neighbor_correction: true\n")
+            append("speller:\n  algebra:\n").append(algebra.trimEnd()).append('\n')
+            for (syllable in syllables.filter { it.length >= 3 }) {
+                for (shorter in syllable.indices.map { syllable.removeRange(it, it + 1) }.distinct()) {
+                    val rule = if (shorter in syllables) "derive/^$syllable$/$shorter/correction"
+                               else "fuzz/^$syllable$/$shorter/"
+                    append("    - ").append(rule).append('\n')
+                }
+            }
+        })
+        val fullPinyinSchema = baseSchema.replace("  dependencies:\n", "  dependencies:\n    - $omissionId\n") +
+            "\ncyime_omission_schema: $omissionId\n"
+        File(root, "rime_ice.schema.yaml").writeText(fullPinyinSchema)
         val doublePinyin = File(root, "double_pinyin_flypy.schema.yaml")
         // Manual syllable split ' (Shift/comma split keys): a' o' e' are 啊 哦 额, any other single key + ' is the
         // syllables that key starts (v'vs 这种). Spellings carry the ', so input without it is unchanged; same rules
@@ -381,7 +404,7 @@ val prepareChineseDictionaries by tasks.registering {
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",
                 "pinyin_colemak" to "Colemak", "pinyin_typewise" to "Typewise")) {
-            File(root, "$id.schema.yaml").writeText(baseSchema
+            File(root, "$id.schema.yaml").writeText(fullPinyinSchema
                 .replace("schema_id: rime_ice", "schema_id: $id")
                 .replace("name: 雾凇拼音", "name: $name"))
         }

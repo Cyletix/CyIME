@@ -30,6 +30,36 @@ private val SETTING_SWITCHES = setOf("traditionalization", "emoji")
  * 方案名称/开关刷新与切换、T9 切离提交等逻辑。共享状态通过 service 引用访问。
  */
 internal class ImeSessionController(private val service: XimeInputMethodService) {
+    private var omissionJob: kotlinx.coroutines.Job? = null
+    private var omissionRevision = 0L
+
+    private fun scheduleOmission(ascii: Boolean) {
+        val state = service.candidateState.value
+        if (state.engineRevision == omissionRevision) return
+        omissionRevision = state.engineRevision
+        omissionJob?.cancel()
+        val ui = service.uiState.value
+        val profile = ui.inputProfile
+        if (ascii || !service.isChineseMode || !state.isComposing || state.hasPrevPage ||
+            profile.language != InputLanguage.CHINESE ||
+            profile.scheme != com.kingzcheung.xime.settings.InputScheme.PINYIN ||
+            profile.layout.kind != com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC ||
+            profile.mode != com.kingzcheung.xime.settings.InputMode.KEYBOARD ||
+            state.inputText.length !in 4..80 || state.inputText.any { it !in 'a'..'z' }) return
+        omissionJob = service.serviceScope.launch(Dispatchers.Main.immediate) {
+            kotlinx.coroutines.delay(180)
+            if (service.uiState.value.inputSessionId != ui.inputSessionId ||
+                !state.hasSameSelectionSource(service.candidateState.value) || service.inputCommands.hasPendingCommands)
+                return@launch
+            val changed = withContext(service.keyProcessingDispatcher) { service.rimeEngine.refineOmission(state.engineRevision) }
+            if (changed && service.uiState.value.inputSessionId == ui.inputSessionId &&
+                service.candidateState.value.engineRevision == state.engineRevision) {
+                omissionRevision = state.engineRevision + 1
+                service.updateUI()
+            }
+        }
+    }
+
     internal fun applyComposition(
         composition: com.kingzcheung.xime.rime.RimeComposition,
         pluginActions: List<CandidateAction> = emptyList(),
@@ -153,6 +183,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
         }
         // 展开态时刷新跨页全量候选并重置页码（编码已变化）
+        scheduleOmission(isAsciiMode)
         service.refreshExpandedCandidates()
         // composing 快照 → 插件（input_changed 事件；T9 与候选栏同源显示态）
         service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else inputText)
@@ -295,6 +326,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
         // 展开态时刷新跨页全量候选并重置页码（编码已变化）
+        scheduleOmission(isAsciiMode)
         service.refreshExpandedCandidates()
         // 候选展开页：编码删空（候选与联想均空）时自动收起，不留空页
         service.maybeCollapseCandidatePage()

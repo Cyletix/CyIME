@@ -21,6 +21,7 @@ public final class RimeEngine {
     public native boolean nativeT9FixLetter(String letter);
     public native int nativeT9RefinementState();
     public native boolean nativeRefineT9Sentences();
+    public native boolean nativeRefineOmission();
     public native String nativeT9ScoringStatus();
     public native String nativeGetInput();
     public native boolean nativeSetInput(String input);

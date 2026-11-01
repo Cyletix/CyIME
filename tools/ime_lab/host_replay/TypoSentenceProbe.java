@@ -10,7 +10,8 @@ import java.util.List;
  * test user directory listing rime_ice (never an installed app's data), a cases TSV (id, input, target) from
  * typo_bench.py, the output TSV, and the measured neighbour map (typo_bench.py neighbors). Each case is typed
  * key by key; a row records the per-key time, the first 10 candidates, the target's place (-1 when absent) and,
- * with a host build (CYIME_T9_WORK_COUNTERS), the per-key dictionary work (all counters but cache hits, summed).
+ * With a sixth argument --idle-omission, run the same idle correction used by the IME before reading the final list.
+ * With a host build (CYIME_T9_WORK_COUNTERS), the per-key dictionary work (all counters but cache hits, summed).
  */
 public final class TypoSentenceProbe {
   public static void main(String[] args) throws Exception {
@@ -53,6 +54,7 @@ public final class TypoSentenceProbe {
           }
         }
         if (!e.nativeGetInput().equals(f[1])) throw new Exception("input changed: " + e.nativeGetInput());
+        if (args.length > 5 && "--idle-omission".equals(args[5])) e.nativeRefineOmission();
         String[][] rows = e.nativeInspectCandidates(100);
         int rank = -1;
         for (int i = 0; i < rows.length; ++i) if (rows[i][0].equals(f[2])) { rank = i; break; }

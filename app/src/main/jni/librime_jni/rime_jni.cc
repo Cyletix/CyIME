@@ -568,8 +568,21 @@ public:
         auto menu = session->context()->composition().back().menu;
         if (!menu) return marks;
         for (size_t i = 0; i < count && offset + i < menu->candidate_count(); ++i) {
-            auto genuine = rime::Candidate::GetGenuineCandidate(menu->GetCandidateAt(offset + i));
-            if (auto phrase = rime::As<rime::Phrase>(genuine)) marks[i] = phrase->correction_marks();
+            auto displayed = menu->GetCandidateAt(offset + i);
+            auto genuine = rime::Candidate::GetGenuineCandidate(displayed);
+            if (auto phrase = rime::As<rime::Phrase>(genuine)) {
+                marks[i] = phrase->correction_marks();
+                if (displayed->type() == "cyime_omission") {
+                    // Keep the corrected syllables highlighted without repeating the whole sentence.
+                    std::istringstream syllables(marks[i]);
+                    marks[i].clear();
+                    for (std::string syllable; syllables >> syllable;) {
+                        if (syllable.find('=') == std::string::npos) continue;
+                        if (!marks[i].empty()) marks[i] += ' ';
+                        marks[i] += syllable;
+                    }
+                }
+            }
         }
         return marks;
     }
@@ -846,6 +859,14 @@ public:
         if (!schema.empty() && schema != getCurrentSchema()) rime->select_schema(session_id_, schema.c_str());
         reapplyPageSizeIfNeeded();
         return true;
+    }
+
+    bool refineOmission() {
+        if (!rime || !session_id_) return false;
+        auto session = rime::Service::instance().GetSession(session_id_);
+        std::string schema;
+        return session && session->schema()->config()->GetString("cyime_omission_schema", &schema) &&
+               cyime::RefineOmission(session->context());
     }
 
     bool refineT9Sentences() {
@@ -2657,6 +2678,11 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9RefinementState(JNIEnv*, jobje
     return rime::T9SentenceRefinementState();
 }
 JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeRefineOmission(JNIEnv*, jobject) {
+    return Rime::Instance().refineOmission() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeRefineT9Sentences(JNIEnv*, jobject) {
     return Rime::Instance().refineT9Sentences() ? JNI_TRUE : JNI_FALSE;
 }
