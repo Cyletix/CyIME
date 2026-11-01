@@ -2079,6 +2079,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 if (it.t9) service.rimeEngine.clearQueuedT9Composition() else service.rimeEngine.clearQueuedComposition()
                 withEditor {
                     discardPendingCandidateCommit()
+                    service.keyboardViewModel.setCandidatePageExpanded(false)
                     service.keyboardCallbacks?.onT9CompositionCleared?.invoke()
                     service.t9PartialSegments.clear()
                     service.candidateState.value = service.candidateState.value.copy(

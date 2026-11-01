@@ -1008,7 +1008,6 @@ fun KeyboardView(
                             val globalIndex = railExpanded.getOrNull(index)?.first
                             if (globalIndex != null) {
                                 callbacks.onGlobalCandidateSelect?.invoke(globalIndex)
-                                viewModel.setCandidatePageExpanded(false)
                             }
                         } else {
                             callbacks.onCandidateSelect(index)
@@ -1209,7 +1208,6 @@ fun KeyboardView(
                             if (!callbacks.isCandidateSnapshotCurrent(cs)) return@CandidatePageCallbacks
                             // entry.globalIndex 即跨页全局索引（引擎侧 select_candidate）
                             callbacks.onGlobalCandidateSelect?.invoke(entry.globalIndex)
-                            viewModel.setCandidatePageExpanded(false)
                         },
                         onCandidateLongPress = { entry ->
                             // 长按删除自造词：与候选栏共用确认弹窗
