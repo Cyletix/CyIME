@@ -56,7 +56,6 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.HighlightOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1078,7 +1077,7 @@ private fun CandidateExpansionButton(
     KeyboardToolbarButton(onClick, background, restingFill = restingFill, slotWidth = slotWidth, cornerRadius = cornerRadius,
         continuousPill = continuousPill,
         modifier = Modifier.testTag("candidate-expansion").semantics { stateDescription = if (expanded) "已展开" else "已收起" }) {
-        Icon(Icons.Default.KeyboardArrowUp,
+        Icon(Icons.Default.KeyboardArrowDown,
             contentDescription = if (expanded) "返回键盘" else "展开候选词",
             tint = foreground, modifier = Modifier.size(24.dp).rotate(rotation))
     }
