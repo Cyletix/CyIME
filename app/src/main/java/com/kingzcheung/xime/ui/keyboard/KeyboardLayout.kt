@@ -124,7 +124,7 @@ fun KeyboardLayout(
         KeysConfigHelper.letterLayout(uiState.currentSchemaId, isAsciiMode)
     }
     val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout) {
-        letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(isAsciiMode)
+        letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(uiState.currentSchemaId, isAsciiMode)
     }
     // Typewise honeycomb: a fourth letter row, short rows offset half a key, hexagonal letter caps.
     val honeycomb = letterLayout?.honeycomb == true

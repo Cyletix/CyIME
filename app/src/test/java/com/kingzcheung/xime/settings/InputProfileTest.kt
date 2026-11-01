@@ -153,6 +153,10 @@ class InputProfileTest {
         assertEquals("拼音 · 九键", entry("rime_ice").profile.summary)
         assertEquals(InputScheme.PINYIN, InputUIState(currentSchemaId = "rime_ice").inputProfile.scheme)
         assertEquals(InputLayout.MERGED14, InputProfiles.current("t9_pinyin").layout)
+        // The UI can receive the new scheme while the previous scheme's gesture cache is active.
+        KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
+        assertEquals(listOf("qw", "er"), KeysConfigHelper.getKeyRows("t9_pinyin", false).first())
+        assertEquals("q", KeysConfigHelper.getKeyRows("t9_pinyin", true).first().first())
         // 14 键可分体（跨中线的双字母键在分体时拆开）；九键不分体。
         assertTrue(supportsSplitKeyboard("t9_pinyin", false))
         assertTrue(supportsSplitKeyboard("t9_pinyin", true))

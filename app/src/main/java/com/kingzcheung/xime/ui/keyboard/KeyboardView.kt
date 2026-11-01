@@ -150,7 +150,12 @@ fun KeyboardView(
     val toolbarFeedback = { callbacks.onKeyPressDown?.invoke("toolbar"); Unit }
     // Docking defaults also depend on reloaded gaps when the visible size stays unchanged.
     KeysConfigHelper.configVersion.collectAsStateWithLifecycle().value
-    val keyboardState by viewModel.keyboardState.collectAsStateWithLifecycle()
+    val pageKeyboardState by viewModel.keyboardState.collectAsStateWithLifecycle()
+    // The host publishes language and scheme together. Navigation can still carry the previous
+    // letter keyboard for a frame after a switch. Use the host for both key routing and rendering.
+    val keyboardState = if (inputSessionManagedByHost && state.currentSchemaId.isNotEmpty() &&
+        (pageKeyboardState == KeyboardLayoutState.English || pageKeyboardState == KeyboardLayoutState.Chinese))
+        initialKeyboardLayoutState(state.isAsciiMode, state.currentSchemaId) else pageKeyboardState
     val page by viewModel.page.collectAsStateWithLifecycle()
     val underlyingPage = page.underlyingPage()
     val overlayVisibility = remember { MutableTransitionState(false) }
@@ -1174,7 +1179,7 @@ fun KeyboardView(
                                 com.kingzcheung.xime.settings.LayoutKind.MERGED))
                     if (!usesQwerty) null else {
                         val custom = KeysConfigHelper.letterLayout(state.currentSchemaId, ascii)
-                        candidateQwertyGeometry(custom?.typingRows() ?: KeysConfigHelper.getKeyRows(ascii),
+                        candidateQwertyGeometry(custom?.typingRows() ?: KeysConfigHelper.getKeyRows(state.currentSchemaId, ascii),
                             fourteenKey = !ascii && state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14,
                             custom = custom != null,
                             split = inputPreferences.splitKeyboardEnabled && supportsSplitKeyboard(state.currentSchemaId, ascii))

@@ -25,8 +25,9 @@ internal fun letterKeyboardDefaults(
     maximumHeightDp: Int? = null,
 ): LetterKeyboardDefaults? {
     if ((!isAsciiMode && profile.layout.kind !in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED)) || split) return null
-    val custom = KeysConfigHelper.letterLayout((profile.engineProfile as? EngineProfile.Rime)?.schemaId.orEmpty(), isAsciiMode)
-    val rows = custom?.typingRows() ?: KeysConfigHelper.getKeyRows(isAsciiMode)
+    val schemaId = (profile.engineProfile as? EngineProfile.Rime)?.schemaId.orEmpty()
+    val custom = KeysConfigHelper.letterLayout(schemaId, isAsciiMode)
+    val rows = custom?.typingRows() ?: KeysConfigHelper.getKeyRows(schemaId, isAsciiMode)
     if (standardLetterRowGeometry(rows, 1f, custom != null, false) == null) return null
     val (x, y) = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
     val pitch = physicalMetrics?.dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM)

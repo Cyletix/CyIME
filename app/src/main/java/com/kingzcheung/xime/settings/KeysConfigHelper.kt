@@ -735,20 +735,17 @@ object KeysConfigHelper {
         _activeMergedSection = section
         // 自建布局的拼音方案，或双拼在自建合并键布局上的版本：按那个布局的键和手势。
         val custom = CustomKeyboardLayouts.forSchema(schemaId)
+        _zhRows = getKeyRows(schemaId, false)
         if (custom != null) {
-            _zhRows = custom.typingRows()
             _keyGestureConfig.value = custom.gestures(_keyGestureConfigZhBase)
         } else if (section != null) {
             // Japanese romaji types on the arrangement chosen for Japanese; its own section keeps the swipes.
             val arranged = letterLayout(schemaId, false)
             val gestures = _mergedGestureConfigs[section] ?: emptyMap()
-            _zhRows = arranged?.typingRows() ?: _mergedRows[section] ?: DEFAULT_ZH_ROWS
             _keyGestureConfig.value = arranged?.gestures(gestures) ?: gestures
         } else {
             // Double pinyin and code tables type on the arrangement chosen for them (QWJRTK, Colemak, the user's own …); pinyin has none.
             val arranged = letterLayout(schemaId, false)
-            val rows = arranged?.typingRows() ?: _zhRowsBase
-            _zhRows = if (!semicolonOnShift && DoublePinyinSchemes.find(schemaId)?.usesSemicolon == true) withSemicolonKey(rows) else rows
             _keyGestureConfig.value = arranged?.gestures(_keyGestureConfigZhBase) ?: _keyGestureConfigZhBase
         }
     }
@@ -799,6 +796,18 @@ object KeysConfigHelper {
      *  合并键布局中合并键的 ID 为组内字母拼接（如 "qw"），渲染层按 ID 长度分配键宽。 */
     fun getKeyRows(isAsciiMode: Boolean): List<List<String>> =
         if (isAsciiMode) _enRows else _zhRows
+
+    /** A rendered frame can arrive before the active gesture cache has switched schemes. */
+    fun getKeyRows(schemaId: String, isAsciiMode: Boolean): List<List<String>> {
+        if (isAsciiMode) return _enRows
+        CustomKeyboardLayouts.forSchema(schemaId)?.let { return it.typingRows() }
+        val arranged = letterLayout(schemaId, false)?.typingRows()
+        val section = mergedSectionForSchema(schemaId)
+        if (section != null) return arranged ?: _mergedRows[section] ?: DEFAULT_ZH_ROWS
+        val rows = arranged ?: _zhRowsBase
+        return if (!semicolonOnShift && DoublePinyinSchemes.find(schemaId)?.usesSemicolon == true)
+            withSemicolonKey(rows) else rows
+    }
 
     /** Read a thumbnail without changing the active keyboard or its gesture state. */
     fun previewKeyRows(layout: InputLayout, language: InputLanguage): List<List<String>> =
