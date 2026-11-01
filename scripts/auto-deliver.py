@@ -613,17 +613,20 @@ class Delivery:
         write_json(self.state_path, self.state)
 
     def release_info(self):
-        # Listing distinguishes network/auth failure from 'tag absent'. Do not mask errors as absence.
-        raw = self.r.run(["gh", "api", "--paginate", f"repos/{self.repo}/releases?per_page=100"], timeout=180)
-        dec = json.JSONDecoder()
-        while raw.strip():
-            raw = raw.lstrip()
-            page, used = dec.raw_decode(raw)
-            for release in page:
-                if release["tag_name"] == self.version:
-                    return release
-            raw = raw[used:]
-        return None
+        # The REST tag endpoint omits unpublished drafts. Query the exact tag, then
+        # read its assets by ID instead of relying on a cached page of release listings.
+        owner, name = self.repo.split("/", 1)
+        query = ("query($owner:String!,$name:String!,$tag:String!){"
+                 "repository(owner:$owner,name:$name){release(tagName:$tag){databaseId}}}")
+        response = json.loads(self.r.run(["gh", "api", "graphql", "-f", f"query={query}",
+            "-f", f"owner={owner}", "-f", f"name={name}", "-f", f"tag={self.version}"]))
+        record = response["data"]["repository"]["release"]
+        if record is None:
+            return None
+        info = json.loads(self.r.run(["gh", "api", f"repos/{self.repo}/releases/{int(record['databaseId'])}"]))
+        if info["tag_name"] != self.version:
+            raise DeliveryError("GitHub returned a release with a different tag.")
+        return info
 
     def verify_release_target(self, info):
         if info.get("draft"):

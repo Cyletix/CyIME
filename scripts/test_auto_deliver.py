@@ -163,7 +163,14 @@ class FakeRunner(m.Runner):
         if args[0] == 'gh':
             if self.network_failure: raise m.DeliveryError('network failure')
             if args[1] == 'api':
-                if '--paginate' in args: return json.dumps(self.releases)
+                if 'graphql' in args:
+                    tag = next(a[4:] for a in args if a.startswith("tag="))
+                    found = next((i for i, r in enumerate(self.releases) if r["tag_name"] == tag), None)
+                    release = None if found is None else {"databaseId": found + 1}
+                    return json.dumps({"data": {"repository": {"release": release}}})
+                if any('/releases/' in x for x in args):
+                    target = next(x for x in args if '/releases/' in x)
+                    return json.dumps(self.releases[int(target.rsplit('/', 1)[1]) - 1])
                 if any('/commits/' in x for x in args):
                     return self.remote_commit or super().run(['git','rev-parse','HEAD'])
             if args[1:3] == ['release','create']:
