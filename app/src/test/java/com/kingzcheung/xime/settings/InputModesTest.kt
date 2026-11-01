@@ -23,6 +23,14 @@ class InputModesTest {
         assertEquals(listOf("中文", "日语", "英文"), choices.map { it.name })
         assertEquals(listOf("double_pinyin_flypy", "japanese_kana", InputModes.ENGLISH), choices.map { it.schemaId })
     }
+    @Test fun addressFieldRemembersItsChineseLayoutWithoutChangingTheSavedProfile() {
+        val saved = mapOf(InputLanguage.CHINESE to "rime_ice")
+        val local = InputModes.languageChoices(modes, InputModes.ENGLISH, emptyMap(),
+            selectedProfiles = saved, fieldNativeModeId = "t9_pinyin")
+        assertEquals("t9_pinyin", local.first { it.language == InputLanguage.CHINESE }.schemaId)
+        val ordinary = InputModes.languageChoices(modes, InputModes.ENGLISH, emptyMap(), selectedProfiles = saved)
+        assertEquals("rime_ice", ordinary.first { it.language == InputLanguage.CHINESE }.schemaId)
+    }
     @Test fun currentModeWinsAndRemovedModeFallsBackWithinItsLanguage() {
         val choices = InputModes.languageChoices(modes, "rime_ice",
             mapOf(InputLanguage.CHINESE to "t9_pinyin", InputLanguage.JAPANESE to "removed"))

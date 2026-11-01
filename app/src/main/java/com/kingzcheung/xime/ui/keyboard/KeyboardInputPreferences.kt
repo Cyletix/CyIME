@@ -408,6 +408,7 @@ data class KeyboardInputActions(
     val isSttEnabled: Boolean = false,
     val schemas: List<SchemaInfo> = emptyList(),
     val currentInputModeId: String = "",
+    val fieldNativeModeId: String? = null,
     val onSwitchSchema: ((String) -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val isVoiceMode: Boolean = false,

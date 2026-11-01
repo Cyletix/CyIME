@@ -86,6 +86,7 @@ data class KeyboardUiState(
     val toolbarPluginButtons: List<ToolbarButtonItem.Plugin> = emptyList(),
     val isCalculatorMode: Boolean = false,
     val inputSessionId: Long = 0L,
+    val isAddressField: Boolean = false,
     val isFloatingMode: Boolean = false,
     val isHandwritingMode: Boolean = false,
     val floatingOffsetX: Int = 0,

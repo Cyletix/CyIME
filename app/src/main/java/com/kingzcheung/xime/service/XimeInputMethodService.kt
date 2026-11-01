@@ -1967,6 +1967,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 languageActions = com.kingzcheung.xime.ui.keyboard.KeyboardInputActions(
                                     schemas = com.kingzcheung.xime.settings.InputModes.available(state.schemas),
                                     currentInputModeId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
+                                    fieldNativeModeId = state.currentSchemaId.takeIf { state.isAddressField },
                                     onSwitchSchema = { id -> if (inputReadiness.ticket() != null) schemaController.switchSchema(id) },
                                 ),
                                 cursorAnchor = state.cursorAnchor,
@@ -2028,6 +2029,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 languageActions = com.kingzcheung.xime.ui.keyboard.KeyboardInputActions(
                                     schemas = com.kingzcheung.xime.settings.InputModes.available(state.schemas),
                                     currentInputModeId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
+                                    fieldNativeModeId = state.currentSchemaId.takeIf { state.isAddressField },
                                     onSwitchSchema = { id -> if (inputReadiness.ticket() != null) schemaController.switchSchema(id) },
                                 ),
                                 onSwitchLanguage = { switchHardwareLanguage() },
@@ -2181,6 +2183,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     toolbarPluginButtons = state.toolbarPluginButtons,
                                     isCalculatorMode = calculatorEngine.isActive(),
                                     inputSessionId = state.inputSessionId,
+                                    isAddressField = state.isAddressField,
                                     isFloatingMode = state.isFloatingMode && !handwritingExpanded,
                                     isHandwritingMode = isHandwritingMode,
                                     // Floating cards remain draggable even when an old size is being protected.
@@ -3084,6 +3087,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         
         uiState.value = uiState.value.copy(
             inputSessionId = System.nanoTime(),
+            isAddressField = editorInputPolicy.field.kind == EditorFieldPolicy.Kind.ADDRESS,
             isAsciiMode = editorPresentation.isAsciiMode,
             currentSchemaId = editorPresentation.currentSchemaId,
             clipboardImagesExpanded = false,

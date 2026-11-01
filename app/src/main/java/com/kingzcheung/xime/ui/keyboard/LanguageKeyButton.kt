@@ -150,7 +150,7 @@ fun LanguageKeyButton(
         actions.schemas, actions.currentInputModeId,
         com.kingzcheung.xime.settings.InputModes.rememberedModes(context, actions.schemas),
         com.kingzcheung.xime.settings.InputModes.languageOrder(context),
-        com.kingzcheung.xime.settings.InputModes.selectedProfiles(context)))
+        com.kingzcheung.xime.settings.InputModes.selectedProfiles(context), actions.fieldNativeModeId))
     val switchSchema by rememberUpdatedState(actions.onSwitchSchema)
     val hasMenu = schemas.isNotEmpty() && switchSchema != null
     val scope = rememberCoroutineScope()

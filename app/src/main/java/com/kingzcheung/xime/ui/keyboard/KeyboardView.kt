@@ -352,6 +352,7 @@ fun KeyboardView(
             isSttEnabled = state.isSttEnabled,
             schemas = com.kingzcheung.xime.settings.InputModes.available(state.schemas),
             currentInputModeId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
+            fieldNativeModeId = state.currentSchemaId.takeIf { state.isAddressField },
             onSwitchSchema = callbacks.onSwitchSchema,
             onCommitText = callbacks.onCommitText,
             onCommitExactText = callbacks.onCommitExactText,

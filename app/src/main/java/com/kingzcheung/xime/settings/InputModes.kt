@@ -86,13 +86,14 @@ object InputModes {
     /** One entry per language, pointing to that language's last available mode. */
     fun languageChoices(schemas: List<SchemaInfo>, currentModeId: String,
         remembered: Map<InputLanguage, String>, languageOrder: List<InputLanguage> = InputLanguage.entries,
-        selectedProfiles: Map<InputLanguage, String> = emptyMap()): List<SchemaInfo> {
+        selectedProfiles: Map<InputLanguage, String> = emptyMap(), fieldNativeModeId: String? = null): List<SchemaInfo> {
         val modes = available(schemas)
         val order = languageOrder + if (modes.any { it.language == InputLanguage.UNSPECIFIED })
             listOf(InputLanguage.UNSPECIFIED) else emptyList()
         return order.distinct().mapNotNull { language ->
             val group = modes.filter { it.language == language }
-            val chosen = group.firstOrNull { it.schemaId == selectedProfiles[language] }
+            val chosen = group.firstOrNull { it.schemaId == fieldNativeModeId }
+                ?: group.firstOrNull { it.schemaId == selectedProfiles[language] }
                 ?: group.firstOrNull { it.schemaId == currentModeId }
                 ?: group.firstOrNull { it.schemaId == remembered[language] }
                 ?: group.firstOrNull()

@@ -83,7 +83,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         else if (service.rimeEngine.isAsciiMode()) nativeLanguage else InputLanguage.ENGLISH
         if (target == null || target !in available) return false
         val targetSchema = if (target == InputLanguage.ENGLISH) currentSchema else {
-            val selected = InputModes.selectedProfiles(service)[target]
+            val localChoice = service.editorInputPolicy.schemaOverride?.takeIf { id ->
+                entries.any { it.schemaId == id && it.profile.language == target }
+            }
+            val selected = localChoice ?: InputModes.selectedProfiles(service)[target]
                 ?: InputModes.rememberedModes(service, entries)[target]
             InputProfileSelection.preferred(entries, target, selected, currentSchema)?.schemaId
                 ?: currentSchema.takeIf { nativeLanguage == target }
