@@ -40,7 +40,7 @@ class T9InputController(
     inputCommands: InputCommandQueue? = null,
     /** 组合为空时光标前的已上屏文字（九键词组模型的上文）；null 表示未知。 */
     private val leftContext: () -> String? = { null },
-    private val onUnconsumedDelete: (suspend () -> Unit)? = null,
+    private val onUnconsumedDelete: (suspend (com.kingzcheung.xime.keyboard.RepeatInput?) -> Unit)? = null,
     private val candidateTransform: ((RimeProcessResult) -> List<com.kingzcheung.xime.service.T9CandidateInjection>?)? = null,
 ) {
     companion object {
@@ -472,6 +472,7 @@ class T9InputController(
         val composition = finalResult.toComposition()
         val deleteResult = if (t9DeleteConsumed(transaction.state.processed, undoneCount, transaction.composingBefore))
             DeleteResult.DELETED else DeleteResult.NOT_CONSUMED
+        if (deleteResult == DeleteResult.DELETED) hold?.allowsDeletion(imeContent = true)
         val gen = uiGeneration.incrementAndGet()
         kotlinx.coroutines.withContext(Dispatchers.Main) {
             if (!accepts(admission, epoch)) return@withContext
@@ -484,13 +485,14 @@ class T9InputController(
                 onCompositionRefresh?.invoke(composition, injections)
                 applyCandidates(finalResult, data.panel, data.options)
             }
-            if (deleteResult != DeleteResult.NOT_CONSUMED || (onUnconsumedDelete == null && hold?.isActive != false)) {
+            if (deleteResult != DeleteResult.NOT_CONSUMED ||
+                (onUnconsumedDelete == null && hold?.allowsDeletion(imeContent = false) != false)) {
                 callback(deleteResult)
             }
         }
         // Editor fallback is still this physical delete, not a new action at the FIFO tail.
         if (deleteResult == DeleteResult.NOT_CONSUMED && accepts(admission, epoch) && hold?.isActive != false) {
-            onUnconsumedDelete?.invoke()
+            onUnconsumedDelete?.invoke(hold)
         }
     }
 

@@ -6,10 +6,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 class RepeatInput {
     private val active = AtomicBoolean(true)
     private val pending = AtomicBoolean(false)
+    private var deletedImeContent = false
     val isActive: Boolean get() = active.get()
     fun acquire(): Boolean = active.get() && pending.compareAndSet(false, true)
     fun completed() { pending.set(false) }
     fun stop() { active.set(false) }
+    /** Called in delete FIFO order. Once this press consumes composition or candidates,
+     * only a new press may start deleting text that was already in the editor. */
+    fun allowsDeletion(imeContent: Boolean): Boolean {
+        if (imeContent) deletedImeContent = true else if (deletedImeContent) stop()
+        return isActive
+    }
     fun dispatch(action: () -> Unit) {
         val previous = current.get()
         current.set(this)

@@ -1,9 +1,20 @@
 package com.kingzcheung.xime.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import com.kingzcheung.xime.keyboard.RepeatInput
 import org.junit.Test
 
 class DeletionTargetTest {
+    @Test fun deletingCompositionCannotCrossIntoEditorTextUntilTheNextPress() {
+        val hold = RepeatInput()
+        repeat(3) { assertTrue(hold.allowsDeletion(imeContent = true)) }
+        assertFalse(hold.allowsDeletion(imeContent = false))
+        assertFalse(hold.isActive)
+        val next = RepeatInput()
+        repeat(3) { assertTrue(next.allowsDeletion(imeContent = false)) }
+    }
     @Test fun delayedCandidateBarCannotMakeCompositionDeleteTheDocument() {
         assertEquals(DeletionTarget.COMPOSITION, deletionTarget(true, false, false, false, false, false))
     }

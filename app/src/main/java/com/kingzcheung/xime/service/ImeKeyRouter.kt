@@ -1680,13 +1680,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val hold = com.kingzcheung.xime.keyboard.RepeatInput.current.get()
         if (hold != null && !hold.acquire()) return
         postRimeJob("delete") {
-            try { if (!hasPendingCandidateCommit && hold?.isActive != false) processDeleteKey() }
+            try { if (!hasPendingCandidateCommit && hold?.isActive != false) processDeleteKey(hold) }
             finally { hold?.completed() }
         }
     }
 
     /** 单次退格处理（service.keyProcessingDispatcher 上执行）。 */
-    internal suspend fun processDeleteKey() {
+    internal suspend fun processDeleteKey(hold: com.kingzcheung.xime.keyboard.RepeatInput?) {
         val owner = service.uiState.value.inputSessionId
         // 退格照常删掉自动补的空格；之后再打标点、空格不再按自动空格处理。
         englishAutoSpace.disarm()
@@ -1715,7 +1715,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             }
             return
         }
-        if (service.japaneseInputController.deleteKana()) return
+        if (service.japaneseInputController.deleteKana()) {
+            hold?.allowsDeletion(imeContent = true)
+            return
+        }
         // 退格改变输入上下文：使在途的联想预测结果失效，防止过期结果迟到回填
         // associationCandidates，导致长按退格删除时候选栏在"联想词↔空"之间闪动。
         // 先作废再读候选：联想恰好在两步之间送达时，要么算“在等”，要么已经看得到，不会落成删正文。
@@ -1732,6 +1735,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             predictionPending = predictionWasPending,
         ).skippingAssociation(SettingsPreferences.isDeleteSkipsAssociation(service), candState.isShowingRecentClipboard)
         if (target == DeletionTarget.WAIT) return
+        if (hold?.allowsDeletion(target == DeletionTarget.COMPOSITION || target == DeletionTarget.CANDIDATES) == false) return
         // 计算器模式：追踪退格
         val calculatorWasActive = service.calculatorEngine.isActive()
         service.calculatorEngine.handleDelete()

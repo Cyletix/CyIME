@@ -248,9 +248,9 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     internal fun bindT9Controller(callbacks: KeyboardCallbacks): T9InputController {
         currentKeyboardCallbacks = callbacks
         // Null means a standalone UI handles unconsumed deletion in its result callback.
-        val onUnconsumedDelete: (suspend () -> Unit)? =
+        val onUnconsumedDelete: (suspend (com.kingzcheung.xime.keyboard.RepeatInput?) -> Unit)? =
             if (callbacks.onT9UnconsumedDelete == null) null
-            else { { currentKeyboardCallbacks?.onT9UnconsumedDelete?.invoke(); Unit } }
+            else { { hold -> currentKeyboardCallbacks?.onT9UnconsumedDelete?.invoke(hold); Unit } }
         val controller = retainedT9Controller ?: T9InputController(
             inputAdmissionTicket = { currentKeyboardCallbacks?.inputAdmissionTicket?.invoke() },
             captureInputContext = {

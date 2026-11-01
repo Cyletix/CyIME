@@ -20,7 +20,7 @@ data class KeyboardCallbacks(
     /** 九键组句的上文：组合为空时光标前的已上屏文字；null 表示未知或正在组合。 */
     val t9LeftContext: () -> String? = { null },
     val inputCommands: com.kingzcheung.xime.rime.InputCommandQueue? = null,
-    val onT9UnconsumedDelete: (suspend () -> Unit)? = null,
+    val onT9UnconsumedDelete: (suspend (com.kingzcheung.xime.keyboard.RepeatInput?) -> Unit)? = null,
     val onKeyPressDown: ((String) -> Unit)? = null,
     val onKeyRelease: ((String) -> Unit)? = null,
     val onCandidateSelect: (Int) -> Unit,
