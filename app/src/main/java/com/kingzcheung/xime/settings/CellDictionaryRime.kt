@@ -8,8 +8,8 @@ import java.io.File
 
 /** Settings/deployment-only adapter. No work is added to the per-keystroke candidate path. */
 object CellDictionaryRime {
-    private const val START = "# BEGIN CYIME CELL DICTIONARIES"
-    private const val END = "# END CYIME CELL DICTIONARIES"
+    internal const val START = "# BEGIN CYIME CELL DICTIONARIES"
+    internal const val END = "# END CYIME CELL DICTIONARIES"
     private fun YamlMap.node(key: String): YamlNode? = entries.entries.firstOrNull { it.key.content == key }?.value
 
     fun supports(profile: InputProfile): Boolean = profile.language == InputLanguage.CHINESE &&
@@ -97,7 +97,9 @@ object CellDictionaryRime {
                 continue
             }
             val source = File(rimeDir, "${schema.schemaId}.schema.yaml").readText()
-            val pack = packName(dictionary(source, original))
+            // An installed older cell block can collide with a later personal patch. Read
+            // the user's dictionary override without the replaceable block first.
+            val pack = packName(dictionary(source, patch(original, null)))
             bindings += Binding(schema.schemaId, pack)
             val english = CellDictionaryEnglish.kind(schema.toSchemaInfo().profile.layout.kind)
                 ?.takeIf { kind -> englishWords.any { CellDictionaryEnglish.code(kind, it) != null } }
