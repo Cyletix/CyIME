@@ -27,6 +27,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +40,9 @@ import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.ui.keyboard.LanguageMenuCard
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputActions
+import com.kingzcheung.xime.ui.keyboard.LanguageKeyButton
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputActions
 import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
 import com.kingzcheung.xime.ui.theme.KeyboardPalette
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
@@ -59,6 +66,29 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LanguageMenuRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
+
+    @Test
+    @Config(sdk = [29, 33, 34], qualifiers = "w400dp-h888dp-432dpi")
+    fun longPressOpensLanguageMenuAcrossTheWindowListenerApiBoundary() {
+        com.kingzcheung.xime.ui.keyboard.AppFonts.initialize(ApplicationProvider.getApplicationContext())
+        rule.setContent {
+            CompositionLocalProvider(LocalKeyboardInputActions provides KeyboardInputActions(
+                schemas = listOf(SchemaInfo("rime_ice", "拼音", "", "", "")),
+                currentInputModeId = "rime_ice", onSwitchSchema = {},
+            )) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                    LanguageKeyButton(onClick = {}, backgroundColor = Color.White,
+                        modifier = Modifier.size(48.dp).testTag("language-key"))
+                }
+            }
+        }
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("language-key").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(400)
+        rule.onNodeWithTag("language-menu").assertIsDisplayed()
+        rule.onNodeWithTag("language-key").performTouchInput { up() }
+        rule.mainClock.autoAdvance = true
+    }
 
     private val schemas = listOf(
         SchemaInfo("zh", "中文", "", "", "", language = InputLanguage.CHINESE),

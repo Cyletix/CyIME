@@ -364,12 +364,12 @@ fun LanguageKeyButton(
 
 /**
  * 键盘窗口不再可见时回调一次，返回取消函数。
- * 窗口可见性监听是 Android 13（API 33）才公开的接口，Android 11/12 上调用会直接崩溃（长按语言键闪退）；
+ * 窗口可见性监听从 Android 14（API 34）才可用；
  * 更早的系统改为菜单开着时每 200ms 查一次窗口可见性。
  */
 private fun watchWindowHidden(view: android.view.View, onHidden: () -> Unit): () -> Unit {
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        return WindowVisibilityListenerApi33.watch(view, onHidden)
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        return WindowVisibilityListenerApi34.watch(view, onHidden)
     }
     val check = object : Runnable {
         override fun run() {
@@ -381,8 +381,8 @@ private fun watchWindowHidden(view: android.view.View, onHidden: () -> Unit): ()
     return { view.removeCallbacks(check) }
 }
 
-@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
-private object WindowVisibilityListenerApi33 {
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+private object WindowVisibilityListenerApi34 {
     fun watch(view: android.view.View, onHidden: () -> Unit): () -> Unit {
         val listener = android.view.ViewTreeObserver.OnWindowVisibilityChangeListener { visibility ->
             if (visibility != android.view.View.VISIBLE) onHidden()
