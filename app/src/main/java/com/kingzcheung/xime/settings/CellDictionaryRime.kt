@@ -8,8 +8,8 @@ import java.io.File
 
 /** Settings/deployment-only adapter. No work is added to the per-keystroke candidate path. */
 object CellDictionaryRime {
-    private const val START = "# BEGIN CYIME CELL DICTIONARIES"
-    private const val END = "# END CYIME CELL DICTIONARIES"
+    internal const val START = "# BEGIN CYIME CELL DICTIONARIES"
+    internal const val END = "# END CYIME CELL DICTIONARIES"
     private fun YamlMap.node(key: String): YamlNode? = entries.entries.firstOrNull { it.key.content == key }?.value
 
     fun supports(profile: InputProfile): Boolean = profile.language == InputLanguage.CHINESE &&
@@ -80,14 +80,15 @@ object CellDictionaryRime {
     data class Binding(val schemaId: String, val pack: String)
 
     /** Plan all patches before writing anything, so an unsupported custom config cannot half-apply. */
-    fun prepare(rimeDir: File, store: CellDictionaryStore, schemas: List<SchemaMeta>, ids: Set<String>): List<Binding> {
+    fun prepare(rimeDir: File, store: CellDictionaryStore, schemas: List<SchemaMeta>, ids: Set<String>,
+        includeEnglish: Boolean = false): List<Binding> {
         val state = store.read()
         require(ids.all { id -> state.installed.any { it.id == id } && store.dictionaryFile(id).isFile }) {
             "已启用的词库文件缺失，请重新导入"
         }
         val writes = linkedMapOf<File, String>()
         val bindings = mutableListOf<Binding>()
-        val englishWords = ids.sorted().flatMap { store.englishWords(it) }.distinct()
+        val englishWords = if (includeEnglish) ids.sorted().flatMap { store.englishWords(it) }.distinct() else emptyList()
         for (schema in schemas) {
             val customFile = File(rimeDir, "${schema.schemaId}.custom.yaml")
             val original = customFile.takeIf { it.isFile }?.readText().orEmpty()
@@ -97,7 +98,9 @@ object CellDictionaryRime {
                 continue
             }
             val source = File(rimeDir, "${schema.schemaId}.schema.yaml").readText()
-            val pack = packName(dictionary(source, original))
+            // An installed older cell block can collide with a later personal patch. Read
+            // the user's dictionary override without the replaceable block first.
+            val pack = packName(dictionary(source, patch(original, null)))
             bindings += Binding(schema.schemaId, pack)
             val english = CellDictionaryEnglish.kind(schema.toSchemaInfo().profile.layout.kind)
                 ?.takeIf { kind -> englishWords.any { CellDictionaryEnglish.code(kind, it) != null } }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,7 +44,7 @@ fun CellDictionarySettingsContent(onBack: () -> Unit, embedded: Boolean = false)
         onSource = { url ->
             runCatching { uriHandler.openUri(url) }.onFailure { linkError = "无法打开浏览器" }
         },
-        onRemove = model::remove, embedded = embedded)
+        onRemove = model::remove, embedded = embedded, onSelectEnglish = model::selectEnglish)
     linkError?.let { message ->
         AlertDialog(onDismissRequest = { linkError = null }, text = { Text(message) },
             confirmButton = { TextButton(onClick = { linkError = null }) { Text("知道了") } })
@@ -63,6 +64,7 @@ fun CellDictionarySettingsPanel(
     onRemove: (String) -> Unit = {},
     /** Inside the 词库 page: no own top bar. */
     embedded: Boolean = false,
+    onSelectEnglish: (Boolean) -> Unit = {},
 ) {
     var confirmLarge by remember { mutableStateOf(false) }
     var showGuide by rememberSaveable { mutableStateOf(false) }
@@ -108,6 +110,12 @@ fun CellDictionarySettingsPanel(
         val listState = rememberLazyListState()
         LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+            item {
+                SettingsToggleItem(Icons.Default.Translate,
+                    "分类词库英文候选", "在中文键盘按字母查找导入词库中的英文词。点「应用更改」后生效。",
+                    dictionaries.selectedEnglish, onSelectEnglish,
+                    lockMessage = if (state.busy) "正在处理词库" else null)
+            }
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("搜索词库") },

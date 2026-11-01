@@ -24,8 +24,10 @@ data class CellDictionaryState(
     val applied: Set<String> = emptySet(),
     /** Built-ins enabled once by default; a later switch-off by the user is never reverted. */
     val seeded: Set<String> = emptySet(),
+    val selectedEnglish: Boolean = false,
+    val appliedEnglish: Boolean = false,
 ) {
-    val pending: Boolean get() = selected != applied
+    val pending: Boolean get() = selected != applied || selectedEnglish != appliedEnglish
 }
 
 /** Downloaded data stays outside Rime until explicitly applied. Never edits learned user dictionaries. */
@@ -123,6 +125,10 @@ class CellDictionaryStore(val directory: File) {
         save(old.copy(selected = if (enabled) old.selected + id else old.selected - id))
     }
 
+    fun selectEnglish(enabled: Boolean) = synchronized(lock) {
+        save(read().copy(selectedEnglish = enabled))
+    }
+
     /** Removes a downloaded or imported dictionary that is not in use; built-ins stay. */
     fun remove(id: String) = synchronized(lock) {
         val old = read()
@@ -133,20 +139,20 @@ class CellDictionaryStore(val directory: File) {
         save(old.copy(installed = old.installed.filterNot { it.id == id }, selected = old.selected - id))
     }
 
-    fun markApplied(ids: Set<String>) = synchronized(lock) {
+    fun markApplied(ids: Set<String>, english: Boolean? = null) = synchronized(lock) {
         val old = read()
         require(ids.all { id -> old.installed.any { it.id == id } })
-        save(old.copy(applied = ids)) // preserve any newer user selection
+        save(old.copy(applied = ids, appliedEnglish = english ?: old.appliedEnglish)) // preserve any newer user selection
     }
 
     /** Commit only after the engine accepted the selection; repair its previous state on failure. */
-    fun activate(ids: Set<String>, prepareAndDeploy: (Set<String>) -> Unit) = synchronized(lock) {
-        val previous = read().applied
+    fun activate(ids: Set<String>, english: Boolean, prepareAndDeploy: (Set<String>, Boolean) -> Unit) = synchronized(lock) {
+        val previous = read()
         try {
-            prepareAndDeploy(ids)
-            markApplied(ids)
+            prepareAndDeploy(ids, english)
+            markApplied(ids, english)
         } catch (error: Exception) {
-            try { prepareAndDeploy(previous) } catch (restoreError: Exception) { error.addSuppressed(restoreError) }
+            try { prepareAndDeploy(previous.applied, previous.appliedEnglish) } catch (restoreError: Exception) { error.addSuppressed(restoreError) }
             throw error
         }
     }

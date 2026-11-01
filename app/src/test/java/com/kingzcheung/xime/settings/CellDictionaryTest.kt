@@ -105,6 +105,9 @@ class CellDictionaryTest {
         val schemas = listOf(SchemaMeta("t9_pinyin", "九键"), SchemaMeta("pinyin_14jian", "14键"), SchemaMeta("rime_ice", "拼音"))
         schemas.forEach { File(rime, "${it.schemaId}.schema.yaml").writeText("translator:\n  dictionary: rime_ice\n") }
         CellDictionaryRime.prepare(rime, store, schemas, setOf(entry.id))
+        assertFalse(File(rime, "rime_ice.custom.yaml").readText().contains(CellDictionaryEnglish.NAMESPACE))
+        assertTrue(File(rime, "rime_ice.custom.yaml").readText().contains("translator/packs/+"))
+        CellDictionaryRime.prepare(rime, store, schemas, setOf(entry.id), includeEnglish = true)
         for ((schema, kind) in listOf("t9_pinyin" to CellDictionaryEnglish.Kind.T9,
                 "pinyin_14jian" to CellDictionaryEnglish.Kind.MERGED, "rime_ice" to CellDictionaryEnglish.Kind.ALPHABETIC)) {
             val custom = File(rime, "$schema.custom.yaml").readText()
@@ -123,6 +126,29 @@ class CellDictionaryTest {
         assertTrue(store.englishWords(entry.id).isEmpty())
     }
 
+    @Test fun optionalEnglishSelectionRollsBackIndependentlyOfChineseDictionaries() {
+        val store = store()
+        val entry = store.install("你好 ni hao\nAme\n".toByteArray())
+        val ids = setOf(entry.id)
+        store.select(entry.id, true)
+        store.markApplied(ids)
+        assertFalse(store.read().selectedEnglish)
+        store.selectEnglish(true)
+        val attempts = mutableListOf<Pair<Set<String>, Boolean>>()
+        assertThrows(IllegalStateException::class.java) {
+            store.activate(ids, true) { active, english ->
+                attempts += active to english
+                if (english) error("optional translator failed")
+            }
+        }
+        assertEquals(listOf(ids to true, ids to false), attempts)
+        assertEquals(ids, store.read().applied)
+        assertFalse(store.read().appliedEnglish)
+        assertTrue(store.read().pending)
+        store.selectEnglish(false)
+        assertFalse(store.read().pending)
+    }
+
     /** 「我的短语」有词条时 CyIME 自己往方案里追加 custom_phrase 翻译器；和带英文词的词库同时开时不能互相挡住。 */
     @Test fun `english words merge beside the custom phrase translator`() {
         val phrase = "patch:\n  \"engine/translators/+\":\n    - table_translator@custom_phrase\n  \"custom_phrase\":\n    dictionary: \"\"\n"
@@ -135,7 +161,9 @@ class CellDictionaryTest {
             assertEquals(phrase, CellDictionaryRime.patch(patched, null))
         }
         val full = phrase + "  \"engine/translators/@next\": other\n"
-        assertThrows(IllegalArgumentException::class.java) { CellDictionaryRime.patch(full, pack, CellDictionaryEnglish.Kind.ALPHABETIC) }
+        assertTrue(CellDictionaryRime.patch(full, pack, CellDictionaryEnglish.Kind.ALPHABETIC).contains("engine/translators/@after last"))
+        val occupied = full + "  \"engine/translators/@after last\": another\n"
+        assertThrows(IllegalArgumentException::class.java) { CellDictionaryRime.patch(occupied, pack, CellDictionaryEnglish.Kind.ALPHABETIC) }
         assertTrue(CellDictionaryRime.patch(full, pack, CellDictionaryEnglish.Kind.T9).contains("@before last"))
     }
 
@@ -157,18 +185,19 @@ class CellDictionaryTest {
         store.select(entry.id, true)
         val engineCalls = mutableListOf<Set<String>>()
         assertThrows(IllegalStateException::class.java) {
-            store.activate(setOf(entry.id)) { ids ->
+            store.activate(setOf(entry.id), true) { ids, english ->
                 engineCalls += ids
+                assertEquals(ids.isNotEmpty(), english)
                 if (ids.isNotEmpty()) error("native pack compilation failed")
             }
         }
         assertEquals(listOf(setOf(entry.id), emptySet<String>()), engineCalls)
         assertTrue(store.read().applied.isEmpty())
         assertTrue(store.read().pending)
-        store.activate(setOf(entry.id)) { }
+        store.activate(setOf(entry.id), false) { _, _ -> }
         assertFalse(store.read().pending)
         store.select(entry.id, false)
-        store.activate(emptySet()) { }
+        store.activate(emptySet(), false) { _, _ -> }
         assertTrue(store.read().applied.isEmpty())
     }
 

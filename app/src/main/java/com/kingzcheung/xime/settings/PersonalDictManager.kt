@@ -189,6 +189,8 @@ object PersonalDictManager {
     private suspend fun ensureSchemaPackInner(rimeDir: java.io.File, context: Context, schemaId: String) {
         val schemaFile = java.io.File(rimeDir, "${schemaId}.schema.yaml")
         if (!schemaFile.exists()) return
+        val customFile = File(rimeDir, "${schemaId}.custom.yaml")
+        if (!optionalPhrasePatch(customFile) { repairTranslatorFile(customFile) }) return
         // 手写方案（schemas 绑定声明）不经过 librime 词典输入，跳过补丁。
         if (isHandwritingSchema(schemaId)) return
         // 注音的编码是大千键码，短语的拼音字母码在注音里是另一串注音（ji 是 ㄨㄛ），不挂短语。
@@ -216,7 +218,7 @@ object PersonalDictManager {
         }
         // 有实际条目时才注入翻译器，避免 Rime 因空 .table.bin 报错
         if (phraseFile.readText(Charsets.UTF_8).lineSequence().count { it.isNotBlank() && !it.startsWith('#') } > 0) {
-            applyCustomPhraseTranslator(rimeDir, schemaId, dictName)
+            optionalPhrasePatch(customFile) { applyCustomPhraseTranslator(rimeDir, schemaId, dictName) }
         }
         // 旧版本给九键、14 键挂的是字母码的 custom_phrase，换成按键码的那一份。
         if (keys != null) retargetCustomPhraseDict(File(rimeDir, "${schemaId}.custom.yaml"), dictName)
@@ -300,40 +302,74 @@ object PersonalDictManager {
         }
     }
 
+    private inline fun optionalPhrasePatch(file: File, change: () -> Unit): Boolean {
+        try {
+            change()
+            return true
+        } catch (e: java.io.IOException) {
+            throw e
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            com.kingzcheung.xime.util.FileLogger.w("PersonalDictManager", "Skipped optional phrase patch in ${file.name}: ${e.message}")
+            return false
+        }
+    }
+
+    internal fun repairTranslatorFile(file: File) {
+        if (!file.isFile) return
+        val original = file.readText()
+        val repaired = TranslatorAppendPatch.repair(original)
+        if (repaired == original) return
+        val backup = File(file.parentFile, file.name + ".before-translator-repair")
+        if (!backup.exists()) CellDictionaryStore.writeAtomic(backup, original)
+        CellDictionaryStore.writeAtomic(file, repaired)
+    }
+
     // 为方案添加 custom_phrase 翻译器（独立于主词典音节表）
     internal fun applyCustomPhraseTranslator(rimeDir: java.io.File, schemaId: String, dictName: String) {
         val customFile = java.io.File(rimeDir, "${schemaId}.custom.yaml")
-        if (customFile.exists()) {
-            val text = customFile.readText(Charsets.UTF_8)
-            if (text.contains("table_translator@custom_phrase")) return
-        }
-        insertUnderPatch(customFile, """  "engine/translators/+":
-    - table_translator@custom_phrase
-  "custom_phrase":
+        val text = customFile.takeIf { it.isFile }?.readText().orEmpty()
+        val patch = (SchemaManager.yaml.parseToYamlNode(text.ifBlank { "patch: {}" }) as? YamlMap)?.get("patch") as? YamlMap
+        val phrase = "table_translator@custom_phrase"
+        if (patch?.entries?.any { (key, value) ->
+                (key.content == "engine/translators" || key.content.startsWith("engine/translators/")) && when (value) {
+                    is YamlScalar -> value.content == phrase
+                    is YamlList -> value.items.any { (it as? YamlScalar)?.content == phrase }
+                    else -> false
+                }
+            } == true) return
+        val hasPhraseOptions = patch?.entries?.keys?.any { it.content == "custom_phrase" } == true
+        val options = if (hasPhraseOptions) "" else """  "custom_phrase":
     dictionary: ""
     user_dict: $dictName
     db_class: stabledb
     enable_completion: false
     enable_sentence: false
     initial_quality: 99
-""")
+"""
+        val occupied = patch?.entries?.keys.orEmpty().map { it.content }
+        val append = when {
+            "engine/translators/+" !in occupied -> "  \"engine/translators/+\":\n    - $phrase"
+            "engine/translators/@next" !in occupied -> "  \"engine/translators/@next\": $phrase"
+            "engine/translators/@after last" !in occupied -> "  \"engine/translators/@after last\": $phrase"
+            else -> "  \"engine/translators/+\":\n    - $phrase"
+        }
+        val content = "$append\n$options"
+        val result = TranslatorAppendPatch.repair(insertUnderPatch(text, content))
+        SchemaManager.yaml.parseToYamlNode(result)
+        CellDictionaryStore.writeAtomic(customFile, result)
     }
 
     /** 在 YAML 的 `patch:` 块下增量插入内容，不覆盖已有配置。 */
-    private fun insertUnderPatch(file: java.io.File, content: String) {
-        if (!file.exists()) {
-            file.writeText("patch:\n$content", Charsets.UTF_8)
-            return
-        }
-        val text = file.readText(Charsets.UTF_8)
+    private fun insertUnderPatch(text: String, content: String): String {
+        if (text.isBlank()) return "patch:\n$content"
         val cleaned = text.trimEnd('\n', '\r', ' ').removeSuffix("...").trimEnd()
-        val patchLine = Regex("^patch:", RegexOption.MULTILINE).find(cleaned)
-        if (patchLine != null) {
-            val at = patchLine.range.last + 1
-            file.writeText(cleaned.substring(0, at) + "\n$content" + cleaned.substring(at) + "\n", Charsets.UTF_8)
-        } else {
-            file.writeText("$cleaned\n\npatch:\n$content", Charsets.UTF_8)
-        }
+        val patchLine = Regex("""(?m)^patch:[ \t]*(?:\{[ \t]*\}[ \t]*)?(?:#.*)?$""").find(cleaned)
+        if (patchLine == null) return "$cleaned\n\npatch:\n$content"
+        val at = patchLine.range.last + 1
+        return cleaned.substring(0, patchLine.range.first) + patchLine.value.replace(Regex("""\{[ \t]*\}"""), "") +
+            "\n$content" + cleaned.substring(at) + "\n"
     }
 
     /** 从 schema 文件中读取 translator.dictionary 名称，没有则用 schemaId 兜底。 */

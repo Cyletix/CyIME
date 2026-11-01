@@ -79,6 +79,7 @@ object CellDictionaryEnglish {
         fun append(list: String, item: String) = when {
             !taken("$list/+") -> "\"$list/+\": [\"$item\"]"
             !taken("$list/@next") -> "\"$list/@next\": \"$item\""
+            !taken("$list/@after last") -> "\"$list/@after last\": \"$item\""
             else -> null
         }
         val translator = "${kind.translator}@$NAMESPACE"
