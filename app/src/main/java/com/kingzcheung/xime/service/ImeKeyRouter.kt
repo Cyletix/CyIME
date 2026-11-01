@@ -2070,6 +2070,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             rejected = { withEditor {
                 pendingCandidateCommit = it
                 service.uiState.value = service.uiState.value.copy(rejectedCommitText = it.text)
+                FileLogger.w("InputLatency", "candidate commit not accepted: retained for retry")
             } },
             accepted = {
                 // Learning failure is diagnostic; it must never undo accepted text.
