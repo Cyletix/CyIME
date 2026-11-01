@@ -136,6 +136,25 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, false)
                                 ?.takeIf { settings.t9FlickLetters }?.message)
                         HorizontalDivider()
+                        SettingsToggleItem(Icons.TwoTone.Gesture, "中文九键滑行输入",
+                            "从数字键划过 6→4 等键序，按全拼拼音交给 Rime 选字；例如 6→4 优先输入 ni（你）。开启后数字键上下滑和拂动选字母会暂时停用，点按、长按选字母和候选操作仍可用。",
+                            checked = settings.chineseGlideTyping, onCheckedChange = {
+                                settings = settings.copy(chineseGlideTyping = it); settings.save(context)
+                            })
+                        HorizontalDivider()
+                        SettingsToggleItem(Icons.TwoTone.SwapHoriz, "九键数字键上下滑",
+                            "数字键上滑输入数字、下滑执行快捷动作。与九键滑行输入互斥；开启中文九键滑行时暂时停用。",
+                            checked = !settings.chineseGlideTyping, onCheckedChange = { enabled ->
+                                if (!enabled) {
+                                    settings = settings.copy(chineseGlideTyping = true); settings.save(context)
+                                } else {
+                                    settings = settings.copy(chineseGlideTyping = false); settings.save(context)
+                                }
+                            },
+                            lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                                com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_DIRECTION_SWIPES, false)
+                                ?.takeIf { settings.chineseGlideTyping }?.message)
+                        HorizontalDivider()
                         Column(Modifier.settingsSearchAnchor("拖到候选选词的距离").padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Text("拖到候选选词的距离：键盘的 ${settings.candidateDragPercent.toInt()}%", style = MaterialTheme.typography.titleSmall)
                             Slider(value = settings.candidateDragPercent,

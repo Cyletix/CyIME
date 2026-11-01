@@ -47,6 +47,7 @@ enum class InputGesturePreset(val label: String) {
 data class InputGestureLock(val option: Option, val lockedValue: Any, val by: String) {
     enum class Option {
         SYMBOL_INPUT_MODE, LETTER_LONG_PRESS_MENU, GLIDE_TYPING, CURSOR_GESTURE, T9_FLICK_LETTERS,
+        T9_DIRECTION_SWIPES,
         /** 双拼键位提示 ↔ 上方/下方角标提示（两个开关都用 [CORNER_HINTS]）。 */
         DOUBLE_PINYIN_KEY_HINTS, CORNER_HINTS,
         /** Shift 键分词 ↔ ing 放在 Shift 键上。 */
@@ -84,6 +85,10 @@ object InputGestureLocks {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "滑行输入"))
         } else if (settings.chineseGlideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "中文滑行输入"))
+        }
+        if (settings.chineseGlideTyping) {
+            add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "中文九键滑行输入"))
+            add(InputGestureLock(InputGestureLock.Option.T9_DIRECTION_SWIPES, true, "中文九键滑行输入"))
         }
         if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
             add(InputGestureLock(InputGestureLock.Option.GLIDE_TYPING, true, "滑动移光标：键盘滑动"))

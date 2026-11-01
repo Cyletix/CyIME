@@ -26,29 +26,34 @@ internal class GlideTrail {
 }
 
 /**
- * 在字母区上方观察触摸（Initial 阶段，先于按键）。确认是滑行后才消费事件，
+ * 在字母区／数字键区上方观察触摸（Initial 阶段，先于按键）。确认是滑行后才消费事件，
  * 按键随即取消自己的点按、上下滑和长按；确认之前一律不干预。
+ * [snapshot] 返回当前键位矩形（26 键是字母键，九键是 2–9 数字键），[minKeys] 是能滑行的最少键数。
  * [rootOrigin] 把本地坐标换到按键记录位置所用的根坐标。
  */
 @Composable
 internal fun Modifier.glideTyping(
     enabled: Boolean,
-    letterGeometry: LetterGeometry?,
+    snapshot: () -> Map<Char, com.kingzcheung.xime.keyboard.LetterKeyRect>?,
     rootOrigin: () -> Offset,
     trail: GlideTrail,
+    minKeys: Int = 26,
+    allowShortVertical: Boolean = false,
     onTrace: (xs: FloatArray, ys: FloatArray) -> Unit,
 ): Modifier {
     // 回调每次重组都会换新，不能作为 pointerInput 的 key，否则正在进行的滑行会被打断。
     val currentOnTrace by rememberUpdatedState(onTrace)
     val currentOrigin by rememberUpdatedState(rootOrigin)
-    if (!enabled || letterGeometry == null) return this
-    return pointerInput(letterGeometry, trail) { awaitEachGesture {
+    val currentSnapshot by rememberUpdatedState(snapshot)
+    if (!enabled) return this
+    return pointerInput(trail) { awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        val keys = letterGeometry.snapshot()
-        if (keys.size < 26) return@awaitEachGesture
+        val keys = currentSnapshot() ?: return@awaitEachGesture
+        if (keys.size < minKeys) return@awaitEachGesture
         val origin = currentOrigin()
         val tracker = GlideTracker(keys, viewConfiguration.touchSlop,
-            down.position.x + origin.x, down.position.y + origin.y, down.uptimeMillis)
+            down.position.x + origin.x, down.position.y + origin.y, down.uptimeMillis,
+            allowShortVertical)
         if (tracker.abandoned) return@awaitEachGesture
         val local = arrayListOf(down.position)
         try {

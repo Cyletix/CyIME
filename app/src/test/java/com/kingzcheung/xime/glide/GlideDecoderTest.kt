@@ -68,6 +68,20 @@ class GlideDecoderTest {
         assertFalse(tracker.claimed)
     }
 
+    @Test fun shortVerticalPathIsOnlyClaimedForT9Mode() {
+        val (fx, fy) = center('f')
+        val normal = GlideTracker(keys, 8f, fx, fy, 0)
+        val t9 = GlideTracker(keys, 8f, fx, fy, 0, allowShortVertical = true)
+        for (step in 1..16) {
+            val x = fx
+            val y = fy - step * 5f
+            normal.move(x, y, 10L * step)
+            t9.move(x, y, 10L * step)
+        }
+        assertFalse(normal.claimed)
+        assertTrue(t9.claimed)
+    }
+
     @Test fun horizontalNeighboursAndLongPathsAreClaimed() {
         val (ax, ay) = center('a')
         val adjacent = GlideTracker(keys, 8f, ax, ay, 0)

@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.kingzcheung.xime.R
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
@@ -214,6 +215,33 @@ private fun T9KeyboardSwipeOverlay(
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
 
+    // ── 九键滑行（中文全拼）──
+    // 与 26 键共用「中文滑行输入」开关；九键的滑行是识数字串（64426 → ni hao / mi han…），
+    // 所以解出来的拼音编码交给 Rime 定字，和手打九键同一条路。
+    val glidePrefs = LocalKeyboardInputPreferences.current
+    val t9Geometry = remember { T9Geometry() }
+    val chineseGlide = glidePrefs.chineseGlideTyping &&
+        com.kingzcheung.xime.glide.chineseGlideSupported(uiState.inputProfile, uiState.currentSchemaId) &&
+        callbacks.onGlideCode != null &&
+        glidePrefs.cursorGesture != CursorGestureMode.KEYBOARD
+    val glideTrail = remember { GlideTrail() }
+    val glideScope = rememberCoroutineScope()
+    val glideContext = LocalContext.current.applicationContext
+    val onGlideTrace: (FloatArray, FloatArray) -> Unit = trace@{ xs, ys ->
+        val keys = t9Geometry.snapshot()
+        if (keys.size < 6) return@trace
+        // 输入框归属在抬手时确定；识别完成前切换输入框则作废。
+        val inputContext = runCatching { callbacks.captureInputContext() }.getOrNull() ?: return@trace
+        glideScope.launch {
+            val candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val keyboard = com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys)
+                com.kingzcheung.xime.glide.GlideLexicon.t9Decoder(glideContext, keyboard).decode(xs, ys)
+            }
+            if (candidates.isEmpty()) return@launch
+            kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word) }
+        }
+    }
+
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
             state.copy(charInfos = SubcharHelper.parseSwipeDownText(state.swipeText))
@@ -243,14 +271,21 @@ private fun T9KeyboardSwipeOverlay(
         keyboardWidth = keyboardBounds.width
     )
 
-    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius) {
+    CompositionLocalProvider(
+        LocalKeyCornerRadius provides keyCornerRadius,
+        LocalT9Geometry provides t9Geometry,
+    ) {
     Box(
         modifier = modifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
+            .glideTyping(chineseGlide, { t9Geometry.snapshot().takeIf { it.isNotEmpty() } },
+                { keyboardBounds.topLeft }, glideTrail, 6, allowShortVertical = true, onTrace = onGlideTrace)
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp)) {
         SwipeBubbleOverlay(bubbleData)
+        if (chineseGlide) GlideTrailOverlay(glideTrail, accentColor,
+            Modifier.matchParentSize().zIndex(1f))
         if (isLandscape) {
             // 横屏：去除原左侧候选大面板（候选已在顶部候选栏展示），
             // 九键布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
@@ -369,7 +404,10 @@ private fun T9KeyboardContent(
     val commitDirect: (String) -> Unit =
         { text -> callbacks.onCommitText?.invoke(text) ?: onKeyPress(text) }
 
+    val chineseGlideEnabled = LocalKeyboardInputPreferences.current.chineseGlideTyping
+
     fun swipesFor(id: String): T9KeySwipes {
+        if (chineseGlideEnabled && id.length == 1 && id[0] in '2'..'9') return T9KeySwipes()
         val gesture = KeysConfigHelper.getT9KeyGesture(id) ?: return T9KeySwipes()
         val upHint = gesture.swipeUp?.let { it.label.ifEmpty { it.value } }
         val downHint = gesture.swipeDown?.let { it.label.ifEmpty { it.value } }
@@ -814,7 +852,9 @@ private fun T9DigitKey(
     val currentSwipes by rememberUpdatedState(swipes)
     val inputPreferences = LocalKeyboardInputPreferences.current
     // 九键拂动：左上右下依次为各字母，点按仍是九键输入，数字（原上滑动作）改为长按。
-    val flick = inputPreferences.t9FlickLetters && currentOnLongPressSelect != null
+    val flick = inputPreferences.t9FlickLetters && !inputPreferences.chineseGlideTyping && currentOnLongPressSelect != null
+    // 滑行要按数字键的矩形判断起手/收手，这里把本键位置报给收集器。
+    val t9Geometry = LocalT9Geometry.current
 
     SwipeableKeyButton(
         text = letters,
@@ -822,7 +862,9 @@ private fun T9DigitKey(
         backgroundColor = backgroundColor,
         textColor = textColor,
         fontSize = fontSize,
-        modifier = modifier,
+        modifier = modifier.onGloballyPositioned { coordinates ->
+            t9Geometry?.place(digit, coordinates.boundsInRoot())
+        },
         onPress = { currentOnPress?.invoke() },
         // 长按弹字母气泡和 26/14 键共用“长按弹出字母气泡”开关，默认关（用户 10-21）；拂动模式长按出数字，不受影响。
         longPressItems = if (flick || inputPreferences.letterLongPressMenu) longPressItems else emptyList(),

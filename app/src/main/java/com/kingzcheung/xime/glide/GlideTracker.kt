@@ -14,6 +14,7 @@ class GlideTracker(
     private val keys: Map<Char, LetterKeyRect>,
     private val touchSlop: Float,
     x: Float, y: Float, private val downTime: Long,
+    private val allowShortVertical: Boolean = false,
 ) {
     private val keyWidth = keys.values.map { it.width }.sorted().let { it.getOrNull(it.size / 2) } ?: 1f
     private val keyHeight = keys.values.map { it.height }.sorted().let { it.getOrNull(it.size / 2) } ?: 1f
@@ -50,7 +51,8 @@ class GlideTracker(
         val spanY = (maxY - minY) / keyHeight
         val horizontal = abs(x - startX) > abs(y - startY)
         claimed = (visited.size >= 3 && (spanX >= MIN_SPAN_KEYS || spanY >= MIN_ROWS)) ||
-            (visited.size >= 2 && horizontal && spanX >= MIN_SPAN_KEYS)
+            (visited.size >= 2 && ((horizontal && spanX >= MIN_SPAN_KEYS) ||
+                (allowShortVertical && spanY >= MIN_SPAN_KEYS)))
         return claimed
     }
 
@@ -88,12 +90,18 @@ fun glideCased(word: String, shifted: Boolean, capsLocked: Boolean): String = wh
 }
 
 /**
- * 中文滑行适用的键盘：全拼、双拼的字母键盘（26 键、分体、自定义字母排列）。
- * 14 键、九键、注音、日文、五笔不滑行；双拼只认得出键位表的方案。
+ * 中文滑行适用的键盘：全拼、双拼的字母键盘（26 键、分体、自定义字母排列），以及全拼的九键。
+ * 14 键、注音、日文、五笔不滑行；双拼只认得出键位表的方案（九键只有全拼，双拼在数字键上没有对应）。
  */
-fun chineseGlideSupported(profile: com.kingzcheung.xime.settings.InputProfile, schemaId: String): Boolean =
-    profile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
-        profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC &&
-        (profile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN ||
-            profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
-            com.kingzcheung.xime.settings.DoublePinyinSchemes.find(schemaId) != null)
+fun chineseGlideSupported(profile: com.kingzcheung.xime.settings.InputProfile, schemaId: String): Boolean {
+    if (profile.language != com.kingzcheung.xime.settings.InputLanguage.CHINESE) return false
+    return when (profile.layout.kind) {
+        com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC ->
+            profile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN ||
+                profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
+                com.kingzcheung.xime.settings.DoublePinyinSchemes.find(schemaId) != null
+        com.kingzcheung.xime.settings.LayoutKind.T9 ->
+            profile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN
+        else -> false
+    }
+}

@@ -477,7 +477,7 @@ fun KeyboardLayout(
                 keyboardBounds = coordinates.boundsInRoot()
                 shiftSlideTargets.keyboardBounds = keyboardBounds
             }
-            .glideTyping(glideEnabled, geometry, { keyboardBounds.topLeft }, glideTrail, onGlideTrace)
+            .glideTyping(glideEnabled, { geometry.snapshot() }, { keyboardBounds.topLeft }, glideTrail, 26, onTrace = onGlideTrace)
 
     ) {
         SwipeBubbleOverlay(bubbleData)

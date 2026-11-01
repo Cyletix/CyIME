@@ -23,6 +23,8 @@ object GlideLexicon {
     @Volatile private var bigrams: EnglishBigrams? = null
     /** 英文、全拼、双拼各留一份；双拼换方案（或改了键位）时按方案内容重建。 */
     private val cached = HashMap<String, Pair<Any?, GlideDecoder>>()
+    /** 九键滑行模板；数字键几何不变时复用。 */
+    @Volatile private var t9: T9GlideDecoder? = null
 
     fun words(context: Context): List<String> = words ?: synchronized(this) {
         words ?: vocabulary(context).filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } }.also { words = it }
@@ -63,6 +65,15 @@ object GlideLexicon {
     /** 中文滑行：[doublePinyin] 为空时按全拼，否则按该双拼方案的编码。须在后台线程调用。 */
     fun chineseDecoder(context: Context, keyboard: GlideKeyboard, doublePinyin: DoublePinyinScheme?): GlideDecoder =
         cachedDecoder(if (doublePinyin == null) "py" else "sp", doublePinyin, keyboard) { pinyinCodes(pinyin(context), doublePinyin) }
+
+    /**
+     * 九键滑行：模板按「数字键」几何建，编码仍是全拼（滑行是连续的一笔，
+     * 双拼在这里没有对应关系，所以只用全拼）。键位尺寸不变时复用缓存。须在后台线程调用。
+     */
+    fun t9Decoder(context: Context, keyboard: GlideKeyboard): T9GlideDecoder = synchronized(this) {
+        t9?.takeIf { it.revision == keyboard.revision }
+            ?: T9GlideDecoder(keyboard, pinyinCodes(pinyin(context), null)).also { t9 = it }
+    }
 
     private fun cachedDecoder(kind: String, source: Any?, keyboard: GlideKeyboard, words: () -> List<String>): GlideDecoder =
         synchronized(this) {

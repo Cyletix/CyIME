@@ -57,6 +57,7 @@ class InputGesturePresetsTest {
                     InputGestureLock.Option.GLIDE_TYPING -> settings.glideTyping
                     InputGestureLock.Option.CURSOR_GESTURE -> settings.cursorGesture
                     InputGestureLock.Option.T9_FLICK_LETTERS -> settings.t9FlickLetters
+                    InputGestureLock.Option.T9_DIRECTION_SWIPES -> !settings.chineseGlideTyping
                     InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS -> settings.doublePinyinKeyHints
                     InputGestureLock.Option.CORNER_HINTS -> settings.swipeUpHints || settings.swipeDownHints
                     InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT -> settings.shiftSyllableSplit
@@ -80,6 +81,13 @@ class InputGesturePresetsTest {
             InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD))
         assertNotNull(InputGestureLocks.lockFor(base.copy(cursorGesture = CursorGestureMode.KEYBOARD),
             InputGestureLock.Option.GLIDE_TYPING, true))
+        val t9Glide = base.copy(chineseGlideTyping = true, t9FlickLetters = true)
+        assertNotNull(InputGestureLocks.lockFor(t9Glide,
+            InputGestureLock.Option.T9_FLICK_LETTERS, false))
+        assertNotNull(InputGestureLocks.lockFor(t9Glide,
+            InputGestureLock.Option.T9_DIRECTION_SWIPES, true))
+        assertNull(InputGestureLocks.lockFor(t9Glide,
+            InputGestureLock.Option.T9_DIRECTION_SWIPES, false))
         // 没有冲突的值不锁。
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.LETTER_LONG_PRESS_MENU, true))
     }
