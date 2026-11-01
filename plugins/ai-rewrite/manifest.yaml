@@ -1,0 +1,34 @@
+# =============================================
+# CyIME Lua 插件元数据（宿主用 YAML 解析）
+# =============================================
+
+id: com.kingzcheung.xime.plugin.ai_rewrite
+
+name: AI 改写
+icon: "改"
+description: 用你自己的 OpenAI 兼容接口改写选中的字；没选字就改整个输入框。润色、改错字、更正式、更口语、缩短，提示词可以改。结果先给你看，点了才替换；答非所问的结果会被拦下，原文不动。密钥只存在手机里。
+
+version: 0.1.0
+
+type: tool
+activation: multi
+
+entry: main.lua
+
+minHostVersion: 1.15.38
+
+toolbarButtons:
+  - id: com.kingzcheung.xime.plugin.ai_rewrite:open
+    label: AI 改写
+    action: open_panel
+
+# 接口地址由用户填写，域名在第一次使用时授权
+network:
+  allowCustomHosts: true
+
+capabilities:
+  tool:
+    # passive：面板里显示原文、动作按钮和结果，点结果才替换
+    display: passive
+    # field：没选字时取整个输入框，点结果替换整框（不拿剪贴板）
+    context: field
