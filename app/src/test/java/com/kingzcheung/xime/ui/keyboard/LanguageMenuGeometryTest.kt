@@ -3,8 +3,21 @@ import androidx.compose.ui.geometry.Rect
 import org.junit.Assert.*
 import org.junit.Test
 class LanguageMenuGeometryTest {
+    @Test fun fractionallyScaledMenuFitsAboveTheKeyAtLargeWindowOffsets() {
+        val density = 432 / 160f
+        for (offset in listOf(2107f, 2110f)) {
+            val panel = Rect(0f, offset, 1080f, 2400f)
+            val key = Rect(840f, 2300f, 960f, 2400f)
+            val menu = languageMenuGeometry(panel, key, density, 2)
+            val inset = 8f * density
+            assertEquals(panel.top + inset, menu.bounds.top, .001f)
+            assertEquals(panel.bottom - inset, menu.bounds.bottom, .001f)
+            assertEquals(key.right, menu.bounds.right, .001f)
+        }
+    }
+
     @Test fun staysInsideActualPanelAtExtremeSizesAndPositions() {
-        for (d in listOf(1f, 3f)) for (w in listOf(200f, 360f, 400f, 1400f)) for (h in listOf(160f, 228f, 700f)) {
+        for (d in listOf(1f, 2.7f, 3f)) for (w in listOf(100f, 200f, 360f, 400f, 1400f)) for (h in listOf(160f, 228f, 700f)) {
             val panel = Rect(170f*d, 80f*d, (170+w)*d, (80+h)*d)
             for (x in listOf(panel.left, panel.center.x, panel.right-32*d)) {
                 val key = Rect(x, panel.bottom-44*d, x+32*d, panel.bottom)
