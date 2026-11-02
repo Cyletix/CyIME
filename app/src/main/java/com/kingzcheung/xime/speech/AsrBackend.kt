@@ -27,6 +27,9 @@ interface AsrBackend {
     }
     /** Only true if the current recognizer and its configured pipeline support this language. */
     fun canContinueIn(language: InputLanguage): Boolean = false
+    /** 最近一次 onResult 的文字是否自带标点（内置在线接口返回服务端原文）。默认 false：本地模型、
+     *  插件和在线失败后的本地回退都按原有空格化处理，只有真正产出标点的后端才声明。 */
+    val resultKeepsPunctuation: Boolean get() = false
     fun processAudioChunk(buffer: ByteArray)
     fun stop()
     fun cancel()

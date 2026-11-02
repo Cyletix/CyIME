@@ -27,9 +27,11 @@ class OcrRecognitionService : Service() {
                     val bitmap = BitmapFactory.decodeFile(file.path) ?: error("Unreadable frame")
                     try {
                         val engine = session ?: DocumentOcrEngine.Session(this).also { session = it }
-                        reply.putString("text", engine.recognize(bitmap, singleLine = true))
+                        val table = OcrTableLayout.Format.parse(message.data.getString("table"))
+                        reply.putString("text", engine.recognize(bitmap, singleLine = true, table = table))
                     } finally { bitmap.recycle() }
-                } catch (_: Exception) { reply.putString("error", "识别失败，请重拍") }
+                } catch (_: OcrModelMissingException) { reply.putString("error", "需要先下载拍照识别模型") }
+                catch (_: Exception) { reply.putString("error", "识别失败，请重拍") }
                 finally { file.delete() }
             } else reply.putString("error", "无效画面")
             runCatching { message.replyTo?.send(Message.obtain(null, 1, message.arg1, 0).apply { data = reply }) }
@@ -67,7 +69,9 @@ internal class OcrRecognitionClient(private val context: Context) : AutoCloseabl
     private val bound = context.bindService(Intent(context, OcrRecognitionService::class.java), connection, Context.BIND_AUTO_CREATE)
     init { if (!bound) ready.completeExceptionally(IllegalStateException("无法启动识别")) }
 
-    suspend fun recognize(bitmap: Bitmap): String = withTimeout(12_000) {
+    /** [table] asks for a table in that format; a table reads every cell, so it may take longer. */
+    suspend fun recognize(bitmap: Bitmap, table: OcrTableLayout.Format? = null): String =
+        withTimeout(if (table == null) 12_000 else 30_000) {
         check(!closed && request == null)
         val result = CompletableDeferred<String>()
         request = result
@@ -76,7 +80,8 @@ internal class OcrRecognitionClient(private val context: Context) : AutoCloseabl
         try {
             withContext(Dispatchers.IO) { file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) } }
             ready.await().send(Message.obtain(null, 1, id, 0).apply {
-                data = Bundle().apply { putString("file", file.name) }; replyTo = reply
+                data = Bundle().apply { putString("file", file.name); table?.let { putString("table", it.name) } }
+                replyTo = reply
             })
             result.await()
         } finally { request = null; withContext(NonCancellable + Dispatchers.IO) { file.delete() } }

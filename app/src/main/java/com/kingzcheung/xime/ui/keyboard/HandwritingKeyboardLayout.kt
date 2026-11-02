@@ -61,19 +61,25 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/** 公式预览的上边：让开画板顶部的语言胶囊和公式按钮（按钮 8dp 外边距 + 约 32dp 高）。 */
+private val FORMULA_PREVIEW_TOP = 44.dp
+
 /** 并排书写（日语、英文）一次最多切出的字数：一个单词、一小句。 */
 private const val SIDE_BY_SIDE_MAX_CHARS = 12
 
-/** 手写板左上角的当前语言提示。 */
+/**
+ * 手写板左上角的当前语言提示：平时只写语言名（「日语」「中文」），胶囊小、不占画板（用户 11-02：
+ * 「不需要写那么多，日语两个字就行」）。只有正在准备、假名模板没读到这种要人知道的状态才多写一句。
+ * [useTemplates] 不再改变文字（原来英文写「边写边学」），留着参数不改调用处。
+ */
+@Suppress("UNUSED_PARAMETER")
 internal fun handwritingLanguageHint(language: InputLanguage, useTemplates: Boolean, preparing: Boolean, missingKana: Boolean): String = when {
-    preparing -> "${language.displayName}手写 · 正在准备（只在第一次较慢）…"
+    preparing -> "${language.displayName} · 正在准备（只在第一次较慢）…"
     // 手写训练页只在自用测试包里有，公开包不指向它。
     language == InputLanguage.JAPANESE && missingKana ->
         if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
-            "日语手写 · 假名模板没读到，去 设置 → 手写训练模式 导入样本备份" else "日语手写 · 假名模板没读到"
-    language == InputLanguage.JAPANESE -> "日语手写 · 假名＋漢字"
-    language == InputLanguage.ENGLISH && useTemplates -> "英文手写 · 边写边学"
-    else -> "${language.displayName}手写"
+            "日语 · 假名模板没读到，去 设置 → 手写训练模式 导入样本备份" else "日语 · 假名模板没读到"
+    else -> language.displayName
 }
 
 /**
@@ -315,8 +321,11 @@ fun HandwritingKeyboardLayout(
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 Box(Modifier.weight(1f).fillMaxHeight()) {
             // 公式预览只是叠在画板顶部的显示内容，放在画布下层：整块区域都能落笔，笔迹画在预览之上。
-            if (formulaActive) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(52.dp)
-                .padding(horizontal = 96.dp).testTag("handwriting-formula-preview"), contentAlignment = Alignment.Center) {
+            // 放在左上语言胶囊和右上公式按钮那一行下面：「英文手写 · 边写边学」这类长提示比原来让出的 96dp 宽，
+            // 会盖住预览（GitHub #66 #67）。
+            if (formulaActive) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .padding(top = FORMULA_PREVIEW_TOP, start = 16.dp, end = 16.dp).height(52.dp)
+                .testTag("handwriting-formula-preview"), contentAlignment = Alignment.Center) {
                 if (session.hasInk && formulaPreview.isNotEmpty())
                     com.kingzcheung.xime.ui.settings.KatexView(formulaPreview, Modifier.fillMaxSize(), color = keyTextColor.copy(alpha = 0.7f))
                 else Text("写完停笔，这里显示公式预览", color = keyTextColor.copy(alpha = 0.4f), fontSize = 12.sp)

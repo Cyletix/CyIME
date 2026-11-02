@@ -1,5 +1,6 @@
 #include "onnx_env.h"
 #include <android/log.h>
+#include <initializer_list>
 #include <mutex>
 #include <dlfcn.h>
 #include <sys/system_properties.h>
@@ -71,6 +72,21 @@ void OnnxReleaseSharedEnv() {
     if (g_threading_options) {
         if (api) api->ReleaseThreadingOptions(g_threading_options);
         g_threading_options = nullptr;
+    }
+}
+
+void OnnxDisableSpinning(OrtSessionOptions* options) {
+    const OrtApi* api = OnnxGetApi();
+    if (!api || !options) return;
+    // 每个 session 实际用自己的线程池（没有调 DisablePerSessionThreads，上面的全局线程池用不上），
+    // 默认线程数跟核数走，做完一次推理后这些线程会空转一阵等下一次。联想每次上屏推理几次，
+    // 空转让几个核在推理之间白白跑着，耗电。只改等待方式：线程数和计算不变，结果一样。
+    for (const char* key : {"session.intra_op.allow_spinning", "session.inter_op.allow_spinning"}) {
+        OrtStatus* status = api->AddSessionConfigEntry(options, key, "0");
+        if (status) {
+            LOGW("Unable to set %s: %s", key, api->GetErrorMessage(status));
+            api->ReleaseStatus(status);
+        }
     }
 }
 

@@ -24,14 +24,15 @@ internal object OcrImageGeometry {
             (vh - ih * scale) / 2 + transform.panY)
     }
 
-    fun output(iw: Int, ih: Int, vw: Int, vh: Int, transform: OcrImageTransform): OcrImageOutput {
+    fun output(iw: Int, ih: Int, vw: Int, vh: Int, transform: OcrImageTransform,
+               frame: OcrScanFrame = OcrScanGeometry.TEXT): OcrImageOutput {
         val image = projection(iw, ih, vw, vh, transform)
-        val frameWidth = vw * (OcrScanGeometry.RIGHT - OcrScanGeometry.LEFT)
-        val frameHeight = vh * (OcrScanGeometry.BOTTOM - OcrScanGeometry.TOP)
+        val frameWidth = vw * (frame.right - frame.left)
+        val frameHeight = vh * (frame.bottom - frame.top)
         val width = (frameWidth / image.scale).roundToInt().coerceIn(1, 1600)
         val factor = width / frameWidth
         return OcrImageOutput(width, (frameHeight * factor).roundToInt().coerceAtLeast(1),
-            image.scale * factor, (image.left - vw * OcrScanGeometry.LEFT) * factor,
-            (image.top - vh * OcrScanGeometry.TOP) * factor)
+            image.scale * factor, (image.left - vw * frame.left) * factor,
+            (image.top - vh * frame.top) * factor)
     }
 }

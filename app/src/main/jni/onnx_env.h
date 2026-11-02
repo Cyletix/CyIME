@@ -14,3 +14,7 @@ bool OnnxTryEnableNnapi(OrtSessionOptions* options);
 // onnxruntime partitions the graph so nodes NNAPI doesn't support run on CPU.
 // Returns true if the CPU EP was appended.
 bool OnnxTryEnableCpuFallback(OrtSessionOptions* options);
+
+// Worker threads block between runs instead of spinning. Same thread count and math,
+// so results are unchanged; only idle CPU (battery) differs.
+void OnnxDisableSpinning(OrtSessionOptions* options);

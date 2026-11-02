@@ -19,6 +19,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+internal data class SpeechSegment(val text: String, val language: InputLanguage, val serverPunctuation: Boolean)
+
 class SpeechRecognitionManager(
     private val context: Context,
     private val backendFactory: ((Context) -> AsrBackend?)? = null,
@@ -53,7 +55,6 @@ class SpeechRecognitionManager(
     @Volatile private var backendConfiguration: String? = null
     private fun selectedBackendConfiguration(): String =
         if (SettingsPreferences.isSttUseLocal(context)) "local:${AsrSupport.generation}"
-        else if (OnlineSpeechApi.isUsable(context)) "api"
         else "online:${SettingsPreferences.getSttOnlinePluginId(context)}"
     @Volatile private var recordingThread: RecordingThread? = null
     @Volatile private var released = false
@@ -95,6 +96,7 @@ class SpeechRecognitionManager(
     @Volatile private var preStartedAtNs = 0L
 
     private var resultCallback: ((String) -> Unit)? = null
+    internal var segmentedTextCallback: ((List<SpeechSegment>, Boolean) -> Unit)? = null
     private var partialResultCallback: ((String) -> Unit)? = null
     private var stateCallback: ((RecognitionState) -> Unit)? = null
     @Volatile
@@ -119,9 +121,9 @@ class SpeechRecognitionManager(
         }
         if (language == InputLanguage.UNSPECIFIED ||
             language != InputLanguage.CHINESE && !SettingsPreferences.isSttUseLocal(context) &&
-            !OnlineSpeechApi.isUsable(context) && backendFactory == null) {
+            !OnlineSpeechPlugin.supports(context, language) && backendFactory == null) {
             releasePreStart()
-            errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言"
+            errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请在「已安装的方案」里给它选语言"
                 else "当前在线语音插件尚未声明${language.displayName}支持，请使用本地多语言模型", true)
             setState(RecognitionState.ERROR)
             return
@@ -444,15 +446,15 @@ class SpeechRecognitionManager(
         val useLocal = SettingsPreferences.isSttUseLocal(context)
         return if (useLocal) {
             AsrBackendFactory.create(context) ?: createOnlineAsrBackend()
-        } else if (OnlineSpeechApi.isUsable(context)) {
-            OnlineApiAsrBackend(context, localFallback = { AsrBackendFactory.create(context) },
-                onNotice = { message -> mainHandler.post { noticeCallback?.invoke(message) } })
         } else {
+            // 优先在线：用选中的语音插件（如「在线语音」）。整段上传的插件失败时，这段录音改用本地模型并提示。
             createOnlineAsrBackend() ?: AsrBackendFactory.create(context)
         }
     }
 
     private fun createOnlineAsrBackend(): AsrBackend? {
+        // 旧版内置「在线语音接口」填过的地址和密钥，装上「在线语音」插件后搬过去（只搬一次）。
+        OnlineSpeechPlugin.migrateOldApi(context)
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isEmpty()) return null
 
@@ -464,7 +466,9 @@ class SpeechRecognitionManager(
         val backend = plugin.createBackend(context.applicationContext)
         val pluginName = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == selected?.first }?.name ?: selected?.first ?: "语音识别"
-        return PluginAsrBackendAdapter(pluginName, backend)
+        return PluginAsrBackendAdapter(pluginName, backend, plugin.getCapabilities(),
+            localFallback = { AsrBackendFactory.create(context) },
+            onNotice = { message -> mainHandler.post { noticeCallback?.invoke(message) } })
     }
 
     private fun createAudioRecord(bufferSecs: Float = 2.0f): AudioRecord? {
@@ -551,24 +555,26 @@ class SpeechRecognitionManager(
         }
 
         /** Each recognizer segment owns its callbacks; late results cannot overwrite a new segment. */
-        private inner class SegmentCallbacks(val prefix: String) {
+        private inner class SegmentCallbacks(val prefix: List<SpeechSegment>, val language: InputLanguage) {
             @Volatile var active = true
             @Volatile var switching = false
-            @Volatile var text = ""
-            fun combined(value: String) = listOf(prefix.trim(), value.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+            @Volatile var parts = prefix
+            fun receive(text: String, partial: Boolean) {
+                if (!active) return
+                val segment = SpeechSegment(text.trim(), language, !partial && currentBackend.resultKeepsPunctuation)
+                val result = if (segment.text.isEmpty()) prefix else prefix + segment
+                parts = result
+                if (switching) return
+                postForSession(session) {
+                    if (!active || cancelRequested) return@postForSession
+                    val segmented = segmentedTextCallback
+                    if (segmented != null) segmented(result, partial)
+                    else (if (partial) partialResultCallback else resultCallback)?.invoke(result.joinToString(" ") { it.text })
+                }
+            }
             fun bind() = currentBackend.setCallbacks(
-                onResult = { value ->
-                    if (active) {
-                        text = value
-                        if (!switching) postForSession(session) { if (active && !cancelRequested) resultCallback?.invoke(combined(value)) }
-                    }
-                },
-                onPartialResult = { value ->
-                    if (active) {
-                        text = value
-                        postForSession(session) { if (active && !cancelRequested) partialResultCallback?.invoke(combined(value)) }
-                    }
-                },
+                onResult = { receive(it, partial = false) },
+                onPartialResult = { receive(it, partial = true) },
                 onStateChange = { state ->
                     if (active && !switching) postForSession(session) { if (active && !switching && !cancelRequested) setState(state) }
                 },
@@ -595,7 +601,7 @@ class SpeechRecognitionManager(
                     if (cancelRequested || released) return
                 }
                 if (cancelRequested || released) return
-                var callbacks = SegmentCallbacks("").also { it.bind() }
+                var callbacks = SegmentCallbacks(emptyList(), language).also { it.bind() }
                 var activeLanguage = language
                 attempted = true
                 backendOperationStartedAt = System.nanoTime()
@@ -612,9 +618,9 @@ class SpeechRecognitionManager(
                                 callbacks.switching = true
                                 currentBackend.stop()
                                 callbacks.active = false
-                                val prefix = callbacks.combined(callbacks.text)
+                                val prefix = callbacks.parts
                                 if (cancelRequested || released) break
-                                callbacks = SegmentCallbacks(prefix).also { it.bind() }
+                                callbacks = SegmentCallbacks(prefix, chunk.language).also { it.bind() }
                                 check(currentBackend.start(chunk.language)) { "无法切换到${chunk.language.displayName}语音，请检查该语言模型" }
                             }
                             activeLanguage = chunk.language

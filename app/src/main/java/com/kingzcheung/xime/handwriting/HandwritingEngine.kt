@@ -197,7 +197,7 @@ object HandwritingEngine {
     }
 
     /**
-     * 预测前确保引擎可用。:inference 进程被系统回收（设计内行为，同联想模型）
+     * 预测前确保引擎可用。:inference 进程被系统回收（设计内行为）
      * 后在此按需重载（重新 bind + loadModel）实现自愈。从未初始化过时直接返回
      * false，保持"无模型时 predict 返回空"的既有语义，不自动拉起服务。
      */

@@ -69,14 +69,129 @@ public final class DocumentOcrPipeline implements AutoCloseable {
         }
         double centerY() { return Arrays.stream(points).mapToDouble(p -> p.y).average().orElse(0); }
         double height() { return Math.max(distance(points[0], points[3]), distance(points[1], points[2])); }
+        OcrTableLayout.Box box() {
+            double[] x = new double[4], y = new double[4];
+            for (int i = 0; i < 4; i++) { x[i] = points[i].x; y[i] = points[i].y; }
+            return new OcrTableLayout.Box(x, y, text);
+        }
     }
 
     /** Input is the already-cropped, fixed camera/gallery frame in BGR order. */
     public List<TextRegion> recognize(Mat bgr) throws OrtException {
-        return recognize(bgr, true);
+        return recognize(bgr, true, 64);
     }
 
-    private List<TextRegion> recognize(Mat bgr, boolean refineTiltedRegion) throws OrtException {
+    /**
+     * The same recognition laid out as a table. Every cell is its own box, so more boxes are read than
+     * for a text strip; ruled lines are found by projection after the text has been leveled.
+     */
+    public String recognizeTable(Mat bgr, OcrTableLayout.Format format) throws OrtException {
+        List<TextRegion> regions = splitWideGaps(bgr, recognize(bgr, true, 160));
+        if (regions.isEmpty()) return "";
+        List<OcrTableLayout.Box> boxes = new ArrayList<>();
+        for (TextRegion region : regions) boxes.add(region.box());
+        double[] level = OcrTableLayout.straighten(OcrTableLayout.skewDegrees(boxes), bgr.cols(), bgr.rows());
+        List<OcrTableLayout.Box> leveled = new ArrayList<>();
+        for (OcrTableLayout.Box box : boxes) leveled.add(box.transformed(level));
+        double text = Math.max(8, OcrTableLayout.medianHeight(leveled));
+        // Opening with a run longer than any glyph stroke keeps only ruling: three text heights across,
+        // two and a half down (a one-row table's vertical lines are barely taller than its text).
+        int across = (int)Math.round(text * 3), down = (int)Math.round(text * 2.5);
+        int[][] profiles = ruleProfiles(bgr, level, across, down);
+        double[] rows = OcrTableLayout.lines(profiles[0], across, text * .5);
+        double[] columns = OcrTableLayout.lines(profiles[1], down, text * .5);
+        if (Boolean.getBoolean("cyime.ocr.diagnostics"))
+            System.err.println("table rows=" + Arrays.toString(rows) + " columns=" + Arrays.toString(columns));
+        return OcrTableLayout.format(OcrTableLayout.grid(leveled, rows, columns), format);
+    }
+
+    /**
+     * The detector joins neighbouring cells less than about a character apart into one box ("单价备注").
+     * Inside a long box, a blank vertical band wider than half the box height is a cell gap, never a
+     * word space: split there and read each side again. A box keeps its reading unless every side reads.
+     */
+    private List<TextRegion> splitWideGaps(Mat bgr, List<TextRegion> regions) throws OrtException {
+        List<TextRegion> result = new ArrayList<>();
+        int budget = 48; // extra recognizer passes for one frame
+        for (TextRegion region : regions) {
+            Point[] p = region.points;
+            if (budget <= 0 || Math.max(distance(p[0], p[1]), distance(p[3], p[2])) < region.height() * 2.5) {
+                result.add(region); continue;
+            }
+            Mat crop = crop(bgr, p), gray = new Mat(), ink = new Mat(), sums = new Mat();
+            try {
+                Imgproc.cvtColor(crop, gray, Imgproc.COLOR_BGR2GRAY);
+                boolean light = Core.mean(gray).val[0] >= 128;
+                Imgproc.threshold(gray, ink, 0, 255, (light ? Imgproc.THRESH_BINARY_INV : Imgproc.THRESH_BINARY) | Imgproc.THRESH_OTSU);
+                Core.reduce(ink, sums, 0, Core.REDUCE_SUM, CvType.CV_32S);
+                int[] columns = new int[(int)sums.total()];
+                sums.get(0, 0, columns);
+                for (int i = 0; i < columns.length; i++) columns[i] /= 255;
+                int[][] gaps = OcrTableLayout.blankRuns(columns, Math.max(1, crop.rows() / 25), (int)Math.round(crop.rows() * .5));
+                if (Boolean.getBoolean("cyime.ocr.diagnostics") && gaps.length > 0)
+                    System.err.println("split " + region.text + " at " + Arrays.deepToString(gaps) + " of " + crop.cols());
+                // Each side keeps a little of the gap as margin for the recognizer; the rest stays a gap
+                // between the new boxes, so the columns can still be found from them.
+                int margin = Math.max(1, crop.rows() / 10);
+                List<TextRegion> parts = new ArrayList<>();
+                for (int i = 0; i <= gaps.length && gaps.length > 0; i++) {
+                    int left = i == 0 ? 0 : gaps[i - 1][1] - margin;
+                    int right = i == gaps.length ? crop.cols() : gaps[i][0] + margin;
+                    Mat piece = crop.submat(0, crop.rows(), left, Math.max(left + 1, right));
+                    Line line;
+                    try { line = read(piece); } finally { piece.release(); }
+                    budget--;
+                    if (Boolean.getBoolean("cyime.ocr.diagnostics")) System.err.println("  piece " + line.text + " " + line.confidence);
+                    // Edge clutter beside a word reads as a lone bracket or dash: a symbol-only side must be sure.
+                    if (!line.accepted() || (line.confidence < .9 && line.text.codePoints().noneMatch(Character::isLetterOrDigit))) {
+                        parts.clear(); break;
+                    }
+                    double from = (double)left / crop.cols(), to = (double)right / crop.cols();
+                    parts.add(new TextRegion(new Point[]{along(p[0], p[1], from), along(p[0], p[1], to),
+                            along(p[3], p[2], to), along(p[3], p[2], from)}, line.text, line.confidence));
+                }
+                if (parts.size() >= 2) result.addAll(parts); else result.add(region);
+            } finally { sums.release(); ink.release(); gray.release(); crop.release(); }
+        }
+        return result;
+    }
+
+    private static Point along(Point a, Point b, double t) { return new Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
+
+    /**
+     * Horizontal and vertical line pixels per image row and per image column. Strokes darker than a
+     * light page (lighter than a dark one) are thresholded locally, so faint spreadsheet gridlines count.
+     */
+    private static int[][] ruleProfiles(Mat bgr, double[] level, int across, int down) {
+        Mat source = new Mat(), gray = new Mat(), binary = new Mat(), lines = new Mat(), sums = new Mat();
+        Mat affine = new Mat(2, 3, CvType.CV_64F);
+        try {
+            Imgproc.cvtColor(bgr, source, Imgproc.COLOR_BGR2GRAY);
+            if (level[1] == 0) source.copyTo(gray);
+            else {
+                affine.put(0, 0, level);
+                Imgproc.warpAffine(source, gray, affine, source.size(), Imgproc.INTER_LINEAR, Core.BORDER_REPLICATE);
+            }
+            boolean lightSurface = Core.mean(gray).val[0] >= 128;
+            int block = Math.max(15, Math.min(gray.rows(), gray.cols()) / 20) | 1;
+            Imgproc.adaptiveThreshold(gray, binary, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C,
+                    lightSurface ? Imgproc.THRESH_BINARY_INV : Imgproc.THRESH_BINARY, block, 10);
+            int[][] profiles = new int[2][];
+            for (int axis = 0; axis < 2; axis++) {
+                Size run = axis == 0 ? new Size(Math.max(3, across), 1) : new Size(1, Math.max(3, down));
+                Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, run);
+                try { Imgproc.morphologyEx(binary, lines, Imgproc.MORPH_OPEN, kernel); } finally { kernel.release(); }
+                Core.reduce(lines, sums, axis == 0 ? 1 : 0, Core.REDUCE_SUM, CvType.CV_32S);
+                int[] profile = new int[(int)sums.total()];
+                sums.get(0, 0, profile);
+                for (int i = 0; i < profile.length; i++) profile[i] /= 255;
+                profiles[axis] = profile;
+            }
+            return profiles;
+        } finally { affine.release(); sums.release(); lines.release(); binary.release(); gray.release(); source.release(); }
+    }
+
+    private List<TextRegion> recognize(Mat bgr, boolean refineTiltedRegion, int maxBoxes) throws OrtException {
         if (bgr.empty() || bgr.type() != CvType.CV_8UC3) throw new IllegalArgumentException("Expected BGR image");
         // A rotated crop has a taller background without larger glyphs. Preserve a useful
         // long-side resolution too; sizing only by strip height loses those small letters.
@@ -92,7 +207,7 @@ public final class DocumentOcrPipeline implements AutoCloseable {
         List<TextRegion> text = new ArrayList<>();
         boolean refined = false;
         // Bound work in one frame; this process never queues OCR alongside IME key events.
-        for (Point[] box : boxes.subList(0, Math.min(64, boxes.size()))) {
+        for (Point[] box : boxes.subList(0, Math.min(maxBoxes, boxes.size()))) {
             Mat crop = crop(bgr, box);
             try {
                 Line line = read(crop);
@@ -105,7 +220,7 @@ public final class DocumentOcrPipeline implements AutoCloseable {
                     // A sloping background can merge separated text into one large detection.
                     // Retry detection once inside that rectified region, never scan outside the frame.
                     refined = true;
-                    List<TextRegion> parts = recognize(crop, false);
+                    List<TextRegion> parts = recognize(crop, false, maxBoxes);
                     if (!parts.isEmpty()) {
                         float score = (float)parts.stream().mapToDouble(p -> p.confidence).average().orElse(0);
                         text.add(new TextRegion(box, assemble(parts), score));

@@ -24,5 +24,5 @@ object HandwritingLanguages {
         hasBuiltinModel && supports(language)
 
     fun unavailableMessage(language: InputLanguage): String = if (language == InputLanguage.UNSPECIFIED)
-        "当前方案未标注语言，暂不能使用手写" else "暂不支持${language.displayName}手写，请先切换到中文"
+        "当前方案未标注语言，请在「已安装的方案」里给它选语言后再手写" else "暂不支持${language.displayName}手写，请先切换到中文"
 }

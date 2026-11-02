@@ -206,8 +206,13 @@ object HandwritingInference {
         val seqData = strokesToSequence(simplified)
         val mask = buildMask(seqData.originalLen)
 
-        val rawResults = HandwritingNativeEngine.predict(seqData.data, mask, min(chars.size, topK.coerceAtMost(64) * 5))
-        if (rawResults.isEmpty()) return emptyList()
+        val modelTop = min(chars.size, topK.coerceAtMost(64) * 5)
+        val rareTemplates = rare
+        // 生僻字模板要模型前 320 类当特征；模型候选仍只看前 modelTop 个（与原来一致）
+        val queryTop = if (rareTemplates != null) max(modelTop, min(chars.size, HanziRareTemplates.QUERY_TOP)) else modelTop
+        val allRaw = HandwritingNativeEngine.predict(seqData.data, mask, queryTop)
+        if (allRaw.isEmpty()) return emptyList()
+        val rawResults = allRaw.take(modelTop)
 
         val results = mutableListOf<HandwritingCandidate>()
         val seen = mutableSetOf<String>()
@@ -224,7 +229,19 @@ object HandwritingInference {
         // The upstream demo prioritizes Han candidates too. Never refill with symbols here:
         // those would participate in DP as high-confidence fragments of an unfinished character.
         val han = HandwritingCandidatePolicy.select(results, results.size)
-        return HandwritingCandidatePolicy.preferCommon(han, frequency).take(topK)
+        if (rareTemplates == null) return HandwritingCandidatePolicy.preferCommon(han, frequency).take(topK)
+        val raw = allRaw.asList()
+        val rareMatches = rareTemplates.match(raw, HandwritingCandidatePolicy.RARE_MAX * 2, HandwritingCandidatePolicy.RARE_MIN_SIMILARITY)
+        val mass = raw.sumOf { it.second.toDouble() }.toFloat().coerceIn(1e-6f, 1f)
+        return HandwritingCandidatePolicy.mergeRare(han, rareMatches, frequency, mass).take(topK)
+    }
+
+    /** 字表外生僻字的笔顺模板（assets/handwriting/hanzi_rare_och.*）；没加载时不出生僻字。 */
+    @Volatile
+    private var rare: HanziRareTemplates? = null
+
+    internal fun loadRareTemplates(templates: HanziRareTemplates?) {
+        rare = templates
     }
 
     /** 汉字常用度（assets/handwriting/hanzi_frequency.tsv），候选排序用；没加载时不调整。 */

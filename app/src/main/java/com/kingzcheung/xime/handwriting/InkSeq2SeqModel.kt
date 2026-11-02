@@ -46,7 +46,12 @@ internal class InkSeq2SeqModel(private val modelId: String, private val external
             val v = JSONArray(File(d, "formula_vocab.json").readText())
             vocab = List(v.length()) { v.getString(it) }
             val e = OrtEnvironment.getEnvironment()
-            val options = OrtSession.SessionOptions().apply { setIntraOpNumThreads(2) }
+            // 逐个 token 解码要推理很多次：线程做完一次不空转等下一次（省电，结果不变），和 DocumentOcrPipeline 一样。
+            val options = OrtSession.SessionOptions().apply {
+                setIntraOpNumThreads(2)
+                addConfigEntry("session.intra_op.allow_spinning", "0")
+                addConfigEntry("session.inter_op.allow_spinning", "0")
+            }
             encoder = e.createSession(File(d, "formula_encoder.onnx").path, options)
             decoder = e.createSession(File(d, "formula_decoder.onnx").path, options)
             env = e

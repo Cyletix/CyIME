@@ -4,12 +4,14 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import android.widget.Toast
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.speech.AsrBackendFactory
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.speech.SpeechRecognitionManager
+import com.kingzcheung.xime.speech.SpeechSegment
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.util.FileLogger
@@ -29,7 +31,12 @@ class VoiceRecognitionHandler(
     /** manager 工厂，供测试注入 mock。 */
     private val managerFactory: (Context) -> SpeechRecognitionManager = { SpeechRecognitionManager(it) },
     /** 超时调度器，供测试注入并手动推进。 */
-    private val mainHandler: Handler = Handler(Looper.getMainLooper())
+    private val mainHandler: Handler = Handler(Looper.getMainLooper()),
+    /**
+     * 隔空输入：开着并且有可发的电脑时返回发送函数（开始说话时取一次）。说完的话交给它发到电脑，
+     * 手机输入框里只用 composing 预览，句子说完即清掉，不上屏。
+     */
+    private val remoteTyping: () -> ((String) -> Unit)? = { null },
 ) {
     companion object {
         private const val TAG = "VoiceRecognition"
@@ -51,6 +58,10 @@ class VoiceRecognitionHandler(
         FileLogger.i(TAG, "Initializing speech recognition system")
 
         speechRecognitionManager = managerFactory(context)
+        speechRecognitionManager.segmentedTextCallback = { parts, partial ->
+            val raw = parts.joinToString(" ") { it.text }
+            if (partial) handlePartialResult(raw, parts) else handleSpeechResult(raw, parts)
+        }
         speechRecognitionManager.noticeCallback = { showVoiceNotice(it) }
 
         speechRecognitionManager.setCallbacks(
@@ -85,7 +96,7 @@ class VoiceRecognitionHandler(
         val language = getState().voiceKeyboardLanguages.recognitionLanguage
         if (::speechRecognitionManager.isInitialized && language != InputLanguage.UNSPECIFIED &&
             (language == InputLanguage.CHINESE || SettingsPreferences.isSttUseLocal(context) ||
-                com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context))) {
+                com.kingzcheung.xime.speech.OnlineSpeechPlugin.supports(context, language))) {
             speechRecognitionManager.startPreStart()
         }
     }
@@ -125,6 +136,8 @@ class VoiceRecognitionHandler(
         inputLanguages = languages
         requestedRecordingLanguage = language
         toolbarSession = getState().voiceSticky
+        remoteSink = remoteTyping()
+        remoteSent = ""
         toolbarText.reset()
         toolbarSentencePrefix = null
         lastToolbarFinal = ""
@@ -132,6 +145,7 @@ class VoiceRecognitionHandler(
 
         textBeforeVoiceInput = getInputConnection()?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
         textLengthBeforeVoiceInput = textBeforeVoiceInput.length
+        voiceStartCursor = cursorOf(getInputConnection())
 
         val providerName = resolveProviderName()
         onStateChanged(getState().copy(voicePluginName = providerName))
@@ -172,7 +186,6 @@ class VoiceRecognitionHandler(
             val localName = AsrBackendFactory.getLocalName()
             if (localName != null) return localName
         }
-        if (com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context)) return "在线语音"
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isNotEmpty()) {
             val selectedId = SettingsPreferences.getSttOnlinePluginId(context)
@@ -223,6 +236,12 @@ class VoiceRecognitionHandler(
     }
 
     private var toolbarSession = false
+    /** 本次会话发到电脑（隔空输入）；null 时照常写本机输入框。 */
+    private var remoteSink: ((String) -> Unit)? = null
+    /** 本次会话已发到电脑的上一句，用来在两句英文之间补一个空格。 */
+    private var remoteSent = ""
+    /** 手机输入框里正显示着隔空输入的预览。 */
+    private var remotePreview = false
     private val toolbarText = StreamingVoiceText()
     private var lastToolbarFinal = ""
     private var toolbarSentencePrefix: String? = null
@@ -245,6 +264,8 @@ class VoiceRecognitionHandler(
     fun abandonPendingOnManualInput() { if (finishing) abandonSession() }
 
     fun abandonSession() {
+        // 隔空输入的预览不能留在手机输入框里变成正文。
+        clearRemotePreview()
         sessionAbandoned = true
         toolbarText.reset()
         toolbarSentencePrefix = null
@@ -253,10 +274,62 @@ class VoiceRecognitionHandler(
         lastPartialText = ""
     }
 
+    /** 说话开始时的光标位置（读不到为 null），上滑取消时用来算这次写进了多少字。 */
+    private var voiceStartCursor: Int? = null
+
+    private fun cursorOf(ic: InputConnection?): Int? = ic?.getExtractedText(ExtractedTextRequest(), 0)
+        ?.takeIf { it.startOffset >= 0 && it.selectionEnd >= 0 }?.let { it.startOffset + it.selectionEnd }
+
+    /**
+     * 按住空格说话上滑取消：工具栏语音是边说边上屏的，把这次写进输入框的字删掉；组合区里的临时结果清掉；
+     * 之后迟到的结果一律丢弃。手指一直按在空格上，这期间用户改不了输入框，新写的字都紧挨在光标前。
+     */
+    fun discardSession() {
+        val ic = getInputConnection()
+        // 隔空输入的预览由 abandonSession 清；终端里字已经发出去，不能再发退格去删。
+        if (ic != null && remoteSink == null && !TerminalEditor.active) {
+            ic.beginBatchEdit()
+            try {
+                if (toolbarSession) spokenLength(ic).takeIf { it > 0 }?.let { ic.deleteSurroundingText(it, 0) }
+                else if (lastPartialText.isNotEmpty()) { ic.setComposingText("", 1); ic.finishComposingText() }
+            } finally { ic.endBatchEdit() }
+        }
+        abandonSession()
+    }
+
+    /** 这次说话写进输入框的字数；核对不上就返回 0，宁可留下字也不误删说话前的内容。 */
+    private fun spokenLength(ic: InputConnection): Int {
+        val before = textBeforeVoiceInput
+        val start = voiceStartCursor
+        val now = cursorOf(ic)
+        if (start != null && now != null) {
+            val spoken = now - start
+            if (spoken <= 0) return 0
+            // 删掉这段后光标前必须正好接回说话前的字。
+            val tail = before.takeLast(32)
+            val seen = ic.getTextBeforeCursor(spoken + tail.length, 0)?.toString() ?: return 0
+            return if (seen.length == spoken + tail.length && seen.startsWith(tail)) spoken else 0
+        }
+        // 读不到光标位置：说话前光标前的字没读满（已到开头）时，现在光标前 = 原来的字 + 这次说的字。
+        if (before.length >= 1000) return 0
+        val seen = ic.getTextBeforeCursor(before.length + 4000, 0)?.toString() ?: return 0
+        return if (seen.startsWith(before)) seen.length - before.length else 0
+    }
+
     // 语音按钮长按抬起时调用：立即提交当前已识别的文本（不依赖可能被断连竞态吞掉的异步最终结果）
     fun commitPendingOnRelease() {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
+        remoteSink?.let { sink ->
+            // 隔空输入：松手时把预览中的这一句发出去，手机输入框清掉预览。
+            val partial = lastPartialText
+            if (!toolbarSession && partial.isEmpty()) return
+            if (partial.isNotBlank()) sendRemote(sink, partial)
+            if (toolbarSession) { toolbarText.reset(); toolbarSentencePrefix = null }
+            lastPartialText = ""
+            suppressDuplicateFinal = true
+            return
+        }
         if (toolbarSession) {
             if (lastPartialText.isNotBlank()) {
                 getInputConnection()?.let { updateToolbarText(it, lastPartialText) }
@@ -304,7 +377,7 @@ class VoiceRecognitionHandler(
         onStateChanged(getState().copy(voiceRecognitionState = RecognitionState.PROCESSING))
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         mainHandler.postDelayed(finishTimeoutRunnable,
-            if (SettingsPreferences.isSttUseLocal(context) || com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context))
+            if (SettingsPreferences.isSttUseLocal(context) || com.kingzcheung.xime.speech.OnlineSpeechPlugin.isBatch(context))
                 speechRecognitionManager.finishTimeoutMs + 500 else FINISH_TIMEOUT_MS)
         speechRecognitionManager.stopRecognition()
         if (toolbarSession) onRecordingStopped()
@@ -324,7 +397,7 @@ class VoiceRecognitionHandler(
         onVoiceComplete()
     }
 
-    private fun handleSpeechResult(text: String) {
+    private fun handleSpeechResult(text: String, parts: List<SpeechSegment>? = null) {
         if (!acceptsInputSession()) return
         Log.d(TAG, "Speech result (final): $text")
 
@@ -351,7 +424,28 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it), voiceMarks()) }
+        val cleanText = normalizeResult(text, parts)
+        remoteSink?.let { sink ->
+            // 隔空输入：整句发到电脑；规则同本机上屏（错误文字不发，工具栏模式 stop 时重发的上一句只发一次）。
+            val error = text.trimStart().startsWith("错误:") || text.trimStart().startsWith("错误：")
+            val repeated = toolbarSession && wasFinishing && lastPartialText.isEmpty() && cleanText == lastToolbarFinal
+            val piece = when {
+                error || repeated -> ""
+                cleanText.isNotEmpty() -> cleanText
+                // 在线引擎最后给空结果：发已显示的临时结果（本机上屏同样留下它）。
+                !SettingsPreferences.isSttUseLocal(context) -> lastPartialText
+                else -> ""
+            }
+            if (piece.isNotBlank()) { sendRemote(sink, piece); lastToolbarFinal = piece }
+            else clearRemotePreview()
+            if (toolbarSession) { toolbarText.reset(); toolbarSentencePrefix = null }
+            lastPartialText = ""
+            if (wasFinishing) {
+                if (toolbarSession) suppressDuplicateFinal = true
+                onVoiceComplete()
+            }
+            return
+        }
         if (toolbarSession) {
             // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
             if (cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：") &&
@@ -395,6 +489,8 @@ class VoiceRecognitionHandler(
     
     // 增量语音模式：先结束 composing，再只提交增量，避免重复与整段重写。
     private fun commitFinal(ic: InputConnection, finalText: String, partial: String) {
+        com.kingzcheung.xime.stats.TypingStats.onCommit(finalText, isPaste = false,
+            source = com.kingzcheung.xime.stats.TypingStatsData.Source.VOICE)
         ic.finishComposingText()
         if (partial.isNotEmpty() && finalText.startsWith(partial)) {
             val remainder = finalText.substring(partial.length)
@@ -413,6 +509,22 @@ class VoiceRecognitionHandler(
         Log.d(TAG, "commitFinal: final='$finalText', partial='$partial'")
     }
     
+    /** 隔空输入：清掉手机输入框里的预览，把这一句发到电脑。 */
+    private fun sendRemote(sink: (String) -> Unit, text: String) {
+        clearRemotePreview()
+        // 两句英文之间补一个空格（电脑上的光标前文读不到，按本次会话上一句判断）；中文不加。
+        val gap = if (remoteSent.lastOrNull()?.let { it.isLetterOrDigit() && it.code < 128 || it in ".,!?;:" } == true &&
+            text.first().let { it.isLetterOrDigit() && it.code < 128 }) " " else ""
+        sink(gap + text)
+        remoteSent = text
+    }
+
+    private fun clearRemotePreview() {
+        if (!remotePreview) return
+        remotePreview = false
+        getInputConnection()?.let { it.setComposingText("", 1); it.finishComposingText() }
+    }
+
     // 引擎逐句返回时，只在下一句真正开始后插入一个分隔空格；句尾不留空格。
     private fun updateToolbarText(ic: InputConnection, text: String) {
         if (toolbarSentencePrefix == null) {
@@ -423,26 +535,35 @@ class VoiceRecognitionHandler(
         toolbarText.update(ic, toolbarSentencePrefix.orEmpty() + text)
     }
 
-    /** 整句定稿 (Chinese recognition only) keeps the local model's punctuation only when 自动加标点 is on (default off);
-     *  online engines, other recognizers (including the English side of a Chinese pair) and the 6 s mode keep the old spacing. */
-    private fun keepVoiceMarks(recognition: InputLanguage) = recognition == InputLanguage.CHINESE &&
-        SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context) &&
-        SettingsPreferences.isSttAutoPunctuation(context)
+    private fun normalizeResult(text: String, parts: List<SpeechSegment>?): String {
+        val language = normalizationLanguage ?: getState().inputProfile.language
+        val segments = parts ?: listOf(SpeechSegment(text, inputLanguage ?: language, false))
+        val automatic = SettingsPreferences.isSttAutoPunctuation(context)
+        val localSentences = SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context)
+        val marks = voiceMarks()
+        return segments.mapIndexed { index, part ->
+            val keep = automatic && (part.serverPunctuation || (localSentences && part.language == InputLanguage.CHINESE))
+            normalizeVoiceText(part.text, language, keep, if (index == segments.lastIndex) marks else marks.copy(trailing = true))
+        }.filter(String::isNotEmpty).joinToString(" ")
+    }
 
     private fun voiceMarks() = VoiceMarks(comma = SettingsPreferences.isSttPunctuationComma(context),
         period = SettingsPreferences.isSttPunctuationPeriod(context), question = SettingsPreferences.isSttPunctuationQuestion(context),
         trailing = SettingsPreferences.isSttPunctuationTrailing(context))
 
-    private fun handlePartialResult(text: String) {
+    private fun handlePartialResult(text: String, parts: List<SpeechSegment>? = null) {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it), voiceMarks()) }
+        val cleanText = normalizeResult(text, parts)
         if (cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")
 
         val ic = getInputConnection()
-        if (ic != null) {
+        if (ic != null && remoteSink != null) {
+            // 隔空输入：只在手机输入框里预览（composing），说完发到电脑后清掉。
+            if (!TerminalEditor.active) { onComposingWritten(); ic.setComposingText(cleanText, 1); remotePreview = true }
+        } else if (ic != null) {
             if (toolbarSession) {
                 updateToolbarText(ic, cleanText)
             } else if (!TerminalEditor.active) {
@@ -476,7 +597,7 @@ class VoiceRecognitionHandler(
         Log.e(TAG, "Speech error: $error")
         FileLogger.e(TAG, "Speech error: $error")
         val wasFinishing = finishing
-        if (toolbarSession) commitPendingOnRelease()
+        if (toolbarSession || remoteSink != null) commitPendingOnRelease()
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         lastPartialText = ""

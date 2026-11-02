@@ -75,8 +75,9 @@ class SpeechLanguagesTest {
         assertFalse(SpeechLanguages.supports(SpeechModelCatalog.TWO_PASS, InputLanguage.JAPANESE))
         assertTrue(SpeechLanguages.supports(SpeechModelCatalog.TWO_PASS, InputLanguage.ENGLISH))
         InputLanguage.speech.forEach { assertTrue(SpeechLanguages.supports(SpeechModelCatalog.SENSEVOICE, it)) }
-        // 没有西班牙语识别器：不能把西班牙语交给 SenseVoice 当中文识别。
-        SpeechModelSelection.primaryIds.forEach { assertFalse(SpeechLanguages.supports(it, InputLanguage.SPANISH)) }
+        // 没有西班牙、德、法、俄、韩语识别器：不能交给 SenseVoice 当中文识别。
+        for (letters in com.kingzcheung.xime.settings.LetterLanguage.entries)
+            SpeechModelSelection.primaryIds.forEach { assertFalse(SpeechLanguages.supports(it, letters.language)) }
         InputLanguage.entries.forEach { assertFalse(SpeechLanguages.supports("unknown-model", it)) }
         SpeechModelSelection.primaryIds.forEach { assertFalse(SpeechLanguages.supports(it, InputLanguage.UNSPECIFIED)) }
     }

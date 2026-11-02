@@ -8,6 +8,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.speech.SpeechRecognitionManager
+import com.kingzcheung.xime.speech.SpeechSegment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -266,6 +267,28 @@ class VoiceRecognitionHandlerFinishTest {
     }
 
     private val editor = StringBuilder()
+
+    private fun segmentedResult(vararg parts: SpeechSegment) {
+        val callback = argumentCaptor<(List<SpeechSegment>, Boolean) -> Unit>()
+        verify(mockManager).segmentedTextCallback = callback.capture()
+        callback.firstValue(parts.toList(), false)
+    }
+
+    @Test fun mixedOnlineAndFallbackSegmentsRespectTheirOwnPunctuation() {
+        autoPunctuation = true
+        startToolbar()
+        segmentedResult(
+            SpeechSegment("你好，世界。", InputLanguage.CHINESE, true),
+            SpeechSegment("本地，备用。", InputLanguage.CHINESE, false),
+        )
+        assertEquals("你好，世界。 本地 备用", editor.toString())
+    }
+
+    @Test fun disabledPunctuationAlsoAppliesToOnlineResults() {
+        startToolbar()
+        segmentedResult(SpeechSegment("你好，世界。", InputLanguage.CHINESE, true))
+        assertEquals("你好 世界", editor.toString())
+    }
 
     private fun startToolbar() {
         whenever(mockInputConnection.getTextBeforeCursor(anyInt(), anyInt())).thenAnswer {

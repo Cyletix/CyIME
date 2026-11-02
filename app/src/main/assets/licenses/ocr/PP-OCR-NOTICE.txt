@@ -10,7 +10,8 @@ SHA256 4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae
 rec/ch_PP-OCRv5_rec_mobile.onnx
 SHA256 5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5
 The character dictionary is extracted without changes from recognition model metadata.
-Models are unmodified. CyIME's Java preprocessing/postprocessing adapts the DB detection,
+Models are unmodified. The lite APK downloads them on first use (same files, SHA256 checked);
+APKs with bundled models carry them in assets/ocr/ppocr-v5. CyIME's Java preprocessing/postprocessing adapts the DB detection,
 perspective crop and CTC pipeline; it adds resolution/work bounds and text assembly.
 Source references:
 https://github.com/RapidAI/RapidOCR/tree/v3.9.2/python/rapidocr

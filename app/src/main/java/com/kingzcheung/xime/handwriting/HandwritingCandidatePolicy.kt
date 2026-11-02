@@ -34,4 +34,44 @@ internal object HandwritingCandidatePolicy {
         } + rest
         return order.mapIndexed { i, c -> HandwritingCandidate(c.char, candidates[i].score) }
     }
+
+    /** 生僻字模板分数打的折扣：模板分 = 这个系数 × 相似度²（与模型概率同量纲）。 */
+    const val RARE_WEIGHT = 0.5f
+    /** 与模板的相似度低于这个值的生僻字不出。 */
+    const val RARE_MIN_SIMILARITY = 0.6f
+    /** 一次最多加几个生僻字。 */
+    const val RARE_MAX = 4
+    /** 没把握的生僻字排在模型前几个候选之后。 */
+    const val RARE_AFTER = 3
+
+    /**
+     * 把字表外生僻字（[HanziRareTemplates]）并进候选，常用字的首选和前 [RARE_AFTER] 个不让位：
+     * - 生僻字的模板分（[RARE_WEIGHT] × 相似度² × [mass]）和模型候选一起按常用度重排后仍排第一的，放最前面；
+     * - 其余生僻字排在模型前 [RARE_AFTER] 个候选之后。
+     * 分数仍按模型候选原来的分数依次分给新顺序（同 [preferCommon]），叠写切分只看首位分数，不受影响。
+     *
+     * @param han 模型给的汉字候选，概率从高到低（[preferCommon] 之前）
+     * @param rare 生僻字和相似度，从高到低
+     * @param mass 模型前若干类概率之和（模板相似度在归一化空间里，换回模型概率的量纲）
+     */
+    fun mergeRare(
+        han: List<HandwritingCandidate>,
+        rare: List<Pair<String, Float>>,
+        weights: Map<String, Int>,
+        mass: Float = 1f,
+    ): List<HandwritingCandidate> {
+        val ranked = preferCommon(han, weights)
+        if (ranked.isEmpty()) return ranked
+        val known = han.mapTo(HashSet()) { it.char }
+        val add = rare.asSequence().filter { it.second >= RARE_MIN_SIMILARITY && it.first !in known }
+            .distinctBy { it.first }.take(RARE_MAX)
+            .map { HandwritingCandidate(it.first, RARE_WEIGHT * it.second * it.second * mass) }.toList()
+        if (add.isEmpty()) return ranked
+        val added = add.mapTo(HashSet()) { it.char }
+        val strong = preferCommon((han + add).sortedByDescending { it.score }, weights)
+            .takeWhile { it.char in added }.map { it.char }
+        val weak = add.map { it.char }.filter { it !in strong }
+        val order = (strong + ranked.take(RARE_AFTER).map { it.char } + weak + ranked.drop(RARE_AFTER).map { it.char }).distinct()
+        return order.mapIndexed { i, c -> HandwritingCandidate(c, ranked.getOrNull(i)?.score ?: ranked.last().score) }
+    }
 }

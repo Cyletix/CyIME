@@ -152,7 +152,7 @@ class AsrModelManager(private val context: Context) {
     /** Language choices are independent. Legacy global choices remain a read-only migration fallback. */
     fun getSelectedModelId(language: InputLanguage): String {
         require(language in InputLanguage.speech) {
-            if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言" else "暂时没有${language.displayName}语音识别"
+            if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请在「已安装的方案」里给它选语言" else "暂时没有${language.displayName}语音识别"
         }
         preferences.getString("selected_model_${language.id}", null)?.let { stored ->
             val mode = SpeechModelSelection.withoutRetiredCorrector(stored)

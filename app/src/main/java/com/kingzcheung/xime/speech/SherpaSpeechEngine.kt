@@ -83,25 +83,17 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         } catch (error: Throwable) { close(); throw error }
     }
 
-    override fun detector(): SpeechDetector = object : SpeechDetector {
-        private val level = SpeechDetectionLevel()
-        override fun speech(frame: FloatArray): Boolean {
-            val v = checkNotNull(vad)
-            v.acceptWaveform(if (paraformer) level.process(frame) else frame)
-            val active = v.isSpeechDetected()
-            while (!v.empty()) v.pop()
-            return active
-        }
-        override fun reset() { vad?.reset(); level.reset() }
-    }
     /**
-     * Captions get the same VAD-only gain as the keyboard (target 0.2): without it a tablet at
-     * arm's length heard nothing at all (2026-10-21, 1.14.77: the keyboard recognised, captions
-     * never opened a segment; tablet recordings gave 0 speech frames raw vs 28–110 with the gain).
-     * Room noise no longer merges turns as on 10-16: the 5 s cap and energy pauses split them, and
-     * fan-only, hiss, hum and click replays still never start recognition with this gain.
+     * Every engine, keyboard and captions alike, gets the VAD-only quiet-speech gain (target 0.2,
+     * at most 16x); recognizers still receive the original PCM. It used to apply only to Paraformer,
+     * the default when it was added (2026-10-06); SenseVoice / X-ASR, the default since, got raw
+     * frames, so quiet speech and whispers never opened a region and the whole sentence was lost.
+     * 2026-11-02 replay (production segmenter, SenseVoice, 30 sentences): -50 dBFS speech 36.1→4.0 %
+     * CER (10→0 empty), -55 dBFS whisper 93.0→14.7 % (27→1 empty); normal volume unchanged, and
+     * floor / fan / hum / hiss / breath / click noise still produce no text.
+     * Captions (2026-10-21, 1.14.77): a tablet at arm's length gave 0 speech frames raw vs 28–110 with the gain.
      */
-    override fun captionDetector(): SpeechDetector = object : SpeechDetector {
+    override fun detector(): SpeechDetector = object : SpeechDetector {
         private val level = SpeechDetectionLevel()
         override fun speech(frame: FloatArray): Boolean {
             val v = checkNotNull(vad)

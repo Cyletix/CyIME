@@ -87,6 +87,7 @@ static OrtSession* OnnxEnsureCpuFallbackSession(const OrtApi* api) {
         api->ReleaseStatus(status);
         return nullptr;
     }
+    OnnxDisableSpinning(options);
 
     status = api->CreateSession(ort_env, g_model_path.c_str(), options, &g_cpu_fallback_session);
     api->ReleaseSessionOptions(options);
@@ -274,6 +275,7 @@ Java_com_kingzcheung_xime_association_NativeOnnxEngine_nativeInitialize(
     // Prefer NNAPI (GPU/HW accelerator). onnxruntime partitions the graph so
     // nodes NNAPI supports run on NNAPI and the rest fall back to CPU. The CPU
     // EP is appended explicitly to guarantee the NNAPI -> CPU fallback order.
+    OnnxDisableSpinning(session_options);
     OnnxTryEnableNnapi(session_options);
     OnnxTryEnableCpuFallback(session_options);
 
@@ -289,6 +291,7 @@ Java_com_kingzcheung_xime_association_NativeOnnxEngine_nativeInitialize(
         OrtSessionOptions* cpu_options = nullptr;
         status = api->CreateSessionOptions(&cpu_options);
         if (!status) {
+            OnnxDisableSpinning(cpu_options);
             OnnxTryEnableCpuFallback(cpu_options);
             status = api->CreateSession(ort_env, modelPathStr, cpu_options, &g_session);
             api->ReleaseSessionOptions(cpu_options);

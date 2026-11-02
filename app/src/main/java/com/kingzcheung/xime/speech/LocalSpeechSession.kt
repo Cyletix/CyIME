@@ -20,7 +20,7 @@ internal interface LocalSpeechEngine : AutoCloseable {
     /** Captions may re-read the sentence so far for a live line when there is no streaming model. */
     val hasCaptionPreview: Boolean get() = false
     fun detector(): SpeechDetector
-    /** Captions: the VAD-only quiet-speech gain on every engine (the keyboard applies it to Paraformer). */
+    /** Captions use the same detector as dictation (VAD-only quiet-speech gain on every engine). */
     fun captionDetector(): SpeechDetector = detector()
     fun accept(samples: FloatArray): String
     fun finishStream(): String

@@ -19,6 +19,7 @@ class VoiceKeyboardContainer(
     private val onVoiceDismiss: () -> Unit = {},
     private val onTouchCancel: () -> Unit = {},
     private val acceptTouchDown: (Long) -> Boolean = { true },
+    private val allowPreviewTouch: (MotionEvent) -> Boolean = { true },
 ) : FrameLayout(context) {
 
     private var discardTouchGesture = false
@@ -48,7 +49,8 @@ class VoiceKeyboardContainer(
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         // Android may deliver old touches only after a blocked main thread resumes.
         // Consume the whole stale gesture, including its UP, rather than replaying a key.
-        if (ev?.actionMasked == MotionEvent.ACTION_DOWN) discardTouchGesture = !acceptTouchDown(ev.downTime)
+        if (ev?.actionMasked == MotionEvent.ACTION_DOWN)
+            discardTouchGesture = !acceptTouchDown(ev.downTime) || !allowPreviewTouch(ev)
         if (discardTouchGesture) {
             if (ev?.actionMasked == MotionEvent.ACTION_UP || ev?.actionMasked == MotionEvent.ACTION_CANCEL) discardTouchGesture = false
             return true

@@ -48,8 +48,9 @@ internal fun loadOcrGalleryImage(context: Context, uri: Uri): Bitmap {
     return Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true).also { if (it !== raw) raw.recycle() }
 }
 
-internal fun cropGalleryStrip(image: Bitmap, vw: Int, vh: Int, transform: OcrImageTransform): Bitmap {
-    val output = OcrImageGeometry.output(image.width, image.height, vw, vh, transform)
+internal fun cropGalleryStrip(image: Bitmap, vw: Int, vh: Int, transform: OcrImageTransform,
+                              frame: OcrScanFrame = OcrScanGeometry.TEXT): Bitmap {
+    val output = OcrImageGeometry.output(image.width, image.height, vw, vh, transform, frame)
     return Bitmap.createBitmap(output.width, output.height, Bitmap.Config.ARGB_8888).also { bitmap ->
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)

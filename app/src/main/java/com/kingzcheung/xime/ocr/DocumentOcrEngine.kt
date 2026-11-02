@@ -2,7 +2,6 @@ package com.kingzcheung.xime.ocr
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.AtomicFile
 import java.io.File
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
@@ -24,32 +23,24 @@ internal object DocumentOcrEngine {
         init {
             check(OpenCVLoader.initLocal()) { "Cannot load OCR image processing" }
             Core.setNumThreads(1)
-            val dataDir = File(context.noBackupFilesDir, "ocr-ppocr-v5-1").apply { check(mkdirs() || isDirectory) }
-            fun asset(name: String): String {
-                val target = File(dataDir, name)
-                val atomic = AtomicFile(target)
-                if (!target.exists() || target.length() == 0L) {
-                    val stream = atomic.startWrite()
-                    try {
-                        context.assets.open("ocr/ppocr-v5/$name").use { it.copyTo(stream) }
-                        atomic.finishWrite(stream)
-                    } catch (e: Exception) { atomic.failWrite(stream); throw e }
-                }
-                return target.absolutePath
-            }
+            // 轻量版的模型是下载的；带模型的安装包第一次用时从 assets 解出（见 OcrModelFiles）。
+            val dataDir = OcrModelFiles.prepare(context) ?: throw OcrModelMissingException()
+            fun file(name: String): String = File(dataDir, name).absolutePath
             engine = DocumentOcrPipeline(
-                asset("ch_PP-OCRv5_det_mobile.onnx"), asset("ch_PP-OCRv5_rec_mobile.onnx"),
-                asset("ppocrv5-characters.txt"),
+                file(OcrModelFiles.DETECTION), file(OcrModelFiles.RECOGNITION), file(OcrModelFiles.CHARACTERS),
             )
         }
-        fun recognize(bitmap: Bitmap, @Suppress("UNUSED_PARAMETER") singleLine: Boolean = false): String {
+        /** [table] lays the text out as a table in that format; null keeps plain text. */
+        fun recognize(bitmap: Bitmap, @Suppress("UNUSED_PARAMETER") singleLine: Boolean = false,
+                      table: OcrTableLayout.Format? = null): String {
             if (OcrFrameQuality.assess(bitmap) != OcrFrameQuality.Verdict.READY) return ""
             val rgba = Mat()
             val bgr = Mat()
             return try {
                 Utils.bitmapToMat(bitmap, rgba)
                 Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR)
-                DocumentOcrPipeline.assemble(engine.recognize(bgr))
+                if (table != null) engine.recognizeTable(bgr, table)
+                else DocumentOcrPipeline.assemble(engine.recognize(bgr))
             } finally { bgr.release(); rgba.release() }
         }
         override fun close() { engine.close() }
