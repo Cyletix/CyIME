@@ -21,7 +21,7 @@ activation: multi
 entry: main.lua
 
 # 宿主最低版本要求（工具栏按钮与工具面板契约）
-minHostVersion: 2.8.0
+minHostVersion: 1.15.37
 
 # 工具栏入口：点击打开该插件的通用面板
 toolbarButtons:

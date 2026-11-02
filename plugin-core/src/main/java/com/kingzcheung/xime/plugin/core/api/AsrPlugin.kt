@@ -31,6 +31,9 @@ interface AsrPluginBackend {
 
     fun start(): Boolean
 
+    /** 带录音语言（zh/en/ja）开始；只对声明 `languages: any` 的插件调用，旧插件忽略语言。 */
+    fun start(languageId: String): Boolean = start()
+
     /** 宿主录音 PCM 灌入（16k/mono/pcm16le，见宿主录音实现）。 */
     fun processAudioChunk(pcm: ByteArray)
 

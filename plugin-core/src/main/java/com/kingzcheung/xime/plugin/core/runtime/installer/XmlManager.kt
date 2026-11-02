@@ -143,11 +143,13 @@ class XmlManager(private val context: Application) {
                 root["speech"] = mapOf(
                     "inputMode" to it.inputMode,
                     "supportsPartialResults" to it.supportsPartialResults,
-                    "requiresNetwork" to it.requiresNetwork
+                    "requiresNetwork" to it.requiresNetwork,
+                    "keepsPunctuation" to it.keepsPunctuation,
+                    "anyLanguage" to it.anyLanguage
                 )
             }
             cap.tool?.let {
-                root["tool"] = mapOf("display" to it.display?.name)
+                root["tool"] = mapOf("display" to it.display?.name, "wholeField" to it.wholeField)
             }
             cap.clipboardSync?.let {
                 root["clipboardSync"] = mapOf("protocols" to it.protocols, "foregroundPollIntervalMs" to it.foregroundPollIntervalMs, "maxTextBytes" to it.maxTextBytes)
@@ -187,7 +189,9 @@ class XmlManager(private val context: Application) {
                         com.kingzcheung.xime.plugin.core.model.PluginCapabilities.SpeechCapabilities(
                             inputMode = (m["inputMode"] as? String) ?: "streaming",
                             supportsPartialResults = (m["supportsPartialResults"] as? Boolean) ?: true,
-                            requiresNetwork = (m["requiresNetwork"] as? Boolean) ?: true
+                            requiresNetwork = (m["requiresNetwork"] as? Boolean) ?: true,
+                            keepsPunctuation = (m["keepsPunctuation"] as? Boolean) ?: false,
+                            anyLanguage = (m["anyLanguage"] as? Boolean) ?: false
                         )
                     },
                     tool = (root["tool"] as? Map<*, *>)?.let { m ->
@@ -197,7 +201,8 @@ class XmlManager(private val context: Application) {
                                 if (s.equals("select", ignoreCase = true)) com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
                                 else com.kingzcheung.xime.plugin.core.api.ToolResult.entries
                                     .firstOrNull { it.name.equals(s, ignoreCase = true) }
-                            }
+                            },
+                            wholeField = (m["wholeField"] as? Boolean) ?: false
                         )
                     },
                     clipboardSync = (root["clipboardSync"] as? Map<*, *>)?.let { m ->

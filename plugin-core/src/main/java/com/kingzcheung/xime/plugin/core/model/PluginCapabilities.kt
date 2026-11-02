@@ -50,12 +50,24 @@ data class PluginCapabilities(
         val inputMode: String = "streaming",
         val supportsPartialResults: Boolean = true,
         val requiresNetwork: Boolean = true,
-    )
+        /** 接口返回的文字自带标点（manifest `keepsPunctuation: true`）：跟随「自动加标点」和逐项开关，不再空格化。 */
+        val keepsPunctuation: Boolean = false,
+        /** manifest `languages: any`：接口自己认语言，宿主把录音语言（zh/en/ja）交给 start；未声明 = 只用于中文。 */
+        val anyLanguage: Boolean = false,
+    ) {
+        /** inputMode: batch：录完整段上传。失败时宿主用本地模型重识别这段录音，收尾等待放宽到 30 秒。 */
+        val isBatch: Boolean get() = inputMode.equals("batch", ignoreCase = true)
+    }
 
     /** tool 工具面板能力声明。 */
     data class ToolCapabilities(
         /** 结果显示方式：DIRECT 直接上屏 / SELECT 全屏候选页面；null 宿主按结果数量兜底。 */
         val display: ToolResult? = null,
+        /**
+         * 面板上下文（manifest `context: field`）：没选字时取整个输入框并在点结果时替换整框，
+         * 不退到剪贴板（AI 改写）。未声明 = 旧行为：选区 > 剪贴板（AI 回复）。
+         */
+        val wholeField: Boolean = false,
     )
 
     /** clipboard_sync 剪贴板同步能力声明。 */

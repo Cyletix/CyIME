@@ -1,0 +1,178 @@
+# Rime schema
+# encoding: utf-8
+# 小鹤双拼九键（原型）：每个字按小鹤双拼的两个字母打，字母落在九键 ABC/DEF/…/WXYZ 上，
+# 于是每个字固定两位数字（如 你 ni → 64，好 hc → 42，双 ul → 85）。
+# 与「中文九键」共用雾凇词库、九键组句、词组模型和用户词库；键盘布局由 CyIME 的 keyboard.t9.schemas 绑定。
+# 左侧音节栏只认全拼，这里关掉；CyLM 整句按全拼九键解码，这里不用。
+cyime_particle_shortcuts:
+  exact: ["5353 来了"]
+t9:
+  # 双拼没有全拼音节栏，左栏只放快捷符号。
+  left_panel_mode: none
+  joint_decoder: true
+  source_budget: 128
+  pool_budget: 64
+  dictionary_beam: 16
+  sentence_beam: 24
+  result_budget: 12
+  display_sentences: 1
+  more_sentences_min_keys: 9
+  spelling_penalty: 5.0
+  word_penalty: 8.0
+  sentence_weight: 0.25
+  ngram_model: t9_ngram
+  ngram_sentence_start: true
+  ngram_eos_weight: 0
+  ngram_user_weight: 0.05
+  ngram_dictionary_prior: 0.02
+  ngram_merge_segmentations: false
+  reading_table: cyime_readings
+  # 编码栏显示按下的数字；候选注释显示词库读音。
+  isDisplayOriginalPreedit: true
+  enable_date_translator: true
+  date_translator:
+    date: riqi
+    time: sj
+    week: xq
+    datetime: dt
+    timestamp: ts
+    lunar: nl
+    idx: 2
+
+schema:
+  schema_id: t9_flypy
+  dependencies:
+    - cyime_t9_english
+  name: 小鹤双拼九键
+  version: "0.1"
+  language: zh
+  input_scheme: double_pinyin
+  author:
+    - CyIME
+  description: |
+    小鹤双拼打在九键上：每个字两位数字。与中文九键共用雾凇词库和词组模型。
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 西文 ]
+  - name: full_shape
+    states: [ 半角, 全角 ]
+  - name: ascii_punct
+    reset: 0
+    states: [ 。，, ．， ]
+
+engine:
+  processors:
+    - t9_processor
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - t9_date_translator
+    - punct_translator
+    - script_translator
+    - t9_english_translator@t9_english
+  filters:
+    - cyime_candidate_policy
+    - t9_filter
+    - uniquifier
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba9876543210
+  initials: zyxwvutsrqponmlkjihgfedcba9876543210
+  delimiter: " '"
+  algebra:
+    # 小鹤双拼（与 double_pinyin_flypy 相同）
+    - erase/^xx$/
+    - derive/^([jqxy])u$/$1v/
+    - derive/^([aoe])([ioun])$/$1$1$2/
+    - xform/^([aoe])(ng)?$/$1$1$2/
+    - xform/iu$/Ⓠ/
+    - xform/(.)ei$/$1Ⓦ/
+    - xform/uan$/Ⓡ/
+    - xform/[uv]e$/Ⓣ/
+    - xform/un$/Ⓨ/
+    - xform/^sh/Ⓤ/
+    - xform/^ch/Ⓘ/
+    - xform/^zh/Ⓥ/
+    - xform/uo$/Ⓞ/
+    - xform/ie$/Ⓟ/
+    - xform/(.)i?ong$/$1Ⓢ/
+    - xform/ing$|uai$/Ⓚ/
+    - xform/(.)ai$/$1Ⓓ/
+    - xform/(.)en$/$1Ⓕ/
+    - xform/(.)eng$/$1Ⓖ/
+    - xform/[iu]ang$/Ⓛ/
+    - xform/(.)ang$/$1Ⓗ/
+    - xform/ian$/Ⓜ/
+    - xform/(.)an$/$1Ⓙ/
+    - xform/(.)ou$/$1Ⓩ/
+    - xform/[iu]a$/Ⓧ/
+    - xform/iao$/Ⓝ/
+    - xform/(.)ao$/$1Ⓒ/
+    - xform/ui$/Ⓥ/
+    - xform/in$/Ⓑ/
+    - xlit/ⓆⓌⓇⓉⓎⓊⒾⓄⓅⓈⒹⒻⒼⒽⒿⓀⓁⓏⓍⒸⓋⒷⓃⓂ/qwrtyuiopsdfghjklzxcvbnm/
+    # 只打声母的简拼：每个字一位数字。
+    - abbrev/^(.).+$/$1/
+    # 九键：字母换成所在键的数字
+    - xlit/abcdefghijklmnopqrstuvwxyz/22233344455566677778889999/
+
+translator:
+  dictionary: rime_ice
+  max_homophones: 32
+  max_sentences: 3
+  prism: t9_flypy
+  spelling_hints: 100
+  always_show_comments: true
+  comment_format: []
+
+cyime:
+  candidate_policy: true
+
+# amzxyz/RIME-LMDG, CC-BY-4.0（随 CyIME 提供）。
+grammar:
+  language: wanxiang-lts-zh-hans
+  collocation_max_length: 6
+  collocation_min_length: 2
+  collocation_penalty: -14
+  non_collocation_penalty: -6
+  weak_collocation_penalty: -100
+  rear_penalty: -18
+
+punctuator:
+  import_preset: default
+
+recognizer:
+  patterns:
+    punct: "^/([0-9]|10|[A-Za-z]*?)$"
+
+key_binder:
+  bindings:
+    - { when: has_menu, accept: 1, send: apostrophe }
+
+editor:
+  bindings:
+    space: confirm
+
+t9_english:
+  dictionary: cyime_t9_english
+  enable_completion: false
+  enable_sentence: false
+  enable_user_dict: true
+  initial_quality: 0.2
+  comment_format: []
+  digit_suffixes: false
+  completion_limit: 3

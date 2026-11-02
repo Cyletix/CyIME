@@ -21,7 +21,7 @@ activation: multi
 entry: main.lua
 
 # 宿主最低版本要求
-minHostVersion: 2.6.2
+minHostVersion: 1.15.37
 
 # 工具栏入口
 toolbarButtons:

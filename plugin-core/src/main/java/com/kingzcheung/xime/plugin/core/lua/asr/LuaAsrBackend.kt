@@ -32,9 +32,15 @@ class LuaAsrBackend(
         return runtime.call("initialize").toboolean()
     }
 
-    override fun start(): Boolean {
+    override fun start(): Boolean = startWith(null)
+
+    /** Lua `start(lang)`：不认参数的旧插件照常工作。 */
+    override fun start(languageId: String): Boolean = startWith(languageId)
+
+    private fun startWith(languageId: String?): Boolean {
         val ok = try {
-            runtime.call("start").toboolean()
+            (if (languageId == null) runtime.call("start")
+                else runtime.call("start", org.luaj.vm2.LuaValue.valueOf(languageId))).toboolean()
         } catch (e: Exception) {
             Log.e(logTag, "start failed", e)
             false

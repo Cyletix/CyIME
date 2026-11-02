@@ -9,6 +9,8 @@ import com.kingzcheung.xime.plugin.core.model.PluginInfo
 import com.kingzcheung.xime.plugin.core.model.PluginSource
 import com.kingzcheung.xime.plugin.core.model.PluginToolbarButton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -103,12 +105,17 @@ internal data class EmojiCapabilitiesConfig(
 internal data class SpeechCapabilitiesConfig(
     val inputMode: String = "streaming",
     val supportsPartialResults: Boolean = true,
-    val requiresNetwork: Boolean = true
+    val requiresNetwork: Boolean = true,
+    val keepsPunctuation: Boolean = false,
+    /** "any"：接口自己认语言（见 PluginCapabilities.SpeechCapabilities.anyLanguage）。 */
+    val languages: String? = null
 )
 
 @Serializable
 internal data class ToolCapabilitiesConfig(
-    val display: String? = null
+    val display: String? = null,
+    /** "field"：没选字时取整个输入框（见 PluginCapabilities.ToolCapabilities.wholeField）。 */
+    val context: String? = null
 )
 
 @Serializable
@@ -137,7 +144,9 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
             com.kingzcheung.xime.plugin.core.model.PluginCapabilities.SpeechCapabilities(
                 inputMode = it.inputMode,
                 supportsPartialResults = it.supportsPartialResults,
-                requiresNetwork = it.requiresNetwork
+                requiresNetwork = it.requiresNetwork,
+                keepsPunctuation = it.keepsPunctuation,
+                anyLanguage = it.languages.equals("any", ignoreCase = true)
             )
         },
         tool = tool?.let {
@@ -148,7 +157,8 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
                     // 旧契约 "select"（全屏结果页）已并入 passive（InfoPanel 内 items 点选上屏）
                     "select" -> com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
                     else -> null
-                }
+                },
+                wholeField = it.context.equals("field", ignoreCase = true)
             )
         },
         clipboardSync = clipboardSync?.let {
@@ -190,7 +200,7 @@ class InstallerManager(
         private const val MANIFEST_YAML = "manifest.yaml"
 
         /** xipk 包大小上限（10MB）：插件是脚本+资源，超过即拒绝安装。 */
-        private const val MAX_ARCHIVE_FILE_BYTES = 10 * 1024 * 1024
+        const val MAX_ARCHIVE_FILE_BYTES = 10 * 1024 * 1024
 
         /** 解压条目数与解压后总体积上限（防 zip bomb）。 */
         private const val MAX_ARCHIVE_ENTRIES = 512
@@ -295,11 +305,14 @@ class InstallerManager(
     private val pluginsDir: File by lazy {
         File(context.filesDir, PLUGINS_DIR).apply { mkdirs() }
     }
+    private val installationLock = Mutex()
 
     suspend fun installPlugin(
         pluginFile: File,
         forceOverwrite: Boolean = false,
-        source: PluginSource = PluginSource.FILE
+        source: PluginSource = PluginSource.FILE,
+        expectedId: String? = null,
+        expectedVersion: String? = null,
     ): InstallResult = withContext(Dispatchers.IO) {
         if (!pluginFile.exists()) {
             return@withContext InstallResult.Failure("插件文件不存在")
@@ -315,6 +328,10 @@ class InstallerManager(
             is PluginParseResult.Success -> parsed.config
         }
         val pluginId = pluginConfig.id
+        if ((expectedId != null && pluginId != expectedId) ||
+            (expectedVersion != null && pluginConfig.version != expectedVersion)) {
+            return@withContext InstallResult.Failure("插件包与所选插件或版本不符")
+        }
         if (!isValidPluginId(pluginId)) {
             return@withContext InstallResult.Failure("非法插件 id: $pluginId（仅允许字母/数字/下划线/连字符，点号分段，最长 64）")
         }
@@ -344,23 +361,41 @@ class InstallerManager(
             return@withContext InstallResult.Failure(range)
         }
 
+        installationLock.withLock {
+            installValidated(pluginFile, pluginConfig, pluginDir, entryScript, forceOverwrite, source)
+        }
+    }
+
+    private fun installValidated(
+        pluginFile: File, pluginConfig: PluginConfig, pluginDir: File, entryScript: String,
+        forceOverwrite: Boolean, source: PluginSource,
+    ): InstallResult {
+        val pluginId = pluginConfig.id
         val existingPlugin = xmlManager.getPluginById(pluginId)
+        if (source == PluginSource.REMOTE && existingPlugin != null && existingPlugin.source != source) {
+            return InstallResult.Failure("同名插件已从其他来源安装，请在插件管理中查看")
+        }
 
         // Lua 插件无版本号概念：只有首次安装或强制覆盖才重新解压
         if (!forceOverwrite && existingPlugin != null) {
-            return@withContext InstallResult.Success(existingPlugin)
+            return InstallResult.Success(existingPlugin)
         }
 
-        if (pluginDir.exists()) {
-            pluginDir.deleteRecursively()
-        }
-        pluginDir.mkdirs()
-
-        try {
-            extractPluginArchive(pluginFile, pluginDir)
+        val staging = File(pluginsDir, ".$pluginId.installing")
+        val previous = File(pluginsDir, ".$pluginId.previous")
+        return try {
+            if (previous.exists() && !pluginDir.exists()) check(previous.renameTo(pluginDir))
+            check(staging.deleteRecursively() && staging.mkdirs())
+            extractPluginArchive(pluginFile, staging)
             val entryFile = File(pluginDir, entryScript)
-            if (!entryFile.exists()) {
+            if (!File(staging, entryScript).isFile) {
                 throw IllegalArgumentException("Lua 入口脚本不存在: $entryScript")
+            }
+            check(previous.deleteRecursively())
+            if (pluginDir.exists()) check(pluginDir.renameTo(previous))
+            if (!staging.renameTo(pluginDir)) {
+                if (previous.exists()) check(previous.renameTo(pluginDir))
+                throw IllegalStateException("无法写入插件目录")
             }
 
             val pluginInfo = PluginInfo(
@@ -372,7 +407,7 @@ class InstallerManager(
                 versionName = pluginConfig.version,
                 path = entryFile.absolutePath,
                 type = pluginConfig.type,
-                enabled = existingPlugin?.enabled ?: true,
+                enabled = existingPlugin?.enabled ?: (source != PluginSource.REMOTE),
                 installTime = existingPlugin?.installTime ?: System.currentTimeMillis(),
                 source = source,
                 minHostVersion = pluginConfig.minHostVersion,
@@ -386,17 +421,22 @@ class InstallerManager(
                 capabilities = pluginConfig.capabilities
             )
 
+            if (source == PluginSource.REMOTE && existingPlugin == null) {
+                com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.setEnabled(context, pluginId, false)
+            }
             if (existingPlugin != null) {
                 xmlManager.updatePlugin(pluginInfo)
             } else {
                 xmlManager.addPlugin(pluginInfo)
             }
             xmlManager.flushToDisk()
+            previous.deleteRecursively()
 
             InstallResult.Success(pluginInfo)
         } catch (e: Exception) {
-            pluginDir.deleteRecursively()
             InstallResult.Failure("插件安装失败: ${e.message}", e)
+        } finally {
+            staging.deleteRecursively()
         }
     }
 
@@ -405,13 +445,13 @@ class InstallerManager(
             Log.e("InstallerManager", "uninstallPlugin 拒绝非法 id: $pluginId")
             return@withContext false
         }
-        val pluginDir = getPluginDirectory(pluginId)
-        if (pluginDir.exists()) {
-            pluginDir.deleteRecursively()
+        installationLock.withLock {
+            val pluginDir = getPluginDirectory(pluginId)
+            if (pluginDir.exists()) pluginDir.deleteRecursively()
+            xmlManager.removePlugin(pluginId)
+            xmlManager.flushToDisk()
+            true
         }
-        xmlManager.removePlugin(pluginId)
-        xmlManager.flushToDisk()
-        true
     }
 
     suspend fun installPluginFromUri(uri: Uri): InstallResult = withContext(Dispatchers.IO) {

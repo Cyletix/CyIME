@@ -2,6 +2,9 @@ package com.kingzcheung.xime.settings
 
 import android.content.Context
 import android.util.Log
+import com.kingzcheung.xime.plugin.core.model.PluginSource
+import com.kingzcheung.xime.plugin.core.runtime.PluginManager
+import com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,6 +12,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /** 下载校验状态：null=未提供sha256, true=校验通过, false=校验不通过。 */
@@ -77,8 +82,8 @@ object XimeIndexSource {
         withContext(Dispatchers.IO) {
             ensureConfigured(context)
             try {
-                // 遍历所有镜像，第一个成功获取到方案的返回
-                for (base in mirrors) {
+                // 遍历所有镜像（国内先魔搭、海外先 GitHub），第一个成功获取到方案的返回
+                for (base in StoreMirrors.orderedBases(context, mirrors)) {
                     val result = tryFetchFromBase(base, appVersion)
                     if (result != null) return@withContext Result.success(result)
                 }
@@ -131,6 +136,96 @@ object XimeIndexSource {
         }
     }
 
+    internal fun bundledPlugins(context: Context): PluginsDirectIndex =
+        context.assets.open("plugin-market/index.yaml").bufferedReader().use {
+            XimeIndexParser.parsePluginsDirectIndex(it.readText())
+        }
+
+    internal suspend fun remotePlugins(context: Context): Pair<String, PluginsDirectIndex>? =
+        withContext(Dispatchers.IO) {
+            for (base in StoreMirrors.orderedBases(context, KeysConfigHelper.loadXimeIndexConfig(context).baseUrls)) {
+                val text = fetchTextSingle(base, "plugins/index.yaml") ?: continue
+                val index = runCatching { XimeIndexParser.parsePluginsDirectIndex(text) }.getOrNull() ?: continue
+                if (index.plugins.isNotEmpty()) return@withContext hostOf(base) to index
+            }
+            null
+        }
+
+    internal suspend fun installMarketPlugin(context: Context, pluginId: String, version: PluginVersion) =
+        withContext(Dispatchers.IO) {
+            val tmp = File.createTempFile("market-", ".xipk", context.cacheDir)
+            try {
+                val copies = version.downloadUrls
+                val bundled = bundledPlugins(context).plugins.find { it.id == pluginId }
+                    ?.versions?.find { it.version == version.version }?.downloadUrls.orEmpty()
+                var failure = "没有可校验的下载地址"
+                val verified = copies.any { copy ->
+                    val hash = copy.sha256?.takeIf { it.isNotBlank() } ?: version.sha256
+                    if (!hash.matches(Regex("[a-fA-F0-9]{64}"))) return@any false
+                    try {
+                        val local = bundled.find { it.sha256.equals(hash, ignoreCase = true) }
+                        if (local != null) {
+                            val file = local.url.substringAfterLast('/')
+                            context.assets.open("plugin-market/packages/$file").use { copyPlugin(it, tmp, hash) }
+                        } else {
+                            // 同一个包的几条线路（国内魔搭、jsDelivr、GitHub）按地区排好，逐条试到校验通过为止。
+                            var lastError: Exception? = null
+                            val downloaded = StoreMirrors.fileCandidates(context, copy.url, hash).any { url ->
+                                try {
+                                    val request = Request.Builder().url(url).build()
+                                    require(request.url.isHttps) { "插件包需要 HTTPS 下载地址" }
+                                    client.newCall(request).execute().use { response ->
+                                        check(response.isSuccessful) { "下载失败（HTTP ${response.code}）" }
+                                        val body = response.body ?: throw IOException("下载内容为空")
+                                        body.byteStream().use { copyPlugin(it, tmp, hash) }
+                                    }
+                                    true
+                                } catch (e: Exception) {
+                                    lastError = e
+                                    false
+                                }
+                            }
+                            if (!downloaded) throw lastError ?: IOException("下载失败")
+                        }
+                        true
+                    } catch (e: Exception) {
+                        failure = e.message ?: "下载失败"
+                        false
+                    }
+                }
+                check(verified) { failure }
+                val result = PluginManager.installerManager.installPlugin(
+                    tmp, forceOverwrite = true, source = PluginSource.REMOTE,
+                    expectedId = pluginId, expectedVersion = version.version,
+                )
+                if (result is InstallerManager.InstallResult.Failure) throw IOException(result.reason)
+                if (PluginManager.getPluginInfo(pluginId) != null) {
+                    PluginManager.unloadPlugin(pluginId)
+                    PluginManager.launchPlugin(pluginId)
+                }
+            } finally {
+                tmp.delete()
+            }
+        }
+
+    private fun copyPlugin(input: InputStream, file: File, expectedHash: String) {
+        val digest = MessageDigest.getInstance("SHA-256")
+        var total = 0L
+        file.outputStream().use { output ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                total += count
+                require(total <= InstallerManager.MAX_ARCHIVE_FILE_BYTES) { "插件包超过大小上限" }
+                digest.update(buffer, 0, count)
+                output.write(buffer, 0, count)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        check(actual.equals(expectedHash, ignoreCase = true)) { "插件包 SHA-256 校验失败" }
+    }
+
     /**
      * 下载一个方案到 market 目录（仅下载，不解压）。
      * 遍历所有 downloadUrl（如主包 + 语言模型等），逐一下载到 market/{schemeId}/。
@@ -156,13 +251,19 @@ object XimeIndexSource {
         var anyVerified = false
 
         for (dl in items) {
-            val result = SchemaManager.downloadToMarket(
-                context, dl.url, scheme.id, dl.fileName, dl.sha256?.takeIf { it.isNotBlank() },
-                onProgress = { read, _ ->
-                    val overall = accumulatedBytes + read
-                    if (totalBytesAll > 0) onDownloadProgress(overall, totalBytesAll)
-                },
-            )
+            val sha = dl.sha256?.takeIf { it.isNotBlank() }
+            // 带 sha256 的文件按地区换线路（国内先魔搭转存）；文件名始终取原地址的，安装时按名字找。
+            var result = SchemaManager.DownloadResult(false)
+            for (url in StoreMirrors.fileCandidates(context, dl.url, sha)) {
+                result = SchemaManager.downloadToMarket(
+                    context, url, scheme.id, dl.fileName, sha,
+                    onProgress = { read, _ ->
+                        val overall = accumulatedBytes + read
+                        if (totalBytesAll > 0) onDownloadProgress(overall, totalBytesAll)
+                    },
+                )
+                if (result.success) break
+            }
             accumulatedBytes += dl.sizeBytes
             if (!result.success) {
                 val schemeDir = SchemaManager.getMarketDir(context, scheme.id)

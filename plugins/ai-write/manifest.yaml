@@ -21,7 +21,7 @@ activation: multi
 entry: main.lua
 
 # 宿主最低版本要求（工具栏按钮 + 工具面板契约 + SSE 流式原语）
-minHostVersion: 2.6.2
+minHostVersion: 1.15.37
 
 # 工具栏入口
 toolbarButtons:
