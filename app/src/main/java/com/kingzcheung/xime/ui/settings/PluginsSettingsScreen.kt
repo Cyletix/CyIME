@@ -105,6 +105,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PluginsSettingsContent(
     onBack: () -> Unit,
+    onNavigateToPluginMarket: () -> Unit = {},
     onNavigateToPluginSettings: (String) -> Unit = {},
     onNavigateToPluginDetail: (String) -> Unit = {},
     onNavigateToSpeechToText: () -> Unit = {},
@@ -123,7 +124,12 @@ fun PluginsSettingsContent(
                         )
                     }
                 },
-                actions = { InstalledPluginActions() },
+                actions = {
+                    IconButton(onClick = onNavigateToPluginMarket) {
+                        Icon(Icons.TwoTone.Storefront, contentDescription = "插件市场")
+                    }
+                    InstalledPluginActions()
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -141,7 +147,7 @@ fun PluginsSettingsContent(
     }
 }
 
-/** 已安装插件的右上角操作：刷新、从文件安装。插件管理页和「扩展 › 插件」共用。 */
+/** 已安装插件的右上角操作：刷新、从文件安装。 */
 @Composable
 internal fun InstalledPluginActions() {
     val viewModel: PluginsSettingsViewModel = viewModel()
@@ -162,7 +168,7 @@ internal fun InstalledPluginActions() {
     }
 }
 
-/** 已安装的插件列表（没有商店，插件只从文件导入）。 */
+/** 所有已安装插件共用此管理列表，包括从文件导入的插件。 */
 @Composable
 internal fun InstalledPluginsList(
     modifier: Modifier = Modifier,

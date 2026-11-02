@@ -51,25 +51,30 @@ object LanguagePreferences {
         val before = this.enabled(context)
         val next = before.toMutableSet().apply { if (enabled) add(language) else remove(language) }
         if (enabled && language !in before) InputModes.moveLanguageLast(context, language)
+        val schemasBefore = SchemaManager.getEnabledSchemas(context)
         // Bundled languages bring their own schemas; others only show what is already installed.
         val bundled = when (language) {
             InputLanguage.JAPANESE -> JapaneseSchemas.ids
-            InputLanguage.SPANISH -> SpanishSchemas.ids
-            else -> null
+            else -> LetterLanguage.of(language)?.let { listOf(it.schemaId) }
         }
         if (bundled != null) {
             val schemas = SchemaManager.getEnabledSchemas(context)
             SchemaManager.setEnabledSchemas(context, if (enabled) (schemas + bundled).distinct()
                 else schemas.filterNot { InputLanguage.forSchema(it) == language })
         }
+        // 补全词表是商店里的下载包：开启时就在后台下载，打字前多半已经下好。
+        if (enabled) LetterLanguage.of(language)?.let { com.kingzcheung.xime.association.WordCompletion.download(context, it) }
         // The English entry is virtual. Keep a real Rime schema as the engine fallback.
         val current = SettingsPreferences.getCurrentSchema(context)
         if (current == InputModes.ENGLISH || InputLanguage.forSchema(current) !in next) {
             val fallback = nativeSchema(current, SchemaManager.getEnabledSchemas(context), next)
             SettingsPreferences.setCurrentSchema(context, fallback)
         }
-        SettingsPreferences.setDeploymentDone(context, false)
+        // 只有启用的方案列表真的变了（开关日语、德语等自带方案的语言）才需要重新部署。
+        // 开关中文、或方案本来就在列表里时，只改语言键轮换的语言，不让键盘重新「准备」一遍。
+        val schemasChanged = SchemaManager.getEnabledSchemas(context) != schemasBefore
+        if (schemasChanged) SettingsPreferences.setDeploymentDone(context, false)
         SettingsPreferences.getPrefsPublic(context).edit().putStringSet(KEY, next.map { it.id }.toSet()).commit()
-        scope.launch { com.kingzcheung.xime.rime.RimeConfigHelper.prepareAutomatically(context.applicationContext) }
+        if (schemasChanged) scope.launch { com.kingzcheung.xime.rime.RimeConfigHelper.prepareAutomatically(context.applicationContext) }
     }
 }

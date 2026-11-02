@@ -62,11 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.kingzcheung.xime.model.ModelCategory
-import com.kingzcheung.xime.model.ModelManager
-import androidx.compose.ui.res.stringResource
-import com.kingzcheung.xime.R
-import com.kingzcheung.xime.model.DeviceModelProfiles
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.viewmodel.SmartPredictionSettingsViewModel
 
@@ -74,8 +69,6 @@ import com.kingzcheung.xime.viewmodel.SmartPredictionSettingsViewModel
 @Composable
 fun SmartPredictionSettingsContent(
     onBack: () -> Unit,
-    onNavigateToModelManagement: () -> Unit = {},
-    onNavigateToModelDetail: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val viewModel: SmartPredictionSettingsViewModel = viewModel()
@@ -98,18 +91,6 @@ fun SmartPredictionSettingsContent(
         )
     }
 
-    // 模型清单来自远程 index，响应式收集以在加载完成后刷新（仅 PREDICTION 类别）
-    val allModels by ModelManager.modelsFlow.collectAsStateWithLifecycle()
-    // 联想关着时选模型不起作用：「选择模型」和「联想行为」一样只在开着时显示（列表为空就不画这一组）。
-    val predictionModels = allModels.filter { it.category == ModelCategory.PREDICTION }.takeIf { uiState.isEnabled }.orEmpty()
-
-    val savedModelId = remember {
-        SettingsPreferences.getPredictionSelectedModel(context)
-    }
-    var selectedModelId by remember {
-        mutableStateOf(savedModelId)
-    }
-
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let { message ->
             viewModel.showToast(message)
@@ -117,35 +98,16 @@ fun SmartPredictionSettingsContent(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = { Text("智能联想") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-            )
-        }
-    ) { padding ->
+    KeyboardSettingsScaffold("智能联想", onBack, preview = pendingImport == null,
+        example = if (uiState.isEnabled) com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Example.Associations
+            else com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Example.Keyboard) { modifier ->
         val listState = rememberSettingsSearchListState()
         LazyColumn(
             state = listState,
-            modifier = Modifier.settingsGutterScroll(listState)
-                .fillMaxSize()
-                .padding(padding)
+            modifier = modifier.settingsGutterScroll(listState)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
+            contentPadding = keyboardPreviewContentPadding(top = 8.dp, bottom = 8.dp)
         ) {
             item {
                 SettingsSection(title = "功能开关", content = {
@@ -162,10 +124,11 @@ fun SmartPredictionSettingsContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "内置中文基础联想，可下载模型增强预测",
+                                text = "上屏后接着给出下一个词",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.PREDICTION)
                         }
                         if (uiState.isLoading) {
                             CircularProgressIndicator(
@@ -180,33 +143,6 @@ fun SmartPredictionSettingsContent(
                             )
                         }
                     }
-
-                    if (!uiState.hasModel) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 16.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "已内置基础联想；下载模型可增强预测",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
                 })
             }
 
@@ -218,17 +154,11 @@ fun SmartPredictionSettingsContent(
                     var singleMode by remember {
                         mutableStateOf(SettingsPreferences.isSingleAssociationMode(context))
                     }
-                    var deleteSkipsAssociation by remember {
-                        mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context))
-                    }
-                    var deleteRecovery by remember {
-                        mutableStateOf(SettingsPreferences.isDeleteRecovery(context))
-                    }
-                    SettingsSection(title = "联想行为", content = {
+                    Column { SettingsSection(title = "联想行为", content = {
                         SettingsToggleItem(
                             icon = Icons.TwoTone.AutoAwesome,
                             title = "空格上屏联想候选",
-                            subtitle = "有联想候选时，按空格键直接上屏第一个联想词",
+                            subtitle = "有联想词时，按空格上屏第一个",
                             checked = spaceCommitEnabled,
                             onCheckedChange = {
                                 spaceCommitEnabled = it
@@ -240,39 +170,9 @@ fun SmartPredictionSettingsContent(
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
-                        SettingsToggleItem(
-                            icon = Icons.AutoMirrored.TwoTone.Backspace,
-                            title = "退格直接删字",
-                            subtitle = "有联想词时，退格直接删掉刚上屏的字，不用先按一下收起联想",
-                            checked = deleteSkipsAssociation,
-                            onCheckedChange = {
-                                deleteSkipsAssociation = it
-                                SettingsPreferences.setDeleteSkipsAssociation(context, it)
-                            }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 16.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsToggleItem(
-                            icon = Icons.AutoMirrored.TwoTone.Undo,
-                            title = "删字后给同音字",
-                            subtitle = "退格删掉字后，候选栏先放回删掉的字，后面跟同音字，删错了点一下补回来",
-                            checked = deleteRecovery,
-                            onCheckedChange = {
-                                deleteRecovery = it
-                                SettingsPreferences.setDeleteRecovery(context, it)
-                            }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 16.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
                         AssociationModeRow(
                             title = "连续联想",
-                            subtitle = "联想词上屏后继续推理，可连续空格上屏联想词",
+                            subtitle = "选了联想词后接着出下一批联想词",
                             isSelected = !singleMode,
                             onClick = {
                                 singleMode = false
@@ -286,7 +186,7 @@ fun SmartPredictionSettingsContent(
                         )
                         AssociationModeRow(
                             title = "单次联想",
-                            subtitle = "联想词上屏一次后停止推理，待下次输入再联想",
+                            subtitle = "选一个联想词就停，下次打字再出",
                             isSelected = singleMode,
                             onClick = {
                                 singleMode = true
@@ -294,34 +194,10 @@ fun SmartPredictionSettingsContent(
                             }
                         )
                     })
+                    // 「退格直接删字」「删字后给同音字」11-01 搬到 按键与手势 › 删除键，这里只指个路，不放第二个开关。
+                    SettingsNote("退格直接删字、删字后给同音字在「按键与手势 › 删除键」。", jumps = listOf("按键与手势 › 删除键"))
+                    }
                 }
-            }
-
-            if (predictionModels.isNotEmpty()) {
-                item { Column {
-                    SettingsSection(title = stringResource(R.string.section_choose_model), searchKey = "选择模型", content = {
-                        predictionModels.forEach { model ->
-                            PredictionModelCard(
-                                modelInfo = model,
-                                isSelected = model.id == selectedModelId,
-                                onSelect = {
-                                    selectedModelId = model.id
-                                    viewModel.selectModel(model.id)
-                                },
-                                onOpenInStore = { onNavigateToModelDetail(model.id) }
-                            )
-                            if (model != predictionModels.last()) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(start = 56.dp),
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-                            }
-                        }
-                    })
-                    // 有人看不懂 base / small（用户 10-31 转述）：直接说该选哪个。
-                    SettingsNote(stringResource(R.string.model_prediction_choose_note))
-                } }
             }
 
             item {
@@ -366,8 +242,6 @@ fun SmartPredictionSettingsContent(
                     onImport = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
                 )
             }
-
-            // 模型的下载和删除统一在「扩展 › 模型」，这里只选用。
         }
     }
 }
@@ -401,129 +275,6 @@ private fun AssociationModeRow(
             )
         }
         RadioButton(selected = isSelected, onClick = onClick)
-    }
-}
-
-@Composable
-private fun PredictionModelCard(
-    modelInfo: com.kingzcheung.xime.model.ModelInfo,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
-    onOpenInStore: () -> Unit
-) {
-    val context = LocalContext.current
-    val revision by ModelManager.installedRevision.collectAsStateWithLifecycle()
-    val downloads by ModelManager.downloadStates.collectAsStateWithLifecycle()
-    val isDownloaded = remember(modelInfo, revision) { ModelManager.isModelReady(context, modelInfo.id) }
-    val progress = downloads[modelInfo.id] as? com.kingzcheung.xime.model.ModelDownloadState.Downloading
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(
-                    if (isDownloaded) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.AutoAwesome,
-                contentDescription = null,
-                tint = if (isDownloaded) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(22.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                // 联想两档的名字随界面语言；其他模型（商店里来的）仍用目录里的中文名。
-                text = when (modelInfo.id) {
-                    DeviceModelProfiles.BASE -> stringResource(R.string.model_prediction_base_name)
-                    DeviceModelProfiles.SMALL -> stringResource(R.string.model_prediction_small_name)
-                    else -> modelInfo.name
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (modelInfo.size.isNotEmpty()) {
-                    Text(
-                        text = modelInfo.size,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (isDownloaded)
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Text(
-                        text = stringResource(if (isDownloaded) R.string.model_downloaded else R.string.model_not_downloaded),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isDownloaded) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-        }
-
-        if (progress != null) {
-            Column(Modifier.width(84.dp).padding(start = 8.dp)) {
-                androidx.compose.material3.LinearProgressIndicator(progress = { progress.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth())
-                Text("${(progress.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
-            }
-        } else if (isDownloaded) {
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedButton(
-                onClick = onSelect,
-                enabled = !isSelected,
-                shape = RoundedCornerShape(50)
-            ) {
-                if (isSelected) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                }
-                Text(stringResource(if (isSelected) R.string.model_in_use else R.string.model_use))
-            }
-        } else {
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedButton(
-                onClick = onOpenInStore,
-                shape = RoundedCornerShape(50)
-            ) {
-                Icon(
-                    Icons.Default.CloudDownload,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.model_go_to_store))
-            }
-        }
     }
 }
 

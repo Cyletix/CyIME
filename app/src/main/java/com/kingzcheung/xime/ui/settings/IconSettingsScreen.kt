@@ -39,8 +39,35 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // 「跟随主题色」打开时底板和样式不起作用，那两组就不显示。
-            if (!IconAppearance.followTheme) SettingsSection(title = "桌面图标底板") {
+            // 11-01：原「同步图标与视觉样式」「桌面图标跟随主题色」两个开关合成三选一，存的值不变（DesktopIconChoice）。
+            val choice = DesktopIconChoice.of(IconAppearance.followTheme, IconAppearance.linked)
+            SettingsSection(title = "桌面图标") {
+                Column(Modifier.padding(16.dp).settingsSearchAnchor("桌面图标"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth().height(124.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DesktopIconChoice.entries.forEach { option ->
+                            IllustratedChoiceCard(option.label, choice == option,
+                                onClick = { changeAppearance(context, onChanged) { IconAppearance.setChoice(context, option) } },
+                                modifier = Modifier.weight(1f), tag = "desktop-icon:${option.name}", titleMaxLines = 2) {
+                                when (option) {
+                                    DesktopIconChoice.THEME -> ThemeLauncherIconPreview(
+                                        com.kingzcheung.xime.settings.SettingsPreferences.getKeyboardTheme(context), Modifier.size(52.dp))
+                                    DesktopIconChoice.VISUAL_STYLE -> LauncherIconPreview(VisualStyles.current, IconAppearance.framed, Modifier.size(52.dp))
+                                    DesktopIconChoice.CUSTOM -> LauncherIconPreview(IconAppearance.selected, IconAppearance.framed, Modifier.size(52.dp))
+                                }
+                            }
+                        }
+                    }
+                    Text(when (choice) {
+                        DesktopIconChoice.THEME -> "换键盘主题时，桌面图标换成同色的图标。"
+                        DesktopIconChoice.VISUAL_STYLE -> "桌面图标和键盘的视觉样式一起换；视觉样式在「主题与外观」里选。"
+                        DesktopIconChoice.CUSTOM -> "在下面挑图标，键盘外观不跟着变。"
+                    }, style = MaterialTheme.typography.bodySmall)
+                    Text("桌面可能要过一会儿才刷新。三星等桌面每换一次图标会先移除再添加，图标可能跑到应用列表最后，要重新拖回原位。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            // 跟随主题色时是固定的带底板图标，底板和样式不起作用，那两组就不显示。
+            if (choice != DesktopIconChoice.THEME) SettingsSection(title = "桌面图标底板") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         listOf(true, false).forEach { framed ->
@@ -58,40 +85,11 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
                             }
                         }
                     }
-                    Text("带底板与系统桌面图标大小、外框统一；无底板突出图案。此选项只影响桌面图标，部分桌面仍会自动加底。",
+                    Text("带底板和别的桌面图标一样大、外框统一；无底板图案更突出。有的桌面仍会自动加底板。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            SettingsSection(title = "图标联动") {
-                Column(Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("同步图标与视觉样式", style = MaterialTheme.typography.bodyLarge)
-                            Text(if (IconAppearance.linked) "任一处选择，键盘和图标一起变化" else "图标与键盘分别设置",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = IconAppearance.linked, onCheckedChange = {
-                            changeAppearance(context, onChanged) { IconAppearance.setLinked(context, it) }
-                        }, modifier = Modifier.testTag("icon-link"))
-                    }
-                    Text("桌面图标使用所选样式；键盘左上角使用简洁线稿，颜色跟随键盘主题。桌面可能需要片刻刷新。",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("桌面图标跟随主题色", style = MaterialTheme.typography.bodyLarge)
-                            Text("换键盘主题时，桌面图标换成同色的带底板折面图标",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = IconAppearance.followTheme, onCheckedChange = {
-                            changeAppearance(context, onChanged) { IconAppearance.setFollowTheme(context, it) }
-                        }, modifier = Modifier.testTag("icon-follow-theme"))
-                    }
-                    Text("三星等桌面每换一次图标，会先移除再重新添加，图标可能跑到应用列表最后，需要重新拖回原位。",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            if (!IconAppearance.followTheme) SettingsSection(title = "图标样式") {
+            if (choice == DesktopIconChoice.CUSTOM) SettingsSection(title = "图标样式") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.chunked(2).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -115,8 +113,6 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("icon-style-original")) {
                         Text(if (IconAppearance.effective == VisualStyle.ORIGINAL) "原有图标 · 已选" else "恢复原有图标")
                     }
-                    Text("绑定开启时，恢复原有图标也会恢复原有外观。关闭绑定后可单独恢复图标。",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

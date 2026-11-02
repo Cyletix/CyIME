@@ -6,12 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.twotone.ViewModule
 import androidx.compose.material.icons.twotone.Inventory
-import androidx.compose.material.icons.twotone.Schedule
 import androidx.compose.material.icons.twotone.Translate
-import androidx.compose.material.icons.twotone.SpaceBar
-import androidx.compose.material.icons.twotone.EmojiEmotions
-import androidx.compose.material.icons.twotone.Functions
-import androidx.compose.material.icons.twotone.FontDownload
+import androidx.compose.material.icons.twotone.Abc
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
@@ -39,7 +35,8 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDoublePinyin: () -> Unit = {}, onBack: () -> Unit) {
+fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDoublePinyin: () -> Unit = {},
+    onOpenChineseInput: () -> Unit = {}, onOpenEnglishInput: () -> Unit = {}, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var languages by remember { mutableStateOf(LanguagePreferences.enabled(context)) }
@@ -52,6 +49,13 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
     var remembered by remember { mutableStateOf(InputModes.rememberedModes(context)) }
     val availableProfiles = InputModes.ordered(context, profilesState.allSchemas
         .filter { it.schemaId in profilesState.enabledSchemas }.map { it.toSchemaInfo() })
+    // 一步选方案（用户 11-01 批准）：关着的内置方案（全拼 14 键、内置双拼）和它们的组合（如小鹤 14 键）也列在
+    // 布局、方案里，点了自动启用并部署，不用先去「已安装的方案」打开再回来。
+    val installedIds = profilesState.allSchemas.map { it.schemaId }.toSet()
+    val offeredIds = CyimeInputDefaults.withCompanions(
+        (profilesState.enabledSchemas + CyimeInputDefaults.listedWhenOff).filter { it in installedIds }.distinct(), installedIds).toSet()
+    val pickableProfiles = InputModes.ordered(context, profilesState.allSchemas
+        .filter { it.schemaId in offeredIds || it.schemaId in profilesState.enabledSchemas }.map { it.toSchemaInfo() })
     val dragOrder = rememberDragOrder(orderedLanguages.map { it.id }) { ids ->
         InputModes.saveLanguageOrder(context, ids)
         orderedLanguages = InputModes.languageOrder(context)
@@ -62,15 +66,12 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
         profilesModel.refresh()
         remembered = InputModes.rememberedModes(context)
     }
-    Scaffold(modifier = Modifier.testTag("language-settings"), containerColor = MaterialTheme.colorScheme.surface,
-        topBar = { TopAppBar(title = { Text("语言与方案") }, navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-        }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
-    ) { padding ->
+    KeyboardSettingsScaffold("语言与方案", onBack, preview = true, modifier = Modifier.testTag("language-settings")) { modifier ->
         SettingsSearchAutoScroll(dragOrder.list)
-        LazyColumn(modifier = Modifier.settingsGutterScroll(dragOrder.list).fillMaxSize().testTag("language-settings-list").padding(padding)
+        LazyColumn(modifier = modifier.settingsGutterScroll(dragOrder.list).testTag("language-settings-list")
             .padding(horizontal = 16.dp, vertical = 8.dp),
-            state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = keyboardPreviewContentPadding()) {
             item { Text("点开语言，分别设置输入方案和键盘布局；下次切换到该语言时使用。长按可调整语言顺序。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -119,63 +120,85 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                                 }
                             })
                         }
-                        if (expanded && selected != null) InputProfileSelectors(availableProfiles, selected,
+                        if (expanded && selected != null) InputProfileSelectors(pickableProfiles, selected,
                             Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) { entry ->
                             InputModes.selectProfile(context, entry)
                             remembered = remembered + (language to entry.schemaId)
-                            message = "已保存：${language.displayName} · ${entry.selectionLabel}，下次切换到该语言时使用"
+                            if (entry.schemaId in profilesState.enabledSchemas) {
+                                // 正在用的语言：同时改当前方案，键盘下次弹出就换（收起时在这里改了布局也算数）。
+                                val current = SettingsPreferences.getCurrentSchema(context)
+                                val active = current.isNotBlank() && !com.kingzcheung.xime.ui.keyboard.isHandwritingSchema(current) &&
+                                    InputModes.languageOf(current, availableProfiles) == language
+                                if (active) SettingsPreferences.setCurrentSchema(context, entry.schemaId, language)
+                                message = "已保存：${language.displayName} · ${entry.selectionLabel}，" +
+                                    if (active) "键盘下次弹出时使用" else "下次切换到该语言时使用"
+                            } else if (!saving) scope.launch {
+                                saving = true
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        // 组合（如小鹤 14 键）启用它需要的双拼和 14 键，组合本身由 setEnabledSchemas 补上。
+                                        val needs = CyimeInputDefaults.companionNeeds(entry.schemaId) ?: listOf(entry.schemaId)
+                                        SchemaManager.setEnabledSchemas(context, (SchemaManager.getEnabledSchemas(context) + needs).distinct())
+                                        LanguagePreferences.enableForSchema(context, entry.schemaId)
+                                    }
+                                    profilesModel.refresh()
+                                    profilesModel.deploySchema()
+                                    message = "已打开并选好：${language.displayName} · ${entry.selectionLabel}，正在部署，几秒后就能用"
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                catch (error: Exception) { message = error.message ?: "打开方案失败，请稍后再试" }
+                                finally { saving = false }
+                            }
+                        }
+                        // 西班牙、德、法、俄语的补全词表在商店里，开启时自动下载；没下好时在这里说一声。
+                        if (checked) LetterLanguage.of(language)?.let {
+                            WordListStatus(it, Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp))
                         }
                     }
                 }
             }
-            item(key = "chinese-output") {
-                val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
-                SettingsSection(title = "中文输出") {
-                    SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
-                        "候选和上屏改用台湾正体（台灣、計畫、了解），全拼、双拼、九键、14 键和仓颉都适用（关着时仓颉也出简体）；注音始终出正体。词库和学习记录不变，开启时不给中文联想。",
-                        checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) })
-                    HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.FontDownload, "生僻字",
-                        "全拼 26 键和九键打一个完整拼音（chan、gui）时，在常用字后面补上约 1.8 万个生僻字（瀺、槻）；双拼、14 键不适用。",
-                        checked = input.rareCharacters, onCheckedChange = { input.copy(rareCharacters = it).save(context) })
-                    HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.Schedule, "时间日期候选",
-                        "打“时间”“日期”“星期”时，词后面紧跟着给设备当前的时间和日期（15:35、2026-10-31、星期六），词本身的位置不变；全拼、双拼、九键、14 键都适用。",
-                        checked = input.datetimeCandidates, onCheckedChange = { input.copy(datetimeCandidates = it).save(context) })
-                    HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.EmojiEmotions, "候选里显示表情",
-                        "打「开心」「爱心」这类词时，在词后面多出对应的表情（😄、❤️）；全拼、双拼、九键和 14 键都适用。",
-                        checked = input.candidateEmoji, onCheckedChange = { input.copy(candidateEmoji = it).save(context) })
-                    HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.Functions, "打符号名出符号",
-                        "打「加号」「问号」「括号」这类符号名时，在词后面多出对应的符号（+、？、（）），词本身的位置不变；全拼、双拼、九键和 14 键都适用。",
-                        checked = input.symbolNames, onCheckedChange = { input.copy(symbolNames = it).save(context) })
+            // 没写语言的导入方案（声笔等，GitHub #86）：在这里选一次语言，字母布局、语音、手写跟着走。
+            val unlabeled = profilesState.allSchemas.filter { it.languageAssignable }
+            if (unlabeled.isNotEmpty()) item(key = "imported-schema-language") {
+                var picking by remember { mutableStateOf<SchemaMeta?>(null) }
+                SettingsSection(title = "导入方案的语言") {
+                    unlabeled.forEachIndexed { index, schema ->
+                        if (index > 0) HorizontalDivider()
+                        SettingsItem(Icons.TwoTone.Translate, schema.name, "方案没写语言，点开选一次",
+                            onClick = { picking = schema }, showArrow = true,
+                            status = if (schema.languageChosen) schema.language.displayName else InputLanguage.UNSPECIFIED.displayName,
+                            searchKey = "导入方案的语言:${schema.schemaId}")
+                    }
                 }
-            }
-            item(key = "english-input") {
-                val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
-                SettingsSection(title = "英文输入") {
-                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "选词后自动加空格",
-                        "英文（含西班牙语）点候选栏的词后自动补一个空格，接着打下一个词不用再按空格。紧接着按空格不会多出一个；" +
-                            "打 , . ? ! : ; 时标点挪到空格前面；退格删掉这个空格。",
-                        checked = input.englishAutoSpace, onCheckedChange = { input.copy(englishAutoSpace = it).save(context) })
-                    HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "标点后自动加空格",
-                        "英文（含西班牙语）键盘在字母后面打 , . ? ! : ; 时自动跟一个空格（Hello, world）。紧接着按空格不会多出一个，" +
-                            "连打 ... ?! 空格留在最后；3.14、1,000、10:30 和网址、邮箱、密码框不加；退格删掉这个空格。",
-                        checked = input.englishPunctuationSpace, onCheckedChange = { input.copy(englishPunctuationSpace = it).save(context) })
+                picking?.let { target ->
+                    SchemaLanguageDialog(target, onChosen = { language ->
+                        picking = null
+                        profilesModel.setSchemaLanguage(target.schemaId, language) {
+                            languages = LanguagePreferences.enabled(context)
+                            orderedLanguages = InputModes.languageOrder(context)
+                            message = if (language == null) "已改回未标注语言" else "已设为${language.displayName}，切到这个方案时生效"
+                        }
+                    }, onDismiss = { picking = null })
                 }
-            }
-            item(key = "language-key-switch") {
-                LanguageKeySwitchSettings(availableProfiles, orderedLanguages, profilesState.currentSchema)
             }
             // 已装的方案组合（启停、排序、应用更改）和导入，原首页「输入资源」。
             item(key = "schema-resources") {
                 SettingsSection(title = "方案资源") {
                     SettingsItem(Icons.TwoTone.Inventory, "已安装的方案",
-                        "启停和排序语言、方案与布局的组合，导入方案文件", onClick = onOpenSchemaResources, showArrow = true)
+                        "启用、停用和排序语言、方案与布局的组合，导入方案文件", onClick = onOpenSchemaResources, showArrow = true)
                     SettingsItem(Icons.TwoTone.ViewModule, "双拼方案",
                         "小鹤、自然码、微软等 6 种内置双拼的键位，新建和修改自己的双拼方案", onClick = onOpenDoublePinyin, showArrow = true)
+                }
+            }
+            item(key = "language-key-switch") {
+                LanguageKeySwitchSettings(availableProfiles, orderedLanguages, profilesState.currentSchema)
+            }
+            // 中文输出、拼音纠错、模糊音和英文输入 11-02 各收进一页（原样搬过去，名字和存的值不变），这页只留入口。
+            item(key = "input-settings") {
+                SettingsSection(title = "输入设置") {
+                    SettingsItem(Icons.TwoTone.Translate, "中文输入", "繁体、生僻字、拼音纠错、模糊音",
+                        onClick = onOpenChineseInput, showArrow = true)
+                    SettingsItem(Icons.TwoTone.Abc, "英文输入", "自动切英文、自动加空格、邮箱后缀",
+                        onClick = onOpenEnglishInput, showArrow = true)
                 }
             }
             item { if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }

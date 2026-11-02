@@ -30,6 +30,7 @@ class SettingsRoundTripTest {
         Case("底部圆角", true, false, S::setRoundedKeyboardBottom, S::roundedKeyboardBottom),
         Case("顶部圆角", false, true, S::setRoundedKeyboardTop, S::roundedKeyboardTop),
         Case("玻璃柔化顶部边缘", true, false, S::setGlassSoftTopEdge, S::glassSoftTopEdge),
+        Case("液态玻璃", true, false, S::setGlassLiquid, S::glassLiquid),
         Case("数字框自动数字键盘", false, true, S::setAutoNumberKeyboardEnabled, S::isAutoNumberKeyboardEnabled),
         Case("分体键盘", true, false, S::setSplitKeyboardEnabled, S::isSplitKeyboardEnabled),
         Case("右半边也放 G 键", true, false, S::setSplitRightGEnabled, S::isSplitRightGEnabled),

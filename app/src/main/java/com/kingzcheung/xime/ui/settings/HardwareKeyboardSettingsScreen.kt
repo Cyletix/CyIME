@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
@@ -23,10 +24,9 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
         HardwareKeyboardPreferences.set(context, key, value)
         options = HardwareKeyboardPreferences.read(context)
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("物理键盘") }, navigationIcon = {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-    }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll()
+    KeyboardSettingsScaffold("物理键盘", onBack, preview = true,
+        example = com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Example.Hardware) { modifier ->
+        Column(modifier.settingsVerticalScroll()
             .padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("语言切换", style = MaterialTheme.typography.titleMedium)
             HardwareOption("Ctrl + 空格", "按已启用语言的顺序循环切换，不输入空格", options.ctrlSpace) { save("ctrl_space", it) }
@@ -52,11 +52,42 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             HardwareOption("联想也显示在候选窗", "上屏后的联想词和打字候选显示在同一个浮窗里；关闭时联想显示在工具条上",
                 options.associationInWindow) { save("association_in_window", it) }
             HardwareOption("自动避开输入区域", "有位置数据时避让输入框；大文档优先避让光标附近", options.avoidEditor) { save("avoid_editor", it) }
-            HardwareOption("靠边停靠", "左右边缘变为竖条，底部变为候选长条，拖近时显示蓝色轮廓", options.dockAtEdge) { save("dock_edge", it) }
-            HardwareOption("底边使用三星式通栏", "吸附到底边时改为贴住屏幕底部的整宽候选栏，九个候选带 1–9 编号",
-                options.bottomBar) { save("bottom_bar", it) }
+            HardwareOption("靠边停靠", "浮窗拖到屏幕左右边变成竖条，拖到底边变成候选长条；拖近时有蓝色轮廓", options.dockAtEdge) { save("dock_edge", it) }
+            // 原「底边使用三星式通栏」（用户 11-01 改名「底部候选」）：只在停靠到底边时起作用（HardwareKeyboardToolbar 里
+            // samsungBottomBar && bottomDocked），所以只在开着靠边停靠时显示；存的值不变。
+            if (options.dockAtEdge) {
+                HardwareOption("底部候选", "停靠到底边时，候选栏铺满屏幕底部整宽，九个候选带 1–9 编号",
+                    options.bottomBar) { save("bottom_bar", it) }
+                BottomCandidatesLegend(options.bottomBar)
+            }
             Text("浮条任意位置均可拖动；长按语言键选择语言。", style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+/** 「底部候选」图例：屏幕底部，开着是整宽带编号的候选栏，关着是普通候选长条。 */
+@Composable
+private fun BottomCandidatesLegend(on: Boolean) {
+    val primary = MaterialTheme.colorScheme.primary
+    SettingsLegend("bottom-candidates-legend") {
+        Box(Modifier.fillMaxWidth().height(64.dp).background(MaterialTheme.colorScheme.surface,
+            androidx.compose.foundation.shape.RoundedCornerShape(4.dp))) {
+            Text("屏幕底部", Modifier.align(Alignment.TopStart).padding(6.dp), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val words = listOf("你好", "拟好", "你号", "泥好", "倪浩")
+            Row(
+                (if (on) Modifier.fillMaxWidth() else Modifier.padding(bottom = 6.dp)).align(Alignment.BottomCenter)
+                    .background(primary.copy(alpha = 0.22f), androidx.compose.foundation.shape.RoundedCornerShape(if (on) 0.dp else 6.dp))
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                words.forEachIndexed { index, word ->
+                    Text(if (on) "${index + 1} $word" else word, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+            }
+        }
+        Text(if (on) "贴住屏幕底边，整宽，按数字键选词" else "普通的候选长条",
+            style = MaterialTheme.typography.labelSmall, color = primary)
     }
 }
 

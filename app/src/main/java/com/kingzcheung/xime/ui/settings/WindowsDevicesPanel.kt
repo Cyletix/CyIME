@@ -134,8 +134,9 @@ internal fun WindowsDevicesPanelContent(
                 Spacer(Modifier.width(8.dp))
                 Text(if (paired == null) "扫码连接电脑" else "扫码添加另一台设备")
             }
-            Text(if (paired == null) "未能自动连接？在电脑“手机与电脑互联”中展开“连接新手机 / 无法自动连接？”，点击“使用二维码连接”，再用这里扫码。"
-                else "已配对的设备都会保留。扫另一台电脑的二维码，或另一部手机/平板在“让其他设备连接本机”里显示的二维码。",
+            SettingsJumpText(if (paired == null) "未能自动连接？在电脑“手机与电脑互联”中展开“连接新手机 / 无法自动连接？”，点击“使用二维码连接”，再用这里扫码。"
+                else "已配对的设备都会保留。扫另一台电脑的二维码，或另一部手机/平板在「让其他手机或平板连接本机」里显示的二维码。",
+                jumps = listOf("让其他手机或平板连接本机"),
                 style = MaterialTheme.typography.bodyMedium)
             val unpaired = devices.filterNot { peer -> saved.any { it.id == peer.id } }
             unpaired.forEach { peer ->

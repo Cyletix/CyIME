@@ -32,36 +32,34 @@ data class CreditItem(
 )
 
 /**
- * 设置 › 关于 › 鸣谢：只列主要的上游、词库、数据、模型和设计参考。
+ * 设置 › 关于 › 鸣谢：只列主要的引擎、词库、数据、模型和设计参考，开发基础放最后。
  * 完整清单（每个依赖、语料及其许可证）在 README 的「鸣谢」，两边改一处要同步另一处。
  */
 object Credits {
     const val README_URL = "https://github.com/Cyletix/CyIME#%E9%B8%A3%E8%B0%A2" // README 的「鸣谢」一节
 
     val groups: List<Pair<String, List<CreditItem>>> = listOf(
-        "上游" to listOf(
-            CreditItem("Xime", "Kingz Cheung（kingzcheung）及贡献者", "CyIME 从它 fork 而来", "GPL-3.0",
-                "https://github.com/ximeiorg/Xime"),
-            CreditItem("Xime 手写与联想模型", "Xime 项目", "中文手写识别、智能联想",
-                "MIT、Apache-2.0、CC BY-NC-SA 4.0", "https://www.modelscope.cn/models/bikeand/ochwpro"),
-        ),
         "输入引擎" to listOf(
             CreditItem("Rime（librime）", "佛振及 Rime 社区", "输入引擎", "BSD-3-Clause", "https://github.com/rime/librime"),
             CreditItem("OpenCC", "BYVoid", "简繁转换", "Apache-2.0", "https://github.com/BYVoid/OpenCC"),
             CreditItem("sherpa-onnx", "k2-fsa", "本地语音识别", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx"),
-            CreditItem("ONNX Runtime", "Microsoft", "手写、联想、识字的模型推理", "MIT",
+            CreditItem("ONNX Runtime", "Microsoft", "手写、识字的模型推理", "MIT",
                 "https://github.com/microsoft/onnxruntime"),
+            CreditItem("azooKey", "Miwa / Ensan", "日语假名汉字转换", "MIT",
+                "https://github.com/azooKey/AzooKeyKanaKanjiConverter"),
         ),
         "词库与数据" to listOf(
             CreditItem("雾凇拼音", "iDvel", "拼音词库和方案", "GPL-3.0", "https://github.com/iDvel/rime-ice"),
-            CreditItem("万象语言模型 RIME-LMDG", "amzxyz", "九键语法增强", "CC BY 4.0", "https://github.com/amzxyz/RIME-LMDG"),
+            CreditItem("万象语言模型", "amzxyz", "九键语法增强", "CC BY 4.0", "https://github.com/amzxyz/RIME-LMDG"),
             CreditItem("LCCC 中文对话语料", "清华大学 CoAI 小组", "训练九键词组模型和联想", "MIT",
                 "https://github.com/thu-coai/CDial-GPT"),
-            CreditItem("rime-jaroomaji", "lazy fox chan", "日语方案和词库", "Apache-2.0",
+            CreditItem("azooKey 词典", "Miwa / Ensan", "日语词库", "Apache-2.0",
+                "https://github.com/azooKey/azooKey_dictionary_storage"),
+            CreditItem("rime-jaroomaji", "lazy fox chan", "日语方案", "Apache-2.0",
                 "https://github.com/lazyfoxchan/rime-jaroomaji"),
-            CreditItem("倉頡五代 Cangjie5", "Jackchows", "仓颉码表", "MIT", "https://github.com/Jackchows/Cangjie5"),
+            CreditItem("倉頡五代", "Jackchows", "仓颉码表", "MIT", "https://github.com/Jackchows/Cangjie5"),
             CreditItem("rime-stroke", "Rime", "笔画方案", "LGPL-3.0", "https://github.com/rime/rime-stroke"),
-            CreditItem("小麦注音 McBopomofo", "OpenVanilla", "台湾词和读音", "MIT", "https://github.com/openvanilla/McBopomofo"),
+            CreditItem("小麦注音", "OpenVanilla", "台湾词和读音", "MIT", "https://github.com/openvanilla/McBopomofo"),
             CreditItem("ECDICT、CC-CEDICT", "skywind3000；MDBG", "候选中英释义", "MIT、CC BY-SA 4.0",
                 "https://github.com/skywind3000/ECDICT"),
         ),
@@ -73,6 +71,8 @@ object Credits {
             CreditItem("3D-Speaker CAM++", "阿里巴巴 3D-Speaker", "字幕区分说话人", "Apache-2.0",
                 "https://github.com/modelscope/3D-Speaker"),
             CreditItem("PP-OCRv5", "PaddlePaddle；RapidAI", "拍照识字", "Apache-2.0", "https://github.com/PaddlePaddle/PaddleOCR"),
+            CreditItem("ochwpro", "bikeand（ModelScope）", "中文手写识别",
+                "MIT", "https://www.modelscope.cn/models/bikeand/ochwpro"),
         ),
         "设计参考" to listOf(
             CreditItem("三星键盘", "Samsung", "键盘交互和外观", null, "https://www.samsung.com/"),
@@ -81,6 +81,9 @@ object Credits {
             CreditItem("Typewise", "", "蜂窝六边形布局", null, "https://www.typewise.app/"),
             CreditItem("首道双拼", "", "首道双拼键位", null, "https://sspai.com/post/108949"),
             CreditItem("小鹤双拼", "小鹤音形", "小鹤双拼键位", null, "https://flypy.cc/"),
+        ),
+        "开发基础" to listOf(
+            CreditItem("Xime", "", "CyIME 基于它开发", "GPL-3.0", "https://github.com/ximeiorg/Xime"),
         ),
     )
 }

@@ -6,6 +6,8 @@ object BuiltinModelCatalog {
     private const val RELEASE = "https://github.com/Cyletix/CyIME/releases/download/models/"
     const val SPEAKER_MODEL = "speaker-campplus-zh"
     const val SPEAKER_MODEL_FILE = "3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx"
+    /** 拍照识别（PP-OCRv5 mobile）。轻量版不带，第一次拍照识别时下载；带模型的安装包仍内置在 assets/ocr/ppocr-v5。 */
+    const val OCR_MODEL = "ocr-ppocr-v5"
 
     val models = com.kingzcheung.xime.speech.SpeechModelCatalog.models + CandidateModelCatalog.models + listOf(
         ModelInfo("ochwpro", "手写模型", "本地手写识别模型。", ModelCategory.HANDWRITING,
@@ -13,6 +15,18 @@ object BuiltinModelCatalog {
                 files = listOf(
                     ModelFile("ochwpro.onnx", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/ochwpro.onnx", "eb04d62a314c7d7bac4e34d6ce0c24137474d30ff94b929115a621385420ce13", 7001270L, mirrors = listOf(RELEASE + "ochwpro-v1.0-ochwpro.onnx")),
                     ModelFile("char_index.json", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/char_index.json", "171cf2ac23731428ac9dd28f64be82dece5f66a0ca3d674ffb3b567b51532176", 51317L, mirrors = listOf(RELEASE + "ochwpro-v1.0-char_index.json")),
+                )))),
+        // 拍照识别：PP-OCRv5 mobile 检测和识别模型（PaddlePaddle，RapidAI/RapidOCR v3.9.2 的 ONNX，Apache-2.0，未改动）；
+        // 字符表从识别模型元数据原样取出。国内走魔搭（RapidAI 原仓库、CyIME 仓库），海外走 CyIME Release 转存。
+        ModelInfo(OCR_MODEL, "拍照识别模型", "拍照识字用的中英文识别模型，约 21 MB。轻量版第一次拍照识别时下载，完整版已内置。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v5-mobile", size = "20.5 MB",
+                files = listOf(
+                    ModelFile("ch_PP-OCRv5_det_mobile.onnx", "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx", "4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae", 4819576L,
+                        mirrors = listOf(RELEASE + "ocr-ppocr-v5-det-mobile.onnx", DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-det-mobile.onnx")),
+                    ModelFile("ch_PP-OCRv5_rec_mobile.onnx", "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx", "5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5", 16631306L,
+                        mirrors = listOf(RELEASE + "ocr-ppocr-v5-rec-mobile.onnx", DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-rec-mobile.onnx")),
+                    ModelFile("ppocrv5-characters.txt", "https://github.com/Cyletix/CyIME/releases/download/models/ocr-ppocr-v5-characters.txt", "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b", 74012L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-characters.txt")),
                 )))),
         // 公式手写（LaTeX）：tools/handwriting_training 训练，只用公开的 MathWriting 2024，不含用户样本；
         // 日语、英文手写的“边写边学”也用它算特征。
@@ -23,18 +37,6 @@ object BuiltinModelCatalog {
                     ModelFile("formula_decoder.onnx", RELEASE + "formula-handwriting-v1-decoder.onnx", "ab11c1ceb4cb58b044be89b77c71eb32fcbc53ff1ddfc136c51444b002bdb2a9", 13346580L, mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "formula-handwriting-v1-decoder.onnx")),
                     ModelFile("formula_vocab.json", RELEASE + "formula-handwriting-v1-vocab.json", "73653abb6993d5f2451501c804fb66671c05f86b4165bbe10cb3ef6ef96ec92c", 2003L, mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "formula-handwriting-v1-vocab.json")),
                     ModelFile("formula_meta.json", RELEASE + "formula-handwriting-v1-meta.json", "2ad149afaa9f3872f872e1d4bf9560dfb67be21d08d69ec1a0fa05441cff7541", 205L, mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "formula-handwriting-v1-meta.json")),
-                )))),
-        ModelInfo("predictive-text-base", "智能联想模型（完整）", "大多数手机选这个：联想下一个词更准，约 35 MB。和轻量版二选一，只用装一个；两个都很快，打字时感觉不出差别。", ModelCategory.PREDICTION,
-            versions = listOf(ModelVersion(version = "v1.0", size = "34.8 MB",
-                files = listOf(
-                    ModelFile("vocab.json", "https://www.modelscope.cn/models/bikeand/predictive-text-base/resolve/master/onnx/vocab.json", "3f7a6aa773afe6dacf75701f7861257d36a46a26ac70c0f8ee6dd4032cc3b9c2", 141139L, mirrors = listOf(RELEASE + "predictive-text-vocab-v1.0.json")),
-                    ModelFile("model_int8_dynamic.onnx", "https://www.modelscope.cn/models/bikeand/predictive-text-base/resolve/master/onnx/model_int8_dynamic.onnx", "e15009c84d9702056ba8b5f6c04b27ae7d0400167647a5e94cb699f24f885a9d", 36353598L, mirrors = listOf(RELEASE + "predictive-text-base-v1.0-model_int8_dynamic.onnx")),
-                )))),
-        ModelInfo("predictive-text-small", "智能联想模型（轻量）", "内存 4 GB 以下的手机、或手机空间紧张时选这个：只有完整版一半大（约 19 MB），联想略弱一点。和完整版二选一，只用装一个。", ModelCategory.PREDICTION,
-            versions = listOf(ModelVersion(version = "v1.0", size = "18.9 MB",
-                files = listOf(
-                    ModelFile("vocab.json", "https://www.modelscope.cn/models/bikeand/predictive-text-small/resolve/master/vocab.json", "3f7a6aa773afe6dacf75701f7861257d36a46a26ac70c0f8ee6dd4032cc3b9c2", 141139L, mirrors = listOf(RELEASE + "predictive-text-vocab-v1.0.json")),
-                    ModelFile("model_int8_dynamic.onnx", "https://www.modelscope.cn/models/bikeand/predictive-text-small/resolve/master/model_int8_dynamic.onnx", "85b9e8915bd22a5ac1312146df37d77ee3453b9c836c89e666977e7c118a4225", 19720256L, mirrors = listOf(RELEASE + "predictive-text-small-v1.0-model_int8_dynamic.onnx")),
                 )))),
         // 候选注释“释义”用的词典（tools/dictionaries/glossary/build_glossary.py 生成）；id 与 CandidateGlossary.MODEL_ID 一致。
         ModelInfo("candidate-gloss", "候选中英释义词典", "设置里“候选注释内容”选释义后，中文候选旁显示英文，中文键盘里的英文候选旁显示中文。英→中取自 ECDICT，中→英取自 CC-CEDICT（MDBG）；常见的日常短语也显示英文。", ModelCategory.OTHER,
@@ -65,5 +67,23 @@ object BuiltinModelCatalog {
                     ModelFile("joiner.int8.onnx", "", "", 0L),
                     ModelFile("tokens.txt", "", "", 0L),
                 )))),
+        // 字母逐字上屏的语言（LetterLanguage）的补全词表：不进安装包，开启语言时下载。
+        // 源文件在 tools/wordlists（build_words.py 生成，来源见 NOTICE），原样传到 Release `models` 和魔搭。
+        ModelInfo("words-es", "西班牙语补全词表", "西班牙语键盘的单词补全，约 4 万个常用词。不打重音也能补全：cancion → canción、ano → año。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v1", size = "0.34 MB",
+                files = listOf(ModelFile("cyime-words-es-v1.txt", RELEASE + "cyime-words-es-v1.txt", "883f448de2eb617dd1e8269d8b3ce6c63a253c08c2b4e7ec9df27cfc606be9cf", 351490L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "cyime-words-es-v1.txt")))))),
+        ModelInfo("words-de", "德语补全词表", "德语键盘的单词补全，约 4 万个常用词。不打变音也能补全：uber → über、strasse → Straße。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v1", size = "0.35 MB",
+                files = listOf(ModelFile("cyime-words-de-v1.txt", RELEASE + "cyime-words-de-v1.txt", "0b72230518bd82fe1e19b28f54154b2fdf91d4513c4c87cdec700ed051b2203a", 365973L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "cyime-words-de-v1.txt")))))),
+        ModelInfo("words-fr", "法语补全词表", "法语键盘的单词补全，约 4 万个常用词。不打重音也能补全：tres → très、francais → français。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v1", size = "0.32 MB",
+                files = listOf(ModelFile("cyime-words-fr-v1.txt", RELEASE + "cyime-words-fr-v1.txt", "5ed4378b44aecce3afba69f312bbb802f53ede4b8f8c3a941370a9a791b95a19", 339957L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "cyime-words-fr-v1.txt")))))),
+        ModelInfo("words-ru", "俄语补全词表", "俄语键盘的单词补全，约 4 万个常用词。不打 ё 也能补全：еще → ещё。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v1", size = "0.62 MB",
+                files = listOf(ModelFile("cyime-words-ru-v1.txt", RELEASE + "cyime-words-ru-v1.txt", "7a818abbe5e85670b76cdac369453848c664540122cf33112365eae749728177", 654612L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "cyime-words-ru-v1.txt")))))),
     )
 }

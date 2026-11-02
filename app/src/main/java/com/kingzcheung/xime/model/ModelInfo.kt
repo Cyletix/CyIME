@@ -2,7 +2,6 @@ package com.kingzcheung.xime.model
 
 enum class ModelCategory {
     CANDIDATE,
-    PREDICTION,
     ASR,
     HANDWRITING,
     /** 声纹模型：字幕模式分说话人用，不是语音识别模型。 */

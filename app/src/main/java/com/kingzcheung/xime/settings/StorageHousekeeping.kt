@@ -7,7 +7,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 启动时清掉上次进程被杀（覆盖安装、系统回收）时没来得及删的临时文件。
+ * 启动时清掉上次进程被杀（覆盖安装、系统回收）时没来得及删的临时文件，以及不再使用的模型。
  * 这些文件只在操作正常结束时删除：下载到一半的模型、导入和方案安装的暂存、
  * 模型替换时挪开的旧目录、发布到 rime/ 途中的链接，一个就可能几百 MB。
  */
@@ -23,6 +23,8 @@ object StorageHousekeeping {
     private val MODEL_STAGING = Regex("^\\.(?:download|import|bundle)-.+-$UUID$")
     /** installCandidateModel 发布前的临时链接；源文件仍在 models/，删掉不丢数据。 */
     private val RUNTIME_INSTALLING = Regex("^\\..+\\.$UUID\\.installing$")
+    /** 不再使用的模型：智能联想 11-02 起只用内置 n-gram 联想表，以前下载或从安装包取出的联想模型一并删掉。 */
+    internal val RETIRED_MODELS = setOf("predictive-text-base", "predictive-text-small")
 
     /**
      * 只收集调用时已经存在的条目，所以必须在本进程开始任何下载、导入或安装之前调用；
@@ -32,7 +34,8 @@ object StorageHousekeeping {
         cacheDir.listFiles { file -> CACHE_TEMP.matches(file.name) }.orEmpty().toList() +
             // 文字识别请求的截图，识别完即删；进程被杀时留下。
             File(cacheDir, "ocr-frames").listFiles { file -> file.isFile }.orEmpty() +
-            modelsDir.listFiles { file -> MODEL_PREVIOUS.matches(file.name) || MODEL_STAGING.matches(file.name) }.orEmpty() +
+            modelsDir.listFiles { file -> MODEL_PREVIOUS.matches(file.name) || MODEL_STAGING.matches(file.name) ||
+                file.name in RETIRED_MODELS }.orEmpty() +
             rimeDir.listFiles { file -> file.isFile && RUNTIME_INSTALLING.matches(file.name) }.orEmpty()
 
     /** 返回腾出的字节数。被挪开的旧模型若原位置已空（替换中途被杀），放回原处而不是删除。 */

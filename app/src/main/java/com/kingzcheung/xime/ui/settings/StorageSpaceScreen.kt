@@ -263,7 +263,7 @@ private fun categoryIcon(id: String): ImageVector = when (id) {
 
 private fun clearConfirmText(id: String): String = when (id) {
     StorageStats.ID_MODELS ->
-        "将删除所有已下载的离线模型（联想 / 手写 / 语音识别），对应功能在重新下载模型前不可用。确定继续吗？"
+        "将删除所有已下载的离线模型（手写 / 语音识别），对应功能在重新下载模型前不可用。确定继续吗？"
     StorageStats.ID_SCHEMA_CACHE ->
         "将删除输入方案的编译缓存与编译日志，不会影响词库和自定义配置；下次启动输入法时会自动重新编译。确定继续吗？"
     StorageStats.ID_MARKET_PACKAGES ->

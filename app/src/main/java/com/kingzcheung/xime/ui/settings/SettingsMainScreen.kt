@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,18 +15,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.automirrored.twotone.MenuBook
 import androidx.compose.material.icons.twotone.Draw
 import androidx.compose.material.icons.twotone.Swipe
@@ -45,8 +37,10 @@ import androidx.compose.material.icons.twotone.Extension
 import androidx.compose.material.icons.twotone.GraphicEq
 import androidx.compose.material.icons.twotone.Info
 import androidx.compose.material.icons.twotone.Keyboard
+import androidx.compose.material.icons.twotone.MoreHoriz
 import androidx.compose.material.icons.twotone.KeyboardAlt
 import androidx.compose.material.icons.twotone.Palette
+import androidx.compose.material.icons.twotone.QueryStats
 import androidx.compose.material.icons.twotone.Storefront
 import androidx.compose.material.icons.twotone.Straighten
 import androidx.compose.material.icons.twotone.Sync
@@ -70,8 +64,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -130,6 +122,7 @@ fun SettingsMainContent(
         topBar = {
             MediumTopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
+                actions = { TypingStatsTitleEntry { onNavigateToRoute(SettingsRoutes.TypingStats) } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surface,
@@ -220,76 +213,6 @@ fun SettingsMainContent(
                         onClick = { onNavigateToRoute(SettingsRoutes.SetupGuide) },
                         showArrow = true
                     )
-                    var testText by remember { mutableStateOf("") }
-                    var isFocused by remember { mutableStateOf(false) }
-                    val editorVisibility = remember { BringIntoViewRequester() }
-                    var editorSize by remember { mutableStateOf(IntSize.Zero) }
-                    // 清空（长按删除）会收起「清除」行、文字框变矮，列表随之回缩；等这一帧布局完成后
-                    // 再把试打框连同键盘高度一起请求进视野，试打框始终露在键盘上方。
-                    LaunchedEffect(isFocused, imeBottomPx, editorSize, testText.isEmpty()) {
-                        if (isFocused && imeBottomPx > 0 && editorSize.height > 0) {
-                            androidx.compose.runtime.withFrameNanos { }
-                            editorVisibility.bringIntoView(Rect(0f, 0f, editorSize.width.toFloat(),
-                                editorSize.height + imeBottomPx.toFloat()))
-                        }
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onFocusEvent { isFocused = it.hasFocus }
-                                .bringIntoViewRequester(editorVisibility)
-                                .onSizeChanged { editorSize = it }
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(
-                                    if (isFocused) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
-                                )
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
-                        ) {
-                            BasicTextField(
-                                value = testText,
-                                onValueChange = { testText = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                singleLine = false,
-                                maxLines = 3,
-                                decorationBox = { innerTextField ->
-                                    Box {
-                                        if (testText.isEmpty() && !isFocused) {
-                                            Text(
-                                                stringResource(R.string.test_input_hint),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                }
-                            )
-                        }
-                        if (testText.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = { testText = "" }) {
-                                    Text(
-                                        stringResource(R.string.action_clear),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-                        }
-                    }
                 })
             }
 
@@ -452,11 +375,13 @@ fun SettingsMainContent(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
+                    // 备份、性能与省电、界面语言收进「其他设置」（11-02「系统塞得太多了」）。
                     SettingsItem(
-                        icon = Icons.TwoTone.Backup,
-                        title = stringResource(R.string.item_backup_title), searchKey = "备份与恢复",
-                        subtitle = stringResource(R.string.item_backup_summary),
-                        onClick = onNavigateToBackup,
+                        icon = Icons.TwoTone.MoreHoriz,
+                        title = stringResource(R.string.item_other_title), searchKey = "其他设置",
+                        subtitle = stringResource(if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
+                            R.string.item_other_summary_with_language else R.string.item_other_summary),
+                        onClick = { onNavigateToRoute(SettingsRoutes.Other) },
                         showArrow = true
                     )
                     HorizontalDivider(
@@ -464,27 +389,6 @@ fun SettingsMainContent(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Speed,
-                        title = stringResource(R.string.item_performance_title), searchKey = "性能与省电",
-                        subtitle = stringResource(R.string.item_performance_summary),
-                        onClick = { onNavigateToRoute(SettingsRoutes.Performance) },
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    // 界面语言：翻译补齐前只在开发者自己的包里出现（公开包隐藏，系统语言照样自动生效）。
-                    if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG) {
-                        AppLanguageItem()
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 56.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                    }
                     SettingsItem(
                         icon = Icons.TwoTone.Info,
                         title = stringResource(R.string.item_about_title), searchKey = "关于 CyIME",
@@ -509,8 +413,6 @@ internal data class MainEntryStatus(
 
 internal fun readMainEntryStatus(context: android.content.Context): MainEntryStatus {
     val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-    val selected = android.content.ComponentName.unflattenFromString(
-        Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty())
     val input = context.getSystemService(android.content.Context.INPUT_SERVICE) as? android.hardware.input.InputManager
     val devices: List<android.view.InputDevice> =
         input?.let { manager -> manager.inputDeviceIds.map { id -> manager.getInputDevice(id) }.filterNotNull() }.orEmpty()
@@ -518,7 +420,7 @@ internal fun readMainEntryStatus(context: android.content.Context): MainEntrySta
     val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.read(context).enabled
     return MainEntryStatus(
         imeEnabled = imm?.enabledInputMethodList?.any { it.packageName == context.packageName } == true,
-        imeSelected = selected?.packageName == context.packageName,
+        imeSelected = isCyimeSelected(context),
         keyboardConnected = com.kingzcheung.xime.service.hasPhysicalTextKeyboard(devices),
         themeName = if (glass) context.getString(R.string.status_glass_suffix, theme) else theme,
         sttEnabled = SettingsPreferences.isSttEnabled(context),
@@ -527,3 +429,24 @@ internal fun readMainEntryStatus(context: android.content.Context): MainEntrySta
 
 /** 下载提示里的大小：和模型管理里写的 MB 一样按 1024 × 1024 字节算，取整。 */
 internal fun formatModelMegabytes(bytes: Long): String = "${(bytes + 524_288) / 1_048_576} MB"
+
+/** 标题栏右边一行小字：今天打了多少字，点进打字统计（11-02「标题栏右侧一个小字显示…不占空间」）。关掉统计后不显示。 */
+@androidx.compose.runtime.Composable
+private fun TypingStatsTitleEntry(onClick: () -> Unit) {
+    val context = LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    var summary by remember { mutableStateOf<com.kingzcheung.xime.stats.TypingStatsData?>(null) }
+    LaunchedEffect(lifecycle) {
+        // 从统计页关掉后回到首页要跟着变，所以每次回到前台都重读一次。
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            summary = if (!com.kingzcheung.xime.stats.TypingStats.isEnabled(context)) null
+                else withContext(Dispatchers.IO) { com.kingzcheung.xime.stats.TypingStats.snapshot(context) }
+        }
+    }
+    val stats = summary ?: return
+    val today = com.kingzcheung.xime.stats.TypingStats.today()
+    TextButton(onClick = onClick) {
+        Text("今天 ${com.kingzcheung.xime.stats.TypingStatsText.count(stats.chars(today))} 字",
+            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+    }
+}

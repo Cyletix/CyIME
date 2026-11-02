@@ -61,7 +61,6 @@ data class SetupFacts(
     val streamingVoice: Boolean = false,
     val usesT9: Boolean = false,
     val usesCaption: Boolean = false,
-    val predictionEnabled: Boolean = true,
     /** 已经在手机上的模型：id → 实际占用字节。 */
     val installed: Map<String, Long> = emptyMap(),
     /** 安装包里带着、不联网就能取回的模型 id（完整版）。 */
@@ -89,6 +88,8 @@ data class SetupFacts(
     val wubiInstalled: Boolean = false,
     /** 「双拼键位提示」已经开着。 */
     val doublePinyinKeyHints: Boolean = false,
+    /** 当前角标设置允许额外显示双拼键位提示。 */
+    val canEnableDoublePinyinKeyHints: Boolean = false,
     /** 已打开的模糊音（[SpellingPatches.Fuzzy] 的 id）。 */
     val fuzzy: Set<String> = emptySet(),
     /** 能不能替人加、去桌面「字幕」图标；老人包固定有图标。 */
@@ -128,7 +129,7 @@ data class InputPlan(
     val downloadWubi: Boolean = false,
     val fuzzyOn: Set<String> = emptySet(),
     val fuzzyOff: Set<String> = emptySet(),
-    /** 打开「双拼键位提示」：从别的打法改成双拼时开，帮刚学的人记键位；本来就用双拼的不动。和它互锁的上下角标提示同时关掉。 */
+    /** 从别的打法改成双拼时可打开键位提示，前提是不会挤掉现有角标。 */
     val keyHintsOn: Boolean = false,
     /** 加（true）或去掉（false）桌面「字幕」图标；null 不动。 */
     val captionIcon: Boolean? = null,
@@ -153,8 +154,6 @@ data class SetupPlan(
     val sttEnabled: Boolean,
     /** 中文、英文语音要用的模式；null 表示不改。 */
     val voiceMode: String?,
-    /** 智能联想用哪个模型；null 表示不改（联想已关闭）。 */
-    val predictionModel: String?,
     /** 九键词组模型用哪一档；null 表示不用。 */
     val t9Model: String?,
     val keep: List<SetupItem>,
@@ -172,6 +171,7 @@ data class SetupPlan(
  * 已装的模型），不跑测速；数字依据见各条注释。纯逻辑，便于单元测试。
  */
 object SetupGuidePlanner {
+    const val HIDE_OTHER_DOUBLE_PINYIN_BY_DEFAULT = false
     const val GIB = 1024L * 1024 * 1024
     const val HANDWRITING = "ochwpro"
 
@@ -180,16 +180,13 @@ object SetupGuidePlanner {
     const val VERY_TIGHT_FREE = 1 * GIB
     /** 下载后至少还要剩这么多。 */
     const val RESERVE_AFTER_DOWNLOAD = 1536L * 1024 * 1024
-    /** 整句精修（X-ASR）再多 136 MB、说完要多跑一个模型：只在性能强、空间宽裕时推荐。 */
-    const val XASR_FREE = 6 * GIB
 
     private val voiceIds = listOf(SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.XASR,
         SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA)
-    private val predictionIds = listOf(DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL)
     private val t9Ids = listOf(CandidateModelCatalog.NGRAM, CandidateModelCatalog.NGRAM_SMALL, CandidateModelCatalog.GRAMMAR)
 
     /** 向导会管的全部模型；其他（公式手写、释义词典等）保持原样。 */
-    val managedIds: List<String> = voiceIds + BuiltinModelCatalog.SPEAKER_MODEL + predictionIds + t9Ids + HANDWRITING
+    val managedIds: List<String> = voiceIds + BuiltinModelCatalog.SPEAKER_MODEL + t9Ids + HANDWRITING
 
     /** 白话名字。 */
     fun title(id: String): String = when (id) {
@@ -199,8 +196,6 @@ object SetupGuidePlanner {
         SpeechModelCatalog.ZIPFORMER -> "另一个边说边出字的中文模型"
         SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA -> "日语专用语音模型"
         BuiltinModelCatalog.SPEAKER_MODEL -> "字幕：分清谁在说话"
-        DeviceModelProfiles.BASE -> "智能联想（完整）"
-        DeviceModelProfiles.SMALL -> "智能联想（轻量）"
         CandidateModelCatalog.NGRAM -> "九键整句组词（完整）"
         CandidateModelCatalog.NGRAM_SMALL -> "九键整句组词（精简）"
         CandidateModelCatalog.GRAMMAR -> "九键语法增强（旧）"
@@ -311,7 +306,7 @@ object SetupGuidePlanner {
             "方案栏里藏起用不到的 ${hide.size} 种双拼：${names.joinToString("、")}。以后想用，在 设置 → 双拼 里再打开。"
         }
 
-        // 模糊音只对全拼 26 键起作用；只改回答和现在不一样的那几项。
+        // 只改回答和现在不一样的那几组读音。
         val fuzzyOn = mutableSetOf<String>()
         val fuzzyOff = mutableSetOf<String>()
         if (typing == TypingWay.FULL_PINYIN) for (habit in FuzzyHabit.entries) {
@@ -322,10 +317,9 @@ object SetupGuidePlanner {
         }
 
         // 刚改用双拼的人还没记熟键位：打开双拼键位提示（用户 10-31）。本来就用双拼的、已经开着的不动。
-        val keyHintsOn = typing == TypingWay.DOUBLE_PINYIN && facts.typing != TypingWay.DOUBLE_PINYIN && !facts.doublePinyinKeyHints
-        // 键位提示和上下角标提示互锁（写在同一块键面上）：一起关掉角标提示，滑动照常出符号。
-        if (keyHintsOn) lines += "打开双拼键位提示：双拼 26 键每个键上写出 zh、ch、sh 和韵母。它写在按键角上，" +
-            "上下角标提示一并关掉，滑动照常出符号。记熟了可以在 语言与方案 › 双拼方案 关掉提示，再到 主题与外观 › 角标与气泡 打开角标。"
+        val keyHintsOn = typing == TypingWay.DOUBLE_PINYIN && facts.typing != TypingWay.DOUBLE_PINYIN &&
+            !facts.doublePinyinKeyHints && facts.canEnableDoublePinyinKeyHints
+        if (keyHintsOn) lines += "打开双拼键位提示，双拼 26 键的键面会标出 zh、ch、sh 和韵母。"
 
         val captionIcon = answers.caption.takeIf { facts.captionIconChangeable && it != facts.usesCaption }
         when (captionIcon) {
@@ -350,8 +344,11 @@ object SetupGuidePlanner {
         val voiceNeeded = answers.voice != VoiceUse.NEVER || answers.caption
         // 字幕只用说完出字时一整句一下子冒出来，看的人跟不上，所以用字幕也配边说边出字。
         var streaming = voiceNeeded && !light && !tight && (answers.voice == VoiceUse.OFTEN || answers.caption)
-        var xasr = streaming && answers.voice == VoiceUse.OFTEN && facts.tier == DeviceModelTier.ENHANCED &&
-            (free == null || free >= XASR_FREE)
+        // 整句精修（X-ASR，136 MB）：用语音就推荐。同一批录音错字 8.5% → 5.5%，比 SenseVoice 定稿还快，
+        // 只用 SenseVoice 时也由它定稿、不再加载 SenseVoice（2026-11-01 复测，用户「就按你说的」）。
+        // 空间紧张时不新下；已经下好的留着，空间极紧才删。
+        var xasr = answers.voice != VoiceUse.NEVER &&
+            (!tight || SpeechModelCatalog.XASR in facts.installed && !veryTight)
         if (answers.voice == VoiceUse.OFTEN && !streaming) notes += when {
             light -> "这台${facts.device}${memoryText(facts.memoryBytes)}，边说边出字要同时跑两个语音模型，容易卡，先用「说完一句出字」。"
             else -> "${facts.device}剩余空间不到 3 GB，先用「说完一句出字」，少占 226 MB。"
@@ -367,9 +364,6 @@ object SetupGuidePlanner {
             light || tight -> CandidateModelCatalog.NGRAM_SMALL
             else -> CandidateModelCatalog.NGRAM
         }
-        // 联想：入门机型或空间很紧用轻量版（18.9 MB），否则完整版（34.8 MB）。
-        var prediction = if (!facts.predictionEnabled) null
-            else if (light || veryTight) DeviceModelProfiles.SMALL else DeviceModelProfiles.BASE
 
         fun needed(): List<String> = buildList {
             add(HANDWRITING)
@@ -382,7 +376,6 @@ object SetupGuidePlanner {
                     .filter { it in facts.installed }.forEach(::add)
             }
             if (answers.caption) add(BuiltinModelCatalog.SPEAKER_MODEL)
-            prediction?.let(::add)
             t9Model?.let(::add)
         }
         fun downloadBytes() = needed().filterNot(::available).sumOf { facts.sizes[it] ?: 0L }
@@ -394,8 +387,6 @@ object SetupGuidePlanner {
                 { if (streaming && !available(SpeechModelCatalog.PARAFORMER)) { streaming = false; true } else false },
                 { if (t9Model == CandidateModelCatalog.NGRAM && !available(CandidateModelCatalog.NGRAM)) {
                     t9Model = CandidateModelCatalog.NGRAM_SMALL; true } else false },
-                { if (prediction == DeviceModelProfiles.BASE && !available(DeviceModelProfiles.BASE)) {
-                    prediction = DeviceModelProfiles.SMALL; true } else false },
             )
             var downgraded = false
             for (step in steps) {
@@ -417,7 +408,7 @@ object SetupGuidePlanner {
         }
         val remove = managedIds.filter { it !in keepIds && available(it) }.map { id ->
             val onPhone = id in facts.installed
-            SetupItem(id, title(id), removeReason(id, facts, answers, streaming, prediction, t9Model),
+            SetupItem(id, title(id), removeReason(id, facts, answers, streaming, t9Model),
                 if (onPhone) facts.installed.getValue(id) else facts.sizes[id] ?: 0L,
                 if (onPhone) SetupSource.ON_PHONE else SetupSource.IN_PACKAGE, modelName(id))
         }
@@ -435,7 +426,7 @@ object SetupGuidePlanner {
             streaming -> SpeechModelCatalog.TWO_PASS
             else -> SpeechModelCatalog.SENSEVOICE
         }
-        return SetupPlan(answers, answers.voice != VoiceUse.NEVER, voiceMode, prediction, t9Model, keep, remove, notes,
+        return SetupPlan(answers, answers.voice != VoiceUse.NEVER, voiceMode, t9Model, keep, remove, notes,
             inputPlan(facts, answers))
     }
 
@@ -447,11 +438,9 @@ object SetupGuidePlanner {
         }
         SpeechModelCatalog.PARAFORMER -> if (answers.voice == VoiceUse.OFTEN) "说话时字就跟着出来，不用等说完。"
             else "字幕边听边出字，看的人跟得上。"
-        SpeechModelCatalog.XASR -> "说完后把整句中文再认一遍，比上面更准；这台${facts.device}性能够、空间也够。"
+        SpeechModelCatalog.XASR -> "说完后把整句中文再认一遍，错字比只用上面的少三分之一，也更快。"
         SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA -> "你已经给日语选了它，保留。"
         BuiltinModelCatalog.SPEAKER_MODEL -> "字幕里分清是谁在说话。"
-        DeviceModelProfiles.BASE -> "联想下一个词更准，这台${facts.device}跑得动。"
-        DeviceModelProfiles.SMALL -> if (facts.tier == DeviceModelTier.LIGHT) "省内存，联想照样能用。" else "省空间，联想照样能用。"
         CandidateModelCatalog.NGRAM -> "九键按整句常用说法组词，长句一次打对的更多。"
         CandidateModelCatalog.NGRAM_SMALL -> "九键按整句组词；比完整版小一半，首选略差一点。"
         HANDWRITING -> "手写输入要用，只有 7 MB。"
@@ -459,14 +448,14 @@ object SetupGuidePlanner {
     }
 
     private fun removeReason(id: String, facts: SetupFacts, answers: SetupAnswers, streaming: Boolean,
-        prediction: String?, t9Model: String?): String = when (id) {
+        t9Model: String?): String = when (id) {
         SpeechModelCatalog.SENSEVOICE -> "不用语音，也不用字幕。"
         SpeechModelCatalog.PARAFORMER -> if (answers.voice == VoiceUse.NEVER && !answers.caption) "不用语音，也不用字幕。"
             else "用「说完一句出字」就够了，用不到它。"
         SpeechModelCatalog.XASR -> when {
             answers.voice == VoiceUse.NEVER && !answers.caption -> "不用语音，也不用字幕。"
-            answers.voice != VoiceUse.OFTEN -> "常用语音时才值得多下 136 MB，中文整句更准；现在先不用。"
-            else -> "整句精修说完要多跑一个模型，这台${facts.device}先不用。"
+            answers.voice == VoiceUse.NEVER -> "只用字幕，用不到它。"
+            else -> "剩余空间不多，先不多下 136 MB；空间够了再到语音设置里下载，中文整句更准。"
         }
         SpeechModelCatalog.ZIPFORMER -> if (answers.voice == VoiceUse.NEVER && !answers.caption) "不用语音，也不用字幕。"
             else "和「边说边出字」作用重复。"
@@ -476,8 +465,6 @@ object SetupGuidePlanner {
             else -> "没有用日语。"
         }
         BuiltinModelCatalog.SPEAKER_MODEL -> "不用字幕。"
-        DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL ->
-            if (prediction == null) "智能联想已关闭。" else "联想只用一个模型，另一个用不到。"
         CandidateModelCatalog.NGRAM, CandidateModelCatalog.NGRAM_SMALL ->
             if (t9Model == null) "不用九键。" else "九键只用一档，两档二选一。"
         CandidateModelCatalog.GRAMMAR -> if (t9Model == null) "不用九键。" else "有了九键整句组词，它就不再起作用。"
@@ -493,8 +480,6 @@ object SetupGuidePlanner {
         SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "Zipformer · 日语轻量"
         SpeechModelCatalog.ZIPFORMER_JA -> "Zipformer · 日语原版"
         BuiltinModelCatalog.SPEAKER_MODEL -> "声纹模型"
-        DeviceModelProfiles.BASE -> "智能联想模型（完整）"
-        DeviceModelProfiles.SMALL -> "智能联想模型（轻量）"
         CandidateModelCatalog.NGRAM -> "九键词组模型（完整）"
         CandidateModelCatalog.NGRAM_SMALL -> "九键词组模型（精简）"
         CandidateModelCatalog.GRAMMAR -> "九键语法增强"
@@ -504,23 +489,22 @@ object SetupGuidePlanner {
 
     fun mbText(bytes: Long): String = "${(bytes + 524_288) / 1_048_576} MB"
 
-    /** 模型属于哪一类，完成页说「语音、联想模型正在下载」用。 */
+    /** 模型属于哪一类，完成页说「语音、手写模型正在下载」用。 */
     fun kind(id: String): String = when (id) {
         SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.XASR, SpeechModelCatalog.ZIPFORMER,
         SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA -> "语音"
         BuiltinModelCatalog.SPEAKER_MODEL -> "字幕"
-        DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL -> "联想"
         CandidateModelCatalog.NGRAM, CandidateModelCatalog.NGRAM_SMALL, CandidateModelCatalog.GRAMMAR -> "九键组词"
         HANDWRITING -> "手写"
         else -> ""
     }
 
-    /** 「语音、联想模型」；认不出类别时就叫「模型」。 */
+    /** 「语音、手写模型」；认不出类别时就叫「模型」。 */
     fun kindsText(ids: List<String>): String = ids.map(::kind).filter { it.isNotEmpty() }.distinct().joinToString("、") + "模型"
 
     /**
      * 推荐页底部那句占多大：分开写现在占多少、要下载／取出／删掉多少、设好后共占多少。
-     * 不写成「现在占 7 MB，整理后 270 MB」：那样读起来像整理反而变大了（10-31 走查），其实是要下载语音、联想模型。
+     * 不写成「现在占 7 MB，整理后 270 MB」：那样读起来像整理反而变大了（10-31 走查），其实是要下载语音等模型。
      */
     fun sizeSummary(now: Long, download: Long, unpack: Long, removed: Long): String {
         val steps = buildList {

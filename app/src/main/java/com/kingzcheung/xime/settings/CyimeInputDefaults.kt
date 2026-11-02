@@ -4,19 +4,14 @@ package com.kingzcheung.xime.settings
 object CyimeInputDefaults {
     val recommended = listOf("rime_ice", "t9_pinyin")
 
-    /**
-     * 只在新装时多打开的布局（用户 10-31：好多人问支不支持 14 键，其实一直有，只是藏在「其他已安装方案」里）：
-     * 新装的人布局栏里就有 14 键。升级的人方案栏不变，不改原有习惯。
-     */
-    val freshInstallExtras = listOf("pinyin_14jian")
-
-    /** 第一次整理默认方案时要打开的：新装多开 [freshInstallExtras]。 */
-    fun firstDefaults(freshInstall: Boolean): List<String> = recommended + if (freshInstall) freshInstallExtras else emptyList()
+    /** 首装就提供小鹤及 14 键，组合由实际安装的方案文件派生。升级保留原先的启停选择。 */
+    fun firstDefaults(freshInstall: Boolean): List<String> = if (freshInstall)
+        listOf("rime_ice", "double_pinyin_flypy", "t9_pinyin", "pinyin_14jian") else recommended
 
     /** 「已安装的方案」里关着也直接列出、不收进「其他已安装方案（高级）」的。 */
-    val listedWhenOff: List<String> get() = recommended + freshInstallExtras
-    val legacyDefaults = setOf("wubi86", "wubi86_pinyin", "wubi86_trad", "wubi86_trad_pinyin")
-    val dependencies = setOf("cyime_t9_english", "cyime_k14_english", "cyime_omission", "melt_eng", "radical_pinyin", "numbers", "handwriting")
+    val listedWhenOff: List<String> get() = recommended + "pinyin_14jian" + doublePinyin
+    val dependencies = setOf("cyime_t9_english", "cyime_k14_english", "cyime_omission", "cyime_letter_swap",
+        "cyime_digit_edit", "cyime_digit_tap", "melt_eng", "radical_pinyin", "numbers", "handwriting")
 
     /**
      * 方案 × 布局的组合配置：所需的方案和布局都启用时自动启用，不作为独立条目单独开关。
@@ -42,9 +37,18 @@ object CyimeInputDefaults {
     fun withDoublePinyin(enabled: List<String>, available: Set<String>): List<String>? {
         if (!available.containsAll(doublePinyin)) return null
         val missing = doublePinyin.filterNot { it in enabled }
-        val after = enabled.indexOf("rime_ice")
-        val merged = if (after < 0) enabled + missing else enabled.take(after + 1) + missing + enabled.drop(after + 1)
+        val pinyin = enabled.indexOf("rime_ice")
+        val insertAt = if (pinyin < 0) enabled.size else
+            pinyin + 1 + enabled.drop(pinyin + 1).takeWhile { it in doublePinyin }.size
+        val merged = enabled.take(insertAt) + missing + enabled.drop(insertAt)
         return withCompanions(merged, available)
+    }
+
+    /** 旧 schema_list 可以只启用组合。只在读取旧列表时补齐它需要的方案与布局。 */
+    fun restoreStoredCompanionParents(ids: List<String>, available: Set<String>): List<String> {
+        val missing = ids.filter { it in available }.mapNotNull(::companionNeeds)
+            .filter { available.containsAll(it) }.flatten().filterNot { it in ids }.distinct()
+        return if (missing.isEmpty()) ids else ids + missing
     }
 
     fun withCompanions(ids: List<String>, available: Set<String>): List<String> {
@@ -67,6 +71,8 @@ object CyimeInputDefaults {
 
     fun visibleSchema(id: String, available: Set<String>): Boolean =
         id !in dependencies && canonicalIds(listOf(id), available).singleOrNull() == id
+
+    fun hasIndependentToggle(id: String, available: Set<String>) = !isCompanion(id) && visibleSchema(id, available)
 
     fun description(id: String): String? = when (id) {
         "t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy" -> "默认雾凇词库 · 支持市场同名更新"

@@ -80,13 +80,8 @@ object ModelManager {
         }
     }
 
-    /** Same readiness contract as the prediction loader, including installs before index loading. */
     fun isModelReady(context: Context, id: String): Boolean {
         ModelStorage.migrateLegacyForModel(context, id)
-        if (id.startsWith("predictive-text")) {
-            return predictionModelFilesReady(ModelStorage.getModelDir(context, id)) &&
-                (getModel(id)?.let { isModelDownloaded(context, it) } ?: true)
-        }
         return isModelDownloaded(context, id)
     }
 
@@ -133,8 +128,7 @@ object ModelManager {
         val dir = getModelStorageDir(context, model) ?: return false
         if (!dir.exists()) return false
 
-        return installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id)) != null &&
-            (model.category != ModelCategory.PREDICTION || predictionModelFilesReady(dir))
+        return installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id)) != null
     }
 
     /** 实际装着的版本（按文件内容认，老版本留下的文件也能认出），未安装为 null。 */

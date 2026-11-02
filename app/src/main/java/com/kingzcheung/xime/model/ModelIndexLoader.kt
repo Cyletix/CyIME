@@ -74,6 +74,8 @@ object ModelIndexLoader {
         val name = (entry["name"] as? YamlScalar)?.content ?: return null
         val description = (entry["description"] as? YamlScalar)?.content ?: ""
         val categoryStr = (entry["category"] as? YamlScalar)?.content ?: "other"
+        // 智能联想 11-02 起只用内置 n-gram 联想表，旧索引里的联想模型不再列出。
+        if (categoryStr.equals("prediction", ignoreCase = true)) return null
         val size = (entry["size"] as? YamlScalar)?.content ?: ""
 
         val category = parseCategory(categoryStr)
@@ -131,7 +133,6 @@ object ModelIndexLoader {
     private fun parseCategory(category: String): ModelCategory {
         return when (category.lowercase()) {
             "candidate" -> ModelCategory.CANDIDATE
-            "prediction" -> ModelCategory.PREDICTION
             "asr" -> ModelCategory.ASR
             "handwriting" -> ModelCategory.HANDWRITING
             "speaker" -> ModelCategory.SPEAKER

@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.settings
 
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,8 +18,8 @@ class KeyTipsTest {
         assertTrue(t.contains("1.0 秒内"))
         assertTrue(t.contains("下拉字母键|输入键上方的角标；上拉输入下方的角标。"))
         assertTrue(t.contains("删除键下拉|"))
-        // Z X C V 默认关：只说怎么打开。
-        assertTrue(t.contains("在「按键与手势」打开「Z X C V 角标做撤销、剪切、复制、粘贴」，默认关。"))
+        // Z X C V 角标 11-02 并进「按键符号」，不在 Ctrl 技巧里出现。
+        assertFalse(t.contains("Z X C V"))
     }
 
     @Test fun directionsFollowReverseLongPressAndHoldSettings() {
@@ -26,8 +27,7 @@ class KeyTipsTest {
         assertTrue(reversed.contains("上拉字母键|输入键上方的角标；下拉输入下方的角标。"))
         assertTrue(reversed.contains("删除键上拉|"))
         assertTrue(reversed.contains("1.5 秒内"))
-        val longPress = text(KeyboardInputPreferences(symbolInputMode = SymbolInputMode.LONG_PRESS, zxcvEditShortcuts = true))
+        val longPress = text(KeyboardInputPreferences(symbolInputMode = SymbolInputMode.LONG_PRESS))
         assertTrue(longPress.contains("长按字母键|"))
-        assertTrue(longPress.contains("长按 Z X C V|撤销、剪切、复制、粘贴"))
     }
 }

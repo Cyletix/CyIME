@@ -87,6 +87,8 @@ object BackupManager {
         val first = relative.substringBefore('/')
         // leveldb 的锁和运行日志不是数据，恢复时覆盖反而有害
         if (first.endsWith(".userdb")) return relative.substringAfterLast('/') !in setOf("LOCK", "LOG", "LOG.old")
+        // 日语 azooKey 的学习记录（词典本身随 APK，不备份）
+        if (relative.startsWith("azookey/memory/")) return true
         if (relative.contains('/')) return false
         return relative.endsWith(".userdb.txt") ||
             (relative.startsWith("custom_phrase") && relative.endsWith(".txt")) ||

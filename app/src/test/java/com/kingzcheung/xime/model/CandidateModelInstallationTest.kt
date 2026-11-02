@@ -10,6 +10,17 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class CandidateModelInstallationTest {
+    @Test fun anImportedSchemeKeepsTheGrammarAfterNineKeyMigratesToNgram() {
+        val runtime = temporary.newFolder()
+        val grammar = listOf("wanxiang-lts-zh-hans.gram")
+        val bytes = "grammar:\n  language: wanxiang-lts-zh-hans".toByteArray()
+        File(runtime, "t9_pinyin.schema.yaml").writeBytes(bytes)
+        val manifest = "${hash(bytes)}\t${bytes.size}\trime_chinese/t9_pinyin.schema.yaml\tt9_pinyin.schema.yaml\n"
+        assertFalse(hasExternalGrammarConsumer(runtime, manifest, grammar))
+        File(runtime, "wanxiang.schema.yaml").writeText("schema:\n  schema_id: wanxiang\n")
+        File(runtime, "build/wanxiang.schema.yaml").apply { parentFile!!.mkdirs(); writeBytes(bytes) }
+        assertTrue(hasExternalGrammarConsumer(runtime, manifest, grammar))
+    }
     @get:Rule val temporary = TemporaryFolder()
     private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
         .joinToString("") { "%02x".format(it) }

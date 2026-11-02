@@ -49,7 +49,8 @@ class InputModesTest {
     @Test fun independentLanguageOrderKeepsTheRememberedInputMode() {
         // 这是所有语言的排位（含未开启的），显示时 languageOrder(context) 再只留已开启的。
         val order = InputModes.languageOrder(listOf("en", "ja", "ja", "unknown"))
-        assertEquals(listOf(InputLanguage.ENGLISH, InputLanguage.JAPANESE, InputLanguage.CHINESE, InputLanguage.SPANISH), order)
+        assertEquals(listOf(InputLanguage.ENGLISH, InputLanguage.JAPANESE, InputLanguage.CHINESE) +
+            LetterLanguage.entries.map { it.language }, order)
         val choices = InputModes.languageChoices(modes, "rime_ice", mapOf(InputLanguage.JAPANESE to "japanese_kana"), order)
         assertEquals(listOf(InputModes.ENGLISH, "japanese_kana", "rime_ice"), choices.map { it.schemaId })
         assertEquals(listOf("rime_ice", "t9_pinyin"), InputModes.available(modes, InputModes.defaultModeOrder).take(2).map { it.schemaId })
@@ -57,13 +58,15 @@ class InputModesTest {
     }
 
     @Test fun japaneseComesAfterEnglishByDefaultAndWhenSwitchedOnLater() {
-        assertEquals(listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH, InputLanguage.JAPANESE, InputLanguage.SPANISH),
-            InputModes.languageOrder(emptyList()))
+        assertEquals(listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH, InputLanguage.JAPANESE) +
+            LetterLanguage.entries.map { it.language }, InputModes.languageOrder(emptyList()))
         // A saved order from older versions put Japanese before English; switching Japanese on moves it last.
-        // 未开启的西班牙语只占排位，开启时会再排到最后。
-        assertEquals(listOf("zh", "en", "es", "ja"), InputModes.orderWithLanguageLast(listOf("zh", "ja", "en"), InputLanguage.JAPANESE))
-        // 西班牙语后开启，同样排到已开启语言后面。
-        assertEquals(listOf("zh", "en", "ja", "es"), InputModes.orderWithLanguageLast(listOf("zh", "en", "ja"), InputLanguage.SPANISH))
+        // 未开启的西班牙、德、法、俄、韩语只占排位，开启时会再排到最后。
+        val letters = LetterLanguage.entries.map { it.language.id }
+        assertEquals(listOf("zh", "en") + letters + "ja", InputModes.orderWithLanguageLast(listOf("zh", "ja", "en"), InputLanguage.JAPANESE))
+        // 德语后开启，同样排到已开启语言后面。
+        assertEquals(listOf("zh", "en", "ja") + (letters - "de") + "de",
+            InputModes.orderWithLanguageLast(listOf("zh", "en", "ja"), InputLanguage.GERMAN))
     }
 
     /** 没排过序时字母排列（Colemak、Cyletix10、Typewise、QWJRTK、自定义）排在其他方案后面，排过的不动。 */

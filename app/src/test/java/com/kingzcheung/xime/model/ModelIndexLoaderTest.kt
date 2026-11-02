@@ -62,9 +62,9 @@ class ModelIndexLoaderTest {
     fun `resolvedVersion returns the first version`() {
         val yaml = """
             models:
-              - id: predictive-text-small
-                name: 智能预测
-                category: prediction
+              - id: some-model
+                name: 某个模型
+                category: other
                 versions:
                   - version: "1.1"
                     files:
@@ -80,6 +80,31 @@ class ModelIndexLoaderTest {
 
         assertEquals("1.1", model.resolvedVersion()?.version)
         assertEquals("1.1", model.versions.first().version)
+    }
+
+    @Test
+    fun `skips retired prediction models`() {
+        val yaml = """
+            models:
+              - id: predictive-text-small
+                name: 智能预测
+                category: prediction
+                versions:
+                  - version: "1.0"
+                    files:
+                      - name: vocab.json
+                        url: "https://example.com/vocab.json"
+              - id: valid
+                name: 有效
+                category: other
+                versions:
+                  - version: "1.0"
+                    files:
+                      - name: a.bin
+                        url: "https://example.com/a.bin"
+        """.trimIndent()
+
+        assertEquals(listOf("valid"), ModelIndexLoader.parseModelsIndex(yaml).map { it.id })
     }
 
     @Test

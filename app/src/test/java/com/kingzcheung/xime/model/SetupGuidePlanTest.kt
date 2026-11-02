@@ -13,7 +13,7 @@ class SetupGuidePlanTest {
     private val sizes = mapOf(
         SpeechModelCatalog.SENSEVOICE to 228 * mb, SpeechModelCatalog.PARAFORMER to 226 * mb, SpeechModelCatalog.XASR to 136 * mb,
         SpeechModelCatalog.ZIPFORMER to 133 * mb, SpeechModelCatalog.ZIPFORMER_JA_INT8 to 153 * mb, SpeechModelCatalog.ZIPFORMER_JA to 586 * mb,
-        BuiltinModelCatalog.SPEAKER_MODEL to 27 * mb, DeviceModelProfiles.BASE to 35 * mb, DeviceModelProfiles.SMALL to 19 * mb,
+        BuiltinModelCatalog.SPEAKER_MODEL to 27 * mb,
         CandidateModelCatalog.NGRAM to 203 * mb, CandidateModelCatalog.NGRAM_SMALL to 105 * mb, CandidateModelCatalog.GRAMMAR to 399 * mb,
         "ochwpro" to 7 * mb,
     )
@@ -27,22 +27,23 @@ class SetupGuidePlanTest {
 
     @Test fun lightPhoneOnLiteGetsTheSmallestWorkingSet() {
         val plan = SetupGuidePlanner.plan(facts(DeviceModelTier.LIGHT), SetupAnswers(VoiceUse.SOMETIMES, t9 = false, caption = false))
-        assertEquals(setOf(SpeechModelCatalog.SENSEVOICE, DeviceModelProfiles.SMALL, "ochwpro"), plan.keepIds())
+        // X-ASR finalizes instead of SenseVoice, so it costs no extra memory even here.
+        assertEquals(setOf(SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.XASR, "ochwpro"), plan.keepIds())
         assertEquals(SpeechModelCatalog.SENSEVOICE, plan.voiceMode)
         assertTrue(plan.keep.all { it.source == SetupSource.DOWNLOAD })
         assertTrue(plan.remove.isEmpty())
     }
 
     @Test fun fullEditionDropsWhatThePersonDoesNotUse() {
-        // 瘦身完整版：SenseVoice、两个联想、声纹、手写解压在手机上，九键词组模型在词库目录里。
-        val bundled = setOf(SpeechModelCatalog.SENSEVOICE, DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL,
+        // 瘦身完整版：SenseVoice、声纹、手写解压在手机上，九键词组模型在词库目录里。
+        val bundled = setOf(SpeechModelCatalog.SENSEVOICE,
             BuiltinModelCatalog.SPEAKER_MODEL, "ochwpro", CandidateModelCatalog.NGRAM)
         val plan = SetupGuidePlanner.plan(facts(DeviceModelTier.ENHANCED, installed = bundled, inPackage = bundled),
             SetupAnswers(VoiceUse.SOMETIMES, t9 = false, caption = false))
-        assertEquals(setOf(SpeechModelCatalog.SENSEVOICE, DeviceModelProfiles.BASE, "ochwpro"), plan.keepIds())
-        assertEquals(setOf(DeviceModelProfiles.SMALL, BuiltinModelCatalog.SPEAKER_MODEL, CandidateModelCatalog.NGRAM), plan.removeIds())
-        assertEquals((19 + 27 + 203) * mb, plan.freedBytes)
-        assertEquals(0L, plan.downloadBytes)
+        assertEquals(setOf(SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.XASR, "ochwpro"), plan.keepIds())
+        assertEquals(setOf(BuiltinModelCatalog.SPEAKER_MODEL, CandidateModelCatalog.NGRAM), plan.removeIds())
+        assertEquals((27 + 203) * mb, plan.freedBytes)
+        assertEquals(136 * mb, plan.downloadBytes) // only X-ASR is not in the package
         assertTrue(plan.notes.any { "安装包" in it })
     }
 
@@ -51,6 +52,20 @@ class SetupGuidePlanTest {
         assertEquals(SpeechModelCatalog.TWO_PASS, plan.voiceMode)
         assertTrue(plan.keepIds().containsAll(setOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE,
             SpeechModelCatalog.XASR, CandidateModelCatalog.NGRAM)))
+    }
+
+    // 2026-11-01 same-path retest: X-ASR finalizing 5.5% vs SenseVoice 8.5% (Doubao 5.9%), and faster.
+    @Test fun anyVoiceUseGetsXasrUnlessSpaceIsTight() {
+        val sometimes = SetupAnswers(VoiceUse.SOMETIMES, t9 = false, caption = false)
+        assertTrue(SpeechModelCatalog.XASR in SetupGuidePlanner.plan(facts(DeviceModelTier.STANDARD), sometimes).keepIds())
+        // Under 3 GB free: not downloaded, but an X-ASR already on the phone stays.
+        assertFalse(SpeechModelCatalog.XASR in SetupGuidePlanner.plan(facts(DeviceModelTier.STANDARD, free = 2 * gb), sometimes).keepIds())
+        assertTrue(SpeechModelCatalog.XASR in SetupGuidePlanner.plan(facts(DeviceModelTier.STANDARD, free = 2 * gb,
+            installed = setOf(SpeechModelCatalog.XASR)), sometimes).keepIds())
+        // Under 1 GB free it goes, and the reason says why.
+        val veryTight = SetupGuidePlanner.plan(facts(DeviceModelTier.STANDARD, free = 800 * mb,
+            installed = setOf(SpeechModelCatalog.XASR)), sometimes)
+        assertTrue(veryTight.remove.single { it.id == SpeechModelCatalog.XASR }.reason.contains("空间"))
     }
 
     @Test fun frequentVoiceOnLightPhoneStaysOnOneModelAndSaysWhy() {
@@ -66,8 +81,8 @@ class SetupGuidePlanTest {
             SetupAnswers(VoiceUse.OFTEN, t9 = true, caption = false))
         assertEquals(SpeechModelCatalog.SENSEVOICE, plan.voiceMode)
         assertEquals(CandidateModelCatalog.NGRAM_SMALL, plan.t9Model)
-        assertEquals(DeviceModelProfiles.SMALL, plan.predictionModel)
-        assertTrue(plan.notes.any { "1.2 GB" in it })
+        // 不到 3 GB 已经直接挑了省空间的搭配，下载放得下，不会再出“放不下才降档”的那条提示。
+        assertTrue(plan.notes.any { "剩余空间不到 3 GB" in it })
     }
 
     @Test fun noVoiceTurnsVoiceOffAndRemovesEveryVoiceModel() {
@@ -131,7 +146,7 @@ class SetupGuidePlanTest {
         // 平板上不能写「这台手机」（10-31 平板新装走查）。各种机型、空间、用法都过一遍，所有给人看的文字只说平板。
         val all = SetupGuidePlanner.managedIds.toSet()
         for (tier in DeviceModelTier.entries) for (free in listOf(50 * gb, 2 * gb, 500 * mb)) for (voice in VoiceUse.entries) {
-            val bundled = setOf(SpeechModelCatalog.SENSEVOICE, DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL, CandidateModelCatalog.NGRAM)
+            val bundled = setOf(SpeechModelCatalog.SENSEVOICE, CandidateModelCatalog.NGRAM)
             val plan = SetupGuidePlanner.plan(facts(tier, free = free, installed = all - CandidateModelCatalog.NGRAM, inPackage = bundled)
                 .copy(device = "平板"), SetupAnswers(voice, t9 = true, caption = false))
             val text = (plan.keep + plan.remove).flatMap { listOf(it.title, it.reason) } + plan.notes
@@ -291,12 +306,13 @@ class SetupGuidePlanTest {
     }
 
     @Test fun switchingToDoublePinyinTurnsOnKeyHintsOnlyForNewcomers() {
-        val f = typingFacts()
+        val f = typingFacts().copy(canEnableDoublePinyinKeyHints = true)
         val toDouble = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.DOUBLE_PINYIN)).input
         assertTrue(toDouble.keyHintsOn)
         assertTrue(toDouble.lines.toString(), toDouble.lines.any { it.startsWith("打开双拼键位提示") })
-        // 和角标提示互锁：计划里说清楚角标一起关。
-        assertTrue(toDouble.lines.toString(), toDouble.lines.any { it.startsWith("打开双拼键位提示") && "上下角标提示一并关掉" in it })
+        val corners = f.copy(canEnableDoublePinyinKeyHints = false)
+        assertFalse(SetupGuidePlanner.plan(corners, SetupGuidePlanner.suggest(corners)
+            .copy(typing = TypingWay.DOUBLE_PINYIN)).input.keyHintsOn)
         // 本来就用双拼（换一种也算）、已经开着、或不选双拼：不动。
         val already = f.copy(typing = TypingWay.DOUBLE_PINYIN, doublePinyin = "double_pinyin_flypy")
         assertFalse(SetupGuidePlanner.plan(already, SetupGuidePlanner.suggest(already).copy(doublePinyin = "double_pinyin_ziranma")).input.keyHintsOn)
@@ -317,8 +333,8 @@ class SetupGuidePlanTest {
     }
 
     @Test fun donePageNamesTheModelsBeingDownloaded() {
-        assertEquals("语音、联想模型", SetupGuidePlanner.kindsText(listOf(SpeechModelCatalog.SENSEVOICE,
-            SpeechModelCatalog.PARAFORMER, DeviceModelProfiles.SMALL)))
+        assertEquals("语音、手写模型", SetupGuidePlanner.kindsText(listOf(SpeechModelCatalog.SENSEVOICE,
+            SpeechModelCatalog.PARAFORMER, SetupGuidePlanner.HANDWRITING)))
         assertEquals("九键组词模型", SetupGuidePlanner.kindsText(listOf(CandidateModelCatalog.NGRAM)))
         assertEquals("模型", SetupGuidePlanner.kindsText(listOf("unknown")))
     }

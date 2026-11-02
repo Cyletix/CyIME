@@ -21,7 +21,6 @@ import androidx.compose.foundation.clickable
 import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
 import com.kingzcheung.xime.ui.keyboard.cursorDistanceMillimeters
 import com.kingzcheung.xime.ui.keyboard.normalizeCursorSwipeLines
-import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.InputGestureLock
 import com.kingzcheung.xime.ui.keyboard.InputGestureLocks
@@ -29,11 +28,11 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.settings.SettingsPreferences
 
 /** Groups of [InputExperienceSettings]; the 布局与显示 sub-pages each show some of them. */
-internal enum class InputExperiencePart { SYMBOLS, FLICK_DISC, KANA, CURSOR, TIMING, HANDWRITING, KEY_TEXT }
+internal enum class InputExperiencePart { SYMBOLS, DELETE, FLICK_DISC, KANA, CURSOR, TIMING, HANDWRITING, KEY_TEXT }
 
 /** 「时长与距离」里的几项（设置搜索点中其中一项时自动展开，见 [InputExperienceSettings] 的 collapsedSummary）。 */
 internal val TIMING_SEARCH_KEYS = setOf("长按空格多久开始", "从中间滑到边缘走几行", "光标每移动一字所需距离",
-    "长按语言键弹出列表", "符号键松手打开符号的时限", "时长与距离")
+    "长按语言键弹出列表", "长按语言键切换输入法", "符号键松手打开符号的时限", "时长与距离")
 
 @Composable
 internal fun InputExperienceSettings(
@@ -67,99 +66,125 @@ internal fun InputExperienceSettings(
             @Composable fun divider() { if (!first) HorizontalDivider(); first = false }
             if (InputExperiencePart.SYMBOLS in parts) {
             divider()
+            // 原「角标输入方式」两张卡和「长按弹出字母气泡」开关合成三选一（11-01）：两者互锁，管的都是长按字母键做什么。
             Column(Modifier.settingsSearchAnchor("按键角标的符号和数字", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
-                // 示意图随「反转上下滑方向」实时变化，一眼看出哪个方向输入哪个角标。
-                Row(Modifier.fillMaxWidth().height(116.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SymbolInputMode.entries.forEach { mode ->
-                        // 冲突的设置先设好的那一项锁住这里（见 InputGestureLocks）；选“长按”会顺带打开九键拂动。
-                        val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, mode)
-                        IllustratedChoiceCard(mode.label, settings.symbolInputMode == mode,
-                            onClick = { settings = InputGestureLocks.withSymbolInputMode(settings, mode); settings.save(context) },
-                            modifier = Modifier.weight(1f), tag = "symbol-input:${mode.name}", enabled = lock == null) {
-                            SymbolGestureIllustration(mode == SymbolInputMode.LONG_PRESS, settings.reverseSymbolSwipe)
+                val corner = com.kingzcheung.xime.ui.keyboard.CornerInputChoice.of(settings)
+                Row(Modifier.fillMaxWidth().height(176.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.entries.forEach { choice ->
+                        IllustratedChoiceCard(choice.label, corner == choice,
+                            onClick = { settings = choice.applyTo(settings); settings.save(context) },
+                            modifier = Modifier.weight(1f).then(if (choice == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE)
+                                Modifier.settingsSearchAnchor("长按弹出字母气泡") else Modifier),
+                            tag = "corner-input:${choice.name}", titleMaxLines = 2) {
+                            CornerInputIllustration(choice, settings.reverseSymbolSwipe)
                         }
                     }
                 }
-                SymbolInputMode.entries.firstNotNullOfOrNull {
-                    InputGestureLocks.lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, it)
-                }?.let { SettingsLockNote("「${it.lockedValue.let { v -> (v as SymbolInputMode).label }}」${it.message}") }
-                Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
-                    "按住 0.3 秒输入上方角标，不弹字母气泡。西班牙语键盘的元音和 n 长按仍出 á é ñ 等重音字母，这几个键的上角标改用上滑。"
-                    else "滑动时在键内预览，松手输入。",
-                    style = MaterialTheme.typography.bodySmall)
-            }
-            // 角标“长按”时长按总是出角标，气泡出不来：照常显示，置灰并写明被谁锁。
-            run {
-                val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.LETTER_LONG_PRESS_MENU, true)
-                    ?.takeIf { !settings.letterLongPressMenu }
-                Row(Modifier.settingsSearchAnchor("长按弹出字母气泡", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("长按弹出字母气泡", style = MaterialTheme.typography.titleSmall)
-                        Text("关掉后长按不弹，上下拖动输入角标不受打扰。西班牙语键盘的元音和 n 总是弹出重音字母。",
-                            style = MaterialTheme.typography.bodySmall)
-                        if (lock != null) SettingsLockNote(lock.message)
-                    }
-                    Switch(checked = settings.letterLongPressMenu, enabled = lock == null, colors = settingsSwitchColors(),
-                        modifier = Modifier.testTag("letter-long-press-menu"), onCheckedChange = {
-                            settings = settings.copy(letterLongPressMenu = it); settings.save(context)
-                        })
-                }
+                Text(when (corner) {
+                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE -> "滑动时键内预览，松手输入。"
+                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE ->
+                        "长按弹出这个字母的大写和带声调的写法；滑得慢时可能先弹出气泡。"
+                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS ->
+                        "按住 0.3 秒输入上方角标。九键长按出数字，选字母改用拂动。西班牙语的元音和 n 长按仍出 á é ñ，它们的上角标改用滑动。"
+                }, style = MaterialTheme.typography.bodySmall)
             }
             Row(Modifier.settingsSearchAnchor("反转上下滑方向", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("反转上下滑方向", style = MaterialTheme.typography.titleSmall)
-                    Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
-                        "所有布局：上方符号使用长按；下方符号${if (settings.reverseSymbolSwipe) "下拉" else "上拉"}输入。"
-                        else if (settings.reverseSymbolSwipe)
-                        "所有布局：上拉输入上方符号，下拉输入下方符号。"
-                        else "所有布局：下拉输入上方符号，上拉输入下方符号。",
-                        style = MaterialTheme.typography.bodySmall)
-                    Text(if (settings.reverseSymbolSwipe) "删除键：上拉清空，下拉撤销。"
-                        else "删除键：下拉清空，上拉撤销。", style = MaterialTheme.typography.bodySmall)
+                    // 卡片图例已画出每个方向出什么，这里只写打开后的变化（11-01 统一用「上滑／下滑」，不再混用「上拉／下拉」）。
+                    Text(if (settings.reverseSymbolSwipe) "上滑出上角标、下滑出下角标；删除键上滑清空、下滑撤销。"
+                        else "打开后上滑出上角标、下滑出下角标，删除键也反过来。", style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.reverseSymbolSwipe,
                     modifier = Modifier.testTag("reverse-symbol-swipe"), onCheckedChange = {
                         settings = settings.copy(reverseSymbolSwipe = it); settings.save(context)
                     })
             }
-            // 分隔线隔开不同的事：上面是角标手势，这里是删除键清空，下面是 Z X C V 快捷操作（10-31 走查：只有 ZXCV 上面有线）。
-            divider()
-            Row(Modifier.settingsSearchAnchor("打字中清空整个输入框", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("打字中清空整个输入框", style = MaterialTheme.typography.titleSmall)
-                    Text("还有没上屏的拼音或候选时，删除键清空也把输入框里的字一起清掉；撤回放回原来的字。关掉时只清没上屏的拼音。",
-                        style = MaterialTheme.typography.bodySmall)
-                }
-                Switch(checked = settings.clearAllWhileComposing, colors = settingsSwitchColors(),
-                    modifier = Modifier.testTag("clear-all-while-composing"), onCheckedChange = {
-                        settings = settings.copy(clearAllWhileComposing = it); settings.save(context)
-                    })
             }
-            Row(Modifier.settingsSearchAnchor("只清空光标前的内容", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (InputExperiencePart.DELETE in parts) {
+            // 删除键的几种行为放一组（11-01，B站评论找「删除跳过候选」找不到）：原来分在「角标与长按」和「智能联想」两页。
+            val clearSwipe = if (settings.reverseSymbolSwipe) "上滑" else "下滑"
+            divider()
+            Row(Modifier.settingsSearchAnchor("左右滑动删除", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("只清空光标前的内容", style = MaterialTheme.typography.titleSmall)
-                    Text("删除键清空时光标后面的字留着，只清光标前面和选中的；撤回照样放回。",
+                    Text("左右滑动删除", style = MaterialTheme.typography.titleSmall)
+                    Text("按住删除键左滑删光标前的字、右滑删光标后的字，滑得越远删得越多，往回滑补回。",
                         style = MaterialTheme.typography.bodySmall)
                 }
-                Switch(checked = settings.clearBeforeCursorOnly, colors = settingsSwitchColors(),
-                    modifier = Modifier.testTag("clear-before-cursor-only"), onCheckedChange = {
-                        settings = settings.copy(clearBeforeCursorOnly = it); settings.save(context)
+                Switch(checked = settings.swipeDistanceDelete, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("swipe-distance-delete"), onCheckedChange = {
+                        settings = settings.copy(swipeDistanceDelete = it); settings.save(context)
                     })
             }
             divider()
-            Row(Modifier.settingsSearchAnchor("Z X C V 角标做撤销、剪切、复制、粘贴", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Z X C V 角标做撤销、剪切、复制、粘贴", style = MaterialTheme.typography.titleSmall)
-                    Text("26 键 Z X C V " +
-                        (if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) "长按" else if (settings.reverseSymbolSwipe) "上拉" else "下拉") +
-                        "就执行；按住 !@# 当 Ctrl 照常可用。",
-                        style = MaterialTheme.typography.bodySmall)
+            Column(Modifier.settingsSearchAnchor("打字中清空整个输入框", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("打字中清空整个输入框", style = MaterialTheme.typography.titleSmall)
+                        Text("还有没上屏的拼音时，${clearSwipe}删除键连输入框里的字一起清；关掉只清拼音。",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = settings.clearAllWhileComposing, colors = settingsSwitchColors(),
+                        modifier = Modifier.testTag("clear-all-while-composing"), onCheckedChange = {
+                            settings = settings.copy(clearAllWhileComposing = it); settings.save(context)
+                        })
                 }
-                Switch(checked = settings.zxcvEditShortcuts, colors = settingsSwitchColors(),
-                    modifier = Modifier.testTag("zxcv-edit-shortcuts"), onCheckedChange = {
-                        settings = settings.copy(zxcvEditShortcuts = it); settings.save(context)
-                    })
+                ClearWhileComposingLegend(settings.clearAllWhileComposing, settings.reverseSymbolSwipe)
+            }
+            divider()
+            Column(Modifier.settingsSearchAnchor("只清空光标前的内容", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("只清空光标前的内容", style = MaterialTheme.typography.titleSmall)
+                        Text("清空时光标后面的字留着；撤销照样放回。", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = settings.clearBeforeCursorOnly, colors = settingsSwitchColors(),
+                        modifier = Modifier.testTag("clear-before-cursor-only"), onCheckedChange = {
+                            settings = settings.copy(clearBeforeCursorOnly = it); settings.save(context)
+                        })
+                }
+                ClearBeforeCursorLegend(settings.clearBeforeCursorOnly, settings.reverseSymbolSwipe)
+            }
+            // 下面两项存在 SettingsPreferences（原在「智能联想 › 联想行为」），值不变，只是换了地方。
+            var deleteSkipsAssociation by remember { mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context)) }
+            var deleteRecovery by remember { mutableStateOf(SettingsPreferences.isDeleteRecovery(context)) }
+            val predictionOn = remember { SettingsPreferences.isSmartPredictionEnabled(context) }
+            divider()
+            Column(Modifier.settingsSearchAnchor("退格直接删字", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("退格直接删字", style = MaterialTheme.typography.titleSmall)
+                        Text("候选栏有联想词时，第一下退格就删字，不用先收起联想。", style = MaterialTheme.typography.bodySmall)
+                        if (!predictionOn) Text("「智能联想」关着，没有联想词，这项不起作用。",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = deleteSkipsAssociation, colors = settingsSwitchColors(),
+                        modifier = Modifier.testTag("delete-skips-association"), onCheckedChange = {
+                            deleteSkipsAssociation = it; SettingsPreferences.setDeleteSkipsAssociation(context, it)
+                        })
+                }
+                DeleteSkipsAssociationLegend(deleteSkipsAssociation)
+            }
+            divider()
+            Column(Modifier.settingsSearchAnchor("删字后给同音字", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("删字后给同音字", style = MaterialTheme.typography.titleSmall)
+                        Text("退格删掉一个字后，候选栏放回这个字和它的同音字，删错或打错了点一下改过来。",
+                            style = MaterialTheme.typography.bodySmall)
+                        PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.DELETE_RECOVERY)
+                    }
+                    Switch(checked = deleteRecovery, colors = settingsSwitchColors(),
+                        modifier = Modifier.testTag("delete-recovery"), onCheckedChange = {
+                            deleteRecovery = it; SettingsPreferences.setDeleteRecovery(context, it)
+                        })
+                }
+                DeleteRecoveryLegend(deleteRecovery)
             }
             }
             if (InputExperiencePart.FLICK_DISC in parts) {
@@ -187,7 +212,8 @@ internal fun InputExperienceSettings(
                     if (com.kingzcheung.xime.settings.InputLanguage.JAPANESE in com.kingzcheung.xime.settings.InputLanguage.supported &&
                         com.kingzcheung.xime.settings.InputLanguage.JAPANESE !in
                         com.kingzcheung.xime.settings.LanguagePreferences.enabled(context))
-                        Text("日语未启用：在「语言与方案」打开日语后才有假名九键。", style = MaterialTheme.typography.bodySmall,
+                        SettingsJumpText("日语未启用：在「语言与方案」打开日语后才有假名九键。", jumps = listOf("语言与方案"),
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = settings.kanaDirectionHints,
@@ -198,33 +224,64 @@ internal fun InputExperienceSettings(
             }
             if (InputExperiencePart.CURSOR in parts) {
             divider()
-            Column(Modifier.settingsSearchAnchor("滑动移动光标", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("滑动移动光标", style = MaterialTheme.typography.titleSmall)
-                Row(Modifier.fillMaxWidth().height(124.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CursorGestureMode.entries.forEach { mode ->
-                        val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.CURSOR_GESTURE, mode)
-                        IllustratedChoiceCard(mode.label, settings.cursorGesture == mode,
-                            onClick = { settings = settings.copy(cursorGesture = mode); settings.save(context) },
-                            modifier = Modifier.weight(1f), tag = "cursor-gesture:${mode.name}", enabled = lock == null) {
-                            CursorGestureIllustration(mode)
+            // 原「滑动移动光标」（长按空格／键盘滑动／关闭）和「长按空格」两处都能选“长按空格移动光标”（11-01 合并）：
+            // 长按空格三选一 + 「键盘面板滑动光标」开关，存的值不变，见 CursorChoices。
+            Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("长按空格", style = MaterialTheme.typography.titleSmall)
+                val spaceHold = com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHold(settings)
+                Row(Modifier.fillMaxWidth().height(132.dp).testTag("space-hold-options"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHoldChoices.forEach { action ->
+                        IllustratedChoiceCard(action.label, spaceHold == action,
+                            onClick = { settings = com.kingzcheung.xime.ui.keyboard.CursorChoices.withSpaceHold(settings, action); settings.save(context) },
+                            modifier = Modifier.weight(1f), tag = "space-hold:${action.name}") {
+                            SpaceHoldChoiceIllustration(action)
                         }
                     }
                 }
-                CursorGestureMode.entries.firstNotNullOfOrNull {
-                    InputGestureLocks.lockFor(settings, InputGestureLock.Option.CURSOR_GESTURE, it)
-                }?.let { SettingsLockNote("「${(it.lockedValue as CursorGestureMode).label}」${it.message}") }
-                if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
-                    Text("整个键盘滑动移动光标时，英文 26 键的滑行输入暂停。", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // 语音总开关关着时，这里选了语音也不会开麦（键盘上只提示去打开），写明，免得以为没生效。
+                if (spaceHold == SpaceHoldAction.VOICE_TOGGLE && !SettingsPreferences.isSttEnabled(context)) {
+                    SettingsLockNote("「语音转文本」关着，按住空格不会说话；在「语音转文本」页打开后生效")
+                }
+                // 上滑取消只在按住说话时起作用，选了语音开关才显示（别人提的需求，默认关，11-02）。
+                if (spaceHold == SpaceHoldAction.VOICE_TOGGLE) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("上滑取消", style = MaterialTheme.typography.titleSmall)
+                            Text("按住空格说话时往上滑，松手不上屏。", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(checked = settings.voiceSwipeCancel, colors = settingsSwitchColors(), modifier = Modifier.testTag("voice-swipe-cancel"),
+                            onCheckedChange = { settings = settings.copy(voiceSwipeCancel = it); settings.save(context) })
+                    }
                 }
             }
-            // 底部留白滑动和上面三选一互不影响，单独一行开关（用户 10-31 要求新增，默认关）。
+            HorizontalDivider()
+            run {
+                val on = com.kingzcheung.xime.ui.keyboard.CursorChoices.keyboardSwipe(settings)
+                val lock = com.kingzcheung.xime.ui.keyboard.CursorChoices.keyboardSwipeLock(settings)
+                Column(Modifier.settingsSearchAnchor("键盘面板滑动光标", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("键盘面板滑动光标", style = MaterialTheme.typography.titleSmall)
+                            Text("在整块按键上左右滑动移光标，不用按住空格。", style = MaterialTheme.typography.bodySmall)
+                            if (lock != null) SettingsLockNote(lock)
+                        }
+                        Switch(checked = on, enabled = lock == null, colors = settingsSwitchColors(),
+                            modifier = Modifier.testTag("keyboard-swipe-cursor"), onCheckedChange = {
+                                settings = com.kingzcheung.xime.ui.keyboard.CursorChoices.withKeyboardSwipe(settings, it); settings.save(context)
+                            })
+                    }
+                    KeyboardSwipeCursorLegend(on)
+                }
+            }
+            // 底部留白滑动和上面两项互不影响，单独一行开关（用户 10-31 要求新增，默认关）。
             Row(Modifier.settingsSearchAnchor("底部留白滑动移动光标", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("底部留白滑动移动光标", style = MaterialTheme.typography.titleSmall)
-                    Text("固定键盘在「调节键盘」里调出底部留白后，在键盘下面空出的那一条左右滑动移动光标，按住 Shift 滑是选字。没有留白或悬浮时不起作用。",
-                        style = MaterialTheme.typography.bodySmall)
+                    SettingsJumpText("在「键盘尺寸与位置」里往上拖出底部留白后，在键盘下面那一条左右滑动移光标，按住 Shift 滑是选字。悬浮键盘没有这一条。",
+                        jumps = listOf("键盘尺寸与位置"), style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.bottomLiftCursor, modifier = Modifier.testTag("bottom-lift-cursor-switch"),
                     onCheckedChange = { settings = settings.copy(bottomLiftCursor = it); settings.save(context) })
@@ -247,32 +304,6 @@ internal fun InputExperienceSettings(
                     "光标每移动一字轻震一下。", settings.cursorStepHaptic, "cursor-step-haptic") { settings.copy(cursorStepHaptic = it) }
                 if (SettingsPreferences.isSoundEnabled(context)) cursorStepSwitch("移动光标时播放按键音",
                     "光标每移动一字响一下按键音。", settings.cursorStepSound, "cursor-step-sound") { settings.copy(cursorStepSound = it) }
-            }
-            // 连续空格/语音一直列出来（用户 10-30：先得把移动光标改走才看得到语音，找不着）。
-            // 长按空格正在移动光标时点这两项直接改过来，见 [KeyboardInputPreferences.withSpaceHold]。
-            HorizontalDivider()
-            Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("长按空格", style = MaterialTheme.typography.titleSmall)
-                Text("语音开关：按住空格说话，松手结束并上屏。", style = MaterialTheme.typography.bodySmall)
-                // 语音总开关关着时，这里选了语音也不会开麦（键盘上只提示去打开），写明，免得以为没生效。
-                if (settings.effectiveSpaceHold == SpaceHoldAction.VOICE_TOGGLE && !SettingsPreferences.isSttEnabled(context)) {
-                    SettingsLockNote("「语音转文本」已关闭，按住空格不会开始说话；在「语音转文本」页打开后生效")
-                }
-                if (settings.cursorGesture == CursorGestureMode.SPACE) {
-                    Text("现在长按空格用来移动光标。选下面一项后，滑动移动光标改为「${settings.cursorGestureAfterLeavingSpace.label}」。",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag("space-hold-takes-over-cursor"))
-                }
-                Row(Modifier.fillMaxWidth().height(104.dp).testTag("space-hold-options"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE).forEach { action ->
-                        IllustratedChoiceCard(action.label, settings.effectiveSpaceHold == action,
-                            onClick = { settings = settings.withSpaceHold(action); settings.save(context) },
-                            modifier = Modifier.weight(1f), tag = "space-hold:${action.name}") {
-                            SpaceHoldIllustration(voice = action == SpaceHoldAction.VOICE_TOGGLE)
-                        }
-                    }
-                }
             }
             }
             if (InputExperiencePart.TIMING in parts) {
@@ -306,6 +337,18 @@ internal fun InputExperienceSettings(
                         onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
                 }
             }
+            // 长按语言键切换输入法（GitHub #60 #68，默认关）：打开后长按弹系统的输入法选择框，语言靠点按语言键轮换。
+            Row(Modifier.settingsSearchAnchor("长按语言键切换输入法", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("长按语言键切换输入法", style = MaterialTheme.typography.titleSmall)
+                    Text("长按弹出系统的输入法选择框，不再弹语言列表", style = MaterialTheme.typography.bodySmall)
+                    PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.LANGUAGE_KEY_IME_PICKER)
+                }
+                Switch(checked = settings.languageKeyImePicker, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("language-key-ime-picker"), onCheckedChange = {
+                        settings = settings.copy(languageKeyImePicker = it); settings.save(context)
+                    })
+            }
             Column(Modifier.settingsSearchAnchor("长按语言键弹出列表", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("长按语言键弹出列表：${"%.2f".format(settings.languageMenuHoldSeconds)} 秒")
                 Text("默认 0.15 秒。", style = MaterialTheme.typography.bodySmall)
@@ -335,6 +378,7 @@ internal fun InputExperienceSettings(
                     Text("手写边写边识别", style = MaterialTheme.typography.titleSmall)
                     Text("每写完一笔就在后台先认，停顿一到马上出候选，不用停顿后再等识别。中文、日语手写可用；会多用一点电。",
                         style = MaterialTheme.typography.bodySmall)
+                    PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.HANDWRITING_LIVE)
                 }
                 Switch(checked = settings.handwritingRecognizeWhileWriting, colors = settingsSwitchColors(),
                     modifier = Modifier.testTag("handwriting-recognize-while-writing"), onCheckedChange = {
@@ -346,7 +390,8 @@ internal fun InputExperienceSettings(
                 Text("公式模式选中候选后上屏的样子，例如 x^{2} 上屏为 \$x^{2}\$ 或 \\[x^{2}\\]。", style = MaterialTheme.typography.bodySmall)
                 // 没装公式手写模型时手写板没有公式模式，这一项暂时不起作用：照常显示并写明。
                 val formulaReady = remember { com.kingzcheung.xime.handwriting.FormulaRecognizer.isAvailable(context) }
-                if (!formulaReady) Text("公式手写模型还没下载，下载后（手写 › 已安装的手写模型）英文手写里才有公式模式，这里的标记才用得上。",
+                if (!formulaReady) SettingsJumpText("公式手写模型还没下载，在「手写 › 已安装的手写模型」下载后英文手写里才有公式模式，这里的标记才用得上。",
+                    jumps = listOf("手写 › 已安装的手写模型"),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FormulaDelimiter.entries.forEach { option ->
                     Row(Modifier.fillMaxWidth().clickable { settings = settings.copy(formulaDelimiter = option); settings.save(context) }
@@ -368,38 +413,21 @@ internal fun InputExperienceSettings(
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.8f..1.6f, steps = 15)
             }
             divider()
-            run {
-                val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.UPPERCASE_KEY_LABELS, true)
-                    ?.takeIf { !settings.uppercaseKeyLabels }
-                Row(Modifier.settingsSearchAnchor("字母键显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("字母键显示大写", style = MaterialTheme.typography.titleSmall)
-                        Text("只改键帽显示；英文大小写仍看 Shift 键上的箭头。",
-                            style = MaterialTheme.typography.bodySmall)
-                        if (lock != null) SettingsLockNote(lock.message)
+            // 原「字母键显示大写」「中文键盘字母显示大写」两个互锁开关合成三选一（11-01），存的值不变，见 KeyLabelCaseChoice。
+            Column(Modifier.settingsSearchAnchor("键帽字母大小写", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("键帽字母大小写", style = MaterialTheme.typography.titleSmall)
+                val case = com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.of(settings)
+                Row(Modifier.fillMaxWidth().height(104.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.entries.forEach { choice ->
+                        IllustratedChoiceCard(choice.label, case == choice,
+                            onClick = { settings = choice.applyTo(settings); settings.save(context) },
+                            modifier = Modifier.weight(1f), tag = "key-label-case:${choice.name}") {
+                            KeyLabelCaseIllustration(choice)
+                        }
                     }
-                    Switch(checked = settings.uppercaseKeyLabels, enabled = lock == null, colors = settingsSwitchColors(),
-                        modifier = Modifier.testTag("uppercase-key-labels"), onCheckedChange = {
-                            settings = settings.copy(uppercaseKeyLabels = it); settings.save(context)
-                        })
                 }
-            }
-            divider()
-            run {
-                val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true)
-                    ?.takeIf { !settings.chineseUppercaseKeyLabels }
-                Row(Modifier.settingsSearchAnchor("中文键盘字母显示大写", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("中文键盘字母显示大写", style = MaterialTheme.typography.titleSmall)
-                        Text("像搜狗：中文时字母键显示大写，切到英文显示小写（按 Shift 才大写），不看空格键也知道现在是中文还是英文。只改键帽显示，26 键和 14 键都适用。",
-                            style = MaterialTheme.typography.bodySmall)
-                        if (lock != null) SettingsLockNote(lock.message)
-                    }
-                    Switch(checked = settings.chineseUppercaseKeyLabels, enabled = lock == null, colors = settingsSwitchColors(),
-                        modifier = Modifier.testTag("chinese-uppercase-key-labels"), onCheckedChange = {
-                            settings = settings.copy(chineseUppercaseKeyLabels = it); settings.save(context)
-                        })
-                }
+                if (case != com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.LOWER)
+                    Text("只改键帽；打出来的大小写仍看 Shift。", style = MaterialTheme.typography.bodySmall)
             }
             }
         }

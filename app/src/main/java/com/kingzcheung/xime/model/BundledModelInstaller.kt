@@ -10,7 +10,7 @@ import org.json.JSONObject
 /** Offline edition: install on IO, then activate a usable local configuration once.
  * User changes/deletions after setup are preserved, including on subsequent upgrades. */
 object BundledModelInstaller {
-    val modelIds = setOf("ochwpro", DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE,
+    val modelIds = setOf("ochwpro",
         SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, BuiltinModelCatalog.SPEAKER_MODEL)
     /** Model ids packed into this offline edition (empty when the manifest is missing). */
     fun bundledIds(context: Context): Set<String> = runCatching {
@@ -80,7 +80,7 @@ object BundledModelInstaller {
             "内置模型清单与应用不匹配"
         }
         for (entry in entries.sortedBy { when (it.getString("id")) {
-            "ochwpro" -> 0; DeviceDefaults.predictionModel(context) -> 1; SpeechModelCatalog.PARAFORMER -> 2; else -> 3
+            "ochwpro" -> 0; SpeechModelCatalog.PARAFORMER -> 1; else -> 2
         } }) {
             val id = entry.getString("id")
             val version = entry.getString("version")

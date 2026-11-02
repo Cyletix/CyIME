@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -106,7 +107,7 @@ import com.kingzcheung.xime.viewmodel.SchemaMarketViewModel
 
 /**
  * 扩展：方案、模型、插件的统一入口，三页左右滑动。
- * 方案、模型页是商店（二级分类 chips 过滤、商店卡片、下拉刷新）；插件页只列已安装的插件。
+ * 右上角按当前页进入对应的本地管理。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,11 +116,11 @@ fun MarketHubContent(
     onNavigateToDetail: (String) -> Unit = {},
     onNavigateToModelDetail: (String) -> Unit = {},
     onNavigateToPluginDetail: (String) -> Unit = {},
-    onNavigateToPluginSettings: (String) -> Unit = {},
-    onNavigateToSpeechToText: () -> Unit = {},
-    onNavigateToClipboardSync: () -> Unit = {},
+    onNavigateToPlugins: () -> Unit = {},
     onNavigateToLocal: () -> Unit = {},
     onNavigateToModelLocal: () -> Unit = {},
+    /** 内置方案（全拼、双拼、九键、14 键）在「语言与方案」里选。 */
+    onNavigateToLanguages: () -> Unit = {},
     initialTab: Int = 0,
 ) {
     // 三页可左右滑动切换，标签跟随；分页状态随返回栈保存，进详情再返回仍回到刚才那页。
@@ -137,14 +138,12 @@ fun MarketHubContent(
                     }
                 },
                 actions = {
-                    // 扩展是方案、模型、插件的唯一入口。方案、模型页右上角进已安装管理；
-                    // 插件没有商店，插件页本身就是已安装列表，右上角是刷新和从文件/浏览器导入。
-                    if (tabIndex == 2) {
-                        InstalledPluginActions()
-                    } else {
-                        TextButton(onClick = if (tabIndex == 0) onNavigateToLocal else onNavigateToModelLocal) {
-                            Text("已安装", style = MaterialTheme.typography.labelMedium)
-                        }
+                    TextButton(modifier = Modifier.testTag("market-installed"), onClick = when (tabIndex) {
+                        0 -> onNavigateToLocal
+                        1 -> onNavigateToModelLocal
+                        else -> onNavigateToPlugins
+                    }) {
+                        Text("已安装", style = MaterialTheme.typography.labelMedium)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -184,16 +183,12 @@ fun MarketHubContent(
                 when (page) {
                     0 -> SchemesMarketTab(
                         onNavigateToDetail = onNavigateToDetail,
+                        onNavigateToLanguages = onNavigateToLanguages,
                     )
                     1 -> ModelsMarketTab(
                         onNavigateToDetail = onNavigateToModelDetail,
                     )
-                    else -> InstalledPluginsList(
-                        onNavigateToPluginSettings = onNavigateToPluginSettings,
-                        onNavigateToPluginDetail = onNavigateToPluginDetail,
-                        onNavigateToSpeechToText = onNavigateToSpeechToText,
-                        onNavigateToClipboardSync = onNavigateToClipboardSync,
-                    )
+                    else -> PluginsMarketTab(onNavigateToPluginDetail)
                 }
             }
         }
@@ -206,6 +201,7 @@ fun MarketHubContent(
 @Composable
 private fun SchemesMarketTab(
     onNavigateToDetail: (String) -> Unit,
+    onNavigateToLanguages: () -> Unit,
 ) {
     val context = LocalContext.current
     val viewModel: SchemaMarketViewModel = viewModel()
@@ -249,6 +245,8 @@ private fun SchemesMarketTab(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // 有人在市场里找双拼、14 键（B站评论 11-01）：内置的不用下载，这里写明并直接带过去选（用户 11-01 批准）。
+                item(key = "builtin-schemes") { BuiltinSchemesCard(onNavigateToLanguages) }
                 when {
                     uiState.isLoading && uiState.schemes.isEmpty() -> item {
                         MarketCenterBox(
@@ -336,7 +334,7 @@ private fun SchemesMarketTab(
                         item {
                             Spacer(Modifier.height(8.dp))
                             val updatedAt = uiState.updatedAt.takeIf { it.isNotBlank() }
-                            val sourceLabel = if (uiState.source.isNotBlank()) "来源：${uiState.source}" else "来自 Xime 官方源"
+                            val sourceLabel = if (uiState.source.isNotBlank()) "来源：${uiState.source}" else "来自 CyIME 官方源"
                             val footerText = buildString {
                                 append("共 ${uiState.filteredSchemes.size} 个方案（$sourceLabel")
                                 if (updatedAt != null) append(" · 更新于 $updatedAt")
@@ -352,6 +350,22 @@ private fun SchemesMarketTab(
                     }
                 }
             }
+        }
+    }
+}
+
+/** 方案市场顶部：内置方案不用下载，点「去选」到「语言与方案」。 */
+@Composable
+private fun BuiltinSchemesCard(onOpen: () -> Unit) {
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().testTag("market-builtin-schemes")) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text("已内置，不用下载", style = MaterialTheme.typography.titleSmall)
+                Text("全拼、九键、14 键，小鹤、自然码、微软等 6 种双拼", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            FilledTonalButton(onClick = onOpen) { Text("去选") }
         }
     }
 }
@@ -465,7 +479,6 @@ private fun ModelsMarketTab(
     val categories = listOf(
         null to "全部",
         ModelCategory.CANDIDATE to "候选增强",
-        ModelCategory.PREDICTION to "联想",
         ModelCategory.HANDWRITING to "手写",
         ModelCategory.ASR to "语音",
         ModelCategory.SPEAKER to "声纹",
@@ -661,7 +674,7 @@ private fun ModelTrailingButton(
  * 标题/描述 + 右侧操作区；底部 meta 行 + 版本选择。
  */
 @Composable
-private fun MarketStoreCard(
+internal fun MarketStoreCard(
     icon: ImageVector,
     iconContainerColor: Color,
     iconContentColor: Color,
@@ -763,7 +776,7 @@ private fun MarketStoreCard(
 
 /** 版本选择：单版本直接展示文本，多版本提供下拉。 */
 @Composable
-private fun MarketVersionSelector(
+internal fun MarketVersionSelector(
     versions: List<String>,
     selectedVersion: String,
     onSelectVersion: (String) -> Unit,
@@ -839,7 +852,7 @@ private fun CategoryChips(
 /** 居中容器：空态/加载/错误占位。 */
 /** 扩展各页里「已安装」「可安装」两段的小标题。 */
 @Composable
-private fun MarketSectionLabel(label: String) {
+internal fun MarketSectionLabel(label: String) {
     Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp).testTag("market-section:$label"))
 }
@@ -1593,8 +1606,6 @@ private fun modelCategoryColors(category: ModelCategory): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
     return when (category) {
         ModelCategory.CANDIDATE -> scheme.primaryContainer to scheme.onPrimaryContainer
-        ModelCategory.PREDICTION ->
-            scheme.primaryContainer to scheme.onPrimaryContainer
         ModelCategory.HANDWRITING ->
             scheme.secondaryContainer to scheme.onSecondaryContainer
         ModelCategory.ASR, ModelCategory.SPEAKER ->
@@ -1606,14 +1617,13 @@ private fun modelCategoryColors(category: ModelCategory): Pair<Color, Color> {
 
 private fun modelCategoryIcon(category: ModelCategory): ImageVector = when (category) {
     ModelCategory.CANDIDATE -> Icons.Default.AutoAwesome
-    ModelCategory.PREDICTION -> Icons.Default.AutoAwesome
     ModelCategory.ASR, ModelCategory.SPEAKER -> Icons.Default.GraphicEq
     ModelCategory.HANDWRITING -> Icons.Outlined.Gesture
     ModelCategory.OTHER -> Icons.Default.AutoAwesome
 }
 
 /** 插件分类图标（pluginType 用 PluginCategory 的 id：emoji/speech/prediction）。 */
-private fun pluginCategoryIcon(pluginType: String): ImageVector = when (pluginType) {
+internal fun pluginCategoryIcon(pluginType: String): ImageVector = when (pluginType) {
     "emoji" -> Icons.Default.SentimentSatisfiedAlt
     "speech" -> Icons.Default.GraphicEq
     "prediction" -> Icons.Default.AutoAwesome
@@ -1624,7 +1634,7 @@ private fun pluginCategoryIcon(pluginType: String): ImageVector = when (pluginTy
 
 /** 插件分类色块。 */
 @Composable
-private fun pluginCategoryColors(pluginType: String): Pair<Color, Color> {
+internal fun pluginCategoryColors(pluginType: String): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
     return when (pluginType) {
         "emoji" -> scheme.tertiaryContainer to scheme.onTertiaryContainer
@@ -1634,7 +1644,7 @@ private fun pluginCategoryColors(pluginType: String): Pair<Color, Color> {
     }
 }
 
-private fun pluginCategoryLabel(pluginType: String): String = when (pluginType) {
+internal fun pluginCategoryLabel(pluginType: String): String = when (pluginType) {
     "emoji" -> "表情"
     "speech" -> "语音转文本"
     "prediction" -> "智能预测"
@@ -1645,7 +1655,6 @@ private fun pluginCategoryLabel(pluginType: String): String = when (pluginType) 
 
 internal fun modelCategoryLabel(category: ModelCategory): String = when (category) {
     ModelCategory.CANDIDATE -> "候选增强"
-    ModelCategory.PREDICTION -> "联想"
     ModelCategory.ASR -> "语音"
     ModelCategory.HANDWRITING -> "手写"
     ModelCategory.SPEAKER -> "声纹"

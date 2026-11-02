@@ -150,7 +150,7 @@ private fun previewRows(layout: InputLayout, language: InputLanguage, @Suppress(
     }
 
 @Composable
-private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, contentColor: Color, modifier: Modifier,
+internal fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, contentColor: Color, modifier: Modifier,
     fillKeys: Boolean = true, equalMergedKeys: Boolean = false, qwertyStagger: Float = 0f,
     /** 「合并键均匀排布」：行宽不变，行内按 [letterKeySpan] 分键宽，同键盘。 */
     evenMergedKeys: Boolean = false, widthOf: ((String) -> Float)? = null) {

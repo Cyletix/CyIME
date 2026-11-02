@@ -4,11 +4,17 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.kingzcheung.xime.ui.common.menuSwipeBack
 
 data class SettingsNavigationRequest(val route: String, val id: Int)
 
@@ -63,9 +69,26 @@ fun SettingsScreen(
     }
     
     val motion = rememberSettingsMotionEnabled()
+    val entry by navController.currentBackStackEntryAsState()
+    val back = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // 说明里的「」指路：亮哪一项和搜索点开一样；已经在那一页就只滚过去高亮，不再压一层。
+    val jump: (SettingsSearchEntry) -> Unit = { target ->
+        SettingsSearchFocus.open(target)
+        val current = navController.currentBackStackEntry
+        if (target.target == SEARCH_TARGET_CUSTOM_LAYOUT) {
+            context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java))
+        } else if (!settingsPageMatches(current?.destination?.route, { current?.arguments?.getString(it) }, target.target)) {
+            runCatching { navController.navigate(target.target) }
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalSettingsJump provides jump) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
+        modifier = Modifier.menuSwipeBack(entry, if (back != null && entry != null && entry?.destination?.route != SettingsRoutes.Main) {
+            { if (back.hasEnabledCallbacks()) back.onBackPressed() }
+        } else null),
         enterTransition = { if (motion) SettingsPageMotion.enter else EnterTransition.None },
         exitTransition = { if (motion) SettingsPageMotion.exit else ExitTransition.None },
         popEnterTransition = { if (motion) SettingsPageMotion.popEnter else EnterTransition.None },
@@ -94,30 +117,39 @@ fun SettingsScreen(
                 )
             }
         }
+        composable(SettingsRoutes.TypingStats) { TypingStatsScreen { navController.popBackStack() } }
         composable(SettingsRoutes.HardwareKeyboard) { HardwareKeyboardSettingsContent { navController.popBackStack() } }
         composable("languages") {
             LanguageSettingsContent(onBack = { navController.popBackStack() },
                 onOpenSchemaResources = { navController.navigate(SettingsRoutes.Schema) },
-                onOpenDoublePinyin = { navController.navigate(SettingsRoutes.DoublePinyin) })
+                onOpenDoublePinyin = { navController.navigate(SettingsRoutes.DoublePinyin) },
+                onOpenChineseInput = { navController.navigate(SettingsRoutes.ChineseInput) },
+                onOpenEnglishInput = { navController.navigate(SettingsRoutes.EnglishInput) })
         }
+        composable(SettingsRoutes.ChineseInput) { ChineseInputSettingsContent { navController.popBackStack() } }
+        composable(SettingsRoutes.EnglishInput) { EnglishInputSettingsContent { navController.popBackStack() } }
         composable(SettingsRoutes.DoublePinyin) { DoublePinyinSettingsContent { navController.popBackStack() } }
         composable(SettingsRoutes.Schema) {
-            SchemaSettingsContent(
-                onBack = {
-                    if (initialRoute == "schema") {
-                        navController.navigate(SettingsRoutes.Main) {
-                            popUpTo(SettingsRoutes.Main) { inclusive = true }
-                        }
-                    } else {
-                        navController.popBackStack()
+            val leaveSchema = {
+                if (initialRoute == "schema") {
+                    navController.navigate(SettingsRoutes.Main) {
+                        popUpTo(SettingsRoutes.Main) { inclusive = true }
                     }
-                    onWizardBack()
-                },
+                } else navController.popBackStack()
+                onWizardBack()
+            }
+            BackHandler(enabled = initialRoute == "schema", onBack = leaveSchema)
+            SchemaSettingsContent(
+                onBack = leaveSchema,
                 onNavigateToRimeFileBrowser = { navController.navigate(SettingsRoutes.RimeFileBrowser) },
             )
         }
-        composable(SettingsRoutes.Market) {
+        composable(
+            "${SettingsRoutes.Market}?tab={tab}",
+            arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+        ) { entry ->
             MarketHubContent(
+                initialTab = entry.arguments?.getInt("tab")?.coerceIn(0, 2) ?: 0,
                 onBack = { navController.popBackStack() },
                 onNavigateToDetail = { schemeId ->
                     navController.navigate("schema_market_detail/$schemeId")
@@ -131,11 +163,12 @@ fun SettingsScreen(
                 // 方案的已安装管理与「语言与方案 › 已安装的方案」是同一页，不再另开一份本地方案页。
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
-                onNavigateToPluginSettings = { pluginId ->
-                    navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
+                onNavigateToLanguages = { navController.navigate("languages") },
+                onNavigateToPlugins = {
+                    if (navController.previousBackStackEntry?.destination?.route == SettingsRoutes.Plugins)
+                        navController.popBackStack()
+                    else navController.navigate(SettingsRoutes.Plugins)
                 },
-                onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
-                onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
             )
         }
         composable(SettingsRoutes.ModelLocal) {
@@ -182,6 +215,11 @@ fun SettingsScreen(
         composable(SettingsRoutes.Plugins) {
             PluginsSettingsContent(
                 onBack = { navController.popBackStack() },
+                onNavigateToPluginMarket = {
+                    if (navController.previousBackStackEntry?.destination?.route == "${SettingsRoutes.Market}?tab={tab}")
+                        navController.popBackStack()
+                    else navController.navigate(SettingsRoutes.MarketPlugins)
+                },
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
                 },
@@ -225,13 +263,7 @@ fun SettingsScreen(
             }
         }
         composable(SettingsRoutes.SmartPrediction) {
-            SmartPredictionSettingsContent(
-                onBack = { navController.popBackStack() },
-                onNavigateToModelManagement = { navController.navigate(SettingsRoutes.ModelLocal) },
-                onNavigateToModelDetail = { modelId ->
-                    navController.navigate("model_market_detail/$modelId")
-                }
-            )
+            SmartPredictionSettingsContent(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoutes.SpeechToText) {
             SpeechToTextSettingsContent(
@@ -272,6 +304,9 @@ fun SettingsScreen(
         composable(SettingsRoutes.ToolbarArrange) {
             KeyboardPanelSettingsContent(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.ARRANGE) { navController.popBackStack() }
         }
+        composable(SettingsRoutes.Other) {
+            OtherSettingsContent(onBack = { navController.popBackStack() }, onNavigateToRoute = { navController.navigate(it) })
+        }
         composable(SettingsRoutes.Backup) {
             BackupSettingsContent(onBack = { navController.popBackStack() })
         }
@@ -288,7 +323,8 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.SetupGuide) {
             SetupGuideScreen(firstRun = false, onDone = { navController.popBackStack() },
-                onOpenPerformance = { navController.navigate(SettingsRoutes.Performance) })
+                onOpenPerformance = { navController.navigate(SettingsRoutes.Performance) },
+                onOpenRoute = { navController.navigate(it) })
         }
         composable(SettingsRoutes.StorageSpace) {
             StorageSpaceScreen(
@@ -330,5 +366,6 @@ fun SettingsScreen(
         composable(SettingsRoutes.Credits) {
             CreditsContent(onBack = { navController.popBackStack() })
         }
+    }
     }
 }

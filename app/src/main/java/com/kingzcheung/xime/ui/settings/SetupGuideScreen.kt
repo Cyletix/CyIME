@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +51,10 @@ import com.kingzcheung.xime.model.SetupFacts
 import com.kingzcheung.xime.model.SetupGuide
 import com.kingzcheung.xime.model.SetupGuidePlanner
 import com.kingzcheung.xime.model.SetupItem
+import com.kingzcheung.xime.model.SetupMore
+import com.kingzcheung.xime.model.SetupMoreChoices
+import com.kingzcheung.xime.model.SetupMoreFacts
+import com.kingzcheung.xime.model.TextSizeChoice
 import com.kingzcheung.xime.model.SetupPlan
 import com.kingzcheung.xime.model.SetupSource
 import com.kingzcheung.xime.model.TypingWay
@@ -66,7 +72,9 @@ import kotlinx.coroutines.withContext
  * 过渡放慢到看得清（[CyMotion.GUIDE]），不靠小圆点或开关位置让人猜选了哪个。
  */
 @Composable
-fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (() -> Unit)? = null) {
+fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (() -> Unit)? = null,
+    /** 「更多配置」里的几行跳转（剪贴板同步、键盘尺寸、性能与省电）；不给就不列。 */
+    onOpenRoute: ((String) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var facts by remember { mutableStateOf<SetupFacts?>(null) }
@@ -74,7 +82,19 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (
     var applying by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<SetupGuide.Result?>(null) }
     var allowMetered by remember { mutableStateOf(false) }
-    var hideDoublePinyin by remember { mutableStateOf(true) }
+    var hideDoublePinyin by remember { mutableStateOf(SetupGuidePlanner.HIDE_OTHER_DOUBLE_PINYIN_BY_DEFAULT) }
+    // 「更多配置」：从跳转页回来仍停在这一页；回答每次打开都从现在的设置读起。
+    var showMore by rememberSaveable { mutableStateOf(false) }
+    var moreFacts by remember { mutableStateOf<SetupMoreFacts?>(null) }
+    var moreAnswers by remember { mutableStateOf<SetupMoreChoices?>(null) }
+    var moreResult by remember { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(showMore) {
+        if (!showMore) return@LaunchedEffect
+        val read = withContext(Dispatchers.IO) { SetupGuide.readMore(context) }
+        moreFacts = read
+        moreAnswers = read.current
+        moreResult = null
+    }
     LaunchedEffect(Unit) {
         val read = withContext(Dispatchers.IO) { SetupGuide.readFacts(context) }
         facts = read
@@ -86,6 +106,34 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (
     }
     // 默认全部勾上“删掉”；换了回答，方案变了就重新全选。
     var removeIds by remember(plan) { mutableStateOf(plan?.remove?.map { it.id }?.toSet().orEmpty()) }
+    if (showMore) {
+        BackHandler { showMore = false }
+        // 改了的先存下，再去别的页面，回来不丢。
+        fun applyThen(next: () -> Unit) {
+            val from = moreFacts?.current; val to = moreAnswers
+            if (from == null || to == null || from == to) { next(); return }
+            scope.launch {
+                withContext(Dispatchers.IO) { SetupGuide.applyMore(context, from, to) }
+                next()
+            }
+        }
+        SetupMoreContent(
+            facts = moreFacts, answers = moreAnswers, result = moreResult,
+            onAnswers = { moreAnswers = it },
+            onBack = { showMore = false },
+            onSkip = onDone,
+            onOpenRoute = onOpenRoute?.let { open -> { route: String -> applyThen { open(route) } } },
+            onApply = {
+                val from = moreFacts?.current; val to = moreAnswers
+                if (from == null || to == null || from == to) onDone()
+                else scope.launch {
+                    moreResult = withContext(Dispatchers.IO) { SetupGuide.applyMore(context, from, to) }
+                }
+            },
+            onDone = onDone,
+        )
+        return
+    }
     SetupGuideContent(
         facts = facts, plan = plan, removeIds = removeIds, allowMetered = allowMetered,
         applying = applying, result = result, firstRun = firstRun,
@@ -107,6 +155,8 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (
         },
         onSkip = { SetupGuide.markShown(context); onDone() },
         onDone = onDone,
+        // 没按推荐设置就直接去「更多配置」，也算看过这一页，下次不再自动弹出。
+        onOpenMore = { SetupGuide.markShown(context); showMore = true },
     )
 }
 
@@ -126,10 +176,11 @@ internal fun SetupGuideContent(
     onApply: () -> Unit,
     onSkip: () -> Unit,
     onDone: () -> Unit,
-    hideDoublePinyin: Boolean = true,
+    hideDoublePinyin: Boolean = SetupGuidePlanner.HIDE_OTHER_DOUBLE_PINYIN_BY_DEFAULT,
     onHideDoublePinyin: (Boolean) -> Unit = {},
     /** 首次设置时不给：先走完这一页。 */
     onOpenPerformance: (() -> Unit)? = null,
+    onOpenMore: (() -> Unit)? = null,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -161,7 +212,7 @@ internal fun SetupGuideContent(
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
             } else if (result != null) {
                 DeviceSection(facts, onOpenPerformance)
-                ResultSection(result, onDone)
+                ResultSection(result, onDone, onOpenMore)
                 Spacer(Modifier.height(24.dp))
             } else {
                 // 先问怎么打字（打开就看到），设备情况放到模型推荐前面。
@@ -186,6 +237,7 @@ internal fun SetupGuideContent(
                 }
                 Text("以后想换，随时可以在 设置 → 配置选择 → 按设备推荐配置 重新选；删掉的模型在用到时会提示下载。",
                     style = GuideText.note(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                onOpenMore?.let { MoreEntry(it) }
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -260,7 +312,8 @@ private fun FactLine(text: String) {
  * 没选中的是浅底、细边框、空心圆；读屏按单选按钮报“已选中”。
  */
 @Composable
-private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag: String, multi: Boolean = false, onClick: () -> Unit) {
+private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag: String, multi: Boolean = false,
+    extra: (@Composable (Color) -> Unit)? = null, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(if (selected) colors.primaryContainer else colors.surfaceContainerLow,
         tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-option-container")
@@ -278,7 +331,8 @@ private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag:
         Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, style = GuideText.optionTitle(), color = content)
-                Text(subtitle, style = GuideText.body(), color = content.copy(alpha = 0.8f))
+                if (subtitle.isNotEmpty()) Text(subtitle, style = GuideText.body(), color = content.copy(alpha = 0.8f))
+                extra?.invoke(content)
             }
             Spacer(Modifier.width(16.dp))
             CheckBadge(selected)
@@ -350,7 +404,7 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
     if (answers.typing == TypingWay.FULL_PINYIN) {
         // 多选：可以同时分不清几组；“都分得清”和其他互斥，让“一个都不选”也是看得见的选择。
         GuideHeading("有分不清的读音吗？")
-        Text("选上的打开模糊音，两边的读音都能打出对方的字，候选会多一些近音字。只对全拼 26 键起作用。",
+        Text("选上的打开模糊音，两边的读音都能打出对方的字。全拼 26 键、14 键和九键都可用。",
             style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             GuideOption(answers.fuzzy.isEmpty(), "都分得清", "不打开模糊音，候选最准", "setup-fuzzy:none") {
@@ -390,7 +444,7 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
     }
 }
 
-/** 打字方式这一块要改的：每项一句；“方案栏里藏起用不到的双拼”单独一行开关，默认开。 */
+/** 打字方式这一块要改的：每项一句；只有主动打开开关才收起其他双拼。 */
 @Composable
 private fun InputSection(input: InputPlan, hideDoublePinyin: Boolean, onHide: (Boolean) -> Unit) {
     if (input.lines.isEmpty() && input.hideLine == null) return
@@ -489,7 +543,7 @@ private fun SummarySection(facts: SetupFacts, plan: SetupPlan, removeIds: Set<St
 }
 
 @Composable
-private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit) {
+private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit, onOpenMore: (() -> Unit)? = null) {
     Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("✓ 已按推荐设置好", style = GuideText.heading(), color = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -508,5 +562,165 @@ private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit) {
             lines.forEach { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, style = GuideText.body()) }
         }
     }
+    onOpenMore?.let { MoreEntry(it) }
     Button(onClick = onDone, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("完成", style = GuideText.optionTitle()) }
+}
+
+/** 推荐配置页底部、完成页上的入口：主题色边框的整行卡片，和完成按钮分开，看得出是可选的。 */
+@Composable
+private fun MoreEntry(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surface, border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp).testTag("setup-open-more").clip(shape)
+            .clickable(role = Role.Button, onClick = onClick)) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("更多配置", style = GuideText.optionTitle(), color = MaterialTheme.colorScheme.primary)
+                Text("长按空格、删除键、字大小、声音振动、玻璃效果、语音标点。可以不设", style = GuideText.body(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(12.dp))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/**
+ * 「更多配置」：大家最常问的几项，一题一组大选项卡。每题先选着现在的设置，不点就不改；点「好了」只改点过的项，
+ * 「跳过」什么都不改。说不清的几样（剪贴板同步、键盘尺寸、性能与省电）只放跳转行。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SetupMoreContent(
+    facts: SetupMoreFacts?,
+    answers: SetupMoreChoices?,
+    result: List<String>?,
+    onAnswers: (SetupMoreChoices) -> Unit,
+    onBack: () -> Unit,
+    onSkip: () -> Unit,
+    onApply: () -> Unit,
+    onDone: () -> Unit,
+    onOpenRoute: ((String) -> Unit)? = null,
+) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            TopAppBar(
+                title = { Text("更多配置", style = GuideText.heading()) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }
+                },
+                actions = { if (result == null) TextButton(onClick = onSkip, modifier = Modifier.testTag("setup-more-skip")) {
+                    Text("跳过", style = GuideText.body())
+                } },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            )
+        }
+    ) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Spacer(Modifier.height(4.dp))
+            if (facts == null || answers == null) {
+                Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+            } else if (result != null) {
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("✓ 已改好", style = GuideText.heading(), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        result.forEach { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, style = GuideText.body()) }
+                    }
+                }
+                Button(onClick = onDone, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("setup-more-done")) {
+                    Text("完成", style = GuideText.optionTitle())
+                }
+                Spacer(Modifier.height(24.dp))
+            } else {
+                Text("选中的是现在的设置，不点就不改。", style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                MoreQuestions(facts, answers, onAnswers)
+                if (onOpenRoute != null) {
+                    GuideHeading("要到单独页面设的")
+                    GuideCard {
+                        listOf(
+                            Triple(SettingsRoutes.ClipboardSync, "剪贴板同步", "这台设备和电脑、平板之间同步复制的内容"),
+                            Triple(SettingsRoutes.KeyboardResize, "键盘尺寸与位置", "拖动调整键盘的高度、宽度和位置"),
+                            Triple(SettingsRoutes.Performance, "性能与省电", "按键动效、炫光和语音模型常驻多久"),
+                        ).forEachIndexed { index, (route, title, subtitle) ->
+                            if (index > 0) GuideDivider()
+                            Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).testTag("setup-more-open:$route")
+                                .clickable(role = Role.Button) { onOpenRoute(route) }.padding(20.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(title, style = GuideText.optionTitle())
+                                    Text(subtitle, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+                val changed = facts.current != answers
+                Button(onClick = onApply, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("setup-more-apply")) {
+                    Text(if (changed) "好了" else "不改了", style = GuideText.optionTitle())
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoreQuestions(facts: SetupMoreFacts, answers: SetupMoreChoices, onAnswers: (SetupMoreChoices) -> Unit) {
+    GuideQuestion("长按空格做什么？", com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHoldChoices.map { action ->
+        Triple(action, action.label, when (action) {
+            com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.CURSOR -> "按住空格左右滑，光标跟着走"
+            com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.REPEAT -> "按住一直出空格"
+            com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.VOICE_TOGGLE -> "按住空格说话，松手上屏" +
+                if (facts.sttEnabled) "" else "；「语音转文本」关着，要先打开"
+        })
+    }, answers.spaceHold, "setup-more-space") { onAnswers(answers.copy(spaceHold = it)) }
+
+    // 智能联想关着就没有联想词，这题没意义。
+    if (facts.predictionEnabled) GuideQuestion("打完字出了联想词，按删除键", listOf(
+        Triple(false, "先收起联想词", "第二下才删字"),
+        Triple(true, "退格直接删字", "第一下就删字"),
+    ), answers.deleteSkipsAssociation, "setup-more-delete") { onAnswers(answers.copy(deleteSkipsAssociation = it)) }
+
+    val clear = if (facts.reverseSwipe) "上滑" else "下滑"
+    val undo = if (facts.reverseSwipe) "下滑" else "上滑"
+    GuideQuestion("删除键${clear}清空时", listOf(
+        Triple(false, "清空整个输入框", "光标前后的字都清；清完立刻${undo}能撤回"),
+        Triple(true, "只清空光标前的内容", "光标后面的字留着"),
+    ), answers.clearBeforeCursorOnly, "setup-more-clear") { onAnswers(answers.copy(clearBeforeCursorOnly = it)) }
+
+    GuideHeading("字大小")
+    Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SetupMore.textSizeChoices(facts.current.textSize).forEach { size ->
+            val candidateSp = if (size == TextSizeChoice.CUSTOM) facts.candidateSp else size.candidateSp
+            val keyPercent = if (size == TextSizeChoice.CUSTOM) facts.keyScalePercent else (size.keyScale * 100).toInt()
+            GuideOption(answers.textSize == size, size.title, "候选字 $candidateSp，按键字号 $keyPercent%", "setup-more-text:$size",
+                extra = { color -> Text("中国 中 种", fontSize = candidateSp.sp, color = color) }) {
+                onAnswers(answers.copy(textSize = size))
+            }
+        }
+    }
+
+    GuideQuestion("按键声音和振动", SetupMore.feedbackChoices(facts.current.feedback).map { Triple(it, it.title, "") },
+        answers.feedback, "setup-more-feedback") { onAnswers(answers.copy(feedback = it)) }
+
+    GuideQuestion("要玻璃效果吗？", listOf(
+        Triple(false, "不要", "键盘不透明"),
+        Triple(true, "玻璃效果", "键盘半透明，透出后面的内容" + (facts.glassCost?.let { "。$it" } ?: "")),
+    ), answers.glass, "setup-more-glass") { onAnswers(answers.copy(glass = it)) }
+
+    // 语音转文本关着时不问标点。
+    if (facts.sttEnabled) GuideQuestion("语音输入要自动加标点吗？", listOf(
+        Triple(false, "不自动加", "停顿处留空格；说“逗号”“句号”照样出标点"),
+        Triple(true, "自动加标点", "保留识别模型加上的标点"),
+    ), answers.autoPunctuation, "setup-more-punctuation") { onAnswers(answers.copy(autoPunctuation = it)) }
 }

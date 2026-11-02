@@ -43,9 +43,9 @@ class DownloadMirrorsTest {
 
     @Test fun localImportMatchesOnlyCompleteVerifiedVersions() {
         val a = File("a"); val b = File("b"); val archive = File("c")
-        val files = ModelInfo("files", "文件模型", "", ModelCategory.PREDICTION, versions = listOf(ModelVersion("v1",
+        val files = ModelInfo("files", "文件模型", "", ModelCategory.OTHER, versions = listOf(ModelVersion("v1",
             files = listOf(ModelFile("x.onnx", "u", "AA"), ModelFile("vocab.json", "u", "bb")))))
-        val partial = ModelInfo("partial", "缺文件", "", ModelCategory.PREDICTION, versions = listOf(ModelVersion("v1",
+        val partial = ModelInfo("partial", "缺文件", "", ModelCategory.OTHER, versions = listOf(ModelVersion("v1",
             files = listOf(ModelFile("y.onnx", "u", "aa"), ModelFile("z.json", "u", "zz")))))
         val unverified = ModelInfo("unverified", "无哈希", "", ModelCategory.OTHER, versions = listOf(ModelVersion("v1",
             files = listOf(ModelFile("x.onnx", "u", "")))))

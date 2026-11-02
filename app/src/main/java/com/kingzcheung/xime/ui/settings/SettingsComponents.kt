@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -117,23 +118,25 @@ internal fun SettingsGroupTitle(title: String, modifier: Modifier = Modifier) {
         modifier = modifier.padding(top = 8.dp, bottom = 8.dp))
 }
 
-/** 卡片下面的一句说明：小字、次要色。提醒色只留给真正的警告。 */
+/** 卡片下面的一句说明：小字、次要色。提醒色只留给真正的警告。[jumps] 里列出的「」指路点一下跳到那一项（见 [settingsJumpText]）。 */
 @Composable
-internal fun SettingsNote(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp))
+internal fun SettingsNote(text: String, modifier: Modifier = Modifier, jumps: List<String> = emptyList()) {
+    Text(settingsJumpText(text, jumps, MaterialTheme.colorScheme.primary), style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp))
 }
 
 /** 卡片里的一行：标题、灰色第二行，右边放这一行的开关或按钮。和 [SettingsItem] 同样的字号字重，只是不带图标。 */
 @Composable
 internal fun SettingsListRow(title: String, detail: String, modifier: Modifier = Modifier,
+                             /** 灰字要提醒时换的颜色（如词库超出正常的代价）；不填是平常的灰字。 */
+                             detailColor: Color = Color.Unspecified,
                              trailing: @Composable () -> Unit = {}) {
     Row(modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = detailColor.takeOrElse { MaterialTheme.colorScheme.onSurfaceVariant })
         }
         trailing()
     }
@@ -225,10 +228,16 @@ fun SettingsToggleItem(
     onCheckedChange: (Boolean) -> Unit,
     onClick: (() -> Unit)? = null,
     showArrow: Boolean = false,
-    /** 被别的设置锁住时的原因（如「已被『角标输入方式：长按』锁定」）：开关置灰不可点，并在说明下显示这句。 */
+    /** 被别的设置锁住时的原因（如「已被『按键角标的符号和数字：长按输入』锁定」）：开关置灰不可点，并在说明下显示这句。 */
     lockMessage: String? = null,
     /** 搜索定位用的名字，见 [SettingsSection]。 */
     searchKey: String = title,
+    /** 说明里可点的「」指路，见 [settingsJumpText]。 */
+    subtitleJumps: List<String> = emptyList(),
+    /** 耗性能的开关：说明下面多一行实测代价（没测过不显示），见 [PerformanceCostNote]。 */
+    costItem: com.kingzcheung.xime.settings.PerformanceCosts.Item? = null,
+    /** [costItem] 下面再加的代价行（如同一组模糊音在九键上的代价）。 */
+    extraCost: (@Composable () -> Unit)? = null,
 ) {
     val locked = lockMessage != null
     Row(
@@ -266,11 +275,13 @@ fun SettingsToggleItem(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = subtitle,
+                text = settingsJumpText(subtitle, subtitleJumps, MaterialTheme.colorScheme.primary),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (lockMessage != null) SettingsLockNote(lockMessage)
+            costItem?.let { PerformanceCostNote(it) }
+            extraCost?.invoke()
         }
         // 说明写满一行时也不能贴着开关：和其他“标题＋说明＋开关”的行一样留 12dp。
         Spacer(modifier = Modifier.width(12.dp))
@@ -312,11 +323,11 @@ internal fun settingsSwitchColors(): SwitchColors {
     )
 }
 
-/** 被锁住的设置下面那一行「已被…锁定」，各页统一样式。 */
+/** 被锁住的设置下面那一行「已被…锁定」，各页统一样式。「」里写的那项设置点一下跳过去，在那边关掉就解锁。 */
 @Composable
 fun SettingsLockNote(message: String, modifier: Modifier = Modifier) {
-    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
-        modifier = modifier.padding(top = 2.dp).testTag("settings-lock:$message"))
+    Text(settingsJumpText(message, null, MaterialTheme.colorScheme.error), style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error, modifier = modifier.padding(top = 2.dp).testTag("settings-lock:$message"))
 }
 
 @Composable

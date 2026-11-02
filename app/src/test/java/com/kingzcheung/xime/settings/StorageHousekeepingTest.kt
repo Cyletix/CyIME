@@ -26,6 +26,9 @@ class StorageHousekeepingTest {
             File(models, ".download-t9-ngram-small-$id").apply { mkdirs(); File(this, "t9_ngram.lm").writeText("partial") },
             File(models, ".import-ochwpro-$id").apply { mkdirs() },
             File(models, ".bundle-paraformer-zh-en-int8-$id").apply { mkdirs() },
+            // 不再使用的智能联想模型
+            File(models, "predictive-text-base").apply { mkdirs(); File(this, "model_int8_dynamic.onnx").writeText("old") },
+            File(models, "predictive-text-small").apply { mkdirs() },
             File(rime, ".t9_ngram.lm.$id.installing").apply { writeText("link") },
         )
         val kept = listOf(

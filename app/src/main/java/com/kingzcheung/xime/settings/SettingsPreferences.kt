@@ -33,6 +33,13 @@ object SettingsPreferences {
     fun setGlassSoftTopEdge(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_GLASS_SOFT_TOP_EDGE, enabled).apply()
     }
+    /** 玻璃「液态玻璃」：按键边缘一道细亮线，按住变亮；默认关（原样）。见 ui/theme/LiquidGlass.kt。 */
+    const val KEY_GLASS_LIQUID = "glass_liquid"
+    fun glassLiquid(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_GLASS_LIQUID, false)
+    fun setGlassLiquid(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_GLASS_LIQUID, enabled).apply()
+    }
     const val KEY_PUNCTUATION_FULL_WIDTH = "punctuation_full_width"
     fun punctuationFullWidth(context: Context, default: Boolean): Boolean =
         getPrefs(context).getBoolean(KEY_PUNCTUATION_FULL_WIDTH, default)
@@ -45,6 +52,17 @@ object SettingsPreferences {
     fun isPairedSymbolsEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_PAIRED_SYMBOLS, false)
     fun setPairedSymbolsEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_PAIRED_SYMBOLS, enabled).apply()
+    }
+
+    /**
+     * 标点上屏首选：中文打字中点逗号、句号这类断句标点时，先上屏首选候选再接标点（nihao 点逗号得到「你好，」）。
+     * 默认关：关着时照旧先上屏打的字母（Gboard 规则，用户 10-24），这是别的用户要的选项（11-02）。
+     */
+    const val KEY_PUNCTUATION_COMMITS_CANDIDATE = "punctuation_commits_candidate"
+    fun isPunctuationCommitsCandidateEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_PUNCTUATION_COMMITS_CANDIDATE, false)
+    fun setPunctuationCommitsCandidateEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_PUNCTUATION_COMMITS_CANDIDATE, enabled).apply()
     }
 
     /**
@@ -71,7 +89,6 @@ object SettingsPreferences {
     private const val KEY_KEYBOARD_THEME = "keyboard_theme"
     
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
-    private const val KEY_PREDICTION_SELECTED_MODEL = "prediction_selected_model"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
@@ -92,6 +109,7 @@ object SettingsPreferences {
     const val KEY_STT_PUNCTUATION_QUESTION = "stt_punctuation_question"
     const val KEY_STT_PUNCTUATION_TRAILING = "stt_punctuation_trailing"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
+    const val KEY_STT_REMOTE_TYPING = "stt_remote_typing"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
@@ -292,12 +310,36 @@ object SettingsPreferences {
     }
 
     const val KEY_INCOGNITO = "incognito_mode"
+    private const val KEY_INCOGNITO_INSTALL = "incognito_initialized_install"
+
+    /** 每次换版本都从关闭开始；同版本重启保留手动选择。 */
+    internal fun initializeIncognitoForVersion(context: Context, versionCode: Int) {
+        val prefs = getPrefs(context)
+        // Android 可能在新装时恢复同版本的设置；还要区分这是哪一次安装。
+        val installedAt = context.packageManager.getPackageInfo(context.packageName, 0).firstInstallTime
+        val installVersion = "$installedAt/$versionCode"
+        if (prefs.getString(KEY_INCOGNITO_INSTALL, null) == installVersion) return
+        prefs.edit().remove(KEY_INCOGNITO).putString(KEY_INCOGNITO_INSTALL, installVersion).apply()
+    }
 
     /** 用户手动开启的无痕：不学新词、不调词频、不记剪贴板与联想；敏感输入框另行自动生效。 */
     fun isIncognito(context: Context): Boolean = getPrefs(context).getBoolean(KEY_INCOGNITO, false)
 
     fun setIncognito(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_INCOGNITO, enabled).apply()
+    }
+
+    /**
+     * 「记录密码等敏感内容」(#95)，默认关：密码管理器复制的、在密码框里复制的内容记进剪贴板历史，
+     * 显示成圆点、1 小时后删除、不同步不导出。无痕开着时照样不记。
+     */
+    private const val KEY_CLIPBOARD_SENSITIVE_CAPTURE = "clipboard_sensitive_capture"
+
+    fun isClipboardSensitiveCaptureEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_CLIPBOARD_SENSITIVE_CAPTURE, false)
+
+    fun setClipboardSensitiveCaptureEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CLIPBOARD_SENSITIVE_CAPTURE, enabled).apply()
     }
 
     private const val KEY_SCHEMA_IMPORT_WARNING_DISMISSED = "schema_import_warning_dismissed"
@@ -308,7 +350,24 @@ object SettingsPreferences {
     const val KEY_CANDIDATE_COMMENT_CONTENT = "candidate_comment_content"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
     const val KEY_ASSOCIATION_CANCEL_ON_RIGHT = "association_cancel_on_right"
-    private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
+    const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
+    const val KEY_SHOW_PREEDIT_PREVIEW = "show_preedit_preview"
+    const val KEY_INLINE_PREEDIT_PREVIEW = "inline_preedit_preview"
+    const val KEY_PREEDIT_BUBBLE_OPACITY = "preedit_bubble_opacity"
+
+    fun showPreeditPreview(context: Context) = getPrefs(context).getBoolean(KEY_SHOW_PREEDIT_PREVIEW, true)
+    fun setShowPreeditPreview(context: Context, show: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_SHOW_PREEDIT_PREVIEW, show).apply()
+    fun inlinePreeditPreview(context: Context) = getPrefs(context).getBoolean(KEY_INLINE_PREEDIT_PREVIEW, false)
+    fun setInlinePreeditPreview(context: Context, inline: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_INLINE_PREEDIT_PREVIEW, inline).apply()
+    /** 拼音气泡底色的不透明度：20%~100%，按 5% 一档；默认 100%（实底，看得清），用户喜欢透的可以调低（11-01）。 */
+    fun normalizePreeditBubbleOpacity(value: Float): Float =
+        if (!value.isFinite()) 1f else kotlin.math.round(value.coerceIn(0.2f, 1f) * 20f) / 20f
+    fun preeditBubbleOpacity(context: Context) =
+        normalizePreeditBubbleOpacity(getPrefs(context).getFloat(KEY_PREEDIT_BUBBLE_OPACITY, 1f))
+    fun setPreeditBubbleOpacity(context: Context, opacity: Float) =
+        getPrefs(context).edit().putFloat(KEY_PREEDIT_BUBBLE_OPACITY, normalizePreeditBubbleOpacity(opacity)).apply()
     private const val KEY_PAGE_SIZE = "page_size"
     private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
     const val KEY_WIDE_CANDIDATE_SPACING = "wide_candidate_spacing"
@@ -665,15 +724,6 @@ object SettingsPreferences {
     
     
     
-    fun getPredictionSelectedModel(context: Context): String {
-        val initial = com.kingzcheung.xime.model.DeviceDefaults.predictionModel(context)
-        return getPrefs(context).getString(KEY_PREDICTION_SELECTED_MODEL, initial) ?: initial
-    }
-    
-    fun setPredictionSelectedModel(context: Context, modelId: String) {
-        getPrefs(context).edit().putString(KEY_PREDICTION_SELECTED_MODEL, modelId).apply()
-    }
-
     /** 空格上屏联想候选：有联想候选时按空格键直接上屏第一个联想词（而非空格字符） */
     fun isSpaceCommitAssociationEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_SPACE_COMMIT_ASSOCIATION, false)
@@ -746,12 +796,12 @@ object SettingsPreferences {
 
     /** 语音转文本是否使用本地（离线）识别引擎。 */
     /**
-     * 是否用本地模型识别。默认一律本地；只有在「在线语音接口」测试通过后选了「优先使用在线接口」，
-     * 或者旧版选过在线语音插件时才不是本地。存的值为 false 但在线不可用时仍算本地，语音不会打开就关。
+     * 是否用本地模型识别。默认一律本地；只有在语音页选了在线语音插件并打开「优先使用在线语音」时才不是本地。
+     * 存的值为 false 但没选插件时仍算本地；选的插件被删或停用时由 SpeechRecognitionManager 退回本地模型。
      */
     fun isSttUseLocal(context: Context): Boolean {
         val stored = getPrefs(context).getBoolean(KEY_STT_USE_LOCAL, getSttOnlinePluginId(context).isBlank())
-        return stored || !(com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context) || getSttOnlinePluginId(context).isNotBlank())
+        return stored || getSttOnlinePluginId(context).isBlank()
     }
 
     /** 1.15.7 及以前的「使用本地模型」开关已删掉：关过它的老用户升级后改回本地（只做一次）。 */
@@ -827,9 +877,9 @@ object SettingsPreferences {
     }
 
     /**
-     * 语音自动加标点：整句定稿时保留模型打的标点。默认关，和 1.15.0 以前一样：模型的标点变成空格，
-     * 只有口述「逗号」「句号」「问号」「感叹号」出标点。1.15.0–1.15.21 把标点绑在整句定稿上、
-     * 又默认开，用户没法只去掉标点（2026-10-31 用户：「不要改我的习惯」）。
+     * 语音自动加标点：保留识别结果自带的标点（本地整句定稿的模型标点，以及内置在线接口返回的原文标点）。
+     * 默认关，和 1.15.0 以前一样：标点变成空格，只有口述「逗号」「句号」「问号」「感叹号」出标点。
+     * 1.15.0–1.15.21 把标点绑在整句定稿上、又默认开，用户没法只去掉标点（2026-10-31 用户：「不要改我的习惯」）。
      */
     fun isSttAutoPunctuation(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_STT_AUTO_PUNCTUATION, false)
@@ -864,6 +914,18 @@ object SettingsPreferences {
 
     fun setSttPillResume(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STT_PILL_RESUME, enabled).apply()
+    }
+
+    /**
+     * 隔空输入（用户 2026-11-02 要的，参照微信输入法）：说完的话经剪贴板同步的连接发到电脑光标处，
+     * 手机输入框只做预览不上屏。默认关；见 RemoteTyping。
+     */
+    fun isSttRemoteTyping(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_STT_REMOTE_TYPING, false)
+    }
+
+    fun setSttRemoteTyping(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_STT_REMOTE_TYPING, enabled).apply()
     }
 
     // ---- 插件网络授权（per plugin per host） ----
@@ -947,11 +1009,9 @@ object SettingsPreferences {
 
     fun getKeyboardHeightDp(context: Context, isLandscape: Boolean): Int {
         val key = if (isLandscape) KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE else KEY_KEYBOARD_HEIGHT_DP
-        val alt = if (isLandscape) KEY_KEYBOARD_HEIGHT_DP else KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE
         val stored = getPrefs(context).getInt(key, -1)
         if (stored > 0) return if (isLandscape) stored.coerceIn(com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(context.resources.configuration.screenHeightDp, true)) else stored
-        val altStored = getPrefs(context).getInt(alt, -1)
-        if (isLandscape && altStored > 0) return if (isLandscape) altStored.coerceIn(com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(context.resources.configuration.screenHeightDp, true)) else altStored
+        // 横竖屏各存一份：横屏没调过就用横屏默认高度，不再借竖屏存的高度（竖屏 40% 多的高度放到横屏会盖住大半个屏幕，用户 11-02）。
         return getDefaultKeyboardHeightDp(context, isLandscape)
     }
 
@@ -969,15 +1029,55 @@ object SettingsPreferences {
         return (portraitHeightDp * DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE / 100).coerceIn(com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(config.screenHeightDp, true))
     }
 
-    private const val KEY_KEYBOARD_BOTTOM_PADDING_DP = "keyboard_bottom_padding_dp"
+    const val KEY_KEYBOARD_BOTTOM_PADDING_DP = "keyboard_bottom_padding_dp"
+    internal const val KEY_KEYBOARD_BOTTOM_LOWERING_DP = "keyboard_bottom_lowering_dp"
+    const val KEY_EDGE_TO_EDGE_KEYBOARD = "edge_to_edge_keyboard"
+
+    fun edgeToEdgeKeyboard(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_EDGE_TO_EDGE_KEYBOARD, false)
+
+    fun setEdgeToEdgeKeyboard(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_EDGE_TO_EDGE_KEYBOARD, enabled).apply()
+    }
+
     private const val DEFAULT_KEYBOARD_BOTTOM_PADDING_DP = 0
 
     fun getKeyboardBottomPaddingDp(context: Context): Int {
-        return getPrefs(context).getInt(KEY_KEYBOARD_BOTTOM_PADDING_DP, DEFAULT_KEYBOARD_BOTTOM_PADDING_DP)
+        return getPrefs(context).getInt(KEY_KEYBOARD_BOTTOM_PADDING_DP, DEFAULT_KEYBOARD_BOTTOM_PADDING_DP).coerceAtLeast(0)
     }
 
+    /** 旧字段始终保存非负留白，低于系统建议值的校准单独保存。 */
+    internal fun getKeyboardBottomAdjustmentDp(context: Context): Int =
+        getKeyboardBottomPaddingDp(context).takeIf { it > 0 }
+            ?: -getPrefs(context).getInt(KEY_KEYBOARD_BOTTOM_LOWERING_DP, 0).coerceAtLeast(0)
+
     fun setKeyboardBottomPaddingDp(context: Context, paddingDp: Int) {
-        getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_PADDING_DP, paddingDp).apply()
+        setKeyboardBottomAdjustmentDp(context, paddingDp.coerceAtLeast(0))
+    }
+
+    internal fun setKeyboardBottomAdjustmentDp(context: Context, adjustmentDp: Int) {
+        val edit = getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_PADDING_DP, adjustmentDp.coerceAtLeast(0))
+        if (adjustmentDp < 0) edit.putInt(KEY_KEYBOARD_BOTTOM_LOWERING_DP, -adjustmentDp)
+        else edit.remove(KEY_KEYBOARD_BOTTOM_LOWERING_DP)
+        edit.apply()
+    }
+
+    /** 键盘上次量到的「最多还能调低多少 dp」（系统建议值减安全下限，按当前方向）；没量过为 null。 */
+    internal const val KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP = "keyboard_bottom_lowering_limit_dp"
+
+    internal fun getKeyboardBottomLoweringLimitDp(context: Context): Int? =
+        getPrefs(context).getInt(KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP, -1).takeIf { it >= 0 }
+
+    /** 键盘量到新的下限时写一次；值没变不写，免得每次 insets 回调都触发设置页刷新。 */
+    internal fun setKeyboardBottomLoweringLimitDp(context: Context, limitDp: Int) {
+        val value = limitDp.coerceAtLeast(0)
+        if (getKeyboardBottomLoweringLimitDp(context) != value)
+            getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP, value).apply()
+    }
+
+    internal fun resetKeyboardBottomCalibration(context: Context) {
+        getPrefs(context).edit().remove(KEY_EDGE_TO_EDGE_KEYBOARD).remove(KEY_KEYBOARD_BOTTOM_PADDING_DP)
+            .remove(KEY_KEYBOARD_BOTTOM_LOWERING_DP).apply()
     }
 
     fun isSchemaImportWarningDismissed(context: Context): Boolean {
@@ -1034,9 +1134,12 @@ object SettingsPreferences {
         getPrefs(context).edit().putInt(key, offset).apply()
     }
 
-    fun getFloatingOffsetY(context: Context, isLandscape: Boolean = false): Int {
+    fun getFloatingOffsetY(context: Context, isLandscape: Boolean = false): Int =
+        getFloatingOffsetY(context, isLandscape, 0)
+
+    internal fun getFloatingOffsetY(context: Context, isLandscape: Boolean = false, defaultDp: Int): Int {
         val key = if (isLandscape) KEY_FLOATING_OFFSET_Y_LANDSCAPE else KEY_FLOATING_OFFSET_Y
-        return getPrefs(context).getInt(key, 0)
+        return getPrefs(context).getInt(key, defaultDp)
     }
 
     fun setFloatingOffsetY(context: Context, offset: Int, isLandscape: Boolean = false) {

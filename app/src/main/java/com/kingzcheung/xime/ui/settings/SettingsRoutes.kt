@@ -5,7 +5,10 @@ object SettingsRoutes {
     const val Main = "main"
     const val Schema = "schema"
     const val DoublePinyin = "double_pinyin"
+    const val ChineseInput = "chinese_input"
+    const val EnglishInput = "english_input"
     const val Market = "market"
+    const val MarketPlugins = "market?tab=2"
     const val ModelLocal = "model_local"
     const val SchemaMarketDetail = "schema_market_detail/{schemeId}"
     const val ModelMarketDetail = "model_market_detail/{modelId}"
@@ -36,4 +39,6 @@ object SettingsRoutes {
     const val RimeFileBrowser = "rime_file_browser"
     const val KeyboardResize = "keyboard_resize"
     const val ToolbarArrange = "toolbar_arrange"
+    const val TypingStats = "typing_stats"
+    const val Other = "other_settings"
 }

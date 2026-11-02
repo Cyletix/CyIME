@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,7 +39,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.settings.CandidateCommentMode
-import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
 
 /**
  * 带示意图的单选卡片（与「编码显示」同一外观）：上方是这个选项在键盘上的样子，下方是名称。
@@ -108,55 +108,6 @@ private fun GestureLine(gesture: String, symbol: String) {
         Text(gesture, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         Text("  →  ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(symbol, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-    }
-}
-
-/** 按键角标怎么输入：随「滑动／长按」和「反转上下滑方向」实时变化。 */
-@Composable
-internal fun SymbolGestureIllustration(longPress: Boolean, reversed: Boolean) {
-    val down = "↓ 下滑"
-    val up = "↑ 上滑"
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MiniKey("a", "@", "1")
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            GestureLine(if (longPress) "长按" else if (reversed) up else down, "@")
-            GestureLine(if (reversed) down else up, "1")
-        }
-    }
-}
-
-/** 文字中的光标与移动方式。 */
-@Composable
-internal fun CursorGestureIllustration(mode: CursorGestureMode) {
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val primary = MaterialTheme.colorScheme.primary
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("你好", fontSize = 13.sp, color = onSurface)
-        Box(Modifier.width(2.dp).height(15.dp).background(if (mode == CursorGestureMode.NONE) onSurface.copy(alpha = 0.4f) else primary))
-        Text("世界", fontSize = 13.sp, color = onSurface)
-    }
-    Spacer(Modifier.height(8.dp))
-    val arrow = if (mode == CursorGestureMode.NONE) "" else "←  →"
-    when (mode) {
-        CursorGestureMode.KEYBOARD -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // 手指横扫过的一排按键。
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                repeat(5) {
-                    Box(Modifier.size(width = 14.dp, height = 18.dp).clip(RoundedCornerShape(3.dp))
-                        .background(primary.copy(alpha = 0.35f)))
-                }
-            }
-            Text("滑过按键 $arrow", fontSize = 12.sp, color = primary)
-        }
-        else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.width(84.dp).height(18.dp).clip(RoundedCornerShape(4.dp))
-                .background(if (mode == CursorGestureMode.SPACE) primary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center) {
-                Text("空格", fontSize = 10.sp, color = onSurface)
-            }
-            Text(if (mode == CursorGestureMode.SPACE) "按住 $arrow" else "不移动", fontSize = 12.sp,
-                color = if (mode == CursorGestureMode.SPACE) primary else onSurface.copy(alpha = 0.6f))
-        }
     }
 }
 
@@ -250,18 +201,6 @@ internal fun CandidateCommentContentIllustration(content: com.kingzcheung.xime.s
     }
 }
 
-/** 空格键其他长按行为：连续空格或语音开关。 */
-@Composable
-internal fun SpaceHoldIllustration(voice: Boolean) {
-    val primary = MaterialTheme.colorScheme.primary
-    Box(Modifier.width(96.dp).height(22.dp).clip(RoundedCornerShape(5.dp))
-        .background(primary.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
-        Text("空格", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
-    }
-    Spacer(Modifier.height(6.dp))
-    Text(if (voice) "长按 → 开始／结束语音" else "长按 → 连续输入空格", fontSize = 12.sp, color = primary, maxLines = 1)
-}
-
 /** 振动反馈：跟随系统、始终振动、关闭。 */
 @Composable
 internal fun HapticModeIllustration(mode: String) {
@@ -330,5 +269,303 @@ internal fun SpacePunctuationIllustration(comma: Boolean, period: Boolean) {
         if (right != null) RowScopeKey(right.primary, right.alternate, 1f, this, accent = true)
         RowScopeKey("中", null, 1f, this)
         RowScopeKey("↵", null, 1.7f, this)
+    }
+}
+
+/**
+ * 开关下面的图例框（11-01 合并设置时加）：只看不点，随开关实时变化；和 [CandidateCancelIllustration] 同一底色。
+ * 放在没有图标的设置行下面，左右和文字对齐。最宽 [SETTINGS_LEGEND_MAX_WIDTH]：平板上是一张限宽卡片，不撑满整行（11-02）。
+ */
+@Composable
+internal fun SettingsLegend(tag: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.widthIn(max = SETTINGS_LEGEND_MAX_WIDTH).fillMaxWidth().testTag(tag).clip(RoundedCornerShape(6.dp))
+        .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
+}
+
+/** 图例卡片最宽多少：手机上撑满，平板上所有图例都是这一个宽度。 */
+internal val SETTINGS_LEGEND_MAX_WIDTH = 420.dp
+
+/** 图例里的一个输入框：[before] 光标 [after]，可再带一段没上屏的拼音。 */
+@Composable
+private fun LegendField(before: String, after: String, pinyin: String? = null, label: String? = null) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (label != null) Text(label, fontSize = 11.sp, color = onSurface.copy(alpha = 0.6f), maxLines = 1,
+            modifier = Modifier.width(34.dp))
+        Row(Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            LegendFieldText(before, after, pinyin)
+        }
+    }
+}
+
+@Composable
+private fun LegendFieldText(before: String, after: String, pinyin: String?) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val primary = MaterialTheme.colorScheme.primary
+    Text(before, fontSize = 13.sp, color = onSurface, maxLines = 1)
+    if (pinyin != null) Text(pinyin, fontSize = 13.sp, color = primary, maxLines = 1,
+        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
+    Box(Modifier.width(2.dp).height(15.dp).background(primary))
+    Text(after, fontSize = 13.sp, color = onSurface, maxLines = 1)
+    if (before.isEmpty() && after.isEmpty() && pinyin == null)
+        Text(" 空", fontSize = 11.sp, color = onSurface.copy(alpha = 0.45f), maxLines = 1)
+}
+
+/**
+ * 「操作前 → 操作后」图例（11-02，原来「之前／之后」上下叠四行，平板上输入框横着撑满，丑又占地方）：
+ * 一张限宽卡片，左右两格一样宽，中间箭头上写动作；左格是操作前，右格随开关变化。
+ */
+@Composable
+private fun SettingsStepLegend(
+    tag: String,
+    action: String,
+    before: @Composable ColumnScope.() -> Unit,
+    after: @Composable ColumnScope.() -> Unit,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    Row(Modifier.widthIn(max = SETTINGS_LEGEND_MAX_WIDTH).fillMaxWidth().testTag(tag).clip(RoundedCornerShape(6.dp))
+        .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp), content = before)
+        // 箭头一栏定宽：几张图例卡片的左右两格上下对齐。
+        Column(Modifier.width(56.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(action, fontSize = 10.sp, color = primary, maxLines = 1)
+            Text("→", fontSize = 15.sp, color = primary, fontWeight = FontWeight.Bold)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp), content = after)
+    }
+}
+
+/** 图例卡片一格里的输入框：占满这一格。 */
+@Composable
+private fun LegendBox(before: String, after: String = "", pinyin: String? = null) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
+        .padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        LegendFieldText(before, after, pinyin)
+    }
+}
+
+/** 输入框下面的候选栏：灰色小字 [lead]（「联想」或删掉的字）后跟几个词；[highlight] 时词用强调色。 */
+@Composable
+private fun LegendChip(lead: String, words: String, highlight: Boolean = false) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    Row(Modifier.clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
+        .padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(lead, fontSize = 11.sp, color = onSurface.copy(alpha = 0.6f), maxLines = 1)
+        Spacer(Modifier.width(6.dp))
+        Text(words, fontSize = 12.sp, maxLines = 1,
+            color = if (highlight) MaterialTheme.colorScheme.primary else onSurface,
+            fontWeight = if (highlight) FontWeight.Medium else FontWeight.Normal)
+    }
+}
+
+/** 输入框下面的灰色小注。 */
+@Composable
+private fun LegendNote(text: String) {
+    Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1)
+}
+
+/** 角标输入方式三选一：键上的两个角标各用什么手势输入，长按做什么。随「反转上下滑方向」变化。 */
+@Composable
+internal fun CornerInputIllustration(choice: com.kingzcheung.xime.ui.keyboard.CornerInputChoice, reversed: Boolean) {
+    val down = "↓下滑"
+    val up = "↑上滑"
+    val top = if (reversed) up else down
+    val bottom = if (reversed) down else up
+    MiniKey("a", "@", "1")
+    Spacer(Modifier.height(6.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.Start) {
+        when (choice) {
+            com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE -> {
+                GestureLine(top, "@"); GestureLine(bottom, "1"); GestureLine("长按", "无")
+            }
+            com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE -> {
+                GestureLine(top, "@"); GestureLine(bottom, "1"); GestureLine("长按", "A á")
+            }
+            com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS -> {
+                GestureLine("长按", "@"); GestureLine(bottom, "1"); GestureLine(top, "无")
+            }
+        }
+    }
+}
+
+/** 长按空格三选一：移动光标、连续空格、按住说话。 */
+@Composable
+internal fun SpaceHoldChoiceIllustration(action: com.kingzcheung.xime.ui.keyboard.SpaceHoldAction) {
+    val primary = MaterialTheme.colorScheme.primary
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    when (action) {
+        com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.CURSOR -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("你好", fontSize = 13.sp, color = onSurface)
+            Box(Modifier.width(2.dp).height(15.dp).background(primary))
+            Text("世界", fontSize = 13.sp, color = onSurface)
+        }
+        com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.REPEAT -> Text("a␣␣␣␣", fontSize = 13.sp, color = onSurface, maxLines = 1)
+        // 麦克风用工具栏语音按钮同一个图标，不用 emoji。
+        com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.VOICE_TOGGLE -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(com.kingzcheung.xime.keyboard.ToolbarButton.VOICE.icon, contentDescription = null, tint = onSurface,
+                modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(2.dp))
+            Text("说话中…", fontSize = 12.sp, color = onSurface, maxLines = 1)
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Box(Modifier.width(84.dp).height(20.dp).clip(RoundedCornerShape(5.dp)).background(primary.copy(alpha = 0.3f)),
+        contentAlignment = Alignment.Center) {
+        Text("空格", fontSize = 10.sp, color = onSurface)
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(when (action) {
+        com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.CURSOR -> "按住左右拖"
+        com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.REPEAT -> "按住一直出空格"
+        com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.VOICE_TOGGLE -> "按住说，松手上屏"
+    }, fontSize = 11.sp, color = primary, maxLines = 1)
+}
+
+/** 键盘面板滑动光标：开着时手指在按键上横扫就移光标；关着时横扫照常是滑动输入。 */
+@Composable
+internal fun KeyboardSwipeCursorLegend(on: Boolean) {
+    val primary = MaterialTheme.colorScheme.primary
+    val surface = MaterialTheme.colorScheme.surface
+    SettingsLegend("keyboard-swipe-cursor-legend") {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            listOf("q", "w", "e", "r", "t", "y").forEach { key ->
+                Box(Modifier.size(width = 22.dp, height = 26.dp).clip(RoundedCornerShape(4.dp))
+                    .background(if (on) primary.copy(alpha = 0.3f) else surface), contentAlignment = Alignment.Center) {
+                    Text(key, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Text(if (on) "  ←  手指横扫  →" else "", fontSize = 12.sp, color = primary, maxLines = 1)
+        }
+        LegendField("你好", "世界", label = if (on) "光标" else null)
+        Text(if (on) "在按键上左右滑，光标跟着走；滑行输入这时用不了" else "按键上滑动照常输入，只有按住空格能移光标",
+            fontSize = 12.sp, color = if (on) primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 2)
+    }
+}
+
+/** 打字中清空：还有没上屏的拼音时，清空是否连输入框里的字一起清。 */
+@Composable
+internal fun ClearWhileComposingLegend(on: Boolean, reversed: Boolean) {
+    SettingsStepLegend("clear-while-composing-legend", if (reversed) "上滑删除键" else "下滑删除键",
+        before = { LegendBox("今天天气", pinyin = "hao") },
+        after = { LegendBox(if (on) "" else "今天天气") })
+}
+
+/** 只清空光标前：光标后面的字留不留。 */
+@Composable
+internal fun ClearBeforeCursorLegend(on: Boolean, reversed: Boolean) {
+    SettingsStepLegend("clear-before-cursor-legend", if (reversed) "上滑删除键" else "下滑删除键",
+        before = { LegendBox("你好", "世界") },
+        after = { LegendBox("", if (on) "世界" else "") })
+}
+
+/** 退格直接删字：上屏后候选栏出了联想词，第一下退格是删字还是先收起联想。 */
+@Composable
+internal fun DeleteSkipsAssociationLegend(on: Boolean) {
+    SettingsStepLegend("delete-skips-association-legend", "退格",
+        before = { LegendBox("你好"); LegendChip("联想", "世界 朋友") },
+        after = {
+            LegendBox(if (on) "你" else "你好")
+            if (!on) LegendNote("只收起了联想")
+        })
+}
+
+/** 删字后给同音字：退格删掉的字放回候选栏，后面跟同音字。 */
+@Composable
+internal fun DeleteRecoveryLegend(on: Boolean) {
+    SettingsStepLegend("delete-recovery-legend", "退格",
+        before = { LegendBox("你号") },
+        after = {
+            LegendBox("你")
+            if (on) LegendChip("号", "好 浩 豪", highlight = true) else LegendNote("候选栏空着")
+        })
+}
+
+/** 键帽字母三选一：中文、英文键盘上各显示大写还是小写。 */
+@Composable
+internal fun KeyLabelCaseIllustration(choice: com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice) {
+    @Composable
+    fun line(tag: String, letters: String) = Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(tag, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.width(20.dp))
+        letters.forEach { c ->
+            Box(Modifier.padding(horizontal = 1.dp).size(width = 16.dp, height = 20.dp).clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+                Text(c.toString(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
+    val upperZh = choice != com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.LOWER
+    val upperEn = choice == com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.UPPER
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        line("中", if (upperZh) "QWE" else "qwe")
+        line("英", if (upperEn) "QWE" else "qwe")
+    }
+}
+
+/**
+ * 「角标与气泡」的图例：上方角标、下方角标、双拼键位提示三个开关和角标不透明度一起实时变化。
+ * 双拼键位提示和角标都开着时分上下两层（和键盘上一样，见 KeyButton 的 dpWithCorners）。
+ */
+@Composable
+internal fun KeyFaceHintsLegend(up: Boolean, down: Boolean, doublePinyin: Boolean, opacity: Float) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val primary = MaterialTheme.colorScheme.primary
+    // 小鹤双拼的 u、i、o 三个键；角标只是示意。
+    val keys = listOf(Triple("u", "sh", "u"), Triple("i", "ch", "i"), Triple("o", null, "uo"))
+    val corners = listOf("&" to "7", "*" to "8", "(" to "9")
+    val cornerColor = onSurface.copy(alpha = 0.6f * opacity.coerceIn(0.1f, 1f))
+    SettingsLegend("key-face-hints-legend", Modifier.padding(top = 8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            keys.zip(corners).forEach { (key, corner) ->
+                val (letter, initial, finals) = key
+                Box(Modifier.size(width = 48.dp, height = 54.dp).clip(RoundedCornerShape(7.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(7.dp))) {
+                    Text(letter, Modifier.align(Alignment.Center), fontSize = if (doublePinyin) 16.sp else 20.sp, color = onSurface)
+                    if (doublePinyin && initial != null) Text(initial, Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 2.dp),
+                        fontSize = 10.sp, color = primary, fontWeight = FontWeight.Medium)
+                    if (doublePinyin) Text(finals, Modifier.align(Alignment.BottomEnd).padding(end = 4.dp, bottom = 2.dp),
+                        fontSize = 10.sp, color = primary)
+                    if (up) Text(corner.first, Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 2.dp),
+                        fontSize = 10.sp, color = cornerColor)
+                    if (down) Text(corner.second, Modifier.align(Alignment.BottomStart).padding(start = 4.dp, bottom = 2.dp),
+                        fontSize = 10.sp, color = cornerColor)
+                }
+            }
+        }
+        if (!doublePinyin && !up && !down) Text("键上只有字母，滑动照样能输入符号",
+            fontSize = 12.sp, color = onSurface.copy(alpha = 0.7f), maxLines = 2)
+    }
+}
+
+/** 键盘顶部样式三选一：上面一块是应用界面，下面是固定键盘，看两者交界处。 */
+@Composable
+internal fun KeyboardTopStyleIllustration(style: com.kingzcheung.xime.ui.keyboard.KeyboardTopStyle) {
+    val keyboard = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+    val app = MaterialTheme.colorScheme.surface
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(app)) {
+        // 应用界面里的几行字
+        Column(Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Box(Modifier.fillMaxWidth(0.8f).height(3.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)))
+            Box(Modifier.fillMaxWidth(0.55f).height(3.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)))
+        }
+        val shape = if (style == com.kingzcheung.xime.ui.keyboard.KeyboardTopStyle.ROUNDED)
+            RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp) else RoundedCornerShape(0.dp)
+        val fill = if (style == com.kingzcheung.xime.ui.keyboard.KeyboardTopStyle.SOFT)
+            Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(
+                0f to keyboard.copy(alpha = 0f), 0.35f to keyboard, 1f to keyboard))
+        else Modifier.background(keyboard)
+        Column(Modifier.fillMaxWidth().height(36.dp).clip(shape).then(fill).padding(start = 5.dp, end = 5.dp, top = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            repeat(2) {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    repeat(6) {
+                        Box(Modifier.weight(1f).height(9.dp).clip(RoundedCornerShape(2.dp)).background(app))
+                    }
+                }
+            }
+        }
     }
 }

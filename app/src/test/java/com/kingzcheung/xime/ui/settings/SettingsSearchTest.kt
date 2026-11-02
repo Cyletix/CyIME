@@ -22,6 +22,22 @@ class SettingsSearchTest {
         assertTrue("候选注释内容" in titles("英文"))
     }
 
+    /** 11-02 整理：中文输出、拼音纠错、模糊音收进「中文输入」页，英文输入单独一页；搜到的都去那一页。 */
+    @Test fun chineseAndEnglishInputItemsOpenTheirOwnPages() {
+        val chinese = listOf("繁体输出", "生僻字", "时间日期候选", "候选里显示表情", "打符号名出符号", "希腊字母",
+            "邻键纠错", "双拼邻键纠错", "九键按数字也模糊", "模糊音也用于双拼", "模糊音")
+        val english = listOf("网址、邮箱框自动切英文", "选词后自动加空格", "标点后自动加空格", "打 @ 时给邮箱后缀")
+        for (title in chinese) SettingsSearchIndex.single { it.title == title }.let {
+            assertEquals(title, SettingsRoutes.ChineseInput, it.target)
+            assertEquals(title, "输入 › 语言与方案 › 中文输入", it.path)
+        }
+        for (title in english) SettingsSearchIndex.single { it.title == title }.let {
+            assertEquals(title, SettingsRoutes.EnglishInput, it.target)
+            assertEquals(title, "输入 › 语言与方案 › 英文输入", it.path)
+        }
+        assertEquals(SettingsRoutes.ChineseInput, settingsJumpEntry("语言与方案 › 中文输入")?.target)
+    }
+
     @Test fun titleMatchesComeFirst() {
         assertEquals("拂动选字母", titles("拂动").first())
     }
@@ -42,7 +58,7 @@ class SettingsSearchTest {
     /** 「时长与距离」默认收起：里面每一项搜到都要能让它自动展开（用户 10-31）。 */
     @Test fun foldedTimingItemsExpandOnSearch() {
         val folded = SettingsSearchIndex.filter { it.section == "时长与距离" }.map { it.title }
-        assertEquals(5, folded.size)
+        assertEquals(6, folded.size)
         assertTrue("没登记自动展开：${folded - TIMING_SEARCH_KEYS}", TIMING_SEARCH_KEYS.containsAll(folded))
     }
 
@@ -93,6 +109,13 @@ class SettingsSearchTest {
         assertTrue("打符号名出符号" in titles("符号名"))
     }
 
+    /** 「希腊字母」按字母名和说法能搜到。 */
+    @Test fun greekLetterCandidatesAreSearchable() {
+        assertTrue("希腊字母" in titles("希腊"))
+        assertTrue("希腊字母" in titles("西塔"))
+        assertTrue("希腊字母" in titles("alpha"))
+    }
+
     /** 14 键默认没启用：搜“14键”要能找到启用它的「已安装的方案」，不只是 14 键的手势设置。 */
     @Test fun fourteenKeySearchFindsWhereToEnableIt() {
         assertTrue("已安装的方案" in titles("14键"))
@@ -114,6 +137,18 @@ class SettingsSearchTest {
         assertTrue("数字行" in titles("平板 一排数字"))
     }
 
+    /** 11-01 整理：新功能和用户自己的说法都能找到。 */
+    @Test fun newFeaturesAndEverydayWordsAreSearchable() {
+        assertTrue("中英混输" in titles("中英混打"))
+        assertTrue("拍照识别模型" in titles("OCR"))
+        assertTrue("拍照识别模型" in titles("拍照识字"))
+        assertTrue("逗号键分词" in titles("隔音符"))
+        assertTrue("中文滑行输入" in titles("划词"))
+        assertTrue("生僻字" in titles("罕用字"))
+        assertTrue("插件市场" in titles("扩展市场"))
+        assertTrue("按键音色" in titles("案件音色"))
+    }
+
     /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */
     @Test fun everyAnchorExistsOnItsPage() {
         val dir = java.io.File("src/main/java/com/kingzcheung/xime/ui/settings")
@@ -126,7 +161,7 @@ class SettingsSearchTest {
 
     @Test fun focusPrefersTheRowAndFallsBackToItsGroup() {
         val entry = SettingsSearchIndex.first { it.title == "移动光标时振动" }
-        // 行此刻不显示（滑动移动光标已关）：只有组在页面上，组亮。
+        // 行此刻不显示（不能移动光标时）：只有组在页面上，组亮。
         SettingsSearchFocus.open(entry)
         val first = SettingsSearchFocus.request!!
         SettingsSearchFocus.register("光标与空格")

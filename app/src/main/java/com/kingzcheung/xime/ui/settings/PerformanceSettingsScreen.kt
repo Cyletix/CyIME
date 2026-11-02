@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilities
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
+import com.kingzcheung.xime.settings.PerformanceCosts
 import com.kingzcheung.xime.settings.PerformanceProfile
 import com.kingzcheung.xime.settings.PerformanceSettings
 import kotlin.math.roundToInt
@@ -122,16 +123,34 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
             item {
                 SettingsSection(title = "明细") {
                     // 分档横条，与「输入体验」里长按时长等设置同一样式：标题写当前值，下面一行说明，再是分档滑块。
+                    // 二次校正只有「两遍识别」的语音模型才有（SherpaSpeechEngine.hasRefinement）；所有语言都只用一个模型时
+                    // 这一项不起作用，就不显示（用户 11-01），存的值不变。读不出来时照常显示。
+                    val hasSecondPass = remember {
+                        runCatching {
+                            val models = com.kingzcheung.xime.speech.AsrModelManager(context)
+                            com.kingzcheung.xime.settings.InputLanguage.speech.any { language ->
+                                models.getSelectedModelId(language) in setOf(com.kingzcheung.xime.speech.SpeechModelCatalog.TWO_PASS,
+                                    com.kingzcheung.xime.speech.SpeechModelCatalog.ZIPFORMER_TWO_PASS)
+                            }
+                        }.getOrDefault(true)
+                    }
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        IdleLevelSlider("语音二次校正空闲后释放", settings.speechRefinerIdleMinutes,
-                            "先卸掉二次校正模型，再用时第一句定稿稍慢；只用一个语音模型时不起作用",
-                            "speech-refiner-idle-slider") { custom(settings.copy(speechRefinerIdleMinutes = it)) }
-                        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                        if (hasSecondPass) {
+                            IdleLevelSlider("语音二次校正空闲后释放", settings.speechRefinerIdleMinutes,
+                                "先卸掉二次校正模型，再用时第一句定稿稍慢",
+                                "speech-refiner-idle-slider") { custom(settings.copy(speechRefinerIdleMinutes = it)) }
+                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                        }
                         IdleLevelSlider("语音模型空闲后全部释放", settings.speechEngineIdleMinutes,
                             "“永不”= 一直常驻，按麦克风最快，占内存最多",
                             "speech-engine-idle-slider") { custom(settings.copy(speechEngineIdleMinutes = it)) }
                     }
                 }
+            }
+            item {
+                // 当前开着的耗性能开关合起来的代价，和各开关下面那行同一张实测表（用户 11-02）。档位变了（动效、炫光）跟着重算。
+                val on = remember(settings) { runCatching { PerformanceCosts.enabled(context) }.getOrDefault(emptySet()) }
+                PerformanceCostTotalSection(on)
             }
             onOpenSetupGuide?.let { open ->
                 item {

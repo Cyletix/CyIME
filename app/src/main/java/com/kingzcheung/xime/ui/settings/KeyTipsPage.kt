@@ -15,15 +15,16 @@ import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 
-/** 一条技巧：[how] 怎么按，[what] 会怎样。 */
-internal data class KeyTip(val how: String, val what: String)
+/** 一条技巧：[how] 怎么按，[what] 会怎样；[jumps] 是 [what] 里可点的「」指路（见 [settingsJumpText]）。 */
+internal data class KeyTip(val how: String, val what: String, val jumps: List<String> = emptyList())
 
 /** 一组技巧，对应「按键技巧」页里的一个分组。 */
 internal data class KeyTipGroup(val title: String, val tips: List<KeyTip>)
 
 /**
  * 「按键技巧」页的内容（用户 10-31：Shift、Ctrl 的高级操作很多人不知道，要有地方说明）。
- * 方向、时长跟着实际设置写（角标长按/反转、符号键时限、Z X C V 开关），不写死默认值。
+ * 方向、时长跟着实际设置写（角标长按/反转、符号键时限），不写死默认值。
+ * Z X C V 角标 11-02 并进「按键符号」的滑动动作预设，不再算 Ctrl 的用法，这里不写。
  */
 internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup> {
     val upper = when {
@@ -48,9 +49,8 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
         KeyTipGroup("Ctrl（26 键左下角 !@# 键）", buildList {
             add(KeyTip("按住 !@#", "按满 $hold 秒，字母键渐变成显示快捷键：全选、复制、粘贴、剪切、撤销、重做、保存、查找等；点一下开符号时键面不变。"))
             add(KeyTip("按住 !@# 拖到字母上松手", "发送 Ctrl 加这个字母，和实体键盘一样；也可以另一根手指直接点字母。不用等快捷键显示出来。"))
-            add(KeyTip("点一下 !@#", "$hold 秒内、没拖动就松手才打开符号面板；时限在「按键与手势」里调。"))
-            add(if (settings.zxcvEditShortcuts) KeyTip("${upper} Z X C V", "撤销、剪切、复制、粘贴（「Z X C V 角标做撤销、剪切、复制、粘贴」已打开）。")
-                else KeyTip("想${upper} Z X C V 直接撤销、剪切、复制、粘贴", "在「按键与手势」打开「Z X C V 角标做撤销、剪切、复制、粘贴」，默认关。"))
+            add(KeyTip("点一下 !@#", "$hold 秒内、没拖动就松手才打开符号面板；时限在「按键与手势 › 符号键松手打开符号的时限」里调。",
+                listOf("按键与手势 › 符号键松手打开符号的时限")))
         }),
         KeyTipGroup("九键", listOf(
             KeyTip("长按「下一项」", "等于按住 Shift：候选中英对调，松手恢复。"),
@@ -79,7 +79,7 @@ internal fun KeyTipsSettings() {
                     Column(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp)) {
                         Text(tip.how, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface)
-                        Text(tip.what, style = MaterialTheme.typography.bodySmall,
+                        SettingsJumpText(tip.what, tip.jumps, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

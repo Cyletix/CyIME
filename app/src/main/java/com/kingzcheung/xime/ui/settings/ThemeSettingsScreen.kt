@@ -7,30 +7,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.twotone.Apps
+import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.Opacity
 import androidx.compose.material.icons.twotone.BlurOn
-import androidx.compose.material.icons.twotone.Gradient
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Crop
 import androidx.compose.material.icons.twotone.Delete
 import androidx.compose.material.icons.twotone.Image
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,37 +81,16 @@ private fun ThemeSettingsPage(
         return
     }
     
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = { Text("主题与外观") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { paddingValues ->
-        var previewTheme by remember { mutableStateOf<KeyboardColorScheme?>(null) }
-        var showGlassSettings by remember { mutableStateOf(false) }
-
+    var previewTheme by remember { mutableStateOf<KeyboardColorScheme?>(null) }
+    var showGlassSettings by remember { mutableStateOf(false) }
+    KeyboardSettingsScaffold("主题与外观", onBack, preview = previewTheme == null && !showGlassSettings) { modifier ->
         val listState = rememberSettingsSearchListState()
         LazyColumn(
             state = listState,
-            modifier = Modifier.settingsGutterScroll(listState)
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier = modifier.settingsGutterScroll(listState)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = keyboardPreviewContentPadding()
         ) {
             item {
                 Text(
@@ -181,21 +153,25 @@ private fun ThemeSettingsPage(
                         onCheckedChange = { enabled ->
                             changeAppearance(context, onThemeChanged) {
                                 FrostedGlassPreferences.saveProfiles(context, glass.withEnabled(enabled))
+                                // 液态玻璃建在玻璃上：关玻璃时一起关。
+                                if (!enabled) SettingsPreferences.setGlassLiquid(context, false)
                             }
-                        })
+                        }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.GLASS)
+                    // 液态玻璃不用先开玻璃：打开它就把玻璃一起打开。
+                    SettingsToggleItem(icon = Icons.TwoTone.AutoAwesome, title = "液态玻璃",
+                        subtitle = "按键边缘加一道细亮线，按住时变亮",
+                        checked = glass.dark.enabled && com.kingzcheung.xime.ui.theme.LiquidGlass.enabled(context),
+                        onCheckedChange = { enabled ->
+                            changeAppearance(context, onThemeChanged) {
+                                if (enabled && !glass.dark.enabled) FrostedGlassPreferences.saveProfiles(context, glass.withEnabled(true))
+                                SettingsPreferences.setGlassLiquid(context, enabled)
+                            }
+                        }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.LIQUID_GLASS)
                     if (glass.dark.enabled) {
                         SettingsItem(icon = Icons.TwoTone.Opacity, title = "透明度与模糊",
                             subtitle = "切换深浅时，背景与按键透明度互换", showArrow = true,
                             onClick = { showGlassSettings = true })
-                        // 和「顶部圆角」互锁：圆角缺口里露着应用，没法渐变（两边都在本页）。
-                        val softTopEdge = com.kingzcheung.xime.ui.keyboard.rememberGlassSoftTopEdge()
-                        val roundedTop = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardTop()
-                        SettingsToggleItem(icon = Icons.TwoTone.Gradient, title = "柔化顶部边缘",
-                            subtitle = if (softTopEdge && roundedTop) "「顶部圆角」开着，暂不生效"
-                                else "固定键盘上沿一小段由透明渐变到玻璃，和应用界面接得更自然；悬浮键盘不变",
-                            checked = softTopEdge,
-                            onCheckedChange = { SettingsPreferences.setGlassSoftTopEdge(context, it) },
-                            lockMessage = if (roundedTop && !softTopEdge) "「顶部圆角」开着时不能用，先在本页「键盘顶部样式」关掉" else null)
+                        // 「柔化顶部边缘」11-01 并进本页下面的「键盘顶部样式」（圆角／直角／柔化三选一）。
                     }
                 }
             }
@@ -281,15 +257,6 @@ private fun ThemeSettingsPage(
                         subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
                         onClick = openIcons, showArrow = true)
                 }
-            }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "提示: 配色切换后设置页面和键盘都会立即生效",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
             }
         }
 

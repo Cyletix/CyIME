@@ -92,11 +92,6 @@ object AppInfo {
             url = "https://github.com/Cyletix/CyIME/blob/main/LICENSE"
         ),
         LicenseItem(
-            name = "Xime（上游，原名曦码）",
-            license = "GPL-3.0",
-            url = "https://github.com/ximeiorg/Xime"
-        ),
-        LicenseItem(
             name = "librime",
             license = "BSD-3-Clause",
             url = "https://github.com/rime/librime"
@@ -145,6 +140,11 @@ object AppInfo {
             name = "KaTeX",
             license = "MIT",
             url = "https://github.com/KaTeX/KaTeX"
+        ),
+        LicenseItem(
+            name = "Xime（CyIME 基于它开发）",
+            license = "GPL-3.0",
+            url = "https://github.com/ximeiorg/Xime"
         )
     )
 }
@@ -216,7 +216,7 @@ fun AboutContent(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "基于 Xime 项目 fork 的 Android 输入法，采用 Rime 输入引擎，由 Cyletix 维护开发，遵循 GNU GPLv3 开源协议。保留上游作者及第三方版权与许可声明。",
+                            text = "Cyletix 开发的 Android 输入法。拼音、九键、双拼、五笔、仓颉、注音、日语、英文都能打；词库、手写、语音、拍照识字和实时字幕都在手机上运行，不联网也能全部使用。以 GNU GPLv3 开源，致谢与许可见下方。",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -256,7 +256,7 @@ fun AboutContent(
                     }
                 }
             
-            // 本分支维护者优先，与源代码、上游作者使用同一种完整卡片。
+            // 作者与源代码使用同一种完整卡片。
                 AboutLinkCard(
                     title = "Cyletix · 维护与开发",
                     subtitle = "github.com/Cyletix",
@@ -268,12 +268,6 @@ fun AboutContent(
                     subtitle = "github.com/Cyletix/CyIME",
                     icon = Icons.TwoTone.Code,
                     onClick = { uriHandler.openUri("https://github.com/Cyletix/CyIME") },
-                )
-                AboutLinkCard(
-                    title = "Kor1 (kingzcheung) · 上游作者",
-                    subtitle = "github.com/kingzcheung",
-                    icon = Icons.TwoTone.PersonOutline,
-                    onClick = { uriHandler.openUri("https://github.com/kingzcheung") },
                 )
 
                 AppUpdateSection()

@@ -145,11 +145,17 @@ internal object CandidateModelAssets {
             .any { model -> model.versions.any { hasDownloadedModelFiles(runtime, it) } }
         if (!ngramInstalled) return
         val grammar = CandidateModelCatalog.models.firstOrNull { it.id == CandidateModelCatalog.GRAMMAR } ?: return
-        val present = grammar.versions.flatMap { it.files }.any { info ->
-            modelDownloadFile(runtime, info.name).exists() ||
-                modelDownloadFile(ModelStorage.getModelDir(context, grammar.id), info.name).exists()
-        }
-        if (present && !ModelManager.deleteModel(context, grammar))
+        val modelDir = ModelStorage.getModelDir(context, grammar.id)
+        val names = grammar.versions.flatMap { it.files }.map { it.name }.distinct()
+        if (names.none { File(runtime, it).isFile || File(modelDir, it).isFile }) return
+        // 用户从文件导入的同版万象模型也会匹配目录哈希，不能据此判定它属于九键。
+        if (names.any { name ->
+                val file = File(runtime, name)
+                file.isFile && !File(modelDir, name).isFile && !isBundledCopy(context, name, file)
+            }) return
+        val manifest = File(runtime, ".cyime-bundled-manifest").takeIf { it.isFile }?.readText().orEmpty()
+        if (hasExternalGrammarConsumer(runtime, manifest, names)) return
+        if (!ModelManager.deleteModel(context, grammar))
             com.kingzcheung.xime.util.FileLogger.w("CandidateModels", "语法增强已被词组模型取代，但未能删除")
     }
 
@@ -170,6 +176,19 @@ internal object CandidateModelAssets {
         setDisabled(context, model.id, true)
         return files.all { (_, file) -> !file.exists() || file.delete() }
     }
+}
+
+/** 自定义或外部方案仍引用同一个模型时，保留文件，即使它原本由模型管理页下载。 */
+internal fun hasExternalGrammarConsumer(runtime: File, bundledManifest: String, grammarFiles: List<String>): Boolean {
+    val names = grammarFiles.map { it.removeSuffix(".gram") }
+    return runtime.listFiles()?.any { source ->
+        if (!source.name.endsWith(".schema.yaml") && !source.name.endsWith(".custom.yaml")) return@any false
+        if (isBundledCopy(bundledManifest, source.name, source)) return@any false
+        // 同时检查编译后的方案，涵盖通过 __include 间接引用的模型。
+        listOf(source, File(runtime, "build/${source.name}")).any { file ->
+            file.isFile && file.useLines { lines -> lines.any { line -> names.any { it in line } } }
+        }
+    } ?: true
 }
 
 /** [file] 与安装包清单里同名条目的大小和哈希一致。 */

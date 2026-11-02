@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -127,7 +128,7 @@ internal fun Modifier.settingsGutterScroll(state: ScrollableState,
     onGloballyPositioned { target.bounds = it.boundsInRoot() }
 }
 
-/** 设置页整页纵向滚动：同 verticalScroll，两侧留空处也能拖。 */
+/** 设置页整页纵向滚动：同 verticalScroll，两侧留空处也能拖；末尾为预览键盘留空（见 [LocalKeyboardPreviewInset]）。 */
 @Composable
 internal fun Modifier.settingsVerticalScroll(state: ScrollState = rememberScrollState()): Modifier =
-    settingsGutterScroll(state).verticalScroll(state)
+    settingsGutterScroll(state).verticalScroll(state).padding(bottom = LocalKeyboardPreviewInset.current)

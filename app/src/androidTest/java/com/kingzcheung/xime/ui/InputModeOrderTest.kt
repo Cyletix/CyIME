@@ -69,6 +69,43 @@ class InputModeOrderTest {
         rule.waitForIdle()
     }
 
+    @Test fun holdingAtBottomEdgeDoesNotScrollPastSortableCardsAndJumpBack() {
+        lateinit var state: com.kingzcheung.xime.ui.menubar.DragOrderState
+        var saved: List<String>? = null
+        val ids = (0..3).map { "mode$it" }
+        val tail = (0..11).map { "off$it" }
+        rule.setContent {
+            state = com.kingzcheung.xime.ui.menubar.rememberDragOrder(ids) { saved = it }
+            androidx.compose.foundation.lazy.LazyColumn(state = state.list, modifier = Modifier.size(320.dp, 240.dp).testTag("drag-list")) {
+                items(state.order.size, key = { state.order[it] }) { index ->
+                    val id = state.order[index]
+                    Box(Modifier.then(dragOrderItem(state, id)).fillMaxWidth().height(48.dp).testTag(id))
+                }
+                items(tail.size, key = { tail[it] }) { Box(Modifier.fillMaxWidth().height(48.dp)) }
+            }
+        }
+        val before = rule.onNodeWithTag("mode0").fetchSemanticsNode().boundsInRoot
+        rule.mainClock.autoAdvance = false
+        try {
+            rule.onNodeWithTag("mode0").performTouchInput { down(Offset(20f, center.y)) }
+            rule.mainClock.advanceTimeBy(700)
+            val viewport = rule.onNodeWithTag("drag-list").fetchSemanticsNode().boundsInRoot
+            val last = rule.onNodeWithTag("mode3").fetchSemanticsNode().boundsInRoot
+            rule.onRoot().performTouchInput { moveTo(Offset(before.center.x, last.center.y + 4f)) }
+            rule.mainClock.advanceTimeBy(32)
+            rule.onRoot().performTouchInput { moveTo(Offset(before.center.x, viewport.bottom - 8f)) }
+            repeat(120) { rule.mainClock.advanceTimeByFrame(); Thread.sleep(3) }
+            rule.runOnUiThread {
+                assertEquals("长时间停在底边也不能取消拖动", "mode0", state.dragging)
+                assertEquals("mode0", state.order.last())
+                assertTrue("被拖的卡片不能滚出屏幕", state.list.layoutInfo.visibleItemsInfo.any { it.key == "mode0" })
+            }
+            rule.onRoot().performTouchInput { up() }
+            rule.runOnUiThread { assertEquals(listOf("mode1", "mode2", "mode3", "mode0"), saved) }
+        } finally { rule.mainClock.autoAdvance = true }
+        rule.waitForIdle()
+    }
+
     @Test fun settingsOrderUsesKeyboardPreferenceAndKeepsInactiveSlots() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext
         val namespace = "scheme-order-${System.nanoTime()}"

@@ -49,34 +49,14 @@ fun KeyEffectSettingsContent(
     val viewModel: KeyEffectSettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = { Text("按键效果") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { paddingValues ->
+    KeyboardSettingsScaffold("按键效果", onBack, preview = true) { modifier ->
         val listState = rememberSettingsSearchListState()
         LazyColumn(
             state = listState,
-            modifier = Modifier.settingsGutterScroll(listState)
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier = modifier.settingsGutterScroll(listState)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = keyboardPreviewContentPadding()
         ) {
             item {
                 SettingsSection(title = "按键音效", content = {
@@ -377,13 +357,13 @@ internal fun KeyVisualEffectSettings(
 ) {
     SettingsSection(title = "按键视觉效果", content = {
         Column(Modifier.padding(16.dp)) {
-            KeyVisualEffectToggle("按键动效", "点按时键帽缩放回弹，可单独开启。",
-                animationEnabled, onAnimationChange)
+            KeyVisualEffectToggle("按键动效", "点按时键帽缩放回弹。",
+                animationEnabled, onAnimationChange, com.kingzcheung.xime.settings.PerformanceCosts.Item.KEY_ANIMATION)
             Spacer(Modifier.height(12.dp))
-            KeyVisualEffectToggle("键内炫光", "点按时显示半秒渐变光效，可单独开启。",
-                glowEnabled, onGlowChange)
+            KeyVisualEffectToggle("键内炫光", "点按时显示半秒渐变光效。",
+                glowEnabled, onGlowChange, com.kingzcheung.xime.settings.PerformanceCosts.Item.KEY_GLOW)
             Spacer(Modifier.height(12.dp))
-            Text("首次使用时按设备配置推荐，两项均可自行调整。",
+            Text("首次使用时按设备配置推荐。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
@@ -405,13 +385,15 @@ internal fun KeyVisualEffectSettings(
 }
 
 @Composable
-private fun KeyVisualEffectToggle(title: String, description: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
+private fun KeyVisualEffectToggle(title: String, description: String, enabled: Boolean, onChange: (Boolean) -> Unit,
+    costItem: com.kingzcheung.xime.settings.PerformanceCosts.Item) {
     Row(Modifier.settingsSearchAnchor(title, bleed = 16.dp).fillMaxWidth().heightIn(min = 48.dp)
         .toggleable(value = enabled, role = Role.Switch, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PerformanceCostNote(costItem)
         }
         Switch(checked = enabled, onCheckedChange = null)
     }
@@ -443,7 +425,7 @@ private fun KeySoundCapturableSetting() {
     }
 }
 
-/** 按键音色二选一：默认 / Rain75 紫薇轴（存的值 default|mahjong）；样式和「触觉反馈模式」的卡片一样。 */
+/** 按键音色二选一，沿用原有的 default / mahjong 存储值。 */
 @Composable
 private fun KeySoundStyleSetting() {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -451,7 +433,8 @@ private fun KeySoundStyleSetting() {
     val key = com.kingzcheung.xime.service.FeedbackManager.KEY_SOUND_STYLE
     // 以前选过已删的「清脆」（crisp）按默认显示，和 FeedbackManager 的处理一致。
     var style by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf((prefs.getString(key, "default") ?: "default").takeIf { it == "mahjong" } ?: "default")
+        androidx.compose.runtime.mutableStateOf(com.kingzcheung.xime.service.FeedbackManager.resolveKeySoundStyle(
+            prefs.getString(key, null), hardware = false))
     }
     Column(modifier = Modifier.settingsSearchAnchor("按键音色").padding(16.dp)) {
         Text(text = "按键音色", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -464,8 +447,7 @@ private fun KeySoundStyleSetting() {
         } + 4.dp + 32.dp + 6.dp + 4.dp
         Row(modifier = Modifier.fillMaxWidth().height(maxOf(104.dp, rowHeight)),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // 「清脆」已删（用户 10-21）；实体键盘默认就用 Rain75，写在「默认」卡片的小字里。
-            listOf(Triple("default", "默认", "♪" to "实体键盘用 Rain75"), Triple("mahjong", "Rain75 紫薇轴", "▣" to "线性轴")).forEach { (value, label, art) ->
+            listOf(Triple("mahjong", "Rain75 紫薇轴", "▣" to "默认 · 线性轴"), Triple("default", "经典音色", "♪" to "屏幕键盘原音")).forEach { (value, label, art) ->
                 IllustratedChoiceCard(label, style == value, onClick = {
                     style = value
                     prefs.edit().putString(key, value).apply()

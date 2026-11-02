@@ -56,7 +56,25 @@ internal fun OfflineModelCard() {
     // Every line below reads the same rule as the :asr service, so no two lines disagree about which model runs.
     fun pipeline(language: InputLanguage) = SpeechModelSelection.pipeline(selected.getValue(language),
         chinese = language == InputLanguage.CHINESE, wholeSentenceOn = wholeSentence, xasrReady = xasrReady)
+    // 整句定稿能用的地方（含只用 SenseVoice 的中文）都由 X-ASR 定稿：放在最上面，下载、在不在用一眼可见。
+    val chineseMode = selected.getValue(InputLanguage.CHINESE)
+    val wholeSentenceAvailable = SpeechModelSelection.wholeSentenceApplies(chineseMode, chinese = true)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SettingsSection(title = "中文定稿") {
+            Row(Modifier.fillMaxWidth().settingsSearchAnchor("X-ASR").testTag("speech-xasr")
+                .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("X-ASR · 中英", style = MaterialTheme.typography.bodyLarge)
+                    Text(when {
+                        !xasrReady -> "说完把整句中文再认一遍，错字比 SenseVoice 少三分之一，也更快。"
+                        pipeline(InputLanguage.CHINESE).finalizer == SpeechModelCatalog.XASR -> "在用：中文说完由它定稿。"
+                        !wholeSentenceAvailable -> "未生效：中文主模型选 SenseVoice，或开启下面的中文二次校正。"
+                        else -> "未生效：打开下面的「整句定稿」。"
+                    }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (!xasrReady) ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }
+        }
         SettingsSection(title = "语言 → 主模型") {
             InputLanguage.speech.forEachIndexed { index, language ->
                 val mode = selected.getValue(language)
@@ -111,10 +129,8 @@ internal fun OfflineModelCard() {
                     }
                 }
                 // 整句定稿只对中文生效：中文开着校正，或中文直接用 SenseVoice 时可用（英文的校正不受它影响）。
-                val chineseMode = selected.getValue(InputLanguage.CHINESE)
                 val chineseCorrection = SpeechModelSelection.hasCorrection(chineseMode)
                 val senseVoiceChinese = SpeechModelSelection.primary(chineseMode) == SpeechModelCatalog.SENSEVOICE
-                val wholeSentenceAvailable = SpeechModelSelection.wholeSentenceApplies(chineseMode, chinese = true)
                 HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Row(Modifier.fillMaxWidth().settingsSearchAnchor("整句定稿").testTag("speech-whole-sentence")
@@ -130,67 +146,9 @@ internal fun OfflineModelCard() {
                             else -> "只对中文生效：先为中文开启上面的 SenseVoice 二次校正。"
                         },
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        // 定稿模型写的是实际在用的那个：同一个 pipeline()，与上面主模型一行一致。
-                        val finalizerNote = when {
-                            pipeline(InputLanguage.CHINESE).finalizer == SpeechModelCatalog.XASR -> "中文整句定稿使用 X-ASR 模型。"
-                            wholeSentenceAvailable && xasrReady -> "X-ASR 已下载；打开整句定稿后中文改用它定稿。"
-                            wholeSentenceAvailable -> "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。"
-                            else -> null
-                        }
-                        if (finalizerNote != null) Text(finalizerNote,
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null,
                         colors = settingsSwitchColors())
-                }
-                // 自动加标点和整句定稿分开：关掉标点照样整句定稿（默认关，和 1.15.0 以前一样不自动加标点）。
-                val autoPunctuationAvailable = wholeSentenceAvailable && wholeSentence
-                var autoPunctuation by remember { mutableStateOf(SettingsPreferences.isSttAutoPunctuation(context)) }
-                HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Row(Modifier.fillMaxWidth().settingsSearchAnchor("自动加标点").testTag("speech-auto-punctuation")
-                    .toggleable(value = autoPunctuation, enabled = autoPunctuationAvailable, role = Role.Switch,
-                        onValueChange = { autoPunctuation = it; SettingsPreferences.setSttAutoPunctuation(context, it) })
-                    .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("自动加标点", style = MaterialTheme.typography.bodyLarge)
-                        Text(if (autoPunctuationAvailable) "保留模型打的逗号、句号、问号；关闭时停顿处留空格。说「逗号」「句号」「问号」「感叹号」始终出标点。"
-                            else "只在整句定稿开着时可用；现在停顿处留空格，说「逗号」「句号」「问号」「感叹号」出标点。",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = autoPunctuation, enabled = autoPunctuationAvailable, onCheckedChange = null,
-                        colors = settingsSwitchColors())
-                }
-                // 只带一部分标点：自动加标点开着时逐项一行开关，默认全开；关掉的那类在停顿处留空格。
-                if (autoPunctuationAvailable && autoPunctuation) listOf(
-                    Triple("逗号、顿号、分号", SettingsPreferences::isSttPunctuationComma, SettingsPreferences::setSttPunctuationComma),
-                    Triple("句号", SettingsPreferences::isSttPunctuationPeriod, SettingsPreferences::setSttPunctuationPeriod),
-                    Triple("问号、感叹号", SettingsPreferences::isSttPunctuationQuestion, SettingsPreferences::setSttPunctuationQuestion),
-                    Triple("末尾的标点", SettingsPreferences::isSttPunctuationTrailing, SettingsPreferences::setSttPunctuationTrailing),
-                ).forEach { (title, read, write) ->
-                    var kept by remember(title) { mutableStateOf(read(context)) }
-                    HorizontalDivider(modifier = Modifier.padding(start = 32.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Row(Modifier.fillMaxWidth().testTag("speech-auto-punctuation:$title")
-                        .toggleable(value = kept, role = Role.Switch, onValueChange = { kept = it; write(context, it) })
-                        .padding(start = 32.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(title, style = MaterialTheme.typography.bodyLarge)
-                            Text(when {
-                                title == "末尾的标点" -> if (kept) "整段话最后保留句号、问号等标点。" else "整段话最后不带标点，中间的照留；口述照样出。"
-                                kept -> "保留模型打的$title。"
-                                else -> "不带$title，停顿处留空格；口述照样出。"
-                            },
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = kept, onCheckedChange = null, colors = settingsSwitchColors())
-                    }
-                }
-                // 整句定稿能用的地方（含只用 SenseVoice 的中文）都能接 X-ASR，下载入口跟着整句定稿走。
-                if (wholeSentenceAvailable && !xasrReady) {
-                    ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }
                 }
                 if (!senseReady) {
                     ModelDownloadAction(SpeechModelCatalog.SENSEVOICE, downloads) { download(SpeechModelCatalog.SENSEVOICE) }
@@ -233,6 +191,7 @@ internal fun speechModelFacts(id: String): String = when (id) {
     SpeechModelCatalog.ZIPFORMER -> "中文 · 边说边出字 · 133 MB"
     SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "日语 · 说话中先出预览 · 153 MB"
     SpeechModelCatalog.ZIPFORMER_JA -> "日语 · 说话中先出预览 · 586 MB"
+    SpeechModelCatalog.XASR -> "中英 · 说完整句定稿 · 136 MB"
     else -> ""
 }
 
@@ -247,6 +206,53 @@ private fun ModelDownloadAction(id: String, downloads: Map<String, ModelDownload
             TextButton(onClick = onDownload) { Text(if (state is ModelDownloadState.Error) "重试下载" else "下载 ${speechModelFacts(id).substringAfterLast(" · ")}") }
             if (state is ModelDownloadState.Error) Text(state.message, color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+internal fun SpeechPunctuationSettings() {
+    val context = LocalContext.current
+    var autoPunctuation by remember { mutableStateOf(SettingsPreferences.isSttAutoPunctuation(context)) }
+    HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    Row(Modifier.fillMaxWidth().settingsSearchAnchor("自动加标点").testTag("speech-auto-punctuation")
+        .toggleable(value = autoPunctuation, role = Role.Switch,
+            onValueChange = { autoPunctuation = it; SettingsPreferences.setSttAutoPunctuation(context, it) })
+        .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("自动加标点", style = MaterialTheme.typography.bodyLarge)
+            Text("保留在线接口或中文本地整句定稿返回的标点。关闭后停顿留空格，口述的标点照常输入。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = autoPunctuation, onCheckedChange = null,
+            colors = settingsSwitchColors())
+    }
+    // 只带一部分标点：自动加标点开着时逐项一行开关，默认全开；关掉的那类在停顿处留空格。
+    if (autoPunctuation) listOf(
+        Triple("逗号、顿号、分号", SettingsPreferences::isSttPunctuationComma, SettingsPreferences::setSttPunctuationComma),
+        Triple("句号", SettingsPreferences::isSttPunctuationPeriod, SettingsPreferences::setSttPunctuationPeriod),
+        Triple("问号、感叹号", SettingsPreferences::isSttPunctuationQuestion, SettingsPreferences::setSttPunctuationQuestion),
+        Triple("末尾的标点", SettingsPreferences::isSttPunctuationTrailing, SettingsPreferences::setSttPunctuationTrailing),
+    ).forEach { (title, read, write) ->
+        var kept by remember(title) { mutableStateOf(read(context)) }
+        HorizontalDivider(modifier = Modifier.padding(start = 32.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        Row(Modifier.fillMaxWidth().testTag("speech-auto-punctuation:$title")
+            .toggleable(value = kept, role = Role.Switch, onValueChange = { kept = it; write(context, it) })
+            .padding(start = 32.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(when {
+                    title == "末尾的标点" -> if (kept) "整段话最后保留句号、问号等标点。" else "整段话最后不带标点，中间的照留；口述照样出。"
+                    kept -> "保留模型打的$title。"
+                    else -> "不带$title，停顿处留空格；口述照样出。"
+                },
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = kept, onCheckedChange = null, colors = settingsSwitchColors())
         }
     }
 }

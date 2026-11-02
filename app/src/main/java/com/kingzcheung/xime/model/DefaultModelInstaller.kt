@@ -20,8 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /** 首次打开应用时安装默认模型；与市场共用下载器、版本和目录，不另建模型副本。 */
 object DefaultModelInstaller {
-    internal val modelIds = setOf("ochwpro", SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE,
-        DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE)
+    internal val modelIds = setOf("ochwpro", SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
     private val started = AtomicBoolean(false)
     private val observingNetwork = AtomicBoolean(false)
     @Volatile private var bundledReady = false
@@ -84,9 +83,6 @@ object DefaultModelInstaller {
                 .filter { choices.contains("selected_model_${it.id}") }.flatMap { dependencies(manager.getSelectedModelId(it)) }
             addAll(dependencies(DeviceDefaults.voiceModel(context)).filter { it in current })
         }
-        val prediction = DeviceDefaults.predictionModel(context)
-        if (SettingsPreferences.isSmartPredictionEnabled(context) &&
-            SettingsPreferences.getPredictionSelectedModel(context) == prediction) add(prediction)
         addAll(guideIds(context))
     }.distinct()
 

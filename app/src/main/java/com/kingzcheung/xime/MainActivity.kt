@@ -231,7 +231,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     } else if (showGuide) {
-                        com.kingzcheung.xime.ui.settings.SetupGuideScreen(firstRun = true, onDone = { showGuide = false })
+                        com.kingzcheung.xime.ui.settings.SetupGuideScreen(firstRun = true, onDone = { showGuide = false },
+                            // 「更多配置」里的跳转：收起引导，在设置里打开那一页（返回落到设置首页）。
+                            onOpenRoute = { route ->
+                                showGuide = false
+                                settingsNavigationRequest = SettingsNavigationRequest(route, (settingsNavigationRequest?.id ?: 0) + 1)
+                            })
                     } else {
                         SettingsScreen(
                             initialRoute = openFragment,

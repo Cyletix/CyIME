@@ -5,8 +5,6 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kingzcheung.xime.association.AssociationManager
-import com.kingzcheung.xime.model.ModelManager
-import com.kingzcheung.xime.model.ModelRuntime
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,10 +23,6 @@ data class SmartPredictionUiState(
     val learningStatus: String = "",
     val isSaving: Boolean = false,
     val isLoading: Boolean = false,
-    val isDownloading: Boolean = false,
-    val downloadProgress: Float = 0f,
-    val downloadStatus: String = "",
-    val hasModel: Boolean = false,
     val toastMessage: String? = null
 )
 
@@ -43,34 +37,7 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     val uiState: StateFlow<SmartPredictionUiState> = _uiState.asStateFlow()
     
     init {
-        checkModelState()
         loadCacheSize()
-        validateModelState()
-        loadRemoteModels()
-        viewModelScope.launch {
-            ModelManager.installedRevision.collect { checkModelState() }
-        }
-        viewModelScope.launch {
-            ModelManager.downloadStates.collect { states ->
-                val state = states[SettingsPreferences.getPredictionSelectedModel(context)]
-                val progress = state as? com.kingzcheung.xime.model.ModelDownloadState.Downloading
-                _uiState.update { it.copy(isDownloading = progress != null,
-                    downloadProgress = progress?.progress ?: 0f,
-                    downloadStatus = (state as? com.kingzcheung.xime.model.ModelDownloadState.Error)?.message.orEmpty()) }
-            }
-        }
-    }
-
-    private fun loadRemoteModels() {
-        viewModelScope.launch {
-            ModelManager.loadFromRemote(context)
-        }
-    }
-    
-    private fun checkModelState() {
-        val modelId = SettingsPreferences.getPredictionSelectedModel(context)
-        val hasModel = ModelManager.isModelReady(context, modelId)
-        _uiState.update { it.copy(hasModel = hasModel) }
     }
     
     private fun loadCacheSize() {
@@ -133,31 +100,13 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
         AssociationManager.importLearningData(context, data)
     }
     
-    private fun validateModelState() {
-        // The bundled public prior is available without a downloaded neural model.
-    }
-
-    fun selectModel(id: String) {
-        modelOperation?.cancel()
-        SettingsPreferences.setPredictionSelectedModel(context, id)
-        checkModelState()
-        AssociationManager.release()
-        _uiState.update { it.copy(isInitialized = false, isLoading = false) }
-        if (_uiState.value.isEnabled) loadModel()
-    }
-
     fun setEnabled(enabled: Boolean) {
-        checkModelState()
         SettingsPreferences.setSmartPredictionEnabled(context, enabled)
         _uiState.update { it.copy(isEnabled = enabled) }
         
         if (enabled && !_uiState.value.isInitialized) {
             loadModel()
-            if (_uiState.value.isInitialized) {
-                ModelRuntime.keepWarm("predictive_text")
-            }
         } else if (!enabled) {
-            ModelRuntime.releaseWarm("predictive_text")
             releaseModel()
         }
     }
@@ -176,8 +125,8 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
                 isLoading = false
             )}
             
-            if (!success || _uiState.value.hasModel && !com.kingzcheung.xime.association.OnnxAssociationEngine.isInitialized()) {
-                _uiState.update { it.copy(toastMessage = "模型加载失败，当前使用基础联想；请检查模型文件") }
+            if (!success) {
+                _uiState.update { it.copy(toastMessage = "联想加载失败") }
             }
         }
     }

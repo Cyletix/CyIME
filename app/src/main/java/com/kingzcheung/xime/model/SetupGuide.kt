@@ -6,6 +6,9 @@ import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.StatFs
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
+import com.kingzcheung.xime.ui.keyboard.InputGestureLock
+import com.kingzcheung.xime.ui.keyboard.InputGestureLocks
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.settings.DoublePinyinScheme
 import com.kingzcheung.xime.settings.DoublePinyinSchemes
 import com.kingzcheung.xime.settings.InputLanguage
@@ -28,6 +31,8 @@ import java.util.Locale
 
 /** 「按设备推荐配置」：读设备情况、照方案改设置、删掉用不到的模型。只在用户点了“按推荐设置”后改东西。 */
 object SetupGuide {
+    private fun canEnableKeyHints(keys: KeyboardInputPreferences): Boolean =
+        InputGestureLocks.lockFor(keys, InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true) == null
     private const val KEY_SHOWN = "setup_guide_shown"
 
     /** 首次设置向导之后是否已经出现过（看过、设置过或点了“以后再说”）。 */
@@ -76,6 +81,7 @@ object SetupGuide {
         val t9Download = listOf(CandidateModelCatalog.NGRAM, CandidateModelCatalog.NGRAM_SMALL).any { id ->
             ModelManager.getModel(id)?.versions?.any { hasDownloadedModelFiles(ModelStorage.getModelDir(context, id), it) } == true
         }
+        val keys = KeyboardInputPreferences.read(context)
         return SetupFacts(
             tier = DeviceModelProfiles.choose(hardware).tier,
             performanceTier = com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.classify(hardware),
@@ -95,7 +101,6 @@ object SetupGuide {
             usesT9 = t9Layout || t9Download,
             usesCaption = com.kingzcheung.xime.BuildConfig.ELDER ||
                 runCatching { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.isEnabled(context) }.getOrDefault(false),
-            predictionEnabled = SettingsPreferences.isSmartPredictionEnabled(context),
             installed = installed,
             inPackage = inPackage,
             sizes = models.associate { it.id to catalogBytes(it) },
@@ -109,8 +114,8 @@ object SetupGuide {
             doublePinyinChoices = doublePinyins.map { DoublePinyinChoice(it.id, it.name, it.preview(), !DoublePinyinSchemes.isCustom(it.id),
                 lettersOnly = it.usesSemicolon) },
             wubiInstalled = File(SchemaManager.getRimeDir(context), "${SetupGuidePlanner.WUBI}.schema.yaml").isFile,
-            doublePinyinKeyHints = SettingsPreferences.getPrefsPublic(context)
-                .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, false),
+            doublePinyinKeyHints = keys.doublePinyinKeyHints,
+            canEnableDoublePinyinKeyHints = canEnableKeyHints(keys),
             fuzzy = SpellingPatches.fuzzy(context).mapTo(linkedSetOf()) { it.id },
             captionIconChangeable = !com.kingzcheung.xime.BuildConfig.ELDER,
         )
@@ -136,27 +141,21 @@ object SetupGuide {
     data class Result(val removed: Int, val freedBytes: Long, val downloading: Long, val waitingForWifi: Boolean, val failed: List<String>,
         /** 打字方式这一块改好的、没改成的，白话一句一行。 */
         val inputDone: List<String> = emptyList(), val inputFailed: List<String> = emptyList(),
-        /** 在下载的、从安装包取出的模型，完成页写「语音、联想模型正在下载」。 */
+        /** 在下载的、从安装包取出的模型，完成页写「语音、手写模型正在下载」。 */
         val downloadingIds: List<String> = emptyList(), val unpackingIds: List<String> = emptyList())
 
     /**
-     * 照 [plan] 设置：改语音、联想选项，删掉 [removeIds]（安装包里的不再解压），
+     * 照 [plan] 设置：改语音选项，删掉 [removeIds]（安装包里的不再解压），
      * 安装包里有的直接取回，其余排队下载（移动数据下除非 [allowMetered] 否则等 Wi-Fi）。
      */
     suspend fun apply(context: Context, plan: SetupPlan, removeIds: Set<String>, allowMetered: Boolean,
-        hideDoublePinyin: Boolean = true): Result {
+        hideDoublePinyin: Boolean = SetupGuidePlanner.HIDE_OTHER_DOUBLE_PINYIN_BY_DEFAULT): Result {
         val app = context.applicationContext
         val facts = readFacts(app)
         val manager = AsrModelManager(app)
         SettingsPreferences.setSttEnabled(app, plan.sttEnabled)
         plan.voiceMode?.let { mode ->
             listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH).forEach { runCatching { manager.setModel(mode, it) } }
-        }
-        plan.predictionModel?.let { model ->
-            if (SettingsPreferences.getPredictionSelectedModel(app) != model) {
-                SettingsPreferences.setPredictionSelectedModel(app, model)
-                com.kingzcheung.xime.association.AssociationManager.release()
-            }
         }
         val keepIds = plan.keep.map { it.id }.toSet()
         // 不在方案里的首次默认模型不再自动下载。
@@ -194,10 +193,65 @@ object SetupGuide {
             .filterNot { it.startsWith("打字方式还是") }
             .filterNot { line -> "五笔" in line && inputFailed.any { "五笔" in it } }
         markShown(app)
-        FileLogger.i("SetupGuide", "按推荐设置：语音=${plan.voiceMode} 联想=${plan.predictionModel} 九键=${plan.t9Model} " +
+        FileLogger.i("SetupGuide", "按推荐设置：语音=${plan.voiceMode} 九键=${plan.t9Model} " +
             "删除=${removing.map { it.id }} 取回=${fromPackage.map { it.id }} 下载=${fromNetwork.map { it.id }} 打字=${plan.input}")
         return Result(removing.count { it.source == SetupSource.ON_PHONE } - failed.size, freed, fromNetwork.sumOf { it.bytes }, waiting, failed,
             inputDone, inputFailed, fromNetwork.map { it.id }, fromPackage.map { it.id })
+    }
+
+    /** 「更多配置」要问的现在的值；在 IO 线程调用（玻璃效果的实测代价要读文件）。 */
+    fun readMore(context: Context): SetupMoreFacts {
+        val keys = KeyboardInputPreferences.read(context)
+        val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.readProfiles(context).dark.enabled
+        return SetupMoreFacts(
+            current = SetupMoreChoices(
+                spaceHold = com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHold(keys),
+                deleteSkipsAssociation = SettingsPreferences.isDeleteSkipsAssociation(context),
+                clearBeforeCursorOnly = keys.clearBeforeCursorOnly,
+                textSize = SetupMore.textSizeOf(SettingsPreferences.getCandidateTextSize(context), keys.keyTextScale),
+                feedback = SetupMore.feedbackOf(SettingsPreferences.isSoundEnabled(context), SettingsPreferences.isVibrationEnabled(context)),
+                glass = glass,
+                autoPunctuation = SettingsPreferences.isSttAutoPunctuation(context),
+            ),
+            sttEnabled = SettingsPreferences.isSttEnabled(context),
+            predictionEnabled = SettingsPreferences.isSmartPredictionEnabled(context),
+            reverseSwipe = keys.reverseSymbolSwipe,
+            candidateSp = SettingsPreferences.getCandidateTextSize(context),
+            keyScalePercent = (keys.keyTextScale * 100).toInt(),
+            glassCost = runCatching {
+                com.kingzcheung.xime.settings.PerformanceCosts.let { costs -> costs.source(context)?.let { costs.note(it,
+                    com.kingzcheung.xime.settings.PerformanceCosts.Item.GLASS.id) } }
+            }.getOrNull(),
+        )
+    }
+
+    /**
+     * 照「更多配置」改设置：只改 [from] 到 [to] 变了的项，每项都走设置页同一个写法（长按空格连带键盘滑动光标、
+     * 振动关了再开恢复原来的模式），输入法监听这些设置，马上生效。返回改了的项，白话。
+     */
+    fun applyMore(context: Context, from: SetupMoreChoices, to: SetupMoreChoices): List<String> {
+        val app = context.applicationContext
+        if (to.spaceHold != from.spaceHold)
+            com.kingzcheung.xime.ui.keyboard.CursorChoices.withSpaceHold(KeyboardInputPreferences.read(app), to.spaceHold).save(app)
+        if (to.deleteSkipsAssociation != from.deleteSkipsAssociation)
+            SettingsPreferences.setDeleteSkipsAssociation(app, to.deleteSkipsAssociation)
+        if (to.clearBeforeCursorOnly != from.clearBeforeCursorOnly)
+            KeyboardInputPreferences.read(app).copy(clearBeforeCursorOnly = to.clearBeforeCursorOnly).save(app)
+        if (to.textSize != from.textSize && to.textSize != TextSizeChoice.CUSTOM) {
+            SettingsPreferences.setCandidateTextSize(app, to.textSize.candidateSp)
+            KeyboardInputPreferences.read(app).copy(keyTextScale = to.textSize.keyScale).save(app)
+        }
+        if (to.feedback != from.feedback) {
+            SettingsPreferences.setSoundEnabled(app, to.feedback.sound)
+            SettingsPreferences.setVibrationEnabled(app, to.feedback.vibration)
+        }
+        if (to.glass != from.glass) com.kingzcheung.xime.settings.FrostedGlassPreferences.let { glass ->
+            glass.saveProfiles(app, glass.readProfiles(app).withEnabled(to.glass))
+        }
+        if (to.autoPunctuation != from.autoPunctuation) SettingsPreferences.setSttAutoPunctuation(app, to.autoPunctuation)
+        val changes = SetupMore.changes(from, to)
+        if (changes.isNotEmpty()) FileLogger.i("SetupGuide", "更多配置：$from → $to")
+        return changes
     }
 
     /**
@@ -264,11 +318,10 @@ object SetupGuide {
             runCatching { DoublePinyinSchemes.setEnabled(app, id, true) }.onFailure { failed += "双拼没打开：${it.message}" }
         }
         // 和双拼方案页的开关是同一个设置，正在显示的键盘监听它，马上生效。
-        // 键位提示和上下角标提示互锁（InputGestureLocks）：同一次写入一起关掉两个角标提示。
-        if (input.keyHintsOn) SettingsPreferences.getPrefsPublic(app).edit()
-            .putBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, true)
-            .putBoolean(SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, false)
-            .putBoolean(SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED, false).apply()
+        if (input.keyHintsOn && canEnableKeyHints(KeyboardInputPreferences.read(app))) {
+            SettingsPreferences.getPrefsPublic(app).edit()
+                .putBoolean(KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, true).apply()
+        }
         if (redeploy) {
             // 与「已安装的方案」里「应用方案更改」同一步。
             val deployed = runCatching {

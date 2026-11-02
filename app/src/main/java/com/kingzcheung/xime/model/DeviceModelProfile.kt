@@ -6,12 +6,10 @@ import com.kingzcheung.xime.speech.SpeechModelCatalog
 enum class DeviceModelTier { LIGHT, STANDARD, ENHANCED }
 
 /** A model recommendation only. It says nothing about GPU, animations or storage speed. */
-data class DeviceModelProfile(val tier: DeviceModelTier, val predictionModel: String, val voiceModel: String)
+data class DeviceModelProfile(val tier: DeviceModelTier, val voiceModel: String)
 
 object DeviceModelProfiles {
     const val GIB = 1024L * 1024 * 1024
-    const val SMALL = "predictive-text-small"
-    const val BASE = "predictive-text-base"
     const val STANDARD_CPU_KHZ = 1_800_000L
     const val ENHANCED_CPU_KHZ = 2_200_000L
 
@@ -31,6 +29,6 @@ object DeviceModelProfiles {
             else -> DeviceModelTier.STANDARD
         }
         val voice = if (SpeechModelCatalog.PARAFORMER in bundled) SpeechModelCatalog.PARAFORMER else SpeechModelCatalog.SENSEVOICE
-        return DeviceModelProfile(tier, if (tier == DeviceModelTier.LIGHT) SMALL else BASE, voice)
+        return DeviceModelProfile(tier, voice)
     }
 }

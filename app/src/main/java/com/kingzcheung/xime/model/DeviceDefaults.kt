@@ -13,7 +13,6 @@ import com.kingzcheung.xime.speech.SpeechModelCatalog
 object DeviceDefaults {
     internal const val VERSION = "device_model_defaults_version"
     internal const val TIER = "device_model_defaults_tier"
-    private const val PREDICTION = "device_default_prediction_model"
     private const val VOICE = "device_default_voice_model"
 
     fun initialize(context: Context) = initialize(context) { DeviceCapabilityProbe.read(context) }
@@ -32,7 +31,6 @@ object DeviceDefaults {
                 if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) BundledModelInstaller.bundledIds(context) else emptySet())
             val effects = DeviceKeyEffectDefaults.choose(hardware)
             editor.putString(TIER, profile.tier.name)
-                .putString(PREDICTION, profile.predictionModel)
                 .putString(VOICE, profile.voiceModel)
                 .putBoolean(KeyEffectPreferences.GLOW, effects.glow)
                 .putBoolean(KeyEffectPreferences.ANIMATION, effects.animation)
@@ -75,9 +73,6 @@ object DeviceDefaults {
 
     private const val ELDER_CANDIDATE_SP = 24
     private const val ELDER_HEIGHT_PERCENT = 40
-
-    fun predictionModel(context: Context): String = SettingsPreferences.getPrefsPublic(context)
-        .getString(PREDICTION, DeviceModelProfiles.BASE) ?: DeviceModelProfiles.BASE
 
     fun voiceModel(context: Context): String {
         val initial = SettingsPreferences.getPrefsPublic(context).getString(VOICE, null)

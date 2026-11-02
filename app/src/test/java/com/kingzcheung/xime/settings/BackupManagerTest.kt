@@ -245,6 +245,7 @@ class BackupManagerTest {
             "rime/rime_ice.userdb/CURRENT", "rime/rime_ice.userdb/LOCK", "rime/rime_ice.userdb/LOG",
             "rime/t9_digit.userdb/000001.log", "rime/rime_ice.userdb.txt",
             "rime/custom_phrase.txt", "rime/user_rime_ice.dict.yaml", "rime/user_cyime_cells_0123456789abcdef.dict.yaml",
+            "rime/azookey/memory/memory.louds", "rime/azookey/dictionary/mm.binary",
             "custom-keyboard-layouts.json", "user_ngram_cache.json", "learning-profiles/abc.json",
             "plugins.xml", "models/x.bin", "logs/a.log",
             "handwriting_templates/latin.json", "handwriting_templates/kana_och.json",
@@ -268,6 +269,7 @@ class BackupManagerTest {
                 "${BackupManager.META_PREFIX}files/handwriting_training/samples.jsonl",
                 "${BackupManager.META_PREFIX}files/learning-profiles/abc.json",
                 "${BackupManager.META_PREFIX}files/user_ngram_cache.json",
+                "azookey/memory/memory.louds",
                 "custom_phrase.txt", "rime_ice.userdb.txt", "rime_ice.userdb/CURRENT",
                 "t9_digit.userdb/000001.log", "user_rime_ice.dict.yaml"
             )).sorted(),
