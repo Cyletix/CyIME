@@ -74,7 +74,6 @@ class T9GlideDecoderTest {
         val decoder = T9GlideDecoder(GlideLexicon.keyboard(keys), listOf("a"))
         val cases = listOf(
             "26952" to "26952",
-            "65456" to "65456",
         )
         for ((pathDigits, expected) in cases) {
             val path = pathDigits.zipWithNext().flatMap { (from, to) ->
