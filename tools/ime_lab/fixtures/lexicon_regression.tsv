@@ -1172,3 +1172,5 @@ user-k14-doua-a	14	DOUA	都啊	2	user	2026-11-02	同上，整句「都啊」退�
 user-k14-zhendea-model	14	ZGEBDEA	真的啊	1	user	2026-11-02	同上，「真的是」不到 20 倍，打全时「真的啊」仍第一
 user-t9-limaoma	9	5462662	礼貌吗	2	user	2026-11-02	「礼貌吗打不出来」：九键只显示一条整句「济南吗」；语气词结尾时多给一条换了词的整句
 user-t9-womenma	9	9663662	我们吗	1	found	2026-11-02	同上排查：常用词+吗 3000 条之一，曾出「我们那」且「我们吗」看不到
+user-yongdehen	26	yijingyongdehenshuangle	已经用得很爽了	1	user	2026-11-03	「已经用的很爽来，这句都打错了」：用的词频远高于用得，整句拆成 用的+很爽；补「用得很」
+user-yongdehen-de	26	woyongdeshi	我用的是	1	found	2026-11-03	同上反例：「用的」本身不受影响

@@ -15,3 +15,5 @@
 # GitHub #40 (2026-11-01): both missing from the dictionary; zaicikulimeiyou read 再次苦力没有.
 删后台	shan hou tai	5000
 在词库里没有	zai ci ku li mei you	20000
+# His report (2026-11-03): yijingyongdehenshuangle read 已经用的很爽了 (用的 706440 vs 用得 42575, 很爽 is a word).
+用得很	yong de hen	100000
