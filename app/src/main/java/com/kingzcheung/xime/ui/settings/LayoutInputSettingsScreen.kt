@@ -295,7 +295,7 @@ private fun QwertyStaggerSettings(
         Text("实体键盘：A 行右移 1/4 键、Z 行右移 3/4 键；手机常见：Z 与 S 上下对齐；按尺寸自动：手机用手机排布，" +
             "平板逐渐过渡到实体排布。", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.fillMaxWidth().height(108.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().choiceCardRowHeight(108.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             modes.forEach { mode ->
                 IllustratedChoiceCard(mode.label, settings.qwertyStagger == mode,
                     onClick = { onChange(settings.copy(qwertyStagger = mode)) },

@@ -70,7 +70,7 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("按键角标的符号和数字", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
                 val corner = com.kingzcheung.xime.ui.keyboard.CornerInputChoice.of(settings)
-                Row(Modifier.fillMaxWidth().height(176.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().choiceCardRowHeight(176.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.entries.forEach { choice ->
                         IllustratedChoiceCard(choice.label, corner == choice,
                             onClick = { settings = choice.applyTo(settings); settings.save(context) },
@@ -229,7 +229,7 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("长按空格", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("长按空格", style = MaterialTheme.typography.titleSmall)
                 val spaceHold = com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHold(settings)
-                Row(Modifier.fillMaxWidth().height(132.dp).testTag("space-hold-options"),
+                Row(Modifier.fillMaxWidth().choiceCardRowHeight(132.dp).testTag("space-hold-options"),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHoldChoices.forEach { action ->
                         IllustratedChoiceCard(action.label, spaceHold == action,
@@ -417,7 +417,7 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("键帽字母大小写", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("键帽字母大小写", style = MaterialTheme.typography.titleSmall)
                 val case = com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.of(settings)
-                Row(Modifier.fillMaxWidth().height(104.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().choiceCardRowHeight(104.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.kingzcheung.xime.ui.keyboard.KeyLabelCaseChoice.entries.forEach { choice ->
                         IllustratedChoiceCard(choice.label, case == choice,
                             onClick = { settings = choice.applyTo(settings); settings.save(context) },

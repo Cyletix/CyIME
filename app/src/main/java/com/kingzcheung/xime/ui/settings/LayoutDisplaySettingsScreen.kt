@@ -440,7 +440,7 @@ private fun LayoutDisplayPage(
                         Text("自动：宽时显示、窄时隐藏，手写里照样显示。中文手写的注释总是读音。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp))
-                        Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
+                        Row(Modifier.fillMaxWidth().choiceCardRowHeight(136.dp).padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             com.kingzcheung.xime.settings.CandidateCommentMode.entries.forEach { mode ->
                                 IllustratedChoiceCard(when (mode) {
@@ -473,7 +473,7 @@ private fun LayoutDisplayPage(
                             if (commentContent == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS) {
                                 GlossDictionaryStatus(glossDownloadRequest)
                             }
-                            Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
+                            Row(Modifier.fillMaxWidth().choiceCardRowHeight(136.dp).padding(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 com.kingzcheung.xime.settings.CandidateCommentContent.entries.forEach { content ->
                                     IllustratedChoiceCard(when (content) {
@@ -883,7 +883,7 @@ internal fun KeyboardAppearanceSettings() {
                     val topStyle = com.kingzcheung.xime.ui.keyboard.KeyboardTopStyle.of(roundedTop, softTopEdge, glassOn)
                     Column(Modifier.settingsSearchAnchor("键盘顶部样式").fillMaxWidth().padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(Modifier.fillMaxWidth().height(110.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth().choiceCardRowHeight(110.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             com.kingzcheung.xime.ui.keyboard.KeyboardTopStyle.entries.forEach { style ->
                                 val enabled = style != com.kingzcheung.xime.ui.keyboard.KeyboardTopStyle.SOFT || glassOn
                                 IllustratedChoiceCard(style.label, topStyle == style, enabled = enabled,

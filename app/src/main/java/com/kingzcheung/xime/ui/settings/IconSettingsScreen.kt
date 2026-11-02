@@ -43,7 +43,7 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
             val choice = DesktopIconChoice.of(IconAppearance.followTheme, IconAppearance.linked)
             SettingsSection(title = "桌面图标") {
                 Column(Modifier.padding(16.dp).settingsSearchAnchor("桌面图标"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth().height(124.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth().choiceCardRowHeight(124.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DesktopIconChoice.entries.forEach { option ->
                             IllustratedChoiceCard(option.label, choice == option,
                                 onClick = { changeAppearance(context, onChanged) { IconAppearance.setChoice(context, option) } },

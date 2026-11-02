@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,9 +38,16 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.settings.CandidateCommentMode
+
+/**
+ * 一排 [IllustratedChoiceCard] 的高度：至少 [min]；示意图和标题放不下（字多一行、系统字号调大）时按内容长高，
+ * 不再切掉最后一行（11-02：角标三张卡的「长按 → …」被切掉一半）。别用固定 height 包选项卡片。
+ */
+internal fun Modifier.choiceCardRowHeight(min: Dp): Modifier = heightIn(min = min).height(IntrinsicSize.Min)
 
 /**
  * 带示意图的单选卡片（与「编码显示」同一外观）：上方是这个选项在键盘上的样子，下方是名称。
