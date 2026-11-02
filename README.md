@@ -23,11 +23,11 @@
 
 要求 Android 9.0（API 28）及以上，安装包只有 ARM64。
 
-1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 下载安装包，两个包源码相同，只差带不带离线模型：
+1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 或[魔搭](https://www.modelscope.cn/models/Cyletix/cyime-model/files)（国内，`app/<版本>/` 文件夹）下载安装包，两个包源码相同，只差带不带离线模型：
    - **轻量版** `CyIME-<版本>-arm64-v8a.apk`：不带语音、手写、联想模型，需要时在「扩展 › 模型」下载。
    - **完整版** `CyIME-<版本>-full-arm64-v8a.apk`：内置 SenseVoice 语音、手写、声纹、联想模型和九键词组模型，装上就能离线用。边说边出字的 Paraformer 不内置，需要时在应用里下载。
 2. 安装后在系统设置里启用 **CyIME**，并把它设为当前输入法。
-3. 以后在「设置 › 关于 › 检查更新」更新，会下载和现在同一种（轻量／完整）的安装包交给系统安装。
+3. 以后在「设置 › 关于 › 检查更新」更新，会下载和现在同一种（轻量／完整）的安装包交给系统安装，国内先从魔搭下载。
 
 **vivo / iQOO 提示安装失败时，先看系统安装器的原文。**
 

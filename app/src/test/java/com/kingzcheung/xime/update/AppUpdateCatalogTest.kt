@@ -87,4 +87,43 @@ class AppUpdateCatalogTest {
         assertEquals("1.14.156", AppUpdateCatalog.versionOfApk("CyIME-1.14.156-arm64-v8a.apk.part"))
         assertNull(AppUpdateCatalog.versionOfApk("other.apk"))
     }
+
+    // Same shape scripts/store/sync_modelscope.py app writes to ModelScope app/releases.json.
+    private val modelscope = """[{"tag_name":"1.15.47","name":"CyIME 1.15.47","draft":false,"prerelease":false,""" +
+        """"html_url":"${AppUpdateCatalog.MODELSCOPE_PAGE}","assets":[""" +
+        """{"name":"CyIME-1.15.47-arm64-v8a.apk","size":103000000,"digest":"sha256:AA11",""" +
+        """"browser_download_url":"${AppUpdateCatalog.modelscopeAssetUrl("1.15.47", "CyIME-1.15.47-arm64-v8a.apk")}"},""" +
+        """{"name":"CyIME-1.15.47-full-arm64-v8a.apk","size":447000000,"digest":"sha256:BB22",""" +
+        """"browser_download_url":"${AppUpdateCatalog.modelscopeAssetUrl("1.15.47", "CyIME-1.15.47-full-arm64-v8a.apk")}"}]}]"""
+
+    @Test
+    fun modelscopeManifestParsesLikeGitHub() {
+        val latest = AppUpdateCatalog.latest(modelscope, full = true, abis = listOf("arm64-v8a"))!!
+        assertEquals("1.15.47", latest.version)
+        assertEquals("CyIME-1.15.47-full-arm64-v8a.apk", latest.asset!!.name)
+        assertEquals("bb22", latest.asset!!.sha256)
+        assertEquals(AppUpdateCatalog.MODELSCOPE_PAGE, latest.pageUrl)
+        assertEquals(
+            "https://www.modelscope.cn/models/Cyletix/cyime-model/resolve/master/app/1.15.47/CyIME-1.15.47-full-arm64-v8a.apk",
+            latest.asset!!.url,
+        )
+    }
+
+    @Test
+    fun eachSourceFallsBackToTheOther() {
+        val fromModelScope = AppUpdateCatalog.withMirror(AppUpdateCatalog.latest(modelscope, false, listOf("arm64-v8a"))!!, true)
+        assertEquals(listOf("https://github.com/Cyletix/CyIME/releases/download/1.15.47/CyIME-1.15.47-arm64-v8a.apk"),
+            fromModelScope.asset!!.mirrors)
+        val fromGitHub = AppUpdateCatalog.withMirror(AppUpdateCatalog.latest(releases, false, listOf("arm64-v8a"))!!, false)
+        assertEquals(listOf(AppUpdateCatalog.modelscopeAssetUrl("1.14.156", "CyIME-1.14.156-arm64-v8a.apk")),
+            fromGitHub.asset!!.mirrors)
+        val pageOnly = AppUpdateCatalog.latest(releases, false, listOf("x86_64"))!!
+        assertEquals(pageOnly, AppUpdateCatalog.withMirror(pageOnly, false))
+    }
+
+    @Test
+    fun domesticUsersOpenModelScope() {
+        assertEquals(AppUpdateCatalog.MODELSCOPE_PAGE, AppUpdateCatalog.releasesPage(domestic = true))
+        assertEquals(AppUpdateCatalog.RELEASES_PAGE, AppUpdateCatalog.releasesPage(domestic = false))
+    }
 }

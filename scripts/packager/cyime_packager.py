@@ -789,6 +789,21 @@ class Packager(ad.Delivery):
         self.state["published"] = {"tag": self.version, "commit": self.commit, "url": final["html_url"]}
         ad.write_json(self.state_path, self.state)
         say(final["html_url"])
+        if not self.p.prerelease:
+            self.mirror_to_modelscope()
+
+    def mirror_to_modelscope(self):
+        """国内连不上 GitHub：公开后把同一版安装包和版本清单传到魔搭，App 的检查更新国内先查那里。
+        GitHub 已经发布完，这一步失败只提示，之后单独运行同一条命令补传。"""
+        command = [sys.executable, "-B", "scripts/store/sync_modelscope.py", "app", self.version]
+        self.stage("MODELSCOPE")
+        try:
+            out = self.r.run(command, timeout=3600)
+        except (DeliveryError, OSError, subprocess.SubprocessError) as exc:
+            say(f"[MODELSCOPE] 没传上魔搭（GitHub 已发布）：{str(exc).splitlines()[0]}\n"
+                f"  之后运行：py -3 -B scripts\\store\\sync_modelscope.py app {self.version}")
+            return
+        say(out.splitlines()[-1] if out else "[MODELSCOPE] 已传到魔搭")
 
     # -- run -------------------------------------------------------------
     def plan(self) -> list[str]:
@@ -823,7 +838,8 @@ class Packager(ad.Delivery):
             lines.append("安装：不安装，只出包")
         if p.publish:
             lines.append(f"发布：GitHub Release {self.version}（{'设为 Latest' if p.latest else '不设为 Latest'}"
-                         f"{'，预发布' if p.prerelease else ''}）；需要源码已提交并推送")
+                         f"{'，预发布' if p.prerelease else ''}）；需要源码已提交并推送"
+                         f"{'' if p.prerelease else '；公开后同一版安装包传到魔搭'}")
         return lines
 
     def execute(self):

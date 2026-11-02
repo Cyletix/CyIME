@@ -69,6 +69,8 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.theme.MaterialLevel
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
+import com.kingzcheung.xime.model.DownloadMirrors
+import com.kingzcheung.xime.update.AppUpdateCatalog
 import com.kingzcheung.xime.util.FileLogger
 
 data class LicenseItem(
@@ -236,7 +238,8 @@ fun AboutContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { uriHandler.openUri("https://github.com/Cyletix/CyIME/releases") },
+                                // 国内打开魔搭上的同一份安装包，海外打开 GitHub 发布页。
+                                .clickable { uriHandler.openUri(AppUpdateCatalog.releasesPage(DownloadMirrors.prefersDomestic(context))) },
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {

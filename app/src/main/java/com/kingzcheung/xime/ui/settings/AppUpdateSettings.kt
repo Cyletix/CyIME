@@ -38,11 +38,11 @@ internal fun pendingUpdate(state: AppUpdateState): AppRelease? = when (state) {
 private fun updateSubtitle(state: AppUpdateState): String {
     val current = BuildConfig.VERSION_NAME
     return when (state) {
-        AppUpdateState.Idle -> "现在是 $current，点一下查 GitHub 上的最新正式版"
-        AppUpdateState.Checking -> "正在查 GitHub…"
+        AppUpdateState.Idle -> "现在是 $current，点一下查最新正式版"
+        AppUpdateState.Checking -> "正在检查…"
         is AppUpdateState.UpToDate -> when (state.latest) {
-            null -> "GitHub 上还没有正式版"
-            else -> "已是最新：现在是 $current，GitHub 上最新正式版是 ${state.latest}"
+            null -> "还没有正式版"
+            else -> "已是最新：现在是 $current，最新正式版是 ${state.latest}"
         }
         is AppUpdateState.Available -> state.release.asset?.let { asset ->
             "${state.release.version} $editionName ${formatModelMegabytes(asset.sizeBytes)}，点一下下载"
@@ -113,7 +113,7 @@ internal fun AppUpdateSection() {
         SettingsToggleItem(
             icon = Icons.TwoTone.Update,
             title = "自动检查更新",
-            subtitle = "打开设置时每天最多查一次 GitHub，有新版本在设置首页提示，不会自己下载",
+            subtitle = "打开设置时每天最多查一次，有新版本在设置首页提示，不会自己下载",
             checked = autoCheck,
             onCheckedChange = { enabled ->
                 autoCheck = enabled

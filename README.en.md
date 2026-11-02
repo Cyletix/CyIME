@@ -19,11 +19,11 @@
 
 Requires Android 9.0 (API 28) or later. Packages are ARM64 only.
 
-1. Download from [Releases](https://github.com/Cyletix/CyIME/releases). Both packages are built from the same source and differ only in the bundled offline models:
+1. Download from [Releases](https://github.com/Cyletix/CyIME/releases) or [ModelScope](https://www.modelscope.cn/models/Cyletix/cyime-model/files) (mainland China, `app/<version>/` folder). Both packages are built from the same source and differ only in the bundled offline models:
    - **Lite** `CyIME-<version>-arm64-v8a.apk`: no voice, handwriting or prediction models; download them in "Extensions › Models" when needed.
    - **Full** `CyIME-<version>-full-arm64-v8a.apk`: bundles the SenseVoice voice model, handwriting, speaker, prediction and 9-key phrase models, so it works offline right away. The streaming Paraformer model is not bundled; download it in the app if you want text while you speak.
 2. Enable **CyIME** in the system settings and make it the current keyboard.
-3. Later updates: "Settings › About › Check for updates" downloads the same edition (lite or full) and hands it to the system installer.
+3. Later updates: "Settings › About › Check for updates" downloads the same edition (lite or full) and hands it to the system installer; mainland China downloads from ModelScope first.
 
 > On phones with Google services (Samsung, global models), apps from developers not registered with Google need a one-time "advanced flow" to install from 2027. Phones sold in mainland China and adb installs are not affected. See [Google developer verification](docs/android-developer-verification.md) (Chinese).
 

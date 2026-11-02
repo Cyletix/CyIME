@@ -19,11 +19,11 @@
 
 要求 Android 9.0（API 28）及以上，安裝包只有 ARM64。
 
-1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 下載安裝包，兩個包源碼相同，只差帶不帶離線模型：
+1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 或[魔搭](https://www.modelscope.cn/models/Cyletix/cyime-model/files)（中國大陸，`app/<版本>/` 資料夾）下載安裝包，兩個包源碼相同，只差帶不帶離線模型：
    - **輕量版** `CyIME-<版本>-arm64-v8a.apk`：不帶語音、手寫、聯想模型，需要時在「擴展 › 模型」下載。
    - **完整版** `CyIME-<版本>-full-arm64-v8a.apk`：內置 SenseVoice 語音、手寫、聲紋、聯想模型和九鍵詞組模型，裝上就能離線用。邊說邊出字的 Paraformer 不內置，需要時在應用裡下載。
 2. 安裝後在系統設置裡啟用 **CyIME**，並把它設為當前輸入法。
-3. 以後在「設置 › 關於 › 檢查更新」更新，會下載和現在同一種（輕量／完整）的安裝包交給系統安裝。
+3. 以後在「設置 › 關於 › 檢查更新」更新，會下載和現在同一種（輕量／完整）的安裝包交給系統安裝，中國大陸先從魔搭下載。
 
 > 帶谷歌服務的手機（三星、海外版機型等）從 2027 年起安裝未在谷歌登記的應用要先開一次「高級安裝」，國行手機和 adb 安裝不受影響，見 [谷歌開發者驗證與安裝](docs/android-developer-verification.md)。
 

@@ -11,6 +11,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.kingzcheung.xime.BuildConfig
+import com.kingzcheung.xime.model.DownloadMirrors
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +43,7 @@ sealed interface AppUpdateState {
 }
 
 /**
- * 应用内检查更新：查 GitHub Releases，下载同版本类型（轻量版 / 完整版）的安装包，核对哈希和签名后交给系统安装程序。
+ * 应用内检查更新：查 GitHub Releases（国内先查魔搭上的副本，失败再换另一边），下载同版本类型（轻量版 / 完整版）的安装包，核对哈希和签名后交给系统安装程序。
  * Android 不允许普通应用静默安装，每次都由用户在系统界面里点「安装」。自动检查默认打开（只查不下载），手动关过的保持关。
  */
 object AppUpdater {
@@ -99,7 +100,7 @@ object AppUpdater {
         job = scope.launch {
             if (manual) _state.value = AppUpdateState.Checking
             try {
-                val latest = fetchLatest()
+                val latest = fetchLatest(DownloadMirrors.prefersDomestic(app))
                 prefs(app).edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
                 _state.value = when {
                     latest != null && AppUpdateCatalog.isNewer(latest.version, BuildConfig.VERSION_NAME) -> AppUpdateState.Available(latest)
@@ -115,19 +116,36 @@ object AppUpdater {
         }
     }
 
-    private fun fetchLatest(): AppRelease? {
-        val request = Request.Builder().url(AppUpdateCatalog.RELEASES_API)
+    /** 国内先查魔搭，海外先查 GitHub；一边连不上、被限流或没有内容就换另一边。两边都失败才算失败。 */
+    private fun fetchLatest(domestic: Boolean): AppRelease? {
+        var firstError: Exception? = null
+        for (fromModelScope in if (domestic) listOf(true, false) else listOf(false, true)) {
+            try {
+                val latest = fetchFrom(fromModelScope) ?: continue
+                // 自用版（打包器「装到我的设备」）带个人九键模型、CyLM 和私有释义，公开包覆盖上去会把它们换掉：
+                // 只提示有新版，不给一键下载安装，点了去发布页。
+                return if (privateBuild) latest.copy(asset = null) else AppUpdateCatalog.withMirror(latest, fromModelScope)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "${if (fromModelScope) "魔搭" else "GitHub"} 查不到更新：${e.message}")
+                if (firstError == null) firstError = e
+            }
+        }
+        firstError?.let { throw it }
+        return null
+    }
+
+    private fun fetchFrom(fromModelScope: Boolean): AppRelease? {
+        val builder = Request.Builder().header("User-Agent", "CyIME/${BuildConfig.VERSION_NAME}")
+        if (fromModelScope) builder.url(AppUpdateCatalog.MODELSCOPE_RELEASES)
+        else builder.url(AppUpdateCatalog.RELEASES_API)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "CyIME/${BuildConfig.VERSION_NAME}")
-            .build()
-        client.newCall(request).execute().use { response ->
-            if (response.code == 403 || response.code == 429) throw IOException("rate-limited")
+        client.newCall(builder.build()).execute().use { response ->
+            if (!fromModelScope && (response.code == 403 || response.code == 429)) throw IOException("rate-limited")
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-            val latest = AppUpdateCatalog.latest(response.body.string(), BuildConfig.BUNDLED_MODELS, Build.SUPPORTED_ABIS.toList())
-            // 自用版（打包器「装到我的设备」）带个人九键模型、CyLM 和私有释义，公开包覆盖上去会把它们换掉：
-            // 只提示有新版，不给一键下载安装，点了去发布页。
-            return if (privateBuild) latest?.copy(asset = null) else latest
+            return AppUpdateCatalog.latest(response.body.string(), BuildConfig.BUNDLED_MODELS, Build.SUPPORTED_ABIS.toList())
         }
     }
 
@@ -157,13 +175,7 @@ object AppUpdater {
                     val needed = asset.sizeBytes - partial.length().coerceAtMost(asset.sizeBytes) + SPACE_MARGIN
                     if (dir.usableSpace in 0 until needed) throw IOException("ENOSPC")
                     if (asset.sizeBytes > 0 && partial.length() > asset.sizeBytes) partial.delete()
-                    // 上次已下完但没校验完时不再请求（越界续传会得到 416）。
-                    if (asset.sizeBytes <= 0 || partial.length() < asset.sizeBytes) fetchApk(release, asset, partial)
-                    if (asset.sizeBytes > 0 && partial.length() != asset.sizeBytes) throw IOException("不完整")
-                    if (!digestMatches(partial, asset.sha256)) {
-                        partial.delete()
-                        throw IOException("校验失败")
-                    }
+                    fetchVerified(release, asset, partial)
                     if (!partial.renameTo(target)) throw IOException("无法保存安装包")
                 }
                 verifyApk(app, target)?.let { problem ->
@@ -188,9 +200,37 @@ object AppUpdater {
         if (current is AppUpdateState.Downloading) _state.value = AppUpdateState.Available(current.release)
     }
 
-    private suspend fun fetchApk(release: AppRelease, asset: AppReleaseAsset, partial: File) {
+    /**
+     * 先用 [AppReleaseAsset.url]，下不动或校验不过再换备用线路。两边是同一个文件，换线路时接着已下的部分续传；
+     * 没有 sha256 时不换线路，免得拼进别处的内容。
+     */
+    private suspend fun fetchVerified(release: AppRelease, asset: AppReleaseAsset, partial: File) {
+        val urls = listOf(asset.url) + if (asset.sha256.isNullOrBlank()) emptyList() else asset.mirrors
+        var firstError: Exception? = null
+        for (url in urls) {
+            try {
+                // 上次已下完但没校验完时不再请求（越界续传会得到 416）。
+                if (asset.sizeBytes <= 0 || partial.length() < asset.sizeBytes) fetchApk(release, asset, url, partial)
+                if (asset.sizeBytes > 0 && partial.length() != asset.sizeBytes) throw IOException("不完整")
+                if (!digestMatches(partial, asset.sha256)) {
+                    partial.delete()
+                    throw IOException("校验失败")
+                }
+                return
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                FileLogger.w(TAG, "从 $url 下载失败：${e.message}")
+                if (firstError == null) firstError = e
+                if (partial.length() > asset.sizeBytes && asset.sizeBytes > 0) partial.delete()
+            }
+        }
+        throw firstError ?: IOException("没有下载地址")
+    }
+
+    private suspend fun fetchApk(release: AppRelease, asset: AppReleaseAsset, url: String, partial: File) {
         val offset = if (partial.isFile) partial.length() else 0L
-        val builder = Request.Builder().url(asset.url).header("User-Agent", "CyIME/${BuildConfig.VERSION_NAME}")
+        val builder = Request.Builder().url(url).header("User-Agent", "CyIME/${BuildConfig.VERSION_NAME}")
         if (offset > 0) builder.header("Range", "bytes=$offset-")
         client.newCall(builder.build()).execute().use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
@@ -289,7 +329,7 @@ object AppUpdater {
         return when {
             chain.any { it is java.net.UnknownHostException || it is java.net.ConnectException ||
                 it is java.net.SocketTimeoutException || it is javax.net.ssl.SSLException } ->
-                "连不上 GitHub，请检查网络后重试，或点上面的「查看最新版本」在浏览器里下载"
+                "连不上 GitHub 和魔搭，请检查网络后重试，或点上面的「查看最新版本」在浏览器里下载"
             "rate-limited" in text -> "GitHub 暂时限制了查询次数，过一会儿再试"
             "ENOSPC" in text || "No space left" in text -> "存储空间不够，清理一些空间后重试"
             "校验失败" in text || "不完整" in text -> "下载的安装包不完整，请重试"

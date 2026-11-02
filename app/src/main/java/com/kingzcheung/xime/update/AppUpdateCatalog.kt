@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.update
 
+import com.kingzcheung.xime.model.DownloadMirrors
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -9,7 +10,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
-/** GitHub 上一个已公开的 Android 正式版。 */
+/** 一个已公开的 Android 正式版（来自 GitHub 或魔搭上的同一份副本）。 */
 data class AppRelease(
     val version: String,
     val tag: String,
@@ -18,15 +19,40 @@ data class AppRelease(
     val asset: AppReleaseAsset?,
 )
 
-data class AppReleaseAsset(val name: String, val url: String, val sizeBytes: Long, val sha256: String?)
+data class AppReleaseAsset(
+    val name: String,
+    val url: String,
+    val sizeBytes: Long,
+    val sha256: String?,
+    /** [url] 下不动时依次换的线路；只在有 sha256 时使用，下载后照样校验。 */
+    val mirrors: List<String> = emptyList(),
+)
 
 /**
  * 不需要自己的服务器：版本信息直接取 GitHub Releases。
  * 同一个仓库里还有 Windows 版（windows-日期）和模型（models）的发布，只认 x.y.z 标签；草稿和预发布不算。
+ *
+ * 国内常连不上 GitHub：发布时 scripts/store/sync_modelscope.py app 把同一版安装包传到魔搭 app/<版本>/，
+ * 再写 app/releases.json（格式和 GitHub 发布列表相同，只有最新一版）。两边的安装包逐字节相同。
  */
 object AppUpdateCatalog {
     const val RELEASES_API = "https://api.github.com/repos/Cyletix/CyIME/releases?per_page=30"
     const val RELEASES_PAGE = "https://github.com/Cyletix/CyIME/releases"
+    const val MODELSCOPE_RELEASES = DownloadMirrors.CYIME_MODELSCOPE + "app/releases.json"
+    const val MODELSCOPE_PAGE = "https://www.modelscope.cn/models/Cyletix/cyime-model/files"
+
+    fun releasesPage(domestic: Boolean): String = if (domestic) MODELSCOPE_PAGE else RELEASES_PAGE
+
+    fun githubAssetUrl(tag: String, name: String) = "https://github.com/Cyletix/CyIME/releases/download/$tag/$name"
+
+    fun modelscopeAssetUrl(tag: String, name: String) = DownloadMirrors.CYIME_MODELSCOPE + "app/$tag/$name"
+
+    /** 给安装包补上另一边的同名文件作备用线路。 */
+    fun withMirror(release: AppRelease, fromModelScope: Boolean): AppRelease {
+        val asset = release.asset ?: return release
+        val other = if (fromModelScope) githubAssetUrl(release.tag, asset.name) else modelscopeAssetUrl(release.tag, asset.name)
+        return release.copy(asset = asset.copy(mirrors = (asset.mirrors + other).filter { it != asset.url }.distinct()))
+    }
 
     private val androidTag = Regex("""^v?(\d+\.\d+\.\d+)$""")
     // CyIME-1.14.156-arm64-v8a.apk / CyIME-1.14.156-full-arm64-v8a.apk（1.14.72 里的完整版文件名是 1.14.73）。
