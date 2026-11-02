@@ -10,12 +10,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -44,7 +47,11 @@ fun CellDictionarySettingsContent(onBack: () -> Unit, embedded: Boolean = false)
         onSource = { url ->
             runCatching { uriHandler.openUri(url) }.onFailure { linkError = "无法打开浏览器" }
         },
-        onRemove = model::remove, embedded = embedded, onSelectEnglish = model::selectEnglish)
+        onRemove = model::remove, embedded = embedded, onSelectEnglish = model::selectEnglish,
+        // 本机或同型号实测过词库曲线就用实测（dict_cost_bench），否则用电脑上的最坏估计。
+        curve = rememberPerformanceCostSource()?.takeIf { it.sameModel }
+            ?.let { CellDictionaryCost.Curve.fromDevice(it.device) } ?: CellDictionaryCost.Curve.DESKTOP,
+        onCheckWordUpdates = model::checkWordUpdates, onAutoUpdate = model::setAutoUpdate)
     linkError?.let { message ->
         AlertDialog(onDismissRequest = { linkError = null }, text = { Text(message) },
             confirmButton = { TextButton(onClick = { linkError = null }) { Text("知道了") } })
@@ -65,6 +72,9 @@ fun CellDictionarySettingsPanel(
     /** Inside the 词库 page: no own top bar. */
     embedded: Boolean = false,
     onSelectEnglish: (Boolean) -> Unit = {},
+    onCheckWordUpdates: () -> Unit = {},
+    onAutoUpdate: (Boolean) -> Unit = {},
+    curve: CellDictionaryCost.Curve = CellDictionaryCost.Curve.DESKTOP,
 ) {
     var confirmLarge by remember { mutableStateOf(false) }
     var showGuide by rememberSaveable { mutableStateOf(false) }
@@ -87,19 +97,31 @@ fun CellDictionarySettingsPanel(
             add(DictionaryItem(it.id, it.name, MY_IMPORTS, it, null, ""))
         }
     }.filter { matches(it.name, it.category) }.groupBy { it.category }
-    // Cost is only mentioned when it is noticeable (CellDictionaryCost).
+    // 每个词库各自让打字慢多少，底部写开着的合计（CellDictionaryCost，全是生僻词时的最坏估计）。
     val selectedEntries = dictionaries.installed.filter { it.id in dictionaries.selected }.sumOf { it.count }
-    val large = selectedEntries > CellDictionaryCost.WARN_ENTRIES
+    fun share(id: String, entries: Int): Double {
+        val others = selectedEntries - if (id in dictionaries.selected) entries else 0
+        return CellDictionaryCost.share(others, entries, curve)
+    }
+    val total = CellDictionaryCost.slowdown(selectedEntries, curve)
+    val totalLevel = CellDictionaryCost.level(total)
+    val large = totalLevel == CellDictionaryCost.Level.HEAVY
     Scaffold(topBar = {
         if (!embedded) TopAppBar(title = { Text("导入的词库") }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         })
     }, bottomBar = {
-        if (dictionaries.pending || large) Surface(tonalElevation = 3.dp) {
+        if (dictionaries.pending || dictionaries.selected.isNotEmpty()) Surface(tonalElevation = 3.dp) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (large) Text("开启的词库较多，打字可能变慢约 ${CellDictionaryCost.slowdownPercent(selectedEntries)}%",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                if (dictionaries.selected.isNotEmpty()) Text("开着 ${dictionaries.selected.size} 个词库，${words(selectedEntries)}，" +
+                    "打字最多慢 ${CellDictionaryCost.format(total)}" + when (totalLevel) {
+                        CellDictionaryCost.Level.NORMAL -> ""
+                        CellDictionaryCost.Level.NOTICEABLE -> "，超出正常"
+                        CellDictionaryCost.Level.HEAVY -> "，会明显卡顿"
+                    },
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("cell-dictionary-total-cost"),
+                    color = costColor(totalLevel))
                 if (dictionaries.pending) Button(onClick = { if (large) confirmLarge = true else onApply() },
                     enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text("应用更改")
@@ -110,6 +132,14 @@ fun CellDictionarySettingsPanel(
         val listState = rememberLazyListState()
         LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+            item {
+                SettingsToggleItem(Icons.Default.Sync,
+                    "自动更新词库", "每天最多查一次新词，键盘收起后自动应用；只下载，不上传。",
+                    state.autoUpdate, onAutoUpdate)
+            }
+            item {
+                TextButton(onClick = onCheckWordUpdates, enabled = !state.busy) { Text("检查内置词库更新") }
+            }
             item {
                 SettingsToggleItem(Icons.Default.Translate,
                     "分类词库英文候选", "在中文键盘按字母查找导入词库中的英文词。点「应用更改」后生效。",
@@ -134,7 +164,7 @@ fun CellDictionarySettingsPanel(
                     TextButton(onClick = { showGuide = true }) { Text("格式与示例") }
                 }
             }
-            state.message?.let { message -> item {
+            state.message?.let { message -> item(key = "message") {
                 Column(Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
                     if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Text(message, style = MaterialTheme.typography.bodySmall,
@@ -149,6 +179,7 @@ fun CellDictionarySettingsPanel(
                 itemsIndexed(items, key = { _, item -> item.id }) { row, item ->
                     SettingsGroupRow(row, items.size) {
                         DictionaryRow(item, item.id in dictionaries.selected, item.id in dictionaries.applied, state.busy,
+                            cost = share(item.id, item.installed?.count ?: item.offer?.entryCount ?: 0),
                             onSelect = { onSelect(item.id, it) }, onDownload = { item.offer?.let(onDownload) },
                             onSource = item.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } },
                             onRemove = if (item.id in builtinIds) null else ({ onRemove(item.id) }))
@@ -167,8 +198,8 @@ fun CellDictionarySettingsPanel(
     if (confirmLarge) {
         AlertDialog(onDismissRequest = { confirmLarge = false },
             title = { Text("词库较多") },
-            text = { Text("开启的词库共约 ${selectedEntries / 10000} 万词，打字可能变慢约 " +
-                "${CellDictionaryCost.slowdownPercent(selectedEntries)}%，候选里也会多一些不常用的词。仍要应用吗？") },
+            text = { Text("开启的词库共${words(selectedEntries)}，打字最多慢 " +
+                "${CellDictionaryCost.format(total)}，候选里也会多一些不常用的词。仍要应用吗？") },
             confirmButton = { TextButton(onClick = { confirmLarge = false; onApply() }) { Text("仍然应用") } },
             dismissButton = { TextButton(onClick = { confirmLarge = false }) { Text("取消") } })
     }
@@ -181,6 +212,15 @@ private data class DictionaryItem(
     val installed: InstalledCellDictionary?, val offer: CellDictionaryOffer?, val sourceUrl: String,
 )
 
+/** 正常灰字；超出正常用橙色，很慢用红色。橙色按底色深浅取明度，浅色、深色和玻璃底上都看得清。 */
+@Composable
+private fun costColor(level: CellDictionaryCost.Level): Color = when (level) {
+    CellDictionaryCost.Level.NORMAL -> MaterialTheme.colorScheme.onSurfaceVariant
+    CellDictionaryCost.Level.NOTICEABLE ->
+        if (MaterialTheme.colorScheme.surface.luminance() < .5f) Color(0xFFFFB74D) else Color(0xFFB45F00)
+    CellDictionaryCost.Level.HEAVY -> MaterialTheme.colorScheme.error
+}
+
 /** Number of words in plain terms: 1600 → 约 1600 词, 22029 → 约 2.2 万词. */
 private fun words(count: Int): String =
     if (count >= 10_000) "约 ${"%.1f".format(count / 10_000.0).removeSuffix(".0")} 万词" else "约 $count 词"
@@ -188,28 +228,41 @@ private fun words(count: Int): String =
 @Composable
 private fun DictionaryRow(
     item: DictionaryItem, selected: Boolean, applied: Boolean, busy: Boolean,
+    /** 这个词库让打字最多慢多少（[CellDictionaryCost.share]），单个词库就超出正常时这一行也变色。 */
+    cost: Double,
     onSelect: (Boolean) -> Unit, onDownload: () -> Unit, onSource: (() -> Unit)?, onRemove: (() -> Unit)?,
 ) {
     var menu by remember { mutableStateOf(false) }
     val installed = item.installed
     val detail = when {
-        installed == null -> "${words(item.offer?.entryCount ?: 0)} · 需下载"
-        selected != applied -> "${words(installed.count + installed.english)} · 应用后生效"
-        else -> words(installed.count + installed.english)
+        installed == null -> "${words(item.offer?.entryCount ?: 0)} · 最多慢 ${CellDictionaryCost.format(cost)} · 需下载"
+        selected != applied -> "${words(installed.count + installed.english)} · 最多慢 ${CellDictionaryCost.format(cost)} · 应用后生效"
+        else -> "${words(installed.count + installed.english)} · 最多慢 ${CellDictionaryCost.format(cost)}"
     }
+    val level = CellDictionaryCost.level(cost)
     // Delete only what is not in use: switch it off and apply first.
-    val removable = installed != null && onRemove != null && !selected && !applied
-    SettingsListRow(item.name, detail) {
+    val removable = installed != null && onRemove != null && !selected && !applied && !busy
+    SettingsListRow(item.name, detail,
+        detailColor = if (level == CellDictionaryCost.Level.NORMAL) Color.Unspecified else costColor(level)) {
         if (installed != null) Switch(checked = selected, onCheckedChange = onSelect, enabled = !busy,
             colors = settingsSwitchColors(),
             modifier = Modifier.semantics { contentDescription = "启用${item.name}" })
         else TextButton(onClick = onDownload, enabled = !busy) { Text("下载") }
-        if (onSource != null || removable) Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "更多") }
+        if (onSource != null || installed != null) Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "${item.name}的更多操作") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 if (onSource != null) DropdownMenuItem(text = { Text("查看来源") }, onClick = { menu = false; onSource() })
-                if (removable) DropdownMenuItem(text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                    onClick = { menu = false; onRemove?.invoke() })
+                if (installed != null) {
+                    val label = when {
+                        onRemove == null -> "内置词库随安装包提供，可关闭"
+                        selected -> "删除前请关闭词库并应用更改"
+                        applied -> "应用更改后可删除"
+                        else -> "删除词库"
+                    }
+                    DropdownMenuItem(text = { Text(label, color = if (removable)
+                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = removable,
+                        onClick = { menu = false; onRemove?.invoke() })
+                }
             }
         } else Spacer(Modifier.width(48.dp))
     }

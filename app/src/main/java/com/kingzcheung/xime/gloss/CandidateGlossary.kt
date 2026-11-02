@@ -160,7 +160,10 @@ object CandidateGlossary {
 
     internal fun annotate(table: GlossTable?, texts: List<String>, comments: List<String>): List<String> {
         if (table == null) return comments
-        return texts.map { gloss(table, it).orEmpty() }
+        return texts.mapIndexed { index, text ->
+            val note = comments.getOrNull(index)
+            if (note == "时间戳") note else gloss(table, text).orEmpty()
+        }
     }
 
     /**

@@ -78,6 +78,20 @@ class BundledRimeSyncTest {
         assertEquals("grammar", File(target, "a.gram").readText())
     }
 
+    @Test fun retiredJaroomajiDictionariesAreRemovedUnlessEdited() {
+        val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
+        val names = listOf("jaroomaji.schema.yaml", "jaroomaji.mozc.dict.yaml", "jaroomaji.dict.yaml",
+            "jaroomaji.user.dict.yaml", "cyime_japanese_particles.dict.yaml", "lua/cyime_japanese_completion.lua", "other.dict.yaml")
+        BundledRimeSync.install(target, backups, names.joinToString("") { manifest(it, it) }) { it.substringAfter('/').byteInputStream() }
+        File(target, "jaroomaji.user.dict.yaml").writeText("my words")
+        BundledRimeSync.install(target, backups, manifest("azooKey schema", "jaroomaji.schema.yaml")) { "azooKey schema".byteInputStream() }
+        assertEquals("azooKey schema", File(target, "jaroomaji.schema.yaml").readText())
+        listOf("jaroomaji.mozc.dict.yaml", "jaroomaji.dict.yaml", "cyime_japanese_particles.dict.yaml",
+            "lua/cyime_japanese_completion.lua").forEach { assertFalse(it, File(target, it).exists()) }
+        assertEquals("my words", File(target, "jaroomaji.user.dict.yaml").readText())
+        assertEquals("other.dict.yaml", File(target, "other.dict.yaml").readText())
+    }
+
     @Test fun userReplacedCylmFileIsKept() {
         val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
         BundledRimeSync.install(target, backups, manifest("schema") + manifest("big", "cylm_model2.lm")) {

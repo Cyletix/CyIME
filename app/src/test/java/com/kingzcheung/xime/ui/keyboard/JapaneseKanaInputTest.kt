@@ -5,12 +5,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class JapaneseKanaInputTest {
-    @Test fun `all base and modified kana codes exist in the bundled dictionary`() {
-        val path = "src/main/assets/rime_japanese/jaroomaji.kana_kigou.dict.yaml"
+    @Test fun `every kana key code converts to its label in azooKey`() {
+        val path = "src/test/resources/azookey_readings.tsv"
         val file = listOf(File(path), File("app/$path")).first { it.isFile }
-        val codes = file.readLines().mapNotNull { it.split('\t').getOrNull(1) }.toSet()
-        val base = japaneseKanaRomaji.filter { it == "-" || it.all { char -> char in 'a'..'z' } }
-        (base + kanaModifierCycles.flatten()).forEach { assertTrue("Missing dictionary code: $it", it in codes) }
+        val readings = file.readLines().filterNot { it.startsWith("#") }.map { it.split('\t') }.associate { it[0] to it[1] }
+        japaneseKanaKeys.flatMap { it.choices }.filterNotNull()
+            .filter { it.romaji == "-" || it.romaji.all { char -> char in 'a'..'z' } }
+            .forEach { assertEquals("Key ${it.label}", it.label, readings[it.romaji]) }
+        kanaModifierCycles.flatten().forEach { code ->
+            val reading = readings[code]
+            assertTrue("Unconverted code: $code", reading != null && reading.length == 1 && reading.none { it in 'a'..'z' })
+        }
     }
 
     @Test fun `flick direction follows japanese phone vowel order`() {

@@ -8,6 +8,7 @@ import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.settings.CellDictionaryManager
 import com.kingzcheung.xime.settings.CellDictionaryOffer
 import com.kingzcheung.xime.settings.CellDictionaryState
+import com.kingzcheung.xime.settings.CellWordAutoUpdate
 import com.kingzcheung.xime.settings.ScelDictionary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class CellDictionaryUiState(
@@ -22,6 +25,7 @@ data class CellDictionaryUiState(
     val busy: Boolean = true,
     val message: String? = null,
     val error: Boolean = false,
+    val autoUpdate: Boolean = true,
 )
 
 class CellDictionaryViewModel(application: Application) : AndroidViewModel(application) {
@@ -30,14 +34,25 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
     private val state = MutableStateFlow(CellDictionaryUiState())
     val uiState = state.asStateFlow()
 
-    init { work("读取词库…", initially = true) { null } }
+    init {
+        state.update { it.copy(autoUpdate = CellWordAutoUpdate.isEnabled(context)) }
+        work("读取词库…", initially = true) { null }
+    }
+
+    fun setAutoUpdate(enabled: Boolean) {
+        CellWordAutoUpdate.setEnabled(context, enabled)
+        state.update { it.copy(autoUpdate = enabled) }
+    }
+
+    /** 开关的保存排队写，下载、导入、应用等等它们写完再读，读到的一定是最后拨的样子。 */
+    private val writes = Mutex()
 
     private fun work(message: String, initially: Boolean = false, action: suspend () -> String?) {
         if (state.value.busy && !initially) return
         state.update { it.copy(busy = true, message = message, error = false) }
         viewModelScope.launch {
             try {
-                val result = withContext(Dispatchers.IO) { action() to store.read() }
+                val result = withContext(Dispatchers.IO) { writes.withLock { action() to store.read() } }
                 state.update { it.copy(dictionaries = result.second, message = result.first, error = false) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -62,14 +77,37 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
         "已导入「${entry.name}」${entry.count + entry.english} 个词$skipped，点「应用更改」后生效"
     }
 
-    fun select(id: String, selected: Boolean) = work("保存选择…") {
-        store.select(id, selected)
-        null
+    /**
+     * 拨开关只记下选择：页面立刻按新选择显示，后台写入，不进忙碌状态、不出「保存…」提示。
+     * 以前每拨一下都插一行进度条和提示再删掉、英文候选开关下多一行「正在处理词库」，整页跟着上下跳。
+     */
+    private fun saveChoice(change: (CellDictionaryState) -> CellDictionaryState, write: () -> Unit) {
+        if (state.value.busy) return
+        state.update { it.copy(dictionaries = change(it.dictionaries)) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { writes.withLock { write() } }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                val actual = runCatching { withContext(Dispatchers.IO) { store.read() } }.getOrNull()
+                state.update { it.copy(dictionaries = actual ?: it.dictionaries,
+                    message = error.message ?: "保存失败，请重试", error = true) }
+            }
+        }
     }
 
-    fun selectEnglish(selected: Boolean) = work("保存英文候选设置…") {
+    fun select(id: String, selected: Boolean) = saveChoice(
+        { it.copy(selected = if (selected) it.selected + id else it.selected - id) }) { store.select(id, selected) }
+
+    fun selectEnglish(selected: Boolean) = saveChoice({ it.copy(selectedEnglish = selected) }) {
         store.selectEnglish(selected)
-        null
+    }
+
+    fun checkWordUpdates() = work("正在检查词库更新…") {
+        if (CellDictionaryManager.checkWordUpdates(context)) "词库更新已下载，点「应用更改」后生效"
+        else if (store.read().pending) "没有更新的词表，已有更改尚未应用"
+        else "词库已是最新"
     }
 
     fun remove(id: String) = work("删除词库…") {

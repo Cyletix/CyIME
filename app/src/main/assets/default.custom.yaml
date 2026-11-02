@@ -7,7 +7,9 @@
 patch:
   schema_list:
     - schema: rime_ice
+    - schema: double_pinyin_flypy
     - schema: t9_pinyin
+    - schema: pinyin_14jian
 
   # Menu
   menu:

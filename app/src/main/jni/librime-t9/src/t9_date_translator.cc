@@ -605,12 +605,14 @@ string T9DateTranslator::FormatCompactDate(time_t t) {
 
 an<Translation> T9DateTranslator::GenerateDateCandidates(
     const Segment& segment, const string& type, const string& preedit) {
+  if (type == "timestamp" && engine_->context()->get_option("_cyime_datetime_off"))
+    return nullptr;
   auto result = New<T9DateTranslation>(idx_);
   time_t now = time(nullptr);
 
   auto add_candidate = [&](const string& type, const string& text) {
     auto cand = New<SimpleCandidate>(type, segment.start, segment.end,
-                                     text, "", preedit);
+                                     text, type == "timestamp" ? "时间戳" : "", preedit);
     result->Append(cand);
   };
 

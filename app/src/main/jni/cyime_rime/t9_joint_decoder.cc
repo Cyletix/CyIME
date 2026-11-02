@@ -156,24 +156,53 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
     // Sentences the user deleted (long press) are skipped here, so the next best one takes the slot.
     const auto suppressed = GetT9SuppressionStore();
 #endif
+    // The words before a sentence-final particle (礼貌 in 礼貌吗), or "" when the sentence does not end in one.
+    auto particle_stem = [&](const Sentence& sentence) -> string {
+      const auto& parts = sentence.components();
+      if (!o.t9_final_particles_ || parts.size() < 2 || !o.t9_final_particles_->count(parts.back().text)) return {};
+      return sentence.text().substr(0, sentence.text().size() - parts.back().text.size());
+    };
+    set<string> stems;
+    bool particle_alternative = false;
+    // Only where a particle is among the first three sentences (as for the particle end weight below).
+    const bool particle_near = std::any_of(order.begin(), order.begin() + std::min<size_t>(order.size(), 3),
+        [&](const auto& item) { return !particle_stem(paths[item.first].sentence).empty(); });
     for (const auto& item : order) {
+      const auto& path = paths[item.first];
+      bool extra = false;
       // t9/display_sentences: whole-input sentences shown before the dictionary words
       // (1 = the best sentence, then shorter words, as stock Rime; 0 = all decoded).
-      if (o.t9_display_sentences_ && sentences->size() >= o.t9_display_sentences_) break;
+      // When a sentence ending in a particle (吗, 呢, 吧…) is among the first three, one more sentence is
+      // shown: the best one ending in a particle after other words than those shown (济南吗, then 礼貌吗;
+      // 我们那, then 我们吗). Behind the particle those words fell below every shorter word, so such a
+      // sentence could not be typed although its words alone come second.
+      if (o.t9_display_sentences_ && sentences->size() >= o.t9_display_sentences_) {
+        if (particle_alternative || !particle_near || o.t9_particle_alternative_margin_ <= 0) break;
+        // Not far behind the first sentence (t9/particle_alternative_margin, ln units): 2026-11-02 host sweep,
+        // 541 of the 546 wanted sentences (礼貌吗) were within 4 of it, and most odd ones (我门吗) beyond.
+        if (order.front().second - item.second > o.t9_particle_alternative_margin_) break;
+        const string stem = particle_stem(path.sentence);
+        if (stem.empty() || stems.count(stem)) continue;
+        extra = true;
+      }
       // Further whole-input sentences only from t9/more_sentences_min_keys keys on: on short input they
       // are weak alternatives that push dictionary words (的, 觉得) out of the first four places.
-      if (!sentences->empty() && total < o.t9_more_sentences_min_keys_) break;
-      const auto& path = paths[item.first];
+      if (!sentences->empty() && total < o.t9_more_sentences_min_keys_ && !extra) break;
 #ifndef T9_ALGO_ONLY_BUILD
       if (suppressed && suppressed->Contains("t9_pinyin", path.sentence.text())) continue;
 #endif
       if (!displayed.insert(path.sentence.text()).second) continue;
+      {
+        const string stem = particle_stem(path.sentence);
+        if (!stem.empty()) stems.insert(stem);
+      }
       auto sentence = New<Sentence>(path.sentence);
       sentence->Offset(q.start);
       sentence->set_syllabifier(q.syllabifier);
       sentence->set_weight(item.second);
       sentence->set_quality(path.coverage + 0.1 * (0.5 + std::atan(item.second / 10.0) / 3.141592653589793) + q.translator->initial_quality());
       sentences->push_back(std::move(sentence));
+      if (extra) particle_alternative = true;
     }
   };
   const string cache_key = q.input + "#" + std::to_string(q.start) +
@@ -384,13 +413,14 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
   }
   // Model word of each entry; an entry the corpus never contained is kept as its parts,
   // so a long unseen entry never wins by paying a single unseen-word cost.
-  struct T9LmEntry { int32_t id; vector<int32_t> parts; double reading = 0; };
+  struct T9LmEntry { int32_t id; vector<int32_t> parts; double reading = 0; bool particle = false; };
   std::unordered_map<const DictEntry*, T9LmEntry> lm_entries;
   auto lm_entry_of = [&](const an<DictEntry>& entry) -> const T9LmEntry& {
     const auto found = lm_entries.find(entry.get());
     if (found != lm_entries.end()) return found->second;
     T9LmEntry lm{o.t9_ngram_->Id(entry->text), {}};
     if (lm.id == ::T9NgramModel::kUnseen) o.t9_ngram_->Decompose(entry->text, &lm.parts);
+    lm.particle = o.t9_final_particles_ && o.t9_final_particles_->count(entry->text);
     if (o.t9_readings_) {
       const auto readings = o.t9_readings_->find(entry->text);
       vector<string> spelling;
@@ -445,7 +475,12 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
             } else {
               lm_id = lm.id;
               lm_prev = previous->lm_id;
-              lp = o.t9_ngram_->LogProb3(previous->lm_prev, previous->lm_id, lm.id);
+              // A sentence-final particle right after the first word: which particle follows depends on that
+              // word, while the sentence-start trigram (<s> 礼貌 嘛) rests on a few one-word messages and
+              // put 礼貌嘛 over 礼貌吗; such a particle takes the bigram (t9/particle_bigram_after_start).
+              lp = lm.particle && o.t9_particle_bigram_after_start_ && previous->lm_prev == o.t9_ngram_->Bos()
+                  ? o.t9_ngram_->LogProb(previous->lm_id, lm.id)
+                  : o.t9_ngram_->LogProb3(previous->lm_prev, previous->lm_id, lm.id);
             }
             if (entry->commit_count > 0 && o.t9_ngram_user_weight_ > 0) {
               // User layer: P = (1-λ)·P(base) + λ·P(user), where P(user) is the user dictionary's own
@@ -578,6 +613,21 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
     final.emplace_back(rank, line);
   }
   std::stable_sort(final.begin(), final.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+  // Input that can end in a sentence-final particle (吗, 呢, 吧…: one of the first sentences ends with one) is
+  // most likely typed to its end, so the end of the sentence counts there: 我们吗 over 我们那, 礼貌吗 over
+  // 礼貌嘛. Other input keeps t9/ngram_eos_weight; it may still be typed on.
+  if (o.t9_ngram_ && o.t9_final_particles_ && o.t9_particle_eos_weight_ > 0) {
+    const size_t window = std::min<size_t>(final.size(), 3);
+    const bool particle_end = std::any_of(final.begin(), final.begin() + window, [&](const auto& ranked) {
+      return ranked.second->entry && o.t9_final_particles_->count(ranked.second->entry->text);
+    });
+    if (particle_end) {
+      for (auto& ranked : final)
+        ranked.first += o.t9_particle_eos_weight_ *
+            o.t9_ngram_->LogProb3(ranked.second->lm_prev, ranked.second->lm_id, o.t9_ngram_->Eos());
+      std::stable_sort(final.begin(), final.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    }
+  }
   if (final.size() > o.t9_result_budget_) final.resize(o.t9_result_budget_);
   vector<T9Path> paths;
   double coverage = 0;

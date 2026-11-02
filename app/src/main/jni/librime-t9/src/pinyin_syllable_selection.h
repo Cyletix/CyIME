@@ -22,10 +22,18 @@ namespace pinyin_selection {
 
 // A session-local constraint, never a spelling rewrite. The underscore makes
 // Rime discard it at the schema boundary. The engine update hook preserves
-// an unchanged selected prefix across suffix edits, while clearing a damaged
-// prefix immediately so that clearing/retyping cannot revive an old selection.
+// an unchanged selected prefix across suffix edits, while dropping damaged
+// readings immediately so that clearing/retyping cannot revive an old selection.
 inline constexpr const char* kProperty = "_cyime_pinyin_syllable_lock_v1";
 inline constexpr const char* kAppliedProperty = "_cyime_pinyin_syllable_applied_v1";
+
+// One chosen reading. Like nine-key choices, readings are chosen one after
+// another: each span starts where the previous one ended (after delimiters).
+struct Span {
+  size_t start = 0;
+  size_t end = 0;
+  rime::SyllableId syllable = -1;
+};
 
 struct Lock {
   std::string schema;
@@ -35,9 +43,7 @@ struct Lock {
   uint32_t dictionary_checksum = 0;
   uint32_t schema_checksum = 0;
   size_t confirmed = 0;
-  size_t start = 0;
-  size_t end = 0;
-  rime::SyllableId syllable = -1;
+  std::vector<Span> spans;
 };
 
 struct Option {
@@ -61,11 +67,12 @@ inline std::string ConfirmedText(const rime::Context& context) {
 
 inline std::string Encode(const Lock& lock) {
   std::ostringstream out;
-  out << 1 << ' ' << std::quoted(lock.schema) << ' ' << std::quoted(lock.input)
+  out << 2 << ' ' << std::quoted(lock.schema) << ' ' << std::quoted(lock.input)
       << ' ' << std::quoted(lock.confirmed_text) << ' ' << lock.epoch << ' '
       << lock.dictionary_checksum << ' ' << lock.schema_checksum << ' '
-      << lock.confirmed << ' ' << lock.start << ' ' << lock.end << ' '
-      << lock.syllable;
+      << lock.confirmed << ' ' << lock.spans.size();
+  for (const auto& span : lock.spans)
+    out << ' ' << span.start << ' ' << span.end << ' ' << span.syllable;
   return out.str();
 }
 
@@ -73,19 +80,50 @@ inline bool Decode(const std::string& value, Lock* lock) {
   if (value.empty() || !lock) return false;
   std::istringstream in(value);
   unsigned version = 0;
+  size_t count = 0;
   Lock parsed;
   if (!(in >> version >> std::quoted(parsed.schema) >> std::quoted(parsed.input)
         >> std::quoted(parsed.confirmed_text) >> parsed.epoch
         >> parsed.dictionary_checksum >> parsed.schema_checksum
-        >> parsed.confirmed >> parsed.start >> parsed.end >> parsed.syllable) ||
-      version != 1 || parsed.syllable < 0 || parsed.start >= parsed.end ||
-      parsed.end > parsed.input.size() || parsed.confirmed != parsed.start) {
+        >> parsed.confirmed >> count) ||
+      version != 2 || count == 0 || count > parsed.input.size()) {
     return false;
+  }
+  size_t previous_end = parsed.confirmed;
+  for (size_t i = 0; i < count; ++i) {
+    Span span;
+    if (!(in >> span.start >> span.end >> span.syllable) || span.syllable < 0 ||
+        span.start >= span.end || span.end > parsed.input.size() ||
+        (i == 0 ? span.start != parsed.confirmed : span.start < previous_end)) return false;
+    previous_end = span.end;
+    parsed.spans.push_back(span);
   }
   in >> std::ws;
   if (!in.eof()) return false;
   *lock = std::move(parsed);
   return true;
+}
+
+inline std::string Delimiters(const rime::Schema* schema) {
+  std::string delimiters = " '";
+  if (schema && schema->config()) schema->config()->GetString("speller/delimiter", &delimiters);
+  return delimiters;
+}
+
+// Delimiters typed after a reading belong to it, as in Rime's own graph edges.
+inline size_t SkipDelimiters(const std::string& input, size_t position,
+                             const std::string& delimiters, size_t limit) {
+  limit = std::min(limit, input.size());
+  while (position < limit && delimiters.find(input[position]) != std::string::npos) ++position;
+  return position;
+}
+
+// Readings that lie before the composition caret. Moving the caret into a
+// chosen reading pauses it and the ones after it; moving out restores them.
+inline size_t ActiveSpans(const Lock& lock, size_t caret) {
+  size_t active = 0;
+  while (active < lock.spans.size() && lock.spans[active].end <= caret) ++active;
+  return active;
 }
 
 inline void ClearLock(rime::Context* context) {
@@ -105,14 +143,25 @@ inline void BeforeContextUpdate(rime::Context* context, const rime::Schema* sche
   Lock lock;
   if (!schema || !Decode(value, &lock) || context->get_option("ascii_mode") ||
       schema->schema_id() != lock.schema || context->input().empty() ||
-      context->input().size() < lock.end ||
-      context->input().compare(0, lock.end, lock.input, 0, lock.end) != 0 ||
       context->composition().GetConfirmedPosition() != lock.confirmed ||
       ConfirmedText(*context) != lock.confirmed_text) {
     ClearLock(context);
     return;
   }
-  if (lock.input != context->input() || lock.epoch != context->composition_epoch()) {
+  // Keep the readings whose code is untouched; an edit inside one drops it and
+  // every reading after it, never the readings before it.
+  const auto& input = context->input();
+  size_t same = 0;
+  while (same < input.size() && same < lock.input.size() && input[same] == lock.input[same]) ++same;
+  size_t kept = 0;
+  while (kept < lock.spans.size() && lock.spans[kept].end <= same) ++kept;
+  if (kept == 0) {
+    ClearLock(context);
+    return;
+  }
+  if (kept != lock.spans.size() || lock.input != input ||
+      lock.epoch != context->composition_epoch()) {
+    lock.spans.resize(kept);
     lock.input = context->input();
     lock.epoch = context->composition_epoch();
     context->set_property(kProperty, Encode(lock));
@@ -123,8 +172,37 @@ inline void BeforeContextUpdate(rime::Context* context, const rime::Schema* sche
 
 // OnSelect has paths that call Compose directly, or only Forward when the
 // entire input was selected. Do not wait for a subsequent update/translation.
+// A word that covers exactly the first chosen readings keeps the readings
+// chosen after it, as the rest of the code is still waiting for its word.
 inline void BeforeCandidateSelection(rime::Context* context) {
-  ClearLock(context);
+  if (!context) return;
+  Lock lock;
+  const auto& composition = context->composition();
+  if (composition.empty() || !Decode(context->get_property(kProperty), &lock) ||
+      lock.input != context->input() || lock.epoch != context->composition_epoch()) {
+    ClearLock(context);
+    return;
+  }
+  const auto& segment = composition.back();
+  const auto candidate = segment.GetSelectedCandidate();
+  std::string confirmed_text;
+  for (size_t i = 0; i + 1 < composition.size(); ++i) {
+    if (composition[i].status < rime::Segment::kSelected) break;
+    if (auto previous = composition[i].GetSelectedCandidate()) confirmed_text += previous->text();
+  }
+  size_t first = 1;
+  while (candidate && first < lock.spans.size() && lock.spans[first].start != candidate->end()) ++first;
+  if (!candidate || segment.start != lock.confirmed || confirmed_text != lock.confirmed_text ||
+      first >= lock.spans.size()) {
+    ClearLock(context);
+    return;
+  }
+  lock.spans.erase(lock.spans.begin(), lock.spans.begin() + first);
+  lock.confirmed = candidate->end();
+  lock.confirmed_text = confirmed_text + candidate->text();
+  context->set_property(kProperty, Encode(lock));
+  if (!context->get_property(kAppliedProperty).empty())
+    context->set_property(kAppliedProperty, "");
 }
 
 inline bool Matches(const Lock& lock, const rime::Context& context,
@@ -135,7 +213,7 @@ inline bool Matches(const Lock& lock, const rime::Context& context,
          lock.schema_checksum == prism.schema_file_checksum() &&
          lock.confirmed == context.composition().GetConfirmedPosition() &&
          lock.confirmed_text == ConfirmedText(context) &&
-         lock.start == lock.confirmed;
+         !lock.spans.empty() && lock.spans.front().start == lock.confirmed;
 }
 
 inline bool ReadLock(rime::Context* context, const rime::Schema* schema,
@@ -211,15 +289,21 @@ inline bool ApplyGraphLock(rime::Context* context, rime::Schema* schema,
   if (constrained) *constrained = false;
   Lock lock;
   if (!ReadLock(context, schema, prism, &lock)) return true;
-  // Moving the composition caret into the chosen syllable pauses this lock.
-  // Moving it out again restores the same reading without rewriting any code.
-  if (context->caret_pos() < lock.end) return true;
-  if (segment_start >= lock.end || segment_start + graph->input_length <= lock.start)
+  // Moving the composition caret into a chosen syllable pauses it and the
+  // ones after it. Moving it out again restores them without rewriting code.
+  const size_t active = ActiveSpans(lock, context->caret_pos());
+  if (active == 0) return true;
+  const size_t lock_start = lock.spans.front().start;
+  const size_t lock_end = lock.spans[active - 1].end;
+  if (segment_start >= lock_end || segment_start + graph->input_length <= lock_start)
     return true;
-  if (segment_start <= lock.start &&
-      lock.end <= segment_start + graph->input_length &&
-      ConstrainGraph(graph, lock.start - segment_start,
-                     lock.end - segment_start, lock.syllable)) {
+  bool applied = segment_start <= lock_start &&
+      lock_end <= segment_start + graph->input_length;
+  for (size_t i = 0; applied && i < active; ++i) {
+    applied = ConstrainGraph(graph, lock.spans[i].start - segment_start,
+                             lock.spans[i].end - segment_start, lock.spans[i].syllable);
+  }
+  if (applied) {
     if (constrained) *constrained = true;
     context->set_property(kAppliedProperty, Encode(lock));
     return true;
@@ -266,9 +350,10 @@ inline size_t BuildGraph(rime::Syllabifier& builder, const std::string& input,
                          rime::SyllableGraphCache* cache, bool* constrained) {
   if (constrained) *constrained = false;
   Lock lock;
-  if (!ReadLock(context, schema, prism, &lock) ||
-      context->caret_pos() < lock.end || segment_start >= lock.end ||
-      segment_start + input.size() <= lock.start) {
+  const size_t active = ReadLock(context, schema, prism, &lock)
+      ? ActiveSpans(lock, context->caret_pos()) : 0;
+  if (active == 0 || segment_start >= lock.spans[active - 1].end ||
+      segment_start + input.size() <= lock.spans.front().start) {
     return static_cast<size_t>(builder.BuildSyllableGraph(input, prism, graph, cache));
   }
   if (constrained) *constrained = true;
@@ -280,23 +365,30 @@ inline size_t BuildGraph(rime::Syllabifier& builder, const std::string& input,
     graph->interpreted_length = 0;
     return 0;
   };
-  if (segment_start > lock.start || lock.end > segment_start + input.size() ||
+  if (segment_start > lock.spans.front().start ||
+      lock.spans[active - 1].end > segment_start + input.size() ||
       context->input().compare(segment_start, input.size(), input) != 0) return fail();
-  const size_t start = lock.start - segment_start;
-  size_t end = lock.end - segment_start;
+  const size_t start = lock.spans.front().start - segment_start;
   // A newly typed delimiter belongs to the preceding graph edge, just as in
   // ordinary Rime syllabification. It need not enlarge the immutable lock span.
-  std::string delimiters = " '";
-  schema->config()->GetString("speller/delimiter", &delimiters);
-  while (end < input.size() && delimiters.find(input[end]) != std::string::npos) ++end;
+  const auto delimiters = Delimiters(schema);
   rime::SyllableGraph before;
   if (start != 0 && static_cast<size_t>(builder.BuildSyllableGraph(
           input.substr(0, start), prism, &before)) != start) return fail();
-  rime::SyllableGraph chosen;
-  const size_t chosen_length = end - start;
-  if (static_cast<size_t>(builder.BuildSyllableGraph(
-          input.substr(start, chosen_length), prism, &chosen)) != chosen_length ||
-      !ConstrainGraph(&chosen, 0, chosen_length, lock.syllable)) return fail();
+  std::vector<std::pair<size_t, rime::SyllableGraph>> chosen(active);
+  size_t end = start;
+  for (size_t i = 0; i < active; ++i) {
+    // Each later reading was chosen right where the previous one ended.
+    if (lock.spans[i].start - segment_start != end) return fail();
+    const size_t chosen_end = SkipDelimiters(
+        input, lock.spans[i].end - segment_start, delimiters, input.size());
+    const size_t chosen_length = chosen_end - end;
+    chosen[i].first = end;
+    if (static_cast<size_t>(builder.BuildSyllableGraph(
+            input.substr(end, chosen_length), prism, &chosen[i].second)) != chosen_length ||
+        !ConstrainGraph(&chosen[i].second, 0, chosen_length, lock.spans[i].syllable)) return fail();
+    end = chosen_end;
+  }
   rime::SyllableGraph after;
   const size_t suffix_length = end < input.size()
       ? static_cast<size_t>(builder.BuildSyllableGraph(input.substr(end), prism, &after))
@@ -307,7 +399,7 @@ inline size_t BuildGraph(rime::Syllabifier& builder, const std::string& input,
   graph->input_length = input.size();
   graph->interpreted_length = end + suffix_length;
   AppendGraph(before, 0, graph);
-  AppendGraph(chosen, start, graph);
+  for (const auto& part : chosen) AppendGraph(part.second, part.first, graph);
   AppendGraph(after, end, graph);
   RebuildIndices(graph);
   context->set_property(kAppliedProperty, Encode(lock));
@@ -358,27 +450,20 @@ inline std::unique_ptr<rime::Dictionary> OpenDictionary(rime::Schema* schema) {
   return dictionary;
 }
 
-inline std::vector<Option> Options(rime::Context* context, rime::Schema* schema,
-                                   rime::Dictionary* dictionary) {
+// Readings that start at [start] and end by the caret, from the prism itself.
+inline std::vector<Option> OptionsAt(rime::Context* context, rime::Schema* schema,
+                                     rime::Dictionary* dictionary, size_t start,
+                                     const Lock* selected) {
   std::vector<Option> result;
-  if (!context || !schema || !dictionary || context->get_option("ascii_mode"))
-    return result;
-  const size_t start = context->composition().GetConfirmedPosition();
   const size_t caret = context->caret_pos();
-  if (start >= caret || caret > context->input().size()) return result;
-  std::string delimiters = " '";
-  schema->config()->GetString("speller/delimiter", &delimiters);
+  const auto delimiters = Delimiters(schema);
   bool strict = false;
   schema->config()->GetBool("translator/strict_spelling", &strict);
-  size_t code_start = start;
-  while (code_start < caret && delimiters.find(context->input()[code_start]) != std::string::npos)
-    ++code_start;
-  if (code_start == caret) return result;
+  const size_t code_start = SkipDelimiters(context->input(), start, delimiters, caret);
+  if (code_start >= caret) return result;
   std::vector<rime::Prism::Match> matches;
   dictionary->prism()->CommonPrefixSearch(
       std::string_view(context->input().data() + code_start, caret - code_start), &matches);
-  Lock selected;
-  const bool has_selected = ReadLock(context, schema, *dictionary->prism(), &selected);
   std::set<std::pair<size_t, rime::SyllableId>> seen;
   // Query the authoritative prism before whole-input pruning: choosing ni from
   // nin is legitimate and locks ni+n rather than making ni disappear from UI.
@@ -396,9 +481,11 @@ inline std::vector<Option> Options(rime::Context* context, rime::Schema* schema,
       const auto pinyin = dictionary->primary_table()->GetSyllableById(syllable);
       if (pinyin.empty()) continue;
       result.push_back({syllable, pinyin, start, end,
-          has_selected && selected.start == start &&
-          selected.end >= code_start + match.length && selected.end <= end &&
-          selected.syllable == syllable});
+          selected && std::any_of(selected->spans.begin(), selected->spans.end(),
+              [&](const Span& span) {
+                return span.start == start && span.end >= code_start + match.length &&
+                       span.end <= end && span.syllable == syllable;
+              })});
     }
   }
   std::sort(result.begin(), result.end(), [](const Option& a, const Option& b) {
@@ -407,35 +494,40 @@ inline std::vector<Option> Options(rime::Context* context, rime::Schema* schema,
   return result;
 }
 
-inline bool Select(rime::Context* context, rime::Schema* schema,
-                   const std::string& expected_input, const std::string& expected_schema,
-                   size_t start, size_t end, rime::SyllableId syllable) {
-  if (!context || !schema || context->get_option("ascii_mode") ||
-      context->input() != expected_input || schema->schema_id() != expected_schema ||
-      start >= end || end > context->caret_pos() ||
-      start != context->composition().GetConfirmedPosition()) return false;
-  auto dictionary = OpenDictionary(schema);
-  if (!dictionary) return false;
-  const auto options = Options(context, schema, dictionary.get());
-  if (std::none_of(options.begin(), options.end(), [&](const Option& option) {
-        return option.start == start && option.end == end && option.syllable == syllable;
-      })) return false;
+inline std::vector<Option> Options(rime::Context* context, rime::Schema* schema,
+                                   rime::Dictionary* dictionary) {
+  if (!context || !schema || !dictionary || context->get_option("ascii_mode")) return {};
+  const size_t confirmed = context->composition().GetConfirmedPosition();
+  const size_t caret = context->caret_pos();
+  if (confirmed >= caret || caret > context->input().size()) return {};
+  Lock selected;
+  const bool has_selected = ReadLock(context, schema, *dictionary->prism(), &selected);
+  const Lock* lock = has_selected ? &selected : nullptr;
+  const size_t active = has_selected ? ActiveSpans(selected, caret) : 0;
+  if (active == 0) return OptionsAt(context, schema, dictionary, confirmed, lock);
+  // Like the nine-key rail, the next syllable is offered once one is chosen.
+  // When nothing can follow before the caret, the last chosen one can be changed.
+  auto next = OptionsAt(context, schema, dictionary,
+      SkipDelimiters(context->input(), selected.spans[active - 1].end, Delimiters(schema),
+                     context->input().size()), lock);
+  return next.empty()
+      ? OptionsAt(context, schema, dictionary, selected.spans[active - 1].start, lock) : next;
+}
 
+// Applies [lock] (empty spans: none) and keeps it only if Rime still has a menu.
+inline bool Apply(rime::Context* context, rime::Schema* schema, const rime::Prism& prism,
+                  const Lock& lock) {
   const auto previous_property = context->get_property(kProperty);
   const auto previous_applied = context->get_property(kAppliedProperty);
   const auto previous_composition = context->composition();
   const auto caret = context->caret_pos();
-  const auto confirmed_text = ConfirmedText(*context);
-  Lock lock{expected_schema, expected_input, confirmed_text,
-            context->composition_epoch(), dictionary->prism()->dict_file_checksum(),
-            dictionary->prism()->schema_file_checksum(), start, start, end, syllable};
-  const auto encoded = Encode(lock);
+  const auto encoded = lock.spans.empty() ? std::string() : Encode(lock);
   context->set_property(kAppliedProperty, "");
   context->set_property(kProperty, encoded);
   const bool refreshed = context->RefreshNonConfirmedComposition();
   if (refreshed && context->caret_pos() == caret && context->HasMenu() &&
-      context->get_property(kAppliedProperty) == encoded &&
-      Matches(lock, *context, *schema, *dictionary->prism())) return true;
+      (lock.spans.empty() || (context->get_property(kAppliedProperty) == encoded &&
+                              Matches(lock, *context, *schema, prism)))) return true;
 
   // No input/caret/commit API participates in a successful selection. Restore
   // the old constraint and composition if the selected graph has no result.
@@ -443,6 +535,63 @@ inline bool Select(rime::Context* context, rime::Schema* schema,
   context->set_property(kAppliedProperty, previous_applied);
   context->set_composition(rime::Composition(previous_composition));
   return false;
+}
+
+inline bool Select(rime::Context* context, rime::Schema* schema,
+                   const std::string& expected_input, const std::string& expected_schema,
+                   size_t start, size_t end, rime::SyllableId syllable) {
+  if (!context || !schema || context->get_option("ascii_mode") ||
+      context->input() != expected_input || schema->schema_id() != expected_schema ||
+      start >= end || end > context->caret_pos() ||
+      start < context->composition().GetConfirmedPosition()) return false;
+  auto dictionary = OpenDictionary(schema);
+  if (!dictionary) return false;
+  const auto options = Options(context, schema, dictionary.get());
+  if (std::none_of(options.begin(), options.end(), [&](const Option& option) {
+        return option.start == start && option.end == end && option.syllable == syllable;
+      })) return false;
+
+  // The readings chosen before this syllable stay; this one replaces any
+  // reading chosen at the same place and the readings after it.
+  Lock previous;
+  const bool has_previous = ReadLock(context, schema, *dictionary->prism(), &previous);
+  const auto confirmed = context->composition().GetConfirmedPosition();
+  Lock lock{expected_schema, expected_input, ConfirmedText(*context),
+            context->composition_epoch(), dictionary->prism()->dict_file_checksum(),
+            dictionary->prism()->schema_file_checksum(), confirmed, {}};
+  if (has_previous) {
+    for (const auto& span : previous.spans) {
+      if (span.end > start) break;
+      lock.spans.push_back(span);
+    }
+  }
+  if (lock.spans.empty() && start != confirmed) return false;
+  lock.spans.push_back({start, end, syllable});
+  return Apply(context, schema, *dictionary->prism(), lock);
+}
+
+// Number of chosen syllables, for the rail and its delete key.
+inline size_t ChosenCount(rime::Context* context, rime::Schema* schema) {
+  Lock lock;
+  if (!context || !schema || context->get_option("ascii_mode") ||
+      !Decode(context->get_property(kProperty), &lock) ||
+      lock.schema != schema->schema_id() || lock.input != context->input() ||
+      lock.epoch != context->composition_epoch() ||
+      lock.confirmed != context->composition().GetConfirmedPosition()) return 0;
+  return lock.spans.size();
+}
+
+// The rail's delete key takes back the last chosen syllable, like nine-key.
+inline bool Undo(rime::Context* context, rime::Schema* schema,
+                 const std::string& expected_input, const std::string& expected_schema) {
+  if (!context || !schema || context->input() != expected_input ||
+      schema->schema_id() != expected_schema || ChosenCount(context, schema) == 0) return false;
+  auto dictionary = OpenDictionary(schema);
+  if (!dictionary) return false;
+  Lock lock;
+  if (!ReadLock(context, schema, *dictionary->prism(), &lock)) return false;
+  lock.spans.pop_back();
+  return Apply(context, schema, *dictionary->prism(), lock);
 }
 
 }  // namespace pinyin_selection

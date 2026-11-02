@@ -38,6 +38,38 @@ class SchemaPackageSafetyTest {
     private fun uninstall(id: String) = runBlocking { SchemaManifestManager.uninstallWithManifest(context, id) }
     private fun entry(name: String) = runBlocking { SchemaManifestManager.loadRegistry(context).getJSONObject("files").getJSONObject(name) }
 
+    @Test fun twoLooseFilesPickedTogetherHaveIndependentPackages() = runBlocking {
+        val schema = SchemaManager.saveImportedFile(context, "sample.schema.yaml",
+            "schema:\n  schema_id: sample\n  name: Sample".byteInputStream(), stageSchemeFiles = true)
+        val dict = SchemaManager.saveImportedFile(context, "sample.dict.yaml",
+            "dictionary".byteInputStream(), stageSchemeFiles = true)
+        assertNotNull(schema.packageId)
+        assertNotNull(dict.packageId)
+        assertNotEquals(schema.packageId, dict.packageId)
+        assertFalse(File(rime, "sample.schema.yaml").exists())
+        for (id in listOf(schema.packageId!!, dict.packageId!!)) {
+            assertTrue(SchemaManager.installPackageFromMarketDir(context, id, "sample", switchEnabled = false).success)
+        }
+        assertEquals("dictionary", File(rime, "sample.dict.yaml").readText())
+        assertEquals("sample", SchemaManager.discoverSchemas(context).single().schemaId)
+    }
+
+    @Test fun invalidReplacementExplainsProblemAndKeepsOriginal() = runBlocking {
+        val name = "current.schema.yaml"
+        val original = write(name, "schema:\n  schema_id: current\n  name: Original")
+        val market = SchemaManager.getMarketDir(context, "replacement").apply { mkdirs() }
+        for ((content, reason) in listOf("not a schema" to "schema/schema_id",
+                "schema:\n  schema_id: other" to "other.schema.yaml")) {
+            File(market, name).writeText(content)
+            val result = SchemaManager.installPackageFromMarketDir(context, "replacement", "sample",
+                switchEnabled = false, replaceConflictingFiles = true)
+            assertFalse(result.success)
+            assertTrue(result.failureReason.orEmpty().contains(reason))
+            assertTrue(original.readText().endsWith("Original"))
+            assertNull(SchemaManifestManager.loadManifest(context, "replacement"))
+        }
+    }
+
     @Test fun identicalFilesShareWithoutConflictAndSurviveEitherPackage() = runBlocking {
         write("shared.yaml", "same"); own("builtin", "shared.yaml")
         assertTrue(SchemaManifestManager.detectConflicts(context, "rime-ice", listOf("shared.yaml"),

@@ -64,7 +64,10 @@ def main():
         with open(path, "w", encoding="utf-8", newline="\n") as out:
             out.write(script)
         subprocess.run(["adb", "-s", args.serial, "push", "-q", path, REMOTE], check=True)
-    subprocess.run(["adb", "-s", args.serial, "shell", f"monkey -f {REMOTE} 1 >/dev/null; rm -f {REMOTE}"], check=True)
+    try:
+        subprocess.run(["adb", "-s", args.serial, "shell", f"monkey -f {REMOTE} 1 >/dev/null"], check=True)
+    finally:
+        subprocess.run(["adb", "-s", args.serial, "shell", "rm", "-f", REMOTE], check=False)
     print(f"keys={taps}")
 
 

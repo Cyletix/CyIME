@@ -1,16 +1,21 @@
 import java.net.HttpURLConnection
 import java.net.URI
 import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
-// Fixed, unmodified upstream dictionary data; APKs still contain the full offline files.
-val japaneseDataRevision = "3e14573828668721ec1eabdc56546ddcca8277e2"
-val japaneseDataHashes = mapOf(
-    "jaroomaji.mozc.dict.yaml" to "5bfcd8c81e89d4c6d4dfed6468988f51f4d1ce1537c14fbb9110dcc880f8209a",
-    "jaroomaji.jmdict.dict.yaml" to "29ff82d7c1a7dd4d96eb3e8a1bb9e262f0add6e56668bdcf1b90f3daed52b50d",
-    "jaroomaji.kanjidic2.dict.yaml" to "6433cd8c4706f285e18e7b59b0e375e905a31f98001135ce8cb8d6a2c0afaf30",
-    "jaroomaji.mozcemoji.dict.yaml" to "f48c7e91207a5a9058cd9ffac387a80437b2ac7b2ad871ad824fb11b72c96aca",
-)
-val japaneseAssetRoot = layout.buildDirectory.dir("generated/japanese-assets/rime_japanese")
+// Japanese conversion: azooKey (tools/azookey). Its dictionary comes unmodified from the pinned upstream
+// commit and is bundled in each APK as one zip; JapaneseSchemas extracts it on the phone.
+val azooKeyDictionaryCommit = "4d418525b090cf49c219819d05a7e3cc2a4346eb"
+// SHA-256 over the sorted lines "<path>\0<sha256 of file>\n" of the Dictionary/ files (3382 files, 25,315,483 bytes).
+val azooKeyDictionaryContentHash = "72336c1a22b96fc7e06ae710e84dd3b9223799fe7fea213b7617fa3f67ea6dd9"
+// Own asset root holding only azookey/: the old generated/japanese-assets root kept the jaroomaji
+// dictionaries (rime_japanese/, ~89 MB) from earlier builds, which would otherwise still be packaged.
+val japaneseAssetRoot = layout.buildDirectory.dir("generated/japanese-azookey-assets/azookey")
+val retiredJapaneseAssetRoot = layout.buildDirectory.dir("generated/japanese-assets")
+fun sha256(bytes: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 fun sha256(file: File): String {
     val digest = MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->
@@ -23,38 +28,118 @@ fun sha256(file: File): String {
     }
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
+fun download(url: String, target: File, what: String) {
+    check(!gradle.startParameter.isOffline) { "Missing $what; run the build once online." }
+    logger.lifecycle("Downloading $what: $url")
+    val connection = URI(url).toURL().openConnection() as HttpURLConnection
+    connection.connectTimeout = 30_000
+    connection.readTimeout = 600_000
+    try {
+        check(connection.responseCode == 200) { "$what HTTP ${connection.responseCode}: $url" }
+        connection.inputStream.use { input -> target.outputStream().use { input.copyTo(it) } }
+    } finally {
+        connection.disconnect()
+    }
+}
 val prepareJapaneseDictionaries by tasks.registering {
     group = "build setup"
-    description = "Fetch and verify pinned Japanese dictionaries for offline APK assets"
-    inputs.property("revision", japaneseDataRevision)
-    inputs.property("checksums", japaneseDataHashes)
+    description = "Fetch and verify the pinned azooKey dictionary for offline APK assets"
+    inputs.property("commit", azooKeyDictionaryCommit)
+    inputs.property("contentHash", azooKeyDictionaryContentHash)
     val targetRoot = japaneseAssetRoot.get().asFile
-    outputs.files(japaneseDataHashes.keys.map { File(targetRoot, it) })
-    outputs.upToDateWhen {
-        japaneseDataHashes.all { (name, hash) -> File(targetRoot, name).let { it.isFile && sha256(it) == hash } }
-    }
+    val zip = File(targetRoot, "dictionary.zip")
+    val version = File(targetRoot, "dictionary.version")
+    outputs.files(zip, version)
+    outputs.upToDateWhen { zip.isFile && version.isFile && version.readText() == azooKeyDictionaryContentHash }
+    val retiredRoot = retiredJapaneseAssetRoot.get().asFile
     doLast {
+        retiredRoot.deleteRecursively()
+        if (zip.isFile && version.isFile && version.readText() == azooKeyDictionaryContentHash) return@doLast
         targetRoot.mkdirs()
-        japaneseDataHashes.forEach { (name, hash) ->
-            val target = File(targetRoot, name)
+        val archive = File(targetRoot, "upstream.zip.download")
+        try {
+            download("https://github.com/ensan-hcl/azooKey_dictionary_storage/archive/$azooKeyDictionaryCommit.zip",
+                archive, "pinned azooKey dictionary")
+            // GitHub archives are not byte-stable, so the files themselves are checked.
+            val files = sortedMapOf<String, ByteArray>()
+            ZipInputStream(archive.inputStream().buffered()).use { input ->
+                while (true) {
+                    val entry = input.nextEntry ?: break
+                    val path = entry.name.substringAfter('/')
+                    if (entry.isDirectory || !path.startsWith("Dictionary/")) continue
+                    val relative = path.removePrefix("Dictionary/")
+                    if (relative.substringAfterLast('/').startsWith(".")) continue
+                    files[relative] = input.readBytes()
+                }
+            }
+            val manifest = files.entries.joinToString("") { (path, bytes) -> "$path\u0000${sha256(bytes)}\n" }
+            check(sha256(manifest.toByteArray()) == azooKeyDictionaryContentHash) { "azooKey dictionary content mismatch" }
+            val pending = File(targetRoot, "dictionary.zip.pending")
+            ZipOutputStream(pending.outputStream().buffered()).use { output ->
+                output.setLevel(9)
+                files.forEach { (path, bytes) ->
+                    output.putNextEntry(ZipEntry(path).apply { time = 0L })
+                    output.write(bytes)
+                    output.closeEntry()
+                }
+            }
+            java.nio.file.Files.move(pending.toPath(), zip.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            version.writeText(azooKeyDictionaryContentHash)
+        } finally {
+            archive.delete()
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareJapaneseDictionaries) }
+
+// libCyAzooKey.so, built by tools/azookey/build-android.sh (Swift has no x86 32-bit Android target;
+// there the translator finds no library and the romaji is shown unconverted).
+// A local copy is used first when its SHA-256 matches: <dir>/<abi>/libCyAzooKey.so or <dir>/libCyAzooKey-<hash8>-<abi>.so,
+// with <dir> from -Pcyime.azookeyLibDir, CYIME_AZOOKEY_LIB_DIR, or .codex-artifacts/azookey-1102/libs. Otherwise it is downloaded.
+val azooKeyLibraryHashes = mapOf(
+    "arm64-v8a" to "16907c1acf748d8b0b731106fcc65c07d70f72eb04d6a5430718b39604b53b50",
+    "armeabi-v7a" to "01f5b76a443b22993de965aa3c4d0eeca67afb1b087451ca9b7bc585cd318f19",
+    "x86_64" to "6589da4104294f49b430b1a65000b6e6a064841298bad6ef9303ebc3518287dc",
+)
+val azooKeyLibraryRoot = layout.buildDirectory.dir("generated/azookey-jniLibs")
+val prepareAzooKeyLibraries by tasks.registering {
+    group = "build setup"
+    description = "Fetch and verify the prebuilt azooKey converter libraries"
+    inputs.property("checksums", azooKeyLibraryHashes)
+    val targetRoot = azooKeyLibraryRoot.get().asFile
+    val libraries = azooKeyLibraryHashes.mapValues { (abi, _) -> File(targetRoot, "$abi/libCyAzooKey.so") }
+    val localDirs = listOfNotNull(providers.gradleProperty("cyime.azookeyLibDir").orNull,
+        providers.environmentVariable("CYIME_AZOOKEY_LIB_DIR").orNull).map { File(it) } +
+        rootProject.file(".codex-artifacts/azookey-1102/libs")
+    outputs.files(libraries.values)
+    outputs.upToDateWhen { azooKeyLibraryHashes.all { (abi, hash) -> libraries.getValue(abi).let { it.isFile && sha256(it) == hash } } }
+    doLast {
+        azooKeyLibraryHashes.forEach { (abi, hash) ->
+            val target = libraries.getValue(abi)
             if (target.isFile && sha256(target) == hash) return@forEach
-            check(!gradle.startParameter.isOffline) { "Missing Japanese data: $name; run prepareJapaneseDictionaries once online." }
-            val url = "https://raw.githubusercontent.com/lazyfoxchan/rime-jaroomaji/$japaneseDataRevision/$name"
-            logger.lifecycle("Downloading pinned Japanese dictionary: $name")
-            val pending = File(targetRoot, "$name.download")
-            val connection = URI(url).toURL().openConnection() as HttpURLConnection
-            connection.connectTimeout = 30_000
-            connection.readTimeout = 600_000
+            target.parentFile.mkdirs()
+            val name = "libCyAzooKey-${hash.take(8)}-$abi.so"
+            val local = localDirs.flatMap { listOf(File(it, "$abi/libCyAzooKey.so"), File(it, name)) }
+                .firstOrNull { it.isFile && sha256(it) == hash }
+            if (local != null) {
+                logger.lifecycle("Using local azooKey library $abi: $local")
+                local.copyTo(target, overwrite = true)
+                return@forEach
+            }
+            val pending = File(target.parentFile, "$name.download")
             try {
-                check(connection.responseCode == 200) { "Japanese dictionary HTTP ${connection.responseCode}: $name" }
-                connection.inputStream.use { input -> pending.outputStream().use { input.copyTo(it) } }
-                check(sha256(pending) == hash) { "Japanese dictionary SHA-256 mismatch: $name" }
+                val urls = listOf("https://github.com/Cyletix/CyIME/releases/download/models/$name",
+                    "https://www.modelscope.cn/models/Cyletix/cyime-model/resolve/master/$name")
+                val fetched = urls.any { url ->
+                    runCatching { download(url, pending, "azooKey library $abi") }.isSuccess &&
+                        sha256(pending) == hash
+                }
+                check(fetched) { "azooKey library $abi unavailable or SHA-256 mismatch: $name" }
                 java.nio.file.Files.move(pending.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
             } finally {
-                connection.disconnect()
                 pending.delete()
             }
         }
     }
 }
-tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareJapaneseDictionaries) }
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareAzooKeyLibraries) }

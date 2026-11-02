@@ -1,0 +1,11 @@
+[
+  {"id":"full-exact","schema":"t9_pinyin","group":"exact","keys":"946476642874264524","text":"形容不上来","top_k":1},
+  {"id":"full-transposed","schema":"t9_pinyin","group":"one adjacent swap (synthetic)","keys":"946476642872464524","text":"形容不上来","top_k":5},
+  {"id":"full-literal","schema":"t9_pinyin","group":"literal reading of the swapped keys","keys":"946476642872464524","text":"形容不派你来","top_k":5},
+  {"id":"full-pai-ni-lai","schema":"t9_pinyin","group":"exact control","keys":"8263672464524","text":"他们派你来","top_k":1},
+  {"id":"flypy-exact","schema":"double_pinyin_flypy_t9","group":"same digits, different readings","keys":"9577288453","text":"形容不上来","top_k":2},
+  {"id":"flypy-other","schema":"double_pinyin_flypy_t9","group":"same digits, different readings","keys":"9577288453","text":"完全不上了","top_k":2},
+  {"id":"flypy-chu-lai","schema":"double_pinyin_flypy_t9","group":"same digits, different readings","keys":"9577284853","text":"形容不出来","top_k":2},
+  {"id":"flypy-chu-lai-other","schema":"double_pinyin_flypy_t9","group":"same digits, different readings","keys":"9577284853","text":"完全不出来","top_k":2},
+  {"id":"flypy-pai-ni-lai","schema":"double_pinyin_flypy_t9","group":"exact control","keys":"8263736453","text":"他们派你来","top_k":1}
+]

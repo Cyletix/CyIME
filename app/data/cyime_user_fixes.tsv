@@ -12,3 +12,6 @@
 新浪微博	xin lang wei bo	12150
 # His report (2026-10-30): 测完 is not a dictionary word, so the pattern rule cannot form it.
 测完了吗	ce wan le ma	3000
+# GitHub #40 (2026-11-01): both missing from the dictionary; zaicikulimeiyou read 再次苦力没有.
+删后台	shan hou tai	5000
+在词库里没有	zai ci ku li mei you	20000

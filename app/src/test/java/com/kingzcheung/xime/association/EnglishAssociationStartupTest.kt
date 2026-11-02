@@ -23,6 +23,16 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
 class EnglishAssociationStartupTest {
+    @Test fun suggestionsPreserveTypedCaseAndKeepTheSameRanking() = runBlocking {
+        val app = context { bundledTrie().inputStream() }
+        suspend fun words(prefix: String) = AssociationService.getAssociations(app, prefix, true, 6)
+        val lower = words("he")
+        assertTrue(lower.any { it.length > 2 })
+        assertEquals(lower.map { it.replaceFirstChar(Char::uppercaseChar) }, words("He"))
+        assertEquals(lower.map { it.uppercase() }, words("HE"))
+        assertEquals(lower.map { "hE" + it.drop(2) }, words("hE"))
+        assertEquals(words("h").map { it.replaceFirstChar(Char::uppercaseChar) }, words("H"))
+    }
     @Before fun resetBefore() = AssociationService.release()
     @After fun resetAfter() = AssociationService.release()
 

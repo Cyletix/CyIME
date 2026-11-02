@@ -140,7 +140,7 @@ fun JapaneseKanaKeyboardLayout(
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 SwipeableIconKeyButton(icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                    onClick = { onKeyPress("delete") }, onLongClick = { onKeyPress("delete") },
+                    onClick = { onKeyPress("delete") }, onLongClick = { onKeyPress("delete") }, distanceDelete = true,
                     backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
                     modifier = Modifier.weight(1f).testTag("kana-delete"), onPress = { onKeyPressDown?.invoke("delete") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)

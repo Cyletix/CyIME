@@ -40,6 +40,7 @@ public final class ChatReplay {
     private String variant;
     /** Rime schema replayed: t9_pinyin (nine-key) or a 26-key schema such as rime_ice with --variant letters. */
     private String schema;
+    private boolean idleSpelling;
     private long rowCount;
     /** Host-only per-key work counter names; null when the engine library has none. */
     private String[] workNames;
@@ -132,7 +133,12 @@ public final class ChatReplay {
             mkdir(user);
             assets = extract(apk, user, schema).put("apk_sha256", apkHash)
                 .put("library_sha256", libraryHashes);
-            if (!schemaPatch.isEmpty()) {
+            if (flags.containsKey("schema-patch-file")) {
+                if (!host || !schemaPatch.isEmpty()) throw new IllegalArgumentException("Use a single host schema patch");
+                File patch = new File(flags.get("schema-patch-file"));
+                write(inside(user, schema + ".custom.yaml"), read(patch));
+                assets.put("schema_patch_file", patch.getName());
+            } else if (!schemaPatch.isEmpty()) {
                 StringBuilder custom = new StringBuilder("patch:\n");
                 // Items are separated by ';'; a value that itself contains ';' (cylm/params) writes it as "\;".
                 for (String item : schemaPatch.split("(?<!\\\\);")) {
@@ -215,6 +221,7 @@ public final class ChatReplay {
             }
             engine.nativeSetOption("ascii_mode", false);
             engine.nativeSetOption("full_shape", false);
+            idleSpelling = engine.nativeGetSchemaString(schema, "cyime_edit_schema") != null;
             JSONObject settings = new JSONObject();
             for (String key : Arrays.asList("t9/dictionary_beam", "t9/sentence_beam", "t9/result_budget",
                     "t9/word_penalty", "t9/spelling_penalty", "t9/sentence_model", "t9/sentence_weight",
@@ -334,8 +341,9 @@ public final class ChatReplay {
             state = engine.nativeT9RefinementState();
         }
         boolean refined = state == 2 && engine.nativeRefineT9Sentences();
+        boolean spelling = idleSpelling && state != 1 && engine.nativeRefineOmission();
         return new JSONObject().put("initial_state", initial).put("ready_state", state)
-            .put("refined", refined).put("timeout", state == 1)
+            .put("refined", refined).put("spelling_refined", spelling).put("timeout", state == 1)
             .put("wait_ms", millisSince(start)).put("final_state", engine.nativeT9RefinementState());
     }
 
@@ -612,7 +620,7 @@ public final class ChatReplay {
         Map<String, String> flags = new HashMap<>();
         Set<String> allowed = new HashSet<>(Arrays.asList("root", "apk", "resources", "host", "lib-dir", "corpus", "output",
             "key-delay-ms", "limit", "boundary-limit", "settle-timeout-ms", "variant", "modes",
-            "only-ids", "case-ids", "reuse", "user-dict", "schema", "schema-patch"));
+            "only-ids", "case-ids", "reuse", "user-dict", "schema", "schema-patch", "schema-patch-file"));
         for (int i = 0; i < args.length; i++) {
             if (!args[i].startsWith("--")) throw new IllegalArgumentException("Expected --flag: " + args[i]);
             String key = args[i].substring(2);

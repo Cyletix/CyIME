@@ -39,8 +39,10 @@ class JsonCellDictionaryTest {
 
     /** Optional local integration corpus, produced by real Cline calls; tests never call the API. */
     @Test fun `real generated exports install and preserve exactly the validated word codes`() {
-        val directory = sequenceOf(File(".codex-artifacts/generated-lexicon-corpus"),
+        val configured = System.getenv("CYIME_GENERATED_LEXICON_CORPUS")
+        val directory = if (configured.isNullOrBlank()) sequenceOf(File(".codex-artifacts/generated-lexicon-corpus"),
             File("../.codex-artifacts/generated-lexicon-corpus")).firstOrNull { it.isDirectory }
+        else File(configured).also { require(it.isDirectory) { "Generated corpus directory missing: $it" } }
         assumeTrue("Local generated corpus unavailable", directory != null)
         val files = requireNotNull(directory).listFiles { file -> file.name.endsWith(".cyime-dict.json") }!!.sorted()
         assertTrue("No exported collections", files.isNotEmpty())

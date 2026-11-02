@@ -18,6 +18,26 @@ public final class MergedLetterProbe {
         Thread.sleep(100);
       }
       if (!e.nativeCreateSession()) throw new Exception("session unavailable");
+      if (args.length > 2 && args[2].equals("--single-key")) {
+        for (String schema : new String[]{"pinyin_14jian", "double_pinyin_flypy_14jian"}) {
+          reset(e, schema, "A");
+          java.util.List<String> ambiguous = firstWords(e);
+          String sWord = schema.equals("pinyin_14jian") ? "是" : "三";
+          System.out.println(schema + " ambiguous A: " + ambiguous +
+              " native syllables=" + Arrays.toString(e.nativePinyinSyllableOptions()));
+          require(ambiguous.contains("啊") && ambiguous.contains(sWord), "tap lost one letter family");
+          for (String letter : new String[]{"s", "a", "s"}) {
+            require(e.nativeSetInput(letter) && e.nativeGetInput().equals(letter), "exact letter " + letter);
+            String[] edit = e.nativePinyinEditSnapshot();
+            require(edit[1].equals("1") && edit[2].equals("0"), "wrong caret or confirmation after letter pick");
+            java.util.List<String> words = firstWords(e);
+            System.out.println(schema + " exact " + letter + ": " + words);
+            require(words.contains(letter.equals("s") ? sWord : "啊") &&
+                !words.contains(letter.equals("s") ? "啊" : sWord), "wrong family for " + letter);
+          }
+        }
+        return;
+      }
       if (args.length > 2 && args[2].equals("--prefix-options")) {
         reset(e, "pinyin_14jian", "BUn");
         System.out.println("PREFIX OPTIONS " + Arrays.toString(e.nativePinyinSyllableOptions()));
@@ -41,6 +61,7 @@ public final class MergedLetterProbe {
       lockedBoundary(e);
       delimiterAndIncompletePrefix(e);
       invalidation(e);
+      chainedChoices(e);
       System.out.println("PASS native syllable selection: real code, reselect, confirmed prefix, stale rejection and invalidation");
     } finally { e.nativeDestroy(); }
   }
@@ -61,6 +82,12 @@ public final class MergedLetterProbe {
     e.nativeProcessKey(0xff1b, 0);
   }
 
+  static java.util.List<String> firstWords(RimeEngine e) {
+    java.util.List<String> words = new java.util.ArrayList<>();
+    for (String[] row : e.nativeInspectCandidates(16)) words.add(row[0]);
+    return words;
+  }
+
   static void reset(RimeEngine e, String schema, String code) throws Exception {
     e.nativeProcessKey(0xff1b, 0);
     if (!e.nativeSwitchSchema(schema)) throw new Exception("schema unavailable: " + schema);
@@ -68,6 +95,9 @@ public final class MergedLetterProbe {
     for (char c : code.toCharArray()) if (!e.nativeProcessKey(c, 0)) throw new Exception("unhandled key " + c);
     require(code.equals(e.nativeGetInput()), "raw input changed before selection");
   }
+
+  /** Readings chosen so far; the rail itself moves on to the next syllable after a choice. */
+  static final java.util.Map<String, String[]> chosen = new java.util.HashMap<>();
 
   static String[] option(RimeEngine e, String reading) throws Exception {
     for (String encoded : e.nativePinyinSyllableOptions()) {
@@ -87,14 +117,16 @@ public final class MergedLetterProbe {
     String[] after = e.nativePinyinEditSnapshot();
     for (int i = 0; i < 4; ++i) require(before[i].equals(after[i]),
         "selection changed raw/caret/confirmed state " + Arrays.toString(before) + " => " + Arrays.toString(after));
-    assertConstrained(e, reading);
+    chosen.put(reading, value);
+    // A later syllable of a chain has no candidate of its own start; chainedChoices checks the words.
+    if (e.nativePinyinSyllablesChosen() == 1) assertConstrained(e, reading);
     System.out.println("LOCK " + e.nativeGetCurrentSchema() + " " + before[0] + " => " + reading +
         " id=" + value[0] + " raw/caret/confirmed preserved");
   }
 
   static void assertConstrained(RimeEngine e, String reading) throws Exception {
-    String[] value = option(e, reading);
-    require(option(e, reading)[4].equals("1"), "chosen reading not selected: " + reading);
+    String[] value = chosen.get(reading);
+    require(value != null && e.nativePinyinSyllablesChosen() > 0, "chosen reading not selected: " + reading);
     boolean found = false;
     for (String[] row : e.nativeInspectCandidates(500)) {
       // Independent English/custom table translators use another dictionary's
@@ -114,15 +146,18 @@ public final class MergedLetterProbe {
     String firstId = option(e, first)[0];
     require(!firstId.equals(option(e, second)[0]), "counterexample has identical syllable IDs");
     choose(e, first);
+    // The rail's delete key takes the choice back; the same syllable can then be chosen again.
+    require(e.nativeUndoPinyinSyllable(code, schema) && e.nativePinyinSyllablesChosen() == 0, "undo failed");
     choose(e, second);
     String[] before = e.nativePinyinEditSnapshot();
-    String[] current = option(e, second);
+    int current = e.nativePinyinSyllablesChosen();
     require(!e.nativeSelectPinyinSyllable(code + "z", schema, 0, 2, Integer.parseInt(firstId)), "stale raw accepted");
     require(!e.nativeSelectPinyinSyllable(code, schema + "_stale", 0, 2, Integer.parseInt(firstId)), "stale schema accepted");
     require(!e.nativeSelectPinyinSyllable(code, schema, 0, code.length() + 1, Integer.parseInt(firstId)), "invalid span accepted");
     require(!e.nativeSelectPinyinSyllable(code, schema, 0, 2, Integer.MAX_VALUE), "invalid syllable accepted");
     require(Arrays.equals(before, e.nativePinyinEditSnapshot()), "rejected selection changed composition");
-    require(option(e, second)[4].equals(current[4]), "rejected selection lost previous lock");
+    require(e.nativePinyinSyllablesChosen() == current, "rejected selection lost previous lock");
+    assertConstrained(e, second);
   }
 
   static void exactLetter(RimeEngine e) throws Exception {
@@ -142,6 +177,7 @@ public final class MergedLetterProbe {
     String[] state = e.nativePinyinEditSnapshot();
     require(state[2].equals("2") && state[3].equals("你"), "prefix was committed instead of confirmed: " + Arrays.toString(state));
     choose(e, "ni");
+    require(e.nativeUndoPinyinSyllable("niBUGaO", "pinyin_14jian"), "undo after confirmed prefix");
     choose(e, "bu");
     require(e.nativeGetInput().equals("niBUGaO"), "remaining ambiguous suffix was rewritten");
     e.nativeProcessKey('n', 0);
@@ -151,6 +187,7 @@ public final class MergedLetterProbe {
   }
 
   static void noSelection(RimeEngine e, String reason) throws Exception {
+    require(e.nativePinyinSyllablesChosen() == 0, reason + ": old selection revived");
     for (String value : e.nativePinyinSyllableOptions())
       require(!value.endsWith("\t1"), reason + ": old selection revived " + value);
   }
@@ -218,6 +255,40 @@ public final class MergedLetterProbe {
     reset(e, "double_pinyin_flypy_14jian", "BUGJ");
     noSelection(e, "schema change");
     System.out.println("PASS suffix edits/append retain lock, caret round-trip retains lock, locked-span edit/clear/schema invalidate");
+  }
+
+  /** Several syllables are chosen one after another, as on the nine-key rail. */
+  static void chainedChoices(RimeEngine e) throws Exception {
+    reset(e, "pinyin_14jian", "BUGaOdE");
+    choose(e, "ni");
+    for (String encoded : e.nativePinyinSyllableOptions())
+      require(encoded.split("\\t")[2].equals("2"), "rail did not move to the second syllable: " + encoded);
+    choose(e, "hao");
+    choose(e, "de");
+    require(e.nativePinyinSyllablesChosen() == 3, "three chosen syllables");
+    require(firstWords(e).get(0).equals("你好的"), "chained readings lost: " + firstWords(e));
+    assertConstrained(e, "ni");
+    e.nativeProcessKey(0xff08, 0);
+    require(e.nativePinyinSyllablesChosen() == 2, "deleting the last letter dropped more than its reading");
+    e.nativeProcessKey('E', 0);
+    require(e.nativePinyinSyllablesChosen() == 2, "retyping revived a dropped reading");
+    choose(e, "de");
+    int selected = -1;
+    for (String[] row : e.nativeInspectCandidates(500)) {
+      if (row[0].equals("你") && row[6].equals("2")) { selected = Integer.parseInt(row[4]); break; }
+    }
+    require(selected >= 0 && e.nativeSelectCandidateByGlobalIndex(selected), "cannot confirm 你");
+    require(e.nativePinyinSyllablesChosen() == 2 && firstWords(e).get(0).equals("好的"),
+        "confirming the first word lost the readings after it: " + firstWords(e));
+    assertConstrained(e, "hao");
+    require(e.nativeUndoPinyinSyllable("BUGaOdE", "pinyin_14jian") && e.nativePinyinSyllablesChosen() == 1,
+        "undo of the last reading");
+    require(e.nativeUndoPinyinSyllable("BUGaOdE", "pinyin_14jian") && e.nativePinyinSyllablesChosen() == 0,
+        "undo of the first reading");
+    require(!e.nativeUndoPinyinSyllable("BUGaOdE", "pinyin_14jian"), "undo without a reading");
+    String[] state = e.nativePinyinEditSnapshot();
+    require(state[2].equals("2") && state[3].equals("你"), "undo touched the confirmed word");
+    System.out.println("PASS chained syllables: next syllable, partial word keeps the rest, delete/undo drop only the last");
   }
 
   static void require(boolean value, String message) throws Exception {

@@ -18,8 +18,13 @@ data class PinyinSyllableChoices(
     val protectedLength: Int,
     val protectedText: String,
     val options: List<PinyinSyllableOption>,
+    /** A single merged key offers exact letters before there is a complete syllable. */
+    val letterGroup: String? = null,
+    /** Syllables already chosen in a row; [options] then belong to the next syllable (or the last one). */
+    val chosen: Int = 0,
 ) {
-    val selectedIndex: Int get() = options.indexOfFirst { it.selected }
+    val labels: List<String> get() = letterGroup?.map { it.toString() } ?: options.map { it.pinyin }
+    val selectedIndex: Int get() = letterGroup?.indexOf(inputText) ?: options.indexOfFirst { it.selected }
 
     internal fun matches(schema: String, revision: Long, input: String,
         confirmedLength: Int, confirmedText: String): Boolean =

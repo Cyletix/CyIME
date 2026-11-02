@@ -136,6 +136,14 @@ def reuse_engine(source, output, cache):
     if not java or javac is None:
         raise ValueError("Java or the cached javac launcher is missing; run once without --engine-from")
     for name in ("engine-build.json", "source-files.json", "resources.zip"):
+        # Timing/seeded repeats read the verified archive without changing it.
+        # A full copy per repeat would exhaust the replay disk budget.
+        if name == "resources.zip":
+            try:
+                os.link(source / name, output / name)
+                continue
+            except OSError:
+                pass  # Cross-filesystem outputs still need a private copy.
         shutil.copyfile(source / name, output / name)
     build = {"library_dir": str(library_dir), "java": java, "javac": str(javac)}
     (output / "build-result.txt").write_text(json.dumps(build, sort_keys=True) + "\n", encoding="utf-8")
@@ -156,6 +164,9 @@ def run_host(args):
     fixture_bytes = args.fixture.read_bytes()
     original = json.loads(fixture_bytes.decode("utf-8-sig"))
     fixture = validate_fixture(original)
+    schema_patch_file = getattr(args, "schema_patch_file", None)
+    if schema_patch_file is not None and not schema_patch_file.is_file():
+        raise ValueError("Schema patch does not exist: " + str(schema_patch_file))
     user_dict = getattr(args, "user_dict", None)
     if user_dict is not None:
         user_dict, user_dict_info = inspect_user_dict(user_dict)
@@ -164,7 +175,7 @@ def run_host(args):
         command = ["wsl.exe", "-d", args.wsl_distro, "--", "python3", linux_path(HERE / "t9_host.py"),
                    "--fixture", linux_path(args.fixture), "--output", linux_path(output),
                    "--json-jar", linux_path(jar), "--key-delay-ms", str(args.key_delay_ms)]
-        for key in ("baseline", "assertions", "user_dict", "engine_from"):
+        for key in ("baseline", "assertions", "user_dict", "engine_from", "schema_patch_file"):
             if getattr(args, key, None):
                 command.extend(["--" + key.replace("_", "-"), linux_path(getattr(args, key))])
         if args.host_cache:
@@ -192,6 +203,10 @@ def run_host(args):
         manifest.update(user_state="preset_user_dict", user_dict_snapshot=dict(
             user_dict_info, source=str(user_dict), file="user-dict.userdb.txt",
             sha256=file_digest(output / "user-dict.userdb.txt")))
+    if schema_patch_file is not None:
+        patch = output / "schema.custom.yaml"
+        shutil.copyfile(schema_patch_file, patch)
+        manifest["schema_patch_sha256"] = file_digest(patch)
     save(output / "run.json", manifest)
     commands = HostCommands(output / "commands.log")
     try:
@@ -265,6 +280,7 @@ def run_host(args):
                           "--lib-dir", library_dir, "--root", live_root, "--corpus", output / "fixture.json",
                           "--output", output / "replay.jsonl", "--modes", "continuous,paused",
                           "--key-delay-ms", args.key_delay_ms,
+                          *(["--schema-patch-file", output / "schema.custom.yaml"] if schema_patch_file else []),
                           *(["--user-dict", output / "user-dict.userdb.txt"] if user_dict is not None else [])])
         finally:
             if live_root.exists():
@@ -306,6 +322,8 @@ def run_host(args):
 def add_arguments(parser):
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--schema-patch-file", type=Path,
+                        help="Deploy this settings-generated t9_pinyin.custom.yaml in the isolated user directory")
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--assertions", type=Path)
     parser.add_argument("--key-delay-ms", type=int, choices=range(0, 1001), default=35, metavar="0..1000")

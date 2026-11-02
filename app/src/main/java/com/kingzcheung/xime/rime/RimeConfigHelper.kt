@@ -42,15 +42,34 @@ object RimeConfigHelper {
 
     /** Retry failures, never queue user keystrokes, and never overlap a running native deployment. */
     suspend fun prepareAutomatically(context: Context, status: (String) -> Unit = {}) {
-        retryPreparation(status = status, problem = { deploymentProblem(context) }) { prepareEngine(context) }
+        // 已经准备好就直接返回，不报「正在准备」：改语言、刷新语言列表都会走到这里，键盘不该为此闪一下提示。
+        // 别的准备正在进行（拿不到锁）时照常报进度。
+        if (preparationMutex.tryLock()) {
+            try { if (readyInProcess(context)) return } finally { preparationMutex.unlock() }
+        }
+        retryPreparation(status = status, problem = { deploymentProblem(context) },
+            preparing = { preparingNotice(context) }) { prepareEngine(context) }
+    }
+
+    // A previous IME service may have destroyed the process-wide engine.
+    // Cached preparation is valid only while that native session is still usable.
+    private fun readyInProcess(context: Context): Boolean =
+        preparedInProcess && SettingsPreferences.isDeploymentDone(context) && RimeEngine.isInitialized() &&
+            RimeEngine.getInstance().ensureSession(1_000L)
+
+    /** 这次要准备的是哪些语言：只看还没编译出来的启用方案，中文早已编译好时不再说「准备中文」。 */
+    private fun preparingNotice(context: Context): String {
+        val build = File(context.filesDir, "rime/build")
+        val missing = runCatching {
+            SchemaManager.getEnabledSchemas(context).filter { missingBuildArtifact(build, it) != null }
+                .map { com.kingzcheung.xime.settings.InputLanguage.forSchema(it) }
+        }.getOrDefault(listOf(com.kingzcheung.xime.settings.InputLanguage.CHINESE))
+        return preparingMessage(missing, firstTime = build.listFiles().isNullOrEmpty())
     }
 
     /** Share the entire copy/init/deploy operation, not just the final compilation lock. */
     suspend fun prepareEngine(context: Context): Boolean = preparationMutex.withLock {
-        // A previous IME service may have destroyed the process-wide engine.
-        // Cached preparation is valid only while that native session is still usable.
-        if (preparedInProcess && SettingsPreferences.isDeploymentDone(context) && RimeEngine.isInitialized() &&
-            RimeEngine.getInstance().ensureSession(1_000L)) return@withLock true
+        if (readyInProcess(context)) return@withLock true
         preparedInProcess = false
         val (user, shared) = initializeRimeDataAsync(context)
         RimeEngine.getInstance().initialize(user, shared)
@@ -131,7 +150,7 @@ object RimeConfigHelper {
     }
 
     /** CyIME 自带或自己生成的方案：这些编译失败说明内置资源坏了，必须当作部署失败。 */
-    private fun isAppSchema(context: Context, id: String): Boolean =
+    internal fun isAppSchema(context: Context, id: String): Boolean =
         id in com.kingzcheung.xime.settings.ChineseSchemas.ids || id in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended ||
             com.kingzcheung.xime.settings.DoublePinyinSchemes.isGenerated(id) ||
             com.kingzcheung.xime.settings.CustomKeyboardLayouts.isCustom(id) || bundledSchemaIds(context).contains(id)
@@ -176,8 +195,8 @@ object RimeConfigHelper {
         val engine = RimeEngine.getInstance()
         engine.initialize(user, shared)
         synchronized(deploymentLock) {
-            store.activate(selected.selected, selected.selectedEnglish) { ids, english ->
-                val bindings = manager.prepare(context, ids, english)
+            store.activate(selected.selected, selected.selectedEnglish) { ids, english, revision ->
+                val bindings = manager.prepare(context, ids, english, revision)
                 // Recreate the live session, as ordinary incremental maintenance retains loaded tables.
                 // Native compilation still reuses unchanged dictionaries by checksum.
                 val usable = engine.deploy() && deploymentUsable(context) &&
@@ -216,6 +235,12 @@ object RimeConfigHelper {
             com.kingzcheung.xime.model.CandidateModelAssets.filterBundledManifest(context,
                 context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() }),
         ) { context.assets.open(it) }
+        // 日语词典装不上只影响日语转换，不能连累其它输入方案启动。
+        try {
+            com.kingzcheung.xime.settings.JapaneseSchemas.installAzooKeyDictionary(rimeDir) { context.assets.open(it) }
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "Failed to install the Japanese dictionary", e)
+        }
         // Optional downloads become available at the normal engine initialization boundary.
         // Never restart or replay an active editor merely because a model download finished.
         com.kingzcheung.xime.model.CandidateModelAssets.installAvailable(context)

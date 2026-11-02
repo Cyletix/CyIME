@@ -43,7 +43,8 @@ import java.io.File
 
 /**
  * 双拼键位提示：小鹤、微软（分号键）双拼 26 键，开关关/开对照；手机/平板宽度，浅、深、纯黑主题，玻璃开关。
- * 开着时键上写 zh/ch/sh（右上）和韵母（字母下面），不画上下角标。只在设了 CYIME_RENDER_OUT 时出图。
+ * 开着时键上写 zh/ch/sh（右上）和韵母（字母下面）；这里同时关掉上下角标提示，只看键位提示本身
+ * （11-01 起角标提示开着时自动分层，见 keyHintsWithCornersNeverOverlap）。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1000dp-h900dp-xhdpi")
@@ -80,7 +81,8 @@ class DoublePinyinKeyHintsRenderTest {
             val palette = resolveKeyboardPalette(theme, dark)
             val config = FrostedGlassConfig.defaults(dark, enabled = glass)
             CompositionLocalProvider(LocalKeyboardExplicitWidth provides true,
-                LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config, doublePinyinKeyHints = hints)) {
+                LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config, doublePinyinKeyHints = hints,
+                    swipeUpHints = !hints, swipeDownHints = !hints)) {
                 MaterialTheme {
                     Box(Modifier.requiredSize(width.dp, height.dp).testTag("layout-body")
                         .keyboardBackground(KeyboardThemes.getRenderingScheme(theme).keyboardBackground, dark,
@@ -117,7 +119,7 @@ class DoublePinyinKeyHintsRenderTest {
     }
 
     /**
-     * 「和角标一起显示」：声母、上角标在上，字母居中，韵母、下角标在下。手机、平板宽度，ZXCV 编辑角标开/关；
+     * 双拼键位提示和上下角标提示都开着（11-01 起不用「和角标一起显示」开关，自动分层）：声母、上角标在上，字母居中，韵母、下角标在下。手机、平板宽度，ZXCV 编辑角标开/关；
      * 每个字母键上的这些字互不重叠（按文字框算，比字形本身更严）。设了 CYIME_RENDER_OUT 时另外出图。
      */
     @Test fun keyHintsWithCornersNeverOverlap() {
@@ -134,9 +136,14 @@ class DoublePinyinKeyHintsRenderTest {
         rule.setContent {
             val palette = resolveKeyboardPalette("soft_blue", false)
             val config = FrostedGlassConfig.defaults(false, enabled = false)
+            // ZXCV 编辑角标 = 「按键符号」里的 Z X C V 预设（字母键滑动动作），键面角标写动作名。
             CompositionLocalProvider(LocalKeyboardExplicitWidth provides true,
+                com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputActions provides
+                    com.kingzcheung.xime.ui.keyboard.KeyboardInputActions(onLetterSwipeAction = {}),
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config,
-                    doublePinyinKeyHints = true, doublePinyinKeyHintsWithCorners = true, zxcvEditShortcuts = edit)) {
+                    doublePinyinKeyHints = true, doublePinyinKeyHintsWithCorners = false,
+                    chineseLetterSwipes = if (edit) com.kingzcheung.xime.settings.LetterSwipeBindings.withEditPreset(emptyMap(), false)
+                        else emptyMap())) {
                 MaterialTheme {
                     Box(Modifier.requiredSize(width.dp, height.dp).testTag("layout-body")
                         .keyboardBackground(KeyboardThemes.getRenderingScheme("soft_blue").keyboardBackground, false,

@@ -22,6 +22,13 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences);
 
+// 14-key: a whole-input word read through the initial of the final merged key (都是 for DOUA, the A key read
+// as s) normally follows the sentence of the typed letters (都啊). With the word model it goes first when its
+// text is more likely than that sentence's by more than `margin` (ln units; t9/merged_tail_word_margin), and
+// the sentence follows it. `word` is the best such whole-input word.
+void T9PreferMergedTailWord(const T9ScriptQuery& q, const T9NgramModel* ngram, double margin,
+                            const an<DictEntry>& word, deque<an<Sentence>>* sentences);
+
 }  // namespace rime
 
 #endif  // CYIME_T9_SENTENCE_RESCORE_H_

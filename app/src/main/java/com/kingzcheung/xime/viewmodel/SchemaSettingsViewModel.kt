@@ -11,6 +11,8 @@ import com.kingzcheung.xime.settings.ImportManager
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.PersonalDictManager
 import com.kingzcheung.xime.settings.SchemaManager
+import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.SchemaLanguageChoice
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.settings.SchemaMeta
 import com.kingzcheung.xime.settings.SettingsPreferences
@@ -33,6 +35,7 @@ data class SchemaUiState(
     val toastMessage: String? = null,
     /** 部署没过或有方案没编译出来时的说明，页面弹窗显示（Toast 在 Android 12 以后最多两行，放不下方案名和原因）。 */
     val deployReport: String? = null,
+    val importReport: String? = null,
 )
 
 class SchemaSettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -60,9 +63,8 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                     SettingsPreferences.getCurrentSchema(context),
                 )
             }
-            // 组合配置（如 14 键小鹤双拼）跟随方案与布局自动启用，不单列。
-            val sorted = allSchemas.filterNot { com.kingzcheung.xime.settings.CyimeInputDefaults.isCompanion(it.schemaId) }
-                .sortedByDescending { it.schemaId in enabledSchemas }
+            // 语言与方案页需要所有组合，只有独立的启停开关列表排除联动项。
+            val sorted = allSchemas.sortedByDescending { it.schemaId in enabledSchemas }
             _uiState.update {
                 it.copy(
                     allSchemas = sorted,
@@ -70,6 +72,15 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                     currentSchema = currentSchema
                 )
             }
+        }
+    }
+
+    /** 没写语言的导入方案：存下用户选的语言（null 回到未标注语言），刷新列表（GitHub #86）。 */
+    fun setSchemaLanguage(schemaId: String, language: InputLanguage?, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { SchemaLanguageChoice.choose(context, schemaId, language) }
+            refresh()
+            onDone()
         }
     }
 
@@ -86,11 +97,12 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
         }
         val turnedOn = schema.schemaId in enabled
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            val persisted = withContext(Dispatchers.IO) {
                 SchemaManager.setEnabledSchemas(context, enabled)
                 if (turnedOn) com.kingzcheung.xime.settings.LanguagePreferences.enableForSchema(context, schema.schemaId)
+                SchemaManager.getEnabledSchemas(context)
             }
-            _uiState.update { it.copy(enabledSchemas = enabled) }
+            _uiState.update { it.copy(enabledSchemas = persisted) }
         }
     }
 
@@ -138,16 +150,18 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
             when (val result = ImportManager.import(context, uri)) {
                 is ImportManager.ImportResult.Content -> {
                     refresh()
-                    _importCompleted.tryEmit(result)
-                    showToast(result.message)
+                    _importCompleted.emit(result)
+                    if (!result.success || (result.pendingPackageId == null && '\n' in result.message))
+                        reportImport(result.message)
+                    else showToast(result.message)
                 }
                 is ImportManager.ImportResult.Plugin -> {
                     withContext(Dispatchers.IO) { PluginManager.loadEnabledPlugins() }
                     refresh()
-                    _importCompleted.tryEmit(null)
+                    _importCompleted.emit(null)
                     showToast("插件「${result.pluginInfo?.name}」安装成功")
                 }
-                is ImportManager.ImportResult.Failed -> showToast("导入失败：${result.reason}")
+                is ImportManager.ImportResult.Failed -> reportImport("导入失败：${result.reason}")
                 is ImportManager.ImportResult.Unsupported -> showToast("不支持的文件类型")
             }
         }
@@ -185,6 +199,12 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
     fun clearDeployReport() {
         _uiState.update { it.copy(deployReport = null) }
     }
+
+    fun reportImport(message: String) = _uiState.update {
+        it.copy(importReport = listOfNotNull(it.importReport, message).joinToString("\n\n"))
+    }
+
+    fun clearImportReport() = _uiState.update { it.copy(importReport = null) }
 
     fun clearToast() {
         _uiState.update { it.copy(toastMessage = null) }

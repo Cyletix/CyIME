@@ -38,6 +38,10 @@ itself is shared with `../android_replay/ChatReplay.java` and invoked with
 contain the existing project dictionaries, schemas, grammar, sentence model and
 vocabulary, with per-file SHA256 manifests. They are test inputs, not APKs.
 
+For settings that regenerate spelling rules, pass the app's complete `t9_pinyin.custom.yaml` to
+`t9_replay.py run --schema-patch-file FILE`. The host deploys it in the run's private directory
+and saves its SHA256 and a copy alongside the deployed schema.
+
 Build logs and artifacts live in the private cache, and each result directory
 retains build/source manifests as well as raw replay evidence. A successful
 build or replay does not claim that candidate quality passed; check quality and
@@ -51,6 +55,16 @@ and a separate test user-resource directory with `rime_ice`, `pinyin_14jian`,
 an installed application's data. It confirms a partial Chinese candidate to
 check prefix preservation, so this is distinct from the no-selection T9 corpus
 protocol. It never commits a full input or adds training phrases.
+Syllables are chosen one after another as on the nine-key rail: after a choice
+the native options move to the next syllable, the rail's delete key takes back
+the last choice (`nativeUndoPinyinSyllable`), and confirming a word that ends on
+a chosen boundary keeps the choices after it.
+
+Pass `--single-key` after the two directory arguments to check a single `as` tap and exact-letter reselection in the two bundled 14-key schemes. The probe prints Chinese candidates and the native syllable options separately and checks both letter families, the composition caret and the absence of a confirmed prefix.
+
+`MergedWordLearningProbe LIB USER learn` needs a freshly deployed, disposable 14-key user directory.
+It selects two words through the real merged-key input path. Run again in a new process with `reopen`
+to verify that the choices persist, an explicit final letter is respected and the literal alternative can be selected again.
 
 The probe covers grouped/exact letters, real `lo`/`luo` shared codes, `xian`
 versus `xi+an`, a chosen `ni` followed by `n`, reselecting the first unconfirmed
@@ -69,6 +83,31 @@ clear leaves, which is the 2026-10-23 report (old digits came back after Enter).
 `CustomPhraseReloadProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists
 `rime_ice`) adds a phrase to `custom_phrase.txt` while a session is open and reports which step makes
 it appear. 2026-10-23: nothing until the schema is selected again; maintenance is not needed.
+
+`com.cyime.audit.WeightExperiment LIB USER CASES OUTPUT SETTINGS [SCHEMA]` accepts an already
+deployed, isolated nine-key scheme. The default is `t9_pinyin`. Use an empty JSON object for
+`SETTINGS` when no numerical schema overrides are expected. The [phrase recall cases](../fixtures/phrase_recall_20261101.json)
+cover both full pinyin and `double_pinyin_flypy_t9`; run once for each schema, with different output
+paths. It records the literal digits and immediate and settled menus; a missing target or a timeout on a
+case with `top_k` returns failure after writing the results. The transposition is synthetic; the user's
+keystrokes were not recorded.
+
+For independent full-pinyin coverage, generate the paired cases with
+`python tools/ime_lab/typo_bench.py make-t9 OUT.json`, run them through the same probe, and pass the cases and its JSONL output to
+`python tools/ime_lab/typo_bench.py score-t9 OUT.json RUN.jsonl`. Each sentence has one omitted
+digit, one transposition, and two single-digit replacements at the same position. One replacement
+shares an edge on the standard 123/456/789 pad and the other does not. Each rate uses only sentences
+that ranked first when spelled correctly. This
+endpoint diagnostic measures candidate recall; the fixed replay supplies the quality and latency gates.
+
+`SpellingPauseProbe LIB USER NEIGHBORS` checks interior transpositions on the real letter and digit
+key paths. On nine keys it also selects a shared-edge correction and checks that a diagonal tap, a
+far tap, crossing a row boundary and two separate substitutions do not promote the target. Use an isolated user directory with the bundled
+`rime_ice` and `t9_pinyin` schemes and the [nine-key trial patch](../../../docs/config_examples/t9_pinyin_spelling/t9_pinyin.custom.yaml)
+already deployed. Use `typo_bench.py neighbors` for the last argument. The probe checks
+the two protected candidates, rejection with a moved caret, the 26-key commit and
+consumption of all original digits on nine keys. It selects candidates and belongs in
+a disposable user directory separate from any no-learning corpus run.
 
 `CaretCandidateProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists `t9_pinyin` and
 `rime_ice`) moves the code caret inside xu'yao'jia'ge to just after yao, the way the pinyin editor does,
@@ -94,3 +133,11 @@ and the hidden-candidate line, for comparing a 14-key schema before and after a 
 the grammar file: the four flick cases, all 12 phrase lookups and the hidden check pass; the 11 ranking
 words are first both with the old schema (no filters) and with `cyime_candidate_policy` + `uniquifier`, the
 only difference being that the hidden 童话 is no longer offered.
+
+`SharedShortcutProbe.java` checks shared symbol shortcuts on full and double pinyin with nine, 26
+and 14 keys. Set `CYIME_PHRASE_PROBE_DIR` to an empty scratch directory when running
+`PersonalDictManagerTest`, then copy its exported tables and patches into a disposable user directory
+containing the bundled schemas (enable all six schemas). Compile the probe with `LayoutSyncProbe.java`
+and the replay's `RimeEngine.java`; arguments are the host library directory and disposable user directory.
+It checks every same-code candidate and selection, supplementary Unicode, backspacing and retyping,
+weight order, and coexistence with the double-pinyin schema's private table.

@@ -11,6 +11,31 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 class SchemaYamlParserTest {
+    @Test fun `inline schema metadata is discovered without scanning a nested schema`() {
+        val f = writeSchema("""
+            metadata:
+              schema: { schema_id: nested, name: 嵌套 }
+            schema: { schema_id: inline_wubi, name: 我的五笔, version: '1' }
+        """.trimIndent())
+        assertEquals("inline_wubi", SchemaManager.parseSchemaYaml(f)?.schemaId)
+    }
+
+    @Test fun `unindented comment in schema metadata does not terminate the mapping`() {
+        val f = writeSchema("""
+            schema:
+            # 第三方方案的说明
+              schema_id: my_table
+              name: 自定义方案
+        """.trimIndent())
+        assertEquals("自定义方案", SchemaManager.parseSchemaYaml(f)?.name)
+    }
+
+    @Test fun `inline and indentless Rime switches retain their declared names`() {
+        val file = writeSchema("switches: [{name: ascii_mode, states: [中文, 西文]}]")
+        assertEquals("ascii_mode", SchemaManager.parseSchemaSwitches(file).single().name)
+        file.writeText("switches:\n# 方案选项\n- name: full_shape\n  states: [半角, 全角]\nengine: {}")
+        assertEquals("full_shape", SchemaManager.parseSchemaSwitches(file).single().name)
+    }
 
     @Test fun `regional Chinese language tag keeps Chinese services on a reordered imported keyboard`() {
         val file = writeSchema("""

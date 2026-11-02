@@ -2,7 +2,8 @@
   CyIME：中文 26 键中英混输（开关 cyime_mixed_input，默认关）。
   nihaohelloshijie → 你好hello世界：输入里找英文词库中的整词（且这段字母本身拼不成全拼音节），其余部分必须是全拼
   （最后一段可以是没打完的音节或首字母），拼音段交给主翻译器转成首选，英文词保持词库写法（打了大写按所打）。
-  整段本来就能拼成全拼音节时不出混输候选（game、nice 这类像拼音的英文词因此打不出），只有一段英文都没有时也不出。
+  整段本来就能拼成全拼音节时，只认其中最长的一个英文词（4 个字母以上），且这个词按拼音读不成词（meeting 读成
+  么额听才算英文，women 读成 我们 仍是拼音），与单独打一个英文词时英文排第一的规则相同；只有一段英文都没有时不出。
   混输候选只覆盖整段输入，放第一位；拼音段用另一个不学习的主翻译器实例查，选中混输候选不进用户词库。
 --]]
 local OPTION = "cyime_mixed_input"
@@ -13,7 +14,7 @@ local MAX_WORD = 20
 -- (PPT, KTV, API) and these common ones count.
 local SHORT_WORDS = { ok = "ok", hi = "hi", go = "go", no = "no" }
 local THREE_LETTER = {}
-for w in ("app bug yes bye wow get low top max min new old hot bad mod buy pay fix job web emo cue"):gmatch("%a+") do
+for w in ("app bug yes bye wow get low top max min new old hot bad mod buy pay fix job web emo cue gym"):gmatch("%a+") do
   THREE_LETTER[w] = true
 end
 
@@ -191,7 +192,7 @@ local function split(s)
   local parts, i, whole = {}, 1, 0
   while i <= n do
     local step = best[i].step
-    if step.kind == "py" and step.whole then whole = whole + 1 end
+    if step.kind == "py" and step.whole and not step.text:match("^[aoe]") then whole = whole + 1 end
     if step.kind == "py" and #parts > 0 and parts[#parts].kind == "py" then
       parts[#parts].text = parts[#parts].text .. step.text
     else
@@ -199,12 +200,95 @@ local function split(s)
     end
     i = best[i].tail
   end
-  -- Initials only (cbdl, whyw) are abbreviated Chinese, not an acronym plus a word.
+  -- Initials only (cbdl, whyw) are abbreviated Chinese, not an acronym plus a word; so are initials with a bare
+  -- a, e or o (cbda 差不多啊, awsl, xxle), which count no whole syllable.
   if whole == 0 then return nil end
   return parts
 end
 
--- First candidate of the pinyin translator that covers the whole piece.
+-- Input that is all full pinyin (jintiandemeetingquxiaole) can still hold an English word that is itself whole
+-- pinyin (meeting = me'e'ting). split() leaves such input to pinyin; this finds the longest such word (4+ letters) with
+-- full pinyin before it and full pinyin after it (the last syllable may be unfinished). The caller keeps it only
+-- when the word read as pinyin is no word at all (meeting reads 么额听; women reads 我们 and stays pinyin), the
+-- same rule that puts English first when the word is typed alone.
+local function pinyin_word(s)
+  local n, lower = #s, s:lower()
+  if n < 6 or n > MAX_INPUT or not s:match("^%l+$") then return nil end
+  local head = { [1] = true }  -- head[i]: lower:sub(1, i - 1) is whole syllables
+  for i = 2, n + 1 do
+    for len = 1, math.min(6, i - 1) do
+      if head[i - len] and SYLLABLES[lower:sub(i - len, i - 1)] then head[i] = true; break end
+    end
+  end
+  local tail = { [n + 1] = true }  -- tail[i]: lower:sub(i) is whole syllables, the last one maybe unfinished
+  for i = n, 1, -1 do
+    for len = 1, 6 do
+      local j = i + len - 1
+      if j > n then break end
+      local syl = lower:sub(i, j)
+      if (SYLLABLES[syl] and tail[j + 1]) or (j == n and PREFIXES[syl]) then tail[i] = true; break end
+    end
+  end
+  -- Syllables that can end a full reading of x (x:sub(1, n) when n is given).
+  local function last_syllables(x, n)
+    n = n or #x
+    local ok, out = { [1] = true }, {}
+    for i = 2, n + 1 do
+      for len = 1, math.min(6, i - 1) do
+        local syl = x:sub(i - len, i - 1)
+        if ok[i - len] and SYLLABLES[syl] then
+          ok[i] = true
+          if i == n + 1 then out[#out + 1] = syl end
+        end
+      end
+    end
+    return out
+  end
+  -- Whether syllable a takes the first letters of b into a longer syllable (ti + anti -> tian, me + n -> men):
+  -- the word then cuts a syllable of the plain reading (jintiantebie, xiongdimen) and is not meant.
+  local function absorbs(a, b)
+    for k = 1, math.min(3, #b) do
+      if SYLLABLES[a .. b:sub(1, k)] then return true end
+    end
+    return false
+  end
+  local function cuts(i, j, key)
+    if i > 1 then
+      for _, syl in ipairs(last_syllables(lower, i - 1)) do
+        if absorbs(syl, key) then return true end
+      end
+    end
+    if j < n then
+      for _, syl in ipairs(last_syllables(key)) do
+        if absorbs(syl, lower:sub(j + 1)) then return true end
+      end
+    end
+    return false
+  end
+  local words, best = load_words(), nil
+  for i = 1, n do
+    if head[i] then
+      for j = n, i + 3, -1 do
+        local key = lower:sub(i, j)
+        if j - i + 1 <= MAX_WORD and tail[j + 1] and (i > 1 or j < n) and words[key] and not mixed_words[key]
+            and SYLLABLES[key] == nil and full_pinyin(key)[1] and (not best or #key > #best.key)
+            and not cuts(i, j, key) then
+          best = { i = i, j = j, key = key }
+          break
+        end
+      end
+    end
+  end
+  if not best then return nil end
+  local parts = {}
+  if best.i > 1 then parts[#parts + 1] = { kind = "py", text = lower:sub(1, best.i - 1) } end
+  parts[#parts + 1] = { kind = "en", text = words[best.key], check = best.key }
+  if best.j < n then parts[#parts + 1] = { kind = "py", text = lower:sub(best.j + 1) } end
+  return parts
+end
+
+-- First candidate of the pinyin translator that covers the whole piece, and its type (sentence when the piece
+-- reads as no single word).
 local function convert(env, piece, seg)
   local segment = Segment(0, #piece)
   segment.tags = seg.tags
@@ -212,7 +296,7 @@ local function convert(env, piece, seg)
   if not translation then return nil end
   local seen = 0
   for cand in translation:iter() do
-    if cand._end - cand._start == #piece then return cand.text end
+    if cand._end - cand._start == #piece then return cand.text, cand.type end
     seen = seen + 1
     if seen >= 8 then break end
   end
@@ -248,11 +332,21 @@ end
 
 local function translator(input, seg, env)
   if not env.engine.context:get_option(OPTION) then return end
-  local parts = split(input)
-  if not parts or not env.pinyin then return end
+  if not env.pinyin then return end
+  local parts = split(input) or pinyin_word(input)
+  if not parts then return end
   local out = {}
   for _, part in ipairs(parts) do
-    if part.kind == "en" then
+    if part.check then
+      local kind = env.converted["\0" .. part.check]
+      if kind == nil then
+        local _, k = convert(env, part.check, seg)
+        kind = k or false
+        env.converted["\0" .. part.check], env.cached = kind, env.cached + 1
+      end
+      if kind ~= "sentence" then return end
+      out[#out + 1] = part.text
+    elseif part.kind == "en" then
       out[#out + 1] = part.text
     else
       -- Typing extends only the last piece: earlier pieces are converted once.

@@ -1,7 +1,9 @@
 #include "candidate_policy.h"
+#include "basic_particle_choices.h"
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <utf8.h>
@@ -17,6 +19,7 @@
 #include <rime/language.h>
 #include <rime/registry.h>
 #include <rime/translation.h>
+#include <t9_pinyin_map.h>
 
 namespace cyime {
 namespace {
@@ -26,6 +29,7 @@ std::set<std::string> hidden;
 std::string hidden_path;
 thread_local Context* omission_context = nullptr;
 thread_local bool omission_inserted = false;
+thread_local an<Candidate> pending_digit_edit;
 
 std::vector<std::string> HanCharacters(const std::string& text) {
   std::vector<std::string> chars;
@@ -52,6 +56,18 @@ std::vector<size_t> SyllableEnds(const an<Phrase>& phrase) {
   return ends;
 }
 
+// Two sentences that end in the same word over the same keys (济南吗 and 礼貌吗): they differ only in the
+// words before it, so the second is an alternative to the first, not another segmentation of the input.
+bool SameLastWord(const an<Phrase>& phrase, const an<Phrase>& best) {
+  const auto a = As<Sentence>(phrase);
+  const auto b = As<Sentence>(best);
+  if (!a || !b || a->components().size() < 2 || b->components().size() < 2 ||
+      a->word_lengths().empty() || b->word_lengths().empty())
+    return false;
+  return a->components().back().text == b->components().back().text &&
+         a->word_lengths().back() == b->word_lengths().back();
+}
+
 double SpellingCoverage(const an<Phrase>& phrase) {
   double complete = phrase->entry().quality_len;
   if (const auto sentence = As<Sentence>(phrase)) {
@@ -61,9 +77,80 @@ double SpellingCoverage(const an<Phrase>& phrase) {
   return complete / std::max<size_t>(1, phrase->end() - phrase->start());
 }
 
+// The auxiliary prism can match an edit in several syllables. Only offer a
+// whole reading that differs from the actual input by one edit in total.
+bool IsSingleSpellingEdit(const string& input, const string& pinyin, bool digits, Config* tap_grid = nullptr) {
+  string expected;
+  for (char ch : pinyin) {
+    if (ch == ' ') continue;
+    if (ch < 'a' || ch > 'z') return false;
+    expected += digits ? T9PinyinMap::LetterToDigit(ch) : ch;
+  }
+  size_t pos = 0;
+  while (pos < input.size() && pos < expected.size() && input[pos] == expected[pos]) ++pos;
+  if (tap_grid) {
+    string adjacent;
+    return expected.size() == input.size() && pos < input.size() &&
+           input.compare(pos + 1, string::npos, expected, pos + 1, string::npos) == 0 &&
+           tap_grid->GetString("cyime_tap_neighbors/" + string(1, input[pos]), &adjacent) &&
+           adjacent.find(expected[pos]) != string::npos;
+  }
+  if (digits && expected.size() == input.size() + 1)
+    return expected.compare(pos + 1, string::npos, input, pos, string::npos) == 0;
+  return expected.size() == input.size() && pos + 1 < input.size() &&
+         input[pos] == expected[pos + 1] && input[pos + 1] == expected[pos] &&
+         input.compare(pos + 2, string::npos, expected, pos + 2, string::npos) == 0;
+}
+
+// ScriptTranslator consults its engine's schema and current input when querying.
+// Use the small edit prism's own engine so it cannot start the active keyboard's
+// joint decoder, sentence model, or learning callbacks a second time.
+class EditLookup : public Engine {
+ public:
+  EditLookup(const string& id, const string& active_dictionary) {
+    schema_.reset(new Schema(id));
+    string prism;
+    auto component = Translator::Require("script_translator");
+    if (component && schema_->config()->GetString("translator/prism", &prism) && prism == id &&
+        schema_->config()->GetString("translator/dictionary", &dictionary_) && dictionary_ == active_dictionary) {
+      translator_.reset(component->Create(Ticket(this, "translator")));
+      schema_->config()->GetString("cyime_tap_schema", &tap_schema_);
+    }
+  }
+
+  an<Candidate> Best(const string& input, bool digits, const string& original_first) {
+    auto hit = Lookup(input);
+    if (hit && IsSingleSpellingEdit(input, hit->comment(), digits)) return hit;
+    // Two independent decodings agree with the original reading. Looking for
+    // a substituted key here mostly introduces alternatives to correctly typed text.
+    if (!digits || tap_schema_.empty() || (hit && hit->text() == original_first)) return nullptr;
+    if (!taps_) taps_.reset(new EditLookup(tap_schema_, dictionary_));
+    auto neighbor = taps_->Lookup(input);
+    return neighbor && IsSingleSpellingEdit(input, neighbor->comment(), true, taps_->schema()->config()) ?
+        neighbor : nullptr;
+  }
+
+ private:
+  an<Candidate> Lookup(const string& input) {
+    if (!translator_) return nullptr;
+    context_->set_input(input);
+    Segment segment(0, input.size());
+    segment.tags.insert("abc");
+    auto matches = translator_->Query(input, segment);
+    auto candidate = matches && !matches->exhausted() ? matches->Peek() : nullptr;
+    return candidate && candidate->start() == 0 && candidate->end() == input.size() ? candidate : nullptr;
+  }
+
+  string dictionary_, tap_schema_;
+  the<Translator> translator_;
+  the<EditLookup> taps_;
+};
+
 class PolicyTranslation : public Translation {
  public:
-  PolicyTranslation(an<Translation> source, const std::string& input, bool numeric, Translator* omission) : source_(source), end_(input.size()) {
+  PolicyTranslation(an<Translation> source, const std::string& input, bool numeric, Translator* omission,
+                    EditLookup* edits, an<Candidate> edit, BasicParticleChoices* particles, size_t particle_start)
+      : source_(source), end_(input.size()) {
     // Bound the work independently of dictionary size. This is native candidate
     // identity-preserving ordering, not a separate UI list with stale indices.
     for (size_t i = 0; i < 64 && !source_->exhausted(); ++i) {
@@ -89,7 +176,10 @@ class PolicyTranslation : public Translation {
       // Alternative T9 segmentations remain accessible, after dictionary prefixes.
       // Words on the best-scoring segmentation (including ambiguous final initials)
       // keep competing by existing weights; no text blacklist or external model.
-      if (numeric && As<Sentence>(p) && !best_ends.empty() && SyllableEnds(p) != best_ends)
+      // A sentence ending in the best sentence's last word stays with it (the T9 decoder shows one such
+      // sentence after one ending in a particle: 直播吗, then 遗憾吗).
+      if (numeric && As<Sentence>(p) && !best_ends.empty() && SyllableEnds(p) != best_ends &&
+          !SameLastWord(p, best_sentence))
         group = 2;
       slots.push_back(i);
       ranked.push_back({head_[i], group, numeric ? SpellingCoverage(p) : 0.0});
@@ -145,6 +235,7 @@ class PolicyTranslation : public Translation {
       });
       if (chinese != head_.begin() && chinese != head_.end()) std::rotate(head_.begin(), chinese, chinese + 1);
     }
+    size_t inserted = 0;
     if (omission && head_.size() >= 2) {
       Segment segment(0, input.size());
       segment.tags.insert("abc");
@@ -152,7 +243,6 @@ class PolicyTranslation : public Translation {
       if (alternatives && !alternatives->exhausted() && alternatives->Peek() &&
           alternatives->Peek()->text() != head_.front()->text()) {
         const auto original = head_;
-        size_t inserted = 0;
         for (size_t i = 0; i < 10 && inserted < 2 && !alternatives->exhausted(); ++i) {
           auto c = alternatives->Peek();
           alternatives->Next();
@@ -171,6 +261,19 @@ class PolicyTranslation : public Translation {
         }
       }
     }
+    if (edits && head_.size() >= 2) edit = edits->Best(input, false, head_.front()->text());
+    if (edit && head_.size() >= 2 && !hidden.count(edit->text()) && !HanCharacters(edit->text()).empty()) {
+      auto same = [&](const auto& c) { return c->text() == edit->text(); };
+      auto original = std::find_if(head_.begin(), head_.end(), same);
+      if (original >= head_.begin() + std::min<size_t>(5, head_.size())) {
+        if (original != head_.end()) head_.erase(original);
+        seen_.insert(edit->text());
+        head_.insert(head_.begin() + 2 + inserted, New<ShadowCandidate>(
+            edit, "cyime_spelling_edit", edit->text(), numeric ? edit->comment() : "纠错", false));
+        omission_inserted = true;
+      }
+    }
+    if (particles) particles->Promote(input, particle_start, head_, hidden, seen_);
     Advance();
   }
   bool Next() override { current_.reset(); Advance(); return !exhausted(); }
@@ -213,31 +316,66 @@ class PolicyTranslation : public Translation {
   an<Candidate> current_;
 };
 
+class CandidatePolicy;
+// Each opt-in schema owns its lookup until its filter is destroyed on a schema
+// switch or session close. RefineOmission can probe it before rebuilding a menu.
+std::map<Context*, CandidatePolicy*> spelling_policies;
+
 class CandidatePolicy : public Filter {
  public:
-  explicit CandidatePolicy(const Ticket& ticket) : Filter(ticket) {}
+  explicit CandidatePolicy(const Ticket& ticket) : Filter(ticket), particles_(ticket) {
+    ticket.schema->config()->GetBool("cyime_particle_shortcuts/selected_tail", &selected_tail_);
+    engine_->schema()->config()->GetString("cyime_omission_schema", &omission_id_);
+    if (engine_->schema()->config()->GetString("cyime_edit_schema", &edit_id_))
+      spelling_policies[engine_->context()] = this;
+  }
+  ~CandidatePolicy() override {
+    const auto it = spelling_policies.find(engine_->context());
+    if (it != spelling_policies.end() && it->second == this) spelling_policies.erase(it);
+  }
+  EditLookup* Edits() {
+    string dictionary;
+    if (!edits_ && !edit_id_.empty() &&
+        engine_->schema()->config()->GetString("translator/dictionary", &dictionary))
+      edits_.reset(new EditLookup(edit_id_, dictionary));
+    return edits_.get();
+  }
+  bool HasOmission() const { return !omission_id_.empty(); }
   an<Translation> Apply(an<Translation> source, CandidateList*) override {
     const auto& input = engine_->context()->input();
     const bool numeric = !input.empty() && input.find_first_not_of("23456789' ") == std::string::npos;
-    Translator* extra = nullptr;
-    if (omission_context == engine_->context()) {
-      std::string id;
-      if (!omission_ && engine_->schema()->config()->GetString("cyime_omission_schema", &id)) {
-        Schema schema(id);
-        std::string prism;
-        auto component = Translator::Require("script_translator");
-        if (component && schema.config()->GetString("translator/prism", &prism) && prism == id) {
-          Ticket ticket(engine_, "translator");
-          ticket.schema = &schema;
-          omission_.reset(component->Create(ticket));
-        }
-      }
-      extra = omission_.get();
-    }
-    return New<PolicyTranslation>(source, input, numeric, extra);
+    const bool idle = omission_context == engine_->context();
+    auto* edits = idle && !numeric && !engine_->context()->get_property("cyime_neighbors").empty() ?
+        Edits() : nullptr;
+    const auto& comp = engine_->context()->composition();
+    const bool at_end = !comp.empty() && comp.back().HasTag("abc") && comp.back().end == input.size() &&
+        engine_->context()->caret_pos() == input.size();
+    const bool whole = at_end && comp.size() == 1 && comp.back().start == 0;
+    const bool tail = selected_tail_ && at_end && comp.size() >= 2 && comp.back().start + 1 == input.size() &&
+        comp[comp.size() - 2].status >= Segment::kSelected && comp[comp.size() - 2].end == comp.back().start;
+    return New<PolicyTranslation>(source, input, numeric, idle ? Omission() : nullptr, edits,
+                                  idle && numeric ? pending_digit_edit : nullptr, whole || tail ? &particles_ : nullptr,
+                                  tail ? comp.back().start : 0);
   }
  private:
+  Translator* Omission() {
+    if (!omission_ && HasOmission()) {
+      Schema schema(omission_id_);
+      std::string prism;
+      auto component = Translator::Require("script_translator");
+      if (component && schema.config()->GetString("translator/prism", &prism) && prism == omission_id_) {
+        Ticket ticket(engine_, "translator");
+        ticket.schema = &schema;
+        omission_.reset(component->Create(ticket));
+      }
+    }
+    return omission_.get();
+  }
   the<Translator> omission_;
+  the<EditLookup> edits_;
+  string edit_id_, omission_id_;
+  BasicParticleChoices particles_;
+  bool selected_tail_ = false;
 };
 
 bool StoreHidden(const std::set<std::string>& next) {
@@ -255,16 +393,37 @@ bool StoreHidden(const std::set<std::string>& next) {
 
 bool RefineOmission(rime::Context* context) {
   if (!context || context->input().size() < 4 || context->input().size() > 80 ||
-      context->input().find_first_not_of("abcdefghijklmnopqrstuvwxyz") != std::string::npos ||
+      (context->input().find_first_not_of("abcdefghijklmnopqrstuvwxyz") != std::string::npos &&
+       (context->input().size() < 6 || context->input().size() > 32 ||
+        context->input().find_first_not_of("23456789") != std::string::npos)) ||
       context->caret_pos() != context->input().size() || context->composition().size() != 1 ||
       context->composition().back().status >= rime::Segment::kSelected ||
       context->composition().back().selected_index != 0) return false;
   const auto original = context->composition().back();
   if (!original.menu || original.menu->Prepare(2) < 2) return false;
+  an<Candidate> digit_edit;
+  const bool numeric = context->input().front() >= '2' && context->input().front() <= '9';
+  const auto policy = numeric ? spelling_policies.find(context) : spelling_policies.end();
+  if (policy != spelling_policies.end()) {
+    auto* edits = policy->second->Edits();
+    auto first = original.menu->GetCandidateAt(0);
+    if (edits && first)
+      digit_edit = edits->Best(context->input(), true, Candidate::GetGenuineCandidate(first)->text());
+    if (digit_edit && (hidden.count(digit_edit->text()) || HanCharacters(digit_edit->text()).empty()))
+      digit_edit.reset();
+    for (size_t i = 0; digit_edit && i < 5; ++i) {
+      auto present = original.menu->GetCandidateAt(i);
+      if (!present) break;
+      if (present->text() == digit_edit->text()) digit_edit.reset();
+    }
+    if (!digit_edit && !policy->second->HasOmission()) return false;
+  }
   struct Scope {
-    explicit Scope(rime::Context* ctx) { omission_context = ctx; omission_inserted = false; }
-    ~Scope() { omission_context = nullptr; }
-  } scope(context);
+    Scope(rime::Context* ctx, an<Candidate> digit_edit) {
+      omission_context = ctx; omission_inserted = false; pending_digit_edit = std::move(digit_edit);
+    }
+    ~Scope() { omission_context = nullptr; pending_digit_edit.reset(); }
+  } scope(context, digit_edit);
   if (!context->RefreshNonConfirmedComposition() || context->composition().empty()) return false;
   auto menu = context->composition().back().menu;
   if (!menu) return false;
@@ -276,6 +435,19 @@ bool RefineOmission(rime::Context* context) {
     auto before = original.menu->GetCandidateAt(i);
     auto after = menu->GetCandidateAt(i);
     keep = before && after && before->text() == after->text() && before->end() == after->end();
+  }
+  if (keep) {
+    // A downstream filter may hide or merge the extra candidate. Do not
+    // invalidate taps on a menu that still shows the same first five choices.
+    keep = false;
+    for (size_t i = 2; i < 5; ++i) {
+      auto before = original.menu->GetCandidateAt(i);
+      auto after = menu->GetCandidateAt(i);
+      if (after && (!before || before->text() != after->text() || before->end() != after->end())) {
+        keep = true;
+        break;
+      }
+    }
   }
   if (!keep) context->composition().back() = original;
   return keep;

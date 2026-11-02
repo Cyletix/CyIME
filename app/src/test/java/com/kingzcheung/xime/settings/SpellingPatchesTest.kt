@@ -37,7 +37,7 @@ class SpellingPatchesTest {
         val algebra = SpellingPatches.algebraOf(schema)!!
         val items = linkedSetOf(SpellingPatches.Fuzzy.Z, SpellingPatches.Fuzzy.AN)
         val custom = SpellingPatches.patch("", SpellingPatches.fuzzyLines(algebra, items))!!
-        assertEquals(SpellingPatches.Fuzzy.Z.rules + SpellingPatches.Fuzzy.AN.rules + algebra, algebraIn(custom))
+        assertEquals(SpellingPatches.Fuzzy.Z.penalized + SpellingPatches.Fuzzy.AN.penalized + algebra, algebraIn(custom))
     }
 
     @Test fun otherPatchesAreKeptAndTurningEverythingOffRestoresTheFile() {
@@ -45,7 +45,7 @@ class SpellingPatchesTest {
         val lines = SpellingPatches.fuzzyLines(listOf("erase/^hm$/"), setOf(SpellingPatches.Fuzzy.NL))
         val patched = SpellingPatches.patch(original, lines)!!
         assertTrue(patched.contains("table_translator@custom_phrase"))
-        assertEquals(listOf("derive/^n/l/", "derive/^l/n/", "erase/^hm$/"), algebraIn(patched))
+        assertEquals(listOf("fuzz/^n/l/", "fuzz/^l/n/", "erase/^hm$/"), algebraIn(patched))
         // 再写一次只换掉自己那一段，不重复。
         val again = SpellingPatches.patch(patched, lines)!!
         assertEquals(patched, again)
@@ -55,7 +55,7 @@ class SpellingPatchesTest {
     @Test fun aFileWithoutPatchGetsOneAndBrokenMarkersAreLeftAlone() {
         val patched = SpellingPatches.patch("# 用户注释\n", SpellingPatches.fuzzyLines(listOf("erase/^hm$/"), setOf(SpellingPatches.Fuzzy.IN)))!!
         assertTrue(patched.startsWith("# 用户注释\npatch:\n"))
-        assertEquals(listOf("derive/ing$/in/", "derive/in$/ing/", "erase/^hm$/"), algebraIn(patched))
+        assertEquals(listOf("fuzz/ing$/in/", "fuzz/in$/ing/", "erase/^hm$/"), algebraIn(patched))
         assertNull(SpellingPatches.patch("patch:\n  # BEGIN CYIME SPELLING\n", listOf("\"translator/enable_correction\": true")))
     }
 
@@ -71,7 +71,7 @@ class SpellingPatchesTest {
         val flypy = listOf("erase/^xx$/", "derive/^([jqxy])u$/\$1v/", "xform/ing$/Ⓚ/", "xlit/Ⓚ/k/")
         val lines = SpellingPatches.fuzzyLines(flypy, setOf(SpellingPatches.Fuzzy.IN)) + "\"translator/enable_correction\": true"
         val patched = SpellingPatches.patch("", lines)!!
-        assertEquals(SpellingPatches.Fuzzy.IN.rules + flypy, algebraIn(patched))
+        assertEquals(SpellingPatches.Fuzzy.IN.penalized + flypy, algebraIn(patched))
         val root = SchemaManager.yaml.parseToYamlNode(patched) as YamlMap
         val patch = root.entries.entries.single { it.key.content == "patch" }.value as YamlMap
         assertEquals("true", (patch.entries.entries.single { it.key.content == "translator/enable_correction" }.value as YamlScalar).content)
@@ -113,5 +113,63 @@ class SpellingPatchesTest {
             assertTrue(item.title, item.rules.all { it.startsWith("derive/") })
         }
         assertEquals(SpellingPatches.Fuzzy.entries.size, SpellingPatches.Fuzzy.entries.map { it.id }.toSet().size)
+    }
+
+    /** 14 键全拼也写模糊音（11-01 反馈：设置在「九键与 14 键」页，14 键开了却不模糊）：规则排在合并键派生前面。 */
+    @Test fun builtinFourteenKeyPinyinGetsFuzzyRulesBeforeItsMergedKeyRules() {
+        assertTrue("pinyin_14jian" in SpellingPatches.builtinFullPinyinSchemas)
+        val algebra = SpellingPatches.algebraOf(java.io.File("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText())!!
+        assertTrue(algebra.any { it.contains("[as]") })
+        val items = linkedSetOf(SpellingPatches.Fuzzy.S, SpellingPatches.Fuzzy.AN, SpellingPatches.Fuzzy.EN)
+        val custom = SpellingPatches.patch("", SpellingPatches.fuzzyLines(algebra, items))!!
+        assertEquals(items.flatMap { it.penalized } + algebra, algebraIn(custom))
+    }
+
+    /** 按 Rime 的意思跑一遍拼写规则（xform 改、derive/abbrev 加、erase 删、xlit 换字），只用于检查规则之间的先后。 */
+    private fun spellingsOf(rules: List<String>, syllable: String): Set<String> = rules.fold(setOf(syllable)) { spellings, rule ->
+        val parts = rule.split('/')
+        val (op, from, to) = Triple(parts[0], parts[1], parts[2])
+        when (op) {
+            "xlit" -> spellings.mapTo(linkedSetOf()) { s ->
+                s.map { c -> from.indexOf(c).let { if (it < 0) c else to[it] } }.joinToString("")
+            }
+            "erase" -> spellings.filterTo(linkedSetOf()) { !Regex(from).matches(it) }
+            "xform" -> spellings.mapTo(linkedSetOf()) { it.replace(Regex(from), to) }
+            else -> spellings + spellings.map { it.replace(Regex(from), to) }
+        }
+    }
+
+    /**
+     * 双拼简拼（11-02）：按拼音首字母打（zh 也能打 z），也能打本方案 zh 所在的键；a、o、e 开头的字的简拼不被零声母规则改成 aa、oo、ee；
+     * 完整双拼编码和原来的 ' 分词拼写都还在，不留 # 记号。
+     */
+    @Test fun doublePinyinAbbreviationAddsInitialsAroundTheSchemeRules() {
+        val scheme = DoublePinyinScheme.FLYPY
+        val original = scheme.algebra() + scheme.separatorRules()
+        val (before, after) = SpellingPatches.abbreviationRules(scheme)
+        val rules = before + original + after
+        for (syllable in listOf("zhong", "guo", "ai", "an", "e", "er", "shi", "chi", "a")) {
+            val old = spellingsOf(original, syllable)
+            val new = spellingsOf(rules, syllable)
+            assertTrue(syllable, new.containsAll(old))
+            assertTrue(syllable, new.none { '#' in it })
+        }
+        assertTrue(spellingsOf(rules, "zhong").containsAll(listOf("vs", "z", "v")))
+        assertTrue(spellingsOf(rules, "shi").containsAll(listOf("ui", "s", "u")))
+        assertTrue(spellingsOf(rules, "guo").containsAll(listOf("go", "g")))
+        assertEquals(spellingsOf(original, "ai") + "a", spellingsOf(rules, "ai"))
+        // 单字母的音节没有简拼：e 还是 ee。
+        assertEquals(spellingsOf(original, "e"), spellingsOf(rules, "e"))
+        // 方案不明时只按拼音首字母。
+        assertEquals(listOf("abbrev/^([a-z]).+$/\$1#/"), SpellingPatches.abbreviationRules(null).first)
+    }
+
+    @Test fun doublePinyinAbbreviationSitsBetweenFuzzyRulesAndTheSchemeRules() {
+        val algebra = listOf("erase/^xx$/", "xform/^zh/V/")
+        val abbreviation = SpellingPatches.abbreviationRules(DoublePinyinScheme.FLYPY)
+        val lines = SpellingPatches.doublePinyinLines(algebra, linkedSetOf(SpellingPatches.Fuzzy.IN), abbreviation)
+        assertEquals("\"speller/algebra\":", lines.first())
+        val expected = SpellingPatches.Fuzzy.IN.penalized + abbreviation.first + algebra + abbreviation.second
+        assertEquals(expected.map { "  - \"" + it.replace("\\", "\\\\") + "\"" }, lines.drop(1))
     }
 }

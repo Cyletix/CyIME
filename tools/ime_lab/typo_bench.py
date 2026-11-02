@@ -3,6 +3,8 @@
   typo_bench.py neighbors                 the measured neighbour map of the phone QWERTY panel
   typo_bench.py make OUT.tsv              clean and typo cases (id, input, target)
   typo_bench.py score BASE.tsv [NEW.tsv]  ranks, rank-weighted score and per-key time (TypoSentenceProbe rows)
+  typo_bench.py make-t9 OUT.json          exact, omitted, transposed, adjacent and nonadjacent taps (WeightExperiment)
+  typo_bench.py score-t9 CASES.json RUN.jsonl  recovery among sentences whose exact spelling ranked first
 
 Typos are generated, not collected: one or two letters replaced by a measured neighbour of that key, at a seeded
 random position, so the same corpus always gives the same cases. Sources: the ranking must-pass list, the
@@ -27,10 +29,13 @@ ROWS = [("qwertyuiop", 18), ("asdfghjkl", 71), ("zxcvbnm", 177)]
 
 
 def neighbor_map():
+    # The keyboard measures each letter's touch box (KeyButton reports its bounds before the visual key padding),
+    # pitch by pitch with no gap, not the visible keycap. With the 92 x 140 keycaps the row gap pushed every key of
+    # the rows above and below past the 1.3 limit, so this benchmark only ever slipped sideways (2026-11-02).
     keys = {}
     for row, (letters, x0) in enumerate(ROWS):
         for col, letter in enumerate(letters):
-            keys[letter] = (x0 + col * 106, row * 175, 92, 140)
+            keys[letter] = (x0 - 7 + col * 106, row * 175 - 17.5, 106, 175)
     # Same rule as LetterNeighbors.kt encodeLetterNeighbors.
     entries = []
     for letter in sorted(keys):
@@ -139,6 +144,60 @@ def load(path):
     return rows
 
 
+def make_t9(path):
+    cases = json.loads((HERE / "fixtures/everyday_clauses_20261009.json").read_text(encoding="utf-8"))["cases"]
+    rows = []
+    for case in cases:
+        keys = case["keys"]
+        rng = random.Random(f"full-t9:{case['id']}")
+        variants = {"exact": keys}
+        if len(keys) > 1:
+            i = rng.randrange(len(keys))
+            variants["omitted"] = keys[:i] + keys[i + 1:]
+        different = [i for i in range(len(keys) - 1) if keys[i] != keys[i + 1]]
+        if different:
+            i = rng.choice(different)
+            variants["transposed"] = keys[:i] + keys[i + 1] + keys[i] + keys[i + 2:]
+        # Same position for both tap controls. The bundled grid is 123/456/789
+        # and 1 is a separator. A shared corner alone is not a shared edge.
+        i = rng.randrange(len(keys))
+        row, col = divmod(int(keys[i]) - 1, 3)
+        others = [str(n) for n in range(2, 10) if str(n) != keys[i]]
+        adjacent = [d for d in others if abs((int(d) - 1) // 3 - row) + abs((int(d) - 1) % 3 - col) == 1]
+        for kind, pool in (("neighbor", adjacent), ("nonneighbor", [d for d in others if d not in adjacent])):
+            variants[kind] = keys[:i] + rng.choice(pool) + keys[i + 1:]
+        for kind, digits in variants.items():
+            rows.append({"id": f"{case['id']}-{kind}", "group": kind, "keys": digits, "text": case["text"]})
+    Path(path).write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def score_t9(cases_path, run_path):
+    cases = json.loads(Path(cases_path).read_text(encoding="utf-8"))
+    with Path(run_path).open(encoding="utf-8") as raw:
+        ready = json.loads(next(raw))
+        if ready.get("stage") != "ready" or ready.get("schema") != "t9_pinyin":
+            raise ValueError("expected a full-pinyin nine-key run")
+        ranks = {}
+        for case in cases:
+            row = json.loads(next(raw))
+            if (row.get("stage") != "case" or row["id"] != case["id"] or row["keys"] != case["keys"]
+                    or row["target"] != case["text"] or row["timeout"] or row["id"] in ranks):
+                raise ValueError(f"incomplete or mismatched observation for {case['id']}")
+            ranks[row["id"]] = row["settled"]["rank"]
+        end = json.loads(next(raw))
+        if end.get("stage") != "complete" or end["cases"] != len(cases) or end.get("failed") or raw.read().strip():
+            raise ValueError("incomplete or mismatched run")
+    exact = {case["id"].removesuffix("-exact"): ranks[case["id"]] for case in cases if case["group"] == "exact"}
+    print(f"exact first: {sum(rank == 1 for rank in exact.values())}/{len(exact)}")
+    for kind in ("omitted", "transposed", "neighbor", "nonneighbor"):
+        subset = [ranks[case["id"]] for case in cases if case["group"] == kind
+                  and exact[case["id"].removesuffix("-" + kind)] == 1]
+        if not subset:
+            continue
+        print(f"{kind} among exact-first: first {subset.count(1)}/{len(subset)}, "
+              f"top5 {sum(1 <= rank <= 5 for rank in subset)}/{len(subset)}, absent from 100 {subset.count(-1)}")
+
+
 def group(case_id):
     source, kind = case_id.split("-")[0], case_id.split("-")[-1]
     return ("heldout" if source == "heldout" else "abbr" if source == "abbr" else "tuning"), kind
@@ -198,5 +257,9 @@ if __name__ == "__main__":
         print(neighbor_map())
     elif sys.argv[1] == "make":
         make(sys.argv[2])
+    elif sys.argv[1] == "make-t9":
+        make_t9(sys.argv[2])
+    elif sys.argv[1] == "score-t9":
+        score_t9(*sys.argv[2:])
     elif sys.argv[1] == "score":
         score(sys.argv[2:])

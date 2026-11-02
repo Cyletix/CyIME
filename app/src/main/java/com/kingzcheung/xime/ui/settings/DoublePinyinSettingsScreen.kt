@@ -8,7 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.Keyboard
+import androidx.compose.material.icons.twotone.ContentCut
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +27,7 @@ import com.kingzcheung.xime.settings.DoublePinyinSchemes
 import com.kingzcheung.xime.settings.CustomKeyboardLayouts
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.SpellingPatches
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,22 +74,36 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    Scaffold(modifier = Modifier.testTag("double-pinyin-settings"), containerColor = MaterialTheme.colorScheme.surface,
-        topBar = { TopAppBar(title = { Text(if (draft == null) "双拼方案" else "编辑双拼方案") }, navigationIcon = {
-            IconButton(onClick = { back() }, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-        }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding().settingsVerticalScroll()
+    KeyboardSettingsScaffold(if (draft == null) "双拼方案" else "编辑双拼方案", { if (!busy) back() },
+        preview = draft == null, example = com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Example.DoublePinyin,
+        modifier = Modifier.testTag("double-pinyin-settings")) { modifier ->
+        Column(modifier.then(if (draft != null) Modifier.imePadding() else Modifier).settingsVerticalScroll()
             .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val current = draft
             val keyboardPrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
             if (current == null) {
-                Text("在「语言与方案」的方案一栏切换双拼。内置方案可以复制后修改键位，保存为自己的方案；" +
+                SettingsJumpText("在「语言与方案」的方案一栏切换双拼。内置方案可以复制后修改键位，保存为自己的方案；" +
                     "符号和词库与中文26键相同。在「语言与方案」点 QWJRTK、Colemak 或自己的字母布局，双拼也按那个排列打；" +
                     "启用了中文14键或自己合并过按键的布局（如自己排的20键）时，在方案栏显示的双拼方案在那个布局上也能用：点合并键打键上第一个字母，长按选另一个字母。",
+                    jumps = listOf("语言与方案"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                DoublePinyinKeyHintsSwitch()
+                // 双拼键位提示 11-01 搬到「主题与外观 › 角标与气泡」，和上下角标放一起；这里只指路。
+                SettingsNote("键盘上的双拼键位提示在「主题与外观 › 角标与气泡」", jumps = listOf("主题与外观 › 角标与气泡"))
+                // 双拼简拼（别人提的需求，用户 11-02 转述）：默认关，所有双拼 26 键方案共用；改完在后台写拼写补丁再重新部署。
+                var abbreviation by remember { mutableStateOf(SpellingPatches.doublePinyinAbbreviation(context)) }
+                Column(Modifier.settingsSearchAnchor("双拼简拼")) {
+                    SettingsSection(title = "通用") {
+                        SettingsToggleItem(Icons.TwoTone.ContentCut, "双拼简拼",
+                            "26 键只打声母也出词，如 wxzf 出“微信支付”；zh、ch、sh 也可打 z、c、s。改完要几秒重新部署",
+                            checked = abbreviation, onCheckedChange = { on ->
+                                SpellingPatches.setDoublePinyinAbbreviation(context, on)
+                                abbreviation = on
+                                scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
+                            }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DOUBLE_PINYIN_ABBREVIATION)
+                        DoublePinyinAbbreviationLegend(abbreviation)
+                    }
+                }
                 Button(onClick = { edit(copyOf(DoublePinyinScheme.FLYPY)) }, enabled = !busy,
                     modifier = Modifier.testTag("double-pinyin-new")) { Text("新建双拼方案") }
                 schemes.forEach { scheme ->
@@ -131,7 +146,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                             if (scheme.usesSemicolon) Row(verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("ing 放在 Shift 键上", style = MaterialTheme.typography.bodyLarge)
-                                    Text("和多数手机输入法一样：不加分号键，L 在第二排最右边；打了声母后左下角的 Shift 键变成 ing",
+                                    Text("不加分号键，L 在第二排最右边；打了声母后左下角的 Shift 键变成 ing",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     if (ingLock != null) SettingsLockNote(ingLock.message)
@@ -140,6 +155,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                     modifier = Modifier.testTag("double-pinyin-semicolon-on-shift:${scheme.id}"),
                                     onCheckedChange = { keyboardPrefs.copy(doublePinyinSemicolonOnShift = it).save(context) })
                             }
+                            if (scheme.usesSemicolon) SemicolonOnShiftLegend(keyboardPrefs.doublePinyinSemicolonOnShift)
                             Row {
                                 if (custom) TextButton(onClick = { edit(scheme) }, enabled = !busy) { Text("编辑") }
                                 TextButton(onClick = { edit(copyOf(scheme)) }, enabled = !busy) { Text(if (custom) "复制" else "复制修改") }
@@ -227,31 +243,6 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                 busy = false
             }
         }) { Text("删除") } }, dismissButton = { TextButton(onClick = { deleteId = null }) { Text("取消") } }) }
-}
-
-/** 键盘上的双拼键位提示（默认关）：别人提的需求，记不住键位时打开。 */
-@Composable
-private fun DoublePinyinKeyHintsSwitch() {
-    val context = LocalContext.current
-    val saved = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
-    SettingsSection(title = "键盘上的提示") {
-        SettingsToggleItem(Icons.TwoTone.Keyboard, "双拼键位提示",
-            "双拼 26 键每个键上写出它代表的 zh、ch、sh 和韵母，和下面的键位图一样，记不住键位时打开。" +
-                "提示写在按键角上，和上下角标提示不能同时开：先在 主题与外观 › 角标与气泡 关掉两个角标提示，" +
-                "或打开下面的「和角标一起显示」；滑动照常出符号。14 键、九键和自己排的合并键布局不显示。",
-            checked = saved.doublePinyinKeyHints,
-            onCheckedChange = { saved.copy(doublePinyinKeyHints = it).save(context) },
-            // 和上下角标提示互锁（InputGestureLocks）；两个都已开着时不锁，关哪个都行。
-            lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(saved, com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true)
-                ?.takeIf { !saved.doublePinyinKeyHints }?.message)
-        androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        // 默认关：开着时键面分上中下三层，提示和角标不重叠，两边不再互锁（InputGestureLocks、fitDoublePinyinWithCorners）。
-        SettingsToggleItem(Icons.TwoTone.Keyboard, "和角标一起显示",
-            "键位提示和上下角标一起写在键上：zh、ch、sh 和上角标在上面，韵母和下角标在下面，字母在中间、稍小一点，" +
-                "谁也不挡谁。手机竖屏键小，字会小一些；个别实在放不下的键只写键位提示。",
-            checked = saved.doublePinyinKeyHintsWithCorners,
-            onCheckedChange = { saved.copy(doublePinyinKeyHintsWithCorners = it).save(context) })
-    }
 }
 
 /** 26 键键位图：键上是字母、翘舌声母（强调色）和韵母；[onKey] 为空时只显示。 */

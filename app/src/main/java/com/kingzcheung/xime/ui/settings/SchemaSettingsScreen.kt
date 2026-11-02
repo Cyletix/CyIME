@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -46,6 +48,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -93,6 +97,14 @@ fun SchemaSettingsContent(
     val localViewModel: SchemaLocalViewModel = viewModel()
     val localUiState by localViewModel.uiState.collectAsStateWithLifecycle()
     var showExtraSchemas by remember { mutableStateOf(false) }
+    // 没写语言的导入方案正在选语言（GitHub #86）。
+    var languageFor by remember { mutableStateOf<SchemaMeta?>(null) }
+    languageFor?.let { target ->
+        SchemaLanguageDialog(target, onChosen = { language ->
+            languageFor = null
+            viewModel.setSchemaLanguage(target.schemaId, language)
+        }, onDismiss = { languageFor = null })
+    }
     var englishEnabled by remember { mutableStateOf(InputLanguage.ENGLISH in LanguagePreferences.enabled(context)) }
     var modeOrderRevision by remember { mutableIntStateOf(0) }
     // F6: 从方案市场/导入返回时自动重扫描，新装方案立即出现
@@ -150,8 +162,9 @@ fun SchemaSettingsContent(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
+                    SettingsJumpText(
                         "五笔等常用方案在「扩展 › 方案」可以直接获取。也可以在手机的文件管理里把文件「分享」给 CyIME 导入。",
+                        jumps = listOf("扩展 › 方案"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -201,7 +214,8 @@ fun SchemaSettingsContent(
 
     LaunchedEffect(localUiState.toastMessage) {
         localUiState.toastMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            if ('\n' in message) viewModel.reportImport(message)
+            else Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             localViewModel.clearToast()
         }
     }
@@ -212,6 +226,15 @@ fun SchemaSettingsContent(
             title = { Text(if (report.startsWith("部署失败")) "部署失败" else "部署完成") },
             text = { Text(report) },
             confirmButton = { TextButton(onClick = { viewModel.clearDeployReport() }) { Text("知道了") } },
+        )
+    }
+
+    uiState.importReport?.let { report ->
+        AlertDialog(
+            onDismissRequest = viewModel::clearImportReport,
+            title = { Text("方案导入结果") },
+            text = { Text(report, Modifier.verticalScroll(rememberScrollState())) },
+            confirmButton = { TextButton(onClick = viewModel::clearImportReport) { Text("知道了") } },
         )
     }
 
@@ -263,7 +286,7 @@ fun SchemaSettingsContent(
         ) {
             val installedIds = uiState.allSchemas.map { it.schemaId }.toSet()
             val visibleSchemas = uiState.allSchemas.filter {
-                com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds)
+                com.kingzcheung.xime.settings.CyimeInputDefaults.hasIndependentToggle(it.schemaId, installedIds)
             }
             val schemaById = visibleSchemas.associateBy { it.schemaId }
             val fullOrder = remember(uiState.allSchemas, modeOrderRevision) {
@@ -309,6 +332,7 @@ fun SchemaSettingsContent(
                         isCurrent = !isEnglish && id == uiState.currentSchema,
                         onToggle = { if (!isEnglish) viewModel.toggleSchema(schema) },
                         onSelect = { if (!isEnglish) viewModel.selectSchema(schema) },
+                        onChooseLanguage = { languageFor = schema },
                         isBuiltIn = isEnglish,
                         isDragging = dragOrder.dragging == id,
                         isDropTarget = false,
@@ -320,7 +344,7 @@ fun SchemaSettingsContent(
 
                 item {
                     SettingsNote("长按可排序；语言和默认组合在「语言与方案」选择。",
-                        Modifier.padding(top = 4.dp))
+                        Modifier.padding(top = 4.dp), jumps = listOf("语言与方案"))
                     SettingsNote("安装或启停其他方案后，点「应用方案更改」生效。")
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -339,6 +363,7 @@ fun SchemaSettingsContent(
                         isCurrent = false,
                         onToggle = { viewModel.toggleSchema(schema) },
                         onSelect = { viewModel.selectSchema(schema) },
+                        onChooseLanguage = { languageFor = schema },
                         groupIndex = row,
                         groupSize = listedOff.size,
                     )
@@ -382,6 +407,7 @@ fun SchemaSettingsContent(
                         isCurrent = false,
                         onToggle = { viewModel.toggleSchema(schema) },
                         onSelect = { viewModel.selectSchema(schema) },
+                        onChooseLanguage = { languageFor = schema },
                         groupIndex = row,
                         groupSize = extraOff.size,
                     )
@@ -437,7 +463,7 @@ internal fun reorderEnabledModes(context: Context, schemas: List<SchemaMeta>, en
     englishEnabled: Boolean, reordered: List<String>): Boolean {
     val installedIds = schemas.map { it.schemaId }.toSet()
     val visibleIds = schemas.filter {
-        com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds)
+        com.kingzcheung.xime.settings.CyimeInputDefaults.hasIndependentToggle(it.schemaId, installedIds)
     }.mapTo(mutableSetOf()) { it.schemaId }
     val fullOrder = orderedInstalledModeIds(context, schemas)
     val enabledOrder = fullOrder.filter { id ->
@@ -455,6 +481,8 @@ internal fun SchemaToggleItem(
     onToggle: () -> Unit,
     onSelect: () -> Unit,
     isBuiltIn: Boolean = false,
+    /** 没写语言的导入方案：点「选择语言」。 */
+    onChooseLanguage: () -> Unit = {},
     reorderModifier: Modifier = Modifier,
     isDragging: Boolean = false,
     isDropTarget: Boolean = false,
@@ -516,6 +544,12 @@ internal fun SchemaToggleItem(
                 val profile = schema.toSchemaInfo().profile
                 Text("${profile.language.displayName} · ${profile.summary}",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // 没写语言的导入方案（GitHub #86）：在这里选一次语言，选过的也能改。
+                if (schema.languageAssignable && !isBuiltIn) TextButton(onClick = onChooseLanguage,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.heightIn(min = 36.dp).testTag("schema-language:${schema.schemaId}")) {
+                    Text(if (schema.languageChosen) "修改语言" else "选择语言", style = MaterialTheme.typography.labelLarge)
+                }
                 com.kingzcheung.xime.settings.CyimeInputDefaults.description(schema.schemaId)?.let { description ->
                     Text(description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

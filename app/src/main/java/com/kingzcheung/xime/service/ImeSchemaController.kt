@@ -490,7 +490,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             val key = TerminalEditor.keyForEditingAction(action)
             when {
                 key != null -> editCursor { TerminalEditor.sendKeys(it, key) }
-                action == "paste" -> editCursor { service.pasteIntoTerminal() }
+                action == "paste" || action == "paste_plain" -> editCursor { service.pasteIntoTerminal() }
                 // 复制交给宿主：有自己选区的终端会处理，不处理也不出错。撤销（Ctrl+Z 会挂起前台程序）、
                 // 剪切、全选和选择模式在终端里没有意义，不发任何东西。
                 action == "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
@@ -502,9 +502,11 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "select_all" -> editCursor { it.performContextMenuAction(android.R.id.selectAll) }
             "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
             "cut" -> editCursor { it.performContextMenuAction(android.R.id.cut) }
-            "paste" -> editCursor {
+            "paste", "paste_plain" -> editCursor {
                 service.dismissPredictionsForPaste()
-                it.performContextMenuAction(android.R.id.paste)
+                val plain = action == "paste_plain"
+                val accepted = it.performContextMenuAction(if (plain) android.R.id.pasteAsPlainText else android.R.id.paste)
+                if (plain && !accepted) Toast.makeText(service, "当前输入框不支持粘贴纯文本", Toast.LENGTH_SHORT).show()
             }
             "select_begin" -> editCursor { editorCursor.beginSelection(it) }
             "select_end" -> editCursor(finishComposition = false) { editorCursor.endSelection(it) }

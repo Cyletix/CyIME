@@ -213,6 +213,10 @@ private fun T9KeyboardSwipeOverlay(
 ) {
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val input = LocalKeyboardInputPreferences.current
+    val glide = input.t9GlideTyping && input.cursorGesture != CursorGestureMode.KEYBOARD
+    val glideKeys = remember(glide, controller, uiState.inputProfile) { if (glide) mutableMapOf<Char, Rect>() else null }
+    val trail = remember(glideKeys, controller) { GlideTrail() }
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
@@ -233,24 +237,21 @@ private fun T9KeyboardSwipeOverlay(
 
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
 
-    val bubbleData = rememberSwipeBubbleDrawData(
-        swipeState = swipeBubble.state,
-        keyBounds = swipeBubble.keyBounds,
-        keyBackgroundColor = bubbleBackgroundColor,
-        keyTextColor = keyTextColor,
-        accentColor = specialKeyTextColor,
-        keyWidth = if (swipeBubble.state.isSwiping || swipeBubble.state.isPressed) swipeBubble.keyBounds.width else 0f,
-        keyboardWidth = keyboardBounds.width
-    )
 
-    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius) {
+    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys) {
     Box(
         modifier = modifier
+            .t9GlideTyping(glideKeys, trail, { keyboardBounds.topLeft }, callbacks.inputAdmissionTicket) { digits ->
+                for (digit in digits) {
+                    val key = digit.toString()
+                    if (callbacks.onPreeditKeyInput?.invoke(key) != true) controller.onDigitPressed(key)
+                }
+            }
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp)) {
-        SwipeBubbleOverlay(bubbleData)
+        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
         if (isLandscape) {
             // 横屏：去除原左侧候选大面板（候选已在顶部候选栏展示），
             // 九键布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
@@ -325,6 +326,7 @@ private fun T9KeyboardSwipeOverlay(
         }
         CandidateDragLine(CandidateDropTargets.shared, { keyboardBounds.topLeft },
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
+        if (glide) GlideTrailOverlay(trail, accentColor, Modifier.matchParentSize())
     }
     }
 }
@@ -444,7 +446,7 @@ private fun T9KeyboardContent(
                 val t9SideSymbols = customSymbols
                     ?: remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
                 val displayItems: List<String> = if (showCandidates) {
-                    currentFirstOptions.map { it.pinyin }
+                    currentFirstOptions.map { if (it.near) "≈" + it.pinyin else it.pinyin }
                 } else {
                     t9SideSymbols
                 }
@@ -687,7 +689,7 @@ private fun T9KeyboardContent(
                 swipeDownLabel = "下滑撤回",
                 onSwipeUp = { onKeyPress("clear_all") },
                 onSwipeDown = { onKeyPress("undo_clear") },
-                onSwipeLeft = { onKeyPress("clear_composition") },
+                distanceDelete = true,
                 onSwipeStateChange = { state, bounds ->
                     onSwipeStateChange?.invoke(state, bounds)
                 },
@@ -815,6 +817,7 @@ private fun T9DigitKey(
     val inputPreferences = LocalKeyboardInputPreferences.current
     // 九键拂动：左上右下依次为各字母，点按仍是九键输入，数字（原上滑动作）改为长按。
     val flick = inputPreferences.t9FlickLetters && currentOnLongPressSelect != null
+    val glideKeys = LocalT9GlideKeys.current
 
     SwipeableKeyButton(
         text = letters,
@@ -822,7 +825,9 @@ private fun T9DigitKey(
         backgroundColor = backgroundColor,
         textColor = textColor,
         fontSize = fontSize,
-        modifier = modifier,
+        modifier = if (glideKeys == null) modifier else modifier.onGloballyPositioned {
+            glideKeys[digit.single()] = it.boundsInRoot()
+        },
         onPress = { currentOnPress?.invoke() },
         // 长按弹字母气泡和 26/14 键共用“长按弹出字母气泡”开关，默认关（用户 10-21）；拂动模式长按出数字，不受影响。
         longPressItems = if (flick || inputPreferences.letterLongPressMenu) longPressItems else emptyList(),
@@ -888,7 +893,12 @@ internal fun T9CandidateItem(
             },
         contentAlignment = Alignment.Center
     ) {
-        val fittedFontSize = fontSize
+        val fittedFontSize = if (text.startsWith("≈")) {
+            val measured = rememberTextMeasurer().measure(text, style = TextStyle(fontSize = fontSize,
+                fontFamily = AppFonts.candidateFontFamily, fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal)).size.width
+            val usable = with(LocalDensity.current) { (maxWidth - 6.dp).toPx() }.coerceAtLeast(1f)
+            fontSize * minOf(1f, usable / measured.coerceAtLeast(1))
+        } else fontSize
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -1059,7 +1069,7 @@ private fun ResetKey(
         if (!compactMode && KeyboardKeyMetrics.hintClearsIcon(hintOffset, hintSize, density.fontScale, iconSize)) {
             Text(
                 text = "重输",
-                color = keyHintColor(textColor, frostedGlass, 0.5f),
+                color = keyHintColor(textColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                 fontSize = hintSize.sp,
                 lineHeight = (hintSize * 1.2f).sp,
                 fontWeight = FontWeight.Normal,

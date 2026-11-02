@@ -93,8 +93,18 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
     fun installPackage(item: LocalPackageItem) = install(item, replaceConflictingFiles = false)
 
     /** 刚导入、因同名文件没装上的包：接着走一遍安装，冲突时弹「更新共用文件」确认。 */
-    fun installImported(packageId: String, displayName: String) = installPackage(
-        LocalPackageItem(packageId, displayName.ifBlank { packageId }, "", downloaded = true, installed = false))
+    fun installImported(packageId: String, displayName: String) {
+        pendingImports.addLast(LocalPackageItem(packageId, displayName.ifBlank { packageId }, "",
+            downloaded = true, installed = false))
+        nextImport()
+    }
+
+    private val pendingImports = ArrayDeque<LocalPackageItem>()
+
+    private fun nextImport() {
+        if (_uiState.value.installingId == null && _uiState.value.conflictPackageId == null)
+            pendingImports.removeFirstOrNull()?.let(::installPackage)
+    }
 
     private var conflictItem: LocalPackageItem? = null
 
@@ -117,6 +127,8 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
                 result.success -> showToast(buildString {
                     append("已安装「${item.displayName}」，点「应用方案更改」生效")
                     if (result.parseFailures.isNotEmpty()) append("\n" + result.parseFailures.joinToString("\n"))
+                    if (result.unresolvedDeps.isNotEmpty())
+                        append("\n请补齐方案引用的文件：" + result.unresolvedDeps.joinToString("、"))
                 })
                 result.conflicts.isNotEmpty() -> {
                     conflictItem = item
@@ -128,6 +140,7 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
                 else -> showToast(result.failureReason ?: "安装失败")
             }
             loadLocalPackages()
+            nextImport()
         }
     }
 
@@ -138,6 +151,7 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
 
     fun cancelConflictInstall() {
         _uiState.update { it.copy(conflictPackageId = null, conflictingSchemeIds = emptyList(), conflictingFiles = emptyList()) }
+        nextImport()
     }
 
     fun deleteDownloaded(item: LocalPackageItem) {

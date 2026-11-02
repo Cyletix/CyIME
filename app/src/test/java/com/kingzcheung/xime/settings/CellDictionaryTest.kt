@@ -136,7 +136,7 @@ class CellDictionaryTest {
         store.selectEnglish(true)
         val attempts = mutableListOf<Pair<Set<String>, Boolean>>()
         assertThrows(IllegalStateException::class.java) {
-            store.activate(ids, true) { active, english ->
+            store.activate(ids, true) { active, english, _ ->
                 attempts += active to english
                 if (english) error("optional translator failed")
             }
@@ -185,7 +185,7 @@ class CellDictionaryTest {
         store.select(entry.id, true)
         val engineCalls = mutableListOf<Set<String>>()
         assertThrows(IllegalStateException::class.java) {
-            store.activate(setOf(entry.id), true) { ids, english ->
+            store.activate(setOf(entry.id), true) { ids, english, _ ->
                 engineCalls += ids
                 assertEquals(ids.isNotEmpty(), english)
                 if (ids.isNotEmpty()) error("native pack compilation failed")
@@ -194,10 +194,10 @@ class CellDictionaryTest {
         assertEquals(listOf(setOf(entry.id), emptySet<String>()), engineCalls)
         assertTrue(store.read().applied.isEmpty())
         assertTrue(store.read().pending)
-        store.activate(setOf(entry.id), false) { _, _ -> }
+        store.activate(setOf(entry.id), false) { _, _, _ -> }
         assertFalse(store.read().pending)
         store.select(entry.id, false)
-        store.activate(emptySet(), false) { _, _ -> }
+        store.activate(emptySet(), false) { _, _, _ -> }
         assertTrue(store.read().applied.isEmpty())
     }
 

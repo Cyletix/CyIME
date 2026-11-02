@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <set>
 #include <unordered_map>
 #include <utility>
 
@@ -54,6 +55,16 @@ struct T9ScriptOptions {
   double t9_ngram_dictionary_prior_ = 0;
   bool t9_ngram_sentence_start_ = false;
   double t9_ngram_eos_weight_ = 0;
+  // Sentence-final particles (t9/final_particles: 吗, 呢, 吧…) and t9/particle_eos_weight: when one of
+  // the first whole-input sentences ends with such a particle, every finished sentence is ordered with
+  // that weight of ln P(</s> | last words), so 我们吗 beats 我们那 and 礼貌吗 beats 礼貌嘛 at the end of
+  // input, while input that cannot end in a particle keeps t9/ngram_eos_weight.
+  std::shared_ptr<const std::set<string>> t9_final_particles_;
+  double t9_particle_eos_weight_ = 0;
+  bool t9_particle_bigram_after_start_ = false;
+  double t9_particle_alternative_margin_ = 0;
+  // 14-key: see T9PreferMergedTailWord (t9_sentence_rescore.h); 0 keeps the typed letters' sentence first.
+  double t9_merged_tail_word_margin_ = 0;
   bool t9_ngram_merge_segmentations_ = false;
   string t9_left_context_;
   string t9_neighbors_;

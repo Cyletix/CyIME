@@ -28,9 +28,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.security.DigestInputStream
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
@@ -44,6 +42,10 @@ data class SchemaMeta(
     val description: String = "",
     val language: InputLanguage = InputProfiles.builtin(schemaId).language,
     val scheme: InputScheme = InputProfiles.builtin(schemaId).scheme,
+    /** 方案没写 `language:`、CyIME 也不认识：可以由用户在设置里选语言（[SchemaLanguageChoice]）。 */
+    val languageAssignable: Boolean = false,
+    /** [language] 是用户选的，不是方案写的。 */
+    val languageChosen: Boolean = false,
 ) {
     fun toSchemaInfo() = SchemaInfo(schemaId, name, version, author, description,
         isDownloaded = true, language = language, scheme = scheme)
@@ -184,7 +186,7 @@ object SchemaManager {
                         zip.entries().asSequence().forEach { entry ->
                             val originalName = entry.name
                             if (entry.isDirectory || isAppleDouble(originalName)) return@forEach
-                            val name = originalName.removePrefix(baseDir)
+                            val name = archiveTarget(originalName, baseDir) ?: return@forEach
                             if (isProtectedImportName(name)) return@forEach
                             val hash = zip.getInputStream(entry).use { streamSha256(it) }
                             result[name] = hash
@@ -215,8 +217,8 @@ object SchemaManager {
                                     entry = tarIn.nextEntry
                                     continue
                                 }
-                                val name = originalName.removePrefix(baseDir)
-                                if (isProtectedImportName(name)) {
+                                val name = archiveTarget(originalName, baseDir)
+                                if (name == null || isProtectedImportName(name)) {
                                     entry = tarIn.nextEntry
                                     continue
                                 }
@@ -246,6 +248,7 @@ object SchemaManager {
         val unresolvedDeps: List<String> = emptyList(),
         val failureReason: String? = null,
         val parseFailures: List<String> = emptyList(),
+        val resourcesOnly: Boolean = false,
     )
 
     /**
@@ -291,31 +294,53 @@ object SchemaManager {
             val before = discoverSchemas(context).map { it.schemaId }.toSet()
             FileLogger.i(TAG, "installPackageFromMarketDir: schemas before install: $before")
 
-            val ok = installFromMarketToRime(context, packageId, staged)
+            var declaredOrder = emptyList<String>()
+            val ok = installFromMarketToRime(context, packageId, staged) { defaults ->
+                topLevelSection(defaults, "schema_list")?.let { section ->
+                    declaredOrder = runCatching { readEnabledSchemaList(section) }.getOrNull().orEmpty()
+                }
+            }
             if (!ok) {
                 FileLogger.e(TAG, "installPackageFromMarketDir: installFromMarketToRime returned false")
                 return@withContext InstallFromDirResult(success = false, failureReason = "安装失败")
             }
 
+            // Rime 装载根目录下以 schema_id 命名的方案；目录名和文件名不是方案 ID。
+            val definitions = targetFiles.filter { it.endsWith(".schema.yaml") }
+            val rootDefinitions = definitions.filterNot { '/' in it || '\\' in it }
+            if (definitions.isNotEmpty() && rootDefinitions.isEmpty()) {
+                return@withContext InstallFromDirResult(false, failureReason =
+                    "方案文件分散在子目录中，请把要用的 .schema.yaml 和配套词库按 Rime 用户目录结构打成一个包")
+            }
+            val targetSchemaIds = linkedSetOf<String>()
+            val parseFailures = mutableListOf<String>()
+            val unreadableFiles = mutableListOf<String>()
+            for (name in rootDefinitions) {
+                val meta = parseSchemaYaml(File(staged, name))
+                val issue = when {
+                    meta == null -> "$name 无法读取 schema/schema_id"
+                    name != "${meta.schemaId}.schema.yaml" ->
+                        "$name 应命名为 ${meta.schemaId}.schema.yaml"
+                    else -> null
+                }
+                if (issue != null) {
+                    parseFailures.add(issue)
+                    unreadableFiles.add(name)
+                } else {
+                    targetSchemaIds.add(name.removeSuffix(".schema.yaml"))
+                }
+            }
+            if (unreadableFiles.isNotEmpty() && (targetSchemaIds.isEmpty() ||
+                    unreadableFiles.any { File(getRimeDir(context), it).exists() })) {
+                return@withContext InstallFromDirResult(false, failureReason = parseFailures.joinToString("\n"))
+            }
             SchemaManifestManager.installStagedFiles(
-                context, packageId, displayName, version, fromMarket, staged, targetFiles,
+                context, packageId, displayName, version, fromMarket, staged, targetFiles - unreadableFiles.toSet(),
             )
 
             val after = discoverSchemas(context).map { it.schemaId }.toSet()
             val newIds = (after - before).toList()
             FileLogger.i(TAG, "installPackageFromMarketDir: schemas after install: $after, new: $newIds")
-
-            // 检查 target 中的 .schema.yaml 是否都解析成功
-            val targetSchemaIds = targetFiles
-                .filter { it.endsWith(".schema.yaml") }
-                .map { it.removeSuffix(".schema.yaml") }
-                .toSet()
-            val failedIds = targetSchemaIds - after
-            val parseFailures = if (failedIds.isEmpty()) emptyList()
-                else failedIds.map { "$it.schema.yaml 解析失败" }
-            if (parseFailures.isNotEmpty()) {
-                FileLogger.w(TAG, "installPackageFromMarketDir: some schemas failed to parse: $parseFailures")
-            }
 
             var unresolved = emptyList<String>()
             var dependencyIds = emptyList<String>()
@@ -326,8 +351,10 @@ object SchemaManager {
                     dependencies = dependencies,
                     resolveUrl = resolveDepUrl,
                 )
-                unresolved = (completion.unresolved + completion.stillMissingFiles).distinct()
+                unresolved = (completion.unresolved + completion.failedToDownload + completion.stillMissingFiles).distinct()
                 dependencyIds = completion.downloaded
+            } else if (!fromMarket) {
+                unresolved = targetSchemaIds.flatMap { RimeDependencyResolver.missingImportFiles(getRimeDir(context), it) }.distinct()
             }
 
             SchemaManifestManager.appendDependencies(context, packageId, dependencyIds)
@@ -338,17 +365,19 @@ object SchemaManager {
 
             // 至少启用一个新方案，避免 RimeEngine 因 schema_list 为空而挂起。
             // 更新已安装方案时（switchEnabled=false）不强制切换启用列表，保留用户现有方案。
-            val firstSchema = CuratedRimeSchemes.preferredSchema(packageId, targetSchemaIds)
-                ?: newIds.firstOrNull()
-                ?: targetFiles.firstOrNull { it.endsWith(".schema.yaml") }
-                    ?.removeSuffix(".schema.yaml")
+            val availableIds = targetSchemaIds.intersect(after)
+            val firstSchema = CuratedRimeSchemes.preferredSchema(packageId, availableIds)
+                ?: declaredOrder.firstOrNull { it in availableIds }
+                ?: newIds.firstOrNull { it in availableIds }
+                ?: availableIds.firstOrNull()
             if (firstSchema != null && switchEnabled) {
                 setEnabledSchemas(context, (getEnabledSchemas(context) + firstSchema).distinct())
                 LanguagePreferences.enableForSchema(context, firstSchema)
             }
 
             FileLogger.i(TAG, "installPackageFromMarketDir: success for $packageId, firstSchema=$firstSchema")
-            InstallFromDirResult(success = true, newSchemaIds = newIds, unresolvedDeps = unresolved, parseFailures = parseFailures)
+            InstallFromDirResult(success = true, newSchemaIds = newIds, unresolvedDeps = unresolved,
+                parseFailures = parseFailures, resourcesOnly = definitions.isEmpty())
         } catch (e: Exception) {
             FileLogger.e(TAG, "installPackageFromMarketDir: UNCAUGHT exception for $packageId", e)
             return@withContext InstallFromDirResult(success = false, failureReason = "安装异常: ${e.message}")
@@ -385,7 +414,7 @@ object SchemaManager {
         }
         if (entryNames.isEmpty()) return emptyList()
         val baseDir = findSchemaBaseDir(entryNames)
-        return entryNames.map { it.removePrefix(baseDir) }
+        return entryNames.mapNotNull { archiveTarget(it, baseDir) }
             .filterNot { isProtectedImportName(it) }
     }
 
@@ -406,7 +435,8 @@ object SchemaManager {
      * - .zip / .tar.gz / .tgz → 解压
      * - 其他文件 → 直接复制
      */
-    fun installFromMarketToRime(context: Context, schemeId: String, destination: File = getRimeDir(context)): Boolean {
+    fun installFromMarketToRime(context: Context, schemeId: String, destination: File = getRimeDir(context),
+                                onPackageDefaults: ((String) -> Unit)? = null): Boolean {
         val dir = getMarketDir(context, schemeId)
         if (!dir.exists()) return false
         val files = dir.listFiles()?.filter { it.isFile } ?: return false
@@ -427,9 +457,9 @@ object SchemaManager {
                     continue
                 }
                 val ok = when {
-                    name.endsWith(".zip", ignoreCase = true) -> importZipFromFile(file, rimeDir)
+                    name.endsWith(".zip", ignoreCase = true) -> importZipFromFile(file, rimeDir, onPackageDefaults)
                     name.endsWith(".tar.gz", ignoreCase = true) || name.endsWith(".tgz", ignoreCase = true) ->
-                        importTarGzFromFile(file, rimeDir)
+                        importTarGzFromFile(file, rimeDir, onPackageDefaults)
                     else -> {
                         val target = File(rimeDir, file.name)
                         file.copyTo(target, overwrite = true)
@@ -566,9 +596,8 @@ object SchemaManager {
         }
     }
 
-    /** 生成基于当前时间的导入 ID，如 import_20260712_015947。 */
-    fun generateImportId(): String =
-        "import_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    /** 多选文件可同时导入，每个包独立暂存并拥有自己的卸载清单。 */
+    fun generateImportId(): String = "import_${UUID.randomUUID()}"
 
     /** 导入归档时禁止覆盖系统文件（保护应用核心配置与系统元数据）。 */
     fun isProtectedImportName(name: String): Boolean {
@@ -634,7 +663,12 @@ object SchemaManager {
             ?: return emptyList()
 
         for (file in schemaFiles) {
-            val meta = parseSchemaYaml(file)
+            val meta = parseSchemaYaml(file)?.let {
+                if (!it.languageAssignable) it
+                else SchemaLanguageChoice.resolve(it, SchemaLanguageChoice.isAppProvided(context, it.schemaId)) {
+                    SchemaLanguageChoice.get(context, it.schemaId)
+                }
+            }
             // Compilation-only tables of imported English words are not input modes.
             if (meta != null && !CellDictionaryEnglish.isDependency(meta.schemaId)) {
                 schemas.add(meta)
@@ -654,6 +688,10 @@ object SchemaManager {
             if (entry.schemaId.isEmpty()) return null
 
             val author = parseAuthorFromText(text)
+            val declared = entry.language?.let {
+                InputLanguage.fromId(it.trim().replace('_', '-').substringBefore('-').lowercase(java.util.Locale.ROOT))
+            }
+            val builtinLanguage = InputProfiles.builtin(entry.schemaId).language
 
             SchemaMeta(
                 schemaId = entry.schemaId,
@@ -661,10 +699,9 @@ object SchemaManager {
                 version = entry.version,
                 author = author,
                 description = entry.description ?: "",
-                language = entry.language?.let {
-                    InputLanguage.fromId(it.trim().replace('_', '-').substringBefore('-').lowercase(java.util.Locale.ROOT))
-                } ?: InputProfiles.builtin(entry.schemaId).language,
+                language = declared ?: builtinLanguage,
                 scheme = entry.inputScheme?.let(InputScheme::fromId) ?: InputProfiles.builtin(entry.schemaId).scheme,
+                languageAssignable = declared == null && builtinLanguage == InputLanguage.UNSPECIFIED,
             )
         } catch (e: Exception) {
             try { Log.w(TAG, "Failed to parse schema file: ${file.name}, error=${e.message}, skip", e) } catch (_: Exception) {}
@@ -676,21 +713,30 @@ object SchemaManager {
      * 从 YAML 文本中提取顶层 `schema:` 块及其子内容，返回一个可独立解析的 YAML 片段。
      * 避免 kaml 因为文件的其他部分（重复 `__include`、锚点等）而报错。
      */
-    internal fun extractSchemaBlock(yamlText: String): String? {
-        val lines = yamlText.lines()
-        val schemaLineIndex = lines.indexOfFirst {
-            it.trimStart().let { t -> t.startsWith("schema:") && (t.length == 7 || t[7] == ' ') }
-        }
-        if (schemaLineIndex < 0) return null
+    internal fun extractSchemaBlock(yamlText: String): String? = topLevelSection(yamlText, "schema")
 
-        val schemaIndent = lines[schemaLineIndex].length - lines[schemaLineIndex].trimStart().length
-        val result = mutableListOf("schema:")
-        for (i in schemaLineIndex + 1 until lines.size) {
-            val line = lines[i]
-            if (line.isBlank()) continue
-            val indent = line.length - line.trimStart().length
-            if (indent <= schemaIndent) break
-            result.add(line)
+    /** Isolate metadata without parsing unrelated Rime sections, preserving flow values and indentless lists. */
+    private fun topLevelSection(text: String, key: String): String? {
+        val lines = text.lines()
+        val firstKey = lines.firstOrNull {
+            val t = it.trim()
+            t.isNotEmpty() && !t.startsWith('#') && !t.startsWith('%') && t.substringBefore(' ') != "---"
+        } ?: return null
+        val root = firstKey.length - firstKey.trimStart().length
+        val header = "$key:"
+        val start = lines.indexOfFirst { line ->
+            val t = line.trimStart()
+            line.length - t.length == root && t.startsWith(header) && (t.length == header.length || t[header.length].isWhitespace())
+        }
+        if (start < 0) return null
+        val result = mutableListOf(lines[start].drop(root))
+        for (line in lines.drop(start + 1)) {
+            val t = line.trimStart()
+            val indent = line.length - t.length
+            if (t.isEmpty() || (indent <= root && t.startsWith('#'))) continue
+            val listItem = (key == "switches" || key == "schema_list") && (t == "-" || t.startsWith("- "))
+            if (indent <= root && !listItem && !t.startsWith('}') && !t.startsWith(']')) break
+            result.add(line.drop(root))
         }
         return result.joinToString("\n")
     }
@@ -784,23 +830,8 @@ object SchemaManager {
      * 从 YAML 文本中提取顶层 `switches:` 的列表项内容（不含 `switches:` 头行），
      * 返回一个可独立作为列表解析的 YAML 片段；不存在时返回 null。
      */
-    internal fun extractSwitchesBlock(yamlText: String): String? {
-        val lines = yamlText.lines()
-        val idx = lines.indexOfFirst {
-            it.trimStart().let { t -> t == "switches:" || (t.startsWith("switches:") && t[9] == ' ') }
-        }
-        if (idx < 0) return null
-        val result = mutableListOf<String>()
-        for (i in idx + 1 until lines.size) {
-            val line = lines[i]
-            if (line.isBlank()) continue
-            val indent = line.length - line.trimStart().length
-            if (indent == 0) break
-            result.add(line)
-        }
-        if (result.isEmpty()) return null
-        return result.joinToString("\n")
-    }
+    internal fun extractSwitchesBlock(yamlText: String): String? =
+        topLevelSection(yamlText, "switches")?.substringAfter("switches:")?.takeIf { it.isNotBlank() }
 
     /** 内置方案（保持默认启用顺序）。 */
     internal val BUILTIN_SCHEMAS = CyimeInputDefaults.recommended
@@ -843,9 +874,7 @@ object SchemaManager {
         // without creating an empty custom list or marking migrations complete.
         if (getRimeDir(context).listFiles().orEmpty().none { it.name.endsWith(".schema.yaml") }) return BUILTIN_SCHEMAS
         if (!customFile.exists()) {
-            setEnabledSchemas(context, BUILTIN_SCHEMAS)
-            SettingsPreferences.setBuiltinSchemasMerged(context, true)
-            return ChineseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS)
+            return initializeEnabledSchemas(context)
         }
 
         try {
@@ -863,9 +892,7 @@ object SchemaManager {
                 return fallback
             }
             if (schemas == null) {
-                setEnabledSchemas(context, BUILTIN_SCHEMAS)
-                SettingsPreferences.setBuiltinSchemasMerged(context, true)
-                return ChineseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS)
+                return initializeEnabledSchemas(context)
             }
             if (schemas.isNotEmpty()) {
                 // 内置方案补齐只执行一次（新版本首次运行，治老版本升级残留：
@@ -890,6 +917,17 @@ object SchemaManager {
         }
 
         return BUILTIN_SCHEMAS
+    }
+
+    /** No saved schema list: offer the same installed modes as the bundled first-install template. */
+    private fun initializeEnabledSchemas(context: Context): List<String> {
+        val available = getRimeDir(context).listFiles().orEmpty().filter { it.name.endsWith(".schema.yaml") }
+            .map { it.name.removeSuffix(".schema.yaml") }.toSet()
+        val defaults = CyimeInputDefaults.firstDefaults(freshInstall = true).filter { it in available }
+            .ifEmpty { fallbackNativeSchema(available) }
+        setEnabledSchemas(context, defaults)
+        SettingsPreferences.setBuiltinSchemasMerged(context, true)
+        return ChineseSchemas.addOnFirstUpgrade(context, defaults)
     }
 
     fun setEnabledSchemas(context: Context, requestedIds: List<String>) {
@@ -1018,10 +1056,7 @@ object SchemaManager {
      */
     fun sanitizeDisplayName(name: String): String {
         return when {
-            name.endsWith(".yaml.txt", ignoreCase = true) ->
-                name.removeSuffix(".txt")
-            name.endsWith(".dict.yaml.txt", ignoreCase = true) ->
-                name.removeSuffix(".txt")
+            name.endsWith(".yaml.txt", ignoreCase = true) -> name.dropLast(4)
             else -> name
         }
     }
@@ -1037,6 +1072,7 @@ object SchemaManager {
         displayName: String,
         inputStream: java.io.InputStream,
         autoEnable: Boolean = true,
+        stageSchemeFiles: Boolean = false,
     ): ImportResult = withContext(Dispatchers.IO) {
         val name = sanitizeDisplayName(displayName)
         if (isFont(name)) {
@@ -1069,7 +1105,8 @@ object SchemaManager {
                 FileLogger.e(TAG, "Failed to import image $name", e)
                 ImportResult(false)
             }
-        } else if (isArchive(name)) {
+        } else if (isArchive(name) || (stageSchemeFiles &&
+                (name.endsWith(".schema.yaml") || name.endsWith(".dict.yaml")))) {
             // 压缩包：先存进 market/，由 ImportManager 接着安装（同名文件冲突时留在这里等用户确认）
             val importId = generateImportId()
             val pkgDir = getMarketDir(context, importId)
@@ -1175,6 +1212,10 @@ object SchemaManager {
         return if (idx >= 0) commonPrefix.substring(0, idx + 1) else ""
     }
 
+    // 多平台发行包常把 Rime、Fcitx 和其它码表放在并列目录；只安装选定 Rime 根下的资源。
+    private fun archiveTarget(entry: String, baseDir: String): String? =
+        entry.takeIf { it.startsWith(baseDir) }?.removePrefix(baseDir)
+
     private fun importZip(context: Context, uri: Uri, targetDir: File): Boolean {
         try {
             // 第一趟：收集文件名以检测共同根目录
@@ -1203,8 +1244,8 @@ object SchemaManager {
                     var entry = zis.nextEntry
                     while (entry != null) {
                         val originalName = entry.name
-                        val name = originalName.removePrefix(baseDir)
-                        if (!entry.isDirectory && !isAppleDouble(originalName) && !isProtectedImportName(name)) {
+                        val name = archiveTarget(originalName, baseDir)
+                        if (name != null && !entry.isDirectory && !isAppleDouble(originalName) && !isProtectedImportName(name)) {
                             val file = safeChild(targetDir, name)
                             if (file == null) {
                                 Log.w(TAG, "Skip unsafe path: $name")
@@ -1431,7 +1472,7 @@ object SchemaManager {
         }
     }
 
-    private fun importZipFromFile(zipFile: File, targetDir: File): Boolean {
+    private fun importZipFromFile(zipFile: File, targetDir: File, onPackageDefaults: ((String) -> Unit)? = null): Boolean {
         return try {
             // 第一趟：收集文件名以检测共同根目录（排除 Apple Double）
             val entryNames = mutableListOf<String>()
@@ -1454,7 +1495,10 @@ object SchemaManager {
                 zip.entries().asSequence().forEach { entry ->
                     val originalName = entry.name
                     if (entry.isDirectory || isAppleDouble(originalName)) return@forEach
-                    val name = originalName.removePrefix(baseDir)
+                    val name = archiveTarget(originalName, baseDir) ?: return@forEach
+                    if (name == "default.yaml" && onPackageDefaults != null && entry.size in 1L..262144L) {
+                        zip.getInputStream(entry).bufferedReader().use { onPackageDefaults(it.readText()) }
+                    }
                     val file = if (isProtectedImportName(name)) null else safeChild(targetDir, name)
                     if (file == null) {
                         FileLogger.d(TAG, "Skip protected/unsafe entry: $name")
@@ -1492,7 +1536,7 @@ object SchemaManager {
         }
     }
 
-    private fun importTarGzFromFile(tarGzFile: File, targetDir: File): Boolean {
+    private fun importTarGzFromFile(tarGzFile: File, targetDir: File, onPackageDefaults: ((String) -> Unit)? = null): Boolean {
         return try {
             // 第一趟：收集文件名以检测共同根目录（排除 Apple Double）
             val entryNames = mutableListOf<String>()
@@ -1521,8 +1565,11 @@ object SchemaManager {
                         entry = tarIn.nextEntry
                         continue
                     }
-                    val name = originalName.removePrefix(baseDir)
-                    val file = if (isProtectedImportName(name)) null else safeChild(targetDir, name)
+                    val name = archiveTarget(originalName, baseDir)
+                    if (name == "default.yaml" && onPackageDefaults != null && entry.size in 1L..262144L) {
+                        onPackageDefaults(tarIn.bufferedReader().readText())
+                    }
+                    val file = if (name == null || isProtectedImportName(name)) null else safeChild(targetDir, name)
                     if (file == null) {
                     } else {
                         file.parentFile?.mkdirs()

@@ -1,0 +1,24 @@
+# 全拼方案共用。仅收录常用词的「末音节只打声母」和「每个音节只打声母」。
+common:
+  phrases:
+    - 呢 ne
+    - 了 le
+    - 的 de
+    - 嗯 en
+    - 你呢 ni ne
+    - 我呢 wo ne
+    - 怎么了 zen me le
+    - 好的 hao de
+    - 是的 shi de
+    - 真的 zhen de
+    - 我的 wo de
+    - 在干嘛呢 zai gan ma ne
+    - 你在干什么呢 ni zai gan shen me ne
+    - 我知道了 wo zhi dao le
+    - 什么 shen me
+    - 什么的 shen me de
+    - 来了 lai le
+    - 不用了 bu yong le
+    - 什么时候 shen me shi hou
+    - 怎么回事呢 zen me hui shi ne
+    - 好了 hao le

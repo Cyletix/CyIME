@@ -164,15 +164,31 @@ class RimeEngine {
     @Volatile
     private var userDataDir: String = ""
     private var sharedDataDir: String = ""
-    private var mergedAlphabet: Pair<String, String>? = null
+    @Volatile private var mergedAlphabet: Pair<String, String>? = null
 
-    internal fun mergedLetterKeyCode(letter: Char): Int = locked {
+    private fun mergedSpellerAlphabet(): String {
         val schema = nativeGetCurrentSchema().orEmpty()
-        val alphabet = mergedAlphabet?.takeIf { it.first == schema }?.second ?: run {
+        return mergedAlphabet?.takeIf { it.first == schema }?.second ?: run {
             nativeGetSchemaString(schema, "speller/alphabet").orEmpty().also { mergedAlphabet = schema to it }
         }
+    }
+
+    /** 按键队列里先读一次当前方案的字母表，屏幕键盘线程随后可以不加锁地查 [spellerAlphabetHas]。 */
+    internal fun warmSpellerAlphabet() { locked { mergedSpellerAlphabet() } }
+
+    /**
+     * 不加锁：当前方案（[schemaId]）的 speller/alphabet 里有没有 [c]。还没读过（刚部署、刚重载）时返回 false，
+     * 照旧按标点处理；按键队列下一次 [warmSpellerAlphabet] 或切换方案后就有了（#87）。
+     */
+    internal fun spellerAlphabetHas(schemaId: String, c: Char): Boolean =
+        mergedAlphabet?.takeIf { it.first == schemaId }?.second?.contains(c) == true
+
+    /** 不加锁：[schemaId] 的字母表已经读过（读到空串也算）。 */
+    internal fun spellerAlphabetKnown(schemaId: String): Boolean = mergedAlphabet?.first == schemaId
+
+    internal fun mergedLetterKeyCode(letter: Char): Int = locked {
         // An intentionally customized old schema must remain usable and must not be overwritten.
-        if (letter.uppercaseChar() in alphabet) letter.uppercaseChar().code else letter.lowercaseChar().code
+        if (letter.uppercaseChar() in mergedSpellerAlphabet()) letter.uppercaseChar().code else letter.lowercaseChar().code
     }
 
     /**
@@ -610,8 +626,30 @@ class RimeEngine {
         } else emptyArray()
     }
 
+    /** A layout binding doesn't tell us whether the active processor owns a separate digit buffer. */
+    internal fun readDeleteDragInput(schema: String): Pair<Array<String>, String>? = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode() ||
+            nativeGetCurrentSchema() != schema) return@locked null
+        nativePinyinEditSnapshot() to nativeT9GetRemainingDigits().orEmpty()
+    }
+
+    /** Walk the raw nine-key tail with real keys so the next ordinary Backspace retains its undo history. */
+    internal fun moveDeleteDragDigits(expected: String, target: String, schema: String, current: () -> Boolean): Boolean =
+        mutateLocked {
+            if (!current() || !nativeHasSession() || nativeIsAsciiMode() || nativeGetCurrentSchema() != schema ||
+                nativeGetInput().orEmpty() != expected || nativeT9GetRemainingDigits().orEmpty() != expected ||
+                !(expected.startsWith(target) || target.startsWith(expected))) return@mutateLocked false
+            var length = expected.length
+            while (length != target.length) {
+                val key = if (length > target.length) { length--; 0xff08 } else target[length++].code
+                if (!current() || !nativeProcessKey(key, 0)) return@mutateLocked false
+                nativeT9FlushRimeInput()
+            }
+            nativeGetInput().orEmpty() == target && nativeT9GetRemainingDigits().orEmpty() == target
+        }
+
     /** Queried only while the expanded reading rail is visible, off the UI thread. */
-    internal fun readPinyinSyllableChoices(expectedRevision: Long,
+    internal fun readPinyinSyllableChoices(expectedRevision: Long, merged14: Boolean,
         isStillCurrent: () -> Boolean = { true }): PinyinSyllableChoices? = locked {
         if (!isInitialized || !nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode() ||
             candidateRevision.get() != expectedRevision) return@locked null
@@ -619,25 +657,60 @@ class RimeEngine {
         val input = snapshot.getOrNull(0).orEmpty()
         val confirmed = snapshot.getOrNull(2)?.toIntOrNull() ?: return@locked null
         if (input.isEmpty() || confirmed !in 0..input.length) return@locked null
-        val options = parsePinyinSyllableOptions(nativePinyinSyllableOptions(), input, confirmed)
-        if (options.isEmpty()) return@locked null
+        val group = if (merged14)
+            MergedLetterInput.singleKeyGroup(input, snapshot.getOrNull(1)?.toIntOrNull(), confirmed)
+                ?.takeIf { pair ->
+                    val alphabet = mergedSpellerAlphabet()
+                    pair.first().uppercaseChar() in alphabet && pair.all { it in alphabet }
+                }
+        else null
+        val options = if (group == null) parsePinyinSyllableOptions(nativePinyinSyllableOptions(), input, confirmed)
+            else emptyList()
+        if (group == null && options.isEmpty()) return@locked null
         PinyinSyllableChoices(0L, nativeGetCurrentSchema().orEmpty(), expectedRevision, input,
-            confirmed, snapshot.getOrNull(3).orEmpty(), options)
+            confirmed, snapshot.getOrNull(3).orEmpty(), options, group,
+            chosen = if (group == null) nativePinyinSyllablesChosen() else 0)
     }
 
-    /** Native graph restriction handles shuangpin collisions and xian versus xi+an. */
-    internal fun selectPinyinSyllable(owner: PinyinSyllableChoices, index: Int,
+    /** Takes back the last chosen syllable; null when none is chosen or the choices are stale. */
+    internal fun undoPinyinSyllable(owner: PinyinSyllableChoices,
         isStillCurrent: () -> Boolean = { true }): RimeProcessResult? = locked {
-        val option = owner.options.getOrNull(index) ?: return@locked null
-        if (!isInitialized || !nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode()) return@locked null
+        if (!isInitialized || !nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode() ||
+            owner.letterGroup != null) return@locked null
         val before = nativePinyinEditSnapshot()
         if (!owner.matches(nativeGetCurrentSchema().orEmpty(), candidateRevision.get(),
                 before.getOrNull(0).orEmpty(), before.getOrNull(2)?.toIntOrNull() ?: -1,
                 before.getOrNull(3).orEmpty())) return@locked null
         editPinyinAndReadState {
-            if (!nativeSelectPinyinSyllable(owner.inputText, owner.schemaId, option.start, option.end,
-                    option.syllableId)) false
-            else { candidateRevision.incrementAndGet(); true }
+            if (!nativeUndoPinyinSyllable(owner.inputText, owner.schemaId)) return@editPinyinAndReadState false
+            candidateRevision.incrementAndGet()
+            true
+        }
+    }
+
+    /** Native graph restriction handles shuangpin collisions and xian versus xi+an. */
+    internal fun selectPinyinSyllable(owner: PinyinSyllableChoices, index: Int,
+        isStillCurrent: () -> Boolean = { true }): RimeProcessResult? = locked {
+        if (!isInitialized || !nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode()) return@locked null
+        val before = nativePinyinEditSnapshot()
+        if (!owner.matches(nativeGetCurrentSchema().orEmpty(), candidateRevision.get(),
+                before.getOrNull(0).orEmpty(), before.getOrNull(2)?.toIntOrNull() ?: -1,
+                before.getOrNull(3).orEmpty())) return@locked null
+        val group = owner.letterGroup
+        editPinyinAndReadState {
+            if (group != null) {
+                if (MergedLetterInput.singleKeyGroup(owner.inputText, before.getOrNull(1)?.toIntOrNull(),
+                        owner.protectedLength) != group) return@editPinyinAndReadState false
+                val letter = group.getOrNull(index)?.toString() ?: return@editPinyinAndReadState false
+                if (letter == owner.inputText) return@editPinyinAndReadState true
+                if (!nativeSetInput(letter)) return@editPinyinAndReadState false
+            } else {
+                val option = owner.options.getOrNull(index) ?: return@editPinyinAndReadState false
+                if (!nativeSelectPinyinSyllable(owner.inputText, owner.schemaId, option.start, option.end,
+                        option.syllableId)) return@editPinyinAndReadState false
+            }
+            candidateRevision.incrementAndGet()
+            true
         }
     }
 
@@ -744,6 +817,8 @@ class RimeEngine {
     private external fun nativePinyinSyllableOptions(): Array<String>
     private external fun nativeSelectPinyinSyllable(expectedInput: String, expectedSchema: String,
         start: Int, end: Int, syllableId: Int): Boolean
+    private external fun nativePinyinSyllablesChosen(): Int
+    private external fun nativeUndoPinyinSyllable(expectedInput: String, expectedSchema: String): Boolean
     private external fun nativeSetCaret(caret: Int)
 
     // English stays half-width even after restoring full_shape from a Chinese schema.
@@ -823,6 +898,7 @@ class RimeEngine {
             nativeEnsureT9SchemaPatches(schemaId)
             val switched = nativeSwitchSchema(schemaId)
             mergedAlphabet = null
+            if (switched) mergedSpellerAlphabet()
             if (!switched) {
                 // 常见于方案未部署（不在 schema_list，如老版本升级残留）：
                 // 留证便于反馈日志定位（用户症状：键盘已切换但按键无候选）

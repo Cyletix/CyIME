@@ -11,7 +11,7 @@ class BaseAssociationIntegrationTest {
   val before=if(cache.exists()) cache.readBytes().toList() else null
   val fusion=NgramFusionEngine(c)
   assertTrue(fusion.initialize())
-  val words=fusion.fuseCandidates(emptyList(),"今天晚上")
+  val words=fusion.fuseCandidates("今天晚上")
   assertTrue("Bundled model must supply candidates without ONNX",words.isNotEmpty())
   android.util.Log.i("BaseCorpusProbe", "今天晚上 => "+words.take(6).joinToString { it.text })
   assertEquals(before,if(cache.exists()) cache.readBytes().toList() else null)

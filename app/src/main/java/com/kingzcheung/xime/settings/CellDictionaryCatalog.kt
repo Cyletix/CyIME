@@ -28,7 +28,7 @@ object CellDictionaryCatalog {
         BuiltinCellDictionary("builtin_dota2", "Dota2", "电子游戏"),
         BuiltinCellDictionary("builtin_cs2", "CS2 / CSGO", "电子游戏"),
         // Gacha-game slang shared by all of them; each game's own words are its Sogou dictionary below.
-        BuiltinCellDictionary("builtin_gacha", "二次元手游通用（抽卡、保底、歪了…）", "电子游戏"),
+        BuiltinCellDictionary("builtin_gacha", "抽卡游戏", "电子游戏"),
         BuiltinCellDictionary("builtin_genshin", "原神", "电子游戏"),
         BuiltinCellDictionary("builtin_hsr", "崩坏：星穹铁道", "电子游戏"),
         BuiltinCellDictionary("builtin_wuwa", "鸣潮", "电子游戏"),

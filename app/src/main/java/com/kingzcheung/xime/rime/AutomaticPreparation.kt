@@ -4,18 +4,32 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.util.FileLogger
+
+/**
+ * 键盘上「正在准备…」说的是这次真正在准备的东西。以前一律写「中文输入」，
+ * 只开了德语、法语这些新语言、中文早就编译好时也这样提示（2026-11-02 平板上加了一堆语言后看到）。
+ * [missing] 是还没编译出来的启用方案所属的语言；[firstTime] 表示还没有任何编译结果（新装、清除数据）。
+ */
+internal fun preparingMessage(missing: Collection<InputLanguage>, firstTime: Boolean): String {
+    if (firstTime || InputLanguage.CHINESE in missing) return "正在自动准备中文输入，请稍候…"
+    val names = missing.filter { it != InputLanguage.ENGLISH && it != InputLanguage.UNSPECIFIED }
+        .distinct().map { it.displayName }
+    return if (names.isEmpty()) "正在更新输入方案，请稍候…" else "正在准备${names.joinToString("、")}输入，请稍候…"
+}
 
 internal suspend fun retryPreparation(
     status: (String) -> Unit,
     wait: suspend (Long) -> Unit = { delay(it) },
     problem: () -> String = { "" },
+    preparing: () -> String = { "正在自动准备中文输入，请稍候…" },
     prepare: suspend () -> Boolean,
 ) {
     var attempt = 0
     while (true) {
         currentCoroutineContext().ensureActive()
-        status("正在自动准备中文输入，请稍候…")
+        status(preparing())
         val error = try { if (prepare()) return else problem().ifBlank { "词库尚未就绪" } }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {

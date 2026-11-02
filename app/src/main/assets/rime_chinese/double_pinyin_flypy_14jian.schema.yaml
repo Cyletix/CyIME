@@ -44,6 +44,8 @@ engine:
   translators:
     - punct_translator
     - script_translator
+    # 生僻字（设置「生僻字」，默认关；关着时只看一下开关就返回），见 lua/cyime_rare_chars.lua。
+    - lua_translator@*cyime_rare_chars
   # 与 26 键、九键同一套候选规则：长按删掉的候选不再出现（cyime_candidate_policy）。
   filters:
     - cyime_candidate_policy
@@ -52,6 +54,8 @@ engine:
     - simplifier@emoji
     # 打符号名出符号（设置 › 语言与方案 › 中文输出，默认关）：加号后面多出 +。
     - simplifier@cyime_symbols
+    # 打希腊字母名出希腊字母（设置 › 语言与方案 › 中文输出，默认关）：xita 第 3 个候选是 θ Θ，见 lua/cyime_greek_letters.lua。
+    - lua_filter@*cyime_greek_letters
     - simplifier@traditionalize
     - uniquifier
 
@@ -131,6 +135,9 @@ translator:
     - xlit/QETUOADGJZCB/qetuoadgjzcb/
   # 合并码无法直接反算唯一音节；保留真实双拼编码，候选注释显示词库读音。
   # 不能套用二十六键 preedit_format 将合并代表字母误显示成另一音节。
+
+# 生僻字按本方案的拼写规则算出每个读音的精确字母编码，合并键逐位换成键上的字母再查（AU 补 ai、si、su）。
+cyime_rare_merged_keys: true
 
 menu:
   page_size: 5

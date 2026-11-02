@@ -1,0 +1,1173 @@
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Package.swift akkc-lite/Package.swift
+--- pristine/Package.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Package.swift	2026-11-02 08:29:48.617378397 +0000
+@@ -21,7 +21,8 @@
+ ]
+ 
+ var efficientNGramDependencies: [Target.Dependency] = [
+-    .product(name: "Transformers", package: "swift-tokenizers")
++    "FoundationLite",
++    .product(name: "Transformers", package: "swift-tokenizers", condition: .when(traits: ["Zenzai", "ZenzaiCPU"]))
+ ]
+ 
+ #if (!os(Linux) || !canImport(Android)) && !os(Windows)
+@@ -35,8 +36,13 @@
+     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
+     // Targets can depend on other targets in this package, and on products in packages this package depends on.
+     .target(
++        name: "FoundationLite",
++        swiftSettings: swiftSettings
++    ),
++    .target(
+         name: "SwiftUtils",
+         dependencies: [
++            "FoundationLite",
+             .product(name: "Algorithms", package: "swift-algorithms")
+         ],
+         resources: [],
+@@ -45,7 +51,7 @@
+     .target(
+         name: "EfficientNGram",
+         dependencies: efficientNGramDependencies,
+-        resources: [.copy("tokenizer")],
++        exclude: ["tokenizer"],
+         swiftSettings: swiftSettings
+     ),
+     .target(
+@@ -164,6 +170,7 @@
+     .target(
+         name: "KanaKanjiConverterModule",
+         dependencies: [
++            "FoundationLite",
+             "SwiftUtils",
+             .target(name: "EfficientNGram"),
+             .target(name: "llama.cpp", condition: .when(traits: ["Zenzai", "ZenzaiCPU"])),
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/EfficientNGram/Inference.swift akkc-lite/Sources/EfficientNGram/Inference.swift
+--- pristine/Sources/EfficientNGram/Inference.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/EfficientNGram/Inference.swift	2026-11-02 08:26:00.126726559 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ #if canImport(SwiftyMarisa) && Zenzai
+ import SwiftyMarisa
+ 
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/EfficientNGram/Tokenizer.swift akkc-lite/Sources/EfficientNGram/Tokenizer.swift
+--- pristine/Sources/EfficientNGram/Tokenizer.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/EfficientNGram/Tokenizer.swift	2026-11-02 08:26:00.125782116 +0000
+@@ -1,3 +1,5 @@
++import FoundationLite
++#if Zenzai || ZenzaiCPU
+ import Foundation
+ import Hub
+ import Tokenizers
+@@ -85,3 +87,16 @@
+         6000
+     }
+ }
++
++#else
++/// Zenzai is off in this build: the tokenizer is never used.
++public struct ZenzTokenizer {
++    public init(enableFastTokenizerPath: Bool = true) {}
++    public func encode(text: String) -> [Int] { [] }
++    public func encodeSlow(text: String) -> [Int] { [] }
++    public func decode(tokens: [Int]) -> String { "" }
++    public var startTokenID: Int { 0 }
++    public var endTokenID: Int { 0 }
++    public var vocabSize: Int { 0 }
++}
++#endif
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/EfficientNGram/Trainer.swift akkc-lite/Sources/EfficientNGram/Trainer.swift
+--- pristine/Sources/EfficientNGram/Trainer.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/EfficientNGram/Trainer.swift	2026-11-02 08:26:00.128099416 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ #if canImport(SwiftyMarisa) && Zenzai
+ import SwiftyMarisa
+ 
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/FoundationLite/FoundationLite.swift akkc-lite/Sources/FoundationLite/FoundationLite.swift
+--- pristine/Sources/FoundationLite/FoundationLite.swift	1970-01-01 00:00:00.000000000 +0000
++++ akkc-lite/Sources/FoundationLite/FoundationLite.swift	2026-11-02 08:26:00.036910334 +0000
+@@ -0,0 +1,226 @@
++// CyIME: the few Foundation pieces this converter needs, on top of FoundationEssentials,
++// so Android builds do not link Foundation's ICU data (about 40 MB).
++@_exported public import FoundationEssentials
++#if canImport(Android)
++@_exported public import Android
++#elseif canImport(Glibc)
++@_exported public import Glibc
++#elseif canImport(Darwin)
++@_exported public import Darwin
++#endif
++
++public final class NSLock: @unchecked Sendable {
++    private var mutex = pthread_mutex_t()
++    public init() { pthread_mutex_init(&mutex, nil) }
++    deinit { pthread_mutex_destroy(&mutex) }
++    public func lock() { pthread_mutex_lock(&mutex) }
++    public func unlock() { pthread_mutex_unlock(&mutex) }
++    public func withLock<R>(_ body: () throws -> R) rethrows -> R {
++        lock(); defer { unlock() }
++        return try body()
++    }
++}
++
++public final class NSString: Hashable, @unchecked Sendable {
++    public let value: String
++    public init(_ value: String) { self.value = value }
++    public static func == (l: NSString, r: NSString) -> Bool { l.value == r.value }
++    public func hash(into h: inout Hasher) { h.combine(value) }
++}
++
++/// Bounded cache with NSCache's surface (count limit only).
++public final class NSCache<Key: Hashable & AnyObject, Value: AnyObject>: @unchecked Sendable {
++    private var storage: [Key: Value] = [:]
++    private var order: [Key] = []
++    private let mutex = NSLock()
++    public var countLimit: Int = 0
++    public var totalCostLimit: Int = 0
++    public init() {}
++    public func object(forKey key: Key) -> Value? { mutex.withLock { storage[key] } }
++    public func setObject(_ value: Value, forKey key: Key) { setObject(value, forKey: key, cost: 0) }
++    public func setObject(_ value: Value, forKey key: Key, cost: Int) {
++        mutex.withLock {
++            if storage.updateValue(value, forKey: key) == nil { order.append(key) }
++            if countLimit > 0, order.count > countLimit {
++                let drop = order.removeFirst()
++                storage[drop] = nil
++            }
++        }
++    }
++    public func removeObject(forKey key: Key) {
++        mutex.withLock {
++            storage[key] = nil
++            order.removeAll { $0 == key }
++        }
++    }
++    public func removeAllObjects() { mutex.withLock { storage = [:]; order = [] } }
++}
++
++public struct NSRange: Sendable, Equatable {
++    public var location: Int
++    public var length: Int
++    public init(location: Int, length: Int) { self.location = location; self.length = length }
++}
++
++public final class NSNumber {
++    public let intValue: Int
++    public init(value: Int) { intValue = value }
++}
++
++/// Only `.spellOut` in Japanese is used: 123 -> 百二十三.
++public final class NumberFormatter {
++    public enum Style { case none, spellOut }
++    public var numberStyle: Style = .none
++    public var locale: Locale? = nil
++    public init() {}
++    public func string(from number: NSNumber) -> String? {
++        let n = number.intValue
++        guard numberStyle == .spellOut else { return String(n) }
++        if n == 0 { return "〇" }
++        let digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
++        func small(_ v: Int) -> String {
++            var out = ""
++            for (unit, name) in [(1000, "千"), (100, "百"), (10, "十")] {
++                let d = (v / unit) % 10
++                if d > 0 { out += (d == 1 ? "" : digits[d]) + name }
++            }
++            return out + digits[v % 10]
++        }
++        var v = abs(n), out = "", units = ["", "万", "億", "兆"], i = 0
++        while v > 0 && i < units.count {
++            let part = v % 10000
++            if part > 0 { out = small(part) + units[i] + out }
++            v /= 10000; i += 1
++        }
++        return (n < 0 ? "マイナス" : "") + out
++    }
++}
++
++public extension Error {
++    var localizedDescription: String { String(describing: self) }
++}
++
++public enum StringTransformLite: Sendable { case fullwidthToHalfwidth }
++public extension StringTransformLite {
++    static let toHalf: [Unicode.Scalar: String] = {
++        var m: [Unicode.Scalar: String] = [:]
++        for v in UInt32(0xFF01)...0xFF5E { m[Unicode.Scalar(v)!] = String(Unicode.Scalar(v - 0xFEE0)!) }
++        m["\u{3000}"] = " "
++        let pairs: [(String, String)] = [("￠", "¢"), ("￡", "£"), ("￢", "¬"), ("￣", "¯"), ("￤", "¦"), ("￥", "¥"), ("￦", "₩"),
++            ("。", "｡"), ("「", "｢"), ("」", "｣"), ("、", "､"), ("・", "･"), ("ー", "ｰ")]
++        for (f, h) in pairs { m[f.unicodeScalars.first!] = h }
++        let full = Array("ヲァィゥェォャュョッアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン".unicodeScalars)
++        let half = Array("ｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ".unicodeScalars)
++        for (f, h) in zip(full, half) { m[f] = String(h) }
++        let voiced = Array("ガギグゲゴザジズゼゾダヂヅデドバビブベボ".unicodeScalars), voicedBase = Array("ｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾊﾋﾌﾍﾎ".unicodeScalars)
++        for (f, h) in zip(voiced, voicedBase) { m[f] = String(h) + "ﾞ" }
++        let semi = Array("パピプペポ".unicodeScalars), semiBase = Array("ﾊﾋﾌﾍﾎ".unicodeScalars)
++        for (f, h) in zip(semi, semiBase) { m[f] = String(h) + "ﾟ" }
++        m["ヴ"] = "ｳﾞ"
++        return m
++    }()
++    static let toFull: [String: Unicode.Scalar] = {
++        var m: [String: Unicode.Scalar] = [:]
++        for (k, v) in toHalf where m[v] == nil || k.value >= 0xFF01 { m[v] = k }
++        return m
++    }()
++}
++
++public extension StringProtocol {
++    func applyingTransform(_ t: StringTransformLite, reverse: Bool) -> String? {
++        var out = ""
++        let scalars = Array(self.unicodeScalars)
++        var i = 0
++        while i < scalars.count {
++            if reverse {
++                if i + 1 < scalars.count, let f = StringTransformLite.toFull[String(scalars[i]) + String(scalars[i + 1])] {
++                    out.unicodeScalars.append(f); i += 2; continue
++                }
++                if let f = StringTransformLite.toFull[String(scalars[i])] { out.unicodeScalars.append(f) } else { out.unicodeScalars.append(scalars[i]) }
++            } else {
++                if let h = StringTransformLite.toHalf[scalars[i]] { out += h } else { out.unicodeScalars.append(scalars[i]) }
++            }
++            i += 1
++        }
++        return out
++    }
++}
++
++public struct CharacterSetLite: Sendable {
++    let test: @Sendable (Unicode.Scalar) -> Bool
++    public static let newlines = CharacterSetLite { [0x0A, 0x0B, 0x0C, 0x0D, 0x85, 0x2028, 0x2029].contains($0.value) }
++    public static let whitespaces = CharacterSetLite { $0.properties.isWhitespace && !newlines.test($0) }
++    public static let whitespacesAndNewlines = CharacterSetLite { $0.properties.isWhitespace }
++    public func contains(_ s: Unicode.Scalar) -> Bool { test(s) }
++}
++
++public extension StringProtocol {
++    func components(separatedBy set: CharacterSetLite) -> [String] {
++        var out: [String] = [], cur = ""
++        for s in self.unicodeScalars {
++            if set.contains(s) { out.append(cur); cur = "" } else { cur.unicodeScalars.append(s) }
++        }
++        out.append(cur)
++        return out
++    }
++    func trimmingCharacters(in set: CharacterSetLite) -> String {
++        let scalars = Array(self.unicodeScalars)
++        var lo = 0, hi = scalars.count
++        while lo < hi && set.contains(scalars[lo]) { lo += 1 }
++        while hi > lo && set.contains(scalars[hi - 1]) { hi -= 1 }
++        var out = ""
++        out.unicodeScalars.append(contentsOf: scalars[lo..<hi])
++        return out
++    }
++    func commonPrefix<T: StringProtocol>(with other: T, options: Int = 0) -> String {
++        var out = ""
++        for (a, b) in zip(self, other) { if a == b { out.append(a) } else { break } }
++        return out
++    }
++    func appending<T: StringProtocol>(_ other: T) -> String { String(self) + String(other) }
++}
++
++public extension String {
++    /// Only the integer conversions used here: %d, %02d, %04X.
++    init(format: String, _ args: CVarArg...) {
++        var out = "", argIndex = 0
++        var it = format.makeIterator()
++        while let c = it.next() {
++            guard c == "%" else { out.append(c); continue }
++            var spec = ""
++            while let n = it.next() {
++                spec.append(n)
++                if n.isLetter || n == "%" { break }
++            }
++            guard let conv = spec.last, conv != "%" else { out.append("%"); continue }
++            let flags = spec.dropLast()
++            let pad = flags.hasPrefix("0") ? "0" : " "
++            let width = Int(flags) ?? 0
++            let arg = argIndex < args.count ? args[argIndex] : 0
++            argIndex += 1
++            var body: String
++            let value: Int = (arg as? Int) ?? (arg as? Int32).map(Int.init) ?? (arg as? UInt32).map(Int.init) ?? (arg as? UInt16).map(Int.init) ?? (arg as? UInt8).map(Int.init) ?? 0
++            switch conv {
++            case "X": body = String(value, radix: 16, uppercase: true)
++            case "x": body = String(value, radix: 16)
++            case "@", "s": body = "\(arg)"
++            default: body = String(value)
++            }
++            if body.count < width { body = String(repeating: pad, count: width - body.count) + body }
++            out += body
++        }
++        self = out
++    }
++}
++
++public extension FileManager {
++    struct DirectoryEnumerationOptionsLite: OptionSet, Sendable {
++        public let rawValue: Int
++        public init(rawValue: Int) { self.rawValue = rawValue }
++        public static let skipsHiddenFiles = Self(rawValue: 1)
++    }
++    func contentsOfDirectory(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options: DirectoryEnumerationOptionsLite = []) throws -> [URL] {
++        try contentsOfDirectory(atPath: url.path).filter { !options.contains(.skipsHiddenFiles) || !$0.hasPrefix(".") }
++            .map { url.appendingPathComponent($0) }
++    }
++}
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessing.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessing.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessing.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessing.swift	2026-11-02 08:26:00.109308206 +0000
+@@ -7,7 +7,7 @@
+ //
+ 
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessingWithPrefixConstraint.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessingWithPrefixConstraint.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessingWithPrefixConstraint.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/FullInputProcessingWithPrefixConstraint.swift	2026-11-02 08:26:00.107447855 +0000
+@@ -1,5 +1,5 @@
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PredictionProcessing.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PredictionProcessing.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PredictionProcessing.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PredictionProcessing.swift	2026-11-02 08:26:00.110078411 +0000
+@@ -5,7 +5,7 @@
+ //  Created by miwa on 2023/09/19.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ // 確定後の予測変換に関係する実装
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PrefixCompletionProcessing.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PrefixCompletionProcessing.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PrefixCompletionProcessing.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/PrefixCompletionProcessing.swift	2026-11-02 08:26:00.108645918 +0000
+@@ -7,7 +7,7 @@
+ //
+ 
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/SuffixReplacementProcessing.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/SuffixReplacementProcessing.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/SuffixReplacementProcessing.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/SuffixReplacementProcessing.swift	2026-11-02 08:26:00.108137367 +0000
+@@ -7,7 +7,7 @@
+ //
+ 
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/UnchangedInputProcessing.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/UnchangedInputProcessing.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/UnchangedInputProcessing.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Core/UnchangedInputProcessing.swift	2026-11-02 08:26:00.105918742 +0000
+@@ -7,7 +7,7 @@
+ //
+ 
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Kana2Kanji.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Kana2Kanji.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Kana2Kanji.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Kana2Kanji.swift	2026-11-02 08:26:00.103099546 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ #if os(iOS) || os(tvOS)
+ public typealias PValue = Float16
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/LatticeNode.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/LatticeNode.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/LatticeNode.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/LatticeNode.swift	2026-11-02 08:26:00.104350505 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ /// ラティスのノード。これを用いて計算する。
+ public final class LatticeNode {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/PostCompositionPredictionCandidate.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/PostCompositionPredictionCandidate.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/PostCompositionPredictionCandidate.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/PostCompositionPredictionCandidate.swift	2026-11-02 08:26:00.102473460 +0000
+@@ -5,7 +5,7 @@
+ //  Created by miwa on 2023/09/19.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ /// 確定後予測変換候補を表す型
+ public struct PostCompositionPredictionCandidate {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Prediction.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Prediction.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Prediction.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Prediction.swift	2026-11-02 08:26:00.105431190 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ struct PredictiveInputCacheContext: Sendable, Equatable {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/RegisteredNode.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/RegisteredNode.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/RegisteredNode.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/RegisteredNode.swift	2026-11-02 08:26:00.103901297 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ 
+ /// N-bestの複数経路で共通する辞書データと入力範囲を1回だけ保持する。
+ final class RegisteredNodePayload {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/FixedSizeHeap.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/FixedSizeHeap.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/FixedSizeHeap.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/FixedSizeHeap.swift	2026-11-02 08:26:00.121279701 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ import HeapModule
+ 
+ struct FixedSizeHeap<Element: Comparable> {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/Zenz.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/Zenz.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/Zenz.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/Zenz.swift	2026-11-02 08:26:00.115707513 +0000
+@@ -1,5 +1,5 @@
+ import EfficientNGram
+-package import Foundation
++package import FoundationLite
+ import SwiftUtils
+ 
+ /// 同一モデルのnative contextをConverter間で共有する。
+@@ -16,7 +16,7 @@
+ 
+     func zenz(resourceURL: URL) throws -> Zenz {
+         try self.lock.withLock {
+-            let key = resourceURL.absoluteString as NSString
++            let key = NSString(resourceURL.absoluteString)
+             if let cached = self.cache.object(forKey: key) {
+                 return cached
+             }
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCandidateEvaluator.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCandidateEvaluator.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCandidateEvaluator.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCandidateEvaluator.swift	2026-11-02 08:26:00.120481485 +0000
+@@ -4,7 +4,7 @@
+ 
+ import Algorithms
+ import EfficientNGram
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ enum CandidateEvaluationResult: Sendable, Equatable, Hashable {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCompatibleInputLanguageModelContext.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCompatibleInputLanguageModelContext.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCompatibleInputLanguageModelContext.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzCompatibleInputLanguageModelContext.swift	2026-11-02 08:26:00.116763851 +0000
+@@ -3,7 +3,7 @@
+ #endif
+ 
+ import EfficientNGram
+-import Foundation
++import FoundationLite
+ 
+ /// typo correction から見た入力言語モデルの共通インターフェース。
+ /// 文字列の token 化、語彙の参照、次 token の対数確率分布の取得だけを抽象化する。
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzContext.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzContext.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzContext.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzContext.swift	2026-11-02 08:27:32.612960352 +0000
+@@ -7,7 +7,7 @@
+ #endif
+ 
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ enum ZenzError: LocalizedError {
+@@ -249,13 +249,13 @@
+     }
+ 
+     func cachedEvaluationPromptTokens(for prompt: String) -> [llama_token]? {
+-        self.evaluationPromptTokenCache.object(forKey: prompt as NSString)?.tokens
++        self.evaluationPromptTokenCache.object(forKey: NSString(prompt))?.tokens
+     }
+ 
+     func cacheEvaluationPromptTokens(_ tokens: [llama_token], for prompt: String) {
+         self.evaluationPromptTokenCache.setObject(
+             ZenzTokenArrayBox(tokens),
+-            forKey: prompt as NSString
++            forKey: NSString(prompt)
+         )
+     }
+ 
+@@ -325,7 +325,7 @@
+ 
+     func model(path: String) throws -> SharedZenzModel {
+         try self.lock.withLock {
+-            let key = path as NSString
++            let key = NSString(path)
+             if let cached = self.cache.object(forKey: key) {
+                 return cached
+             }
+@@ -586,7 +586,7 @@
+     private func preprocessText(text: String) -> String {
+         // replace space into ideographic space (\u3000) for zenz tokenizer
+         // replace newline into null for zenz tokenizer
+-        text.replacingOccurrences(of: " ", with: "\u{3000}").replacingOccurrences(of: "\n", with: "")
++        text.replacing(" ", with: "\u{3000}").replacing("\n", with: "")
+     }
+     private func tokenize(text: String, add_bos: Bool, add_eos: Bool = false) -> [llama_token] {
+         let utf8Count = text.utf8.count
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzInputTextGenerator.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzInputTextGenerator.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzInputTextGenerator.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzInputTextGenerator.swift	2026-11-02 08:26:00.116238160 +0000
+@@ -3,7 +3,7 @@
+ #endif
+ 
+ import Algorithms
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ struct ZenzInputTextGenerator {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPromptBuilder.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPromptBuilder.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPromptBuilder.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPromptBuilder.swift	2026-11-02 08:26:00.119061612 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ enum ZenzPromptBuilder {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPureGreedyDecoder.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPureGreedyDecoder.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPureGreedyDecoder.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzPureGreedyDecoder.swift	2026-11-02 08:26:00.120929590 +0000
+@@ -2,7 +2,7 @@
+ import llama
+ #endif
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ struct ZenzPureGreedyDecoder {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzaiTypoCandidateGenerator.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzaiTypoCandidateGenerator.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzaiTypoCandidateGenerator.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/Zenz/ZenzaiTypoCandidateGenerator.swift	2026-11-02 08:26:00.115004379 +0000
+@@ -4,7 +4,7 @@
+ 
+ import Algorithms
+ import EfficientNGram
+-import Foundation
++import FoundationLite
+ import OrderedCollections
+ import SwiftUtils
+ 
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/zenzai.swift akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/zenzai.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/zenzai.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConversionAlgorithms/Zenzai/zenzai.swift	2026-11-02 08:26:00.111984796 +0000
+@@ -1,6 +1,6 @@
+ import Algorithms
+ import EfficientNGram
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension Kana2Kanji {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/Candidate.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/Candidate.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/Candidate.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/Candidate.swift	2026-11-02 08:27:32.614293583 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ /// Data of clause.
+ struct ClauseDataUnit {
+@@ -194,13 +194,13 @@
+         }
+         // MARK: Fine Filtering: 正確にチェックする
+         var newText = text
+-        while let range = newText.range(of: Self.dateExpression, options: .regularExpression) {
++        while let range = newText.firstRange(of: try! Regex(Self.dateExpression)) {
+             let templateString = String(newText[range])
+             let template = DateTemplateLiteral.import(from: templateString)
+             let value = template.previewString()
+             newText.replaceSubrange(range, with: value)
+         }
+-        while let range = newText.range(of: Self.randomExpression, options: .regularExpression) {
++        while let range = newText.firstRange(of: try! Regex(Self.randomExpression)) {
+             let templateString = String(newText[range])
+             let template = RandomTemplateLiteral.import(from: templateString)
+             let value = template.previewString()
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/ConvertRequestOptions.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/ConvertRequestOptions.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/ConvertRequestOptions.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/ConvertRequestOptions.swift	2026-11-02 08:27:32.619860137 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2022 ensan. All rights reserved.
+ //
+ 
+-public import Foundation
++public import FoundationLite
+ 
+ public struct ConvertRequestOptions: Sendable {
+     public enum PredictionMode: Sendable, Equatable {
+@@ -120,9 +120,9 @@
+             maxMemoryCount: 65536,
+             shouldResetMemory: false,
+             // dummy data, won't work
+-            memoryDirectoryURL: (try? FileManager.default.url(for: .libraryDirectory, in: .userDomainMask, appropriateFor: nil, create: false)) ?? Bundle.main.bundleURL,
++            memoryDirectoryURL: (try? FileManager.default.url(for: .libraryDirectory, in: .userDomainMask, appropriateFor: nil, create: false)) ?? URL(fileURLWithPath: "/"),
+             // dummy data, won't work
+-            sharedContainerURL: Bundle.main.bundleURL,
++            sharedContainerURL: URL(fileURLWithPath: "/"),
+             textReplacer: .empty,
+             specialCandidateProviders: nil,
+             preloadDictionary: false,
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/KanaKanjiConverter.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/KanaKanjiConverter.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/KanaKanjiConverter.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/KanaKanjiConverter.swift	2026-11-02 08:52:44.872092097 +0000
+@@ -8,7 +8,7 @@
+ 
+ import Algorithms
+ import EfficientNGram
+-public import Foundation
++public import FoundationLite
+ import SwiftUtils
+ 
+ /// かな漢字変換の管理を受け持つクラス
+@@ -752,7 +752,7 @@
+                 N_best: 5,
+                 dicdataStoreState: self.dicdataStoreState
+             )
+-            print(fullClause.text, predictions)
++            debug(fullClause.text, predictions)
+             candidates.append(contentsOf: consume predictions)
+         }
+         // 辞書の予測は最後の文節を読みで引き直すため、先頭の表記を含まない候補が出る。それは除く
+@@ -891,7 +891,7 @@
+         }
+         if options.fullWidthRomanCandidate {
+             // 全角英数字
+-            let word = string.applyingTransform(.fullwidthToHalfwidth, reverse: true) ?? ""
++            let word = string.applyingTransform(StringTransformLite.fullwidthToHalfwidth, reverse: true) ?? ""
+             let data = DicdataElement(word: word, ruby: string, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -15)
+             let fullWidthLetter = Candidate(
+                 text: word,
+@@ -904,7 +904,7 @@
+         }
+         if options.halfWidthKanaCandidate {
+             // 半角カタカナ
+-            let word = string.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? ""
++            let word = string.applyingTransform(StringTransformLite.fullwidthToHalfwidth, reverse: false) ?? ""
+             let data = DicdataElement(word: word, ruby: string, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -15)
+             let halfWidthKatakana = Candidate(
+                 text: word,
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/Replacer/TextReplacer.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/Replacer/TextReplacer.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/Replacer/TextReplacer.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/Replacer/TextReplacer.swift	2026-11-02 08:27:32.621847799 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2023 ensan. All rights reserved.
+ //
+ 
+-public import Foundation
++public import FoundationLite
+ import SwiftUtils
+ 
+ /// `TextReplacer`は前後の文脈に基づいて、現在のカーソル位置の語の置き換えを提案するためのモジュールである。
+@@ -76,11 +76,11 @@
+     public init() {
+         self.init {
+             if #available(iOS 16.4, *) {
+-                Bundle.main.bundleURL.appendingPathComponent("emoji_all_E15.0.txt.gen", isDirectory: false)
++                URL(fileURLWithPath: "/").appendingPathComponent("emoji_all_E15.0.txt.gen", isDirectory: false)
+             } else if #available(iOS 15.4, *) {
+-                Bundle.main.bundleURL.appendingPathComponent("emoji_all_E14.0.txt.gen", isDirectory: false)
++                URL(fileURLWithPath: "/").appendingPathComponent("emoji_all_E14.0.txt.gen", isDirectory: false)
+             } else {
+-                Bundle.main.bundleURL.appendingPathComponent("emoji_all_E13.1.txt.gen", isDirectory: false)
++                URL(fileURLWithPath: "/").appendingPathComponent("emoji_all_E13.1.txt.gen", isDirectory: false)
+             }
+         }
+     }
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/Session/AncoSession.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/Session/AncoSession.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/Session/AncoSession.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/Session/AncoSession.swift	2026-11-02 08:26:00.101015718 +0000
+@@ -1,4 +1,4 @@
+-package import Foundation
++package import FoundationLite
+ import SwiftUtils
+ 
+ package struct AncoSession {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CalendarCandidate.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CalendarCandidate.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CalendarCandidate.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CalendarCandidate.swift	2026-11-02 08:26:00.093875342 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2023 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension KanaKanjiConverter {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CommaSeparatedNumber.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CommaSeparatedNumber.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CommaSeparatedNumber.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/CommaSeparatedNumber.swift	2026-11-02 08:26:00.097276202 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension KanaKanjiConverter {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/EmailAddress.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/EmailAddress.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/EmailAddress.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/EmailAddress.swift	2026-11-02 08:26:00.096502685 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension KanaKanjiConverter {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/RomanTypographys.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/RomanTypographys.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/RomanTypographys.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/RomanTypographys.swift	2026-11-02 08:26:00.095948536 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ private extension UnicodeScalar {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/TimeExpression.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/TimeExpression.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/TimeExpression.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/TimeExpression.swift	2026-11-02 08:26:00.098119965 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ 
+ extension KanaKanjiConverter {
+     func convertToTimeExpression(_ inputData: ComposingText) -> [Candidate] {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/Unicode.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/Unicode.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/Unicode.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/Unicode.swift	2026-11-02 08:26:00.096905496 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension KanaKanjiConverter {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/VersionCandidate.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/VersionCandidate.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/VersionCandidate.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpecialConversion/VersionCandidate.swift	2026-11-02 08:26:00.097609614 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2023 ensan All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ extension KanaKanjiConverter {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpellChecker.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpellChecker.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/SpellChecker.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/SpellChecker.swift	2026-11-02 08:26:00.093197907 +0000
+@@ -5,7 +5,7 @@
+ //  Created by ensan on 2023/05/20.
+ //
+ 
+-import Foundation
++import FoundationLite
+ #if os(iOS) || os(tvOS) || os(visionOS)
+ import UIKit
+ #elseif os(macOS)
+@@ -45,7 +45,7 @@
+     #endif
+ 
+     func completions(forPartialWordRange range: NSRange, in string: String, language: String) -> [String]? {
+-        let cacheKey = "\(language)\u{0}\(range.location):\(range.length)\u{0}\(string)" as NSString
++        let cacheKey = NSString("\(language)\u{0}\(range.location):\(range.length)\u{0}\(string)")
+         if let cached = Self.completionCache.storage.object(forKey: cacheKey) {
+             return cached.completions
+         }
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/ConverterAPI/TemplateData.swift akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/TemplateData.swift
+--- pristine/Sources/KanaKanjiConverterModule/ConverterAPI/TemplateData.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/ConverterAPI/TemplateData.swift	2026-11-02 08:27:32.622392258 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-public import Foundation
++public import FoundationLite
+ import SwiftUtils
+ 
+ public struct TemplateData: Codable, Sendable {
+@@ -152,11 +152,21 @@
+     }
+ 
+     public func previewString() -> String {
+-        let formatter = DateFormatter()
+-        formatter.locale = Locale(identifier: self.language.identifier)
+-        formatter.calendar = Calendar(identifier: self.type.identifier)
+-        formatter.dateFormat = format
+-        return formatter.string(from: Date().advanced(by: Double((Int(delta) ?? 0) * deltaUnit)))
++        // CyIME: no ICU here; Gregorian numeric fields only (yyyy MM M dd d HH H mm ss).
++        var t = time_t(Date().advanced(by: Double((Int(delta) ?? 0) * deltaUnit)).timeIntervalSince1970)
++        var tm = tm()
++        localtime_r(&t, &tm)
++        let fields: [(String, String)] = [
++            ("yyyy", String(Int(tm.tm_year) + 1900)), ("MM", String(format: "%02d", Int(tm.tm_mon) + 1)), ("M", String(Int(tm.tm_mon) + 1)),
++            ("dd", String(format: "%02d", Int(tm.tm_mday))), ("d", String(Int(tm.tm_mday))), ("HH", String(format: "%02d", Int(tm.tm_hour))),
++            ("H", String(Int(tm.tm_hour))), ("mm", String(format: "%02d", Int(tm.tm_min))), ("ss", String(format: "%02d", Int(tm.tm_sec))),
++        ]
++        var out = "", rest = Substring(format)
++        outer: while !rest.isEmpty {
++            for (k, v) in fields where rest.hasPrefix(k) { out += v; rest = rest.dropFirst(k.count); continue outer }
++            out.append(rest.removeFirst())
++        }
++        return out
+     }
+ 
+     public static func `import`(from string: String, escaped _: Bool = false) -> DateTemplateLiteral {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/DictionaryBuilder.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/DictionaryBuilder.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/DictionaryBuilder.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/DictionaryBuilder.swift	2026-11-02 08:26:00.082415003 +0000
+@@ -1,5 +1,5 @@
+ import OrderedCollections
+-public import Foundation
++public import FoundationLite
+ 
+ public enum DictionaryBuilder {
+     /// Bit width for local index in node index representation.
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/LOUDS.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/LOUDS.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/LOUDS.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/LOUDS.swift	2026-11-02 08:26:00.081014085 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ /// LOUDS
+ package struct LOUDS: Sendable {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' "pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/extension LOUDS.swift" "akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/extension LOUDS.swift"
+--- "pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/extension LOUDS.swift"	2026-10-28 13:39:27.000000000 +0000
++++ "akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DataStructure/extension LOUDS.swift"	2026-11-02 08:26:00.083736828 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-package import Foundation
++package import FoundationLite
+ import SwiftUtils
+ 
+ extension LOUDS {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStore.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStore.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStore.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStore.swift	2026-11-02 08:26:00.072717958 +0000
+@@ -7,7 +7,7 @@
+ //
+ 
+ import Algorithms
+-public import Foundation
++public import FoundationLite
+ import SwiftUtils
+ 
+ public final class DicdataStore {
+@@ -821,7 +821,7 @@
+     // 記号に対する半角・全角変換
+     private static let (fullwidthToHalfwidth, halfwidthToFullwidth) = zip(
+         "＋ー＊＝・！＃％＆＇＂〜｜￡＄￥＠｀；：＜＞，．＼／＿￣－",
+-        "＋ー＊＝・！＃％＆＇＂〜｜￡＄￥＠｀；：＜＞，．＼／＿￣－".applyingTransform(.fullwidthToHalfwidth, reverse: false)!
++        "＋ー＊＝・！＃％＆＇＂〜｜￡＄￥＠｀；：＜＞，．＼／＿￣－".applyingTransform(StringTransformLite.fullwidthToHalfwidth, reverse: false)!
+     )
+     .reduce(into: ([Character: Character](), [Character: Character]())) { (results: inout ([Character: Character], [Character: Character]), values: (Character, Character)) in
+         results.0[values.0] = values.1
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStoreState.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStoreState.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStoreState.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/DicdataStoreState.swift	2026-11-02 08:26:00.069888905 +0000
+@@ -1,4 +1,4 @@
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ package final class DicdataStoreState {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/CIDData.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/CIDData.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/CIDData.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/CIDData.swift	2026-11-02 08:26:00.084182460 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2022 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ public enum CIDData: Sendable {
+     static var totalCount: Int {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/DicdataElement.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/DicdataElement.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/DicdataElement.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/DicdataElement.swift	2026-11-02 08:26:00.085329977 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ public struct DicdataElement: Equatable, Hashable, Sendable {
+     static let BOSData = Self(word: "", ruby: "", cid: CIDData.BOS.cid, mid: MIDData.BOS.mid, value: 0, adjust: 0)
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/MIDData.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/MIDData.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/MIDData.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/Entry/MIDData.swift	2026-11-02 08:26:00.084605915 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2022 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ public enum MIDData: Sendable {
+     static var totalCount: Int {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/JapaneseNumber.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/JapaneseNumber.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/JapaneseNumber.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/JapaneseNumber.swift	2026-11-02 08:26:00.079359076 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ private enum JapaneseNumber {
+     case いち, に, さん, よん, ご, ろく, なな, はち, きゅう, れい
+     case じゅう, ひゃく, せん, まん, おく, ちょう
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/LearningMemory.swift akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/LearningMemory.swift
+--- pristine/Sources/KanaKanjiConverterModule/DictionaryManagement/LearningMemory.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/DictionaryManagement/LearningMemory.swift	2026-11-02 08:26:00.077956973 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2021 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ private struct MetadataElement: CustomDebugStringConvertible {
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/InputManagement/ComposingText.swift akkc-lite/Sources/KanaKanjiConverterModule/InputManagement/ComposingText.swift
+--- pristine/Sources/KanaKanjiConverterModule/InputManagement/ComposingText.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/InputManagement/ComposingText.swift	2026-11-02 08:26:00.067594494 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2022 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ import SwiftUtils
+ 
+ /// ユーザ入力、変換対象文字列、ディスプレイされる文字列、の3つを同時にハンドルするための構造体
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/InputManagement/InputStyleManager.swift akkc-lite/Sources/KanaKanjiConverterModule/InputManagement/InputStyleManager.swift
+--- pristine/Sources/KanaKanjiConverterModule/InputManagement/InputStyleManager.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/InputManagement/InputStyleManager.swift	2026-11-02 08:26:00.065796922 +0000
+@@ -1,4 +1,4 @@
+-public import Foundation
++public import FoundationLite
+ import OrderedCollections
+ import SwiftUtils
+ 
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/KanaKanjiConverterModule/InputManagement/InputTableID.swift akkc-lite/Sources/KanaKanjiConverterModule/InputManagement/InputTableID.swift
+--- pristine/Sources/KanaKanjiConverterModule/InputManagement/InputTableID.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/KanaKanjiConverterModule/InputManagement/InputTableID.swift	2026-11-02 08:34:47.191790701 +0000
+@@ -1,4 +1,4 @@
+-import struct Foundation.URL
++import struct FoundationEssentials.URL
+ 
+ public enum InputTableID: Sendable, Equatable, Hashable {
+     case defaultRomanToKana
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/ArrayUtils.swift akkc-lite/Sources/SwiftUtils/ArrayUtils.swift
+--- pristine/Sources/SwiftUtils/ArrayUtils.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/SwiftUtils/ArrayUtils.swift	2026-11-02 08:26:00.125249601 +0000
+@@ -6,7 +6,7 @@
+ //
+ 
+ package import Algorithms
+-import Foundation
++import FoundationLite
+ 
+ package extension Sequence {
+     /// Returns a sequence that contains the elements of this sequence followed by the elements of the given sequence.
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/CharacterUtils.swift akkc-lite/Sources/SwiftUtils/CharacterUtils.swift
+--- pristine/Sources/SwiftUtils/CharacterUtils.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/SwiftUtils/CharacterUtils.swift	2026-11-02 08:26:00.123350979 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ public enum CharacterUtils {
+     /// 小書きのかなカナ集合
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/DataUtils.swift akkc-lite/Sources/SwiftUtils/DataUtils.swift
+--- pristine/Sources/SwiftUtils/DataUtils.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/SwiftUtils/DataUtils.swift	2026-11-02 08:26:00.123694517 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2022 ensan. All rights reserved.
+ //
+ 
+-package import Foundation
++package import FoundationLite
+ 
+ package extension Data {
+     /// Converts this data to an array of the given type.
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/Debug.swift akkc-lite/Sources/SwiftUtils/Debug.swift
+--- pristine/Sources/SwiftUtils/Debug.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/SwiftUtils/Debug.swift	2026-11-02 08:26:00.122523189 +0000
+@@ -5,7 +5,7 @@
+ //  Created by ensan on 2023/04/30.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ /// Prints the given items to the standard output if the build setting "DEBUG" is set.
+ /// - Parameter:
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/StringUtils.swift akkc-lite/Sources/SwiftUtils/StringUtils.swift
+--- pristine/Sources/SwiftUtils/StringUtils.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/SwiftUtils/StringUtils.swift	2026-11-02 08:26:00.122007757 +0000
+@@ -6,14 +6,14 @@
+ //  Copyright © 2020 ensan. All rights reserved.
+ //
+ 
+-public import Foundation
++public import FoundationLite
+ 
+ extension StringProtocol {
+     /// ローマ字と数字のみかどうか
+     ///  - note: 空文字列の場合`false`を返す。
+     @inlinable
+     package var onlyRomanAlphabetOrNumber: Bool {
+-        !isEmpty && range(of: "[^a-zA-Z0-9]", options: .regularExpression) == nil
++        !isEmpty && self.utf8.allSatisfy { (0x30...0x39).contains($0) || (0x41...0x5a).contains($0) || (0x61...0x7a).contains($0) }
+     }
+     /// ローマ字のみかどうか
+     ///  - note: 空文字列の場合`false`を返す。
+@@ -67,13 +67,18 @@
+     ///  - note: 空文字列の場合`false`を返す。
+     @inlinable
+     public var isEnglishSentence: Bool {
+-        !isEmpty && range(of: "[^0-9a-zA-Z\n !'_<>\\[\\]{}*@`\\^|~=\"#$%&\\+\\(\\),\\-\\./:;?’\\\\]", options: .regularExpression) == nil
++        !isEmpty && self.unicodeScalars.allSatisfy { s in
++            switch s.value {
++            case 0x30...0x39, 0x41...0x5a, 0x61...0x7a: return true
++            default: return "\n !'_<>[]{}*@`^|~=\"#$%&+(),-./:;?’\\".unicodeScalars.contains(s)
++            }
++        }
+     }
+ 
+     /// 仮名か
+     @inlinable
+     public var isKana: Bool {
+-        !isEmpty && range(of: "[^ぁ-ゖァ-ヶ]", options: .regularExpression) == nil
++        !isEmpty && self.unicodeScalars.allSatisfy { (0x3041...0x3096).contains($0.value) || (0x30A1...0x30F6).contains($0.value) }
+     }
+ 
+     /// Returns a String value in which Hiraganas are all converted to Katakana.
+@@ -88,7 +93,7 @@
+                 return scalar
+             }
+         }
+-        return String(utf16CodeUnits: result, count: result.count)
++        return String(decoding: result, as: UTF16.self)
+     }
+ 
+     /// Returns a String value in which Katakana are all converted to Hiragana.
+@@ -103,7 +108,7 @@
+                 return scalar
+             }
+         }
+-        return String(utf16CodeUnits: result, count: result.count)
++        return String(decoding: result, as: UTF16.self)
+     }
+ 
+     // FIXME: レガシーな実装なのでどうにかしたい。Migrationする……？
+@@ -118,24 +123,24 @@
+      */
+     // please use these letters in order to avoid user-inputting text crash
+     package func templateDataSpecificEscaped() -> String {
+-        var result = self.replacingOccurrences(of: "\\", with: "\\b")
+-        result = result.replacingOccurrences(of: "\0", with: "\\0")
+-        result = result.replacingOccurrences(of: "\n", with: "\\n")
+-        result = result.replacingOccurrences(of: "\t", with: "\\t")
+-        result = result.replacingOccurrences(of: ",", with: "\\c")
+-        result = result.replacingOccurrences(of: " ", with: "\\s")
+-        result = result.replacingOccurrences(of: "\"", with: "\\d")
++        var result = String(self).replacing( "\\", with: "\\b")
++        result = result.replacing( "\0", with: "\\0")
++        result = result.replacing( "\n", with: "\\n")
++        result = result.replacing( "\t", with: "\\t")
++        result = result.replacing( ",", with: "\\c")
++        result = result.replacing( " ", with: "\\s")
++        result = result.replacing( "\"", with: "\\d")
+         return result
+     }
+ 
+     package func templateDataSpecificUnescaped() -> String {
+-        var result = self.replacingOccurrences(of: "\\d", with: "\"")
+-        result = result.replacingOccurrences(of: "\\s", with: " ")
+-        result = result.replacingOccurrences(of: "\\c", with: ",")
+-        result = result.replacingOccurrences(of: "\\t", with: "\t")
+-        result = result.replacingOccurrences(of: "\\n", with: "\n")
+-        result = result.replacingOccurrences(of: "\\0", with: "\0")
+-        result = result.replacingOccurrences(of: "\\b", with: "\\")
++        var result = String(self).replacing( "\\d", with: "\"")
++        result = result.replacing( "\\s", with: " ")
++        result = result.replacing( "\\c", with: ",")
++        result = result.replacing( "\\t", with: "\t")
++        result = result.replacing( "\\n", with: "\n")
++        result = result.replacing( "\\0", with: "\0")
++        result = result.replacing( "\\b", with: "\\")
+         return result
+     }
+ }
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/WithMutableValue.swift akkc-lite/Sources/SwiftUtils/WithMutableValue.swift
+--- pristine/Sources/SwiftUtils/WithMutableValue.swift	2026-10-28 13:39:27.000000000 +0000
++++ akkc-lite/Sources/SwiftUtils/WithMutableValue.swift	2026-11-02 08:26:00.123972976 +0000
+@@ -6,7 +6,7 @@
+ //  Copyright © 2022 ensan. All rights reserved.
+ //
+ 
+-import Foundation
++import FoundationLite
+ 
+ /// Modifies the given value and returns the result.
+ /// - Parameters:

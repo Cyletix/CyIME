@@ -18,6 +18,7 @@ internal object BundledRimeSync {
     /** 上一次清单里没有记录时，只备份这个大小以下的文件：用户手改的是配置，几百 MB 的词库和模型不是。 */
     private const val UNKNOWN_BACKUP_LIMIT = 1L shl 20
     private val REVISION_DIR = Regex("[0-9a-f]{64}")
+    private val RETIRED_JAPANESE = Regex("""jaroomaji(\.[a-z0-9_]+)?\.dict\.yaml|cyime_japanese_particles\.dict\.yaml|lua/cyime_japanese_completion\.lua""")
 
     private fun parse(manifest: String) =
         manifest.lineSequence().filter { it.isNotBlank() }.map { it.split('\t') }.toList()
@@ -66,11 +67,12 @@ internal object BundledRimeSync {
             } finally { pending.delete() }
         }
         // CyLM files (cylm_*) change with the tier a package carries: one the new package no longer has is removed
-        // when unmodified, so switching to a smaller tier does not leave hundreds of MB behind. Other files a
-        // package dropped stay, as before (a lightweight edition keeps the enhancement models already installed).
+        // when unmodified, so switching to a smaller tier does not leave hundreds of MB behind. The jaroomaji
+        // dictionaries that Japanese used before azooKey go the same way. Other files a package dropped stay,
+        // as before (a lightweight edition keeps the enhancement models already installed).
         val carried = entries.map { it[3] }.toSet()
         for ((relative, installed) in previous) {
-            if (!relative.startsWith("cylm_") || relative in carried) continue
+            if (!(relative.startsWith("cylm_") || RETIRED_JAPANESE.matches(relative)) || relative in carried) continue
             val file = destination(relative)
             if (file.isFile && !userModified(file, installed)) file.delete()
         }

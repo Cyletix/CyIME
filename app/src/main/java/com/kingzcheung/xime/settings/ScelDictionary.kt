@@ -12,13 +12,15 @@ object ScelDictionary {
     /** [english]: Latin words of a mixed list (Ame, Team Spirit), offered by the English candidates, not the Chinese pack. */
     data class Parsed(val name: String, val entries: List<DictEntry>, val skipped: Int, val english: List<String> = emptyList())
 
-    fun readBounded(input: InputStream): ByteArray {
+    fun readBounded(input: InputStream): ByteArray = readBounded(input, MAX_BYTES)
+
+    internal fun readBounded(input: InputStream, limit: Int): ByteArray {
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
         while (true) {
             val count = input.read(buffer)
             if (count < 0) break
-            require(output.size() + count <= MAX_BYTES) { "词库超过 16 MB，请选择较小的词库" }
+            require(output.size() + count <= limit) { if (limit == MAX_BYTES) "词库超过 16 MB，请选择较小的词库" else "词库更新文件过大" }
             output.write(buffer, 0, count)
         }
         return output.toByteArray()

@@ -29,7 +29,10 @@ public final class RimeEngine {
     public native void nativeSetCaret(int caret);
     public native String[] nativePinyinSyllableOptions();
     public native boolean nativeSelectPinyinSyllable(String expectedInput, String expectedSchema, int start, int end, int syllableId);
+    public native int nativePinyinSyllablesChosen();
+    public native boolean nativeUndoPinyinSyllable(String expectedInput, String expectedSchema);
     public native boolean nativeSelectCandidateByGlobalIndex(int index);
+    public native String nativeCommit();
     public native String nativeT9GetRemainingDigits();
     public native String[][] nativeInspectCandidates(int limit);
     public native void nativeDestroy();

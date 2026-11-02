@@ -1,0 +1,9 @@
+{
+  "format": "cyime.cell-words.v1",
+  "revision": 1,
+  "dictionaries": {
+    "builtin_arknights": [
+      { "word": "精一队", "code": "jing yi dui" }
+    ]
+  }
+}

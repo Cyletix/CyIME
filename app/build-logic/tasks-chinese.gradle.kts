@@ -30,14 +30,19 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("t9EnglishIndex", 9)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 3)
+    inputs.property("idleSpellingEdits", 3)
     inputs.property("candidatePolicy", 4)
+    inputs.property("particleShortcuts", 2)
+    inputs.property("pinyinFinalNe", 1)
     inputs.property("pinyin26WordModel", 5)
+    inputs.property("pinyinUAsV", 1)
     inputs.property("candidateComments", 1)
     inputs.property("cyimeTerms", 1)
     inputs.property("taiwanTraditional", 1)
-    inputs.property("rareCharacters", 1)
-    inputs.property("datetimeHints", 1)
+    inputs.property("rareCharacters", 2)
+    inputs.property("datetimeHints", 2)
     inputs.property("symbolNames", 1)
+    inputs.property("greekLetters", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -62,6 +67,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(mixedInput)
     val rareChars = file("data/cyime_rare_chars.lua")
     inputs.file(rareChars)
+    val greekLetters = file("data/cyime_greek_letters.lua")
+    inputs.file(greekLetters)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -196,6 +203,18 @@ val prepareChineseDictionaries by tasks.registering {
         mixedInput.copyTo(File(root, "lua/cyime_mixed_input.lua"), overwrite = true)
         // 生僻字（瀺 chan…），Rime 选项 cyime_rare_chars 打开才出候选；设置默认关。表在下面生成。
         rareChars.copyTo(File(root, "lua/cyime_rare_chars.lua"), overwrite = true)
+        // 打希腊字母名出希腊字母（xita → θ），Rime 选项 cyime_greek_letters 打开才插入；设置默认关。
+        greekLetters.copyTo(File(root, "lua/cyime_greek_letters.lua"), overwrite = true)
+        val dateLua = File(root, "lua/date_translator.lua")
+        val timestampYield = "yield_cand(seg, string.format('%d', current_time))"
+        val dateSource = dateLua.readText()
+        check(dateSource.split(timestampYield).size == 2) { "Upstream timestamp translator changed" }
+        dateLua.writeText(dateSource.replace(timestampYield, """
+            if env.engine.context:get_option('_cyime_datetime_off') then return end
+            local stamp = Candidate('timestamp', seg.start, seg._end, string.format('%d', current_time), '时间戳')
+            stamp.quality = 100
+            yield(stamp)
+        """.trimIndent().replace("\n", "\n        ")))
         val corrector = File(root, "lua/corrector.lua")
         val source = corrector.readText()
         val commentGate = "if env.keep_comment then"
@@ -288,10 +307,18 @@ val prepareChineseDictionaries by tasks.registering {
             "\n    - simplifier@cyime_symbols\n    - simplifier@traditionalize")
             .also { check(it.split("\n    - simplifier@cyime_symbols\n").size == 2) { "Upstream traditionalize filter changed" } } +
             "\ncyime_symbols:\n  option_name: cyime_symbol_names\n  opencc_config: cyime_symbols.json\n  inherit_comment: false\n"
+        // 打希腊字母名出希腊字母 (default off, Rime option cyime_greek_letters): xita, pi, alpha put θ Θ, π Π, α Α third,
+        // after every reordering filter (acronym, single syllable) so the first two candidates stay; skipped while off.
+        fun withGreekLetters(schema: String) = schema.replace("\n    - simplifier@traditionalize",
+            "\n    - lua_filter@*cyime_greek_letters\n    - simplifier@traditionalize")
+            .also { check(it.split("\n    - lua_filter@*cyime_greek_letters\n").size == 2) { "Upstream traditionalize filter changed" } }
         fun taiwanForms(schema: String) = schema.replace("  opencc_config: s2t.json ", "  opencc_config: cyime_s2tw.json ")
             .also { check(it.contains("  opencc_config: cyime_s2tw.json ")) { "Upstream traditionalize config changed" } }
+        val vuRule = "    - derive/^([jqxy])v/\$1u/\n"
         val baseSchema = taiwanForms(File(root, "rime_ice.schema.yaml").readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
+            // chen can also end a phrase as che + abbreviated ne (他在等车呢).
+            "  preserve_final_ne: true\n" +
             // A doubled letter typed once where syllables meet (chengong → 成功 second, after the typed 陈宫), shown
             // only when the corrected word is 20 times as common as the typed reading (docs/development/typo-correction-20261021.md).
             "  cyime_doubled_letter_correction: true\n" +
@@ -318,7 +345,12 @@ val prepareChineseDictionaries by tasks.registering {
                     "    - lua_translator@*cyime_rare_chars") else sequenceOf(it) }
             .joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
-            .let { withSymbolNames(withDatetimeHints(it)) } +
+            // ü typed as u (nusheng 女生, luxing 旅行, meinu 美女): nü and lü also read nu and lu as a fuzzy spelling
+            // at half weight, so 路 努 keep lu and nu where they make the word (lushang 路上, nuli 努力). nu alone now
+            // shows 女 first (was 怒). 2026-11-01 host bench: ü-as-u 1/12 -> 11/12, nothing else changed.
+            .replace(vuRule, vuRule + "    - fuzz/^([nl])v\$/\$1u/\n")
+            .also { check(it.split(vuRule).size == 2) { "Upstream v/u spelling rules changed" } }
+            .let { withGreekLetters(withSymbolNames(withDatetimeHints(it))) } +
             "\ncyime:\n  candidate_policy: true\n" +
             // 26-key ranking by the nine-key word n-gram model (docs/development/pinyin26-word-model-20261018.md):
             // same decoder and model file; initials are not penalized (a letter names its initial, unlike a
@@ -363,6 +395,12 @@ val prepareChineseDictionaries by tasks.registering {
             .contains("  sentence_position_final_only: [${particles.joinToString(", ")}]\n")) {
             "$schema.schema.yaml sentence_position_final_only differs from app/data particle lists"
         }
+        // The nine-key decoder's sentence-final particles (t9/final_particles) are the same list without measure words.
+        val finalOnly = finalParticles.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+        check(file("src/main/assets/rime_chinese/t9_pinyin.schema.yaml").readText()
+            .contains("  final_particles: [${finalOnly.joinToString(", ")}]\n")) {
+            "t9_pinyin.schema.yaml final_particles differs from ${finalParticles.name}"
+        }
         val omissionId = "cyime_omission"
         val syllables = File(root, "cn_dicts/8105.dict.yaml").useLines { lines ->
             lines.filterNot { it.startsWith("#") }.mapNotNull { it.split('\t').getOrNull(1) }
@@ -384,8 +422,56 @@ val prepareChineseDictionaries by tasks.registering {
                 }
             }
         })
-        val fullPinyinSchema = baseSchema.replace("  dependencies:\n", "  dependencies:\n    - $omissionId\n") +
-            "\ncyime_omission_schema: $omissionId\n"
+        // Auxiliary prisms only used after a pause. Mark derived spellings until all
+        // rules have run so that one edit on a syllable cannot feed another rule.
+        val letters = "abcdefghijklmnopqrstuvwxyz"
+        // The built-in T9 digit pad is 123/456/789. Only a shared edge admits a
+        // substituted digit; a transposition is adjacency in the stream instead.
+        val tapNeighbors = ('2'..'9').associateWith { digit ->
+            val cell = digit - '1'
+            ('2'..'9').filter { other ->
+                val next = other - '1'
+                kotlin.math.abs(cell / 3 - next / 3) + kotlin.math.abs(cell % 3 - next % 3) == 1
+            }.joinToString("")
+        }
+        for (id in listOf("cyime_letter_swap", "cyime_digit_edit", "cyime_digit_tap")) {
+            val numeric = id != "cyime_letter_swap"
+            val taps = id == "cyime_digit_tap"
+            File(root, "$id.schema.yaml").writeText(buildString {
+                append("schema:\n  schema_id: $id\n  name: 拼音纠错索引\n  version: '1'\n")
+                append("translator:\n  dictionary: rime_ice\n  prism: $id\n  enable_user_dict: false\n")
+                append("  enable_completion: false\n  max_homophones: 8\n  max_sentences: 4\n")
+                append("  sentence_cutoff_threshold: 100\n  spelling_hints: 100\n  always_show_comments: true\n")
+                if (id == "cyime_digit_edit") append("cyime_tap_schema: cyime_digit_tap\n")
+                if (taps) {
+                    append("cyime_tap_neighbors:\n")
+                    tapNeighbors.forEach { (digit, neighbors) -> append("  '$digit': '$neighbors'\n") }
+                }
+                append("speller:\n  alphabet: '").append(if (numeric) "23456789" else letters).append("'\n  algebra:\n")
+                for (syllable in syllables.filter { it.length >= 3 }) {
+                    val code = if (numeric) syllable.map { digits[letters.indexOf(it)] }.joinToString("") else syllable
+                    if (taps) {
+                        for (i in code.indices) for (near in tapNeighbors.getValue(code[i])) {
+                            val variant = code.replaceRange(i, i + 1, near.toString())
+                            append("    - fuzz/^$syllable$/~$variant/\n")
+                        }
+                    } else {
+                        val variants = sortedSetOf<String>()
+                        for (i in code.indices) {
+                            if (numeric) variants.add(code.removeRange(i, i + 1))
+                            if (i < code.lastIndex && code[i] != code[i + 1])
+                                variants.add(code.replaceRange(i, i + 2, code.substring(i, i + 2).reversed()))
+                        }
+                        for (variant in variants) append("    - derive/^$syllable$/~$variant/\n")
+                    }
+                }
+                if (numeric) append("    - xlit/$letters/$digits/\n")
+                append("    - xform/^~//\n")
+            })
+        }
+        val fullPinyinSchema = baseSchema.replace("  dependencies:\n", "  dependencies:\n    - $omissionId\n    - cyime_letter_swap\n") +
+            "\ncyime_omission_schema: $omissionId\ncyime_edit_schema: cyime_letter_swap\n" +
+            "\ncyime_particle_shortcuts:\n  __include: cyime_particle_shortcuts:/common\n  alphabet: abcdefghijklmnopqrstuvwxyz\n  selected_tail: true\n"
         File(root, "rime_ice.schema.yaml").writeText(fullPinyinSchema)
         val doublePinyin = File(root, "double_pinyin_flypy.schema.yaml")
         // Manual syllable split ' (Shift/comma split keys): a' o' e' are 啊 哦 额, any other single key + ' is the
@@ -396,11 +482,21 @@ val prepareChineseDictionaries by tasks.registering {
         val flypySeparatorRules = listOf("derive/^aa\$/a'/", "derive/^oo\$/o'/", "derive/^ee\$/e'/", "abbrev/^(.).+\$/\$1'/")
             .joinToString("") { "    - \"$it\"\n" }
         doublePinyin.writeText(doublePinyin.readText().replace(flypyAbbrevOff, flypySeparatorRules + flypyAbbrevOff))
+        // enable_correction: upstream flypy has no such line, so the replace below never applied and double pinyin had
+        // no corrector at all. With it on, the keyboard decides: 双拼邻键纠错 on sends its layout (full correction), off
+        // sends it marked "~;" so only a pair that spells nothing is corrected (wp for wo had no candidate at all).
+        check(!doublePinyin.readText().contains("enable_correction")) { "Upstream double_pinyin_flypy now sets enable_correction" }
         doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
-            "\ntranslator:\n  cyime_neighbor_correction: true\n")
+            "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
-            .let { withSymbolNames(withDatetimeHints(it)) }
-            .replace("enable_correction: false", "enable_correction: true"))
+            .let { withGreekLetters(withSymbolNames(withDatetimeHints(it))) }
+            // 生僻字 also for double pinyin (GitHub #72, same default-off switch): the Lua translator maps the two keys
+            // through this scheme's preedit_format; DoublePinyinScheme copies both lines into every generated scheme.
+            .let { schema ->
+                check(schema.split("    - script_translator\n").size == 2) { "Upstream double_pinyin_flypy translator list changed" }
+                schema.replace("    - script_translator\n", "    - script_translator\n    - lua_translator@*cyime_rare_chars\n") +
+                    "\ncyime_rare_double_pinyin: true\n"
+            })
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",
                 "pinyin_colemak" to "Colemak", "pinyin_typewise" to "Typewise")) {
@@ -446,8 +542,8 @@ val prepareChineseDictionaries by tasks.registering {
         // Rare characters (user 2026-10-30: 瀺 chan had no candidate). 8105.dict.yaml is only the 通用规范汉字表;
         // upstream's large table 41448.dict.yaml (Unihan kMandarin + zdic readings) ships disabled. Importing all of
         // it cost the nine-key replay +140% dictionary entries per key at the same first candidates, so the
-        // characters 8105 lacks go to cyime_rare.txt instead, read by lua/cyime_rare_chars.lua for full-pinyin 26 keys
-        // and nine keys (t9_pinyin.schema.yaml) only while its switch is on (default off; 槻 gui 2026-10-31 too). Only the BMP (URO and Ext A, about 18,000): most Android fonts
+        // characters 8105 lacks go to cyime_rare.txt instead, read by lua/cyime_rare_chars.lua for full-pinyin 26 keys,
+        // nine keys (t9_pinyin.schema.yaml), double pinyin and 14 keys (2026-11-02) only while its switch is on (default off; 槻 gui 2026-10-31 too). Only the BMP (URO and Ext A, about 18,000): most Android fonts
         // have no glyphs for Ext B and beyond, which would show as empty boxes. Only readings 8105 already has (drops
         // 黁 nun). The large table itself is no longer bundled: the generated list is about half its size.
         val common = HashSet<String>()

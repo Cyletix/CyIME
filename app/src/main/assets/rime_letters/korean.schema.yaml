@@ -1,0 +1,24 @@
+# CyIME 韩语：字母由应用按两벌식拼成音节，直接上屏。
+# 这个方案只是语言入口（语言列表、语言键、键盘布局 dubeolsik_korean 都按方案识别），
+# 不组字、不翻译、不转标点：按键交回应用原样上屏。
+schema:
+  schema_id: korean
+  name: 韩语
+  version: "1"
+  author:
+    - Cyletix
+  description: |
+    韩语两벌식键盘：字母自动拼成音节（ㅎ ㅏ ㄴ → 한），Shift 或长按出双辅音。
+
+switches:
+  - name: ascii_mode
+    states: [ 한, ABC ]
+    reset: 0
+
+engine:
+  processors:
+    - express_editor
+  segmentors:
+    - fallback_segmentor
+  translators:
+    - echo_translator

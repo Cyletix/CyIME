@@ -4,6 +4,7 @@ import android.content.Context
 import com.kingzcheung.xime.rime.RimeEngine
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -21,9 +22,12 @@ object CellDictionaryManager {
 
     fun store(context: Context) = CellDictionaryStore(File(context.filesDir, "cell-dictionaries"))
 
-    suspend fun download(offer: CellDictionaryOffer): ByteArray = suspendCancellableCoroutine { continuation ->
-        val call = client.newCall(Request.Builder().url(offer.downloadUrl)
-            .header("Referer", offer.sourceUrl).build())
+    suspend fun download(offer: CellDictionaryOffer): ByteArray = downloadBytes(Request.Builder()
+        .url(offer.downloadUrl).header("Referer", offer.sourceUrl).build(), ScelDictionary.MAX_BYTES,
+        "搜狗暂时无法下载，可从来源页下载后导入")
+
+    private suspend fun downloadBytes(request: Request, limit: Int, failure: String): ByteArray = suspendCancellableCoroutine { continuation ->
+        val call = client.newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -32,10 +36,10 @@ object CellDictionaryManager {
             override fun onResponse(call: Call, response: Response) {
                 try {
                     val bytes = response.use {
-                        check(it.isSuccessful && it.request.url.isHttps) { "搜狗暂时无法下载（${it.code}），可从来源页下载后导入" }
+                        if (!it.isSuccessful || !it.request.url.isHttps) throw IOException("$failure（${it.code}）")
                         val body = requireNotNull(it.body) { "下载内容为空" }
-                        require(body.contentLength() <= ScelDictionary.MAX_BYTES) { "词库超过 16 MB" }
-                        body.byteStream().use(ScelDictionary::readBounded)
+                        require(body.contentLength() <= limit) { "词库文件过大" }
+                        body.byteStream().use { input -> ScelDictionary.readBounded(input, limit) }
                     }
                     if (continuation.isActive) continuation.resumeWith(Result.success(bytes))
                 } catch (error: Exception) {
@@ -43,6 +47,25 @@ object CellDictionaryManager {
                 }
             }
         })
+    }
+
+    private fun bundledUpdates(context: Context): CellWordUpdates = context.assets.open(CellWordUpdates.ASSET).use {
+        CellWordUpdates.parse(ScelDictionary.readBounded(it, CellWordUpdates.MAX_BYTES))
+    }
+
+    /** Runs only when requested in settings. A failed check leaves the active dictionary alone. */
+    suspend fun checkWordUpdates(context: Context): Boolean {
+        val bundled = bundledUpdates(context)
+        var lastError: IOException? = null
+        for (base in CYIME_STORE_BASE_URLS) {
+            val url = base.removeSuffix("store/") + "app/src/main/assets/" + CellWordUpdates.ASSET
+            try {
+                val bytes = downloadBytes(Request.Builder().url(url).build(), CellWordUpdates.MAX_BYTES, "词库更新源暂不可用")
+                return store(context).stageWordUpdates(bytes, bundled)
+            } catch (e: CancellationException) { throw e }
+            catch (e: IOException) { lastError = e }
+        }
+        throw lastError ?: IOException("词库更新源暂不可用")
     }
 
     /** Copy bundled dictionaries into the store before the applied set is prepared for Rime. */
@@ -60,9 +83,15 @@ object CellDictionaryManager {
     }
 
     fun prepare(context: Context, ids: Set<String> = store(context).read().applied,
-        english: Boolean = store(context).read().appliedEnglish): List<CellDictionaryRime.Binding> =
-        CellDictionaryRime.prepare(SchemaManager.getRimeDir(context), store(context),
-            SchemaManager.discoverSchemas(context), ids, english)
+        english: Boolean = store(context).read().appliedEnglish, wordRevision: Int? = null): List<CellDictionaryRime.Binding> {
+        val store = store(context)
+        val bundled = runCatching { bundledUpdates(context) }.getOrDefault(CellWordUpdates.empty)
+        // Main dictionary words apply with or without cell dictionaries (CellWordUpdates.main).
+        val updates = if (wordRevision != null) store.wordUpdates(wordRevision, bundled)
+        else runCatching { store.wordUpdates(store.read().appliedWordRevision, bundled) }.getOrDefault(bundled)
+        return CellDictionaryRime.prepare(SchemaManager.getRimeDir(context), store,
+            SchemaManager.discoverSchemas(context), ids, english, updates)
+    }
 
     /** Native deployment can report success even when an optional pack failed to compile. */
     fun verify(context: Context, bindings: List<CellDictionaryRime.Binding>): Boolean {

@@ -631,10 +631,12 @@ object SchemaManifestManager {
         if (relPath == "xime.custom.yaml") return true
         // themes/ 存放用户导入或自定义的背景图片，不应被清单追踪
         if (relPath.startsWith("themes/")) return true
+        // 日语 azooKey 词典（随 APK 解压，几千个文件）和它的学习记录，不归方案包管理
+        if (relPath.startsWith("azookey/")) return true
         return false
     }
 
-    internal val bundledAssetRoots = listOf("rime", "rime_chinese", "rime_japanese", "rime_spanish", "rime_ice")
+    internal val bundledAssetRoots = listOf("rime", "rime_chinese", "rime_japanese", "rime_letters", "rime_ice")
 
     internal fun matchesBundledAsset(context: Context, path: String, file: File): Boolean {
         val currentHash = fileSha256(file) ?: return false

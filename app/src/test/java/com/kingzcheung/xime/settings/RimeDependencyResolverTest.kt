@@ -13,6 +13,24 @@ import java.io.File
  * [RimeDependencyResolver.completeCore]). Fixtures mirror real Rime schema/dict files.
  */
 class RimeDependencyResolverTest {
+    @Test fun mintStyleCommentsAndQuotedEmptyDictionariesAreNotFileNames() {
+        val refs = RimeDependencyResolver.scanSchemaRefs("""
+            schema:
+              dependencies: [stroke, 'reverse_lookup']  # 配套方案
+            translator:
+              dictionary: mint  # 主要词典
+            cn_en:
+              dictionary: ""  # 只使用用户词典
+            reverse_lookup:
+              dictionary: 'rare #table' # 引号内的井号属于名称
+            grammar:
+              language: wanxiang-lts-zh-hans  # 语法模型名
+        """.trimIndent(), "import_tables:\n  - dicts/words # 词表\n...\n正文\tdictionary: fake")
+        assertEquals(setOf("stroke", "reverse_lookup"), refs.schemaDeps)
+        assertEquals(setOf("mint", "dicts/words"), refs.mainDicts)
+        assertEquals(setOf("rare #table"), refs.reverseDicts)
+        assertTrue("wanxiang-lts-zh-hans.gram" in RimeDependencyResolver.expectedFiles(refs))
+    }
 
     // 与内置 wubi86_pinyin.schema.yaml 结构一致（五笔反查拼音）
     private val wubi86PinyinSchema = """

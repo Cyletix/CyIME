@@ -27,7 +27,8 @@ data class CandidateFocus(
 }
 
 fun CandidateState.usesT9CandidateNavigation(profile: InputProfile): Boolean =
-    profile.language == InputLanguage.CHINESE && profile.scheme == InputScheme.PINYIN &&
+    profile.language == InputLanguage.CHINESE &&
+        (profile.scheme == InputScheme.PINYIN || profile.scheme == InputScheme.DOUBLE_PINYIN) &&
         profile.layout.kind == LayoutKind.T9 && profile.mode == InputMode.KEYBOARD &&
         ((isComposing && inputText.isNotEmpty()) ||
             (!isComposing && inputText.isEmpty() && candidates.isEmpty() && associationCandidates.isNotEmpty() &&

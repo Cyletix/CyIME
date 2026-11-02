@@ -66,6 +66,9 @@ class GlidePairCorrectionTest {
         assertEquals("I'm", plan.replacePrevious ?: previous.text)
         assertEquals("done", plan.word)
         assertTrue("整对候选：${plan.alternatives}", plan.pair && plan.alternatives.all { it.contains(' ') })
+        // 实时预览写的就是抬手后的结果：要改上一个词时两个词都写。
+        assertEquals(if (plan.replacePrevious != null) "I'm done" else "done", plan.preview)
+        assertEquals("done", GlideCommitPlan(null, "done", emptyList(), pair = false).preview)
     }
 
     @Test fun contextWordAndShiftFollowTheRules() {

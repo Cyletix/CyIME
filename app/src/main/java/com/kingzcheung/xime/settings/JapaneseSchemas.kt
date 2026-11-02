@@ -2,8 +2,11 @@ package com.kingzcheung.xime.settings
 
 import android.content.Context
 import java.io.File
+import java.io.InputStream
+import java.security.MessageDigest
+import java.util.zip.ZipInputStream
 
-/** 日语词库与上游默认方案子模块独立分发，兼容用户从市场更新同名 jaroomaji 文件。 */
+/** 日语方案（azooKey 转换）与上游默认方案子模块独立分发，兼容用户从市场更新同名 jaroomaji 文件。 */
 object JapaneseSchemas {
     val ids = listOf("japanese", "japanese_kana")
     private const val ASSET_DIRECTORY = "rime_japanese"
@@ -31,6 +34,10 @@ object JapaneseSchemas {
         "70f8bc1e14caf75ef402f77cb35a79eb21ec73e3521b5f24882e11475099aa7b",
         "3b527b454003606458f56d842aa3206cf9cf11e8b76083ea8fb32aaf56a9a5b6",
         "f5cc54a66cf002e77a6d6be553b11ec300c6f6d5b5fdc075bcb9d91ca96f44cc",
+        // jaroomaji dictionary versions of japanese / japanese_kana / jaroomaji, before azooKey.
+        "e190a2dcb19015b16e71b93d33ef9a3155fa78889c3dc7c081f63e5aca0a3951",
+        "9c611fec58694e0bff0f086c99e5fe194933515ad2483f72e0fa00d3d842971d",
+        "f9f8df50a008b1c2cabc2d39f57f3e27401bbc8df5ac34e6b6eb966c8ce42144",
     )
 
     internal fun isPreviousBuiltinSchema(text: String): Boolean {
@@ -61,6 +68,57 @@ object JapaneseSchemas {
             } finally {
                 temporary.delete()
             }
+        }
+    }
+
+    private const val AZOOKEY_DICTIONARY = "azookey/dictionary.zip"
+    private const val AZOOKEY_DICTIONARY_VERSION = "azookey/dictionary.version"
+    private const val INSTALLED_VERSION = ".cyime-version"
+
+    /**
+     * azooKey 词典随 APK 打包成一个 zip，版本变了才解压到 rime/azookey/dictionary（日语翻译器从这里读）。
+     * 学习记录在 rime/azookey/memory，不动。版本是词典内容哈希（tasks-japanese.gradle.kts），解压后再核对一遍。
+     * 没有这个资源的包（长辈版不带日语）直接跳过。
+     */
+    @Synchronized
+    fun installAzooKeyDictionary(rimeDir: File, open: (String) -> InputStream) {
+        val version = runCatching { open(AZOOKEY_DICTIONARY_VERSION).use { it.readBytes().decodeToString().trim() } }
+            .getOrNull() ?: return
+        val root = File(rimeDir, "azookey")
+        val dictionary = File(root, "dictionary")
+        val marker = File(dictionary, INSTALLED_VERSION)
+        if (marker.isFile && marker.readText() == version) return
+        val staging = File(root, "dictionary.cyime-installing")
+        val retired = File(root, "dictionary.cyime-old")
+        staging.deleteRecursively()
+        retired.deleteRecursively()
+        try {
+            staging.mkdirs()
+            val lines = sortedMapOf<String, String>()
+            ZipInputStream(open(AZOOKEY_DICTIONARY).buffered()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (entry.isDirectory) continue
+                    val file = File(staging, entry.name).canonicalFile
+                    require(file.path.startsWith(staging.canonicalPath + File.separator)) { "Bad dictionary entry: ${entry.name}" }
+                    file.parentFile?.mkdirs()
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(65536)
+                        while (true) { val n = zip.read(buffer); if (n < 0) break; digest.update(buffer, 0, n); output.write(buffer, 0, n) }
+                    }
+                    lines[entry.name] = digest.digest().joinToString("") { "%02x".format(it) }
+                }
+            }
+            val content = lines.entries.joinToString("") { (name, hash) -> "$name\u0000$hash\n" }
+            val hash = MessageDigest.getInstance("SHA-256").digest(content.toByteArray()).joinToString("") { "%02x".format(it) }
+            check(hash == version) { "azooKey dictionary checksum mismatch" }
+            File(staging, INSTALLED_VERSION).writeText(version)
+            if (dictionary.exists()) check(dictionary.renameTo(retired)) { "Cannot replace azooKey dictionary" }
+            check(staging.renameTo(dictionary)) { "Cannot install azooKey dictionary" }
+        } finally {
+            staging.deleteRecursively()
+            retired.deleteRecursively()
         }
     }
 

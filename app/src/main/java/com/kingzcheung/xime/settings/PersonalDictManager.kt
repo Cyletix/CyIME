@@ -88,17 +88,17 @@ object PersonalDictManager {
     }
 
     /** 从文本中解析 `custom_phrase.user_dict` 声明的文件名，没有则返回 null。 */
-    private fun parseCustomPhraseDictName(text: String): String? {        for (cpKey in listOf("\"custom_phrase\"", "'custom_phrase'", "custom_phrase:")) {
-            val idx = text.indexOf(cpKey)
-            if (idx < 0) continue
-            val after = text.substring(idx)
-            val udIdx = after.indexOf("user_dict")
-            if (udIdx < 0) continue
-            val line = after.substring(udIdx).lineSequence().firstOrNull() ?: continue
-            val value = line.substringAfter(":").trim().substringBefore(" #").substringBefore("\n")
-            if (value.isNotBlank()) return value
+    private fun parseCustomPhraseDictName(text: String): String? {
+        // Third-party schemas can contain YAML tags unsupported by our parser.
+        // Only read this translator's own block (or its Rime slash-path override).
+        val path = Regex("""(?m)^\s*["']?custom_phrase/user_dict["']?\s*:\s*([^#\r\n]+)""")
+        val block = Regex("""(?m)^([ ]*)["']?custom_phrase["']?:[ \t]*(?:#.*)?\r?$""").find(text)
+        val value = path.find(text)?.groupValues?.get(1) ?: block?.let {
+            text.substring(it.range.last + 1).lineSequence().filter { line -> line.isNotBlank() && !line.trimStart().startsWith('#') }
+                .takeWhile { line -> line.takeWhile { ch -> ch == ' ' }.length > it.groupValues[1].length }
+                .firstOrNull { line -> line.trimStart().startsWith("user_dict:") }?.substringAfter(':')?.substringBefore('#')
         }
-        return null
+        return value?.trim()?.removeSurrounding("\"")?.removeSurrounding("'")?.takeIf { it.isNotEmpty() }
     }
 
     
@@ -126,7 +126,7 @@ object PersonalDictManager {
     fun saveCustomPhrases(context: Context, schemaId: String? = null, entries: List<DictEntry>) {
         val file = getCustomPhraseFile(context, schemaId)
         file.parentFile?.mkdirs()
-        file.writeText(buildStableDbText(STABLEDB_HEADER, entries), Charsets.UTF_8)
+        CellDictionaryStore.writeAtomic(file, buildStableDbText(STABLEDB_HEADER, entries))
     }
 
     /** Bumped after saved phrases are ready; the keyboard then re-selects its schema in its input queue. */
@@ -196,15 +196,23 @@ object PersonalDictManager {
         // 注音的编码是大千键码，短语的拼音字母码在注音里是另一串注音（ji 是 ㄨㄛ），不挂短语。
         // 仓颉同理：短语的拼音码在仓颉里是别的字的码（nh 是 弓竹），会抢在码表前面。
         if (InputProfiles.describe(schemaId).scheme in setOf(InputScheme.ZHUYIN, InputScheme.CANGJIE)) return
-        // 西班牙语的字母不进 Rime，中文短语挂上去也用不到。
-        if (InputProfiles.describe(schemaId).language == InputLanguage.SPANISH) return
+        // 西班牙、德、法、俄、韩语的字母不进 Rime，中文短语挂上去也用不到。
+        if (LetterLanguage.ofSchema(schemaId) != null) return
         // 个人词库合并规则已移除：清理旧版本写入的 merged 词典引用，
         // 让 librime 按 schema 原声明编译原始词典名（如 pinyin_simp.table.bin），
         // 恢复 wubi86_pinyin 等方案的 reverse_lookup 拼音反查。
         cleanupStaleMergedPatch(rimeDir, schemaId)
-        // 九键打出来的是数字、14 键是合并键的大写码：短语换成这个键盘实际打出的编码另存一份，方案挂这一份。
-        val keys = PhraseKeys.of(schemaId)
-        val dictName = keys?.dictName ?: getCustomPhraseDictName(rimeDir, schemaId)
+        // 九键打出来的是数字、14 键是合并键的大写码、双拼是双拼码：短语换成这个键盘实际打出的编码另存一份，方案挂这一份。
+        val doublePinyin = DoublePinyinSchemes.find(schemaId) ?: if (DoublePinyinSchemes.isGenerated(schemaId))
+            DoublePinyinSchemes.load(context).let { DoublePinyinSchemes.find(schemaId) } else null
+        val keys = keyedPhrases(schemaId, doublePinyin)
+        val sharedName = keys?.dictName ?: "custom_phrase"
+        val configured = getCustomPhraseDictName(rimeDir, schemaId)
+        val dictName = if (isGeneratedPhraseDict(configured)) sharedName else configured
+        // 方案自己的 custom_phrase 带着词典（万象：dictionary: custom_phrase，它的 Lua 置顶词靠这一块），
+        // 整块换成我们的会让它的置顶词失效：不动这一块，「我的短语」另挂一份。
+        val ownTable = hasOwnPhraseDictionary(schemaFile.readText(Charsets.UTF_8))
+        if (ownTable) dropGeneratedMainPhrase(customFile)
         if (keys != null) writeKeyedPhrases(rimeDir, keys)
         val phraseFile = File(rimeDir, "$dictName.txt")
         if (!phraseFile.exists()) {
@@ -217,11 +225,22 @@ object PersonalDictManager {
 """, Charsets.UTF_8)
         }
         // 有实际条目时才注入翻译器，避免 Rime 因空 .table.bin 报错
-        if (phraseFile.readText(Charsets.UTF_8).lineSequence().count { it.isNotBlank() && !it.startsWith('#') } > 0) {
+        if (!ownTable && phraseFile.readText(Charsets.UTF_8).lineSequence().count { it.isNotBlank() && !it.startsWith('#') } > 0) {
             optionalPhrasePatch(customFile) { applyCustomPhraseTranslator(rimeDir, schemaId, dictName) }
         }
-        // 旧版本给九键、14 键挂的是字母码的 custom_phrase，换成按键码的那一份。
-        if (keys != null) retargetCustomPhraseDict(File(rimeDir, "${schemaId}.custom.yaml"), dictName)
+        // Some letter schemes (e.g. Xiaohe) have a private phrase table. Keep it
+        // and its entries; add the table the user actually edits in 我的短语.
+        if ((dictName != sharedName || ownTable) &&
+            File(rimeDir, "$sharedName.txt").takeIf { it.isFile }?.useLines { rows ->
+                rows.any { it.isNotBlank() && !it.startsWith('#') }
+            } == true) {
+            optionalPhrasePatch(customFile) {
+                applyCustomPhraseTranslator(rimeDir, schemaId, sharedName, "cyime_shared_phrase")
+                retargetCustomPhraseDict(customFile, sharedName, "cyime_shared_phrase")
+            }
+        }
+        // Migrate our old table binding, never retarget a user's private table.
+        if (dictName != configured) retargetCustomPhraseDict(customFile, dictName)
     }
 
     /**
@@ -258,23 +277,124 @@ object PersonalDictManager {
         }
     }
 
+    /** 双拼方案的短语副本名，后面接方案 id（含九键、14 键、自建布局版本的后缀）。 */
+    private const val DOUBLE_PINYIN_PHRASE_PREFIX = "custom_phrase_sp_"
+
+    /** 方案顶层 custom_phrase 块自带非空 dictionary：不是 Rime 常见的「dictionary: ""＋user_dict」用户短语表。 */
+    internal fun hasOwnPhraseDictionary(schemaText: String): Boolean {
+        val block = Regex("""(?m)^custom_phrase:[ \t]*(?:#.*)?\r?$""").find(schemaText) ?: return false
+        val value = schemaText.substring(block.range.last + 1).lineSequence()
+            .filter { it.isNotBlank() && !it.trimStart().startsWith('#') }
+            .takeWhile { it.startsWith(" ") || it.startsWith("\t") }
+            .firstOrNull { it.trimStart().startsWith("dictionary:") }
+            ?.substringAfter(':')?.substringBefore('#')?.trim()?.removeSurrounding("\"")?.removeSurrounding("'")
+        return !value.isNullOrEmpty()
+    }
+
+    /** 以前给这类方案写进去的整块 custom_phrase 和它的翻译器（只认我们写的原样内容）。 */
+    private fun dropGeneratedMainPhrase(customFile: File) {
+        if (!customFile.isFile) return
+        val text = customFile.readText(Charsets.UTF_8)
+        val phrase = """table_translator@custom_phrase"""
+        val translator = Regex("""(?m)^  ["']?engine/translators/(?:@before 0+|\+|@next|@after last)["']?:[ \t]*""" +
+            """(?:$phrase|\[[ \t]*$phrase[ \t]*\]|\r?\n    - $phrase)[ \t]*(?:\r?\n|$)""")
+        val defaults = """(?:dictionary: ""|user_dict: custom_phrase|db_class: stabledb|enable_completion: false|enable_sentence: false|initial_quality: 99)"""
+        val block = Regex("""(?m)^  ["']?custom_phrase["']?:[ \t]*\r?\n(?:    $defaults[ \t]*(?:\r?\n|$))+""")
+        val updated = block.replace(translator.replace(text, ""), "")
+        if (updated != text) CellDictionaryStore.writeAtomic(customFile, updated)
+    }
+
+    /** 我们自己生成、可以换绑的短语表；方案自带的专用短语表（如小鹤的 custom_phrase_double）不算。 */
+    private fun isGeneratedPhraseDict(name: String) = name == "custom_phrase" ||
+        PhraseKeys.entries.any { it.dictName == name } || name.startsWith(DOUBLE_PINYIN_PHRASE_PREFIX)
+
+    /** 一个键盘自己的短语副本：表名，以及一条短语编码在这个键盘上实际打出的编码。 */
+    internal class KeyedPhrases(val dictName: String, val codes: (String) -> List<String>)
+
+    /**
+     * 这个方案要不要短语副本：九键、14 键按 [PhraseKeys] 换码；双拼（含九键、14 键双拼）先把全拼编码换成
+     * 这套双拼的编码（b站 填 bzhan，小鹤里打 bvj），原编码也留着（用户本来就填双拼码时照样能打）。
+     */
+    internal fun keyedPhrases(schemaId: String, doublePinyin: DoublePinyinScheme?): KeyedPhrases? {
+        val keys = PhraseKeys.of(schemaId)
+        if (doublePinyin == null) return keys?.let { KeyedPhrases(it.dictName, it::codes) }
+        return KeyedPhrases("$DOUBLE_PINYIN_PHRASE_PREFIX$schemaId") { code ->
+            val typed = listOf(code) + doublePinyinCodes(doublePinyin, code)
+            (if (keys == null) typed else typed.flatMap(keys::codes)).distinct()
+        }
+    }
+
+    private val PINYIN_SYLLABLES by lazy { DoublePinyinScheme.SYLLABLES.toSet() }
+
+    /**
+     * 全拼写的短语编码换成 [scheme] 的双拼编码。按音节拆，也认单独一个声母（简拼，如 bzhan 的 b、dz）；
+     * 拆法不唯一时（fangan = fang'an / fan'gan）几种都给，' 和空格是用户写的分隔。拆不成拼音的编码（符号快捷码等）不换。
+     */
+    internal fun doublePinyinCodes(scheme: DoublePinyinScheme, code: String): List<String> {
+        val parts = code.lowercase().split('\'', ' ').filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return emptyList()
+        return parts.fold(listOf("")) { heads, part ->
+            val tails = doublePinyinPart(scheme, part)
+            if (tails.isEmpty()) return emptyList()
+            heads.flatMap { head -> tails.map { head + it } }.take(MAX_PHRASE_READINGS)
+        }
+    }
+
+    private const val MAX_PHRASE_READINGS = 4
+
+    /** 一段连续字母的双拼编码：音节越少越好，整音节优先于单个声母。 */
+    private fun doublePinyinPart(scheme: DoublePinyinScheme, letters: String): List<String> {
+        if (letters.any { it !in 'a'..'z' }) return emptyList()
+        val best = arrayOfNulls<Pair<Int, List<String>>>(letters.length + 1).also { it[0] = 0 to listOf("") }
+        for (start in letters.indices) {
+            val (cost, heads) = best[start] ?: continue
+            for (end in start + 1..minOf(letters.length, start + 6)) {
+                val piece = letters.substring(start, end)
+                val (step, key) = when {
+                    // lue、nue 是 lve、nve 的另一种写法。
+                    piece in PINYIN_SYLLABLES || piece == "lue" || piece == "nue" ->
+                        2 to (scheme.code(piece.replace("ue", "ve").takeIf { it in PINYIN_SYLLABLES } ?: piece) ?: continue)
+                    piece in DoublePinyinScheme.SPECIAL_INITIALS -> 3 to (scheme.initials[piece]?.toString() ?: continue)
+                    piece.length == 1 && piece[0] in DoublePinyinScheme.PLAIN_INITIALS -> 3 to piece
+                    else -> continue
+                }
+                val total = cost + step
+                val codes = heads.map { it + key }
+                val current = best[end]
+                best[end] = when {
+                    current == null || total < current.first -> total to codes
+                    total == current.first -> total to (current.second + codes).distinct().take(MAX_PHRASE_READINGS)
+                    else -> current
+                }
+            }
+        }
+        return best[letters.length]?.second.orEmpty()
+    }
+
+    internal fun writeKeyedPhrases(rimeDir: File, keys: PhraseKeys) =
+        writeKeyedPhrases(rimeDir, KeyedPhrases(keys.dictName, keys::codes))
+
     /** Rewrites the keyed copy only when its content changes, so an unchanged list costs no reload. */
-    internal fun writeKeyedPhrases(rimeDir: File, keys: PhraseKeys) {
+    internal fun writeKeyedPhrases(rimeDir: File, keys: KeyedPhrases) {
         val source = File(rimeDir, CUSTOM_PHRASE_FILE).takeIf { it.isFile }?.readText(Charsets.UTF_8).orEmpty()
         val entries = parseStableDbEntries(source).flatMap { entry -> keys.codes(entry.code).map { entry.copy(code = it) } }
         val text = buildStableDbText(STABLEDB_HEADER.replace("db_name\tcustom_phrase", "db_name\t${keys.dictName}"), entries)
         val target = File(rimeDir, "${keys.dictName}.txt")
-        if (target.takeIf { it.isFile }?.readText(Charsets.UTF_8) != text) target.writeText(text, Charsets.UTF_8)
+        CellDictionaryStore.writeAtomic(target, text)
     }
 
     /** Points an existing custom_phrase translator patch at [dictName]; other patch lines are kept. */
-    internal fun retargetCustomPhraseDict(customFile: File, dictName: String) {
+    internal fun retargetCustomPhraseDict(customFile: File, dictName: String, namespace: String = "custom_phrase") {
         if (!customFile.isFile) return
         val text = customFile.readText(Charsets.UTF_8)
-        val block = Regex("""(?m)^(\s*"?custom_phrase"?:\s*\n(?:\s{4,}.*\n)*?\s{4,}user_dict:\s*)(\S+)""")
-        val match = block.find(text) ?: return
-        if (match.groupValues[2] == dictName) return
-        customFile.writeText(text.replaceRange(match.groups[2]!!.range, dictName), Charsets.UTF_8)
+        val name = Regex.escape(namespace)
+        val scalar = """(?:"[^"\r\n]*"|'[^'\r\n]*'|[^#\s]+)"""
+        val block = Regex("""(?m)^([ ]+["']?$name["']?:[ \t]*\r?\n(?:[ ]{4,}[^\n]*\n)*?[ ]{4,}user_dict:[ \t]*)$scalar""")
+        val path = Regex("""(?m)^([ ]+["']?$name/user_dict["']?:[ \t]*)$scalar""")
+        val updated = listOf(block, path).fold(text) { yaml, key ->
+            key.replace(yaml) { it.groupValues[1] + dictName }
+        }
+        if (updated != text) CellDictionaryStore.writeAtomic(customFile, updated)
     }
 
     /**
@@ -327,36 +447,41 @@ object PersonalDictManager {
     }
 
     // 为方案添加 custom_phrase 翻译器（独立于主词典音节表）
-    internal fun applyCustomPhraseTranslator(rimeDir: java.io.File, schemaId: String, dictName: String) {
+    internal fun applyCustomPhraseTranslator(rimeDir: java.io.File, schemaId: String, dictName: String, namespace: String = "custom_phrase") {
         val customFile = java.io.File(rimeDir, "${schemaId}.custom.yaml")
         val text = customFile.takeIf { it.isFile }?.readText().orEmpty()
         val patch = (SchemaManager.yaml.parseToYamlNode(text.ifBlank { "patch: {}" }) as? YamlMap)?.get("patch") as? YamlMap
-        val phrase = "table_translator@custom_phrase"
-        if (patch?.entries?.any { (key, value) ->
-                (key.content == "engine/translators" || key.content.startsWith("engine/translators/")) && when (value) {
-                    is YamlScalar -> value.content == phrase
-                    is YamlList -> value.items.any { (it as? YamlScalar)?.content == phrase }
-                    else -> false
-                }
-            } == true) return
-        val hasPhraseOptions = patch?.entries?.keys?.any { it.content == "custom_phrase" } == true
-        val options = if (hasPhraseOptions) "" else """  "custom_phrase":
-    dictionary: ""
-    user_dict: $dictName
-    db_class: stabledb
-    enable_completion: false
-    enable_sentence: false
-    initial_quality: 99
-"""
+        val phrase = "table_translator@$namespace"
+        val beforeFirst = "engine/translators/@before 0"
+        val atFront = patch?.entries?.any { (key, value) ->
+            key.content.startsWith(beforeFirst) && key.content.removePrefix(beforeFirst).all { it == '0' } &&
+                (value as? YamlScalar)?.content == phrase
+        } == true
+        val existing = patch?.get<YamlMap>(namespace)
+        val defaults = mapOf("dictionary" to "\"\"", "user_dict" to dictName, "db_class" to "stabledb",
+            "enable_completion" to "false", "enable_sentence" to "false", "initial_quality" to "99")
+        val options = if (existing == null) {
+            "  \"$namespace\":\n" + defaults.entries.joinToString("") { (key, value) -> "    $key: $value\n" }
+        } else defaults.entries.filter { (key, _) ->
+            key !in existing.entries.keys.map { it.content } && patch.entries.keys.none { it.content == "$namespace/$key" }
+        }.joinToString("") { (key, value) -> "  \"$namespace/$key\": $value\n" }
+        if (atFront && options.isEmpty()) return
         val occupied = patch?.entries?.keys.orEmpty().map { it.content }
-        val append = when {
-            "engine/translators/+" !in occupied -> "  \"engine/translators/+\":\n    - $phrase"
-            "engine/translators/@next" !in occupied -> "  \"engine/translators/@next\": $phrase"
-            "engine/translators/@after last" !in occupied -> "  \"engine/translators/@after last\": $phrase"
-            else -> "  \"engine/translators/+\":\n    - $phrase"
+        // Rime elects a translator by comparing it with its neighbour. Appending
+        // can starve an exact match behind the Pinyin/English translators.
+        val frontKey = generateSequence(beforeFirst) { it + "0" }.first { it !in occupied }
+        val front = if (atFront) "" else "  \"$frontKey\": $phrase\n"
+        val content = "$front$options"
+        // Drop the old generated singleton append when moving it to the front.
+        // Lists containing other translators and lines with user comments stay intact.
+        val escaped = Regex.escape(phrase)
+        val oldKeys = setOf("engine/translators/+", "engine/translators/@next", "engine/translators/@after last")
+        val withoutLegacy = patch?.entries.orEmpty().entries.fold(text) { source, (key, value) ->
+            val only = if (value is YamlList) value.items.singleOrNull() else value
+            if (key.content !in oldKeys || (only as? YamlScalar)?.content != phrase) source
+            else source.replace(Regex("""(?m)^  ["']?${Regex.escape(key.content)}["']?:[ \t]*(?:$escaped|\r?\n    - $escaped|\[[ \t]*$escaped[ \t]*\])[ \t]*(?:\r?\n|$)"""), "")
         }
-        val content = "$append\n$options"
-        val result = TranslatorAppendPatch.repair(insertUnderPatch(text, content))
+        val result = TranslatorAppendPatch.repair(insertUnderPatch(withoutLegacy, content))
         SchemaManager.yaml.parseToYamlNode(result)
         CellDictionaryStore.writeAtomic(customFile, result)
     }

@@ -90,6 +90,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     if (config->GetString("t9/ngram_model", &ngram_model) && !ngram_model.empty())
       t9_ngram_ = T9NgramModel::Open(T9ResolveOnce("t9_ngram", ".lm", ngram_model));
     config->GetBool("t9/ngram_sentence_start", &t9_ngram_sentence_start_);
+    config->GetDouble("t9/merged_tail_word_margin", &t9_merged_tail_word_margin_);
   }
   {
     // t9/reading_table: ln(count / count of the text's main reading) for minority readings
@@ -130,6 +131,15 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     config->GetDouble("t9/ngram_dictionary_prior", &t9_ngram_dictionary_prior_);
     config->GetBool("t9/ngram_sentence_start", &t9_ngram_sentence_start_);
     config->GetDouble("t9/ngram_eos_weight", &t9_ngram_eos_weight_);
+    config->GetDouble("t9/particle_eos_weight", &t9_particle_eos_weight_);
+    config->GetBool("t9/particle_bigram_after_start", &t9_particle_bigram_after_start_);
+    config->GetDouble("t9/particle_alternative_margin", &t9_particle_alternative_margin_);
+    if (auto list = config->GetList("t9/final_particles")) {
+      auto particles = std::make_shared<std::set<string>>();
+      for (size_t i = 0; i < list->size(); ++i)
+        if (auto value = list->GetValueAt(i)) particles->insert(value->str());
+      if (!particles->empty()) t9_final_particles_ = std::move(particles);
+    }
     config->GetBool("t9/ngram_merge_segmentations", &t9_ngram_merge_segmentations_);
     config->GetDouble("t9/correction_penalty", &t9_correction_penalty_);
     config->GetBool("t9/prefer_user_entries", &t9_prefer_user_entries_);

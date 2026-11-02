@@ -1,0 +1,22 @@
+# 自己写的字母键盘预设：对齐用的两个参数（可选）。
+# 只对 xime.custom.yaml 里自己的 section 生效；应用内「自定义布局」编辑的布局不读这里。
+# 两项都不写时和以前一样：标准排列（整套 26 字母，每排 10/9/7 左右）按字母格自动对齐，
+# 其余排列第二行左右各缩进 16dp、删除键 1.4 份。
+#
+#   middle_row_inset   第二行左右各缩进几格，0～3。一格 = 第一行一个键宽（14 键按字母数占格时是一个字母宽）。
+#   delete_key_weight  删除键在第三行占几份，0.2～5。和 Shift（约 1.4 份）、底排字母区（7 份）按比例分这一行。
+keyboard:
+  qwerty_lxsq17:
+    schemas: [double_pinyin_lxsq17]   # 换成你自己的方案 id
+    layout:
+      rows:
+        - [q, [w, e], [r, t], [y, u], i, [o, p]]
+        - [a, [s, d], [f, g], h, [j, k], l, 横]
+        - [z, [x, c], v, [b, n], m]
+    keys:
+      # 字母行的键点按时把 value 当按键送进 Rime（进编码），值要是方案认的字母。
+      # 合并键没写 tap 时点按发组里第一个字母（we 发 w），e t u p d g k c n 点按时不会发出，可以拿来当辅助码。
+      横: { tap: { label: "横", value: "e" } }
+    geometry:
+      middle_row_inset: 0
+      delete_key_weight: 1.4

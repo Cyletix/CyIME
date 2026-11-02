@@ -18,7 +18,7 @@ private fun kanaKey(labels: String, vararg romaji: String?) = KanaFlickKey(
     labels.mapIndexed { index, label -> romaji[index]?.let { KanaChoice(label.toString(), it) } }
 )
 
-/** 顺序为点按、左、上、右、下，使用 jaroomaji 词典中的标准编码。 */
+/** 顺序为点按、左、上、右、下，使用 azooKey 罗马字表里的标准编码。 */
 internal val japaneseKanaKeys = listOf(
     kanaKey("あいうえお", "a", "i", "u", "e", "o"),
     kanaKey("かきくけこ", "ka", "ki", "ku", "ke", "ko"),

@@ -142,8 +142,13 @@ data class DoublePinyinScheme(
         require(this == FLYPY || valid())
         val t9 = t9Id(id)
         val algebra = algebra() + T9_DIGITS.map { (letters, digit) -> "derive/[$letters]/$digit/" }
+        val laiLe = listOfNotNull(code("lai"), code("le")).takeIf { it.size == 2 }?.joinToString("")
+            ?.takeIf { keys -> keys.all { it in 'a'..'z' } }
+            ?.map { key -> T9_DIGITS.first { key in it.first }.second }?.joinToString("")
+        val particleChoice = laiLe?.let { "cyime_particle_shortcuts:\n  exact: [\"$it 来了\"]" }.orEmpty()
         return """
             |$GENERATED_MARK$t9
+            |$particleChoice
             |schema:
             |  schema_id: $t9
             |  language: zh

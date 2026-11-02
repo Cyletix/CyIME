@@ -39,7 +39,7 @@ def parse(path):
             for stage in STAGES + FAULTS:
                 if stage in fields:
                     row[stage] = int(fields[stage])
-            row["dropped"] = int(fields.get("dropped", 0))
+            row["dropped"] = int(fields.get("dropped", -1))
             row["inflight"] = int(fields.get("inflight", 0))
             row["at"] = int(fields.get("at", 0))
             rows.append(row)
@@ -74,13 +74,48 @@ def slow_keys(rows, threshold_us=50_000):
     return len(slow), len(waited), len(faulted)
 
 
+def check_smoke(rows, words, rounds, layout, max_key_ms):
+    """0 = within budget, 1 = observed stall, 2 = incomplete or mismatched capture."""
+    expected = [length for word in words for length in range(1, len(word) + 1)] * rounds
+    if len(rows) != len(expected):
+        return 2, f"captured {len(rows)} of {len(expected)} expected keys"
+    ordered = sorted(rows, key=lambda row: row["at"])
+    previous_at = 0
+    for index, (row, length) in enumerate(zip(ordered, expected), 1):
+        if (row["layout"] != layout or row["len"] != length or row["trigger"] != "up"
+                or row["at"] <= previous_at or row.get("total", -1) <= 0
+                or row["dropped"] < 0 or row["dropped"] != ordered[0]["dropped"]):
+            return 2, f"capture does not match the touch protocol at key {index} (expected {layout}, len={length})"
+        previous_at = row["at"]
+    times = [row["total"] for row in ordered]
+    worst = max(times)
+    index = times.index(worst)
+    stalls = sum(t > max_key_ms * 1000 for t in times)
+    return int(stalls > 0), (f"{stalls}/{len(rows)} keys above {max_key_ms} ms; "
+                             f"p99={percentile(times, 99)/1000:.1f} ms; "
+                             f"worst={worst/1000:.1f} ms at key {index + 1} (len={ordered[index]['len']})")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("log")
     parser.add_argument("--json")
+    parser.add_argument("--smoke-words", help="comma-separated key sequences as supplied to key_latency_drive.py")
+    parser.add_argument("--rounds", type=int)
+    parser.add_argument("--layout", help="expected layout ID in the probe, e.g. qwerty or t9")
+    parser.add_argument("--max-key-ms", type=int, help="maximum touch-to-frame time for any key in this capture")
     args = parser.parse_args()
-    rows = parse(args.log)
+    smoke = any(x is not None for x in (args.smoke_words, args.rounds, args.layout, args.max_key_ms))
+    if smoke and (not args.smoke_words or not all(args.smoke_words.split(",")) or not args.layout
+                  or not args.rounds or args.rounds < 1 or not args.max_key_ms or args.max_key_ms < 1):
+        parser.error("smoke requires --smoke-words, --layout and positive --rounds and --max-key-ms")
+    try:
+        rows = parse(args.log)
+    except (OSError, ValueError, KeyError) as error:
+        parser.error(f"cannot read latency capture: {error}")
     if not rows:
+        if smoke:
+            parser.error("no CyIMELatency key samples in smoke capture")
         sys.exit("no CyIMELatency lines")
     summary = summarize(rows)
     stamps = sorted(r["at"] for r in rows if r["at"])
@@ -104,7 +139,11 @@ def main():
     if args.json:
         with open(args.json, "w", encoding="utf-8") as out:
             json.dump(summary, out, ensure_ascii=False, indent=2)
+    if smoke:
+        code, reason = check_smoke(rows, args.smoke_words.split(","), args.rounds, args.layout, args.max_key_ms)
+        print(f"smoke={('within_budget', 'stall', 'invalid_capture')[code]} {reason}")
+        return code
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

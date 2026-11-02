@@ -176,6 +176,7 @@ object RimeExportManager {
         return when {
             relativePath.startsWith("build/") -> false
             relativePath.startsWith("opencc/") -> true
+            relativePath.startsWith("azookey/dictionary") -> false
             relativePath.endsWith(".bin") -> false
             relativePath.endsWith(".gram") -> false
             relativePath.endsWith(".db") -> false

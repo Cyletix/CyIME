@@ -26,8 +26,11 @@ data class CellDictionaryState(
     val seeded: Set<String> = emptySet(),
     val selectedEnglish: Boolean = false,
     val appliedEnglish: Boolean = false,
+    val downloadedWordRevision: Int = 0,
+    val appliedWordRevision: Int = 0,
 ) {
-    val pending: Boolean get() = selected != applied || selectedEnglish != appliedEnglish
+    val pending: Boolean get() = selected != applied || selectedEnglish != appliedEnglish ||
+        downloadedWordRevision != appliedWordRevision
 }
 
 /** Downloaded data stays outside Rime until explicitly applied. Never edits learned user dictionaries. */
@@ -57,6 +60,34 @@ class CellDictionaryStore(val directory: File) {
 
     private fun save(state: CellDictionaryState) {
         writeAtomic(File(directory, "state.json"), json.encodeToString(state))
+    }
+
+    private fun updateFile(revision: Int) = File(directory, "word-updates-$revision.json")
+
+    private fun readWordFile(file: File): CellWordUpdates = file.inputStream().use {
+        CellWordUpdates.parse(ScelDictionary.readBounded(it, CellWordUpdates.MAX_BYTES))
+    }
+
+    internal fun stageWordUpdates(bytes: ByteArray, bundled: CellWordUpdates): Boolean {
+        val update = CellWordUpdates.parse(bytes)
+        return synchronized(lock) {
+            val old = read()
+            if (update.revision <= bundled.revision || update.revision < old.downloadedWordRevision) return@synchronized false
+            val file = updateFile(update.revision)
+            val existing = if (file.isFile) runCatching { readWordFile(file) }.getOrNull() else null
+            if (existing != null) require(existing == update) { "同一词库版本的内容不一致" }
+            else writeAtomic(file, bytes.decodeToString())
+            if (old.downloadedWordRevision == update.revision) return@synchronized false
+            save(old.copy(downloadedWordRevision = update.revision))
+            if (old.downloadedWordRevision != old.appliedWordRevision) updateFile(old.downloadedWordRevision).delete()
+            true
+        }
+    }
+
+    internal fun wordUpdates(revision: Int, bundled: CellWordUpdates): CellWordUpdates = synchronized(lock) {
+        if (revision <= bundled.revision) bundled else readWordFile(updateFile(revision)).also {
+            require(it.revision == revision) { "词库更新版本不符" }
+        }
     }
 
     fun dictionaryFile(id: String): File {
@@ -139,21 +170,24 @@ class CellDictionaryStore(val directory: File) {
         save(old.copy(installed = old.installed.filterNot { it.id == id }, selected = old.selected - id))
     }
 
-    fun markApplied(ids: Set<String>, english: Boolean? = null) = synchronized(lock) {
+    fun markApplied(ids: Set<String>, english: Boolean? = null, wordRevision: Int? = null) = synchronized(lock) {
         val old = read()
         require(ids.all { id -> old.installed.any { it.id == id } })
-        save(old.copy(applied = ids, appliedEnglish = english ?: old.appliedEnglish)) // preserve any newer user selection
+        save(old.copy(applied = ids, appliedEnglish = english ?: old.appliedEnglish,
+            appliedWordRevision = wordRevision ?: old.appliedWordRevision)) // preserve any newer user selection
     }
 
     /** Commit only after the engine accepted the selection; repair its previous state on failure. */
-    fun activate(ids: Set<String>, english: Boolean, prepareAndDeploy: (Set<String>, Boolean) -> Unit) = synchronized(lock) {
+    fun activate(ids: Set<String>, english: Boolean, prepareAndDeploy: (Set<String>, Boolean, Int) -> Unit): Unit = synchronized(lock) {
         val previous = read()
         try {
-            prepareAndDeploy(ids, english)
-            markApplied(ids, english)
+            prepareAndDeploy(ids, english, previous.downloadedWordRevision)
+            markApplied(ids, english, previous.downloadedWordRevision)
         } catch (error: Exception) {
-            try { prepareAndDeploy(previous.applied, previous.appliedEnglish) } catch (restoreError: Exception) { error.addSuppressed(restoreError) }
+            try { prepareAndDeploy(previous.applied, previous.appliedEnglish, previous.appliedWordRevision) }
+            catch (restoreError: Exception) { error.addSuppressed(restoreError) }
             throw error
         }
+        if (previous.appliedWordRevision != previous.downloadedWordRevision) updateFile(previous.appliedWordRevision).delete()
     }
 }

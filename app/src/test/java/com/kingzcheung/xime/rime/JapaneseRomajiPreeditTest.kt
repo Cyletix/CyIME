@@ -3,18 +3,13 @@ package com.kingzcheung.xime.rime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import com.charleskorn.kaml.Yaml
-import com.charleskorn.kaml.YamlMap
-import com.charleskorn.kaml.YamlList
-import com.charleskorn.kaml.YamlScalar
 import java.io.File
 
 /**
  * 日语未拼完罗马音的显示判定（纯字符串规则，不需要引擎）。
  *
- * 依据随包方案 `japanese.schema.yaml` 的 preedit_format：末尾是元音即为完整假名；
- * 末尾剩辅音串说明还在等后续元音，此时方案的单字母回显规则
- * （`xform/n/ん/`、`xform/k/っ/` …，方案文件 506-530 行）会把它显示成 っ / ん。
+ * 引擎回显来自 azooKey 的读音（test resources 里的 azookey_readings.tsv）：末尾是元音即为完整假名；
+ * 末尾剩辅音串说明还在等后续元音，azooKey 原样保留这些字母（kash → かsh）。
  */
 class JapaneseRomajiPreeditTest {
     @Test fun rebuildingInputMatchesContextualKeyProcessing() {
@@ -26,29 +21,20 @@ class JapaneseRomajiPreeditTest {
         }
     }
 
-    @Test fun bundledSchemasDisplayAndDeleteTheSameUnits() {
-        listOf("japanese", "jaroomaji").forEach { schema ->
-            val root = Yaml.default.parseToYamlNode(
-                File("src/main/assets/rime_japanese/$schema.schema.yaml").readText()) as YamlMap
-            val translator = root.entries.entries.single { it.key.content == "translator" }.value as YamlMap
-            val formats = (translator.entries.entries.single { it.key.content == "preedit_format" }.value as YamlList)
-                .items.map { (it as YamlScalar).content.split('/') }
-            fun display(input: String): String {
-                val echo = formats.fold(input) { text, rule ->
-                    assertEquals("xform", rule[0])
-                    Regex(rule[1]).replace(text, rule[2])
-                }
-                return japanesePreedit(input, echo)
-            }
-            mapOf("k" to "k", "n" to "n", "sh" to "sh", "ky" to "ky",
-                "kash" to "かsh", "nk" to "んk", "kk" to "っk", "ny" to "ny",
-                "nn" to "ん", "KATAK" to "カタK").forEach { (input, expected) ->
-                assertEquals("$schema: $input", expected, display(input))
-            }
-            mapOf("nka" to "ん", "kakka" to "かっ", "kk" to "っ", "nk" to "ん",
-                "kash" to "かs", "kya" to "", "KANPA" to "カン").forEach { (input, expected) ->
-                assertEquals("$schema: delete $input", expected, display(deleteJapaneseRomaji(input)))
-            }
+    @Test fun azooKeyReadingsDisplayAndDeleteTheSameUnits() {
+        val path = "src/test/resources/azookey_readings.tsv"
+        val file = listOf(File(path), File("app/$path")).first { it.isFile }
+        val readings = file.readLines().filterNot { it.startsWith("#") }.map { it.split('\t') }.associate { it[0] to it[1] }
+        fun display(input: String): String =
+            if (input.isEmpty()) "" else japanesePreedit(input, readings[input] ?: error("No recorded reading: $input"))
+        mapOf("k" to "k", "n" to "n", "sh" to "sh", "ky" to "ky",
+            "kash" to "かsh", "nk" to "んk", "kk" to "っk", "ny" to "ny",
+            "nn" to "ん", "KATAK" to "カタK").forEach { (input, expected) ->
+            assertEquals(input, expected, display(input))
+        }
+        mapOf("nka" to "ん", "kakka" to "かっ", "kk" to "っ", "nk" to "ん",
+            "kash" to "かs", "kya" to "", "KANPA" to "カン").forEach { (input, expected) ->
+            assertEquals("delete $input", expected, display(deleteJapaneseRomaji(input)))
         }
     }
 

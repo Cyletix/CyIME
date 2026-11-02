@@ -58,8 +58,19 @@ class T9InputController(
     /** 音节选项（原 T9PinyinMap.SyllableOption，已内联至此） */
     data class SyllableOption(
         val pinyin: String,
-        val digitLength: Int
+        val digitLength: Int,
+        val spelling: String = pinyin,
+        val near: Boolean = false,
     )
+
+    internal var fuzzyReadings: com.kingzcheung.xime.settings.NineKeyFuzzyReadings? = null
+        set(value) {
+            if (field === value) return
+            field = value
+            if (leftPanelState != LeftPanelState.IDLE) lastRailPanel?.let { updateReadings(it, lastRailOptions) }
+        }
+    private var lastRailPanel: LeftPanelInfo? = null
+    private var lastRailOptions: List<Pair<String, Int>> = emptyList()
 
     // ── 异步执行模型 ──
     private val ownsQueue = inputCommands == null
@@ -238,12 +249,17 @@ class T9InputController(
             }
             KeyLatencyProbe.applied()
             if (refineWhenIdle && onCompositionRefresh != null)
-                scheduleRefinement(finalResult.engineRevision, gen, admission, epoch)
+                scheduleRefinement(finalResult.engineRevision, gen, admission, epoch, data)
         }
     }
 
     private var refinementPoll: Runnable? = null
-    private fun scheduleRefinement(revision: Long, generation: Long, admission: Long, epoch: Long, attempt: Int = 0) {
+    private fun rawDigitsForSpelling(input: String, panel: LeftPanelInfo) =
+        input.length in 6..32 && panel.selectedPinyin.isEmpty() && !panel.leftLocked &&
+            input.all { it in '2'..'9' }
+
+    private fun scheduleRefinement(revision: Long, generation: Long, admission: Long, epoch: Long,
+                                   data: T9RefreshData, attempt: Int = 0) {
         refinementPoll?.let(mainHandler::removeCallbacks)
         if (attempt >= 40 || !accepts(admission, epoch) || generation != uiGeneration.get()) return
         val ownerContext = captureInputContext()
@@ -252,11 +268,17 @@ class T9InputController(
             enqueue("t9-refine") {
                 kotlinx.coroutines.withContext(ownerContext + commandValidity(admission, epoch)) {
                     if (!accepts(admission, epoch) || generation != uiGeneration.get() || !rimeEngine.isCandidateRevisionCurrent(revision)) return@withContext
-                    when (rimeEngine.t9RefinementState()) {
-                        2 -> rimeEngine.refineQueuedT9Result(revision)?.let {
-                            refreshOnBackground(result = it, admission = admission, epoch = epoch, refineWhenIdle = false)
-                        }
-                        1 -> mainHandler.post { scheduleRefinement(revision, generation, admission, epoch, attempt + 1) }
+                    val state = rimeEngine.t9RefinementState()
+                    if (state == 1) {
+                        mainHandler.post { scheduleRefinement(revision, generation, admission, epoch, data, attempt + 1) }
+                        return@withContext
+                    }
+                    val ranked = if (state == 2) rimeEngine.refineQueuedT9Result(revision) else null
+                    val edited = rawDigitsForSpelling(data.result.inputText, data.panel) &&
+                        rimeEngine.refineOmission(ranked?.engineRevision ?: revision)
+                    if (edited || ranked != null) {
+                        refreshOnBackground(result = if (edited) null else ranked, admission = admission,
+                            epoch = epoch, refineWhenIdle = false)
                     }
                 }
             }
@@ -326,18 +348,28 @@ class T9InputController(
             return
         }
 
-        // 从数字段用 librime-t9 (C++) 计算左栏候选
-        firstOptions = options.map { SyllableOption(it.first, it.second) }
-
-        // 同步 C++ 状态机状态（分词键锁定 / 左选高亮 / 选择候选数字段）
+        lastRailPanel = panel
+        lastRailOptions = options
+        updateReadings(panel, options)
         leftPanelState = panel.state
+        selectionCandidateDigits = panel.selectionCandidateDigits.ifEmpty { null }
+        leftColumnLocked = panel.leftLocked
+    }
+
+    private fun updateReadings(panel: LeftPanelInfo, options: List<Pair<String, Int>>) {
+        val fuzzy = fuzzyReadings
+        val base = if (fuzzy?.scheme == null) options.map { SyllableOption(it.first, it.second) } else emptyList()
+        firstOptions = if (fuzzy == null) base else {
+            val readings = fuzzy.options(panel.panelDigits).map { SyllableOption(it.pinyin, it.digits, it.spelling, it.near) }
+            if (readings.isEmpty()) base else (base + readings).distinctBy { it.pinyin to it.digitLength }.sortedByDescending { it.digitLength }
+        }
+
         selectedOption = if (panel.selectedPinyin.isNotEmpty()) {
-            SyllableOption(panel.selectedPinyin, panel.selectedDigitLength)
+            firstOptions.firstOrNull { it.spelling == panel.selectedPinyin && it.digitLength == panel.selectedDigitLength }
+                ?: SyllableOption(panel.selectedPinyin, panel.selectedDigitLength)
         } else {
             null
         }
-        selectionCandidateDigits = panel.selectionCandidateDigits.ifEmpty { null }
-        leftColumnLocked = panel.leftLocked
     }
 
     /** C++ 左侧面板状态（t9GetLeftPanelState 解析结果） */
@@ -404,7 +436,7 @@ class T9InputController(
 
     fun onChoiceSelected(option: SyllableOption) {
         enqueueInput("t9-syllable") { admission, epoch ->
-            val result = rimeEngine.selectQueuedT9Pinyin(option.pinyin, option.digitLength) ?: return@enqueueInput
+            val result = rimeEngine.selectQueuedT9Pinyin(option.spelling, option.digitLength) ?: return@enqueueInput
             refreshOnBackground(result = result, admission = admission, epoch = epoch)
         }
     }

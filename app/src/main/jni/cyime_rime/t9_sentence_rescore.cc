@@ -169,4 +169,60 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
   if (rime_best && rime_best != chosen && corrected(rime_best)) sentences->push_back(rime_best);
 }
 
+namespace {
+// ln P(text) under the word model, over its best split into model words (up to 8 characters); the first word
+// is not scored as a sentence start (the 14-key schema does not pass the committed text).
+double T9TextLogProb(const T9NgramModel* ngram, const string& text) {
+  vector<size_t> at{0};
+  for (size_t i = 0; i < text.size();) {
+    const unsigned char c = static_cast<unsigned char>(text[i]);
+    i += c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+    at.push_back(std::min(i, text.size()));
+  }
+  const size_t n = at.size() - 1;
+  struct State { double value; int32_t prev2, prev1; };
+  vector<vector<State>> states(n + 1);
+  constexpr size_t kStates = 4;
+  for (size_t end = 1; end <= n; ++end) {
+    auto& here = states[end];
+    for (size_t start = end > 8 ? end - 8 : 0; start < end; ++start) {
+      if (start && states[start].empty()) continue;
+      const int32_t id = ngram->Id(text.substr(at[start], at[end] - at[start]));
+      if (id == ::T9NgramModel::kUnseen && end - start > 1) continue;
+      vector<State> from = start ? states[start] : vector<State>{{0, ::T9NgramModel::kUnseen, ::T9NgramModel::kUnseen}};
+      for (const State& s : from) {
+        const double value = s.value + (start ? ngram->LogProb3(s.prev2, s.prev1, id) : ngram->Start(id, false));
+        const State next{value, s.prev1, id};
+        auto same = std::find_if(here.begin(), here.end(), [&](const State& o) { return o.prev1 == id; });
+        if (same != here.end()) { if (value > same->value) *same = next; continue; }
+        if (here.size() < kStates) { here.push_back(next); continue; }
+        auto worst = std::min_element(here.begin(), here.end(),
+                                      [](const State& a, const State& b) { return a.value < b.value; });
+        if (value > worst->value) *worst = next;
+      }
+    }
+  }
+  double best = -std::numeric_limits<double>::infinity();
+  for (const State& s : states[n]) best = std::max(best, s.value);
+  return best;
+}
+}  // namespace
+
+void T9PreferMergedTailWord(const T9ScriptQuery& q, const T9NgramModel* ngram, double margin,
+                            const an<DictEntry>& word, deque<an<Sentence>>* sentences) {
+  if (!ngram || margin <= 0 || !word || sentences->empty()) return;
+  const auto& sentence = sentences->front();
+  if (sentence->text() == word->text) return;
+  // 都是 -7.3 against 都啊 -15.5 goes first; 真的是 -8.2 against 真的啊 -9.6 does not (margin ln 20, the gate
+  // used for other readings the letters only partly spell), nor 猪上树 against 智商啊.
+  if (T9TextLogProb(ngram, word->text) <= T9TextLogProb(ngram, sentence->text()) + margin) return;
+  auto first = New<Sentence>(q.translator->language());
+  first->Extend(*word, q.end_of_input - q.start, word->weight);
+  first->Offset(q.start);
+  first->set_syllabifier(q.syllabifier);
+  first->set_weight(sentence->weight());
+  first->set_quality(sentence->quality());
+  sentences->push_front(first);
+}
+
 }  // namespace rime

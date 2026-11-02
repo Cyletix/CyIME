@@ -55,6 +55,29 @@ class GlideChineseLexiconTest {
             pinyinCodes(listOf(listOf("zhong", "guo")), flypy).single()))
     }
 
+    @Test fun previewShowsThePinyinOfTheGlidedCode() {
+        assertEquals("ni hao", pinyinReadings(entries, null)["nihao"])
+        assertEquals("zhong guo", pinyinReadings(entries, flypy)["vsgo"])
+        // 同一编码只留最常用的读法（xian 是 xian，不是 xi an）。
+        assertEquals("xian", pinyinReadings(entries, null)["xian"])
+    }
+
+    /** 实时预览在手指移动中按半截轨迹反复识别：半截轨迹也要在时限内算完。 */
+    @Test fun partialTracesDecodeWithinThePreviewBudget() {
+        val decoder = GlideDecoder(GlideLexicon.keyboard(keys), pinyinCodes(entries, null))
+        val traces = words.mapIndexed { index, word -> trace(word.replace(" ", ""), index) }
+        traces.forEach { (xs, ys) -> decoder.decode(xs, ys) }
+        val started = System.nanoTime()
+        var runs = 0
+        for ((xs, ys) in traces) for (fraction in listOf(0.4, 0.7)) {
+            val size = maxOf(2, (xs.size * fraction).toInt())
+            decoder.decode(xs.copyOf(size), ys.copyOf(size), limit = 1); runs++
+        }
+        val perRunMs = (System.nanoTime() - started) / 1e6 / runs
+        println("glide preview pinyin: ${"%.2f".format(perRunMs)} ms/partial decode")
+        assertTrue("too slow: $perRunMs ms", perRunMs < 50.0)
+    }
+
     @Test fun commonQuanpinWordsComeFirstWithinTheLatencyBudget() {
         val decoder = GlideDecoder(GlideLexicon.keyboard(keys), pinyinCodes(entries, null))
         val started = System.nanoTime()

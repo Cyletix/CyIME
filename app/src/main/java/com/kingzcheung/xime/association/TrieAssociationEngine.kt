@@ -179,7 +179,13 @@ class TrieAssociationEngine {
         val candidates = mutableListOf<AssociationCandidate>()
         collectWords(startIdx, candidates)
         
-        candidates.sortedBy { it.score }.take(topK)
+        val ranked = candidates.sortedBy { it.score }.take(topK)
+        if (prefix == normalizedPrefix) return@withContext ranked
+        val allCaps = prefix.length > 1 && prefix.all { it.isUpperCase() }
+        ranked.map { candidate ->
+            val tail = candidate.text.substring(normalizedPrefix.length)
+            candidate.copy(text = prefix + if (allCaps) tail.uppercase() else tail)
+        }
     }
     
     private fun findNode(prefix: String): Int {

@@ -18,6 +18,22 @@ data class PinyinEditSession(
     internal fun isActive(): Boolean = active.get()
 }
 
+/** The host and engine can use different separators for the same syllable boundary. */
+internal fun PinyinEditSession.inlineOffset(code: String): Int? {
+    if (!code.startsWith(protectedText)) return null
+    val suffix = code.drop(protectedText.length).replace(' ', '\'')
+    if (suffix == text) return protectedText.length + caret
+    if (suffix.replace("'", "") != text.replace("'", "")) return null
+    return protectedText.length + offsetAfterCodeKeys(suffix, codeKeysBefore(text, caret))
+}
+
+internal fun PinyinEditSession.editOffset(code: String, offset: Int): Int? {
+    if (inlineOffset(code) == null) return null
+    val suffix = code.drop(protectedText.length).replace(' ', '\'')
+    val local = (offset - protectedText.length).coerceIn(0, suffix.length)
+    return if (suffix == text) local else offsetAfterCodeKeys(text, codeKeysBefore(suffix, local))
+}
+
 internal object PinyinEditBuffer {
     fun supports(schema: String): Boolean =
         com.kingzcheung.xime.settings.InputProfiles.describe(schema).capabilities.editablePinyin

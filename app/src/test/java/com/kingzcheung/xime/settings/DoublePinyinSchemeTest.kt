@@ -258,6 +258,8 @@ class DoublePinyinSchemeTest {
         for (scheme in DoublePinyinScheme.BUILTINS.filterNot { it.usesSemicolon } + custom) {
             val id = DoublePinyinScheme.t9Id(scheme.id)
             val text = scheme.t9Schema()
+            val laiLe = t9(scheme.code("lai")!! + scheme.code("le")!!)
+            assertTrue("来了 follows this scheme's own two-key codes", "exact: [\"$laiLe 来了\"]" in text)
             assertTrue(text.startsWith(DoublePinyinScheme.GENERATED_MARK + id + "\n"))
             assertTrue(text.contains("  schema_id: $id\n  language: zh\n  input_scheme: double_pinyin\n"))
             assertTrue(text.contains("  prism: $id\n"))

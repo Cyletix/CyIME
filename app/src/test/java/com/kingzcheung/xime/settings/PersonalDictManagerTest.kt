@@ -31,6 +31,59 @@ private fun mockContext(): Context {
 
 class PersonalDictManagerTest {
 
+    @Test
+    fun `shared symbol shortcuts reach each keyboard without replacing private tables or manual translators`() {
+        val context = mockContext()
+        val dir = File(context.filesDir, "rime").apply { mkdirs() }
+        val schemas = listOf("rime_ice", "double_pinyin_flypy", "t9_pinyin", "pinyin_14jian",
+            "double_pinyin_flypy_t9", "double_pinyin_flypy_14jian")
+        for (schema in schemas) {
+            val dict = if (schema == "double_pinyin_flypy") "custom_phrase_double" else "custom_phrase"
+            File(dir, "$schema.schema.yaml").writeText(if (schema == "double_pinyin_flypy_t9")
+                DoublePinyinScheme.FLYPY.t9Schema() else "custom_phrase:\n  user_dict: $dict\n")
+        }
+        val privateFile = File(dir, "custom_phrase_double.txt").apply { writeText("专用短语\tqqw\t99\n") }
+        val private14 = File(dir, "my_symbols.txt").apply { writeText("布局短语\tJJQ\t9\n") }
+        File(dir, "pinyin_14jian.custom.yaml").writeText("patch:\n  \"custom_phrase/user_dict\": my_symbols\n")
+        // Upgrade an existing nine-key installation where the translation was appended after the dictionary.
+        File(dir, "t9_pinyin.custom.yaml").writeText("patch:\n  \"engine/translators/+\": [table_translator@custom_phrase]\n" +
+            "  custom_phrase:\n    dictionary: \"\"\n    user_dict: custom_phrase\n    db_class: stabledb\n    initial_quality: 99\n")
+        val entries = listOf("❤️" to "oof", "🟠" to "oof", "🟡" to "oof", "🟢" to "oof",
+            "----------------" to "oog", "/" to "oog", "——" to "oov", "-" to "oov", "?" to "ow", "!" to "os")
+            .map { (word, code) -> DictEntry(word, code, 9999999) } +
+            listOf(DictEntry("短语甲", "qzs", 1), DictEntry("短语乙", "qzs", 9999999))
+        PersonalDictManager.saveCustomPhrases(context, entries = entries)
+        fun apply() = runBlocking { schemas.forEach { PersonalDictManager.ensureSchemaPack(context, it) } }
+        apply()
+        val configs = schemas.associateWith { File(dir, "$it.custom.yaml").readText() }
+        apply()
+        for ((schema, config) in configs) {
+            assertEquals(config, File(dir, "$schema.custom.yaml").readText())
+            assertTrue("$schema must query exact shortcuts before ordinary spelling", config.contains("engine/translators/@before 0"))
+        }
+        assertEquals(1, Regex("table_translator@custom_phrase").findAll(configs.getValue("t9_pinyin")).count())
+        assertEquals("专用短语\tqqw\t99\n", privateFile.readText())
+        assertEquals("布局短语\tJJQ\t9\n", private14.readText())
+        assertEquals("my_symbols", PersonalDictManager.getCustomPhraseDictName(dir, "pinyin_14jian"))
+        assertTrue(configs.getValue("double_pinyin_flypy").contains("table_translator@cyime_shared_phrase"))
+        assertEquals(entries, PersonalDictManager.loadCustomPhrases(context))
+        for ((dict, code) in listOf("custom_phrase_t9" to "663", "custom_phrase_k14" to "OOD")) {
+            val rows = PersonalDictManager.parseStableDbEntries(File(dir, "$dict.txt").readText()).filter { it.code == code }
+            assertEquals(entries.take(4).map { it.copy(code = code) }, rows)
+        }
+        // The host JNI probe consumes these actual settings outputs in a separate disposable Rime directory.
+        System.getenv("CYIME_PHRASE_PROBE_DIR")?.let { path ->
+            val export = File(path).apply { mkdirs() }
+            dir.listFiles().orEmpty().filter { it.extension == "txt" || it.name.endsWith(".custom.yaml") }
+                .forEach { it.copyTo(File(export, it.name), overwrite = true) }
+            File(dir, "double_pinyin_flypy_t9.schema.yaml").copyTo(File(export, "double_pinyin_flypy_t9.schema.yaml"), overwrite = true)
+        }
+        PersonalDictManager.saveCustomPhrases(context, entries = entries.drop(1))
+        apply()
+        assertFalse(File(dir, "custom_phrase_k14.txt").readText().contains("❤️"))
+        assertFalse(File(dir, "custom_phrase_t9.txt").readText().contains("❤️"))
+    }
+
     // ── 九键、14 键的自定义短语按键码 ──
 
     @Test
@@ -66,6 +119,111 @@ class PersonalDictManagerTest {
         assertTrue(patch.readText().contains("    - table_translator@custom_phrase\n"))
         assertEquals("custom_phrase_t9", PersonalDictManager.getCustomPhraseDictName(dir, "t9_pinyin"))
         dir.deleteRecursively()
+    }
+
+    // ── 双拼的自定义短语按双拼编码 ──
+
+    @Test
+    fun `full pinyin phrase codes become the codes each double pinyin scheme types`() {
+        val flypy = DoublePinyinScheme.FLYPY
+        // 单个声母按简拼（b站 的 b），翘舌声母换成这套双拼的键。
+        assertEquals(listOf("bvj"), PersonalDictManager.doublePinyinCodes(flypy, "bzhan"))
+        assertEquals(listOf("nihc"), PersonalDictManager.doublePinyinCodes(flypy, "nihao"))
+        assertEquals(listOf("vsgo"), PersonalDictManager.doublePinyinCodes(flypy, "zhongguo"))
+        assertEquals(listOf("uj"), PersonalDictManager.doublePinyinCodes(flypy, "shj"))
+        assertEquals(listOf("dz"), PersonalDictManager.doublePinyinCodes(flypy, "dz"))
+        // 少拆优先；' 是用户写的分隔；拆法并列时都给。
+        assertEquals(listOf("xm"), PersonalDictManager.doublePinyinCodes(flypy, "xian"))
+        assertEquals(listOf("xian"), PersonalDictManager.doublePinyinCodes(flypy, "xi'an"))
+        assertEquals(listOf("fjgj", "fhan"), PersonalDictManager.doublePinyinCodes(flypy, "fangan"))
+        assertEquals(listOf("lt"), PersonalDictManager.doublePinyinCodes(flypy, "lue"))
+        assertEquals(listOf("baj"), PersonalDictManager.doublePinyinCodes(DoublePinyinScheme.ZNABC, "bzhan"))
+        assertEquals(listOf("okyp"), PersonalDictManager.doublePinyinCodes(DoublePinyinScheme.MICROSOFT, "aoyun"))
+        assertEquals(listOf("x;"), PersonalDictManager.doublePinyinCodes(DoublePinyinScheme.MICROSOFT, "xing"))
+        // 拆不成拼音的不换。
+        assertEquals(emptyList<String>(), PersonalDictManager.doublePinyinCodes(flypy, "wifi"))
+        assertEquals(emptyList<String>(), PersonalDictManager.doublePinyinCodes(flypy, "a1"))
+    }
+
+    @Test
+    fun `my phrases typed in full pinyin work on double pinyin keyboards`() {
+        val context = mockContext()
+        val dir = File(context.filesDir, "rime").apply { mkdirs() }
+        val schemas = listOf("double_pinyin_flypy", "double_pinyin_microsoft", "double_pinyin_flypy_t9", "double_pinyin_flypy_14jian")
+        for (schema in listOf("double_pinyin_flypy", "double_pinyin_microsoft")) {
+            File(dir, "$schema.schema.yaml").writeText("custom_phrase:\n  user_dict: custom_phrase_double\n")
+        }
+        File(dir, "double_pinyin_flypy_t9.schema.yaml").writeText(DoublePinyinScheme.FLYPY.t9Schema())
+        File(dir, "double_pinyin_flypy_14jian.schema.yaml").writeText("custom_phrase:\n  user_dict: custom_phrase\n")
+        val privateFile = File(dir, "custom_phrase_double.txt").apply { writeText("专用短语\tqqw\t99\n") }
+        // 上一版：双拼挂的是全拼码的共享表，九键双拼挂的是全拼数字码的那一份。
+        File(dir, "double_pinyin_flypy.custom.yaml").writeText("patch:\n" +
+            "  \"engine/translators/@before 0\": table_translator@cyime_shared_phrase\n" +
+            "  \"cyime_shared_phrase\":\n    dictionary: \"\"\n    user_dict: custom_phrase\n    db_class: stabledb\n")
+        File(dir, "double_pinyin_flypy_t9.custom.yaml").writeText("patch:\n" +
+            "  \"engine/translators/@before 0\": table_translator@custom_phrase\n" +
+            "  \"custom_phrase\":\n    dictionary: \"\"\n    user_dict: custom_phrase_t9\n    db_class: stabledb\n")
+        PersonalDictManager.saveCustomPhrases(context, entries = listOf(DictEntry("B站", "bzhan", 1),
+            DictEntry("你好呀", "nihao", 1), DictEntry("❤️", "oof", 1)))
+        runBlocking { schemas.forEach { PersonalDictManager.ensureSchemaPack(context, it) } }
+        fun codes(schema: String, word: String) = PersonalDictManager.parseStableDbEntries(
+            File(dir, "custom_phrase_sp_$schema.txt").readText()).filter { it.word == word }.map { it.code }
+
+        // 26 键：原编码留着，再加这套双拼的编码。
+        assertEquals(listOf("bzhan", "bvj"), codes("double_pinyin_flypy", "B站"))
+        assertEquals(listOf("nihao", "nihc"), codes("double_pinyin_flypy", "你好呀"))
+        assertEquals(listOf("nihao", "nihk"), codes("double_pinyin_microsoft", "你好呀"))
+        assertTrue("oof" in codes("double_pinyin_flypy", "❤️"))
+        // 九键双拼按双拼键所在的数字，14 键双拼按合并键。
+        assertEquals(listOf("29426", "285"), codes("double_pinyin_flypy_t9", "B站"))
+        assertEquals(listOf("BZGAB", "bzhan", "BCJ", "bvj"), codes("double_pinyin_flypy_14jian", "B站"))
+
+        // 小鹤自带的专用短语表不动，「我的短语」挂成换好编码的那一份。
+        assertEquals("专用短语\tqqw\t99\n", privateFile.readText())
+        assertEquals("custom_phrase_double", PersonalDictManager.getCustomPhraseDictName(dir, "double_pinyin_flypy"))
+        val flypyPatch = File(dir, "double_pinyin_flypy.custom.yaml").readText()
+        assertTrue(flypyPatch.contains("    user_dict: custom_phrase_sp_double_pinyin_flypy\n"))
+        assertEquals(1, Regex("table_translator@cyime_shared_phrase").findAll(flypyPatch).count())
+        assertTrue(File(dir, "double_pinyin_microsoft.custom.yaml").readText().contains("custom_phrase_sp_double_pinyin_microsoft"))
+        for (schema in listOf("double_pinyin_flypy_t9", "double_pinyin_flypy_14jian")) {
+            assertEquals("custom_phrase_sp_$schema", PersonalDictManager.getCustomPhraseDictName(dir, schema))
+        }
+        // 再跑一遍不再改配置。
+        val configs = schemas.associateWith { File(dir, "$it.custom.yaml").readText() }
+        runBlocking { schemas.forEach { PersonalDictManager.ensureSchemaPack(context, it) } }
+        for ((schema, config) in configs) assertEquals(config, File(dir, "$schema.custom.yaml").readText())
+    }
+
+    @Test
+    fun `a scheme's own phrase dictionary stays and my phrases get their own table`() {
+        val context = mockContext()
+        val dir = File(context.filesDir, "rime").apply { mkdirs() }
+        // 万象：custom_phrase 块挂着自己的词典，它的 Lua 置顶词用这一块。
+        val own = "custom_phrase:\n  dictionary: custom_phrase\n  prism: wanxiang_phrase\n  enable_user_dict: false\n"
+        File(dir, "wanxiang.schema.yaml").writeText(own)
+        File(dir, "rime_ice.schema.yaml").writeText("custom_phrase:\n  dictionary: \"\"\n  user_dict: custom_phrase\n")
+        // 上一版已经把万象这一块整块换成了我们的。
+        File(dir, "wanxiang.custom.yaml").writeText("patch:\n" +
+            "  \"engine/translators/@before 0\": table_translator@custom_phrase\n" +
+            "  \"custom_phrase\":\n    dictionary: \"\"\n    user_dict: custom_phrase\n    db_class: stabledb\n" +
+            "    enable_completion: false\n    enable_sentence: false\n    initial_quality: 99\n" +
+            "  \"menu/page_size\": 7\n")
+        PersonalDictManager.saveCustomPhrases(context, entries = listOf(DictEntry("我的邮箱", "yx", 1)))
+        runBlocking { listOf("wanxiang", "rime_ice").forEach { PersonalDictManager.ensureSchemaPack(context, it) } }
+
+        val wanxiang = File(dir, "wanxiang.custom.yaml").readText()
+        assertFalse(wanxiang.contains("table_translator@custom_phrase"))
+        assertFalse(wanxiang.contains("\"custom_phrase\":"))
+        assertTrue(wanxiang.contains("table_translator@cyime_shared_phrase"))
+        assertTrue(wanxiang.contains("    user_dict: custom_phrase\n"))
+        assertTrue(wanxiang.contains("\"menu/page_size\": 7"))
+        assertTrue(File(dir, "rime_ice.custom.yaml").readText().contains("table_translator@custom_phrase"))
+        assertTrue(PersonalDictManager.hasOwnPhraseDictionary(own))
+        assertFalse(PersonalDictManager.hasOwnPhraseDictionary("custom_phrase:\n  dictionary: ''\n  user_dict: x\n"))
+        assertFalse(PersonalDictManager.hasOwnPhraseDictionary("custom_phrase:\n  user_dict: custom_phrase_double\n"))
+        // 再跑一遍不再改配置。
+        runBlocking { PersonalDictManager.ensureSchemaPack(context, "wanxiang") }
+        assertEquals(wanxiang, File(dir, "wanxiang.custom.yaml").readText())
     }
 
     // ── 个人词库（只读显示） ──
@@ -560,6 +718,18 @@ c	d
 """)
         val result = PersonalDictManager.run { getCustomPhraseDictName(rimeDir, "wubi86") }
         assertEquals("custom_phrase", result)
+    }
+
+    @Test fun `unrelated dictionaries are ignored and a keyed override follows the actual keys`() {
+        val dir = createTempDir()
+        File(dir, "t9_pinyin.schema.yaml").writeText("# custom_phrase: see settings\ntranslator:\n  user_dict: rime_ice\n")
+        assertEquals("custom_phrase", PersonalDictManager.getCustomPhraseDictName(dir, "t9_pinyin"))
+        val patch = File(dir, "t9_pinyin.custom.yaml")
+        patch.writeText("patch:\n  'custom_phrase/user_dict': 'custom_phrase'  # retain my comment\n  translator/user_dict: rime_ice\n")
+        PersonalDictManager.retargetCustomPhraseDict(patch, "custom_phrase_t9")
+        assertEquals("custom_phrase_t9", PersonalDictManager.getCustomPhraseDictName(dir, "t9_pinyin"))
+        assertTrue(patch.readText().contains("custom_phrase_t9  # retain my comment"))
+        assertTrue(patch.readText().contains("translator/user_dict: rime_ice"))
     }
 
     @Test

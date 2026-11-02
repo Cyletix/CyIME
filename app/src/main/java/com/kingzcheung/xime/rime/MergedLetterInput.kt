@@ -9,4 +9,11 @@ internal object MergedLetterInput {
         else if (shifted) configuredValue.uppercase() else configuredValue
 
     fun isGroup(value: String, enabled: Boolean): Boolean = enabled && value in groups
+
+    /** One untouched pair, or its explicitly chosen lowercase letter. No suffix or confirmed text is rewritten. */
+    fun singleKeyGroup(input: String, caret: Int?, confirmed: Int): String? {
+        val key = input.singleOrNull() ?: return null
+        if (caret != 1 || confirmed != 0) return null
+        return groups.firstOrNull { key == it.first().uppercaseChar() || key in it }
+    }
 }

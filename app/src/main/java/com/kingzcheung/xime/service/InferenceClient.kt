@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.DeadObjectException
 import android.os.IBinder
-import com.kingzcheung.xime.association.AssociationCandidate
 import com.kingzcheung.xime.handwriting.HandwritingCandidate
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +20,6 @@ class InferenceClient(context: Context) {
 
     companion object {
         private const val TAG = "InferenceClient"
-        const val MODEL_PREDICTION = "predictive_text"
         const val MODEL_HANDWRITING = "handwriting"
     }
 
@@ -122,27 +120,6 @@ class InferenceClient(context: Context) {
             requireService().isModelLoaded(modelId)
         } catch (_: Exception) {
             false
-        }
-    }
-
-    suspend fun predict(text: String, topK: Int = 20): List<AssociationCandidate> = withContext(Dispatchers.IO) {
-        try {
-            val result = requireService().predict(MODEL_PREDICTION, text, topK)
-            val candidates = mutableListOf<AssociationCandidate>()
-            for (i in result.indices step 2) {
-                val word = result[i]
-                val score = result.getOrNull(i + 1)?.toFloatOrNull() ?: continue
-                candidates.add(AssociationCandidate(word, score))
-            }
-            candidates
-        } catch (e: DeadObjectException) {
-            // 服务进程已死：重置绑定状态，让上层（OnnxAssociationEngine）感知失联并自愈
-            invalidateBinding()
-            FileLogger.e(TAG, "predict failed: service died", e)
-            emptyList()
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "predict failed", e)
-            emptyList()
         }
     }
 

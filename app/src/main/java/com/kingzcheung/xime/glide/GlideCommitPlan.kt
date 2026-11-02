@@ -12,7 +12,10 @@ data class GlideCommitPlan(
     val word: String,
     val alternatives: List<String>,
     val pair: Boolean,
-)
+) {
+    /** 实时预览写的字：连上一个词一起改时两个词都写（I'm done），否则只写这个词。 */
+    val preview: String get() = listOfNotNull(replacePrevious, word).joinToString(" ")
+}
 
 /**
  * 按上下文选词：有双词表时，紧挨着上一笔滑行就前后两个词一起选，否则按光标前的词 [before] 选这个词；

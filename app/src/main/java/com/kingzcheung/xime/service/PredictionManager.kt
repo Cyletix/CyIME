@@ -18,7 +18,7 @@ class PredictionManager(
     private val context: Context,
     private val serviceScope: CoroutineScope,
     private val onPredictionResult: (List<String>) -> Unit,
-    /** Language of the letters being completed: English, or Spanish on its own keyboard. */
+    /** Language of the letters being completed: English, or a [com.kingzcheung.xime.settings.LetterLanguage] on its own keyboard. */
     private val completionLanguage: () -> com.kingzcheung.xime.settings.InputLanguage =
         { com.kingzcheung.xime.settings.InputLanguage.ENGLISH },
 ) {
@@ -182,8 +182,8 @@ class PredictionManager(
     
     suspend fun getEnglishAssociations(text: String, limit: Int = MAX_ASSOCIATION_COUNT): List<String> {
         return try {
-            if (completionLanguage() == com.kingzcheung.xime.settings.InputLanguage.SPANISH)
-                com.kingzcheung.xime.association.SpanishCompletion.complete(context, text, limit)
+            val letters = com.kingzcheung.xime.settings.LetterLanguage.of(completionLanguage())
+            if (letters != null) com.kingzcheung.xime.association.WordCompletion.complete(context, letters, text, limit)
             else AssociationService.getAssociations(context, text, true, limit)
         } catch (e: Exception) {
             Log.e(TAG, "English association failed", e)

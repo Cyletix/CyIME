@@ -35,6 +35,18 @@ class T9CandidateNavigationTest {
         assertEquals(0, single.retreatT9Candidate(profile).spaceCandidateIndex(profile))
     }
 
+    @Test fun doublePinyinNineNavigatesCandidatesAndPredictionsButIdleIsZero() {
+        val flypy = profile.copy(scheme = InputScheme.DOUBLE_PINYIN)
+        assertFalse(CandidateState().usesT9CandidateNavigation(flypy))
+        assertTrue(composing.usesT9CandidateNavigation(flypy))
+        val next = composing.advanceT9Candidate(flypy)
+        assertEquals(1, next.spaceCandidateIndex(flypy))
+        assertEquals(0, next.retreatT9Candidate(flypy).spaceCandidateIndex(flypy))
+        val predictions = CandidateState(associationCandidates = listOf("明天", "下午"))
+        assertEquals(0, predictions.advanceT9Candidate(flypy).focusedT9AssociationIndex)
+        assertFalse(composing.usesT9CandidateNavigation(flypy.copy(layout = InputLayout.MERGED14)))
+    }
+
     @Test fun previousMovesOnlyTheHighlightAndPreservesTheSpaceSnapshot() {
         val third = composing.advanceT9Candidate(profile).advanceT9Candidate(profile)
         val second = third.retreatT9Candidate(profile)

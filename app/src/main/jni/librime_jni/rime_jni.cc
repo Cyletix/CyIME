@@ -15,6 +15,7 @@
 #include <rime/menu.h>
 #include <rime/gear/translator_commons.h>
 #include "candidate_policy.h"
+#include "jni_text.h"
 #include "pinyin_syllable_selection.h"
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
@@ -23,6 +24,7 @@
 #include "t9_sentence_scorer.h"
 #include <jni.h>
 #include <android/log.h>
+#include <algorithm>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -62,12 +64,14 @@ extern void rime_require_module_lua();
 extern void rime_require_module_octagram();
 extern void rime_require_module_predict();
 extern void rime_require_module_t9();
+extern void rime_require_module_cyime_azookey();
 
 static void declare_librime_module_dependencies() {
   rime_require_module_lua();
   rime_require_module_octagram();
   rime_require_module_predict();
   rime_require_module_t9();
+  rime_require_module_cyime_azookey();
 }
 
 struct ProcessResult {
@@ -400,6 +404,18 @@ public:
         return session && cyime::pinyin_selection::Select(session->context(), session->schema(),
             expectedInput, expectedSchema, static_cast<size_t>(start),
             static_cast<size_t>(end), static_cast<rime::SyllableId>(syllable));
+    }
+
+    int pinyinSyllablesChosen() {
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        return session ? static_cast<int>(cyime::pinyin_selection::ChosenCount(
+            session->context(), session->schema())) : 0;
+    }
+
+    bool undoPinyinSyllable(const std::string& expectedInput, const std::string& expectedSchema) {
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        return session && cyime::pinyin_selection::Undo(session->context(), session->schema(),
+            expectedInput, expectedSchema);
     }
 
     bool setInput(const char* input) {
@@ -805,37 +821,58 @@ public:
         auto phrase = rime::As<rime::Phrase>(genuine);
         if (!phrase) return 2;  // symbols, dates and other generated candidates learn nothing
         auto sentence = rime::As<rime::Sentence>(genuine);
-        std::vector<const rime::DictEntry*> learned;
-        if (sentence) {
-            for (const auto& component : sentence->components())
-                if (component.commit_count > 0) learned.push_back(&component);
-        } else if (phrase->entry().commit_count > 0) {
-            learned.push_back(&phrase->entry());
-        }
-        // Nothing learned: write nothing (a deletion mark would make the next pick count twice).
-        if (learned.empty()) return 2;
+        const bool learned = sentence ?
+            std::any_of(sentence->components().begin(), sentence->components().end(),
+                        [](const rime::DictEntry& e) { return e.commit_count > 0; }) :
+            phrase->entry().commit_count > 0;
         // The same user dictionary the translator learns into (shared through the component pool).
-        // Its records are erased, so picking the word again learns from the start.
+        // Its records are erased, so picking the word again learns from the start. Records that are not
+        // there are left alone: nothing is written for a word never learned (a deletion mark would make
+        // the next pick count twice).
         auto* dictionaries = rime::Dictionary::Require("dictionary");
         auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
         const rime::Ticket ticket(session->schema(), "translator");
         rime::the<rime::Dictionary> dictionary(dictionaries ? dictionaries->Create(ticket) : nullptr);
         rime::the<rime::UserDictionary> userDictionary(userDictionaries ? userDictionaries->Create(ticket) : nullptr);
+        const std::string text = candidate->text();
         bool forgotten = false;
         if (dictionary && userDictionary && dictionary->Load() && userDictionary->Load() &&
             !userDictionary->readonly()) {
             userDictionary->Attach(dictionary->primary_table(), dictionary->prism());
-            for (const auto* entry : learned) forgotten = userDictionary->Forget(*entry) || forgotten;
+            forgotten = forgetWords(userDictionary.get(), genuine);
+            // Committing a phrase also credits each of its words (records without commits of their own).
+            // Those rank the words up and build the same sentence again in its place, so the forget looked
+            // like it did nothing (11-02: 妁双侧 came back after forgetting it). Forget them as well.
+            for (int round = 0; forgotten && round < 2; ++round) {
+                context->RefreshNonConfirmedComposition();
+                const auto& menu = context->composition().empty() ? nullptr : context->composition().back().menu;
+                const auto again = menu ? menu->GetCandidateAt(nativeIndex) : nullptr;
+                if (!again || again->text() != text ||
+                    !forgetWords(userDictionary.get(), rime::Candidate::GetGenuineCandidate(again))) break;
+            }
         }
-        const std::string text = candidate->text();
         if (forgotten) {
             context->RefreshNonConfirmedComposition();
         } else {
+            if (!learned) return 2;
             // Not in that dictionary (another translator's word): Rime's own deletion by the owning translator.
             if (sentence && sentence->components().size() > 1) return 0;
             if (!context->DeleteCandidate(nativeIndex)) return 0;
         }
         return stillOffered(context, text) ? 1 : 3;
+    }
+
+    // Erases the user dictionary records of the words `candidate` is made of (its own entry, or a
+    // sentence's components), including the credit records a committed phrase leaves for its words.
+    static bool forgetWords(rime::UserDictionary* userDictionary, const rime::an<rime::Candidate>& candidate) {
+        bool forgotten = false;
+        if (auto sentence = rime::As<rime::Sentence>(candidate)) {
+            for (const auto& component : sentence->components())
+                forgotten = userDictionary->Forget(component) || forgotten;
+        } else if (auto phrase = rime::As<rime::Phrase>(candidate)) {
+            forgotten = userDictionary->Forget(phrase->entry());
+        }
+        return forgotten;
     }
 
     // Whether `text` is still a candidate of the refreshed menu: a dictionary word stays, a self-made word is gone.
@@ -865,7 +902,8 @@ public:
         if (!rime || !session_id_) return false;
         auto session = rime::Service::instance().GetSession(session_id_);
         std::string schema;
-        return session && session->schema()->config()->GetString("cyime_omission_schema", &schema) &&
+        return session && (session->schema()->config()->GetString("cyime_omission_schema", &schema) ||
+                           session->schema()->config()->GetString("cyime_edit_schema", &schema)) &&
                cyime::RefineOmission(session->context());
     }
 
@@ -1570,8 +1608,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeProcessKeyAndGetResult(
         result.candidates.size(), gRimeCandidateClass, nullptr);
 
     for (size_t i = 0; i < result.candidates.size(); ++i) {
-        jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
-        jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
+        jstring text = CandidateString(env, result.candidates[i].first);
+        jstring comment = CandidateString(env, result.candidates[i].second);
         jstring correction = env->NewStringUTF(
             i < result.corrections.size() ? result.corrections[i].c_str() : "");
         jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
@@ -1583,9 +1621,9 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeProcessKeyAndGetResult(
         env->DeleteLocalRef(candidate);
     }
 
-    jstring jCommitted = env->NewStringUTF(result.committedText.c_str());
-    jstring jInput = env->NewStringUTF(result.inputText.c_str());
-    jstring jPreedit = env->NewStringUTF(result.preeditText.c_str());
+    jstring jCommitted = CandidateString(env, result.committedText);
+    jstring jInput = CandidateString(env, result.inputText);
+    jstring jPreedit = CandidateString(env, result.preeditText);
     jstring jT9Panel = env->NewStringUTF(result.t9PanelState.c_str());
     jstring jT9Options = env->NewStringUTF(result.t9SyllableOptions.c_str());
 
@@ -1625,8 +1663,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
         result.candidates.size(), gRimeCandidateClass, nullptr);
 
     for (size_t i = 0; i < result.candidates.size(); ++i) {
-        jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
-        jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
+        jstring text = CandidateString(env, result.candidates[i].first);
+        jstring comment = CandidateString(env, result.candidates[i].second);
         jstring correction = env->NewStringUTF(
             i < result.corrections.size() ? result.corrections[i].c_str() : "");
         jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
@@ -1638,9 +1676,9 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
         env->DeleteLocalRef(candidate);
     }
 
-    jstring jCommitted = env->NewStringUTF(result.committedText.c_str());
-    jstring jInput = env->NewStringUTF(result.inputText.c_str());
-    jstring jPreedit = env->NewStringUTF(result.preeditText.c_str());
+    jstring jCommitted = CandidateString(env, result.committedText);
+    jstring jInput = CandidateString(env, result.inputText);
+    jstring jPreedit = CandidateString(env, result.preeditText);
     jstring jT9Panel = env->NewStringUTF(result.t9PanelState.c_str());
     jstring jT9Options = env->NewStringUTF(result.t9SyllableOptions.c_str());
 
@@ -1668,7 +1706,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
 
 JNIEXPORT jstring JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeConversionPreview(JNIEnv* env, jobject) {
-    return env->NewStringUTF(Rime::Instance().conversionPreview().c_str());
+    return CandidateString(env, Rime::Instance().conversionPreview());
 }
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeHighlightCandidate(JNIEnv*, jobject, jint index) {
@@ -1681,7 +1719,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinEditSnapshot(JNIEnv* env, 
     jclass stringClass = env->FindClass("java/lang/String");
     auto result = env->NewObjectArray(values.size(), stringClass, nullptr);
     for (size_t i = 0; i < values.size(); ++i) {
-        auto value = env->NewStringUTF(values[i].c_str());
+        auto value = CandidateString(env, values[i]);
         env->SetObjectArrayElement(result, i, value);
         env->DeleteLocalRef(value);
     }
@@ -1702,7 +1740,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinSyllableOptions(JNIEnv* en
     auto result = env->NewObjectArray(values.size(), stringClass, nullptr);
     if (result) {
         for (size_t i = 0; i < values.size(); ++i) {
-            auto value = env->NewStringUTF(values[i].c_str());
+            auto value = CandidateString(env, values[i]);
             if (!value) break;
             env->SetObjectArrayElement(result, i, value);
             env->DeleteLocalRef(value);
@@ -1729,6 +1767,28 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeSelectPinyinSyllable(
     env->ReleaseStringUTFChars(expectedSchema, schema);
     env->ReleaseStringUTFChars(expectedInput, input);
     return selected ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinSyllablesChosen(JNIEnv*, jobject) {
+    return Rime::Instance().pinyinSyllablesChosen();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeUndoPinyinSyllable(
+        JNIEnv* env, jobject, jstring expectedInput, jstring expectedSchema) {
+    if (!expectedInput || !expectedSchema) return JNI_FALSE;
+    const char* input = env->GetStringUTFChars(expectedInput, nullptr);
+    if (!input) return JNI_FALSE;
+    const char* schema = env->GetStringUTFChars(expectedSchema, nullptr);
+    if (!schema) {
+        env->ReleaseStringUTFChars(expectedInput, input);
+        return JNI_FALSE;
+    }
+    const bool undone = Rime::Instance().undoPinyinSyllable(input, schema);
+    env->ReleaseStringUTFChars(expectedSchema, schema);
+    env->ReleaseStringUTFChars(expectedInput, input);
+    return undone ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1774,8 +1834,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetComposition(
         result.candidates.size(), gRimeCandidateClass, nullptr);
 
     for (size_t i = 0; i < result.candidates.size(); ++i) {
-        jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
-        jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
+        jstring text = CandidateString(env, result.candidates[i].first);
+        jstring comment = CandidateString(env, result.candidates[i].second);
         jstring correction = env->NewStringUTF(
             i < result.corrections.size() ? result.corrections[i].c_str() : "");
         jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
@@ -1787,9 +1847,9 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetComposition(
         env->DeleteLocalRef(candidate);
     }
 
-    jstring jInput = env->NewStringUTF(result.input.c_str());
-    jstring jPreedit = env->NewStringUTF(result.preedit.c_str());
-    jstring jCommitted = env->NewStringUTF(result.committedText.c_str());
+    jstring jInput = CandidateString(env, result.input);
+    jstring jPreedit = CandidateString(env, result.preedit);
+    jstring jCommitted = CandidateString(env, result.committedText);
 
     jobject jComposition = env->NewObject(gRimeCompositionClass, gRimeCompositionCtor,
         jInput,
@@ -1821,7 +1881,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetCandidates(
     jobjectArray result = env->NewObjectArray(candidates.size(), stringClass, nullptr);
     
     for (size_t i = 0; i < candidates.size(); ++i) {
-        jstring str = env->NewStringUTF(candidates[i].c_str());
+        jstring str = CandidateString(env, candidates[i]);
         env->SetObjectArrayElement(result, i, str);
         env->DeleteLocalRef(str);
     }
@@ -1845,8 +1905,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetCandidatesWithComments(
     
     for (size_t i = 0; i < candidates.size(); ++i) {
         jobjectArray pair = env->NewObjectArray(2, stringClass, nullptr);
-        jstring text = env->NewStringUTF(candidates[i].first.c_str());
-        jstring comment = env->NewStringUTF(candidates[i].second.c_str());
+        jstring text = CandidateString(env, candidates[i].first);
+        jstring comment = CandidateString(env, candidates[i].second);
         env->SetObjectArrayElement(pair, 0, text);
         env->SetObjectArrayElement(pair, 1, comment);
         env->SetObjectArrayElement(result, i, pair);
@@ -1894,8 +1954,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetAllCandidates(
 
     for (size_t i = 0; i < candidates.size(); ++i) {
         jobjectArray pair = env->NewObjectArray(2, stringClass, nullptr);
-        jstring text = env->NewStringUTF(candidates[i].first.c_str());
-        jstring comment = env->NewStringUTF(candidates[i].second.c_str());
+        jstring text = CandidateString(env, candidates[i].first);
+        jstring comment = CandidateString(env, candidates[i].second);
         env->SetObjectArrayElement(pair, 0, text);
         env->SetObjectArrayElement(pair, 1, comment);
         env->SetObjectArrayElement(result, i, pair);
@@ -1924,8 +1984,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetCandidateBatch(
 
     for (size_t i = 0; i < candidates.size(); ++i) {
         jobjectArray pair = env->NewObjectArray(2, stringClass, nullptr);
-        jstring text = env->NewStringUTF(candidates[i].first.c_str());
-        jstring comment = env->NewStringUTF(candidates[i].second.c_str());
+        jstring text = CandidateString(env, candidates[i].first);
+        jstring comment = CandidateString(env, candidates[i].second);
         env->SetObjectArrayElement(pair, 0, text);
         env->SetObjectArrayElement(pair, 1, comment);
         env->SetObjectArrayElement(result, i, pair);
@@ -1946,7 +2006,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeInspectCandidates(JNIEnv* env, j
     for (size_t i = 0; i < rows.size(); ++i) {
         auto row = env->NewObjectArray(rows[i].size(), strings, nullptr);
         for (size_t j = 0; j < rows[i].size(); ++j) {
-            auto value = env->NewStringUTF(rows[i][j].c_str());
+            auto value = CandidateString(env, rows[i][j]);
             env->SetObjectArrayElement(row, j, value);
             env->DeleteLocalRef(value);
         }
@@ -2000,7 +2060,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetHiddenCandidates(JNIEnv* env,
     auto strings = env->FindClass("java/lang/String");
     auto result = env->NewObjectArray(words.size(), strings, nullptr);
     for (size_t i = 0; i < words.size(); ++i) {
-        auto text = env->NewStringUTF(words[i].c_str());
+        auto text = CandidateString(env, words[i]);
         env->SetObjectArrayElement(result, i, text);
         env->DeleteLocalRef(text);
     }
@@ -2010,20 +2070,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetHiddenCandidates(JNIEnv* env,
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeRestoreHiddenCandidate(JNIEnv* env, jobject, jstring text) {
     if (!text) return JNI_FALSE;
-    const char* chars = env->GetStringUTFChars(text, nullptr);
-    const bool result = cyime::RestoreCandidate(chars);
-    env->ReleaseStringUTFChars(text, chars);
-    return result ? JNI_TRUE : JNI_FALSE;
+    return cyime::RestoreCandidate(CandidateUtf8(env, text)) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeRestoreSuppressedCandidate(
     JNIEnv* env, jobject, jstring text) {
     if (!text) return JNI_FALSE;
-    const char* chars = env->GetStringUTFChars(text, nullptr);
-    const bool result = Rime::Instance().restoreSuppressedCandidate(chars);
-    env->ReleaseStringUTFChars(text, chars);
-    return result ? JNI_TRUE : JNI_FALSE;
+    return Rime::Instance().restoreSuppressedCandidate(CandidateUtf8(env, text)) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jobjectArray JNICALL
@@ -2032,7 +2086,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetSuppressedCandidates(JNIEnv* 
     auto strings = env->FindClass("java/lang/String");
     auto result = env->NewObjectArray(words.size(), strings, nullptr);
     for (size_t i = 0; i < words.size(); ++i) {
-        auto text = env->NewStringUTF(words[i].c_str());
+        auto text = CandidateString(env, words[i]);
         env->SetObjectArrayElement(result, i, text);
         env->DeleteLocalRef(text);
     }
@@ -2088,7 +2142,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeCommit(
     jobject thiz
 ) {
     std::string text = Rime::Instance().commit();
-    return env->NewStringUTF(text.c_str());
+    return CandidateString(env, text);
 }
 
 // 清除组合
@@ -2820,14 +2874,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9SelectCandidate(
     }
     const char* p = env->GetStringUTFChars(pinyin, nullptr);
     if (!p) return JNI_FALSE;
-    std::string candidate_text;
-    if (text) {
-        const char* t = env->GetStringUTFChars(text, nullptr);
-        if (t) {
-            candidate_text.assign(t);
-            env->ReleaseStringUTFChars(text, t);
-        }
-    }
+    const auto candidate_text = CandidateUtf8(env, text);
     bool result = proc->SelectCandidate(std::string(p), candidate_text, text_length);
     env->ReleaseStringUTFChars(pinyin, p);
     return result ? JNI_TRUE : JNI_FALSE;
@@ -2841,8 +2888,8 @@ static jboolean T9DictUpdate(JNIEnv* env, jstring text, jstring pinyin, bool mem
         LOGE("T9DictUpdate: no active T9Processor");
         return JNI_FALSE;
     }
-    const char* t = env->GetStringUTFChars(text, nullptr);
-    if (!t) return JNI_FALSE;
+    const auto t = CandidateUtf8(env, text);
+    if (t.empty()) return JNI_FALSE;
     std::string p;
     if (pinyin) {
         const char* pp = env->GetStringUTFChars(pinyin, nullptr);
@@ -2851,9 +2898,8 @@ static jboolean T9DictUpdate(JNIEnv* env, jstring text, jstring pinyin, bool mem
             env->ReleaseStringUTFChars(pinyin, pp);
         }
     }
-    bool result = memorize ? proc->MemorizeEntry(std::string(t), p)
-                           : proc->ForgetEntry(std::string(t), p);
-    env->ReleaseStringUTFChars(text, t);
+    bool result = memorize ? proc->MemorizeEntry(t, p)
+                           : proc->ForgetEntry(t, p);
     return result ? JNI_TRUE : JNI_FALSE;
 }
 

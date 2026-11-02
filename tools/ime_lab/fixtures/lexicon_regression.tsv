@@ -1,5 +1,7 @@
 # CyIME 词库/排序回归用例。每个新报告先加一行再修。列：id 键盘(26/14/9/win26) 输入 期望(前缀!表示首选不能是它) 名次上限(期望须在前几位) 来源 日期 备注
 id	keyboard	input	expect	top_k	source	date	note
+phrase-xingrong-exact	26	xingrongbushanglai	形容不上来	1	用户反馈目标	2026-11-01	准确拼写对照，反馈未提供原始按键
+phrase-pai-ni-lai	26	tamenpainilai	他们派你来	1	对照	2026-11-01	保护「派你来」的正常读音
 user-zdky	26	zdky	这都可以	1	user	2026-10-17	曾出“在都可以”（邻键纠错把整词挤掉）
 user-14-zdky	14	ZDJT	!ZDJT	1	user	2026-10-18	14 键简拼只出大写字母
 user-14-Z	14	Z	!Z	1	user	2026-10-18	同上
@@ -1121,9 +1123,11 @@ user-haohaodi	26	haohaodi	好好地	1	user	2026-10-19	同上
 user-nishuode	26	nishuode	你说的	1	user	2026-10-19	原来“你说得”权重远高于“你说的”
 user-shenghuode	26	shenghuode	生活的	1	user	2026-10-19	同上
 k14-tail-woyes	14	QOTEA	我也是	5	k14-tail	2026-10-23	最后一个合并键 A（a/s）也按声母读：打一半时出“我也是”
-k14-tail-jius	14	JUUA	就是	5	k14-tail	2026-10-23	同上，“就啊”仍排在前
+k14-tail-jius	14	JUUA	就是	1	k14-tail	2026-11-02	同上；2026-11-02 起有词组模型（--t9-ngram）时“就是”第一、“就啊”第二，没有模型时仍是就啊第一
 k14-tail-zhendea	14	ZGEBDEA	真的啊	1	k14-tail	2026-10-23	打全时完整音节“啊”的读法仍排第一
 k14-tail-zhishanga	14	ZGUAGABGA	智商啊	1	k14-tail	2026-10-23	声母读法拼出的整词（猪上树）不抢第一
+k14-tail-hais	14	GAUA	还是	2	k14-tail	2026-11-01	轻点 gh/as/ui/as 时同时提供「还啊」和「还是」，选词学习另由 MergedWordLearningProbe 回归
+k14-full-haishi	14	GAUAGU	还是	1	k14-tail	2026-11-01	轻点完整 hai shi 时「还是」为首选
 k14-jqc	14	JQC	讲清楚	5	k14-initials	2026-10-24	C 键（c/v）跟在 J/Q 后要能当声母，不能被读成 ju/qu 的 v
 demo-shijiyanshi	26	shijiyanshi	实机演示	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
 demo-jiaquanfen	26	jiaquanfen	加权分	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
@@ -1151,3 +1155,20 @@ user-a-an	26	a	安	10	user	2026-10-31	B站评论：一个 a 打不出晚安的�
 user-a-first	26	a	啊	1	user	2026-10-31	同上，首选仍是啊
 user-e-er	26	e	二	10	user	2026-10-31	同上，e 也出二、而、儿
 user-o-ou	26	o	欧	10	user	2026-10-31	同上，o 也出欧、偶
+particle-ne-initial	26	n	呢	3	user	2026-11-01	常用语气词在首屏，同时保留那和你
+particle-ne-14	14	B	呢	3	user	2026-11-01	按 bn 一次可以选呢
+particle-ne-9	9	6	呢	3	user	2026-11-01	按 MNO 一次可以选呢
+particle-nine	26	nin	你呢	3	user	2026-11-01	末音节省韵母仍能打整词
+particle-nin-literal	26	nin	您	1	user	2026-11-01	完整音节不被简拼抢首选
+particle-nin-14	14	BUB	你呢	3	user	2026-11-01	配对键上的末声母
+particle-nin-9	9	646	你呢	3	user	2026-11-01	九键候选要消费全部三键
+particle-lail	26	lail	来了	3	user	2026-11-01	末声母 l 与普通词竞争
+particle-9-de	9	43	好的	3	user	2026-11-01	含的的常用词可以简拼
+particle-9-shenmede	9	763	什么的	3	user	2026-11-01	三个首字母也能选到整词
+particle-de-full	26	de	的	1	user	2026-11-01	完整音节仍按原顺序
+particle-le-full	26	le	了	1	user	2026-11-01	完整音节仍按原顺序
+user-k14-doua	14	DOUA	都是	1	user	2026-11-02	「啊的权重太高」：14 键最后按 as 键出了「都啊」；需 --t9-ngram，词组模型认为「都是」常见 20 倍以上时排第一
+user-k14-doua-a	14	DOUA	都啊	2	user	2026-11-02	同上，整句「都啊」退到第二，还能直接选
+user-k14-zhendea-model	14	ZGEBDEA	真的啊	1	user	2026-11-02	同上，「真的是」不到 20 倍，打全时「真的啊」仍第一
+user-t9-limaoma	9	5462662	礼貌吗	2	user	2026-11-02	「礼貌吗打不出来」：九键只显示一条整句「济南吗」；语气词结尾时多给一条换了词的整句
+user-t9-womenma	9	9663662	我们吗	1	found	2026-11-02	同上排查：常用词+吗 3000 条之一，曾出「我们那」且「我们吗」看不到

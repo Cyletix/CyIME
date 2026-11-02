@@ -2,6 +2,8 @@ package com.kingzcheung.xime.settings
 
 import android.content.Context
 import android.util.Log
+import com.charleskorn.kaml.YamlList
+import com.charleskorn.kaml.YamlScalar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -13,6 +15,7 @@ data class SchemaRefs(
     val presets: Set<String> = emptySet(),       // import_preset: <p>  → <p>.yaml
     val needsEssay: Boolean = false,             // use_preset_vocabulary: true → essay.txt
     val schemaDeps: Set<String> = emptySet(),    // schema 内 dependencies:（包 id，用于递归）
+    val grammarModels: Set<String> = emptySet(), // grammar.language 是模型名，与输入语言无关
 )
 
 /** [RimeDependencyResolver.complete] 的结果。绝不抛异常；失败项都落进对应列表。 */
@@ -45,18 +48,20 @@ object RimeDependencyResolver {
         val reverseDicts = linkedSetOf<String>()
         val presets = linkedSetOf<String>()
         val schemaDeps = linkedSetOf<String>()
+        val grammarModels = linkedSetOf<String>()
         var needsEssay = false
 
         for (text in listOf(schemaYaml, dictYaml ?: "")) {
             var top = ""
             var listTarget: MutableSet<String>? = null
-            for (raw in text.lines()) {
+            for (raw in text.lineSequence()) {
                 val line = raw.trim()
+                if (line == "...") break // Rime 词典的 YAML 头结束，下面是制表符分隔的词条。
                 if (line.isEmpty() || line.startsWith("#")) continue
                 val indent = raw.takeWhile { it == ' ' }.length
 
                 if (line.startsWith("- ")) {
-                    listTarget?.add(line.removePrefix("- ").trim().removeSurrounding("\""))
+                    listTarget?.addAll(referenceValues(line.removePrefix("- ")))
                     continue
                 }
                 listTarget = null
@@ -64,23 +69,35 @@ object RimeDependencyResolver {
 
                 when {
                     line.startsWith("dictionary:") -> {
-                        val v = line.substringAfter(":").trim().removeSurrounding("\"")
-                        if (v.isNotEmpty()) {
-                            (if (top == "reverse_lookup") reverseDicts else mainDicts).add(v)
-                        }
+                        (if (top == "reverse_lookup") reverseDicts else mainDicts)
+                            .addAll(referenceValues(line.substringAfter(':')))
                     }
                     line.startsWith("import_preset:") -> {
-                        val v = line.substringAfter(":").trim().removeSurrounding("\"")
-                        if (v.isNotEmpty()) presets.add(v)
+                        presets.addAll(referenceValues(line.substringAfter(':')))
                     }
                     line.startsWith("dependencies:") && top == "schema" -> listTarget = schemaDeps
+                    line.startsWith("language:") && top == "grammar" ->
+                        grammarModels.addAll(referenceValues(line.substringAfter(':')))
                     line.startsWith("import_tables:") -> listTarget = mainDicts
                     line.startsWith("use_preset_vocabulary:") ->
                         if (line.substringAfter(":").trim().startsWith("true")) needsEssay = true
                 }
+                listTarget?.addAll(referenceValues(line.substringAfter(':')))
             }
         }
-        return SchemaRefs(mainDicts, reverseDicts, presets, needsEssay, schemaDeps)
+        return SchemaRefs(mainDicts, reverseDicts, presets, needsEssay, schemaDeps, grammarModels)
+    }
+
+    // 只解析引用值，交给 YAML 处理引号、行内列表和注释，避免把薄荷等方案的说明当成文件名。
+    private fun referenceValues(value: String): List<String> {
+        if (value.isBlank()) return emptyList()
+        val node = runCatching { SchemaManager.yaml.parseToYamlNode(value.trim()) }.getOrNull()
+        val values = when (node) {
+            is YamlScalar -> listOf(node.content)
+            is YamlList -> node.items.mapNotNull { (it as? YamlScalar)?.content }
+            else -> emptyList()
+        }
+        return values.filter { it.isNotBlank() }
     }
 
     /** 把 [SchemaRefs] 推成期望存在的文件名集合。纯函数。 */
@@ -89,8 +106,28 @@ object RimeDependencyResolver {
         refs.mainDicts.forEach { s.add("$it.dict.yaml") }
         refs.reverseDicts.forEach { s.add("$it.dict.yaml") }
         refs.presets.forEach { s.add("$it.yaml") }
+        refs.grammarModels.forEach { s.add("$it.gram") }
         if (refs.needsEssay) s.add("essay.txt")
         return s
+    }
+
+    /** 本地导入只检查方案直接声明的文件，允许用户随后补齐，不联网也不读取整份词库。 */
+    internal fun missingImportFiles(dir: File, schemaId: String): List<String> {
+        val file = File(dir, "$schemaId.schema.yaml")
+        val refs = try {
+            scanSchemaRefs(file.readText(), null)
+        } catch (e: java.io.IOException) {
+            Log.w(TAG, "Cannot check references in ${file.name}", e)
+            return emptyList()
+        }
+        val files = expectedFiles(refs) + refs.schemaDeps.map { "$it.schema.yaml" }
+        return files.filterNot { name ->
+            val compiled = if (name.endsWith(".dict.yaml"))
+                name.removeSuffix(".dict.yaml") + ".table.bin" else name
+            listOf(name, compiled, "build/$compiled").any { path ->
+                runCatching { SchemaManifestManager.safeTarget(dir, path).isFile }.getOrDefault(false)
+            }
+        }
     }
 
     /**

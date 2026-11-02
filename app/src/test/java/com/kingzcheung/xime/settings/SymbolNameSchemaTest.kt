@@ -17,7 +17,8 @@ class SymbolNameSchemaTest {
         for (name in listOf("t9_pinyin", "pinyin_14jian", "double_pinyin_flypy_14jian")) {
             val text = File(chinese, "$name.schema.yaml").readText()
             // 表情之后、繁体转换之前：符号紧跟在词后面，表情排在符号后面；繁体输出开着时词照样转正体。
-            assertTrue(name, text.contains("    - simplifier@emoji\n") && text.contains("    - simplifier@cyime_symbols\n    - simplifier@traditionalize\n"))
+            assertTrue(name, text.contains("    - simplifier@emoji\n") && text.contains("    - simplifier@cyime_symbols\n"))
+            assertTrue(name, text.indexOf("    - simplifier@cyime_symbols\n") < text.indexOf("    - simplifier@traditionalize\n"))
             assertTrue(name, text.indexOf("    - simplifier@emoji\n") < text.indexOf("    - simplifier@cyime_symbols\n"))
             assertTrue(name, text.contains("\ncyime_symbols:\n  option_name: cyime_symbol_names\n  opencc_config: cyime_symbols.json\n"))
             // 方案开关里不登记，选项只由设置写，读不到就是关。

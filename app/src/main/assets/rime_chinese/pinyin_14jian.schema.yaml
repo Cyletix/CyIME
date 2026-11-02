@@ -1,5 +1,9 @@
 # Rime schema
 # 小写编码为精确字母，大写代表合并键；逐位派生支持点击与滑动混合输入。
+cyime_particle_shortcuts:
+  __include: cyime_particle_shortcuts:/common
+  alphabet: ABCDEDGGUJJlmBOOQEATUCQZTZ
+
 schema:
   schema_id: pinyin_14jian
   name: 中文14键
@@ -44,6 +48,8 @@ engine:
   translators:
     - punct_translator
     - script_translator
+    # 生僻字（设置「生僻字」，默认关；关着时只看一下开关就返回），见 lua/cyime_rare_chars.lua。
+    - lua_translator@*cyime_rare_chars
     - reverse_lookup_translator
     - t9_english_translator@k14_english
     - lua_translator@*uuid
@@ -55,6 +61,8 @@ engine:
     - simplifier@emoji
     # 打符号名出符号（设置 › 语言与方案 › 中文输出，默认关）：加号后面多出 +。
     - simplifier@cyime_symbols
+    # 打希腊字母名出希腊字母（设置 › 语言与方案 › 中文输出，默认关）：xita 第 3 个候选是 θ Θ，见 lua/cyime_greek_letters.lua。
+    - lua_filter@*cyime_greek_letters
     - simplifier@traditionalize
     - uniquifier
 
@@ -165,6 +173,7 @@ speller:
     - derive/^(.{6})[bn](.*)$/$1B$2/
 
 translator:
+  prefer_sentence_prefix: true
   dictionary: rime_ice
   prism: pinyin_14jian
   # 整句规则同 26 键（tasks-chinese.gradle.kts 由 app/data/sentence_final_particles.txt、sentence_measure_words.txt
@@ -195,6 +204,9 @@ reverse_lookup:
   preedit_format:
     - xlit/hspnz/一丨丿丶乙/
 
+# 生僻字按本方案的拼写规则算出每个读音的精确字母编码，合并键逐位换成键上的字母再查（AU 补 ai、si、su）。
+cyime_rare_merged_keys: true
+
 menu:
   page_size: 5
 
@@ -217,6 +229,10 @@ t9:
   sentence_rescore: true
   ngram_model: t9_ngram
   ngram_sentence_start: false
+  # 最后一个合并键按声母读出的整词（DOUA 的 A 读 s：都是）平时排在按字母拼出的整句（都啊）后面；词组模型认为它
+  # 常见 20 倍以上（ln 20 ≈ 3）时排第一，整句退第二。2026-11-02「啊的权重太高」：都是、就是、我也是 排第一；
+  # 真的啊、好啊、对啊、智商啊 不变。常用词 + A 键 2000 条里 179 条首选换成整词，原来的「X啊」都在第二位。
+  merged_tail_word_margin: 3.0
 
 # 英文词（同九键英文词表，按 14 键合并键编码）：整词排在中文后，按到第 4 个键起再给出最多 3 个开头相符的词。
 k14_english:

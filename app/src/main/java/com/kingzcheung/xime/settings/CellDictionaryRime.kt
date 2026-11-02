@@ -79,9 +79,13 @@ object CellDictionaryRime {
 
     data class Binding(val schemaId: String, val pack: String)
 
+    private fun englishKind(schema: SchemaMeta, words: List<String>): CellDictionaryEnglish.Kind? =
+        CellDictionaryEnglish.kind(schema.toSchemaInfo().profile.layout.kind)
+            ?.takeIf { kind -> words.any { CellDictionaryEnglish.code(kind, it) != null } }
+
     /** Plan all patches before writing anything, so an unsupported custom config cannot half-apply. */
-    fun prepare(rimeDir: File, store: CellDictionaryStore, schemas: List<SchemaMeta>, ids: Set<String>,
-        includeEnglish: Boolean = false): List<Binding> {
+    internal fun prepare(rimeDir: File, store: CellDictionaryStore, schemas: List<SchemaMeta>, ids: Set<String>,
+        includeEnglish: Boolean = false, updates: CellWordUpdates = CellWordUpdates.empty): List<Binding> {
         val state = store.read()
         require(ids.all { id -> state.installed.any { it.id == id } && store.dictionaryFile(id).isFile }) {
             "已启用的词库文件缺失，请重新导入"
@@ -89,34 +93,47 @@ object CellDictionaryRime {
         val writes = linkedMapOf<File, String>()
         val bindings = mutableListOf<Binding>()
         val englishWords = if (includeEnglish) ids.sorted().flatMap { store.englishWords(it) }.distinct() else emptyList()
+        val mainTable = updates.mainTable()
+        // A changed version line changes the pack file, which is what makes the deployment hash ask for a rebuild.
+        val version = if (mainTable != null || ids.any { !updates.dictionaries[it].isNullOrEmpty() }) "1.${updates.revision}" else "1"
         for (schema in schemas) {
             val customFile = File(rimeDir, "${schema.schemaId}.custom.yaml")
             val original = customFile.takeIf { it.isFile }?.readText().orEmpty()
             val supported = supports(schema.toSchemaInfo().profile)
-            if (ids.isEmpty() || !supported) {
+            // The maintainer's online words need the pack even when no cell dictionary is on.
+            if ((ids.isEmpty() && mainTable == null) || !supported) {
                 if (original.contains(START)) writes[customFile] = patch(original, null)
                 continue
             }
             val source = File(rimeDir, "${schema.schemaId}.schema.yaml").readText()
             // An installed older cell block can collide with a later personal patch. Read
             // the user's dictionary override without the replaceable block first.
-            val pack = packName(dictionary(source, patch(original, null)))
+            // Only online words, no cell dictionary chosen: a schema whose own config cannot take the pack is
+            // skipped instead of failing every schema (the user never asked for a pack there).
+            val english = englishKind(schema, englishWords)
+            val (pack, patched) = try {
+                val name = packName(dictionary(source, patch(original, null)))
+                name to patch(original, name, english)
+            } catch (error: Exception) {
+                if (ids.isNotEmpty()) throw error
+                continue
+            }
             bindings += Binding(schema.schemaId, pack)
-            val english = CellDictionaryEnglish.kind(schema.toSchemaInfo().profile.layout.kind)
-                ?.takeIf { kind -> englishWords.any { CellDictionaryEnglish.code(kind, it) != null } }
-            writes[customFile] = patch(original, pack, english)
+            writes[customFile] = patched
             if (english != null) {
                 writes[File(rimeDir, "${english.dictionary}.dict.yaml")] = CellDictionaryEnglish.dictionary(english, englishWords)
                 writes[File(rimeDir, "${english.dictionary}.schema.yaml")] = CellDictionaryEnglish.schema(english)
             }
             writes[File(rimeDir, "$pack.dict.yaml")] = buildString {
-                append("---\nname: $pack\nversion: \"1\"\nsort: by_weight\nuse_preset_vocabulary: false\nimport_tables:\n")
+                append("---\nname: $pack\nversion: \"$version\"\nsort: by_weight\nuse_preset_vocabulary: false\nimport_tables:\n")
                 ids.sorted().forEach { append("  - cyime_cells/cell_$it\n") }
+                if (mainTable != null) append("  - ${CellWordUpdates.MAIN_TABLE}\n")
                 append("...\n")
             }
         }
+        if (mainTable != null && bindings.isNotEmpty()) writes[File(rimeDir, "${CellWordUpdates.MAIN_TABLE}.dict.yaml")] = mainTable
         ids.sorted().forEach { id ->
-            writes[File(rimeDir, "cyime_cells/cell_$id.dict.yaml")] = store.dictionaryFile(id).readText()
+            writes[File(rimeDir, "cyime_cells/cell_$id.dict.yaml")] = updates.extend(id, store.dictionaryFile(id).readText())
         }
         writes.forEach { (file, text) -> CellDictionaryStore.writeAtomic(file, text) }
         return bindings

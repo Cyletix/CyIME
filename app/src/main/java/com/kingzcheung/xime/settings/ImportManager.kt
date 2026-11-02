@@ -50,6 +50,12 @@ object ImportManager {
         val displayName = queryDisplayName(context, uri)
             ?: return@withContext ImportResult.Failed("无法识别文件名")
         val name = SchemaManager.sanitizeDisplayName(displayName)
+        if (listOf(".rar", ".7z", ".tar").any { name.endsWith(it, ignoreCase = true) }) {
+            return@withContext ImportResult.Failed("请解开「$name」，把含 .schema.yaml 的 Rime 目录连同词库、Lua 等子目录重新压成 .zip 再导入")
+        }
+        if (listOf(".apk", ".exe", ".msi").any { name.endsWith(it, ignoreCase = true) }) {
+            return@withContext ImportResult.Failed("「$name」是应用安装程序，请选择 Rime 方案包")
+        }
 
         if (isPluginFile(name)) {
             when (val r = PluginManager.installerManager.installPluginFromUri(uri)) {
@@ -57,14 +63,20 @@ object ImportManager {
                 is InstallerManager.InstallResult.Failure -> ImportResult.Failed(r.reason)
             }
         } else {
-            val stream = when (uri.scheme) {
-                "file" -> java.io.FileInputStream(uri.path!!)
-                else -> context.contentResolver.openInputStream(uri)
+            if (name.isBlank() || name == "." || name == ".." || '/' in name || '\\' in name)
+                return@withContext ImportResult.Failed("文件名不能包含目录")
+            val stream = try {
+                when (uri.scheme) {
+                    "file" -> java.io.FileInputStream(requireNotNull(uri.path))
+                    else -> context.contentResolver.openInputStream(uri)
+                }
+            } catch (e: Exception) {
+                return@withContext ImportResult.Failed("无法读取「$name」：${e.message}")
             }
             if (stream == null) {
                 ImportResult.Failed("无法读取文件")
             } else {
-                val r = SchemaManager.saveImportedFile(context, name, stream)
+                val r = SchemaManager.saveImportedFile(context, name, stream, stageSchemeFiles = true)
                 val packageId = r.packageId
                 if (r.success && packageId != null) installArchive(context, packageId, archiveTitle(name))
                 else ImportResult.Content(r.success, r.installedDirect,
@@ -78,8 +90,14 @@ object ImportManager {
         val install = SchemaManager.installPackageFromMarketDir(context, packageId, displayName = title)
         return when {
             install.success -> ImportResult.Content(true, installedDirect = true, message = buildString {
-                append("已安装「$title」，点「应用方案更改」生效")
+                if (title.endsWith(".dict.yaml"))
+                    append("已导入词库「$title」，由引用它的方案在部署时加载")
+                else if (install.resourcesOnly)
+                    append("「$title」只含配套文件，没有可启用的 .schema.yaml 方案")
+                else append("已安装「$title」，点「应用方案更改」生效")
                 if (install.parseFailures.isNotEmpty()) append("\n" + install.parseFailures.joinToString("\n"))
+                if (install.unresolvedDeps.isNotEmpty())
+                    append("\n请补齐方案引用的文件：" + install.unresolvedDeps.joinToString("、"))
             })
             install.conflicts.isNotEmpty() -> ImportResult.Content(true, installedDirect = false,
                 pendingPackageId = packageId, pendingName = title,
@@ -97,6 +115,7 @@ object ImportManager {
         Regex("""\.(zip|tar\.gz|tgz)$""", RegexOption.IGNORE_CASE).replace(name, "").ifBlank { name }
 
     private fun queryDisplayName(context: Context, uri: Uri): String? {
+        if (uri.scheme == "file") return uri.path?.let { java.io.File(it).name }
         return try {
             context.contentResolver.query(
                 uri,

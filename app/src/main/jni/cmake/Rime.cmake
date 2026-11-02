@@ -7,7 +7,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/CyimePatches.cmake")
 # Nine-key whole-word grammar scoring and host replay counters; the plugin copy below picks it up.
 cyime_apply_patch("${CMAKE_SOURCE_DIR}/librime-octagram" "${CMAKE_CURRENT_LIST_DIR}/OctagramT9.patch")
 
-set(RIME_PLUGINS librime-octagram librime-predict librime-t9)
+set(RIME_PLUGINS librime-octagram librime-predict librime-t9 cyime_azookey)
 
 foreach(plugin ${RIME_PLUGINS})
   file(COPY "${CMAKE_SOURCE_DIR}/${plugin}/"

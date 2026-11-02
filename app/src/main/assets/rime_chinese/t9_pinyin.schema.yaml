@@ -38,6 +38,18 @@ t9:
   ngram_sentence_start: true
   # 句尾概率强度：整句排序时加上“在这里结束”的概率；打字途中不一定是句尾，强度由调参集确定，0 为不用。
   ngram_eos_weight: 0
+  # 句尾语气词（与 app/data/sentence_final_particles.txt 同一张表，构建时检查）。2026-11-02「礼貌吗打不出来」：
+  # 九键 5462662 只显示一条整句「济南吗」，「礼貌吗」整个候选栏都没有。下面三条只在输入能以语气词结尾时起作用：
+  # 1. 前三条整句里有以语气词结尾的，就按 particle_eos_weight 加上“句子在这里结束”的概率排（我们吗 胜过 我们那）；
+  # 2. 第一个词后面紧跟语气词时按二元（前一个词）算，句首三元只来自少数单句消息，曾让「礼貌嘛」压过「礼貌吗」；
+  # 3. 再多显示一条整句：语气词前换成别的词的最好一条（济南吗 后面是 礼貌吗），和第一条差距在 margin 以内才给。
+  # 电脑同源引擎 + 公开 v3 词组模型，常用词 +吗 3000 条：首选 1430→1866，前四 1499→2381；+呢、+吧（各 1500）
+  # 首选 995→1138、880→1106；单打 3000 个词首选只变 1 个（我把→我吧），日常整句 217 句 179→180。
+  final_particles: [吧, 呗, 呢, 吗, 啊, 嘛, 啦, 呀, 哦, 咯, 哟, 哇, 嘞, 喽]
+  # 2026-11-02 电脑九键回放门禁没过（打到一半 我把→我吧、你那→你吗、我妈→我吗，工作量增加），先全部关掉，等改成只在停顿后起作用再开。
+  particle_eos_weight: 0
+  particle_bigram_after_start: false
+  particle_alternative_margin: 0
   # 用户学习层占比 λ：词分数 = ln((1-λ)·P底座 + λ·P用户)，P用户取用户词库的上屏占比（近期选过的更高）；底座模型不被改写，0 为不学习。
   ngram_user_weight: 0.05
   # 词库先验 μ：语料里没见过的词库词（细胞词库、生僻词）按 ln((1-μ)·P拆字 + μ·P词库频率) 计分，
@@ -73,6 +85,10 @@ t9:
     lunar: nl
     # 候选插入位置（默认 2，即第二位）
     idx: 2
+
+cyime_particle_shortcuts:
+  __include: cyime_particle_shortcuts:/common
+  alphabet: "22233344455566677778889999"
 
 schema:
   schema_id: t9_pinyin
@@ -131,6 +147,8 @@ engine:
     - simplifier@emoji
     # 打符号名出符号（设置 › 语言与方案 › 中文输出，默认关）：加号后面多出 +。
     - simplifier@cyime_symbols
+    # 打希腊字母名出希腊字母（设置 › 语言与方案 › 中文输出，默认关）：xita 第 3 个候选是 θ Θ，见 lua/cyime_greek_letters.lua。
+    - lua_filter@*cyime_greek_letters
     - simplifier@traditionalize
     - uniquifier
 

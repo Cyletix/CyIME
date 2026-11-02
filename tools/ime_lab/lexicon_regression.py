@@ -85,7 +85,7 @@ def prepare_android(work):
     if data.exists():
         shutil.rmtree(data)
     shutil.copytree(REPO / "app/build/generated/chinese-assets/rime_ice", data)
-    for name in ("pinyin_14jian.schema.yaml", "cyime_k14_english.schema.yaml"):
+    for name in ("pinyin_14jian.schema.yaml", "cyime_k14_english.schema.yaml", "cyime_particle_shortcuts.yaml"):
         if (REPO / "app/src/main/assets/rime_chinese" / name).exists():
             shutil.copy(REPO / "app/src/main/assets/rime_chinese" / name, data / name)
     if os.environ.get("CYIME_K14_RESCORE"):  # experiment: the 26-key sentence rescoring on the 14-key schema

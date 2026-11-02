@@ -147,7 +147,8 @@ object ChineseSchemas {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val available = SchemaManager.getRimeDir(context).listFiles().orEmpty()
             .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.toSet()
-        val normalized = CyimeInputDefaults.canonicalIds(enabled, available)
+        val normalized = CyimeInputDefaults.restoreStoredCompanionParents(
+            CyimeInputDefaults.canonicalIds(enabled, available), available)
         // An early UI read must not consume the migration before bundled files are installed.
         if (!available.containsAll(CyimeInputDefaults.recommended)) return normalized
         if (prefs.getBoolean(ADDED, false)) {
@@ -157,7 +158,7 @@ object ChineseSchemas {
             if (repaired != enabled) SchemaManager.setEnabledSchemas(context, repaired)
             return repaired
         }
-        val updated = CyimeInputDefaults.withCompanions((normalized.filterNot { it in CyimeInputDefaults.legacyDefaults } +
+        val updated = CyimeInputDefaults.withCompanions((normalized +
             CyimeInputDefaults.firstDefaults(isFreshInstall(context)).filter { it in available }).distinct(), available)
         if (updated != enabled) SchemaManager.setEnabledSchemas(context, updated)
         val current = SettingsPreferences.getCurrentSchema(context)

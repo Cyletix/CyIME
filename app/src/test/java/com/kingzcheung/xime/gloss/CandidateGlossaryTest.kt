@@ -67,6 +67,14 @@ class CandidateGlossaryTest {
     private val shiftTable get() = table("你好" to "hello", "电脑" to "computer", "computer" to "电脑",
         "苹果" to "apple", "东西" to "a long description that got cut…")
 
+    @Test fun timestampKeepsItsMeaningInGlossAndShiftModes() {
+        val texts = listOf("1793536505", "1234567890", "你好")
+        val notes = listOf("时间戳", "", "ni hao")
+        assertEquals(listOf("时间戳", "", "hello"), CandidateGlossary.annotate(shiftTable, texts, notes))
+        assertEquals(listOf("1793536505", "1234567890", "hello") to listOf("时间戳", "", "你好"),
+            CandidateGlossary.swapped(shiftTable, texts, notes))
+    }
+
     @Test
     fun `shift-held selection commits the English of a Chinese candidate`() {
         assertEquals("hello", CandidateGlossary.englishFor(shiftTable, "你好"))

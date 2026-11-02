@@ -16,9 +16,23 @@ class RareCharacterDictionaryTest {
         assertFalse(File(root, "cn_dicts/41448.dict.yaml").exists())
         assertTrue(File(root, "rime_ice.schema.yaml").readText().contains("    - lua_translator@*cyime_rare_chars\n"))
         assertTrue(File(root, "lua/cyime_rare_chars.lua").isFile)
-        // Nine-key full pinyin reads it too (digits of one syllable); 14 keys and double pinyin do not.
+        // Nine-key full pinyin reads it too (digits of one syllable); 14 keys do not.
         assertTrue(File("src/main/assets/rime_chinese/t9_pinyin.schema.yaml").readText().contains("    - lua_translator@*cyime_rare_chars\n"))
-        assertFalse(File("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText().contains("cyime_rare_chars"))
+        // Double pinyin (GitHub #72): the base scheme carries the translator and the flag the generated schemes copy.
+        val flypy = File(root, "double_pinyin_flypy.schema.yaml").readText()
+        assertTrue(flypy.contains("    - script_translator\n    - lua_translator@*cyime_rare_chars\n"))
+        assertTrue(flypy.contains("\ncyime_rare_double_pinyin: true\n"))
+        // 14 keys, full pinyin and double pinyin (2026-11-02): merged keys are read through the scheme's own algebra;
+        // schemes generated from a key table copy both lines from the built-in 14-key flypy.
+        for (name in listOf("pinyin_14jian", "double_pinyin_flypy_14jian")) {
+            val k14 = File("src/main/assets/rime_chinese/$name.schema.yaml").readText()
+            assertTrue(name, k14.contains("    - script_translator\n    # 生僻字（设置「生僻字」，默认关；关着时只看一下开关就返回），见 lua/cyime_rare_chars.lua。\n    - lua_translator@*cyime_rare_chars\n"))
+            assertTrue(name, k14.contains("\ncyime_rare_merged_keys: true\n"))
+        }
+        val generated = DoublePinyinScheme.FLYPY.copy(id = DoublePinyinScheme.ZIRANMA_ID)
+            .k14Schema(File("src/main/assets/rime_chinese/double_pinyin_flypy_14jian.schema.yaml").readText())
+        assertTrue(generated.contains("    - lua_translator@*cyime_rare_chars\n"))
+        assertTrue(generated.contains("\ncyime_rare_merged_keys: true\n"))
     }
 
     @Test fun onlyMissingBmpCharactersWithKnownReadings() {

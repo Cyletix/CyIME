@@ -69,12 +69,13 @@ class EnglishLiteralInputTest {
     }
 
     @Test fun spanishLettersJoinTheWordOnlyOnTheSpanishKeyboard() {
+        val spanish = com.kingzcheung.xime.settings.LetterLanguage.SPANISH.extraLetters
         for (letter in listOf("ñ", "á", "é", "í", "ó", "ú", "ü", "Ñ", "É")) {
-            assertTrue(letter, isDirectLetter(letter, spanish = true))
-            assertFalse(letter, isDirectLetter(letter, spanish = false))
+            assertTrue(letter, isDirectLetter(letter, spanish))
+            assertFalse(letter, isDirectLetter(letter, ""))
         }
-        for (key in listOf("a", "Z")) assertTrue(key, isDirectLetter(key, spanish = false))
-        for (key in listOf("¿", ",", "1", "space", "è", "")) assertFalse(key, isDirectLetter(key, spanish = true))
+        for (key in listOf("a", "Z")) assertTrue(key, isDirectLetter(key, ""))
+        for (key in listOf("¿", ",", "1", "space", "è", "")) assertFalse(key, isDirectLetter(key, spanish))
         var state = CandidateState()
         val editor = StringBuilder()
         for ((letter, shifted) in listOf("n" to true, "i" to false, "ñ" to false, "o" to false)) {
@@ -82,5 +83,18 @@ class EnglishLiteralInputTest {
         }
         assertEquals("Niño", editor.toString())
         assertEquals("Niño", state.pendingEnglishText)
+    }
+
+    @Test fun germanSharpSStaysSharpUnderShiftAndCyrillicTypesDirectly() {
+        assertTrue(isDirectLetter("ß", com.kingzcheung.xime.settings.LetterLanguage.GERMAN.extraLetters))
+        assertTrue(isDirectLetter("й", com.kingzcheung.xime.settings.LetterLanguage.RUSSIAN.extraLetters))
+        assertFalse(isDirectLetter("й", com.kingzcheung.xime.settings.LetterLanguage.GERMAN.extraLetters))
+        var state = CandidateState()
+        val editor = StringBuilder()
+        // ß 的 uppercase 是 SS：Shift 时照旧打一个 ß。
+        for ((letter, shifted) in listOf("ß" to true, "п" to true, "р" to false)) {
+            state = requireNotNull(commitEnglishLetter(state, letter, shifted, { true }) { editor.append(it); true })
+        }
+        assertEquals("ßПр", editor.toString())
     }
 }

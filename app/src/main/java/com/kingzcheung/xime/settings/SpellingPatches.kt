@@ -8,9 +8,9 @@ import com.charleskorn.kaml.YamlScalar
 import java.io.File
 
 /**
- * 模糊音（中文全拼 26 键；另开「模糊音也用于双拼」时双拼 26 键及其自建合并键布局版本）和双拼邻键纠错（双拼 26 键）。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
+ * 中文全拼、双拼的模糊音，以及双拼 26 键的邻键纠错和简拼。改的是方案的拼写规则或翻译器配置，只能写进 `<方案>.custom.yaml` 再部署；
  * 这里只增删自己标记的一段，个人词库、分类词库、短语等其他补丁原样保留。
- * 别人提的需求（B 站评论 10-31），默认全关；全关时不写任何文件，九键、14 键、注音不碰。
+ * 各组默认关闭，关闭时移除曾写入的规则。
  */
 object SpellingPatches {
     const val FUZZY_KEY = "fuzzy_pinyin"
@@ -19,6 +19,16 @@ object SpellingPatches {
      * 改为默认开：开了哪几组，全拼、双拼一样模糊。各组本身仍默认关，没开模糊音的人双拼不变。
      */
     const val FUZZY_DOUBLE_PINYIN_KEY = "fuzzy_pinyin_double_pinyin"
+    /**
+     * 九键直接按数字也模糊（用户 11-02：很多人要，但词图变大、每键变慢，做成开关，默认关，开关和各组下面写实测代价）。
+     * 关着时九键只在点左侧读音后查近音（拼写规则排在数字映射后面）；开着时把所开各组的派生排在最前，按数字也出近音字。
+     */
+    const val FUZZY_T9_DIGITS_KEY = "fuzzy_pinyin_t9_digits"
+    /**
+     * 双拼 26 键只打声母也出词，像全拼的简拼（zgrm 出中国人民）。别人提的需求（用户 11-02 转述），默认关。
+     * 雾凇的双拼方案特意关着简拼：打到一半的奇数个键会被拆成简拼，候选变杂，所以只做成开关。
+     */
+    const val DOUBLE_PINYIN_ABBREVIATION_KEY = "double_pinyin_abbreviation"
     /** 与 KeyboardInputPreferences.doublePinyinCorrection 同一个键：键盘按它决定是否把键位邻接表交给纠错。 */
     const val DOUBLE_PINYIN_CORRECTION_KEY = "double_pinyin_neighbor_correction"
     /** 设置页写好补丁后递增；输入法服务据此重新部署并切回当前方案。 */
@@ -42,7 +52,22 @@ object SpellingPatches {
         EN("en_eng", "en 和 eng", "chen 也出“成”，cheng 也出“陈”", listOf("derive/eng$/en/", "derive/en$/eng/")),
         IN("in_ing", "in 和 ing", "xin 也出“星”，xing 也出“新”", listOf("derive/ing$/in/", "derive/in$/ing/")),
         IAN("ian_iang", "ian 和 iang", "xian 也出“想”，xiang 也出“先”", listOf("derive/iang$/ian/", "derive/ian$/iang/")),
-        UAN("uan_uang", "uan 和 uang", "zhuan 也出“装”，zhuang 也出“专”", listOf("derive/uang$/uan/", "derive/uan$/uang/")),
+        UAN("uan_uang", "uan 和 uang", "zhuan 也出“装”，zhuang 也出“专”", listOf("derive/uang$/uan/", "derive/uan$/uang/"));
+
+        private val replacements = rules.map { rule ->
+            val (_, pattern, replacement) = rule.split('/')
+            Regex(pattern) to replacement
+        }
+
+        /**
+         * 26 键全拼、双拼写进方案的规则：fuzz 和 derive 一样两个方向都出字，只是近音降权（每个音节 log 0.5），打准的读音排前面。
+         * 用户 11-02：双拼开了 s/sh、z/zh，uuzi 首选是素质（su zhi 权重 644574）不是数字（shu zi 330346）——derive 不降权，只比词频。
+         */
+        val penalized: List<String> get() = rules.map { it.replaceFirst("derive/", "fuzz/") }
+
+        internal fun spellings(reading: String): List<String> = replacements.mapNotNull { (pattern, replacement) ->
+            reading.replaceFirst(pattern, replacement).takeIf { it != reading }
+        }
     }
 
     fun fuzzy(context: Context): Set<Fuzzy> {
@@ -63,19 +88,37 @@ object SpellingPatches {
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(FUZZY_DOUBLE_PINYIN_KEY, enabled).apply()
     }
 
+    fun fuzzyT9Digits(context: Context): Boolean =
+        SettingsPreferences.getPrefsPublic(context).getBoolean(FUZZY_T9_DIGITS_KEY, false)
+
+    fun setFuzzyT9Digits(context: Context, enabled: Boolean) {
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(FUZZY_T9_DIGITS_KEY, enabled).apply()
+    }
+
+    fun doublePinyinAbbreviation(context: Context): Boolean =
+        SettingsPreferences.getPrefsPublic(context).getBoolean(DOUBLE_PINYIN_ABBREVIATION_KEY, false)
+
+    fun setDoublePinyinAbbreviation(context: Context, enabled: Boolean) {
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(DOUBLE_PINYIN_ABBREVIATION_KEY, enabled).apply()
+    }
+
     fun doublePinyinCorrection(context: Context): Boolean =
         SettingsPreferences.getPrefsPublic(context).getBoolean(DOUBLE_PINYIN_CORRECTION_KEY, false)
 
     /**
-     * 中文全拼 26 键：雾凇拼音、内置字母排列和自建布局。自建合并键布局把字母换成代表键的规则在拼写规则最后，
-     * 模糊音排在最前，仍按拼音派生。14/17/18 键、九键各有自己的拼写规则，不加。
+     * 中文全拼：雾凇拼音、内置字母排列、内置 14 键和自建布局。14 键和自建合并键布局把字母换成代表键的规则在拼写规则后面，
+     * 模糊音排在最前，仍按拼音派生（fan 先派生出 fang，再合成 14 键的 DAB）。九键另外按自己的数字拼写规则处理。
+     * 设置页把模糊音放在「九键与 14 键」页，14 键却一直没写规则，开了也不模糊（11-01 反馈）。
      */
-    internal fun fullPinyinSchemas(context: Context): List<String> = (listOf("rime_ice") + BuiltinLetterLayouts.ids +
+    internal val builtinFullPinyinSchemas: List<String> = listOf("rime_ice", "pinyin_14jian") + BuiltinLetterLayouts.ids
+
+    internal fun fullPinyinSchemas(context: Context): List<String> = (builtinFullPinyinSchemas +
         runCatching { CustomKeyboardLayouts.load(context).map { it.id } }.getOrDefault(emptyList())).distinct()
 
     /**
-     * 双拼 26 键：小鹤和其他内置、自定义双拼。九键、14 键版本不加（一个键不止一个字母）。
-     * 小鹤方案构建时已带 cyime_neighbor_correction，其他双拼由它生成，同样带着；缺的只是 enable_correction。
+     * 双拼 26 键：小鹤和其他内置、自定义双拼。九键另外写模糊音，不打开邻键纠错。
+     * 小鹤方案构建时已带 enable_correction 和 cyime_neighbor_correction，其他双拼由它生成，同样带着；开关关着时键盘
+     * 只交出带 "~;" 的键位表（只纠拼不成音节的两个键），开着才整串纠错（KeyboardLayout）。
      */
     internal fun doublePinyinSchemas(context: Context): List<String> = (DoublePinyinScheme.BUILTINS.map { it.id } +
         runCatching { DoublePinyinSchemes.load(context).map { it.id } }.getOrDefault(emptyList())).distinct()
@@ -88,10 +131,10 @@ object SpellingPatches {
         .mapNotNull { file -> file.name.removeSuffix(".schema.yaml").takeIf { file.isFile && file.name.endsWith(".schema.yaml") } }
         .filter { DoublePinyinScheme.splitLayoutVariant(it) != null }.sorted()
 
-    /** 现在用的是双拼 26 键或它在自建布局上的版本：模糊音设置据此提醒打开「模糊音也用于双拼」。 */
+    /** 模糊音设置据此提醒双拼用户打开「模糊音也用于双拼」。 */
     fun usingDoublePinyin(context: Context): Boolean {
         val id = SettingsPreferences.getCurrentSchema(context)
-        return id in doublePinyinSchemas(context) || DoublePinyinScheme.splitLayoutVariant(id) != null
+        return id in doublePinyinSchemas(context) || DoublePinyinScheme.splitLayoutVariant(id) != null || DoublePinyinSchemes.isT9(id)
     }
 
     /** 设置页改完开关后在后台线程调用：写补丁，有改动就通知输入法重新部署。 */
@@ -111,6 +154,8 @@ object SpellingPatches {
         val fuzzy = fuzzy(context)
         val correction = doublePinyinCorrection(context)
         val doublePinyinFuzzy = if (fuzzyDoublePinyin(context)) fuzzy else emptySet()
+        val t9Digits = fuzzyT9Digits(context)
+        val abbreviation = doublePinyinAbbreviation(context)
         var changed = false
         for (id in fullPinyinSchemas(context)) {
             changed = write(rimeDir, id) { schema -> listOf(fuzzyPart(schema, fuzzy) ?: return@write null) } || changed
@@ -118,15 +163,46 @@ object SpellingPatches {
         // 双拼：拼写规则先按全拼派生模糊音，再换成双拼编码（同雾凇双拼方案注释里的位置），所以两段写在同一个文件里。
         for (id in doublePinyinSchemas(context)) {
             changed = write(rimeDir, id) { schema ->
-                listOf(fuzzyPart(schema, doublePinyinFuzzy) ?: return@write null,
+                listOf(doublePinyinPart(schema, doublePinyinFuzzy, abbreviation, id) ?: return@write null,
                     Part(CORRECTION, if (correction) listOf("\"$CORRECTION\": true") else emptyList()))
             } || changed
         }
         for (id in doublePinyinLayoutVariants(rimeDir)) {
-            changed = write(rimeDir, id) { schema -> listOf(fuzzyPart(schema, doublePinyinFuzzy) ?: return@write null) } || changed
+            changed = write(rimeDir, id) { schema ->
+                listOf(doublePinyinPart(schema, doublePinyinFuzzy, abbreviation, id) ?: return@write null)
+            } || changed
+        }
+        for (file in rimeDir.listFiles().orEmpty()) {
+            if (!file.isFile || !file.name.endsWith(".schema.yaml")) continue
+            val id = file.name.removeSuffix(".schema.yaml")
+            val profile = InputProfiles.describe(id)
+            if (profile.language != InputLanguage.CHINESE || profile.layout.kind != LayoutKind.T9) continue
+            val groups = when (profile.scheme) {
+                InputScheme.PINYIN -> fuzzy
+                InputScheme.DOUBLE_PINYIN -> doublePinyinFuzzy
+                else -> continue
+            }
+            val doubleScheme = if (profile.scheme == InputScheme.DOUBLE_PINYIN) DoublePinyinSchemes.find(id) ?: continue else null
+            changed = write(rimeDir, id) { schema ->
+                val lines = if (groups.isEmpty()) emptyList() else {
+                    val algebra = algebraOf(schema()) ?: return@write null
+                    val near = if (doubleScheme == null) groups.flatMap { g -> g.rules.map { it.replaceFirst("derive/", "fuzz/") } }
+                        else NineKeyFuzzyReadings.doubleRules(doubleScheme, groups)
+                    algebraLines(nineKeyRules(algebra, groups, near, t9Digits))
+                }
+                listOf(Part(ALGEBRA, lines), Part("t9/left_panel_mode",
+                    if (doubleScheme != null && groups.isNotEmpty()) listOf("\"t9/left_panel_mode\": pinyin") else emptyList()))
+            } || changed
         }
         return changed
     }
+
+    /**
+     * 九键的整张拼写规则。[near] 放在数字映射之后：只有点选读音传入字母时才查近音，普通数字不扩大词图。
+     * [digits] 开着时再把各组派生排在最前（同 26 键全拼、双拼的位置），先派生出近音拼音再换成数字，按数字就模糊。
+     */
+    internal fun nineKeyRules(algebra: List<String>, groups: Set<Fuzzy>, near: List<String>, digits: Boolean): List<String> =
+        (if (digits) groups.flatMap { it.rules } else emptyList()) + algebra + near
 
     private const val ALGEBRA = "speller/algebra"
     private const val CORRECTION = "translator/enable_correction"
@@ -138,9 +214,32 @@ object SpellingPatches {
     private fun fuzzyPart(schema: () -> String, fuzzy: Set<Fuzzy>): Part? =
         if (fuzzy.isEmpty()) Part(ALGEBRA, emptyList()) else algebraOf(schema())?.let { Part(ALGEBRA, fuzzyLines(it, fuzzy)) }
 
+    /** 双拼 26 键及其自建布局版本的拼写规则：模糊音和简拼都关着时不写。 */
+    private fun doublePinyinPart(schema: () -> String, fuzzy: Set<Fuzzy>, abbreviation: Boolean, id: String): Part? {
+        if (!abbreviation) return fuzzyPart(schema, fuzzy)
+        val algebra = algebraOf(schema()) ?: return null
+        return Part(ALGEBRA, doublePinyinLines(algebra, fuzzy, abbreviationRules(DoublePinyinSchemes.find(id))))
+    }
+
+    /**
+     * 双拼简拼：按拼音取每个字的第一个字母（zh、ch、sh 取 z、c、s，同全拼的简拼），也取本方案 zh、ch、sh 所在的键
+     * （小鹤 v、i、u，同 Rime 双拼方案注释里的简拼）。新拼写先带上 #，双拼规则就不会把 a、o、e 当成零声母音节改掉；
+     * 双拼规则（含自建布局的合并键派生）做完后去掉 #。abbrev 派生的拼写权重低，完整的双拼编码仍排在前面。
+     * 返回（排在双拼规则前面的，接在最后的）。
+     */
+    internal fun abbreviationRules(scheme: DoublePinyinScheme?): Pair<List<String>, List<String>> =
+        (listOf("abbrev/^([a-z]).+$/\$1#/") + listOf("zh", "ch", "sh").mapNotNull { initial ->
+            scheme?.initials?.get(initial)?.let { key -> "abbrev/^$initial.+$/$key#/" }
+        }) to listOf("xform/#$//")
+
+    /** 模糊音在最前，简拼规则夹在原有规则两头。 */
+    internal fun doublePinyinLines(algebra: List<String>, fuzzy: Set<Fuzzy>, abbreviation: Pair<List<String>, List<String>>): List<String> =
+        algebraLines(fuzzy.flatMap { it.penalized } + abbreviation.first + algebra + abbreviation.second)
+
     /** 补丁内容：模糊音派生排在原有拼写规则前面（同雾凇注释的位置），整张规则表一起写。 */
-    internal fun fuzzyLines(algebra: List<String>, items: Set<Fuzzy>): List<String> =
-        listOf("\"speller/algebra\":") + (items.flatMap { it.rules } + algebra).map { "  - " + quote(it) }
+    internal fun fuzzyLines(algebra: List<String>, items: Set<Fuzzy>): List<String> = algebraLines(items.flatMap { it.penalized } + algebra)
+    private fun algebraLines(rules: List<String>): List<String> =
+        listOf("\"speller/algebra\":") + rules.map { "  - " + quote(it) }
 
     internal fun algebraOf(schema: String): List<String>? {
         val root = runCatching { SchemaManager.yaml.parseToYamlNode(schema) }.getOrNull() as? YamlMap ?: return null
