@@ -984,6 +984,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             delay(5_000)
             runCatching { FileLogger.w("InputInventory", InputInventory.describe(this@XimeInputMethodService)) }
         }
+        // 安装包不是作者签名的就提示一次（每个进程一次）；读签名放后台，不拖慢键盘启动。
+        serviceScope.launch {
+            val integrity = withContext(Dispatchers.IO) {
+                com.kingzcheung.xime.security.InstallIntegrity.check(this@XimeInputMethodService)
+            }
+            if (integrity == com.kingzcheung.xime.security.InstallIntegrity.Result.FOREIGN) {
+                Toast.makeText(this@XimeInputMethodService, "CyIME 不是官方安装包，可能被人改过，请从官方下载页重装", Toast.LENGTH_LONG).show()
+            }
+        }
         // 允许 IME 窗口绘制到摄像头挖孔/刘海区域（横屏时背景覆盖全屏）
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             window.window?.attributes?.layoutInDisplayCutoutMode =

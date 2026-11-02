@@ -250,6 +250,9 @@ class MainActivity : ComponentActivity() {
                     }
                     }
 
+                    // 装的不是作者签名的包就提示（每次打开设置一次）。
+                    com.kingzcheung.xime.security.InstallIntegrityWarning()
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
