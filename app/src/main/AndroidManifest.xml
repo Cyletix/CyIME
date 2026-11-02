@@ -64,8 +64,10 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
+        <!-- 同拍照识字：自己单独一个任务。原来落进设置那个任务，从键盘添加图片会把设置带到前台，
+             选完图停在设置，不回当前输入框。 -->
         <activity android:name="com.kingzcheung.xime.clipboard.ImageAccessActivity"
-            android:exported="false" android:excludeFromRecents="true"
+            android:exported="false" android:excludeFromRecents="true" android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <!-- 自己单独一个任务（taskAffinity 为空）：CyIME 设置开在后台时，拍照识字原来会落进设置那个任务，
              把设置带到前台、结束后停在设置，不回当前输入框（GitHub #64）。 -->
