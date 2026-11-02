@@ -43,6 +43,18 @@ class CandidateModelInstallationTest {
         assertEquals(setOf("t9_sentence.onnx", "t9_sentence.vocab"), runtime.list()!!.toSet())
     }
 
+    @Test fun sameContentCopyBecomesALinkToTheDownload() {
+        val source = source()
+        val runtime = temporary.newFolder()
+        File(runtime, "t9_sentence.onnx").writeText("model")
+        File(runtime, "t9_sentence.vocab").writeText("words")
+        assertFalse(installCandidateModel(source, runtime, version()))
+        for (name in listOf("t9_sentence.onnx", "t9_sentence.vocab"))
+            assertTrue(java.nio.file.Files.isSameFile(File(source, name).toPath(), File(runtime, name).toPath()))
+        assertEquals("model", File(runtime, "t9_sentence.onnx").readText())
+        assertEquals(setOf("t9_sentence.onnx", "t9_sentence.vocab"), runtime.list()!!.toSet())
+    }
+
     @Test fun corruptedDownloadPublishesNothingAndLeavesUserFilesAlone() {
         val source = source()
         File(source, "t9_sentence.vocab").writeText("wrong")

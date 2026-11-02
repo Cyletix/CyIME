@@ -200,6 +200,11 @@ android {
     // 带模型的完整版、老人包、朋友包照旧内置，不联网也能识别。
     if (providers.gradleProperty("bundleModels").orNull != "true")
         androidResources.ignoreAssetsPatterns.add("<dir>ppocr-v5")
+    // 内置的拍照识别模型不压缩存放（只多约 3 MB 下载）：识别时直接映射安装包，手机上不再解出第二份（OcrModelFiles）。
+    // 语音（SenseVoice）和九键词组模型不这样做：不压缩会让完整版下载各多约 76 MB（2026-11-02 决定保持压缩、解压一份）。
+    // 声纹和手写模型保持解压：模型管理（是否装好、删除、设置向导跳过）和手写模板、训练页都按 models/ 下的文件路径读，
+    // 为省 7–27 MB 改这些地方不值得。
+    androidResources.noCompress.addAll(listOf("ch_PP-OCRv5_det_mobile.onnx", "ch_PP-OCRv5_rec_mobile.onnx"))
     // The elder package carries no Japanese dictionaries and no letter-language (Spanish, German…) schemas (elder-pack-spec.md).
     if (providers.gradleProperty("elderEdition").orNull == "true") {
         listOf("<dir>rime_japanese", "<dir>azookey", "<dir>rime_letters").forEach { androidResources.ignoreAssetsPatterns.add(it) }

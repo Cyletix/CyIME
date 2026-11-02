@@ -56,7 +56,9 @@ object StorageHousekeeping {
     /** 主进程启动时调用：同步列出残留（很快），后台删除。 */
     fun sweepAtStartup(context: Context, scope: CoroutineScope) {
         val leftovers = runCatching {
-            findLeftovers(context.cacheDir, StorageStats.modelsDir(context), StorageStats.rimeDir(context))
+            findLeftovers(context.cacheDir, StorageStats.modelsDir(context), StorageStats.rimeDir(context)) +
+                // 拍照识别模型改为直接映射安装包后，以前解出来的副本（约 21 MB）。
+                listOfNotNull(com.kingzcheung.xime.ocr.OcrModelFiles.obsoleteExtractedDir(context))
         }.getOrDefault(emptyList())
         if (leftovers.isEmpty()) return
         scope.launch {

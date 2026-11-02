@@ -208,6 +208,21 @@ internal fun activeVariant(runtime: File, variants: List<Pair<ModelInfo, File>>)
     }?.first
 }
 
+/**
+ * [existing] 已校验与 [source] 内容相同：不是同一个文件时，原子地换成 [source] 的硬链接。
+ * 换不了（存储不支持硬链接等）就保持原样，内容本来就对，只是少省一份空间。
+ */
+internal fun relinkSameContent(source: File, existing: File) {
+    if (runCatching { Files.isSameFile(source.toPath(), existing.toPath()) }.getOrDefault(true)) return
+    val temporary = File(existing.parentFile, ".${existing.name}.${UUID.randomUUID()}.installing")
+    try {
+        Files.createLink(temporary.toPath(), source.toPath())
+        Files.move(temporary.toPath(), existing.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+    } catch (_: Exception) {
+    } finally { temporary.delete() }
+}
+
 /** Validate the complete source before publishing any file; preserve unknown destination content. */
 internal fun installCandidateModel(
     source: File, runtime: File, version: ModelVersion,
@@ -225,7 +240,9 @@ internal fun installCandidateModel(
     val missing = version.files.filter { info ->
         val existing = modelDownloadFile(runtime, info.name)
         if (existing.exists()) {
-            try { verifyModelDigest(existing, info.sha256); false }
+            // 内容一样却是另一份拷贝（安装包带的那份、或从别处拷来的）：换成指向下载的硬链接，
+            // 不然同一个模型白占两份空间（九键词组模型约 200 MB），而且每次启动都要把两份各算一遍哈希。
+            try { verifyModelDigest(existing, info.sha256); relinkSameContent(findModelFile(source, version, info.name), existing); false }
             catch (error: IOException) {
                 if (!canReplace(info.name, existing))
                     throw IOException("保留已有不同版本的 ${info.name}，未覆盖；请先移走该文件后重试", error)

@@ -33,22 +33,42 @@ public final class DocumentOcrPipeline implements AutoCloseable {
     private final OrtSession recognition;
     private final String[] alphabet;
 
+    /** Opens one model with the shared session options (from a file, or from a mapped buffer). */
+    private interface ModelSource { OrtSession open(OrtEnvironment environment, OrtSession.SessionOptions options) throws OrtException; }
+
     public DocumentOcrPipeline(String detPath, String recPath, String alphabetPath) throws OrtException, IOException {
+        // Read UTF-8 directly: ORT's JNI metadata string conversion truncates this
+        // model's supplementary-plane characters and shifts all subsequent CTC IDs.
+        this((e, o) -> e.createSession(detPath, o), (e, o) -> e.createSession(recPath, o),
+            () -> Files.readAllLines(Paths.get(alphabetPath), StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Models read straight from direct buffers, e.g. uncompressed APK assets mapped in place, so the
+     * offline package needs no second copy on disk. The buffers must stay mapped while this pipeline lives.
+     */
+    public DocumentOcrPipeline(java.nio.ByteBuffer detection, java.nio.ByteBuffer recognition, List<String> alphabet)
+            throws OrtException, IOException {
+        this((e, o) -> e.createSession(detection, o), (e, o) -> e.createSession(recognition, o), () -> alphabet);
+    }
+
+    private interface AlphabetSource { List<String> read() throws IOException; }
+
+    private DocumentOcrPipeline(ModelSource det, ModelSource recSource, AlphabetSource alphabetSource)
+            throws OrtException, IOException {
         try (OrtSession.SessionOptions options = new OrtSession.SessionOptions()) {
             options.setIntraOpNumThreads(2);
             options.setInterOpNumThreads(1);
             options.addConfigEntry("session.intra_op.allow_spinning", "0");
             options.addConfigEntry("session.inter_op.allow_spinning", "0");
             options.setMemoryPatternOptimization(false);
-            detection = environment.createSession(detPath, options);
+            detection = det.open(environment, options);
             OrtSession rec = null;
             try {
-                rec = environment.createSession(recPath, options);
+                rec = recSource.open(environment, options);
                 List<String> chars = new ArrayList<>();
                 chars.add(""); // CTC blank
-                // Read UTF-8 directly: ORT's JNI metadata string conversion truncates this
-                // model's supplementary-plane characters and shifts all subsequent CTC IDs.
-                chars.addAll(Files.readAllLines(Paths.get(alphabetPath), StandardCharsets.UTF_8));
+                chars.addAll(alphabetSource.read());
                 chars.add(" ");
                 alphabet = chars.toArray(new String[0]);
                 recognition = rec;

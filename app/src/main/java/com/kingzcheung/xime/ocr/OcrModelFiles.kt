@@ -5,11 +5,16 @@ import android.util.AtomicFile
 import com.kingzcheung.xime.model.BuiltinModelCatalog
 import com.kingzcheung.xime.model.ModelManager
 import java.io.File
+import java.io.FileInputStream
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 
 /**
  * 拍照识别模型在哪：轻量版第一次用时下载（模型目录 [BuiltinModelCatalog.OCR_MODEL]），
  * 带模型的安装包（完整版、老人包、朋友包）照旧放在 assets/ocr/ppocr-v5。
- * 以前用过拍照识别的手机，安装包里的模型已经解到 noBackup/ocr-ppocr-v5-1，升级后接着用，不用重新下载。
+ * 安装包把两个模型不压缩存放（app/build.gradle.kts 的 noCompress），识别时直接映射安装包里的那段，不再解出第二份；
+ * 以前解到 noBackup/ocr-ppocr-v5-1 的旧副本，能直接映射后在启动时删掉（[obsoleteExtractedDir]）。
+ * 安装包里的模型被压缩了（没带 noCompress 的旧打包方式）才照旧解压。
  */
 internal object OcrModelFiles {
     const val DETECTION = "ch_PP-OCRv5_det_mobile.onnx"
@@ -38,14 +43,45 @@ internal object OcrModelFiles {
         return dir.takeIf { names.all { name -> File(dir, name).length().let { it > 0 && (sizes[name] ?: it) == it } } }
     }
 
+    /** 识别要用的模型：已下载或旧解压的目录，或者直接映射的安装包内容。 */
+    sealed interface Source {
+        class Directory(val dir: File) : Source
+        /** 映射在安装包上的两个模型，识别会话存在期间要一直引用着。 */
+        class Packaged(val detection: MappedByteBuffer, val recognition: MappedByteBuffer, val characters: List<String>) : Source
+    }
+
+    /** 安装包里的模型是不压缩存放的，能直接映射；压缩了 openFd 会失败，返回 null。 */
+    private fun map(context: Context, name: String): MappedByteBuffer? = runCatching {
+        context.assets.openFd("$ASSET_DIR/$name").use { fd ->
+            // 映射建立后与文件描述符无关，关掉 fd 不影响；通道不单独关，fd 归 AssetFileDescriptor 管。
+            FileInputStream(fd.fileDescriptor).channel.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
+        }
+    }.getOrNull()
+
+    private fun packaged(context: Context): Source.Packaged? {
+        if (!bundled(context)) return null
+        val detection = map(context, DETECTION) ?: return null
+        val recognition = map(context, RECOGNITION) ?: return null
+        val characters = context.assets.open("$ASSET_DIR/$CHARACTERS").bufferedReader(Charsets.UTF_8).use { it.readLines() }
+        return Source.Packaged(detection, recognition, characters)
+    }
+
+    /** 安装包里的模型能直接映射时，以前解出来的副本就没用了，返回它好在启动时删掉；否则 null。 */
+    fun obsoleteExtractedDir(context: Context): File? {
+        val dir = File(context.noBackupFilesDir, EXTRACTED_DIR)
+        if (!dir.exists() || !bundled(context)) return null
+        return dir.takeIf { map(context, DETECTION) != null && map(context, RECOGNITION) != null }
+    }
+
     /** 不解压、不联网，只看现在能不能识别。 */
     fun available(context: Context): Boolean =
         downloadedDir(context) != null || extractedDir(context) != null || bundled(context)
 
-    /** 能用的模型文件夹；安装包带着时先解到 noBackup。都没有返回 null（该去下载）。 */
-    fun prepare(context: Context): File? {
-        downloadedDir(context)?.let { return it }
-        extractedDir(context)?.let { return it }
+    /** 能用的模型：下载的优先，其次直接映射安装包；安装包里是压缩的才解到 noBackup。都没有返回 null（该去下载）。 */
+    fun prepare(context: Context): Source? {
+        downloadedDir(context)?.let { return Source.Directory(it) }
+        packaged(context)?.let { return it }
+        extractedDir(context)?.let { return Source.Directory(it) }
         if (!bundled(context)) return null
         val dir = File(context.noBackupFilesDir, EXTRACTED_DIR).apply { check(mkdirs() || isDirectory) }
         for (name in names) {
@@ -58,7 +94,7 @@ internal object OcrModelFiles {
                 atomic.finishWrite(stream)
             } catch (e: Exception) { atomic.failWrite(stream); throw e }
         }
-        return dir
+        return Source.Directory(dir)
     }
 }
 

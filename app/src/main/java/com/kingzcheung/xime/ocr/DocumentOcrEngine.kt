@@ -20,15 +20,22 @@ internal object DocumentOcrEngine {
 
     class Session(context: Context) : AutoCloseable {
         private val engine: DocumentOcrPipeline
+        /** 映射在安装包上的模型跟会话同生命周期引用着，不让映射先被回收。 */
+        private val source: OcrModelFiles.Source
         init {
             check(OpenCVLoader.initLocal()) { "Cannot load OCR image processing" }
             Core.setNumThreads(1)
-            // 轻量版的模型是下载的；带模型的安装包第一次用时从 assets 解出（见 OcrModelFiles）。
-            val dataDir = OcrModelFiles.prepare(context) ?: throw OcrModelMissingException()
-            fun file(name: String): String = File(dataDir, name).absolutePath
-            engine = DocumentOcrPipeline(
-                file(OcrModelFiles.DETECTION), file(OcrModelFiles.RECOGNITION), file(OcrModelFiles.CHARACTERS),
-            )
+            // 轻量版的模型是下载的；带模型的安装包直接映射 assets 里不压缩的模型（见 OcrModelFiles）。
+            source = OcrModelFiles.prepare(context) ?: throw OcrModelMissingException()
+            engine = when (val model = source) {
+                is OcrModelFiles.Source.Packaged -> DocumentOcrPipeline(model.detection, model.recognition, model.characters)
+                is OcrModelFiles.Source.Directory -> {
+                    fun file(name: String): String = File(model.dir, name).absolutePath
+                    DocumentOcrPipeline(
+                        file(OcrModelFiles.DETECTION), file(OcrModelFiles.RECOGNITION), file(OcrModelFiles.CHARACTERS),
+                    )
+                }
+            }
         }
         /** [table] lays the text out as a table in that format; null keeps plain text. */
         fun recognize(bitmap: Bitmap, @Suppress("UNUSED_PARAMETER") singleLine: Boolean = false,
