@@ -11,7 +11,16 @@ internal class InlineCompositionTracker {
     var text: String? = null
         private set
 
-    fun shown(text: String?) { active = true; this.text = text }
+    /** Offset in the last composing text. Ordinary setComposingText(..., 1) puts it at the end. */
+    var caret = 0
+        private set
+    fun shown(text: String?) { active = true; this.text = text; caret = text?.length ?: 0 }
+    fun moveCaret(offset: Int) { caret = offset }
+    fun hostCaret(start: Int, end: Int, selection: Int, selectionEnd: Int): Int? {
+        val code = text ?: return null
+        if (start < 0 || end - start != code.length || selection != selectionEnd || selection !in start..end) return null
+        return (selection - start).takeIf { it != caret }
+    }
     fun ended() { active = false; text = null }
 
     /** 新的输入连接开始：旧组合区已不可再用，返回其拼音文字供核对。 */

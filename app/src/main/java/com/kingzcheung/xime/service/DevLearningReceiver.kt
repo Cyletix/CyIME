@@ -27,6 +27,15 @@ import kotlin.concurrent.thread
  * - `op=restore`：打完后把上面这些原样放回（用户词库按快照逐条复原，期间新学的词删掉），再核对一遍。
  *   之后脚本要重启输入法进程，让内存里的设置和 CyLM 学习层重新读取，再发 `op=verify`。
  * - `op=verify`：只核对现状和快照是否完全一样，结果第一个词是 OK 或 DIFFERENT，后面列出哪里不一样。
+ * - `op=perf_state`：列出登记了性能代价的开关（[com.kingzcheung.xime.settings.PerformanceCosts.Item]）现在开没开，
+ *   一行 `id=true|false`，给 tools/ime_lab/perf_cost_bench.py 记下原状。
+ * - `op=perf_switch --es id <id> --ez on true|false`：和设置页拨这个开关写同样的值；模糊音、双拼纠错写完补丁，
+ *   脚本重启输入法后部署。测完先 `op=restore` 放回设置，再 `op=perf_sync` 让方案补丁跟着设置写回去。
+ * - `op=cell_state`：导入词库现状，一行 `selected=a,b applied=a,b english=… applied_english=… installed=id:词数,…
+ *   applying=true|false last=<上次 cell_set 的结果>`，给 tools/ime_lab/dict_cost_bench.py 记下原状、等应用完。
+ * - `op=cell_set --es ids a,b --ez english false`：把开着的导入词库设成正好这几个（目录里的搜狗词库没下载的先下载），
+ *   再像点「应用更改」一样应用。应用要几分钟，所以立刻回 `cell_set: started`，脚本用 cell_state 等 applying=false。
+ * - `op=cell_remove --es ids a,b`：删掉这几个没在用的下载词库（脚本测完删掉它为测量下载的，原来就有的不动）。
  * 输入法正在部署时回 busy，稍后重试。每个 op 的结果写进广播结果（am broadcast 会打印 data=...）和 logcat 标签 DevLearning。
  * 用法：adb shell am broadcast -n com.cyletix.cyime/com.kingzcheung.xime.service.DevLearningReceiver -a com.cyletix.cyime.DEV_LEARNING --es op unlearn
  * 只有 adb（持有 DUMP 权限）能发，普通应用发不进来。
@@ -102,6 +111,68 @@ class DevLearningReceiver : BroadcastReceiver() {
                     "restart=${if (putBack.isEmpty()) "no" else "yes"}; " + verify(app, dir)
             }
             "verify" -> background { verify(app, snapshotDir(app)) }
+            "perf_state" -> report(com.kingzcheung.xime.settings.PerformanceCosts.Item.entries.joinToString(" ") {
+                "${it.id}=${runCatching { com.kingzcheung.xime.settings.PerformanceCosts.isOn(app, it) }.getOrDefault(false)}"
+            })
+            "perf_switch" -> {
+                val item = com.kingzcheung.xime.settings.PerformanceCosts.Item.byId(intent.getStringExtra("id").orEmpty())
+                if (item == null) { report("perf_switch: unknown id"); return }
+                val on = intent.getBooleanExtra("on", false)
+                background {
+                    com.kingzcheung.xime.settings.PerformanceCosts.set(app, item, on)
+                    "perf_switch: ${item.id}=${com.kingzcheung.xime.settings.PerformanceCosts.isOn(app, item)}"
+                }
+            }
+            "perf_sync" -> background {
+                com.kingzcheung.xime.settings.SpellingPatches.apply(app)
+                "perf_sync: done"
+            }
+            "cell_state" -> {
+                val state = com.kingzcheung.xime.settings.CellDictionaryManager.store(app).read()
+                report("selected=${state.selected.sorted().joinToString(",")} applied=${state.applied.sorted().joinToString(",")} " +
+                    "english=${state.selectedEnglish} applied_english=${state.appliedEnglish} " +
+                    "installed=${state.installed.joinToString(",") { "${it.id}:${it.count}" }} " +
+                    "applying=$cellApplying last=${cellLast.replace(' ', '_')}")
+            }
+            "cell_set" -> {
+                if (cellApplying) { report("busy: still applying"); return }
+                val ids = intent.getStringExtra("ids").orEmpty().split(",").filter { it.isNotBlank() }.toSet()
+                val english = intent.getBooleanExtra("english", false)
+                cellApplying = true
+                cellLast = "running"
+                // Not in background(): applying deploys and takes the engine itself, for minutes.
+                thread(name = "dev-cell-set") {
+                    cellLast = runCatching {
+                        kotlinx.coroutines.runBlocking {
+                            val manager = com.kingzcheung.xime.settings.CellDictionaryManager
+                            val store = manager.store(app)
+                            val installed = store.read().installed.map { it.id }.toSet()
+                            ids.filter { it !in installed }.forEach { id ->
+                                val offer = com.kingzcheung.xime.settings.CellDictionaryCatalog.offers.firstOrNull { it.id == id }
+                                    ?: error("not installed and not in the catalog: $id")
+                                store.install(manager.download(offer), offer)
+                            }
+                            val state = store.read()
+                            state.installed.forEach { store.select(it.id, it.id in ids) }
+                            store.selectEnglish(english)
+                            com.kingzcheung.xime.rime.RimeConfigHelper.applyCellDictionaries(app)
+                            val after = store.read()
+                            check(after.applied == ids && after.appliedEnglish == english) { "applied ${after.applied}" }
+                            "ok words=${after.installed.filter { it.id in ids }.sumOf { it.count }}"
+                        }
+                    }.getOrElse { "failed: ${it.message}" }
+                    Log.i(TAG, "cell_set: $cellLast")
+                    cellApplying = false
+                }
+                report("cell_set: started")
+            }
+            "cell_remove" -> {
+                if (cellApplying) { report("busy: still applying"); return }
+                val store = com.kingzcheung.xime.settings.CellDictionaryManager.store(app)
+                val ids = intent.getStringExtra("ids").orEmpty().split(",").filter { it.isNotBlank() }
+                report("cell_remove: " + ids.joinToString(" ") { id -> "$id=" + runCatching { store.remove(id); "removed" }
+                    .getOrElse { "kept(${it.message})" }.replace(' ', '_') })
+            }
             else -> report("unknown op")
         }
     }
@@ -180,6 +251,9 @@ class DevLearningReceiver : BroadcastReceiver() {
     }
 
     private companion object {
+        /** cell_set runs on its own thread; cell_state reports these. */
+        @Volatile var cellApplying = false
+        @Volatile var cellLast = "none"
         const val ACTION = "com.cyletix.cyime.DEV_LEARNING"
         const val TAG = "DevLearning"
         const val SETTINGS_PREFS = "kime_settings"

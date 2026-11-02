@@ -13,12 +13,14 @@ import org.junit.Test
 class PluginSettingsNavigationTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun pluginManagementHasNoStoreAndImportsFromFile() {
+    @Test fun pluginManagementCanBrowseMarketAndImportFromFile() {
         rule.setContent { XimeTheme { SettingsScreen(initialRoute = "plugins") } }
         rule.onNodeWithText("插件管理").assertIsDisplayed()
-        rule.onNodeWithText("安装插件").assertDoesNotExist()
-        rule.onNodeWithContentDescription("更多").performClick()
-        rule.onNodeWithText("从文件安装插件").assertIsDisplayed()
+        rule.onNodeWithContentDescription("从文件安装插件").assertIsDisplayed()
+        rule.onNodeWithContentDescription("插件市场").performClick()
+        rule.onNodeWithText("插件市场").assertIsDisplayed()
+        rule.onNodeWithTag("market-installed").performClick()
+        rule.onNodeWithText("插件管理").assertIsDisplayed()
     }
 
     @Test fun clipboardSetupIsReachableBeforeSyncIsEnabled() {
@@ -42,12 +44,10 @@ class PluginSettingsNavigationTest {
         rule.onNodeWithText("从备份恢复").assertIsDisplayed()
         rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
-    @Test fun onlineSpeechIsBuiltInApiWithoutPluginStore() {
-        rule.setContent { XimeTheme { OnlineSpeechApiSection() } }
-        rule.onNodeWithTag("speech-api-key").assertIsDisplayed()
-        rule.onNodeWithTag("speech-api-test").assertIsDisplayed()
-        rule.onNodeWithTag("speech-api-status").assertIsDisplayed()
-        rule.onNodeWithText("安装插件").assertDoesNotExist()
+    @Test fun onlineSpeechPointsToPluginMarketWhenNoVoicePlugin() {
+        rule.setContent { XimeTheme { OnlineSpeechPluginSection() } }
+        rule.onNodeWithTag("speech-plugin-hint").assertIsDisplayed()
+        rule.onNodeWithTag("speech-api-key").assertDoesNotExist()
     }
 
 }

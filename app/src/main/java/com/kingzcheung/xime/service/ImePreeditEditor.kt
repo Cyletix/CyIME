@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.service
 
 import com.kingzcheung.xime.rime.PinyinEditBuffer
+import com.kingzcheung.xime.rime.editOffset
 import com.kingzcheung.xime.rime.PinyinEditSession
 import com.kingzcheung.xime.rime.PinyinEditDisplay
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
@@ -99,7 +100,10 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 caret = when (movement) {
                     "start" -> 0
                     "end" -> text.length
-                    else -> (caret + (movement.toIntOrNull() ?: 0)).coerceIn(0, text.length)
+                    else -> if (movement.startsWith("inline:")) {
+                        val code = service.candidateState.value.shownPreedit(service.uiState.value.inputProfile)
+                        movement.removePrefix("inline:").toIntOrNull()?.let { session.editOffset(code, it) } ?: caret
+                    } else (caret + (movement.toIntOrNull() ?: 0)).coerceIn(0, text.length)
                 }
             } else if (key == "delete") {
                 if (caret > 0) { text = text.removeRange(caret - 1, caret); caret-- }
@@ -139,9 +143,9 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             withContext(Dispatchers.Main) {
                 if (!owner.isActive() || !isOwnerCurrent(session)) return@withContext
                 if (session.isT9) service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
-                // Moving the code caret updates candidates only, never the host's
-                // composing region or selection. A real code edit still updates it.
+                // A caret-only move leaves the host's text and composing span intact.
                 service.sessionController.updateUIWithResult(result, updateInputBoxComposition = changed)
+                service.showInlineEditCaret(next)
                 reply(next)
             }
         }

@@ -306,9 +306,30 @@ class PreeditEditorImeTest {
         rule.waitUntil(5000) { engine.readPinyinEditSnapshot()[1].toInt() < 5 }
         assertEquals("nihao", engine.getInput())
         assertEquals(before, text())
-        rule.runOnUiThread { assertEquals(beforeSelection, editor.selectionStart) }
+        rule.onNodeWithTag("preedit-editor").assertDoesNotExist()
+        rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
+        rule.runOnUiThread { assertTrue("光标只在正在编辑的拼音里移动", editor.selectionStart in 2 until beforeSelection) }
         assertEquals("Caret movement never commits", "", engine.commit())
     }
+    @Test fun tappingInlineNineKeyCodeDeletesAndReinsertsAtTheTapBeforeCommitting() {
+        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
+        chooseMode("t9_pinyin"); setPrefix()
+        listOf("GHI", "MNO", "TUV", "WXYZ", "TUV", "ABC", "MNO").forEach(::tap)
+        rule.waitUntil(5000) { engine.getInput() == "4689826" && text().length > 3 }
+        rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
+        rule.runOnUiThread { editor.setSelection("前文".length + 1) }
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().getOrNull(1) == "1" }
+        rule.onNodeWithTag("preedit-editor").assertDoesNotExist()
+        rule.onNodeWithTag("t9-delete-key").performTouchInput { click() }
+        rule.waitUntil(5000) { engine.getInput() == "689826" }
+        tap("GHI")
+        rule.waitUntil(5000) { engine.getInput() == "4689826" }
+        rule.runOnUiThread { editor.setSelection(editor.length()) }
+        rule.waitUntil(5000) { engine.getCandidates().contains("后院") }
+        selectExpandedCandidate("后院")
+        rule.waitUntil(5000) { text() == "前文后院" && engine.getInput().isEmpty() }
+    }
+
     @Test fun punctuationCommitsImmediatelyAndNeverLeavesCandidates() {
         chooseMode("rime_ice"); setPrefix()
         "nihao".forEach { tap(it.toString()) }

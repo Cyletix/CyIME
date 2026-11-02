@@ -4,5 +4,6 @@
     <cache-path name="emoji_cache" path="emoji_cache/" />
     <cache-path name="clipboard_images" path="clipboard_images/" />
     <cache-path name="updates" path="updates/" />
+    <cache-path name="stats_share" path="stats_share/" />
     <files-path name="files" path="." />
 </paths>

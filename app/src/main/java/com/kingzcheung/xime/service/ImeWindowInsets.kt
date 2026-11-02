@@ -5,6 +5,10 @@ import android.os.Build
 import android.util.Log
 import android.view.Window
 import android.view.WindowInsets
+import android.view.View
+import androidx.core.view.OneShotPreDrawListener
+import androidx.core.view.doOnPreDraw
+import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlin.math.roundToInt
 
 private const val INSETS_TAG = "ImeWindowInsets"
@@ -126,7 +130,7 @@ private fun gestureAwareBottom(insets: WindowInsets, imeWindow: Window?, fullPx:
     // 只有核对过的厂商才缩：vivo 等手势导航时也在键盘下面画「切换输入法」按钮，缩了会压在按钮上。
     val unverifiedVendor = !gestureStripVerifiedVendor(Build.MANUFACTURER)
     val pick = imeBottomInsetPx(fullPx, tappable, navigationMode,
-        imeNavButtons = taskbarScreen || unverifiedVendor || hideKeyboardButton || imeWindowDrawsNavButtons(imeWindow),
+        imeNavButtons = taskbarScreen || unverifiedVendor || hideKeyboardButton || imeNavButtonHeightPx(imeWindow) > 0,
         gestureBarPx = gestureBarHeightPx(context, hintHidden = gestureHint == 0))
     if (pick != fullPx) {
         Log.d(INSETS_TAG, "gesture nav: full=$fullPx mode=$navigationMode tappable=$tappable hint=$gestureHint hideButton=$hideKeyboardButton pick=$pick")
@@ -178,13 +182,88 @@ private fun gestureBarHeightPx(context: Context, hintHidden: Boolean): Int {
 }
 
 /** Pixel 等机型手势导航时，系统在输入法窗口底部自己画返回/切换输入法按钮（NavigationBarFrame）。 */
-private fun imeWindowDrawsNavButtons(imeWindow: Window): Boolean {
-    fun find(view: android.view.View): Boolean {
-        if (view.javaClass.name == "android.inputmethodservice.NavigationBarFrame") return view.isShown && view.height > 0
-        if (view is android.view.ViewGroup) for (i in 0 until view.childCount) if (find(view.getChildAt(i))) return true
-        return false
+private fun imeNavButtonHeightPx(imeWindow: Window): Int {
+    val decor = imeWindow.decorView
+    fun find(view: android.view.View): Int {
+        val name = view.javaClass.name
+        if ((name == "android.inputmethodservice.navigationbar.NavigationBarFrame" ||
+                name == "android.inputmethodservice.NavigationBarFrame") && view.isShown && view.width >= view.height) {
+            val frame = android.graphics.Rect()
+            val windowBounds = android.graphics.Rect()
+            if (view.getGlobalVisibleRect(frame) && decor.getGlobalVisibleRect(windowBounds)) {
+                return (windowBounds.bottom - frame.top).coerceIn(0, windowBounds.height())
+            }
+        }
+        if (view is android.view.ViewGroup) for (i in 0 until view.childCount) {
+            val height = find(view.getChildAt(i))
+            if (height > 0) return height
+        }
+        return 0
     }
-    return runCatching { find(imeWindow.decorView) }.getOrDefault(false)
+    return runCatching { find(decor) }.getOrDefault(0)
+}
+
+/** 系统可以先派发 insets，再摆放输入法导航按钮。只在这一帧重查，取到真实位置后再修正。 */
+internal fun View.observeKeyboardBottomInsets(window: Window?, update: (WindowInsets) -> Unit) {
+    var pending: OneShotPreDrawListener? = null
+    setOnApplyWindowInsetsListener { view, insets ->
+        pending?.removeListener()
+        val beforeLayout = window?.let(::imeNavButtonHeightPx)
+        update(insets)
+        if (window != null) pending = view.doOnPreDraw {
+            pending = null
+            if (imeNavButtonHeightPx(window) != beforeLayout) update(insets)
+        }
+        view.onApplyWindowInsets(insets)
+    }
+}
+
+/** 三键、任务栏、系统绘制的 IME 按钮和底部切口决定下限，不能用手动校准覆盖。 */
+internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, normalPx: Int): Int {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return maxOf(normalPx,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) insets.displayCutout?.safeInsetBottom ?: 0 else 0)
+    val context = window.context
+    val cutout = insets.displayCutout?.safeInsetBottom ?: 0
+    val tappable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+        insets.getInsets(WindowInsets.Type.tappableElement()).bottom
+    else @Suppress("DEPRECATION") insets.tappableElementInsets.bottom
+    val navButtons = imeNavButtonHeightPx(window)
+    val controls = maxOf(cutout, tappable, navButtons)
+    val safe = maxOf(normalPx, controls)
+    if (controls >= normalPx) return safe
+    if (context.resources.configuration.smallestScreenWidthDp >= 600) {
+        // 有些平板只把任务栏报为 navigationBars；大屏本身并不代表底部有任务栏。
+        val nav = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+            else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
+        if (nav > 0) return maxOf(nav, controls)
+    }
+    val resolver = context.contentResolver
+    val mode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
+    val vendorGesture = vendorGestureNavigationOn(Build.MANUFACTURER) { global, key ->
+        readSetting {
+            if (global) android.provider.Settings.Global.getInt(resolver, key)
+            else android.provider.Settings.Secure.getInt(resolver, key)
+        }
+    }
+    val mandatory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+        insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
+    else @Suppress("DEPRECATION") insets.mandatorySystemGestureInsets.bottom
+    val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null
+    if (!gesture) return safe
+    if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&
+        readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_gesture_hint") } != 0 &&
+        readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_button_to_hide_keyboard") } == 1
+    ) return safe
+    return controls
+}
+
+/** 默认采用系统建议值，手动下调只消耗建议值中可调的一段。 */
+internal fun fixedKeyboardBottomInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
+    minimumPx: Int = fixedKeyboardMinimumInsetPx(insets, window, normalPx)): Int {
+    val context = window.context
+    if (SettingsPreferences.edgeToEdgeKeyboard(context)) return minimumPx
+    val adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context).coerceAtMost(0)
+    return (normalPx + adjustment * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(minimumPx)
 }
 
 /**
@@ -194,9 +273,17 @@ private fun imeWindowDrawsNavButtons(imeWindow: Window): Boolean {
  * 所以同时读各家自己的开关（[vendorGestureNavigationOn]），手势区报得太小时按 [GESTURE_ZONE_MIN_DP] 算。
  */
 internal fun bottomGestureZoneTopInWindowPx(view: android.view.View): Int? {
+    val insets = view.rootWindowInsets ?: return null
+    return bottomGestureZonePx(view.context, insets)?.let { view.rootView.height - it }
+}
+
+/** 悬浮拖条需要可以接收整段拖动。优先用系统报告的强制手势区，缺报才用厂商回退。 */
+internal fun floatingMinimumInsetPx(window: Window, insets: WindowInsets, minimumPx: Int): Int =
+    maxOf(minimumPx, bottomGestureZonePx(window.context, insets, preferReported = true) ?: 0)
+
+private fun bottomGestureZonePx(context: Context, insets: WindowInsets, preferReported: Boolean = false): Int? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
     return try {
-        val insets = view.rootWindowInsets ?: return null
         val zone: Int
         val tappable: Int
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -208,7 +295,8 @@ internal fun bottomGestureZoneTopInWindowPx(view: android.view.View): Int? {
             @Suppress("DEPRECATION")
             tappable = insets.tappableElementInsets.bottom
         }
-        val resolver = view.context.contentResolver
+        if (preferReported && zone > 0) return zone
+        val resolver = context.contentResolver
         val navigationMode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
         val vendorGesture = vendorGestureNavigationOn(Build.MANUFACTURER) { global, key ->
             readSetting {
@@ -216,9 +304,8 @@ internal fun bottomGestureZoneTopInWindowPx(view: android.view.View): Int? {
                 else android.provider.Settings.Secure.getInt(resolver, key)
             }
         }
-        val minZonePx = (GESTURE_ZONE_MIN_DP * view.resources.displayMetrics.density).roundToInt()
+        val minZonePx = (GESTURE_ZONE_MIN_DP * context.resources.displayMetrics.density).roundToInt()
         bottomGestureZoneHeightPx(zone, tappable, navigationMode, vendorGesture, minZonePx)
-            ?.let { view.rootView.height - it }
     } catch (e: Exception) { null }
 }
 

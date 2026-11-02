@@ -64,7 +64,7 @@ internal class EditorInputPreparation(private val service: XimeInputMethodServic
                         numberEditor && SettingsPreferences.isAutoNumberKeyboardEnabled(service))
                 service.keyboardViewModel.synchronizeInputSession(service.uiState.value.inputSessionId,
                     service.uiState.value.t9ResetSignal, ascii, target)
-                policy.completePreparation()
+                policy.completePreparation(ascii, target)
                 if (refreshName) service.sessionController.updateSchemaName()
                 else service.sessionController.refreshSchemaSwitches()
                 if (missingHandwriting) android.widget.Toast.makeText(service, "请先下载手写模型", android.widget.Toast.LENGTH_LONG).show()

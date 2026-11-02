@@ -61,12 +61,14 @@ class RealEditorFieldInputTest {
         var editorReady = false
         var service: XimeInputMethodService? = null
         var fieldId = 100
-        fun openField(type: Int) {
+        fun openField(type: Int, action: Int = EditorInfo.IME_ACTION_DONE, prompt: String? = null,
+                      expectedKind: EditorFieldPolicy.Kind = EditorFieldPolicy.fromInputType(type).kind) {
             rule.runOnUiThread {
                 editor = FixtureEditor(rule.activity).apply {
                     id = ++fieldId
                     inputType = type
-                    imeOptions = EditorInfo.IME_ACTION_DONE
+                    imeOptions = action
+                    hint = prompt
                     setOnEditorActionListener { _, action, _ ->
                         if (action == EditorInfo.IME_ACTION_DONE) doneActions++
                         true
@@ -81,7 +83,7 @@ class RealEditorFieldInputTest {
             rule.waitUntil(30_000) {
                 rule.runOnUiThread { service = WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull(::findService) }
                 service?.currentInputEditorInfo?.fieldId == fieldId && service?.inputReadiness?.ticket() != null &&
-                    service?.keyboardCallbacks != null && service?.editorInputPolicy?.field == EditorFieldPolicy.fromInputType(type)
+                    service?.keyboardCallbacks != null && service?.editorInputPolicy?.field?.kind == expectedKind
             }
         }
         fun typeKey(key: String, shifted: Boolean = false) {
@@ -216,6 +218,13 @@ class RealEditorFieldInputTest {
                     assertText("a@b.c")
                 }
             }
+            openField(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                EditorInfo.IME_ACTION_GO, "在 Google 中搜索或输入网址", EditorFieldPolicy.Kind.SEARCH_OR_ADDRESS)
+            drainInputQueue()
+            assertEquals("the navigation bar inherits the original language", savedAscii, actual.uiState.value.isAsciiMode)
+            assertEquals(savedAscii, actual.rimeEngine.isAsciiMode())
+            assertFalse(actual.editorInputPolicy.directInput)
+
             openField(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
             drainInputQueue()
             rule.waitUntil(10_000) { actual.uiState.value.isAsciiMode == savedAscii }

@@ -172,7 +172,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             learnedCandidates = candidatesWithComments.filter { it.learned }.mapTo(HashSet()) { it.text },
             correctedCandidates = candidatesWithComments.filter { it.correction.isNotEmpty() }.associate { it.text to it.correction },
             isComposing = isComposing,
-            associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
+            // 刚打 @ 给的邮箱后缀（默认关）不是英文补全，跟着这次刷新留着。
+            associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty() &&
+                !EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)) emptyList()
+                else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
             hasNextPage = hasNextPage,
             hasPrevPage = hasPrevPage,
@@ -188,7 +191,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         // composing 快照 → 插件（input_changed 事件；T9 与候选栏同源显示态）
         service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else inputText)
 
-        if (pendingEnglish.isNotEmpty() && !service.isSecretEditor() && service.supportsEnglishCandidateReplace()) {
+        if (pendingEnglish.isNotEmpty() && !service.isSecretEditor() && service.supportsEnglishCandidateReplace() &&
+            !EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)) {
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                 withContext(Dispatchers.Main) {
@@ -228,15 +232,14 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         // Typing into the keyboard's own field (clipboard search, tool panel, quick send): the pinyin
         // belongs there, never in the app behind it. 26-key search wrote it into the app's field and it
         // stayed after search closed (10-30 device check); all three callers pass through here.
-        if (service.uiState.value.inputTarget.isInternal) return
+        if (service.uiState.value.inputTarget.isInternal || service.keepInlineEditCaret(displayText)) return
         // 第二参数为 1：光标相对编码起始偏移 1 个字符，使光标落在编码末尾，
         // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
         // 否则该调用会在光标处插入空串，光标处有选中文字时等于删除选区。
-        service.markInputBoxComposing(displayText)
         ic.beginBatchEdit()
         try {
-            ic.setComposingText(displayText, 1)
+            if (ic.setComposingText(displayText, 1)) service.markInputBoxComposing(displayText)
         } finally {
             ic.endBatchEdit()
         }
@@ -317,7 +320,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             learnedCandidates = candidatesWithComments.filter { it.learned }.mapTo(HashSet()) { it.text },
             correctedCandidates = candidatesWithComments.filter { it.correction.isNotEmpty() }.associate { it.text to it.correction },
             isComposing = isComposing,
-            associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
+            // 刚打 @ 给的邮箱后缀（默认关）不是英文补全，跟着这次刷新留着。
+            associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty() &&
+                !EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)) emptyList()
+                else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
             hasNextPage = result.hasNextPage,
             hasPrevPage = result.hasPrevPage,
@@ -333,7 +339,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         // composing 快照 → 插件（input_changed 事件；空编码表示本轮输入结束）
         service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else result.inputText)
 
-        if (pendingEnglish.isNotEmpty() && !service.isSecretEditor() && service.supportsEnglishCandidateReplace()) {
+        if (pendingEnglish.isNotEmpty() && !service.isSecretEditor() && service.supportsEnglishCandidateReplace() &&
+            !EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)) {
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                 withContext(Dispatchers.Main) {
@@ -524,7 +531,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     /**
      * 设置页里直接改 Rime 候选的开关写进引擎，按键路径、打开输入框和设置监听共用一处，设置是唯一来源：
      * 中英混输、繁体输出（雾凇系方案是 traditionalization；仓颉码表是繁体，反过来用 simplification）、
-     * 时间日期候选（选项是反的）、候选里显示表情、打符号名出符号、生僻字。只在值不同时写，返回是否有改动。
+     * 时间日期候选（选项是反的）、候选里显示表情、打符号名出符号、希腊字母、生僻字。只在值不同时写，返回是否有改动。
      * [persist] 时把方案开关 traditionalization、emoji 同步进 user.yaml：librime 自己重建会话时按
      * switcher/save_options 从那里恢复，旧值不能再盖过设置。按键路径不写文件。
      */
@@ -542,6 +549,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             add("_cyime_datetime_off" to !prefs.getBoolean(KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false))
             add("emoji" to prefs.getBoolean(KeyboardInputPreferences.CANDIDATE_EMOJI_KEY, false))
             add("cyime_symbol_names" to prefs.getBoolean(KeyboardInputPreferences.SYMBOL_NAMES_KEY, false))
+            add("cyime_greek_letters" to prefs.getBoolean(KeyboardInputPreferences.GREEK_LETTERS_KEY, false))
             add("cyime_rare_chars" to prefs.getBoolean(KeyboardInputPreferences.RARE_CHARACTERS_KEY, false))
         }
         var changed = false

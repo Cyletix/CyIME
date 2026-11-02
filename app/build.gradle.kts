@@ -23,6 +23,12 @@ apply(from = "build-logic/tasks-cangjie.gradle.kts")
 apply(from = "build-logic/tasks-t9-grammar.gradle.kts")
 apply(from = "build-logic/tasks-rime-manifest.gradle.kts")
 
+val preparePluginMarket by tasks.registering(Sync::class) {
+    from(rootProject.file("store/plugins")) { into("plugin-market") }
+    into(layout.buildDirectory.dir("generated/plugin-market-assets"))
+}
+tasks.named("preBuild").configure { dependsOn(preparePluginMarket) }
+
 // 获取 Git 提交哈希
 fun getGitHash(): String {
     return try {
@@ -47,10 +53,13 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.kingzcheung.xime"
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/plugin-market-assets").get().asFile)
     if (providers.gradleProperty("bundleModels").orNull == "true") {
         sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/bundled-model-assets").get().asFile)
     }
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-assets").get().asFile)
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-azookey-assets").get().asFile)
+    // libCyAzooKey.so per ABI (tasks-japanese.gradle.kts), loaded by the Japanese Rime translator.
+    sourceSets.getByName("main").jniLibs.srcDir(layout.buildDirectory.dir("generated/azookey-jniLibs").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/stroke-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/cangjie-assets").get().asFile)
@@ -77,8 +86,8 @@ android {
         // 按发布批次定号：兼容修复升 PATCH，兼容功能升 MINOR 并归零 PATCH。
         // 不兼容变更升 MAJOR；日常编辑不逐次升号。完整规则见 docs/packaging.md。
         // versionCode 是独立递增的交付序号；同批普通版与内置版共用。
-        versionCode = 20261386
-        versionName = "1.15.34"
+        versionCode = 20261398
+        versionName = "1.15.46"
 
 
         // Isolated Compose rendering on a local x86 emulator; ordinary device tests keep the full app.
@@ -187,9 +196,15 @@ android {
     androidResources.ignoreAssetsPatterns.add("t9_sentence.onnx")
     // Retain the old model files for the local comparison, exclude them from delivery.
     androidResources.ignoreAssetsPatterns.add("*.traineddata")
-    // The elder package carries no Japanese or Spanish dictionaries or schemas (elder-pack-spec.md).
-    if (providers.gradleProperty("elderEdition").orNull == "true")
-        listOf("<dir>rime_japanese", "<dir>rime_spanish", "<dir>spanish").forEach { androidResources.ignoreAssetsPatterns.add(it) }
+    // 拍照识别模型（约 21 MB）：轻量版用到时再下载（模型目录 ocr-ppocr-v5，国内魔搭、海外 GitHub）；
+    // 带模型的完整版、老人包、朋友包照旧内置，不联网也能识别。
+    if (providers.gradleProperty("bundleModels").orNull != "true")
+        androidResources.ignoreAssetsPatterns.add("<dir>ppocr-v5")
+    // The elder package carries no Japanese dictionaries and no letter-language (Spanish, German…) schemas (elder-pack-spec.md).
+    if (providers.gradleProperty("elderEdition").orNull == "true") {
+        listOf("<dir>rime_japanese", "<dir>azookey", "<dir>rime_letters").forEach { androidResources.ignoreAssetsPatterns.add(it) }
+        packaging.jniLibs.excludes.add("**/libCyAzooKey.so")
+    }
     ndkVersion = "29.0.14206865"
 
     // F-Droid 一致性验证：不在 APK 中写入依赖元数据（Dependency metadata 签名块）。

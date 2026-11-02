@@ -50,3 +50,19 @@ internal fun CandidateState.hasSameSelectionSource(current: CandidateState): Boo
         candidateActions == current.candidateActions &&
         expandedCandidates.size <= current.expandedCandidates.size &&
         expandedCandidates.indices.all { expandedCandidates[it] == current.expandedCandidates[it] }
+
+/** The expanded strip and grid use global indices, even for items within the first page. */
+internal fun CandidateState.englishForHeldSelection(index: Int, global: Boolean): String? {
+    val text = if (global) expandedCandidates.getOrNull(index)?.text else candidates.getOrNull(index)
+    return text?.let(com.kingzcheung.xime.gloss.CandidateGlossary::englishFor)
+}
+
+/** A refreshed row elsewhere in the bar does not invalidate the actual item under the finger. */
+internal fun CandidateState.stillOffers(current: CandidateState, index: Int, expanded: RimeCandidate?): Boolean {
+    if (engineRevision != current.engineRevision || inputText != current.inputText ||
+        isShowingRecentClipboard != current.isShowingRecentClipboard) return false
+    if (expanded != null) return expandedCandidates.getOrNull(index) == expanded && current.expandedCandidates.getOrNull(index) == expanded
+    return index in candidates.indices && candidates[index] == current.candidates.getOrNull(index) &&
+        candidateComments.getOrNull(index) == current.candidateComments.getOrNull(index) &&
+        candidateActions.getOrNull(index) == current.candidateActions.getOrNull(index)
+}

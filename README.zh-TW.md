@@ -4,7 +4,16 @@
   <a href="README.en.md">English</a> · <a href="README.md">简体中文</a>
 </p>
 
-**CyIME** 是 Cyletix 開發維護的 Android 輸入法，基於 [Rime](https://rime.im/) 引擎，從 [Xime](https://github.com/ximeiorg/Xime) fork 而來。中文拼音、雙拼、五筆、筆畫、倉頡、注音，日語、英文、西班牙語，手寫、語音、拍照識字都在本機完成，另有給聽障人士用的實時字幕。
+**CyIME** 是 Cyletix 開發的 Android 輸入法，基於 [Rime](https://rime.im/) 引擎。中文拼音、雙拼、五筆、筆畫、倉頡、注音，日語、英文、西班牙語，手寫、語音、拍照識字都在本機完成，另有給聽障人士用的實時字幕。
+
+## 亮點
+
+- **不聯網也能全部用**：詞庫、手寫、語音識別、拍照識字、實時字幕都在手機上運行，完整版裝上就能離線用。
+- **自己訓練的九鍵模型**：九鍵用 CyIME 自己訓練的詞組模型，長句一口氣打完，逐鍵選詞。
+- **一個鍵盤，多種打法**：全拼 26 鍵、九鍵、14 鍵；六種內置雙拼，還能自建方案；五筆、筆畫、倉頡、注音；日語、英文、西班牙語。
+- **手寫一次寫好幾個字**：中文、英文、日語連寫，數學公式直接識別成 LaTeX，支持 S Pen。
+- **給聽障人士的實時字幕**：把周圍的話轉成字幕，自動區分說話人，通話時也能用，有人叫你名字時振動。
+- **想怎麼放就怎麼放**：固定、懸浮、分體三種放法，懸浮鍵盤能拖動、縮放、旋轉；多套配色、玻璃效果、自己的圖片做背景。
 
 ## 下載與安裝
 
@@ -32,6 +41,8 @@
 - 繁體輸出（按臺灣用字，默認關）、模糊音（默認關）、生僻字（默認關）、中英混輸（默認關）、中文滑行輸入（默認關）。
 - 候選可顯示拼音或中英釋義；26 鍵能糾正多打、少打的字母，糾錯候選不搶第一位。
 - 詞庫頁：自己的短語、導入 TXT／搜狗／QQ／Rime 詞庫、刪掉的候選、查詞；帶動漫、遊戲、編程、數學等分類詞庫（默認關）。
+- 選詞用固定測試集檢查：題目主要取自公開的短信和對話語料，只用來打分，不參與訓練和調參。
+- 改詞庫、解碼或排序時，首選率和每鍵耗時都和上一版對比，任一項超出允許範圍就不合入。
 
 **其他語言**
 
@@ -87,10 +98,10 @@ git submodule update --init --recursive
 
 技術棧：Kotlin · Jetpack Compose · Material 3 · librime（JNI / C++）· ONNX Runtime · sherpa-onnx · OpenCV
 
-## 項目關係
+源碼包名 `com.kingzcheung.xime`、插件標識、`xime.yaml` / `xime.custom.yaml` 和擴展商店協議沿用早期命名，安裝身份是 `com.cyletix.cyime`。取捨見 [命名與身份記錄](docs/cyime-identity.md)。
 
-- 源碼 fork 自 [Xime](https://github.com/ximeiorg/Xime)（Kingz Cheung / kingzcheung 及貢獻者），分叉點是 2026-09-21 的上游提交 `9452b16`。
-- 為了方便對照上游，源碼包名 `com.kingzcheung.xime`、插件標識、`xime.yaml` / `xime.custom.yaml`、擴展商店協議都沒改，只有安裝身份獨立。取捨見 [命名與身份記錄](docs/cyime-identity.md)。
+## 相關項目
+
 - 作者自己的前作：[Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard)（2024 年的鍵盤佈局研究，Cyletix10 佈局出自這裡）、ASRInput（電腦上的語音字幕，字幕逐字出現的節奏沿用它）。
 - 社區 Linux 版：[tuxKOH/CyIME 的 linux-desktop-preview 分支](https://github.com/tuxKOH/CyIME/tree/feat/linux-desktop-preview)（IBus 拼音 + 電腦剪貼簿，tuxKOH 維護）。歡迎 Linux 版本的魔改，但由於本人精力有限，暫時不會維護 Linux 版本。
 
@@ -101,14 +112,6 @@ git submodule update --init --recursive
 ## 鳴謝
 
 CyIME 用到了下面這些項目、數據和模型，感謝作者們的工作。安裝包裡的許可證全文和版權聲明見 `app/src/main/assets/NOTICE.txt`、`app/src/main/assets/licenses/` 和各方案目錄下的 NOTICE 文件；應用裡在「設置 › 關於 › 鳴謝」和「開源許可證」。
-
-### 上游
-
-| 項目 | 作者 | 用在哪裡 | 許可證 |
-| --- | --- | --- | --- |
-| [Xime](https://github.com/ximeiorg/Xime) | Kingz Cheung（kingzcheung）及貢獻者 | CyIME 的起點：界面框架、Rime 接入、九鍵 librime-t9、插件系統、手寫與聯想 | GPL-3.0 |
-| [rime-wubi](https://github.com/kingzcheung/rime-wubi)（fork 自 [KyleBing/rime-wubi86-jidian](https://github.com/KyleBing/rime-wubi86-jidian)） | kingzcheung；KyleBing | 內置五筆 86 方案和手寫的五筆反查 | Apache-2.0 |
-| Xime 模型：[ochwpro](https://www.modelscope.cn/models/bikeand/ochwpro)、[predictive-text-small](https://www.modelscope.cn/models/bikeand/predictive-text-small)、[predictive-text-base](https://www.modelscope.cn/models/bikeand/predictive-text-base) | Xime 項目 | 中文手寫識別；智能聯想 | ochwpro MIT；small Apache-2.0；base CC BY-NC-SA 4.0 |
 
 ### 輸入引擎
 
@@ -125,12 +128,13 @@ CyIME 用到了下面這些項目、數據和模型，感謝作者們的工作�
 
 | 項目 | 作者 | 用在哪裡 | 許可證 |
 | --- | --- | --- | --- |
-| [霧凇拼音 rime-ice](https://github.com/iDvel/rime-ice) | iDvel（Dvel） | 全拼、小鶴雙拼、九鍵、14 鍵的詞庫和方案 | GPL-3.0 |
-| [RIME-LMDG（萬象語言模型）](https://github.com/amzxyz/RIME-LMDG) | amzxyz | 九鍵語法增強模型（可下載） | CC BY 4.0 |
+| [rime-wubi](https://github.com/kingzcheung/rime-wubi)（fork 自 [KyleBing/rime-wubi86-jidian](https://github.com/KyleBing/rime-wubi86-jidian)） | kingzcheung；KyleBing | 內置五筆 86 方案和手寫的五筆反查 | Apache-2.0 |
+| [霧凇拼音](https://github.com/iDvel/rime-ice) | iDvel（Dvel） | 全拼、小鶴雙拼、九鍵、14 鍵的詞庫和方案 | GPL-3.0 |
+| [萬象語言模型](https://github.com/amzxyz/RIME-LMDG) | amzxyz | 九鍵語法增強模型（可下載） | CC BY 4.0 |
 | [rime-stroke](https://github.com/rime/rime-stroke) | 四季的風、雪齋、Kunki Chou、宋天 | 筆畫方案 | LGPL-3.0 |
 | [Cangjie5](https://github.com/Jackchows/Cangjie5) | Jackchows；倉頡之友·馬來西亞 | 倉頡五代碼表 | MIT |
 | [rime-cangjie](https://github.com/rime/rime-cangjie)、[rime-bopomofo](https://github.com/rime/rime-bopomofo) | Rime | 倉頡、注音方案的寫法參照 | LGPL-3.0 |
-| [小麥注音 McBopomofo](https://github.com/openvanilla/McBopomofo) | OpenVanilla | 臺灣詞、讀音和詞頻（注音、繁體輸出、倉頡排序） | MIT |
+| [小麥注音](https://github.com/openvanilla/McBopomofo) | OpenVanilla | 臺灣詞、讀音和詞頻（注音、繁體輸出、倉頡排序） | MIT |
 | [rime-jaroomaji](https://github.com/lazyfoxchan/rime-jaroomaji) | lazy fox chan | 日語方案和詞庫 | Apache-2.0；詞庫各自保留原許可：Mozc（BSD 風格）、JMdict / KANJIDIC2（EDRDG，CC BY-SA 4.0） |
 | [搜狗細胞詞庫](https://pinyin.sogou.com/dict/) | 搜狗輸入法及詞庫作者 | 應用內下載的分類詞庫，文件直接從搜狗下載 | 版權歸原作者 |
 | [rime-wubi98](https://github.com/cz-archive/rime-wubi98) | cz-archive | 五筆 98（應用內下載） | GPL-3.0 |
@@ -138,7 +142,7 @@ CyIME 用到了下面這些項目、數據和模型，感謝作者們的工作�
 | [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict) | MDBG | 候選釋義：中→英 | CC BY-SA 4.0 |
 | [opus-mt-zh-en](https://huggingface.co/Helsinki-NLP/opus-mt-zh-en) | Helsinki-NLP | 釋義裡常見短語的參考譯文（在電腦上離線生成） | CC BY 4.0 |
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) | Hermit Dave | 西班牙語補全詞表 | 代碼 MIT；詞表 CC BY-SA 4.0 |
-| [ChaiPUA 字體](https://github.com/tansongchen/input) | 譚淞宸（tansongchen） | 顯示五筆字根等擴展區字符（隨 Xime 帶入） | 字體內未標明 |
+| [ChaiPUA 字體](https://github.com/tansongchen/input) | 譚淞宸（tansongchen） | 顯示五筆字根等擴展區字符 | 字體內未標明 |
 
 ### 語料（訓練 CyIME 自己的模型）
 
@@ -167,6 +171,7 @@ CyIME 用到了下面這些項目、數據和模型，感謝作者們的工作�
 | [OpenCV](https://github.com/opencv/opencv) | OpenCV | 拍照識字的圖像處理 | Apache-2.0 |
 | [KaTeX](https://github.com/KaTeX/KaTeX) | KaTeX 作者 | 顯示手寫公式 | MIT |
 | [UER-py](https://github.com/dbiir/UER-py) 中文 RoBERTa | UER 團隊 | 九鍵整句打分（已停用，詞表仍在包裡） | Apache-2.0 |
+| [ochwpro](https://www.modelscope.cn/models/bikeand/ochwpro)、[predictive-text-small](https://www.modelscope.cn/models/bikeand/predictive-text-small)、[predictive-text-base](https://www.modelscope.cn/models/bikeand/predictive-text-base) | bikeand（ModelScope） | 中文手寫識別；智能聯想 | ochwpro MIT；small Apache-2.0；base CC BY-NC-SA 4.0 |
 
 ### Android 庫
 
@@ -176,14 +181,14 @@ CyIME 用到了下面這些項目、數據和模型，感謝作者們的工作�
 
 CyIME 的交互、外觀和鍵位參考過下面這些產品和方案：
 
-- [三星鍵盤 Samsung Keyboard](https://www.samsung.com/)：鍵盤整體的交互和外觀。
+- [三星鍵盤](https://www.samsung.com/)：鍵盤整體的交互和外觀。
 - [Gboard](https://play.google.com/store/apps/details?id=com.google.android.inputmethod.latin)：鍵盤交互和外觀，比如大屏工具欄樣式。
 - [Typewise](https://www.typewise.app/)：蜂窩六邊形佈局。
 - [Colemak](https://colemak.com/)（Shai Coleman）：Colemak 字母排列。
 - [首道雙拼](https://sspai.com/post/108949)：首道雙拼鍵位。
 - 小鶴雙拼（[小鶴音形](https://flypy.cc/)）、自然碼、智能ABC、拼音加加、微軟雙拼：內置雙拼鍵位。
-- [Trime 同文輸入法](https://github.com/osfans/trime)、[fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)：Android 上 Rime 輸入法的做法，用來對照。
+- [同文輸入法](https://github.com/osfans/trime)、[fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)：Android 上 Rime 輸入法的做法，用來對照。
 
 ## 許可證
 
-[GPLv3](LICENSE)。上游代碼版權歸其作者所有，本分支的修改由 Cyletix 維護。"Xime" 名稱、Logo 及其他品牌資產**不屬於** GPLv3 授權範圍，詳見 [TRADEMARKS.md](TRADEMARKS.md)。第三方組件、數據和模型按各自的許可證分發，見上面的鳴謝和 `app/src/main/assets/NOTICE.txt`。注意智能聯想 base 模型（CC BY-NC-SA 4.0）和公式手寫模型（訓練數據 MathWriting 為 CC BY-NC-SA 4.0）不能用於商業用途。
+[GPLv3](LICENSE)。CyIME 自 2026-09-21 起基於 [Xime](https://github.com/ximeiorg/Xime)（GPL-3.0）獨立開發，源文件中原有的版權聲明照常保留。第三方組件、數據和模型按各自的許可證分發，見上面的鳴謝和 `app/src/main/assets/NOTICE.txt`。注意智能聯想 base 模型（CC BY-NC-SA 4.0）和公式手寫模型（訓練數據 MathWriting 為 CC BY-NC-SA 4.0）不能用於商業用途。

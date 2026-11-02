@@ -61,7 +61,6 @@ class OfflineEditionTest {
             LanguagePreferences.initialize(fresh)
             assertTrue(SettingsPreferences.isSmartPredictionEnabled(fresh))
             assertTrue(SettingsPreferences.isSingleAssociationMode(fresh))
-            assertEquals(profile.predictionModel, SettingsPreferences.getPredictionSelectedModel(fresh))
             assertTrue(SettingsPreferences.isSttEnabled(fresh))
             assertTrue(SettingsPreferences.isSttUseLocal(fresh))
             // 新装是「性能与省电 → 自动」：语音常驻与否跟本机档位那一组走。
@@ -190,16 +189,13 @@ class OfflineEditionTest {
             val glow = com.kingzcheung.xime.runtime.adaptation.DeviceKeyEffectDefaults.choose(hardware).glow
             withContext(Dispatchers.IO) { BundledModelInstaller.install(fresh) }
             val high = profile.tier == DeviceModelTier.ENHANCED
-            assertEquals(profile.predictionModel, SettingsPreferences.getPredictionSelectedModel(fresh))
             val asr = com.kingzcheung.xime.speech.AsrModelManager(fresh)
             assertEquals(com.kingzcheung.xime.speech.SpeechModelCatalog.ZIPFORMER, asr.getFirstPassModelId())
             assertEquals(high, asr.isRefinementEnabled())
             assertEquals(glow, SettingsPreferences.getPrefsPublic(fresh).getBoolean("key_glow_enabled", !glow))
             asr.setRefinementEnabled(!high)
-            SettingsPreferences.setPredictionSelectedModel(fresh, DeviceModelProfiles.SMALL)
             SettingsPreferences.getPrefsPublic(fresh).edit().putBoolean("key_glow_enabled", !high).commit()
             withContext(Dispatchers.IO) { BundledModelInstaller.install(fresh) }
-            assertEquals(DeviceModelProfiles.SMALL, SettingsPreferences.getPredictionSelectedModel(fresh))
             assertEquals(!high, asr.isRefinementEnabled())
             assertEquals(!high, SettingsPreferences.getPrefsPublic(fresh).getBoolean("key_glow_enabled", high))
         } finally { used.forEach { app.getSharedPreferences(it, 0).edit().clear().commit() } }

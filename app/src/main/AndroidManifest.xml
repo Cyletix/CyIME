@@ -67,8 +67,10 @@
         <activity android:name="com.kingzcheung.xime.clipboard.ImageAccessActivity"
             android:exported="false" android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <!-- 自己单独一个任务（taskAffinity 为空）：CyIME 设置开在后台时，拍照识字原来会落进设置那个任务，
+             把设置带到前台、结束后停在设置，不回当前输入框（GitHub #64）。 -->
         <activity android:name="com.kingzcheung.xime.ocr.DocumentOcrActivity"
-            android:exported="false" android:excludeFromRecents="true"
+            android:exported="false" android:excludeFromRecents="true" android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <service android:name="com.kingzcheung.xime.ocr.OcrRecognitionService"
             android:exported="false" android:process=":ocr" />

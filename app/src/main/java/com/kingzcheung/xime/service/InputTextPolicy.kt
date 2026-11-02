@@ -18,6 +18,13 @@ internal fun isLiteralPunctuation(key: String): Boolean = key.length == 1 && whe
     else -> false
 }
 
+/**
+ * 「标点上屏首选」管的标点：断句用的逗号、句号、问号、感叹号、顿号、分号、冒号和省略号，全角半角都算。
+ * 括号、引号、@、# 这些不管，照旧先上屏打的字母。
+ */
+internal fun isSentencePunctuation(text: String): Boolean =
+    text.isNotEmpty() && text.all { it in ",.?!;:，。？！、；：…" }
+
 /** Keyboard punctuation only: never rewrite pasted prose, digits, emoji or speech results. */
 internal fun punctuationWidth(text: String, full: Boolean, japanese: Boolean = false): String {
     if (text.isEmpty() || !text.all { isLiteralPunctuation(it.toString()) }) return text

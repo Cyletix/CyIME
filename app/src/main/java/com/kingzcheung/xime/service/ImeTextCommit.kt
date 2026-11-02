@@ -140,7 +140,8 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
     }
     
 
-    internal fun selectClipboardItem(text: String) {
+    /** [source] 是这一项来自的剪贴板原文（候选栏的干净链接、BV 号来自带链接的那条）；默认就是 [text]。 */
+    internal fun selectClipboardItem(text: String, source: String = text) {
         if (service.candidateState.value.isComposing) {
             service.keyRouter.postRimeJob {
                 service.keyRouter.endQueuedComposition()
@@ -150,10 +151,11 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
             }
         }
         // 标记为已消费：候选栏/剪贴板点选上屏后不再重复出现在候选栏
-        service.clipboardManager.markConsumed(text)
-        if (com.kingzcheung.xime.clipboard.clipboardPasteMode(text, service.clipboardManager.quickSendItems.value) ==
+        service.clipboardManager.markConsumed(source)
+        if (com.kingzcheung.xime.clipboard.clipboardPasteMode(source, service.clipboardManager.quickSendItems.value +
+                service.clipboardManager.clipboardItems.value.filter { it.sensitive }) ==
             com.kingzcheung.xime.clipboard.ClipboardPasteMode.PRIVATE) {
-            // 固定内容多是账号、密码等个人信息：照常上屏，但不发给插件提交事件，也不进联想上下文。
+            // 固定内容多是账号、密码等个人信息，记下的密码更是：照常上屏，但不发给插件提交事件，也不进联想上下文。
             service.dismissPredictionsForPaste()
             service.commitTextSilently(text, isPaste = true, isSensitive = true)
             return
@@ -173,10 +175,10 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
      * 先结束当前候选，再提交字面内容；手势预览不走此入口。
      */
     internal fun isFullWidthPunctuation(): Boolean {
-        // 全角/半角只作用于中文与日文：英文（ASCII）模式和西班牙语始终输出半角标点。
+        // 全角/半角只作用于中文与日文：英文（ASCII）模式和西班牙、德、法、俄、韩语始终输出半角标点。
         // 日文的英数模式除外：全角英数、全角空格是日文输入的常用写法，跟随用户的选择。
         if (service.uiState.value.isAsciiMode && !isJapaneseProfile()) return false
-        if (service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.SPANISH) return false
+        if (com.kingzcheung.xime.settings.LetterLanguage.of(service.uiState.value.inputProfile.language) != null) return false
         return punctuationWidthChoice()
     }
 
@@ -222,6 +224,9 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
             PairedSymbols.commitFor(literal) else literal to CommitCaret.NONE
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         val owner = service.uiState.value.inputSessionId
+        // 「标点上屏首选」（默认关）只管屏幕键盘上的断句标点；实体键盘的逗号句号另有翻页规则，不变。
+        val candidateFirst = !hardware && isSentencePunctuation(literal) &&
+            com.kingzcheung.xime.settings.SettingsPreferences.isPunctuationCommitsCandidateEnabled(service)
         val submit: suspend () -> Unit = literal@ {
             if (owner != service.uiState.value.inputSessionId) return@literal
             if (service.keyRouter.usesDirectFieldInput) {
@@ -238,8 +243,12 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 // onT9RefreshComposition 不再二次 post，屏上候选与本队列的引擎输入因此同源。
                 withContext(Dispatchers.Main) { Unit }
             }
+            if (candidateFirst && owner == service.uiState.value.inputSessionId &&
+                commitCandidateAndPunctuation(paired, caret)) return@literal
             if (owner != service.uiState.value.inputSessionId) return@literal
-            commitCompositionAndLiteral(paired, asTyped = true, caret = caret)
+            val committed = commitCompositionAndLiteral(paired, asTyped = true, caret = caret)
+            // 打 @ 时给邮箱后缀（默认关）；邮箱框走上面的直接上屏，在那里给。
+            if (committed && literal == "@") service.keyRouter.offerEmailSuffixesAfterAt()
         }
         return submit
     }
@@ -279,6 +288,22 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         return result.accepted
     }
 
+    /**
+     * 「标点上屏首选」：中文打字中点断句标点，先像空格那样上屏高亮的候选（平常就是首选；九键「下一项」换过高亮时是高亮那个），
+     * 候选只用掉一部分编码时，剩下的按首选接上，最后接标点。没在打中文时返回 false，照旧走先上屏字母的路。
+     */
+    private suspend fun commitCandidateAndPunctuation(literal: String, caret: CommitCaret): Boolean {
+        val state = service.uiState.value
+        if (state.isAsciiMode || state.inputProfile.language != com.kingzcheung.xime.settings.InputLanguage.CHINESE ||
+            state.inputProfile.mode != com.kingzcheung.xime.settings.InputMode.KEYBOARD) return false
+        val snapshot = service.candidateState.value
+        if (!snapshot.isComposing || snapshot.pendingEnglishText.isNotEmpty() || snapshot.isShowingRecentClipboard) return false
+        val index = snapshot.spaceCandidateIndex(state.inputProfile)
+        if (index in snapshot.candidates.indices) service.keyRouter.selectCandidateAsync(index, snapshot = snapshot)
+        commitCompositionAndLiteral(literal, asTyped = false, caret = caret)
+        return true
+    }
+
     internal fun deleteClipboardChars(count: Int) {
         service.currentInputConnection?.deleteSurroundingText(count, 0)
     }
@@ -307,7 +332,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         return insertImageToMediaStore(imageFile, mimeType)
     }
 
-    /** 把图片插入 MediaStore（Pictures/Xime），返回系统 content URI。 */
+    /** 把图片插入 MediaStore（Pictures/CyIME），返回系统 content URI。 */
     private fun insertImageToMediaStore(imageFile: File, mimeType: String): Uri? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             FileLogger.e(XimeInputMethodService.TAG, "MediaStore fallback requires API 29+, image commit failed")
@@ -318,7 +343,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, imageFile.name)
                 put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Xime")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/CyIME")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)

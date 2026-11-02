@@ -4,7 +4,16 @@
   <a href="README.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a>
 </p>
 
-**CyIME** is an Android input method developed and maintained by Cyletix. It runs on the [Rime](https://rime.im/) engine and is a fork of [Xime](https://github.com/ximeiorg/Xime). Chinese Pinyin, Shuangpin, Wubi, stroke, Cangjie and Zhuyin, plus Japanese, English and Spanish, handwriting, voice and photo text recognition all run on the device. It also has live captions for people who are hard of hearing.
+**CyIME** is an Android input method made by Cyletix. It runs on the [Rime](https://rime.im/) engine. Chinese Pinyin, Shuangpin, Wubi, stroke, Cangjie and Zhuyin, plus Japanese, English and Spanish, handwriting, voice and photo text recognition all run on the device. It also has live captions for people who are hard of hearing.
+
+## Highlights
+
+- **Everything works offline**: dictionaries, handwriting, speech recognition, photo text recognition and live captions all run on the phone. The full package works offline right after install.
+- **Its own 9-key model**: 9-key input uses a phrase model trained for CyIME, so you can type a whole sentence and pick words key by key.
+- **One keyboard, many ways to type**: 26-key Pinyin, 9-key, 14-key; six built-in Shuangpin layouts plus your own; Wubi, stroke, Cangjie, Zhuyin; Japanese, English and Spanish.
+- **Write several characters at once**: Chinese, English and Japanese handwriting in one go, math formulas recognized as LaTeX, S Pen support.
+- **Live captions for people who are hard of hearing**: turns speech around you into captions, tells speakers apart, works during calls, and vibrates when someone says your name.
+- **Put it where you want**: fixed, floating or split; the floating keyboard can be moved, resized and rotated; color themes, glass effect, your own picture as background.
 
 ## Download and install
 
@@ -32,6 +41,8 @@ Features marked "off by default" have to be turned on in the settings.
 - Traditional Chinese output (Taiwan forms), fuzzy Pinyin, rare characters, mixed Chinese-English input and Chinese glide typing, all off by default.
 - Candidates can show Pinyin or a Chinese/English gloss. The 26-key keyboard corrects extra or missing letters without putting the correction first.
 - Dictionary page: your own phrases, import TXT / Sogou / QQ / Rime dictionaries, removed candidates, word lookup. Topic dictionaries for anime, games, programming, math and more (off by default).
+- Word choice is checked against fixed test sets drawn mainly from public SMS and chat corpora. They are only used for scoring, never for training or tuning.
+- Every change to the dictionary, decoder or ranking is compared with the previous version on both top-1 accuracy and time per key; if either falls outside the allowed range, it is not merged.
 
 **Other languages**
 
@@ -87,10 +98,10 @@ Needs JDK 17 and NDK `29.0.14206865`. The build downloads rime-ice, the Japanese
 
 Tech stack: Kotlin · Jetpack Compose · Material 3 · librime (JNI / C++) · ONNX Runtime · sherpa-onnx · OpenCV
 
-## Project history
+The source namespace `com.kingzcheung.xime`, plugin IDs, `xime.yaml` / `xime.custom.yaml` and the extension store protocol keep their early names; the install ID is `com.cyletix.cyime`. See [docs/cyime-identity.md](docs/cyime-identity.md) (Chinese).
 
-- Forked from [Xime](https://github.com/ximeiorg/Xime) (Kingz Cheung / kingzcheung and contributors) at upstream commit `9452b16` on 2026-09-21.
-- To keep the code easy to compare with upstream, the source namespace `com.kingzcheung.xime`, plugin IDs, `xime.yaml` / `xime.custom.yaml` and the extension store protocol are unchanged; only the install ID is CyIME's own. See [docs/cyime-identity.md](docs/cyime-identity.md) (Chinese).
+## Related projects
+
 - The author's earlier work: [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) (2024 keyboard layout research, where the Cyletix10 layout comes from) and ASRInput (desktop voice captions; CyIME's caption pacing follows it).
 - Community Linux port: [tuxKOH/CyIME, branch linux-desktop-preview](https://github.com/tuxKOH/CyIME/tree/feat/linux-desktop-preview) (IBus Pinyin + desktop clipboard, maintained by tuxKOH). Linux forks are welcome, but I don't have the time to maintain a Linux version myself for now.
 
@@ -101,14 +112,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese): open an issue first, then a mi
 ## Credits
 
 CyIME builds on the projects, data and models below. Thanks to all their authors. Full license texts and copyright notices ship in `app/src/main/assets/NOTICE.txt`, `app/src/main/assets/licenses/` and the NOTICE files next to each scheme. In the app, see "Settings › About › Credits" and "Open source licenses".
-
-### Upstream
-
-| Project | Author | Used for | License |
-| --- | --- | --- | --- |
-| [Xime](https://github.com/ximeiorg/Xime) | Kingz Cheung (kingzcheung) and contributors | CyIME's starting point: app framework, Rime integration, 9-key librime-t9, plugin system, handwriting and prediction | GPL-3.0 |
-| [rime-wubi](https://github.com/kingzcheung/rime-wubi) (fork of [KyleBing/rime-wubi86-jidian](https://github.com/KyleBing/rime-wubi86-jidian)) | kingzcheung; KyleBing | Bundled Wubi 86 scheme and Wubi lookup in handwriting | Apache-2.0 |
-| Xime models: [ochwpro](https://www.modelscope.cn/models/bikeand/ochwpro), [predictive-text-small](https://www.modelscope.cn/models/bikeand/predictive-text-small), [predictive-text-base](https://www.modelscope.cn/models/bikeand/predictive-text-base) | Xime project | Chinese handwriting; prediction | ochwpro MIT; small Apache-2.0; base CC BY-NC-SA 4.0 |
 
 ### Input engine
 
@@ -125,6 +128,7 @@ CyIME builds on the projects, data and models below. Thanks to all their authors
 
 | Project | Author | Used for | License |
 | --- | --- | --- | --- |
+| [rime-wubi](https://github.com/kingzcheung/rime-wubi) (fork of [KyleBing/rime-wubi86-jidian](https://github.com/KyleBing/rime-wubi86-jidian)) | kingzcheung; KyleBing | Bundled Wubi 86 scheme and Wubi lookup in handwriting | Apache-2.0 |
 | [rime-ice (雾凇拼音)](https://github.com/iDvel/rime-ice) | iDvel (Dvel) | Dictionary and schemes for full Pinyin, Xiaohe Shuangpin, 9 keys, 14 keys | GPL-3.0 |
 | [RIME-LMDG (万象)](https://github.com/amzxyz/RIME-LMDG) | amzxyz | 9-key grammar model (download) | CC BY 4.0 |
 | [rime-stroke](https://github.com/rime/rime-stroke) | 四季的風, 雪齋, Kunki Chou, 宋天 | Stroke scheme | LGPL-3.0 |
@@ -138,7 +142,7 @@ CyIME builds on the projects, data and models below. Thanks to all their authors
 | [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict) | MDBG | Candidate gloss, Chinese → English | CC BY-SA 4.0 |
 | [opus-mt-zh-en](https://huggingface.co/Helsinki-NLP/opus-mt-zh-en) | Helsinki-NLP | Reference translations of common phrases in the gloss (generated offline on a PC) | CC BY 4.0 |
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) | Hermit Dave | Spanish word list | Code MIT; lists CC BY-SA 4.0 |
-| [ChaiPUA font](https://github.com/tansongchen/input) | Tan Songchen (tansongchen) | Shows Wubi radicals and other extension characters (inherited from Xime) | Not stated in the font |
+| [ChaiPUA font](https://github.com/tansongchen/input) | Tan Songchen (tansongchen) | Shows Wubi radicals and other extension characters | Not stated in the font |
 
 ### Corpora (for CyIME's own models)
 
@@ -167,6 +171,7 @@ CyIME builds on the projects, data and models below. Thanks to all their authors
 | [OpenCV](https://github.com/opencv/opencv) | OpenCV | Image processing for text recognition | Apache-2.0 |
 | [KaTeX](https://github.com/KaTeX/KaTeX) | KaTeX authors | Rendering handwritten formulas | MIT |
 | [UER-py](https://github.com/dbiir/UER-py) Chinese RoBERTa | UER team | 9-key sentence scoring (retired; the vocabulary still ships) | Apache-2.0 |
+| [ochwpro](https://www.modelscope.cn/models/bikeand/ochwpro), [predictive-text-small](https://www.modelscope.cn/models/bikeand/predictive-text-small), [predictive-text-base](https://www.modelscope.cn/models/bikeand/predictive-text-base) | bikeand (ModelScope) | Chinese handwriting; prediction | ochwpro MIT; small Apache-2.0; base CC BY-NC-SA 4.0 |
 
 ### Android libraries
 
@@ -186,4 +191,4 @@ CyIME's interaction, look and key layouts drew on these products and schemes:
 
 ## License
 
-[GPLv3](LICENSE). Upstream code remains copyright of its authors; the changes in this fork are maintained by Cyletix. The "Xime" name, logo and other brand assets are **not** covered by the GPLv3; see [TRADEMARKS.md](TRADEMARKS.md). Third-party components, data and models are distributed under their own licenses, listed in the credits above and in `app/src/main/assets/NOTICE.txt`. Note that the base prediction model (CC BY-NC-SA 4.0) and the formula handwriting model (trained on MathWriting, CC BY-NC-SA 4.0) may not be used commercially.
+[GPLv3](LICENSE). Since 2026-09-21 CyIME has been developed independently on the basis of [Xime](https://github.com/ximeiorg/Xime) (GPL-3.0); the original copyright notices in the source files are kept. Third-party components, data and models are distributed under their own licenses, listed in the credits above and in `app/src/main/assets/NOTICE.txt`. Note that the base prediction model (CC BY-NC-SA 4.0) and the formula handwriting model (trained on MathWriting, CC BY-NC-SA 4.0) may not be used commercially.

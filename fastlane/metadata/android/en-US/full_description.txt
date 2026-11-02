@@ -1,8 +1,12 @@
-CyIME is a Chinese IME built on the Rime engine for Wubi and Pinyin input, focused on a simple and efficient typing experience.
+CyIME is an Android input method made by Cyletix, running on the Rime engine. The goal is the best open-source keyboard there is: dictionaries, handwriting, voice, photo text recognition and live captions all run on the phone, so everything works offline.
 
-Features:
-* Multiple input schemes - Wubi 86, Wubi 98, Pinyin, and mixed Wubi/Pinyin
-* Rime engine - mature and stable Rime input method engine
-* Speech-to-text - built-in voice recognition (FunAsr and local models)
-* Emoji plugins - supports extendable emoji plugins
-* Material Design 3 style with light/dark themes
+Highlights:
+* Everything offline - the full package bundles voice, handwriting, prediction and the 9-key phrase model
+* Its own 9-key model - type a whole sentence and pick words key by key
+* Many ways to type - 26-key Pinyin, 9-key, 14-key; six Shuangpin layouts (Xiaohe, Shoudao, Ziranma and more) plus your own; Wubi, stroke, Cangjie, Zhuyin; Japanese, English and Spanish
+* Handwriting - several Chinese, English or Japanese characters at once, math formulas as LaTeX, S Pen support
+* Live captions for people who are hard of hearing - tells speakers apart, works during calls, vibrates when someone says your name
+* Layout and looks - fixed, floating or split; color themes, glass effect, your own picture as background
+* Clipboard - history, pinning, search, groups; SMS codes shown in the candidate bar
+
+License: GPL-3.0.

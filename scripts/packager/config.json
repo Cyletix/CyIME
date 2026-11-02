@@ -29,7 +29,7 @@
     "完整发布包": {
       "build_type": "release",
       "offline_models": true,
-      "offline_ids": ["ochwpro", "predictive-text-base", "predictive-text-small", "sensevoice-multilingual-int8", "speaker-campplus-zh"],
+      "offline_ids": ["ochwpro", "sensevoice-multilingual-int8", "speaker-campplus-zh"],
       "t9_model": "@best_public",
       "exclude_dicts": [],
       "install": false
@@ -57,8 +57,6 @@
   },
   "modelNotes": {
     "ochwpro": "MIT：可以分发，需附带原许可声明",
-    "predictive-text-base": "CC BY-NC-SA：只能非商业使用，须署名",
-    "predictive-text-small": "Apache-2.0",
     "paraformer-zh-en-int8": "Apache-2.0（转换自阿里达摩院 Paraformer，需署名）",
     "sensevoice-multilingual-int8": "许可未标明（原版为 FunASR 模型协议，需署名，未逐条核对）"
   },

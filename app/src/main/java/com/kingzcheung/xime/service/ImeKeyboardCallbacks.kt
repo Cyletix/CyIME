@@ -56,9 +56,11 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
+            startDeleteDrag = { ImeDistanceBackspace(service, state.inputSessionId)::move },
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
             onGlideWord = service.keyRouter::commitGlideWord,
             onGlideCode = service.keyRouter::typeGlideCode,
+            glidePreviewer = service.keyRouter::glidePreviewer,
             inputAdmissionTicket = { if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket() },
             captureInputContext = service.keyRouter::captureInputContext,
             t9LeftContext = {
@@ -74,6 +76,7 @@ internal fun rememberImeKeyboardCallbacks(
             onLivePreeditEdit = preeditEditor::edit,
             onRequestPinyinSyllables = syllableSelector::request,
             onSelectPinyinSyllable = syllableSelector::select,
+            onUndoPinyinSyllable = syllableSelector::undo,
             onKeyPress = keyPress@{ key, isShifted ->
                 if (service.inputReadiness.ticket() == null) return@keyPress
                 if (service.keyRouter.usesDirectFieldInput) {
@@ -85,7 +88,11 @@ internal fun rememberImeKeyboardCallbacks(
                     val separator = key == "'" && service.candidateState.value.isComposing && !service.uiState.value.isAsciiMode
                     // 微软双拼的 ing 在分号上：分号键交给按键队列，打字中送进 Rime 组码，没在打字时照旧按标点上屏（见 ImeKeyRouter）。
                     val semicolonCode = key == ";" && service.keyRouter.semicolonIsCode()
-                    if (!numberPanel && !separator && !semicolonCode && isLiteralPunctuation(key)) {
+                    // 第三方方案字母表里的符号（声笔的 ; ' , . /）是编码键：交给按键队列送进 Rime（#87）。
+                    val schemeCode = if (numberPanel) null else service.keyRouter.schemeCodeKey(key)
+                    if (schemeCode != null) {
+                        service.keyRouter.handleKeyPress(schemeCode, false)
+                    } else if (!numberPanel && !separator && !semicolonCode && isLiteralPunctuation(key)) {
                         service.textCommit.commitLiteralText(key)
                     } else {
                         val mergedKey = com.kingzcheung.xime.rime.MergedLetterInput.isGroup(key,
@@ -105,6 +112,7 @@ internal fun rememberImeKeyboardCallbacks(
                 } else service.schemaController.handleJapaneseKanaAction(action)
             },
             onKeyPressDown = { key ->
+                com.kingzcheung.xime.stats.TypingStats.onKeyDown(key)
                 if (key == "delete") service.predictionManager.cancelForDeletePress()
                 else service.predictionManager.invalidatePendingPredictions()
                 service.feedbackManager.performKeyPressDownEffect(key, view)
@@ -197,8 +205,22 @@ internal fun rememberImeKeyboardCallbacks(
                 }.onFailure { android.widget.Toast.makeText(service, "没有可接收图片的应用", android.widget.Toast.LENGTH_SHORT).show() }
             },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
-            onCommitText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text) },
-            onCommitExactText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text, preserveWidth = true) },
+            // 角标、长按、空格两侧标点键和符号面板上屏的符号：第三方方案把它当编码键时同样先交给 Rime（#87）。
+            onCommitText = { text ->
+                if (service.inputReadiness.ticket() != null) {
+                    val schemeCode = if (numberPanelShown(service)) null else service.keyRouter.schemeCodeKey(text)
+                    if (schemeCode != null) service.keyRouter.handleKeyPress(schemeCode, false)
+                    else service.textCommit.commitLiteralText(text)
+                }
+            },
+            onCommitExactText = { text ->
+                if (service.inputReadiness.ticket() != null) {
+                    val schemeCode = if (numberPanelShown(service)) null else service.keyRouter.schemeCodeKey(text)
+                    if (schemeCode != null) service.keyRouter.handleKeyPress(schemeCode, false)
+                    else service.textCommit.commitLiteralText(text, preserveWidth = true)
+                }
+            },
+            onDeleteKaomoji = service::deleteKaomojiBeforeCursor,
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
             onKeyboardResize = {
                 service.keyboardViewModel.closeOverlay()
@@ -206,7 +228,7 @@ internal fun rememberImeKeyboardCallbacks(
                 val s = service.uiState.value
                 val currentSize = service.currentResolvedKeyboardSize ?: service.resolveKeyboardSize(
                     config.screenWidthDp, effectiveScreenH,
-                    if (s.isFloatingMode) floatingMinY else s.keyboardBottomPaddingDp + floatingMinY, s,
+                    if (s.isFloatingMode) floatingMinY else s.keyboardBottomPaddingDp + service.keyboardBottomSpaceDp(s), s,
                 )
                 // The displayed base size excludes expanded clipboard/tool panels and already
                 // incorporates automatic defaults; raw height preferences do not describe it.
@@ -299,6 +321,11 @@ internal fun rememberImeKeyboardCallbacks(
                 // 按住空格说话松手：结束并上屏。只收尾工具栏同一条语音路径，没开起来（输入框不许语音等）时不开麦。
                 val state = service.uiState.value
                 if (state.isVoiceMode && state.voiceSticky) service.endVoiceSession()
+            },
+            onVoiceHoldCancel = {
+                // 按住空格说话上滑后松手：停麦，这次说的字撤掉，不上屏。
+                val state = service.uiState.value
+                if (state.isVoiceMode && state.voiceSticky) service.cancelVoiceSession()
             },
             onPageDown = { service.keyRouter.pageDown() },
             onPageUp = { service.keyRouter.pageUp() },
@@ -532,3 +559,7 @@ private fun spaceCursorSelecting(service: XimeInputMethodService): Boolean =
     com.kingzcheung.xime.ui.keyboard.SpaceCursorShift.selecting(service.keyboardViewModel.shiftMode.value).also {
         if (it) service.keyboardViewModel.onCharacterTyped()
     }
+
+/** 数字面板上的 . / 是数字和运算符，不当方案编码键（#87）。 */
+private fun numberPanelShown(service: XimeInputMethodService): Boolean =
+    service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number

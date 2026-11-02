@@ -252,14 +252,21 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
         return moved
     }
 
-    /** Never dispatch an arrow to the host: at document edges Android can move focus. */
+    /**
+     * 实体方向键先在文字里自己移光标。宿主读不出文字或不收 setSelection 时（部分输入框，外接键盘用户 11-01：
+     * 方向键按了没反应，微信输入法能用），把方向键交给宿主自己处理，和别的输入法一样；
+     * 读得到光标那一侧已经没有字（文首按左/上、文末按右/下）时不交，免得焦点跳出输入框。
+     */
     fun movePhysical(ic: InputConnection, keyCode: Int, selecting: Boolean = false,
         byWord: Boolean = false, toBoundary: Boolean = false): Boolean {
         val backwards = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_UP
         val horizontal = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
         val direction = if (backwards) -1 else 1
-        if (!byWord && !toBoundary) return if (horizontal) move(ic, direction, selecting, allowKeyEventFallback = false)
-            else moveVertical(ic, direction, selecting)
+        if (!byWord && !toBoundary) {
+            val moved = if (horizontal) move(ic, direction, selecting, allowKeyEventFallback = false)
+                else moveVertical(ic, direction, selecting)
+            return moved || hostArrow(ic, keyCode, backwards, selecting)
+        }
         bind(ic)
         if (!selecting) resetSelection()
         val extracted = snapshot(ic) ?: return false
@@ -275,6 +282,16 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
             if (next == java.text.BreakIterator.DONE) { if (backwards) 0 else extracted.text.length } else next
         } else paragraphBoundary(extracted.text, position, !backwards)
         return setSelection(ic, extracted.startOffset + target, selecting) && target != position
+    }
+
+    /** 自己没移动时交给宿主；光标这一侧确定没有字时不交（自己没动是因为到头了）。 */
+    private fun hostArrow(ic: InputConnection, keyCode: Int, backwards: Boolean, selecting: Boolean): Boolean {
+        val adjacent = runCatching {
+            if (backwards) ic.getTextBeforeCursor(1, 0) else ic.getTextAfterCursor(1, 0)
+        }.getOrNull()
+        if (adjacent?.isEmpty() == true) return false
+        dropDragText()
+        return sendKeyPair(ic, keyCode, selecting)
     }
 
     private fun extendedHorizontalTarget(ic: InputConnection, extracted: ExtractedText, from: Int, steps: Int): Int? {

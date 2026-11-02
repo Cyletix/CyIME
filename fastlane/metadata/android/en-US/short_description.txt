@@ -1,1 +1,1 @@
-A Rime-based Chinese IME for Wubi and Pinyin input
+Offline Chinese keyboard: Pinyin, 9-key, Shuangpin, Wubi, handwriting, voice

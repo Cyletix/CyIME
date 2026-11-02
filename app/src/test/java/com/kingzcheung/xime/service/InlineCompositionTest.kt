@@ -8,6 +8,19 @@ import org.junit.Test
 
 /** 宿主重启输入后被定格的拼音编码：只在光标处文字正好拼回原编码时找回，其他情况一律不碰。 */
 class InlineCompositionTest {
+    @Test fun onlyANewCollapsedCaretInOurCurrentComposingSpanRequestsAnEdit() {
+        val tracker = InlineCompositionTracker()
+        tracker.shown("hou yuan")
+        assertNull(tracker.hostCaret(2, 10, 10, 10))
+        assertEquals(3, tracker.hostCaret(2, 10, 5, 5))
+        tracker.moveCaret(3)
+        assertNull(tracker.hostCaret(2, 10, 5, 5))
+        assertNull(tracker.hostCaret(2, 10, 1, 1))
+        assertNull(tracker.hostCaret(2, 10, 4, 6))
+        assertNull(tracker.hostCaret(-1, -1, 5, 5))
+        tracker.ended()
+        assertNull(tracker.hostCaret(2, 10, 5, 5))
+    }
     @Test fun caretAtTheEndOfTheFrozenPinyin() {
         // 截图一：“解别人的完整观点,duan xiang qu”，光标在末尾。
         val prefix = "解别人的完整观点,"

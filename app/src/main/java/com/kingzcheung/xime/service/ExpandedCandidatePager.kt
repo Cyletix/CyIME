@@ -11,8 +11,8 @@ object ExpandedCandidatePager {
     /** 条目固定开销：水平 padding(8dp) + 两侧间隙分摊(6dp)，以 18sp 字宽为 1 单位近似 */
     const val ITEM_FIXED_UNITS = 1.2f
 
-    /** 注释字号(11sp)相对主字号(18sp)的宽度系数 */
-    private const val COMMENT_WIDTH_FACTOR = 0.62f
+    /** 拼音注释字号相对候选字号的比例；展开页画字和估算宽度共用，跟着候选字号一起缩放（原 11/18 太小看不清，用户 11-02） */
+    const val COMMENT_SIZE_RATIO = 0.75f
 
     /** 单字符宽度（字符当量）：CJK 约 1 个字宽，其余（拉丁/数字/标点）约 0.55 */
     fun charUnits(c: Char): Float = if (c.code > 0x2E80) 1.0f else 0.55f
@@ -21,7 +21,7 @@ object ExpandedCandidatePager {
     fun estimateItemUnits(candidate: RimeCandidate): Float {
         var units = ITEM_FIXED_UNITS
         candidate.text.forEach { units += charUnits(it) }
-        candidate.comment.forEach { units += charUnits(it) * COMMENT_WIDTH_FACTOR }
+        candidate.comment.forEach { units += charUnits(it) * COMMENT_SIZE_RATIO }
         return units
     }
 

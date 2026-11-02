@@ -44,7 +44,8 @@ PUBLIC_FORBIDDEN_ASSETS = ("assets/gloss/cyime_gloss-private.tsv",)
 PUBLIC_FORBIDDEN_PREFIXES = ("assets/rime_chinese/cylm_",)
 PUBLIC_FORBIDDEN_REFERENCES = ("cyime_gloss-v9",)
 # The bundled-model (full) edition is the elder package; docs/development/elder-pack-spec.md is its checklist.
-ELDER_MODELS = {"ochwpro", "paraformer-zh-en-int8", "predictive-text-base", "predictive-text-small",
+# 智能联想 11-02 起只用内置 n-gram 联想表，不再带联想模型。
+ELDER_MODELS = {"ochwpro", "paraformer-zh-en-int8",
                 "sensevoice-multilingual-int8", "speaker-campplus-zh"}
 ELDER_FORBIDDEN = re.compile(r"^assets/.*(rime_japanese/|jaroomaji|japanese|zipformer|_ja[-_./]|kana)", re.I)
 

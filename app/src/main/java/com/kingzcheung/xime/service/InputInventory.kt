@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.content.Context
 import com.kingzcheung.xime.association.AssociationManager
 import com.kingzcheung.xime.model.CandidateModelCatalog
-import com.kingzcheung.xime.model.ModelStorage
 import com.kingzcheung.xime.settings.SettingsPreferences
 import java.io.File
 
@@ -19,15 +18,13 @@ internal object InputInventory {
             .filter { it.name.endsWith(".userdb") || it.name.contains("userdict", ignoreCase = true) || it.name.endsWith(".userdb.txt") }
             .sortedBy { it.name }
             .joinToString(",") { "${it.name}:${sizeOf(it) / 1024}KB" }
-        val predictionModel = SettingsPreferences.getPredictionSelectedModel(context)
         val memory = ActivityManager.MemoryInfo().also {
             context.getSystemService(ActivityManager::class.java)?.getMemoryInfo(it)
         }
         return "userdata=[$stores] " +
             "grammar=${installed(rime, CandidateModelCatalog.GRAMMAR)} " +
             "sentence=${installed(rime, CandidateModelCatalog.SENTENCE)} " +
-            "prediction=${SettingsPreferences.isSmartPredictionEnabled(context)}/$predictionModel/" +
-            "${ModelStorage.getModelDir(context, predictionModel).listFiles().orEmpty().any { it.name.endsWith(".onnx") }} " +
+            "prediction=${SettingsPreferences.isSmartPredictionEnabled(context)} " +
             "association_entries=${AssociationManager.getCacheSize()} " +
             "avail_mb=${memory.availMem shr 20} total_mb=${memory.totalMem shr 20} " +
             "threshold_mb=${memory.threshold shr 20} low=${memory.lowMemory}"

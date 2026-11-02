@@ -34,7 +34,7 @@ class EditorSessionInputPolicyTest {
             assertFalse(session.scoped)
             assertNull(session.asciiOverride)
             assertFalse(session.engineAsciiOverride()!!)
-            session.completePreparation()
+            session.completePreparation(restored.isAsciiMode, restored.currentSchemaId)
             assertNull(session.engineAsciiOverride())
         }
     }
@@ -116,6 +116,119 @@ class EditorSessionInputPolicyTest {
             assertFalse(session.scoped)
             assertFalse(session.directInput)
         }
+    }
+
+    private fun uri(action: Int, hint: String? = null, id: Int = 1) =
+        editor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, id).apply {
+            imeOptions = action or EditorInfo.IME_FLAG_NO_FULLSCREEN
+            hintText = hint
+        }
+
+    @Test fun chromeNavigationBarKeepsLanguageAndLayoutAcrossNewConnections() {
+        val bar = uri(EditorInfo.IME_ACTION_GO, "在 Google 中搜索或输入网址").apply {
+            inputType = 0x80011
+            imeOptions = 0x12000002
+            packageName = "com.android.chrome"
+        }
+        for (english in listOf(false, true)) {
+            val session = EditorSessionInputPolicy()
+            assertEquals(english, session.begin(bar, false, english, "chinese-14").isAsciiMode)
+            assertEquals(EditorFieldPolicy.Kind.SEARCH_OR_ADDRESS, session.field.kind)
+            assertNull(session.engineAsciiOverride())
+            assertFalse(session.directInput)
+            session.completePreparation(english, "chinese-14")
+            assertTrue(session.choose(!english, "other-layout"))
+            bar.hintText = null
+            bar.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            for (restart in listOf(true, false)) {
+                val resumed = session.begin(bar, restart, english, "chinese-14")
+                assertEquals(EditorSessionPresentation(!english, "other-layout"), resumed)
+                assertFalse(session.directInput)
+            }
+            assertEquals(EditorSessionPresentation(english, "chinese-14"),
+                session.begin(editor(InputType.TYPE_CLASS_TEXT, 2), false, !english, "other-layout"))
+        }
+    }
+
+    @Test fun metadataSeparatesMixedInputsFromDedicatedAddressesWithoutReadingContent() {
+        listOf(uri(EditorInfo.IME_ACTION_SEARCH), uri(EditorInfo.IME_ACTION_GO),
+            uri(EditorInfo.IME_ACTION_GO, "Rechercher ou saisir une URL"),
+            uri(EditorInfo.IME_ACTION_DONE, "Search the web or type a URL"),
+            uri(EditorInfo.IME_ACTION_DONE, "輸入網址或搜尋"), uri(EditorInfo.IME_ACTION_NEXT, "搜索")
+        ).forEach { assertEquals(EditorFieldPolicy.Kind.SEARCH_OR_ADDRESS, EditorFieldPolicy.from(it).kind) }
+        listOf(uri(EditorInfo.IME_ACTION_NEXT), uri(EditorInfo.IME_ACTION_DONE),
+            uri(EditorInfo.IME_ACTION_GO, "https://example.org"), uri(EditorInfo.IME_ACTION_GO, "请输入网址"),
+            uri(EditorInfo.IME_ACTION_GO, "请输入 URL"), uri(EditorInfo.IME_ACTION_GO, "Server address"),
+            uri(EditorInfo.IME_ACTION_GO, "Search engine URL"), uri(EditorInfo.IME_ACTION_DONE, "搜索引擎网址"),
+            uri(EditorInfo.IME_ACTION_GO).apply { fieldName = "callback_url" }
+        ).forEach { assertEquals(EditorFieldPolicy.Kind.ADDRESS, EditorFieldPolicy.from(it).kind) }
+        for (variation in listOf(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+            InputType.TYPE_TEXT_VARIATION_PASSWORD, InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)) {
+            val info = uri(EditorInfo.IME_ACTION_SEARCH, "搜索").apply { inputType = InputType.TYPE_CLASS_TEXT or variation }
+            val session = EditorSessionInputPolicy()
+            assertTrue(session.begin(info, false, false, "chinese-9").isAsciiMode)
+            assertTrue(session.directInput)
+        }
+    }
+
+    @Test fun coldEnginePreferenceAndTemporaryPasswordModeAreNotConfused() {
+        val session = EditorSessionInputPolicy()
+        val mixed = uri(EditorInfo.IME_ACTION_GO)
+        session.begin(mixed, false, false, "")
+        session.completePreparation(true, "saved-layout")
+        session.choose(false, "temporary-layout")
+        assertEquals(EditorSessionPresentation(true, "saved-layout"),
+            session.begin(editor(InputType.TYPE_CLASS_TEXT, 2), false, false, "temporary-layout"))
+
+        val password = editor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        session.begin(password, false, false, "chinese-9")
+        assertFalse(session.begin(mixed, false, true, "temporary").isAsciiMode)
+        assertEquals(false, session.engineAsciiOverride())
+    }
+
+    @Test fun anonymousPageEditorsKeepManualLanguageOnlyForRestartsOfTheSameField() {
+        val session = EditorSessionInputPolicy()
+        val page = uri(EditorInfo.IME_ACTION_GO, id = -1)
+        session.begin(page, false, true, "original")
+        session.choose(false, "chinese-14")
+        page.inputType = page.inputType or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        assertEquals(EditorSessionPresentation(false, "chinese-14"), session.begin(page, true, true, "original"))
+        assertEquals(EditorSessionPresentation(true, "original"), session.begin(page, false, false, "chinese-14"))
+        page.imeOptions = EditorInfo.IME_ACTION_NEXT
+        assertTrue(session.begin(page, true, false, "chinese-14").isAsciiMode)
+        assertTrue(session.directInput)
+    }
+
+    @Test fun emailAndUrlKeepCurrentLanguageWhenAutoEnglishIsOffButPasswordsStayLocked() {
+        listOf(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+            InputType.TYPE_TEXT_VARIATION_URI).forEach { variation ->
+            val session = EditorSessionInputPolicy()
+            val address = editor(InputType.TYPE_CLASS_TEXT or variation)
+            val entered = session.begin(address, false, false, "chinese", addressEnglish = false)
+            assertEquals(EditorSessionPresentation(false, "chinese"), entered)
+            assertEquals(EditorFieldPolicy.Kind.ADDRESS, session.field.kind)
+            assertFalse(session.directInput)
+            assertNull(session.engineAsciiOverride())
+            // Switching inside the field stays local, as with auto-English on.
+            assertTrue(session.choose(true))
+            assertTrue(session.directInput)
+            assertEquals(EditorSessionPresentation(false, "chinese"),
+                session.begin(editor(InputType.TYPE_CLASS_TEXT, 2), false, true, "chinese", addressEnglish = false))
+
+            val password = editor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD, 3)
+            assertTrue(session.begin(password, false, false, "chinese", addressEnglish = false).isAsciiMode)
+            assertTrue(session.locksNativeInput)
+        }
+    }
+
+    @Test fun emailFieldWithAutoEnglishOffAdoptsTheSavedLanguageOnColdStart() {
+        val session = EditorSessionInputPolicy()
+        val email = editor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        session.begin(email, false, false, "", addressEnglish = false)
+        session.completePreparation(false, "saved-layout")
+        session.choose(true)
+        assertEquals(EditorSessionPresentation(false, "saved-layout"),
+            session.begin(editor(InputType.TYPE_CLASS_TEXT, 2), false, true, "saved-layout"))
     }
 
     @Test fun onlyTypedKeysAreNormalizedAndNativeWordsAreNeverPartiallyInserted() {

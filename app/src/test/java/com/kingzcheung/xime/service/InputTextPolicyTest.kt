@@ -15,6 +15,11 @@ class InputTextPolicyTest {
         listOf(",", "。", "！", "/", "@", "(").forEach { assertTrue(it, isLiteralPunctuation(it)) }
         listOf("delete", "space", "abc", "s", "4", "").forEach { assertFalse(it, isLiteralPunctuation(it)) }
     }
+    // 2026-11-02「标点上屏首选」：只有断句标点先上屏首选，括号、引号、@ 照旧先上屏字母。
+    @Test fun onlySentencePunctuationCommitsTheFirstCandidate() {
+        listOf(",", "，", ".", "。", "?", "？", "!", "！", "、", ";", "；", ":", "：", "……").forEach { assertTrue(it, isSentencePunctuation(it)) }
+        listOf("@", "#", "（", "(", "“", "《", "'", "-", "/", "1", "a", "space", "").forEach { assertFalse(it, isSentencePunctuation(it)) }
+    }
 
     @org.junit.Test fun widthNormalizesBothAsciiAndPresetChinesePunctuation() {
         assertEquals("、。", punctuationWidth(",.", true, japanese = true))

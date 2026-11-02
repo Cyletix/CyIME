@@ -68,10 +68,10 @@ class FeedbackManager(private val context: Context) {
 
         /**
          * 按键音色：default（原有）或 mahjong（显示名「Rain75 紫薇轴」，用户实录）；只影响普通键、空格、回车、删除。
-         * 外接实体键盘的「默认」就是 Rain75；已删除的旧值（如 crisp）按默认处理。
+         * 未选音色时软键盘和实体键盘都用 Rain75；显式选用原音或旧值的软键盘保持原音。
          */
         fun resolveKeySoundStyle(stored: String?, hardware: Boolean): String =
-            if (hardware || stored == "mahjong") "mahjong" else "default"
+            if (hardware || stored == null || stored == "mahjong") "mahjong" else "default"
 
         /** 不支持点击触感的普通马达上，按键震动时长：短于约 30 ms 时转子马达基本震不起来。 */
         fun plainMotorDurationMs(longPress: Boolean, light: Boolean): Long = when {

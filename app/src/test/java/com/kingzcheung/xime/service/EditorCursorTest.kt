@@ -34,15 +34,30 @@ class EditorCursorTest {
         verify(ic, never()).sendKeyEvent(any())
     }
 
-    @Test fun `physical arrows never fall back to focus navigation when selection is unsupported or refused`() {
+    // 外接键盘用户 11-01：有的输入框读不出文字或不收 setSelection，方向键按了没反应（微信输入法能用）。
+    // 自己移不动时把方向键交给宿主，和别的输入法一样。
+    @Test fun `physical arrows go to the host when the text cannot be read or the selection is refused`() {
         for (ic in listOf(mock<InputConnection>(), editor(1))) {
             doReturn(false).whenever(ic).setSelection(any(), any())
             val cursor = EditorCursor()
             for (key in listOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) {
-                assertEquals(false, cursor.movePhysical(ic, key))
+                cursor.movePhysical(ic, key)
             }
-            verify(ic, never()).sendKeyEvent(any())
+            verify(ic, times(8)).sendKeyEvent(any())
         }
+    }
+
+    @Test fun `physical arrows stay inside the editor at a known edge even when the selection is refused`() {
+        val start = editor(0)
+        val end = editor(4)
+        val cursor = EditorCursor()
+        for (ic in listOf(start, end)) doReturn(false).whenever(ic).setSelection(any(), any())
+        assertEquals(false, cursor.movePhysical(start, KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(false, cursor.movePhysical(start, KeyEvent.KEYCODE_DPAD_UP))
+        assertEquals(false, cursor.movePhysical(end, KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(false, cursor.movePhysical(end, KeyEvent.KEYCODE_DPAD_DOWN))
+        verify(start, never()).sendKeyEvent(any())
+        verify(end, never()).sendKeyEvent(any())
     }
 
     @Test fun `physical cursor uses surrounding text and reported absolute selection without extracted text`() {

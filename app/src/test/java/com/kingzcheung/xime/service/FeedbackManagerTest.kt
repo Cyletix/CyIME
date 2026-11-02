@@ -67,9 +67,10 @@ class FeedbackManagerTest {
         org.junit.Assert.assertNull(HardwareKeySound.soundFor(android.view.KeyEvent.KEYCODE_DEL, 3, false, false, false))
     }
 
-    @Test fun `physical keyboard defaults to Rain75 while the screen keyboard keeps its sound`() {
+    @Test fun `both keyboards default to Rain75 and an explicit screen sound stays selected`() {
         org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle(null, hardware = true))
-        org.junit.Assert.assertEquals("default", FeedbackManager.resolveKeySoundStyle(null, hardware = false))
+        org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle(null, hardware = false))
+        org.junit.Assert.assertEquals("default", FeedbackManager.resolveKeySoundStyle("default", hardware = false))
         org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle("mahjong", hardware = false))
     }
 
