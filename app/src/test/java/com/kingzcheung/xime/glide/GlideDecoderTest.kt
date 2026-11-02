@@ -82,6 +82,17 @@ class GlideDecoderTest {
         assertTrue(t9.claimed)
     }
 
+    @Test fun t9TrackerClaimsWhenOnlyTheReleasePointReachesTheTargetKey() {
+        val (fx, fy) = center('f')
+        val target = center('r')
+        val tracker = GlideTracker(keys, 8f, fx, fy, 0, allowShortVertical = true)
+        for (step in 1..4) {
+            assertFalse(tracker.move(fx, fy - step * 8f, step * 10L))
+        }
+
+        assertTrue(tracker.finish(target.first, target.second))
+    }
+
     @Test fun horizontalNeighboursAndLongPathsAreClaimed() {
         val (ax, ay) = center('a')
         val adjacent = GlideTracker(keys, 8f, ax, ay, 0)

@@ -36,6 +36,14 @@ class T9GlideDecoderTest {
         assertEquals("ni", decoder.decode(xs, ys).first().word)
     }
 
+    @Test fun straightFiveToTwoProducesThe52PinyinCandidates() {
+        val decoder = T9GlideDecoder(GlideLexicon.keyboard(keys), listOf("la", "ka", "ja"))
+        val (xs, ys) = straightTrace('5', '2')
+        val result = decoder.decode(xs, ys, limit = 6, perGroup = 3).map { it.word }
+
+        assertEquals(listOf("la", "ka", "ja"), result)
+    }
+
     @Test fun bundledLexiconMapsStraightSixToFourToNi() {
         val codes = File("src/main/assets/glide_pinyin.txt").readLines()
             .filter { it.isNotBlank() }

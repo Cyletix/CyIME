@@ -64,7 +64,7 @@ internal fun Modifier.glideTyping(
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 if (!tracker.claimed && change.isConsumed) break
                 if (!change.pressed) {
-                    if (tracker.claimed) {
+                    if (tracker.finish(change.position.x + origin.x, change.position.y + origin.y)) {
                         change.consume()
                         currentOnTrace(tracker.xs(), tracker.ys())
                     }

@@ -47,13 +47,27 @@ class GlideTracker(
         }
         add(x, y)
         if (claimed) return false
+        add(x, y)
+        updateClaimed(x, y)
+        return claimed
+    }
+
+    /** Include the pointer-up coordinate; Compose may deliver the final travel only on release. */
+    fun finish(x: Float, y: Float): Boolean {
+        if (abandoned) return false
+        add(x, y)
+        updateClaimed(x, y)
+        return claimed
+    }
+
+    private fun updateClaimed(x: Float, y: Float) {
+        if (claimed) return
         val spanX = (maxX - minX) / keyWidth
         val spanY = (maxY - minY) / keyHeight
         val horizontal = abs(x - startX) > abs(y - startY)
         claimed = (visited.size >= 3 && (spanX >= MIN_SPAN_KEYS || spanY >= MIN_ROWS)) ||
             (visited.size >= 2 && ((horizontal && spanX >= MIN_SPAN_KEYS) ||
                 (allowShortVertical && spanY >= MIN_SPAN_KEYS)))
-        return claimed
     }
 
     fun abandon() { if (!claimed) abandoned = true }
