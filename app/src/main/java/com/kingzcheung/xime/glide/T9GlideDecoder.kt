@@ -67,6 +67,44 @@ class T9GlideDecoder(private val keypad: GlideKeyboard, codes: List<String>) {
     }
 
     /**
+     * Convert the sampled finger path to an ordered T9 digit sequence.
+     * Consecutive samples within the same key are collapsed, but returning to
+     * a key later is preserved: 9-6-9-3-6 stays 96936.
+     */
+    fun decodeDigits(xs: FloatArray, ys: FloatArray): String {
+        if (xs.size < 2 || xs.size != ys.size) return ""
+        val unit = keypad.keyUnit
+        val digits = StringBuilder()
+        var previous: Char? = null
+        var length = 0f
+        for (i in xs.indices) {
+            val x = xs[i] / unit
+            val y = ys[i] / unit
+            if (i > 0) length += hypot(x - xs[i - 1] / unit, y - ys[i - 1] / unit)
+            val key = nearestKey(x, y)
+            if (key != previous) {
+                digits.append(key)
+                simplifyStraightThroughKeys(digits)
+            }
+            previous = key
+        }
+        return if (length >= MIN_PATH_KEYS && digits.length >= 2) digits.toString() else ""
+    }
+
+    private fun simplifyStraightThroughKeys(digits: StringBuilder) {
+        if (digits.length < 3) return
+        val a = keypad.centers[digits[digits.length - 3]] ?: return
+        val b = keypad.centers[digits[digits.length - 2]] ?: return
+        val c = keypad.centers[digits[digits.length - 1]] ?: return
+        val ab = hypot(b.first - a.first, b.second - a.second)
+        val bc = hypot(c.first - b.first, c.second - b.second)
+        val ac = hypot(c.first - a.first, c.second - a.second)
+        if (ac > 0f && kotlin.math.abs((ab + bc) - ac) <= keypad.keyUnit * 0.12f) {
+            digits.delete(digits.length - 2, digits.length - 1)
+        }
+    }
+
+    /**
      * [xs]/[ys] 为与键中心同一坐标系的轨迹点；轨迹过短或没有合理解时返回空表。
      * [limit] 是返回的拼音编码数，[perGroup] 是同一数字串最多取几个编码。
      */

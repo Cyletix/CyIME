@@ -231,14 +231,18 @@ private fun T9KeyboardSwipeOverlay(
         val keys = t9Geometry.snapshot()
         if (keys.size < 6) return@trace
         // 输入框归属在抬手时确定；识别完成前切换输入框则作废。
-        val inputContext = runCatching { callbacks.captureInputContext() }.getOrNull() ?: return@trace
         glideScope.launch {
-            val candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val digits = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 val keyboard = com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys)
-                com.kingzcheung.xime.glide.GlideLexicon.t9Decoder(glideContext, keyboard).decode(xs, ys)
+                com.kingzcheung.xime.glide.GlideLexicon.t9Decoder(glideContext, keyboard).decodeDigits(xs, ys)
             }
-            if (candidates.isEmpty()) return@launch
-            kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word) }
+            if (digits.length < 2) return@launch
+            // Feed the ordered digit sequence through the existing T9 controller.
+            // This preserves repeated keys (96936) and keeps the left pinyin panel,
+            // Rime candidates, learning, and candidate navigation on the normal path.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                digits.forEach { controller.onDigitPressed(it.toString()) }
+            }
         }
     }
 

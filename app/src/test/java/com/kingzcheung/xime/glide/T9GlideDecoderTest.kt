@@ -36,6 +36,23 @@ class T9GlideDecoderTest {
         assertEquals("ni", decoder.decode(xs, ys).first().word)
     }
 
+    @Test fun decodeDigitsPreservesNonConsecutiveRepeatedKeys() {
+        val decoder = T9GlideDecoder(GlideLexicon.keyboard(keys), listOf("wo zen me"))
+        val path = listOf('9', '6', '9', '3', '6').zipWithNext().flatMap { (from, to) ->
+            val start = center(from)
+            val end = center(to)
+            (0 until 8).map { step ->
+                val fraction = step / 8f
+                (start.first + (end.first - start.first) * fraction) to
+                    (start.second + (end.second - start.second) * fraction)
+            }
+        } + center('6')
+        val xs = path.map { it.first }.toFloatArray()
+        val ys = path.map { it.second }.toFloatArray()
+
+        assertEquals("96936", decoder.decodeDigits(xs, ys))
+    }
+
     @Test fun straightFiveToTwoProducesThe52PinyinCandidates() {
         val decoder = T9GlideDecoder(GlideLexicon.keyboard(keys), listOf("la", "ka", "ja"))
         val (xs, ys) = straightTrace('5', '2')
