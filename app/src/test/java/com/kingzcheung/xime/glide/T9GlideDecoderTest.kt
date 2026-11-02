@@ -70,6 +70,28 @@ class T9GlideDecoderTest {
             path.map { it.first }.toFloatArray(), path.map { it.second }.toFloatArray()))
     }
 
+    @Test fun arbitraryLongPathsKeepNonConsecutiveReturns() {
+        val decoder = T9GlideDecoder(GlideLexicon.keyboard(keys), listOf("a"))
+        val cases = listOf(
+            "26952" to "26952",
+            "25852" to "25852",
+            "65456" to "65456",
+        )
+        for ((pathDigits, expected) in cases) {
+            val path = pathDigits.zipWithNext().flatMap { (from, to) ->
+                val start = center(from)
+                val end = center(to)
+                (0 until 6).map { step ->
+                    val fraction = step / 6f
+                    (start.first + (end.first - start.first) * fraction) to
+                        (start.second + (end.second - start.second) * fraction)
+                }
+            } + center(pathDigits.last())
+            assertEquals(expected, decoder.decodeDigits(
+                path.map { it.first }.toFloatArray(), path.map { it.second }.toFloatArray()))
+        }
+    }
+
     @Test fun straightFiveToTwoProducesThe52PinyinCandidates() {
         val decoder = T9GlideDecoder(GlideLexicon.keyboard(keys), listOf("la", "ka", "ja"))
         val (xs, ys) = straightTrace('5', '2')
