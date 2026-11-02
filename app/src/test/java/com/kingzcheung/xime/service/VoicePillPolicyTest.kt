@@ -16,13 +16,14 @@ class VoicePillPolicyTest {
         assertFalse(voicePillExpandsOnShowRequest(voiceCollapsed = true, selfShow = false, configChange = true))
     }
 
-    @Test fun `scrolling away the keyboard and the collapse button keep listening`() {
+    @Test fun `only the collapse button keeps listening`() {
         val keeps = VoiceSessionEnd.entries.filter(::voiceKeepsListeningAfter).toSet()
-        assertEquals(setOf(VoiceSessionEnd.COLLAPSE_BUTTON, VoiceSessionEnd.APP_HIDES_KEYBOARD), keeps)
+        assertEquals(setOf(VoiceSessionEnd.COLLAPSE_BUTTON), keeps)
     }
 
-    @Test fun `back, sending, focus loss and every other way the input ends stop voice`() {
-        for (end in listOf(VoiceSessionEnd.BACK_KEY, VoiceSessionEnd.FIELD_CLEARED, VoiceSessionEnd.FOCUS_LEAVES,
+    @Test fun `back, tapping elsewhere, sending, focus loss and every other way the input ends stop voice`() {
+        for (end in listOf(VoiceSessionEnd.BACK_KEY, VoiceSessionEnd.APP_HIDES_KEYBOARD,
+            VoiceSessionEnd.FIELD_CLEARED, VoiceSessionEnd.FOCUS_LEAVES,
             VoiceSessionEnd.FOCUS_TO_OTHER_FIELD, VoiceSessionEnd.SENSITIVE_FIELD, VoiceSessionEnd.HOME,
             VoiceSessionEnd.APP_SWITCH, VoiceSessionEnd.SCREEN_OFF, VoiceSessionEnd.ROTATION,
             VoiceSessionEnd.SWITCH_KEYBOARD, VoiceSessionEnd.OPEN_CAPTIONS)) {

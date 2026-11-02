@@ -35,11 +35,11 @@ internal enum class VoiceSessionEnd {
 }
 
 /**
- * 听写在这些情况下继续（显示悬浮条）：收起按钮；键盘被收起但输入框焦点还在（翻看页面）。
- * 其余情况本次听写都结束并立即释放麦克风（用户 10-24 选定）。
+ * 只有用户自己点收起按钮，听写才继续并显示悬浮条。点别处让应用收起键盘也算离开：
+ * 听写结束、立即释放麦克风，不能再自己弹出悬浮条把焦点拉回输入框（用户 11-02）。
  */
 internal fun voiceKeepsListeningAfter(end: VoiceSessionEnd): Boolean =
-    end == VoiceSessionEnd.COLLAPSE_BUTTON || end == VoiceSessionEnd.APP_HIDES_KEYBOARD
+    end == VoiceSessionEnd.COLLAPSE_BUTTON
 
 /** 听写中输入框从有字变成空（读不到时不算）。 */
 internal fun voiceFieldCleared(hadText: Boolean, textNow: CharSequence?): Boolean =

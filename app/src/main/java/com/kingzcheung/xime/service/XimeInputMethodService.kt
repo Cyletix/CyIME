@@ -3798,7 +3798,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onFinishInputView(finishingInput)
         runtimeObserver?.stop()
         com.kingzcheung.xime.stats.TypingStats.flush()
-        // App 收起键盘但输入框焦点还在（往上翻看内容等）：听写继续，随后换成悬浮条。
+        // App 收起键盘（点了别处）：听写结束，不再自己弹悬浮条；只有收起按钮才出悬浮条（voiceKeepsListeningAfter）。
         voiceKeptAlive = !finishingInput && voiceKeepsAliveOnHide()
         if (!voiceKeptAlive) noteVoicePillInterrupted(VoiceSessionEnd.FOCUS_LEAVES)
         mainHandler.removeCallbacks(resumeVoicePill)
@@ -4184,7 +4184,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         requestHideSelf(0)
     }
     
-    // 键盘被 App 收起但焦点还在时继续听写（用户 10-24 选的方案）。
+    // 键盘被 App 收起时是否继续听写：按 voiceKeepsListeningAfter，现在一律结束（用户 11-02）。
     private var voiceKeptAlive = false
     /** 悬浮条是 App 收起键盘后自己弹出的：听写结束时一起收起。 */
     private var voicePillAuto = false
