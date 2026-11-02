@@ -165,6 +165,9 @@ fun LanguageKeyButton(
     var selectedId by remember { mutableStateOf<String?>(null) }
     // 松手后菜单仍开着（点选模式）。
     var menuSticky by remember { mutableStateOf(false) }
+    // 手指从语言键滑进菜单必然先经过底边；进到边缘以内一次后，边缘才开始自动滚动，
+    // 免得一滑进去列表就自己往下跑。
+    var edgeScrollArmed by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
     val density = LocalDensity.current
     val panelBounds = LocalLanguageMenuPanel.current
@@ -176,11 +179,18 @@ fun LanguageKeyButton(
     val edgeSize = with(density) { 20.dp.toPx() }
     val scrollStep = with(density) { 8.dp.toPx() }
 
-    LaunchedEffect(menuOpen) { if (menuOpen) scroll.scrollTo((menuSchemas.indexOfFirst { it.schemaId == actions.currentInputModeId }.coerceAtLeast(0) * rowHeight).toInt()) }
+    LaunchedEffect(menuOpen) {
+        if (menuOpen) scroll.scrollTo(languageMenuInitialScroll(menuGeometry,
+            menuSchemas.indexOfFirst { it.schemaId == actions.currentInputModeId }, density.density))
+    }
     // 仅在手指进入边缘时滚动；新菜单不继承上次手势的位置。
     LaunchedEffect(menuOpen, pointer, viewport) {
         if (!menuOpen || selectedId == null || !pointer.x.isFinite() || !pointer.y.isFinite() ||
             pointer.x < viewport.left || pointer.x >= viewport.right) return@LaunchedEffect
+        if (!edgeScrollArmed) {
+            if (pointer.y >= viewport.top + edgeSize && pointer.y <= viewport.bottom - edgeSize) edgeScrollArmed = true
+            return@LaunchedEffect
+        }
         val delta = when {
             pointer.y < viewport.top + edgeSize -> -scrollStep
             pointer.y > viewport.bottom - edgeSize -> scrollStep
@@ -195,11 +205,14 @@ fun LanguageKeyButton(
 
     val menuHoldSeconds by rememberUpdatedState(
         normalizeLanguageMenuHoldSeconds(LocalKeyboardInputPreferences.current.languageMenuHoldSeconds))
+    // 「长按语言键切换输入法」（GitHub #60 #68，默认关）：长按到时弹系统的输入法选择框，不弹语言列表。
+    val imePicker by rememberUpdatedState(LocalKeyboardInputPreferences.current.languageKeyImePicker)
     fun closeMenu() {
         menuOpen = false
         menuSticky = false
         selectedId = null
         pointer = Offset.Unspecified
+        edgeScrollArmed = false
     }
     fun choose(id: String) {
         closeMenu()
@@ -249,15 +262,25 @@ fun LanguageKeyButton(
                     if (down.isConsumed) return@awaitEachGesture
                     var chosenId: String? = null
                     var keepOpen = false
+                    var pickerShown = false
                     // 按在语言键上就不让键盘的滑动移光标接手，菜单弹出前后都一样。
                     suppressCursorMove.value = true
-                    val menuJob = if (hasMenu) scope.launch {
+                    val menuJob = if (imePicker) scope.launch {
+                        delay((menuHoldSeconds * 1000).roundToLong())
+                        pickerShown = true
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                            as? android.view.inputmethod.InputMethodManager
+                        @Suppress("DEPRECATION")
+                        imm?.showInputMethodPicker()
+                    } else if (hasMenu) scope.launch {
                         delay((menuHoldSeconds * 1000).roundToLong())
                         menuSchemas = schemas
                         selectedId = null
                         viewport = Rect.Zero
                         pointer = Offset.Unspecified
                         menuSticky = false
+                        edgeScrollArmed = false
                         menuOpen = true
                         suppressCursorMove.value = true
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
@@ -267,7 +290,11 @@ fun LanguageKeyButton(
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (change.isConsumed) break
-                            if (menuOpen) {
+                            if (pickerShown) {
+                                // 选择框已弹出：吃掉这次按压剩下的事件，松手不再算一次点按（不切语言）。
+                                change.consume()
+                                if (!change.pressed) break
+                            } else if (menuOpen) {
                                 change.consume()
                                 pointer = keyScreenPosition + change.position
                                 selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight, selectedId)
@@ -399,7 +426,7 @@ private fun rememberLanguageMenuBlurAvailable(): Boolean {
     return remember(context) {
         android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && runCatching {
             context.getSystemService(android.view.WindowManager::class.java)?.isCrossWindowBlurEnabled == true ||
-                com.kingzcheung.xime.ui.theme.SamsungWindowBlur.isAvailable
+                com.kingzcheung.xime.ui.theme.SamsungWindowBlur.usableFor(context)
         }.getOrDefault(false)
     }
 }

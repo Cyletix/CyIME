@@ -86,8 +86,8 @@ internal fun KeyboardKeySpacingScope(
         )
         val bottomClearance = LocalFloatingBottomClearance.current
         if (bottomClearance != null && growthSpacing != null) {
-            val clearance = verticalInset.value + metrics.bottomSpaceDp + metrics.extraInsetY +
-                resolvedVisualGap(growthSpacing.second, metrics.insetY ?: 0f) / 2f
+            // 只有下面真正施加在整行外面的 padding 可以用来拖动；键帽内缩处仍是底排按键的触摸区。
+            val clearance = metrics.bottomSpaceDp
             SideEffect { bottomClearance.floatValue = clearance }
             DisposableEffect(bottomClearance) {
                 onDispose { bottomClearance.floatValue = 0f }

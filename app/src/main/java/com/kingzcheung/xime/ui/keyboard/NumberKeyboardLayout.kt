@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
@@ -114,15 +113,6 @@ fun NumberKeyboardLayout(
 
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
 
-    val bubbleData = rememberSwipeBubbleDrawData(
-        swipeState = swipeBubble.state,
-        keyBounds = swipeBubble.keyBounds,
-        keyBackgroundColor = bubbleBackgroundColor,
-        keyTextColor = keyTextColor,
-        accentColor = specialKeyTextColor,
-        keyWidth = if (swipeBubble.state.isSwiping || swipeBubble.state.isPressed) swipeBubble.keyBounds.width else 0f,
-        keyboardWidth = keyboardBounds.width
-    )
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
@@ -147,7 +137,7 @@ fun NumberKeyboardLayout(
                 keyboardBounds = coordinates.boundsInRoot()
             }
     ) {
-        SwipeBubbleOverlay(bubbleData)
+        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
         run {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
@@ -202,7 +192,6 @@ private fun NumberRows(
     val symFontSize = if (compactMode) 14.sp else 18.sp
     val keyFontSize = if (compactMode) 16.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val ctrlFontSize = if (compactMode) 12.sp else androidx.compose.ui.unit.TextUnit.Unspecified
-    val suppressCursorMove = LocalSuppressCursorMove.current
     val symbols = listOf("+", "-", "*", "/")
     Column(Modifier.fillMaxSize()) {
         // Numeric navigation uses the operator-column width, independent of the text row.
@@ -242,7 +231,7 @@ private fun NumberRows(
                     upFeedback = KeyFlickFeedback.DELETE,
                     swipeUpLabel = "上滑清空", downFeedback = KeyFlickFeedback.UNDO, swipeDownLabel = "下滑撤回",
                     onSwipeUp = { onKeyPress("clear_all") }, onSwipeDown = { onKeyPress("undo_clear") },
-                    onSwipeLeft = { suppressCursorMove.value = true; onKeyPress("clear_composition") },
+                    distanceDelete = true,
                     onSwipeStateChange = onSwipeStateChange,
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius)
@@ -251,11 +240,12 @@ private fun NumberRows(
                     modifier = Modifier.weight(1f), onPress = { onKeyPressDown?.invoke("space") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius, fontSize = ctrlFontSize)
-                IconKeyButton(icon = rememberVectorPainter(Icons.Default.EmojiEmotions),
-                    onClick = { onKeyPress("emoji") }, backgroundColor = specialKeyBackgroundColor,
-                    iconColor = specialKeyTextColor, modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("emoji") }, shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                // 表情在工具栏里已有入口；这里放邮箱、@人常用的 @，和小数点一样是直接上屏的字符键。
+                KeyButton(text = "@", onClick = { onKeyPress("@") },
+                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                    modifier = Modifier.weight(1f).testTag("number-at-key"), onPress = { onKeyPressDown?.invoke("@") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                    shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
             }
         }
         Row(Modifier.fillMaxWidth().weight(1f)) {

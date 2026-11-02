@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
+import com.kingzcheung.xime.ui.theme.liquidGlassCap
 
 internal const val KEY_GLOW_DURATION_MS = 500
 internal const val KEY_CAP_DURATION_MS = 235
@@ -45,10 +46,19 @@ internal fun Modifier.keyGlow(
     applyMaterial: Boolean = true,
     // 1 = full glow; drops toward 0 while a semantic flick colour (clear/undo) takes over the key.
     glowVisibility: Float = 1f,
+    /** 液态玻璃只给有键帽的按键；表情格、编辑页的无底色键不画。 */
+    liquid: Boolean = true,
 ): Modifier = composed {
     val visibility by rememberUpdatedState(glowVisibility.coerceIn(0f, 1f))
-    val paintedCap = if (applyMaterial) cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current, materialLevel) else cap
     val preferences = LocalKeyboardInputPreferences.current
+    // 液态玻璃（玻璃开着才生效）代替按键上的视觉样式；蜂窝布局的六边形键不画（高光按圆角矩形画）。
+    val liquidCap = applyMaterial && liquid && preferences.frostedGlass.enabled && !LocalHoneycombKeys.current &&
+        com.kingzcheung.xime.ui.theme.LiquidGlass.enabled(androidx.compose.ui.platform.LocalContext.current)
+    val paintedCap = when {
+        liquidCap -> Modifier.liquidGlassCap(cap, LocalKeyCornerRadius.current)
+        applyMaterial -> cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current, materialLevel)
+        else -> cap
+    }
     val glowEnabled = preferences.keyGlowEnabled
     val motionEnabled = preferences.keyAnimationEnabled && animateCap
     if (!glowEnabled && !motionEnabled) return@composed this.then(paintedCap)

@@ -17,6 +17,19 @@ object CtrlShortcuts {
 
     fun label(letter: Char): String? = labels[letter.lowercaseChar()]
 
+    /**
+     * 全选、复制、剪切、粘贴不发模拟按键，走编辑面板同一条输入框自带动作（返回编辑面板的动作名）。
+     * 11-02 用户反馈：荣耀 Magic8 的微信收到模拟的 Ctrl+A 不全选，只在光标处留一个空选择框，杀掉微信才消失；
+     * 编辑面板的全选在同一个输入框里正常。其他字母仍发 Ctrl+字母，由应用自己处理。
+     */
+    fun editingAction(letter: Char): String? = when (letter.lowercaseChar()) {
+        'a' -> "select_all"
+        'c' -> "copy"
+        'x' -> "cut"
+        'v' -> "paste"
+        else -> null
+    }
+
     /** 和实体键盘一样：Ctrl 按下、字母按下抬起都带 Ctrl、Ctrl 抬起；由应用自己处理（复制、关标签页等）。 */
     fun keyEvents(letter: Char, now: Long): List<KeyEvent> {
         val lower = letter.lowercaseChar()
@@ -33,13 +46,6 @@ object CtrlShortcuts {
             event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0),
         )
     }
-
-    /** 「Z X C V 上角标改成撤销/剪切/复制/粘贴」打开时换掉上角标的几个字母（10-31 用户反馈，默认关）。 */
-    val EDIT_CORNER_LETTERS = setOf('z', 'x', 'c', 'v')
-
-    /** 单字母 z/x/c/v 键在开关打开时返回它的字母（上角标改发 Ctrl+这个字母），其他键和双字母键返回 null。 */
-    fun editCornerLetter(key: String, enabled: Boolean): Char? =
-        key.singleOrNull()?.lowercaseChar()?.takeIf { enabled && it in EDIT_CORNER_LETTERS }
 
     /** 键盘层经 [GestureAction.COMMAND] 传给服务的命令名。 */
     fun command(letter: Char): String = "ctrl:${letter.lowercaseChar()}"

@@ -118,7 +118,7 @@ internal class ImeGlassBlurWindow(
             return
         }
         observeAvailability()
-        if (!blurAvailable && !SamsungWindowBlur.isAvailable) {
+        if (!blurAvailable && !SamsungWindowBlur.usableFor(context)) {
             observeParent(null)
             removeWindow()
             return
@@ -285,7 +285,7 @@ internal class ImeGlassBlurWindow(
             window.decorView.invalidateOutline()
             appliedCornerRadius = corner
         }
-        val useSamsung = !blurAvailable && SamsungWindowBlur.isAvailable
+        val useSamsung = !blurAvailable && SamsungWindowBlur.usableFor(context)
         if (appliedBlurRadius != blurRadiusPx || appliedSamsungBlur != useSamsung ||
             (useSamsung && cornerChanged)) {
             // DecorView itself listens for cross-window blur availability changes and switches

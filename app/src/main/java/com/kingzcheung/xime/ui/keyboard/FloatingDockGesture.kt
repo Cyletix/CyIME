@@ -1,5 +1,15 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
+import kotlin.math.abs
+
 internal enum class FloatingDockEdge { BOTTOM, LEFT, RIGHT, TOP }
 
 /** 只在导航栏上方的底部贴边区恢复；横向和顶部位置不参与恢复判定。 */
@@ -15,12 +25,8 @@ internal fun floatingDockEdge(
     return if ((offsetY - bottomInset).coerceAtLeast(0f) <= tolerance) FloatingDockEdge.BOTTOM else null
 }
 
-/**
- * How long a dragged floating card must rest on the bottom edge before it docks, which is also how
- * long its outline takes to morph into the docked shape. 0.75 s: 0.5 s docked a tall card (clipboard
- * search open) by accident, 1 s was too slow (user, 2026-10-22 and 10-23).
- */
-internal const val FLOATING_DOCK_DURATION_MILLIS = 750L
+/** 已经靠近底边，剩余行程不足一次长拖时的短停顿。 */
+internal const val FLOATING_DOCK_DURATION_MILLIS = 300L
 
 /**
  * Releasing docks exactly when the preview shows the docked shape: the outline has reached it and the
@@ -31,48 +37,72 @@ internal fun floatingDockOnRelease(previewProgress: Float, onBottomEdge: Boolean
 internal const val FLOATING_DRAG_BAR_HEIGHT_DP = 28
 
 /** 调节界面里固定键盘上拖变悬浮：先有 [FIXED_TO_FLOATING_DEAD_ZONE_DP] 不动的阻力，再拉 [FIXED_TO_FLOATING_PULL_DP] 才满。 */
-internal const val FIXED_TO_FLOATING_DEAD_ZONE_DP = 24f
+internal const val FIXED_TO_FLOATING_DEAD_ZONE_DP = 48f
 internal const val FIXED_TO_FLOATING_PULL_DP = 96f
 
-internal fun fixedToFloatingPullProgress(pulledUpDp: Float): Float =
-    ((pulledUpDp - FIXED_TO_FLOATING_DEAD_ZONE_DP) / FIXED_TO_FLOATING_PULL_DP).coerceIn(0f, 1f)
+internal fun modeSwitchPullProgress(verticalDp: Float, horizontalDp: Float = 0f): Float =
+    ((verticalDp - abs(horizontalDp) - FIXED_TO_FLOATING_DEAD_ZONE_DP) / FIXED_TO_FLOATING_PULL_DP).coerceIn(0f, 1f)
 
 /** 移动条覆盖键帽以下的完整空白，卡片本身仍只额外预留原来的 28dp。 */
 internal fun floatingDragAreaHeightDp(contentPaddingDp: Int, keyClearanceDp: Float, totalHeightDp: Float): Float =
     (FLOATING_DRAG_BAR_HEIGHT_DP + contentPaddingDp.coerceAtLeast(0) + keyClearanceDp.coerceAtLeast(0f))
         .coerceAtMost(totalHeightDp.coerceAtLeast(0f))
 
-/** 持续贴底半秒完成恢复预览，只有正常松手才能确认。 */
-internal class FloatingDockGesture(private val holdMillis: Long = FLOATING_DOCK_DURATION_MILLIS) {
-    private var dragging = false
-    private var edge: FloatingDockEdge? = null
-    private var enteredAt = 0L
+/** 距离来自手指在屏幕上的净位移，即使卡片先碰到边也能识别继续往下拖。 */
+internal class FloatingDockGesture {
+    private var x = 0f
+    private var y = 0f
+    private var pull by mutableFloatStateOf(0f)
+    private var hold by mutableFloatStateOf(0f)
+    var armed by mutableStateOf(false)
+        private set
+    var epoch by mutableIntStateOf(0)
+        private set
+    val progress get() = if (armed) maxOf(pull, hold) else 0f
 
-    fun start(currentEdge: FloatingDockEdge?, now: Long) {
-        cancel()
-        dragging = true
-        update(currentEdge, now)
-    }
-
-    fun update(currentEdge: FloatingDockEdge?, now: Long): Boolean {
-        if (!dragging) return false
-        val bottomEdge = currentEdge?.takeIf { it == FloatingDockEdge.BOTTOM }
-        if (edge != bottomEdge) {
-            edge = bottomEdge
-            enteredAt = now
+    fun move(dx: Float, dy: Float, onBottom: Boolean) {
+        x += dx
+        y += dy
+        pull = modeSwitchPullProgress(y, x)
+        val next = onBottom && y - abs(x) >= 8f && dy >= 0f
+        if (armed != next) {
+            if (!next) {
+                // 离开或回拉表示这次贴底作废，再次靠近要从新的方向和行程开始。
+                x = 0f
+                y = 0f
+                pull = 0f
+            }
+            armed = next
+            hold = 0f
+            epoch++
         }
-        return edge != null && now - enteredAt >= holdMillis
     }
 
-    fun release(currentEdge: FloatingDockEdge?, now: Long): Boolean {
-        val restore = update(currentEdge, now)
-        cancel()
-        return restore
+    fun advanceHold(elapsedMillis: Long, startedEpoch: Int) {
+        if (armed && epoch == startedEpoch)
+            hold = (elapsedMillis.toFloat() / FLOATING_DOCK_DURATION_MILLIS).coerceIn(0f, 1f)
     }
 
     fun cancel() {
-        dragging = false
-        edge = null
-        enteredAt = 0L
+        x = 0f
+        y = 0f
+        pull = 0f
+        hold = 0f
+        armed = false
+        epoch++
+    }
+}
+
+/** 用帧时间计时，系统动画倍率不会把手势的等待时间放大。 */
+@Composable
+internal fun TrackDockHold(gesture: FloatingDockGesture) {
+    val epoch = gesture.epoch
+    LaunchedEffect(gesture, epoch) {
+        if (!gesture.armed) return@LaunchedEffect
+        val start = withFrameMillis { it }
+        do {
+            val elapsed = withFrameMillis { it } - start
+            gesture.advanceHold(elapsed, epoch)
+        } while (elapsed < FLOATING_DOCK_DURATION_MILLIS && gesture.armed && gesture.epoch == epoch)
     }
 }

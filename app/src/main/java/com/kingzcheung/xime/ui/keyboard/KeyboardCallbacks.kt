@@ -15,6 +15,8 @@ data class KeyboardCallbacks(
     val onGlideWord: ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> Unit)? = null,
     /** 中文滑行：识别出的一个词的编码（全拼或双拼），按点按同一路径接进当前编码。 */
     val onGlideCode: ((String) -> Unit)? = null,
+    /** 英文滑行实时预览：每笔开头取一次，返回按上下文算“现在抬手会上屏什么”的函数（可在后台线程调用）。 */
+    val glidePreviewer: (() -> ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> String)?)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },
     val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },
     /** 九键组句的上文：组合为空时光标前的已上屏文字；null 表示未知或正在组合。 */
@@ -54,6 +56,9 @@ data class KeyboardCallbacks(
     val onRequestPinyinSyllables: ((Long, (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,
     val onSelectPinyinSyllable: ((com.kingzcheung.xime.rime.PinyinSyllableChoices, Int,
         (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,
+    /** Takes back the last chosen syllable; the second lambda runs when nothing was taken back. */
+    val onUndoPinyinSyllable: ((com.kingzcheung.xime.rime.PinyinSyllableChoices, () -> Unit,
+        (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,
     val onAssociationSelect: ((Int) -> Unit)? = null,
     val onClearAssociation: (() -> Unit)? = null,
     val onToggleDarkMode: (() -> Unit)? = null,
@@ -84,6 +89,7 @@ data class KeyboardCallbacks(
     val onVoiceModeChange: ((Boolean) -> Unit)? = null,
     val onVoiceStickyToggle: (() -> Unit)? = null,
     val onVoiceHoldEnd: (() -> Unit)? = null,
+    val onVoiceHoldCancel: (() -> Unit)? = null,
     val onPageDown: (() -> Unit)? = null,
     val onPageUp: (() -> Unit)? = null,
     val onCursorMove: ((Int) -> Unit)? = null,
@@ -195,4 +201,8 @@ data class KeyboardCallbacks(
     val onJapaneseKanaAction: ((JapaneseKanaAction) -> Unit)? = null,
     /** Explicit symbol categories commit the chosen glyph without width conversion. */
     val onCommitExactText: ((String) -> Unit)? = null,
+    val onDeleteKaomoji: ((String?) -> String?)? = null,
+    /** Create a gesture-local editor; its argument is the net number of characters to remove
+     *  before the caret, or minus the number to remove after it (right swipe = forward delete). */
+    val startDeleteDrag: (() -> (Int) -> Unit)? = null,
 )

@@ -148,15 +148,6 @@ onKeyPressDown: ((String) -> Unit)?,
 
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
 
-    val bubbleData = rememberSwipeBubbleDrawData(
-        swipeState = swipeBubble.state,
-        keyBounds = swipeBubble.keyBounds,
-        keyBackgroundColor = bubbleBackgroundColor,
-        keyTextColor = keyTextColor,
-        accentColor = specialKeyTextColor,
-        keyWidth = if (swipeBubble.state.isSwiping || swipeBubble.state.isPressed) swipeBubble.keyBounds.width else 0f,
-        keyboardWidth = keyboardBounds.width
-    )
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
@@ -183,7 +174,7 @@ onKeyPressDown: ((String) -> Unit)?,
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
-        SwipeBubbleOverlay(bubbleData)
+        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
         if (isLandscape) {
             // 横屏：去除原左侧符号面板（符号走符号键盘），
             // 笔画布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
@@ -298,7 +289,6 @@ private fun StrokeKeyboardContent(
         else (if (keyTextColor == Color(0xFFE8EAED)) Color.White
               else Color(0xFF1A73E8))
 
-    val suppressCursorMove = LocalSuppressCursorMove.current
 
     // 笔画键滑动手势（keyboard.stroke.keys，热重载经 configVersion 感知）：
     // 有配置走配置（可覆盖上滑/新增下滑动作），无配置回退内置默认（上滑提交对应数字）。
@@ -605,10 +595,7 @@ private fun StrokeKeyboardContent(
                 swipeDownLabel = "下滑撤回",
                 onSwipeUp = { onKeyPress("clear_all") },
                 onSwipeDown = { onKeyPress("undo_clear") },
-                onSwipeLeft = {
-                    suppressCursorMove.value = true
-                    onKeyPress("clear_composition")
-                },
+                distanceDelete = true,
                 onSwipeStateChange = onSwipeStateChange,
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
@@ -862,7 +849,7 @@ private fun ResetKey(
                 9f, density.fontScale, 20f)) {
 Text(
             text = "重输",
-            color = keyHintColor(textColor, frostedGlass, 0.5f),
+            color = keyHintColor(textColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
             fontSize = 9.sp,
             lineHeight = 11.sp,
             fontWeight = FontWeight.Normal,

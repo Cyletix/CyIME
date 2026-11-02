@@ -23,6 +23,7 @@ internal data class RepeatingKeyActions(
     val downLabel: String? = null,
     // 上下动作对调后，预览仍从原提示所在一侧出现（“清空”标在上方，下拉时也从上方移入）。
     val swappedVertical: Boolean = false,
+    val startDeleteDrag: (() -> (Int) -> Unit)? = null,
 )
 
 /** A single owner for hold and swipe: touch slop must not cancel repeated deletion. */
@@ -32,12 +33,23 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
     val scope = this
     val actionDistance = 80.dp.toPx()
     val previewDistance = 50.dp.toPx()
+    // 灵敏度比 1.15.41 略低（用户 11-01）：横移 16dp 内不打断点按和长按，30dp 起删，每 16dp 多删一个。
+    val dragCancel = maxOf(viewConfiguration.touchSlop, 16.dp.toPx())
+    val dragStart = 30.dp.toPx()
+    val dragStep = 16.dp.toPx()
+    val backtrackSlop = 4.dp.toPx()
     awaitEachGesture {
         val down = awaitFirstDown()
         val actions = currentActions()
         val repeat = RepeatInput()
         var repeated = false
         var crossed = false
+        var drag: ((Int) -> Unit)? = null
+        // 右滑是对称的向后删除（Delete）：起手方向定下后本次触摸不再换向。
+        var forwardDrag = false
+        var lastCount = 0
+        var released = false
+        var verticalClaimed = false
         down.consume()
         actions.onPress()
         actions.onPreview(SwipeState(isPressed = true))
@@ -58,9 +70,35 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                 val dx = change.position.x - down.position.x
                 val dy = change.position.y - down.position.y
                 val vertical = abs(dy) > abs(dx) * 1.1f
+                if (actions.startDeleteDrag != null && drag == null && !repeated) {
+                    if (vertical && abs(dy) >= previewDistance) verticalClaimed = true
+                    val horizontal = abs(dx) > abs(dy) * 1.4f
+                    if (!verticalClaimed && horizontal && abs(dx) > dragCancel) {
+                        // A deliberate sideways move below threshold is neither a tap nor a hold.
+                        timer?.cancel()
+                        crossed = true
+                        if (abs(dx) >= dragStart) {
+                            repeat.stop()
+                            forwardDrag = dx > 0
+                            drag = actions.startDeleteDrag.invoke()
+                            actions.onPreview(SwipeState(isPressed = true))
+                        }
+                    }
+                }
+                if (drag != null) {
+                    // Absolute distance, not the number of MOVE events; moving back retraces exactly.
+                    fun stops(distance: Float) = if (distance < dragStart) 0 else 1 + ((distance - dragStart) / dragStep).toInt()
+                    // A tiny wobble on a boundary must not alternately delete and reinsert a character.
+                    val distance = if (forwardDrag) dx else -dx
+                    val count = maxOf(stops(distance), minOf(lastCount, stops(distance + backtrackSlop)))
+                    if (count != lastCount) { drag.invoke(if (forwardDrag) -count else count); lastCount = count }
+                    change.consume()
+                    if (!change.pressed) { released = true; break }
+                    continue
+                }
                 val up = vertical && dy < -actionDistance && actions.onUp != null
                 val downSwipe = vertical && dy > actionDistance && actions.onDown != null
-                val left = -dx > abs(dy) * 1.1f && dx < -actionDistance && actions.onLeft != null
+                val left = actions.startDeleteDrag == null && -dx > abs(dy) * 1.1f && dx < -actionDistance && actions.onLeft != null
                 fun flickFrom(start: Float) = keyFlickPreview(dx, dy, start, actionDistance,
                     actions.upLabel?.removePrefix("上滑").takeIf { actions.onUp != null },
                     actions.downLabel?.removePrefix("下滑").takeIf { actions.onDown != null })
@@ -99,6 +137,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                 }
             }
         } finally {
+            if (!released && lastCount != 0) drag?.invoke(0)
             repeat.stop()
             timer?.cancel()
             actions.onRelease()

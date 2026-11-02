@@ -4,6 +4,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class KaomojiDataTest {
+    @Test fun longDeleteFindsOneCompleteFaceAtTheCursor() {
+        for (face in KaomojiData.categories.flatMap { it.faces }) {
+            val before = "正文$face".takeLast(KaomojiData.maxFaceLength)
+            assertEquals(face, KaomojiData.faceBeforeCursor(before, face))
+        }
+        assertEquals(":-)", KaomojiData.faceBeforeCursor("正文o:-)", ":-)"))
+        assertEquals("o:-)", KaomojiData.faceBeforeCursor("正文o:-)", "o:-)"))
+        assertEquals(":-)", KaomojiData.faceBeforeCursor("hello:-)", null))
+        assertEquals("(･o･;)", KaomojiData.faceBeforeCursor("正文(･o･;)", null))
+        assertEquals("^_^", KaomojiData.faceBeforeCursor("正文:-)^_^", ":-)"))
+        assertNull(KaomojiData.faceBeforeCursor("正文(*´▽｀*", "(*´▽｀*)"))
+        assertNull(KaomojiData.faceBeforeCursor("正文", "正文"))
+        assertNull(KaomojiData.faceBeforeCursor(null, ":-)"))
+    }
+
     @Test fun catalogHasDistinctCompleteUnicodeStringsAndIndependentHistory() {
         val faces = KaomojiData.categories.flatMap { it.faces }
         assertEquals(22, KaomojiData.categories.size)

@@ -3,10 +3,13 @@ package com.kingzcheung.xime.ui.keyboard
 import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.data.KaomojiData
 import com.kingzcheung.xime.data.RecentUsageStore
+import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 @Composable
@@ -32,27 +36,47 @@ internal fun KaomojiKeyboard(onSelect: (String) -> Unit, modifier: Modifier = Mo
     accentColor: Color = MaterialTheme.colorScheme.primary,
     leadingTabs: @Composable RowScope.() -> Unit = {},
     onCategoryFeedback: (() -> Unit)? = null,
+    onDeleteFace: ((String?) -> String?)? = null,
+    picked: ArrayDeque<String> = remember { ArrayDeque() },
 ) {
     val context = LocalContext.current
-    var category by remember { mutableIntStateOf(0) }
     var recent by remember { mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_KAOMOJI)) }
-    val faces = if (category == -1) recent else KaomojiData.categories[category].faces
+    // Same as the emoji panel: page 0 is 最近, page i + 1 is category i, in tab order;
+    // swiping the grid left/right moves between categories and the tab strip follows.
+    val categories = KaomojiData.categories
+    val pager = rememberPagerState(initialPage = 1, pageCount = { categories.size + 1 })
+    val tabs = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(pager.currentPage) {
+        if (tabs.layoutInfo.visibleItemsInfo.isNotEmpty() &&
+            tabs.layoutInfo.visibleItemsInfo.none { it.index == pager.currentPage })
+            tabs.animateScrollToItem(pager.currentPage)
+    }
     Column(modifier.fillMaxSize()) {
-        ExpressionPanelBar(textColor, { onSelect("delete") }, leadingTabs) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                ExpressionTab("最近", category == -1, textColor, accentColor, Modifier.testTag("kaomoji-recent")) {
-                    onCategoryFeedback?.invoke(); category = -1
+        ExpressionPanelBar(textColor, { picked.clear(); onSelect("delete") }, leadingTabs,
+            onDeleteFace = onDeleteFace?.let { delete -> {
+                val last = picked.lastOrNull()
+                val removed = delete(last)
+                if (last != null && removed == last) picked.removeLast() else picked.clear()
+            } }) {
+            LazyRow(Modifier.weight(1f).testTag("kaomoji-categories"), state = tabs,
+                horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                item {
+                    ExpressionTab("最近", pager.currentPage == 0, textColor, accentColor, Modifier.testTag("kaomoji-recent")) {
+                        onCategoryFeedback?.invoke(); scope.launch { pager.animateScrollToPage(0) }
+                    }
                 }
-                KaomojiData.categories.forEachIndexed { index, item ->
-                    ExpressionTab(item.name, category == index, textColor, accentColor, Modifier.testTag("kaomoji-category:$index")) {
-                        onCategoryFeedback?.invoke(); category = index
+                itemsIndexed(categories) { index, item ->
+                    ExpressionTab(item.name, pager.currentPage == index + 1, textColor, accentColor, Modifier.testTag("kaomoji-category:$index")) {
+                        onCategoryFeedback?.invoke(); scope.launch { pager.animateScrollToPage(index + 1) }
                     }
                 }
             }
         }
-        if (faces.isEmpty()) PanelEmptyHint("暂无颜文字记录", textColor, Modifier.weight(1f).fillMaxWidth())
-        else BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth().testTag("kaomoji-pages")) { page ->
+        val faces = if (page == 0) recent else categories[page - 1].faces
+        if (faces.isEmpty()) PanelEmptyHint("暂无颜文字记录", textColor, Modifier.fillMaxSize())
+        else BoxWithConstraints(Modifier.fillMaxSize()) {
             // Long faces span several cells instead of wrapping onto a second line.
             val density = LocalDensity.current
             val measurer = rememberTextMeasurer()
@@ -74,12 +98,15 @@ internal fun KaomojiKeyboard(onSelect: (String) -> Unit, modifier: Modifier = Mo
                 Box(Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(RoundedCornerShape(KeyShapes.current.radius(8.dp)))
                     .background(textColor.copy(alpha = .08f)).testTag("kaomoji:$face").clickable {
                         recent = RecentUsageStore.record(context, RecentUsageStore.KEY_RECENT_KAOMOJI, face)
+                        if (picked.size >= 32) picked.removeFirst()
+                        picked.addLast(face)
                         onSelect(face)
                     }.padding(horizontal = 6.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
                     Text(face, color = textColor, fontSize = 16.sp, lineHeight = 22.sp, textAlign = TextAlign.Center)
                 }
             }
             }
+        }
         }
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import com.kingzcheung.xime.ui.theme.cyPopupEnter
@@ -20,10 +21,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * 按键上的浮窗（点按气泡、滑动/长按选择气泡、拂动方向盘）只显示、不接触摸。
- * 浮窗是单独的窗口，盖住按下的键、上一排的键和四周一圈阴影；可接触摸时，落在里面的点按全被它吃掉：
- * 抬手后气泡还留几十毫秒，这时快速再点同一个键或旁边的键就丢字（用户反馈 10-31「同一个键快速连按两下漏字」）。
- * 不接触摸后这些点按落回键盘；正在按着的那根手指本来就归键盘窗口，滑动和长按选择照旧。
+ * 滑动、长按选项和拂动方向盘需要越过键盘边缘，浮窗只负责显示，触摸仍交给按键。
+ * 普通点按由 [PressBubbleLayer] 直接画在键盘窗口里。
  */
 internal val DisplayOnlyPopupProperties = PopupProperties(
     flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -33,6 +32,22 @@ internal val DisplayOnlyPopupProperties = PopupProperties(
 
 /** 悬浮键盘当前的旋转角；独立窗口里的气泡要跟着转，尖角才对得上按键。 */
 internal val LocalFloatingKeyboardRotation = compositionLocalOf { 0f }
+
+/** Only this overlay observes key presses. The keyboard rows don't depend on the preview. */
+@Composable
+internal fun KeyboardSwipeBubbleOverlay(controller: SwipeBubbleController, background: Color,
+    text: Color, accent: Color, keyboardWidth: Float) {
+    if (LocalKeyboardInputPreferences.current.showPressBubble) {
+        PressBubbleLayer(controller, background, text, accent, keyboardWidth)
+    }
+    val choosing by remember(controller) { derivedStateOf { controller.state.isSwiping || controller.state.isLongPress } }
+    if (choosing) {
+        val state = controller.state
+        val bounds = controller.keyBounds
+        SwipeBubbleOverlay(rememberSwipeBubbleDrawData(state, bounds, background, text, accent,
+            if (state.isSwiping || state.isPressed) bounds.width else 0f, keyboardWidth))
+    }
+}
 
 /**
  * 键盘转过时：Popup 的锚点是转过后的布局原点，气泡在布局里的位置也按同一角度转到窗口坐标；

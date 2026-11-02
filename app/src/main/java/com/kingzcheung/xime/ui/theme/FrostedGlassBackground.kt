@@ -81,6 +81,12 @@ internal fun Modifier.frostedGlassBackground(
                 if (image == null) drawRect(shared.fallback, alpha = shared.opacity)
                 else {
                     val offset = shared.frame.offsetIn(origin)
+                    // The window/inset frame and this surface may move on different layout passes.
+                    // Tint only uncovered pixels so translucent glass is composited exactly once.
+                    clipRect(offset.x, offset.y, offset.x + shared.frame.size.width,
+                        offset.y + shared.frame.size.height, androidx.compose.ui.graphics.ClipOp.Difference) {
+                        drawRect(shared.fallback, alpha = shared.opacity)
+                    }
                     clipRect {
                         translate(offset.x, offset.y) {
                             drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,

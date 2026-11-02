@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,10 +26,12 @@ internal val PanelCategoryHeight = 32.dp
 internal val PanelCategoryVerticalPadding = 4.dp
 
 /** One content bar, like the clipboard filters: modes, scrollable categories, delete. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ExpressionPanelBar(
     textColor: Color, onDelete: () -> Unit,
     leadingTabs: @Composable RowScope.() -> Unit,
+    onDeleteFace: (() -> Unit)? = null,
     categories: @Composable RowScope.() -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().testTag("expression-controls").padding(horizontal = 4.dp, vertical = 2.dp),
@@ -39,7 +42,9 @@ internal fun ExpressionPanelBar(
         categories()
         Box(Modifier.size(PanelCategoryHeight).testTag("expression-delete").clip(RoundedCornerShape(8.dp))
             .background(textColor.copy(alpha = .12f))
-            .clickable(role = Role.Button, onClick = onDelete), contentAlignment = Alignment.Center) {
+            .combinedClickable(role = Role.Button, onClick = onDelete, onLongClick = onDeleteFace,
+                onLongClickLabel = if (onDeleteFace != null) "删除整个颜文字" else null),
+            contentAlignment = Alignment.Center) {
             Icon(Icons.AutoMirrored.Filled.Backspace, "删除", Modifier.size(20.dp), tint = textColor)
         }
     }

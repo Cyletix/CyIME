@@ -184,13 +184,13 @@ internal const val BOTTOM_HANDLE_GESTURE_CLEARANCE_DP = 12f
 /**
  * 固定键盘底边（底部留白）把手的 y，和 [frame] 同一坐标。
  * 手势导航时键盘底边贴着或落进系统底部手势区，按住把手往上拖会被系统当成回桌面（10-31 vivo 用户反馈）；
- * 这时把手抬到手势区上沿之上 [clearancePx]，最多抬卡片高度的四分之一。[gestureZoneTopPx] 为 null
+ * 这时把手抬到手势区上沿之上 [clearancePx]，限制在卡片内。[gestureZoneTopPx] 为 null
  * （三键导航、读不到）或底边离手势区够远时就在底边，和原来一样。
  */
 internal fun fixedBottomHandleY(frame: ResizeRect, gestureZoneTopPx: Float?, clearancePx: Float): Float {
     val safe = (gestureZoneTopPx ?: return frame.bottom) - clearancePx
     if (frame.bottom <= safe) return frame.bottom
-    return safe.coerceIn(frame.bottom - frame.height / 4f, frame.bottom)
+    return safe.coerceIn(frame.top, frame.bottom)
 }
 
 /**
@@ -210,12 +210,12 @@ internal data class ResizeFrameStyle(
 )
 
 /**
- * 粗细与屏幕最短边成正比（400dp 为 1 倍，上限 2 倍）：手机约 1 倍、平板约 2 倍，
- * 线条和把手占屏幕的比例在大小屏上一致。短条和括号放大 [RESIZE_HANDLE_ACTIVE_SCALE] 倍仍在
+ * 按实际键盘的宽度和高度取比例（400dp 为 1 倍，上限 2 倍），小悬浮窗和矮横屏用较细的框。
+ * 短条和括号放大 [RESIZE_HANDLE_ACTIVE_SCALE] 倍仍在
  * [RESIZE_EDGE_HIT_DP] 边带内；括号两臂落在 [RESIZE_CORNER_HIT_DP] 角区附近。
  */
-internal fun resizeFrameStyle(smallestScreenWidthDp: Int): ResizeFrameStyle {
-    val scale = (smallestScreenWidthDp / 400f).coerceIn(0.85f, 2f)
+internal fun resizeFrameStyle(frameSpanDp: Int): ResizeFrameStyle {
+    val scale = (frameSpanDp / 400f).coerceIn(0.85f, 2f)
     return ResizeFrameStyle(
         strokeDp = 2f * scale,
         handleThicknessDp = 5f * scale,

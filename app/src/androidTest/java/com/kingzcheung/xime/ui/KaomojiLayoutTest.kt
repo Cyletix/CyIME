@@ -30,4 +30,20 @@ class KaomojiLayoutTest {
         rule.onNodeWithTag("kaomoji-recent").performScrollTo().performClick()
         rule.onNodeWithTag("kaomoji:$face").assertIsDisplayed()
     }
+
+    @Test fun swipingTheGridMovesBetweenCategoriesLikeTheEmojiPanel() {
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) {
+                MaterialTheme { Box(Modifier.requiredSize(320.dp, 320.dp)) { KaomojiKeyboard({}) } }
+            }
+        }
+        rule.onNodeWithTag("kaomoji-category:0").assertIsSelected()
+        rule.onNodeWithTag("kaomoji-pages").performTouchInput { swipeLeft() }
+        rule.onNodeWithTag("kaomoji-category:1").assertIsSelected()
+        rule.onNodeWithTag("kaomoji:${KaomojiData.categories[1].faces.first()}").assertIsDisplayed()
+        rule.onNodeWithTag("kaomoji-pages").performTouchInput { swipeRight() }
+        rule.onNodeWithTag("kaomoji-category:0").assertIsSelected()
+        rule.onNodeWithTag("kaomoji-pages").performTouchInput { swipeRight() }
+        rule.onNodeWithTag("kaomoji-recent").assertIsSelected()
+    }
 }

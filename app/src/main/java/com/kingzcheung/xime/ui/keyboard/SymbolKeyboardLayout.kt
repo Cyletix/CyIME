@@ -262,7 +262,7 @@ fun SymbolKeyboardLayout(
                 icon = androidx.compose.ui.graphics.vector.rememberVectorPainter(
                     androidx.compose.material.icons.Icons.AutoMirrored.Filled.Backspace),
                 onClick = { onSelect("delete") },
-                onLongClick = { onSelect("delete") },
+                onLongClick = { onSelect("delete") }, distanceDelete = true,
                 backgroundColor = specialKeyBackgroundColor,
                 iconColor = specialKeyTextColor,
                 modifier = Modifier.weight(bottom.enter).testTag("symbol-delete")

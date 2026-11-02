@@ -37,6 +37,7 @@ import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.ui.keyboard.FLOATING_DRAG_BAR_HEIGHT_DP
 import com.kingzcheung.xime.ui.keyboard.FloatingKeyboardContainer
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.KeyboardDockTarget
 import com.kingzcheung.xime.ui.keyboard.KeyboardResizeOverlay
 import com.kingzcheung.xime.ui.keyboard.KeyboardResizePreviewState
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
@@ -175,6 +176,34 @@ class PositionHighlightRenderTest {
     @Test fun pullingTheDockedHandleUpMakesItFloating() = assertTrue(pullDockedHandle(160f))
 
     @Test fun shortPullOnTheDockedHandleStaysDocked() = assertEquals(false, pullDockedHandle(60f))
+
+    @Test fun floatingDragDocksOnADownwardReleaseButNotOnASidewaysMoveAtTheEdge() {
+        var docks = 0
+        var offsetY by mutableStateOf(20)
+        rule.setContent {
+            MaterialTheme {
+                Box(Modifier.requiredSize(hostW.dp, hostH.dp).testTag("host")) {
+                    FloatingKeyboardContainer(isFloatingMode = true, scaleFactor = 0.7f, contentHeightDp = contentH,
+                        offsetX = 0, offsetY = offsetY, minOffsetY = 20, onDrag = { _, _ -> }, onDragEnd = {},
+                        onDock = { docks++ }, dockTarget = KeyboardDockTarget(hostW, contentH, 0, 0, 20)) { FakeKeys() }
+                }
+            }
+        }
+        val bar = rule.onNodeWithTag("floating-drag-bar")
+        bar.performTouchInput {
+            down(center)
+            for (i in 1..8) moveTo(center + Offset(i * 10f, i * 0.5f))
+        }
+        rule.mainClock.advanceTimeBy(900)
+        bar.performTouchInput { up() }
+        rule.runOnIdle { assertEquals(0, docks); offsetY = 170 }
+        bar.performTouchInput {
+            down(center)
+            for (i in 1..18) moveTo(center + Offset(0f, i * 10f))
+            up()
+        }
+        rule.runOnIdle { assertEquals("no hold is required after a deliberate drag to the bottom", 1, docks) }
+    }
 
     private var floatingMode by mutableStateOf(false)
 

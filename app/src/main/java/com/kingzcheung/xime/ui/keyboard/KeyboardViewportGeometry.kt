@@ -11,7 +11,7 @@ data class KeyboardDockTarget(
 
 internal fun KeyboardDockTarget.rectInHost(widthPx: Float, heightPx: Float, density: Float): ResizeRect =
     fixedKeyboardRect(widthPx, heightPx, contentHeightDp * density, bottomPaddingDp * density,
-        bottomInsetDp * density, widthDp * density, offsetXDp * density)
+        bottomInsetDp * density, widthDp * density, offsetXDp * density, density)
 
 /** Service 的内层宿主与窗口必须同时使用这个条件，不能仅在调节时全高。 */
 internal fun usesFullKeyboardHost(floating: Boolean, resizing: Boolean): Boolean = floating || resizing
@@ -52,10 +52,13 @@ internal fun fixedKeyboardRect(
     navigationInsetPx: Float,
     widthPx: Float = hostWidthPx,
     horizontalOffsetPx: Float = 0f,
+    density: Float = 1f,
 ): ResizeRect {
     val bounds = floatingViewportBounds(hostWidthPx, hostHeightPx, navigationInsetPx)
     val height = (contentHeightPx + bottomPaddingPx.coerceAtLeast(0f)).coerceIn(1f, bounds.height)
-    val width = widthPx.coerceIn(1f, bounds.width)
+    // 宽度按整 dp 存，屏幕宽多半不是整 dp（1080px / 2.625 = 411.43dp → 411dp = 1079px）。
+    // 差不到 1dp 就是整宽：和正常显示（FloatingKeyboardContainer）同一条规则，调节时也不能左右挪那 1 像素（用户 11-02）。
+    val width = widthPx.coerceIn(1f, bounds.width).let { if (bounds.width - it < density) bounds.width else it }
     val left = (bounds.width / 2f + horizontalOffsetPx - width / 2f).coerceIn(0f, bounds.width - width)
     return ResizeRect(left, bounds.bottom - height, left + width, bounds.bottom)
 }

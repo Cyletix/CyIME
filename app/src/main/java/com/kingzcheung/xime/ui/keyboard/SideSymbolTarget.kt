@@ -9,11 +9,11 @@ import com.kingzcheung.xime.settings.KeysConfigHelper
 enum class SideSymbolTarget(val key: String, val label: String, val where: String, val slots: Int?, val vertical: Boolean) {
     T9("t9", "九键侧栏", "九键左侧一列，空闲时显示", null, true),
     STROKE("stroke", "笔画侧栏", "笔画键盘左侧一列", null, true),
-    HANDWRITING("handwriting", "手写侧栏", "手写键盘右侧删除键下方的三格", 3, true),
-    HANDWRITING_ROW("handwriting_row", "手写展开栏", "全屏手写底部删除键左侧的一排", 6, false),
-    COMMON("common", "常用符号栏", "点键盘「符号」键，排在「常用」页最前面，留空只显示默认符号", null, false),
+    HANDWRITING("handwriting", "手写侧栏", "手写键盘右侧删除键下方三格", 3, true),
+    HANDWRITING_ROW("handwriting_row", "手写展开栏", "全屏手写底部删除键左边一排", 6, false),
+    COMMON("common", "常用符号栏", "符号键盘「常用」页最前面", null, false),
     /** 26 键、14 键字母上方的一排（「键盘布局 → 数字行」打开，默认关）；格数不限，所有格平分这一排。 */
-    NUMBER_ROW("number_row", "数字行", "26 键、14 键字母上方的一排，在「键盘布局」里打开", null, false);
+    NUMBER_ROW("number_row", "数字行", "字母上方一排，在「键盘布局」里打开", null, false);
 
     val prefKey: String get() = "side_symbols_$key"
 

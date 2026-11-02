@@ -75,6 +75,24 @@ class CalculatorModeIntegrationTest {
     }
 
     @Test
+    fun `Number键盘_at键直接提交并结束算式`() {
+        val engine = CalculatorEngine()
+
+        routeCalculatorKey("1", true, false, engine)
+        routeCalculatorKey("+", true, false, engine)
+        routeCalculatorKey("2", true, false, engine)
+        val result = routeCalculatorKey("@", true, false, engine)
+
+        assertTrue(result is CalculatorRouteResult.Handled)
+        assertEquals("@", (result as CalculatorRouteResult.Handled).commitText)
+        assertFalse(engine.isActive())
+        assertNull(engine.getCandidate())
+
+        routeCalculatorKey("5", true, false, engine)
+        assertNull("Digits after @ start fresh, not 1+25", engine.getCandidate())
+    }
+
+    @Test
     fun `CommonSymbol键盘_直接提交不经过计算器`() {
         val engine = CalculatorEngine()
 

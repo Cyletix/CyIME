@@ -113,6 +113,8 @@ class KeyboardInputPreferencesTest {
         val upgraded = KeyboardInputPreferences.read(context)
         assertEquals(true, upgraded.glideTyping)
         assertEquals(false, upgraded.chineseGlideTyping)
+        // 滑行实时预览（11-02 别的用户提的）同样默认关。
+        assertEquals(false, upgraded.glidePreview)
         upgraded.save(context)
         assertEquals(false, KeyboardInputPreferences.read(context).chineseGlideTyping)
         // 自己打开中文滑行后保持打开，英文滑行原样不动。
@@ -124,8 +126,8 @@ class KeyboardInputPreferencesTest {
         val onlyChinese = KeyboardInputPreferences(chineseGlideTyping = true)
         assertEquals("已被「中文滑行输入」锁定", InputGestureLocks.lockFor(onlyChinese,
             InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD)?.message)
-        // 手势预设不管中文滑行：开着它，「滑动」预设照样认得出。
-        assertEquals(InputGesturePreset.SWIPE, InputGesturePreset.of(InputGesturePreset.SWIPE.applyTo(onlyChinese)))
+        // 角标输入方式不管中文滑行：开着它，「滑动输入」照样认得出。
+        assertEquals(CornerInputChoice.SWIPE, CornerInputChoice.of(CornerInputChoice.SWIPE.applyTo(onlyChinese)))
     }
 
     @Test fun `comma and period keys are both on by default and the old saved period default does not turn it off`() {
@@ -138,6 +140,17 @@ class KeyboardInputPreferencesTest {
         // 用户在新版自己关掉后保持关。
         KeyboardInputPreferences.read(context).copy(qwertyPeriodKey = false).save(context)
         assertEquals(false, KeyboardInputPreferences.read(context).qwertyPeriodKey)
+    }
+
+    @Test fun `corner hint opacity defaults to today's look, persists and is bounded`() {
+        assertEquals(1f, KeyboardInputPreferences().cornerHintOpacity, 0f)
+        assertEquals(1f, KeyboardInputPreferences.read(context).cornerHintOpacity, 0f)
+        KeyboardInputPreferences.read(context).copy(cornerHintOpacity = 0.35f).save(context)
+        assertEquals(0.35f, KeyboardInputPreferences.read(context).cornerHintOpacity, 0.001f)
+        assertEquals(0.1f, normalizeCornerHintOpacity(0f), 0f)
+        assertEquals(1f, normalizeCornerHintOpacity(3f), 0f)
+        assertEquals(1f, normalizeCornerHintOpacity(Float.NaN), 0f)
+        assertTrue(KeyboardInputPreferences.CORNER_HINT_OPACITY_KEY in KeyboardInputPreferences.watchedKeys)
     }
 
     @Test fun `time and date candidates are off by default and stay on once turned on`() {
@@ -160,6 +173,17 @@ class KeyboardInputPreferencesTest {
         assertEquals(true, KeyboardInputPreferences.read(context).symbolNames)
         KeyboardInputPreferences.read(context).copy(symbolNames = false).save(context)
         assertEquals(false, KeyboardInputPreferences.read(context).symbolNames)
+    }
+
+    @Test fun `greek letter candidates are off by default and persist`() {
+        // 别人请求的功能默认关，不改原有习惯；在 语言与方案 › 中文输出 打开。
+        assertEquals(false, KeyboardInputPreferences().greekLetters)
+        assertEquals(false, KeyboardInputPreferences.read(context).greekLetters)
+        KeyboardInputPreferences.read(context).copy(greekLetters = true).save(context)
+        assertEquals(true, values[KeyboardInputPreferences.GREEK_LETTERS_KEY])
+        assertEquals(true, KeyboardInputPreferences.read(context).greekLetters)
+        KeyboardInputPreferences.read(context).copy(greekLetters = false).save(context)
+        assertEquals(false, KeyboardInputPreferences.read(context).greekLetters)
     }
 
     @Test fun `bottom lift cursor is off by default and persists without touching the cursor gesture choice`() {
@@ -226,7 +250,10 @@ class KeyboardInputPreferencesTest {
         assertEquals(0.2f, settings.cursorHoldSeconds, 0f)
         assertEquals(200L, settings.spaceHoldDelayMs)
         assertEquals(10f, settings.cursorStepDp, 0f)
-        assertEquals(1.15f, settings.keyTextScale, 0f)
+        assertEquals(1.2f, settings.keyTextScale, 0f)
+        assertEquals(1.2f, KeyboardInputPreferences().keyTextScale, 0f)
+        values["key_text_scale"] = 1.15f
+        assertEquals(1.15f, KeyboardInputPreferences.read(context).keyTextScale, 0f)
         assertEquals(0.5f, settings.handwritingPauseSeconds, 0f)
         assertNull(settings.symbols())
     }
@@ -349,7 +376,7 @@ class KeyboardInputPreferencesTest {
         val settings = KeyboardInputPreferences.read(context)
         assertEquals(SpaceHoldAction.CURSOR, settings.spaceHold)
         assertEquals(10f, settings.cursorStepDp, 0f)
-        assertEquals(1.15f, settings.keyTextScale, 0f)
+        assertEquals(1.2f, settings.keyTextScale, 0f)
     }
 
     @Test

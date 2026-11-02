@@ -174,6 +174,9 @@ data class CustomKeyboardLayout(
             text = text.replaceRange(speller.range, speller.value.trimEnd() + "\n" + mergedRules() + "\n")
             text = text.replace(Regex("(?m)^  prism:.*$"), "  prism: $id")
             if (!text.contains("  prism: $id")) text = text.replace("translator:\n", "translator:\n  prism: $id\n")
+            val letters = "abcdefghijklmnopqrstuvwxyz"
+            text = text.replace("cyime_particle_shortcuts:/common\n  alphabet: $letters",
+                "cyime_particle_shortcuts:/common\n  alphabet: ${encode(letters)}")
         }
         return text
     }

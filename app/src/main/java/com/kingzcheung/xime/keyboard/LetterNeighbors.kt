@@ -19,3 +19,16 @@ fun encodeLetterNeighbors(keys: Map<Char, LetterKeyRect>): String {
         "$letter:$near"
     }
 }
+
+/**
+ * What the engine gets (Rime property cyime_neighbors): the layout with correction on, nothing with it off. With
+ * [unreadableOnly] (双拼邻键纠错 off) the layout goes marked "~;", and librime's NearSearchCorrector then corrects only
+ * where the typed letters start no spelling at all, so a slip into a pair that spells nothing still gives candidates
+ * while every pair that reads stays as typed.
+ */
+fun letterNeighborsForEngine(encoded: String, correction: Boolean, unreadableOnly: Boolean): String = when {
+    encoded.isEmpty() -> ""
+    correction -> encoded
+    unreadableOnly -> "~;$encoded"
+    else -> ""
+}

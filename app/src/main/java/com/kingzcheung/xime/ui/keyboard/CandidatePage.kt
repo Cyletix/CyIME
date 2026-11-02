@@ -10,7 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -103,10 +103,11 @@ data class CandidatePageState(
     val bottomPaddingDp: Int = 0,
     /** "只看单字"过滤开启中（左栏底部切换按钮的选中态） */
     val singleCharFilter: Boolean = false,
-    /** 左栏符号列表（九键/笔画复刻各自键盘左栏的 side_symbols）；空=通用快捷符号 */
-    val railSymbols: List<String> = emptyList(),
+    /** null uses the usual shortcuts. An empty list reserves the rail for choices without inserting punctuation. */
+    val railSymbols: List<String>? = null,
     /** 左栏音节拼音候选（九键输入/选择态复刻，与键盘左栏同源）；非空时优先于 railSymbols */
     val railPinyinOptions: List<String> = emptyList(),
+    val choosingMergedLetter: Boolean = false,
     /** 拼音候选项选中索引（九键 SELECTION 态），-1 无选中 */
     val railSelectedPinyinIndex: Int = -1,
     /** 拼音选中胶囊强调色（对齐九键 CandidateItem）；Unspecified 时用 textColor 兜底 */
@@ -216,12 +217,12 @@ private fun CandidatePageContent(
     val keyBg = if (state.keyBackgroundColor == Color.Unspecified)
         state.textColor.copy(alpha = 0.12f) else state.keyBackgroundColor
     val dividerColor = state.textColor.copy(alpha = 0.12f)
-    val railSymbols = state.railSymbols.ifEmpty { QUICK_SYMBOLS }
+    val railSymbols = state.railSymbols ?: QUICK_SYMBOLS
     // 九键输入/选择态：左栏显示音节拼音候选（与键盘左栏同源同点击）；空闲态回落符号列表
     val railItems = state.railPinyinOptions.ifEmpty { railSymbols }
     val isPinyinRail = state.railPinyinOptions.isNotEmpty()
     // 中间候选区滚动；翻页 = 滚动一屏
-    val listState = rememberLazyListState()
+    val listState = remember(state.engineRevision, state.singleCharFilter) { LazyListState() }
     var viewportHeightPx by remember { mutableIntStateOf(0) }
     val scrollScope = rememberCoroutineScope()
     fun scrollPage(direction: Int) {
@@ -230,13 +231,8 @@ private fun CandidatePageContent(
             scrollScope.launch { listState.animateScrollBy(direction.toFloat() * viewport) }
         }
     }
-    // 候选内容变化（新输入/切过滤/删词）回到顶部（宽度变化只重排，不重置滚动）
-    // More batches of this composition append in place; only a new query/filter resets scroll.
-    LaunchedEffect(if (state.engineRevision != 0L) state.engineRevision else state.candidates, state.singleCharFilter) {
-        listState.scrollToItem(0)
-    }
     // 硬件键盘 DPAD 上/下的翻页联动
-    LaunchedEffect(pageScrollEvents) {
+    LaunchedEffect(pageScrollEvents, listState) {
         pageScrollEvents?.collect { direction -> scrollPage(direction) }
     }
 
@@ -330,8 +326,8 @@ private fun CandidatePageContent(
                             }
                         }
                     }
-                    RailKey(
-                        onClick = { callbacks.onToggleSingleCharFilter?.invoke() },
+                    if (callbacks.onToggleSingleCharFilter == null) Spacer(Modifier.weight(1f)) else RailKey(
+                        onClick = callbacks.onToggleSingleCharFilter,
                         keyBg = if (state.singleCharFilter) state.textColor.copy(alpha = 0.28f) else keyBg,
                         textColor = state.textColor,
                         opacityScale = if (state.singleCharFilter) 0.28f else 1f,
@@ -403,7 +399,8 @@ private fun CandidatePageContent(
                         }
 
                         if (state.associationCandidates.isNotEmpty()) {
-                            item(key = "assoc") {
+                            // 联想可能先于首批拼音候选到达。它是页脚，不能让列表跟着它移到末尾。
+                            item(contentType = "associations") {
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Box(
@@ -419,12 +416,14 @@ private fun CandidatePageContent(
                                     ) {
                                         state.associationCandidates.forEachIndexed { index, candidate ->
                                             if (index > 0) FlexRowDivider(dividerColor)
-                                            CandidatePageItem(
-                                                entry = CandidateEntry(text = candidate),
-                                                textSizeSp = candidateTextSize,
-                                                onClick = { callbacks.onAssociationSelect?.invoke(index) },
-                                                textColor = state.textColor
-                                            )
+                                            androidx.compose.runtime.key(index, candidate) {
+                                                CandidatePageItem(
+                                                    entry = CandidateEntry(text = candidate),
+                                                    textSizeSp = candidateTextSize,
+                                                    onClick = { callbacks.onAssociationSelect?.invoke(index) },
+                                                    textColor = state.textColor
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -464,7 +463,7 @@ private fun CandidatePageContent(
                             onSwipe = callbacks.onClearComposition,
                             onSwipeUp = callbacks.onClear,
                             onSwipeDown = callbacks.onUndoClear,
-                            onSwipeLeft = callbacks.onClearComposition,
+                            distanceDelete = true,
                             followSymbolSwipeDirection = true,
                             upFeedback = KeyFlickFeedback.DELETE,
                             swipeUpLabel = "清空",
@@ -542,7 +541,7 @@ private fun CandidatePageItem(
                 withStyle(
                     SpanStyle(
                         color = textColor.copy(alpha = 0.5f),
-                        fontSize = (textSizeSp * 11f / 18f).sp,
+                        fontSize = (textSizeSp * ExpandedCandidatePager.COMMENT_SIZE_RATIO).sp,
                         fontFamily = AppFonts.commentFontFamily
                     )
                 ) {
@@ -893,11 +892,12 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
             .background(frostedKeyColor(keyBg, state.textColor, LocalKeyboardInputPreferences.current.frostedGlass))) {
             val metrics = t9CandidateMetrics(maxWidth.value, maxHeight.value, LocalDensity.current.fontScale,
                 LocalKeyboardInputPreferences.current.keyTextScale, keyContentScale(maxWidth.value, maxHeight.value / 4f))
-            val sample = androidx.compose.ui.text.rememberTextMeasurer().measure("shuang",
+            val sample = androidx.compose.ui.text.rememberTextMeasurer().measure(if (state.choosingMergedLetter) "W" else "shuang",
                 TextStyle(fontSize = metrics.fontSizeSp.sp, fontFamily = AppFonts.candidateFontFamily),
                 maxLines = 1, softWrap = false)
             val textWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
             val font = (metrics.fontSizeSp * minOf(1f, textWidth / sample.size.width.coerceAtLeast(1))).sp
+            val rowHeight = if (state.choosingMergedLetter && items.isNotEmpty()) maxHeight / items.size else metrics.rowHeightDp.dp
             LazyColumn(Modifier.fillMaxSize().testTag("expanded-pinyin-options")) {
                 itemsIndexed(items) { index, item ->
                     T9CandidateItem(text = item, onClick = {
@@ -906,12 +906,12 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
                     }, onPress = { callbacks.onKeyPressDown?.invoke(item) }, textColor = state.textColor,
                         backgroundColor = keyBg, accentColor = state.railAccentColor,
                         fontSize = font, isSelected = index == state.railSelectedPinyinIndex,
-                        modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp))
+                        modifier = Modifier.fillMaxWidth().height(rowHeight))
                 }
             }
         }
-        KeyButton(text = if (state.singleCharFilter) "候选" else "单字",
-            onClick = { callbacks.onToggleSingleCharFilter?.invoke() },
+        if (callbacks.onToggleSingleCharFilter == null) Spacer(Modifier.weight(1f)) else KeyButton(
+            text = if (state.singleCharFilter) "候选" else "单字", onClick = callbacks.onToggleSingleCharFilter,
             backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
             textColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
             modifier = Modifier.weight(1f).fillMaxWidth().testTag("expanded-filter-key"), shadowEnabled = false)

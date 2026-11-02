@@ -56,6 +56,7 @@ sealed interface CandidateBarState {
             highlightIndex: Int = 0,
             hardwareHighlightIndex: Int? = null,
             associationHighlightIndex: Int? = null,
+            expandAssociations: Boolean = true,
         ): CandidateBarState {
             val hasCandidates = candidates.isNotEmpty()
             val hasAssociations = associationCandidates.isNotEmpty()
@@ -78,7 +79,7 @@ sealed interface CandidateBarState {
                 !isComposing && !hasInput && hasAssociations && !hasCandidates ->
                     AssociationOnly(
                         candidates = associationCandidates,
-                        hasMore = hasNextPage,
+                        hasMore = expandAssociations && associationCandidates.size > 1,
                         highlightIndex = hardwareHighlightIndex ?: associationHighlightIndex ?: -1,
                     )
                 hasCandidates || hasInput ->

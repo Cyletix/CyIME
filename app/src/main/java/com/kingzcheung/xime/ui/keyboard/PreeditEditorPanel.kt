@@ -46,6 +46,7 @@ internal fun PreeditEditorBar(
     onCaret: (Int) -> Unit,
     onReplace: (String) -> Unit,
     preedit: String = session.text,
+    inline: Boolean = false,
 ) {
     if (LocalOnBackPressedDispatcherOwner.current != null) BackHandler(onBack = onClose)
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -68,10 +69,7 @@ internal fun PreeditEditorBar(
             anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
             (anchorBounds.top - popupContentSize.height - gap).coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)))
     } }
-    BoxWithConstraints(Modifier.fillMaxWidth().height(0.dp)) {
-        val width = maxWidth
-        Popup(popupPositionProvider = position,
-            properties = PopupProperties(focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
+    val content: @Composable (Dp) -> Unit = { width ->
             Row(Modifier.width(width).height(44.dp).testTag("preedit-editor")
                 .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
@@ -108,6 +106,13 @@ internal fun PreeditEditorBar(
                     Icon(Icons.Default.Close, "关闭拼音编辑", tint = textColor, modifier = Modifier.size(24.dp))
                 }
             }
+    }
+    BoxWithConstraints(if (inline) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().height(0.dp)) {
+        val width = maxWidth
+        if (inline) content(width)
+        else Popup(popupPositionProvider = position,
+            properties = PopupProperties(focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
+            content(width)
         }
     }
 }

@@ -13,6 +13,12 @@ internal fun deletionTarget(engineComposing: Boolean?, uiComposing: Boolean, par
 }
 
 /**
+ * 长按退格把拼音删完就停，不接着删输入框里原有的字（fd790a91）。只有拼音（组合）算：收起联想词、剪贴板胶囊不算，
+ * 否则刚上屏有联想时长按退格，第一下收起联想后整次长按就停了，一个字都不删（1.15.38 平板压力测试）。
+ */
+internal val DeletionTarget.consumesImeContent: Boolean get() = this == DeletionTarget.COMPOSITION
+
+/**
  * 设置「退格直接删字」打开时，只有联想词（含在途的联想）挡着的那一下退格改成删字；
  * 剪贴板胶囊照旧先收起，不删正文。
  */

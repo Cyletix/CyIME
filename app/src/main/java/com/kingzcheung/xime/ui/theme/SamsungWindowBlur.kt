@@ -35,6 +35,13 @@ internal object SamsungWindowBlur {
 
     val isAvailable: Boolean get() = api != null
 
+    /**
+     * 键盘这时能不能用 One UI 模糊顶替系统模糊。系统省电模式会关掉所有应用的窗口模糊（跨窗口模糊不可用），
+     * 这时不再用 One UI 的接口把模糊重新打开：省电模式本来就是要省这份 GPU，键盘照系统没有模糊时的样子显示。
+     */
+    fun usableFor(context: android.content.Context): Boolean = isAvailable &&
+        context.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode != true
+
     fun apply(view: View, radiusPx: Int, cornerRadiusPx: Float): Boolean {
         val methods = api ?: return false
         return runCatching {

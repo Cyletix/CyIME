@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,7 @@ import com.kingzcheung.xime.ui.keyboard.CandidateEntry
 import com.kingzcheung.xime.ui.keyboard.CandidatePage
 import com.kingzcheung.xime.ui.keyboard.CandidatePageCallbacks
 import com.kingzcheung.xime.ui.keyboard.CandidatePageState
+import com.kingzcheung.xime.ui.keyboard.FixedCandidateStrip
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.candidateQwertyGeometry
@@ -75,6 +78,39 @@ class CandidateScrollRenderTest {
     private val mixed = listOf("这到底", "是什么", "原理", "这到底是什么原理呀朋友们", "折倒", "这道", "浙", "这", "着", "者", "哲", "这道题")
     private val longFirst = listOf(long, "这到底", "是什么", "原理", "折倒", "这道", "浙", "这", "着", "者", "哲", "这道题",
         "折", "遮", "辙", "浙江", "这样子", "这是一个也挺长的候选词组啊", "这道理", "这一刀")
+
+    @Test fun edgeCandidateRemainsSelectableWhenOnlyItsTapPaddingIsClipped() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        KeyboardThemes.initFromConfig(app)
+        val words = listOf("测", "侧", "策", "CEF", "册")
+        var width by mutableStateOf(320.dp)
+        var selected = -1
+        var visible = emptyList<String>()
+        rule.setContent {
+            FixedCandidateStrip(words, comments = emptyList(),
+                visuals = CandidateBarVisuals(Color.White, Color.Black, Color.Gray),
+                callbacks = CandidateBarCallbacks(onCandidateSelect = { selected = it },
+                    onVisibleCandidatesChanged = { visible = it }),
+                fontSize = 19.sp, modifier = Modifier.width(width).height(44.dp),
+                scrollable = true, itemPadding = 10.dp)
+        }
+        val item = rule.onNodeWithTag("bar-candidate:3", useUnmergedTree = true)
+        val strip = rule.onNodeWithTag("candidate-scroll-row", useUnmergedTree = true)
+        val end = with(rule.density) {
+            (item.fetchSemanticsNode().boundsInRoot.right - strip.fetchSemanticsNode().boundsInRoot.left).toDp()
+        }
+        rule.runOnIdle { width = end - 5.dp }
+        item.performClick()
+        System.getenv("CYIME_RENDER_OUT")?.let { shot(it, "cef-at-edge", "candidate-scroll-row") }
+        val actualWidth = strip.fetchSemanticsNode().boundsInRoot.width
+        rule.runOnIdle {
+            org.junit.Assert.assertEquals(3, selected)
+            org.junit.Assert.assertEquals("requested $width, strip $actualWidth px", words.take(4), visible)
+            width = end - 15.dp
+        }
+        item.assertDoesNotExist()
+        rule.runOnIdle { org.junit.Assert.assertEquals(words.take(3), visible) }
+    }
 
     @Test fun renderCandidateScroll() {
         val out = System.getenv("CYIME_RENDER_OUT")
@@ -112,16 +148,7 @@ class CandidateScrollRenderTest {
             }
         }
         File(out!!).mkdirs()
-        fun shot(name: String) {
-            rule.waitForIdle()
-            val body = rule.onAllNodesWithTag("shot", true).fetchSemanticsNodes().first().boundsInRoot
-            val root = rule.activity.window.decorView
-            val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
-            rule.runOnIdle { root.draw(android.graphics.Canvas(full)) }
-            val crop = Bitmap.createBitmap(full, body.left.toInt().coerceAtLeast(0), body.top.toInt().coerceAtLeast(0),
-                body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
-            File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        }
+        fun shot(name: String) = shot(out, name, "shot")
         shot("collapsed-rest")
         val rows = rule.onAllNodesWithTag("candidate-scroll-row")
         for (i in rows.fetchSemanticsNodes().indices) rows[i].performTouchInput { swipeLeft(durationMillis = 400) }
@@ -130,6 +157,17 @@ class CandidateScrollRenderTest {
             rule.runOnIdle { scene = "expanded"; glass = g; filter = f }
             shot("expanded-${if (g) "glass" else "solid"}${if (f) "-singlechar" else ""}")
         }
+    }
+
+    private fun shot(out: String, name: String, tag: String) {
+        rule.waitForIdle()
+        val body = rule.onAllNodesWithTag(tag, true).fetchSemanticsNodes().first().boundsInRoot
+        val root = rule.activity.window.decorView
+        val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        rule.runOnIdle { root.draw(android.graphics.Canvas(full)) }
+        val crop = Bitmap.createBitmap(full, body.left.toInt().coerceAtLeast(0), body.top.toInt().coerceAtLeast(0),
+            body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
+        File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     @Composable

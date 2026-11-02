@@ -15,6 +15,17 @@ class DeletionTargetTest {
         val next = RepeatInput()
         repeat(3) { assertTrue(next.allowsDeletion(imeContent = false)) }
     }
+    /** 刚上屏有联想时长按退格：第一下收起联想，接着照常删字，不能整次长按停住（1.15.38 平板压力测试）。 */
+    @Test fun dismissingCandidatesDoesNotStopAHeldDelete() {
+        val hold = RepeatInput()
+        assertTrue(hold.allowsDeletion(DeletionTarget.CANDIDATES.consumesImeContent))
+        repeat(3) { assertTrue(hold.allowsDeletion(DeletionTarget.DOCUMENT.consumesImeContent)) }
+        assertTrue(hold.isActive)
+        // 删拼音的那次长按，删完拼音照旧停住。
+        val composing = RepeatInput()
+        assertTrue(composing.allowsDeletion(DeletionTarget.COMPOSITION.consumesImeContent))
+        assertFalse(composing.allowsDeletion(DeletionTarget.DOCUMENT.consumesImeContent))
+    }
     @Test fun delayedCandidateBarCannotMakeCompositionDeleteTheDocument() {
         assertEquals(DeletionTarget.COMPOSITION, deletionTarget(true, false, false, false, false, false))
     }

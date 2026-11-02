@@ -2,6 +2,12 @@ package com.kingzcheung.xime.ui.keyboard
 import org.junit.Assert.assertEquals
 import org.junit.Test
 class CandidateStripGeometryTest {
+ @Test fun clippingTransparentPaddingKeepsBothEdgeWordsReadable() {
+  assertEquals(true, candidateLabelFits(-8, 36, 8, 0, 100))
+  assertEquals(true, candidateLabelFits(72, 36, 8, 0, 100))
+  assertEquals(false, candidateLabelFits(-9, 36, 8, 0, 100))
+  assertEquals(false, candidateLabelFits(73, 36, 8, 0, 100))
+ }
  @Test fun focusWindowKeepsOriginalIndicesAndFitsTheSelectedItem() {
   val widths=listOf(40,70,80,30,50)
   fun window(selected:Int, available:Int=114)=candidateWindow(widths.size,selected,available,4) { widths[it] }
@@ -52,6 +58,15 @@ class CandidateStripGeometryTest {
   assertEquals(1,candidatePrefixCount(listOf(40,70,30),113,4))
  }
  @Test fun oversizedFirstRemainsAccessible() { assertEquals(1,candidatePrefixCount(listOf(500,20),60,4)) }
+ @Test fun focusDoesNotShiftTheRowJustBecauseTheLastGlossOverflows() {
+  val widths = listOf(90, 150, 30)
+  fun window(width: Int, focused: Int, start: Int = 0) =
+   candidateWindow(widths.size, focused, width, 4, start, edgeWidthAt = { if (it == 1) 40 else widths[it] }) { widths[it] }
+  assertEquals(0..1, window(134, 0))
+  assertEquals(0..1, window(134, 1))
+  assertEquals(0..0, window(133, 0)) // 一像素也不能切掉候选本身。
+  assertEquals(2..2, window(134, 2)) // 中间的释义占据实际宽度，不把后续词叠在它上面。
+ }
  @Test fun emptyAndUnavailable() {
   assertEquals(0,candidatePrefixCount(emptyList(),200,4))
   assertEquals(0,candidatePrefixCount(listOf(20),0,4))

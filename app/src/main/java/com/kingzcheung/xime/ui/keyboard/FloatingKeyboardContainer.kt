@@ -1,8 +1,5 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -33,7 +30,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -293,11 +289,8 @@ internal fun FloatingKeyboardContainer(
         val maxOffsetY = (maxHeight.value - cardTotalHeight.value).coerceAtLeast(minimumY)
         val safeOffsetY = (maxHeight.value - baseRect.bottom / density.density)
         val safeOffsetX = (baseRect.centerX / density.density - maxWidth.value / 2f)
-        val positionedEdge = if (rotatedRect != null) null
-            else floatingDockEdge(safeOffsetX, safeOffsetY, horizontalTravel, maxOffsetY, minimumY)
         val dockGesture = remember(maxWidth, cardTotalHeight, screenHeightDp, minOffsetY) { FloatingDockGesture() }
         var isDragging by remember(dockGesture) { mutableStateOf(false) }
-        var dockReady by remember(dockGesture) { mutableStateOf(false) }
         var dragX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
         // 拖动期间卡片只按本地的 dragX/dragY 摆放，不每一下都写回状态重建整个键盘；
@@ -333,34 +326,15 @@ internal fun FloatingKeyboardContainer(
                 onDispose { if (undockFollow.onFinish === finish) undockFollow.onFinish = null }
             }
         }
-        var dragEdge by remember(dockGesture) { mutableStateOf(positionedEdge) }
-        var dockEpoch by remember(dockGesture) { mutableIntStateOf(0) }
-        val edge = if (isDragging) dragEdge else positionedEdge
-        val effectEpoch = dockEpoch
-        val dockProgress = remember(dockGesture) { Animatable(0f) }
-        LaunchedEffect(isDragging, edge, dockGesture, effectEpoch, destination) {
-            dockReady = false
-            dockProgress.snapTo(0f)
-            if (isDragging && destination != null) {
-                dockGesture.update(edge, 0L)
-                if (edge != null) {
-                    // Linear, so how far the outline has morphed is how long the card has rested; the
-                    // moment it reaches the docked shape, releasing docks (see onDragEnd).
-                    dockProgress.animateTo(1f, tween(FLOATING_DOCK_DURATION_MILLIS.toInt(), easing = LinearEasing))
-                    if (effectEpoch == dockEpoch && isDragging && dragEdge == edge) {
-                        dockReady = true
-                    }
-                }
-            }
-        }
-        if (isDragging && edge != null && destination != null) {
-            val progress = dockProgress.value
+        TrackDockHold(dockGesture)
+        if (isDragging && dockGesture.armed && destination != null) {
+            val progress = dockGesture.progress
             fun between(start: Float, end: Float) = start + (end - start) * progress
             // 「变回固定」预览从卡片的实时位置插值到目标位置。
             val liveRect = liveShiftPx().let { normalRect.translated(it.x, it.y) }
             val shown = ResizeRect(between(liveRect.left, destination.left), between(liveRect.top, destination.top),
                 between(liveRect.right, destination.right), between(liveRect.bottom, destination.bottom))
-            KeyboardModeMorphOutline(Modifier.align(Alignment.TopStart), shown, progress, fixedCardShape, dockReady,
+            KeyboardModeMorphOutline(Modifier.align(Alignment.TopStart), shown, progress, fixedCardShape, progress >= 1f,
                 "floating-dock-preview")
         }
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
@@ -431,14 +405,11 @@ internal fun FloatingKeyboardContainer(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
                 indicatorColor = dragIndicatorColor,
                 onDragStart = {
-                    dockEpoch++
-                    dockReady = false
+                    dockGesture.cancel()
                     dragX = safeOffsetX
                     dragY = safeOffsetY
                     dragStartX = safeOffsetX
                     dragStartY = safeOffsetY
-                    dragEdge = positionedEdge
-                    dockGesture.start(dragEdge, 0L)
                     isDragging = true
                 },
                 onDrag = drag@{ change, dragAmount ->
@@ -459,34 +430,24 @@ internal fun FloatingKeyboardContainer(
                     dragY = (dragY - dyDp).coerceIn(minimumY, maxOffsetY)
                     val nextEdge = floatingDockEdge(dragX.roundToInt().toFloat(), dragY.roundToInt().toFloat(),
                         horizontalTravel, maxOffsetY, minOffsetY.toFloat())
-                    if (nextEdge != dragEdge) {
-                        // MOVE 与 UP 可能早于下一帧重组；必须在触摸回调中立即撤销准备态。
-                        dragEdge = nextEdge
-                        dockEpoch++
-                        dockReady = false
-                        dockGesture.update(nextEdge, 0L)
-                    }
+                    dockGesture.move(dxDp, dyDp, nextEdge != null && destination != null)
                 },
                 onDragEnd = {
                     // Dock exactly when the preview shows it docked; the old separate timer could end a
                     // frame after the outline looked finished, and releasing then left the card floating.
-                    val restore = floatingDockOnRelease(dockProgress.value, dragEdge != null, destination != null)
+                    val restore = floatingDockOnRelease(dockGesture.progress, dockGesture.armed, destination != null)
                     dockGesture.cancel()
-                    dockEpoch++
                     // 松手时把整段位移一次交给后台，按原规矩限位、取整、保存。
                     onDrag(dragX - dragStartX, dragY - dragStartY)
                     isDragging = false
-                    dockReady = false
                     onDragEnd()
                     // 变回固定时由模式切换亮框；留在悬浮就在松手处亮一下。
                     if (restore) onDock() else highlight.trigger()
                 },
                 onDragCancel = {
                     dockGesture.cancel()
-                    dockEpoch++
                     onDrag(dragX - dragStartX, dragY - dragStartY)
                     isDragging = false
-                    dockReady = false
                     onDragEnd()
                 },
                 // 点一下拖动条也亮出四角角标：亮着时拖角调大小、点角打开调节界面。
@@ -652,7 +613,7 @@ private fun Modifier.undockPull(state: UndockPullState, onUndock: () -> Unit): M
                     }
                     change.consume()
                     val before = state.progress
-                    state.progress = fixedToFloatingPullProgress(up.coerceAtLeast(0f) / 1.dp.toPx())
+                    state.progress = modeSwitchPullProgress(up / 1.dp.toPx(), (change.position.x - down.position.x) / 1.dp.toPx())
                     if (state.progress >= 1f && before < 1f) {
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                         // 拉满就变悬浮，悬浮键盘接着跟这根手指走，松手停在那里；没有外层跟手时照旧松手才变。

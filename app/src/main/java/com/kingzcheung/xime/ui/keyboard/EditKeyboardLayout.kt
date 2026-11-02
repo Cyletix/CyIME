@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -170,7 +171,8 @@ fun EditKeyboardLayout(
                         repeatable = arrow || command in listOf("delete", "enter"),
                         plain = arrow, visualShape = cutout, compact = compact,
                         glowSize = if (arrow) androidx.compose.ui.unit.DpSize(padDiameter / 3, padDiameter / 3) else null,
-                        contentOffsetX = offsetX, contentOffsetY = offsetY)
+                        contentOffsetX = offsetX, contentOffsetY = offsetY,
+                        onPastePlain = if (command == "paste") ({ onAction("paste_plain") }) else null)
                 }
                 CompositionLocalProvider(LocalKeyboardKeyVisualMetrics provides padMetrics,
                     LocalKeyboardKeyContentScale provides glyphScale) {
@@ -308,8 +310,11 @@ internal fun EditorActionKey(
     glowSize: androidx.compose.ui.unit.DpSize? = null,
     contentOffsetX: Dp = 0.dp,
     contentOffsetY: Dp = 0.dp,
+    onPastePlain: (() -> Unit)? = null,
 ) {
     val action by rememberUpdatedState(onAction)
+    val plainPaste by rememberUpdatedState(onPastePlain)
+    val hasPlainPaste = onPastePlain != null
     val scope = rememberCoroutineScope()
     var pressed by remember { mutableStateOf(false) }
     val shadow = LocalEditorKeyShadow.current
@@ -332,9 +337,15 @@ internal fun EditorActionKey(
     }
     BoxWithConstraints(modifier.fillMaxSize()
         // 独立合并每个按键，避免被面板的点击屏障合并成一个无障碍节点。
-        .semantics(mergeDescendants = true) { contentDescription = label; role = Role.Button; onClick { action(); true } }
-        .pointerInput(repeatable) {
-            detectTapGestures(onPress = {
+        .semantics(mergeDescendants = true) {
+            contentDescription = label; role = Role.Button; onClick { action(); true }
+            if (hasPlainPaste) onLongClick("粘贴纯文本") { plainPaste?.invoke(); true }
+        }
+        .pointerInput(repeatable, hasPlainPaste) {
+            detectTapGestures(
+                onLongPress = if (hasPlainPaste) ({ plainPaste?.invoke() }) else null,
+                onTap = if (hasPlainPaste) ({ action() }) else null,
+                onPress = {
                 pressed = true
                 var repeated = false
                 val timer = if (repeatable) scope.launch {
@@ -345,7 +356,7 @@ internal fun EditorActionKey(
                 try {
                     val released = tryAwaitRelease()
                     timer?.cancel()
-                    if (released && !repeated) action()
+                    if (released && !repeated && !hasPlainPaste) action()
                 } finally {
                     timer?.cancel()
                     pressed = false

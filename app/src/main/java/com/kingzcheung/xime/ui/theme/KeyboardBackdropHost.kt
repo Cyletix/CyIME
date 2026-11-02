@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import com.kingzcheung.xime.settings.BackgroundConfig
 import com.kingzcheung.xime.settings.FrostedGlassConfig
+import kotlin.math.ceil
 
 /** One window-space image frame for the keyboard, bottom padding and navigation inset. */
 internal data class KeyboardBackdropFrame(val origin: Offset, val size: IntSize) {
@@ -33,8 +34,12 @@ internal fun keyboardBackdropFrame(
     hostOrigin: Offset,
     hostSize: IntSize,
     requestedHeightPx: Int,
+    cardTopInWindow: Float? = null,
 ): KeyboardBackdropFrame {
-    val height = requestedHeightPx.coerceIn(0, hostSize.height.coerceAtLeast(0))
+    // Insets can resize the IME host and its card in separate passes. Keep the image
+    // over the measured card as well as the bottom padding/navigation strip.
+    val measuredHeight = cardTopInWindow?.let { ceil(hostOrigin.y + hostSize.height - it).toInt() } ?: 0
+    val height = maxOf(requestedHeightPx, measuredHeight).coerceIn(0, hostSize.height.coerceAtLeast(0))
     return KeyboardBackdropFrame(
         hostOrigin + Offset(0f, (hostSize.height - height).toFloat()),
         IntSize(hostSize.width.coerceAtLeast(0), height),
@@ -66,6 +71,7 @@ internal fun KeyboardBackdropHost(
     clipboardInMotion: Boolean = false,
     /** 「柔化顶部边缘」生效时固定卡片上沿在窗口里的 y，见 [GlassTopFeatherSource]。 */
     topFeather: androidx.compose.runtime.State<Float?>? = null,
+    fixedCard: androidx.compose.runtime.State<androidx.compose.ui.geometry.Rect?>? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -73,7 +79,7 @@ internal fun KeyboardBackdropHost(
     val backdropGlass = glass.forBackground(background)
     var origin by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
-    val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() })
+    val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() }, fixedCard?.value?.top)
     val image = if (enabled) {
         rememberFrostedBackgroundImage(background, isDark, fallback, backdropGlass, frame.size, clipboardInMotion)
     } else null

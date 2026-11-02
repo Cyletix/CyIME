@@ -22,7 +22,7 @@ sealed class CalculatorRouteResult {
  *
  * 路由规则：
  * - CommonSymbol 键盘：所有单字符键直接提交，不经过计算器（符号无计算器支持）
- * - Number 键盘：数字/运算符/小数点先经计算器引擎，再直接提交（不经过 Rime）
+ * - Number 键盘：数字/运算符/小数点先经计算器引擎，再直接提交（不经过 Rime）；其他单字符（如 @）直接提交并结束算式
  * - 其他键盘：返回 [NotHandled]
  */
 fun routeCalculatorKey(
@@ -42,6 +42,9 @@ fun routeCalculatorKey(
             } else {
                 calculatorEngine.handleOperator(key)
             }
+        } else if (key.length == 1) {
+            // 数字面板上的 @ 等非算式字符打断算式，后面的数字不能接回前面的算式。
+            calculatorEngine.clear()
         }
         return CalculatorRouteResult.Handled(key)
     }

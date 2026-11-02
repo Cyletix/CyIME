@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import com.kingzcheung.xime.settings.KeysConfigHelper
 
 /**
  * 双拼编码打了单数个键（声母或零声母的第一键已经打了，正等韵母）。分隔符 ' 和空格不算键。
@@ -44,3 +45,12 @@ internal fun SemicolonShiftKey(
         )
     } else shift()
 }
+
+/**
+ * 微软双拼的分号键：没在打字时点它按全角／半角设置出标点（ImeKeyRouter.semicolonPunctuation），
+ * 全角时键面写「；」，和上屏的一样；打字中照旧是 ing。其他方案、英文键盘的分号键不变。
+ */
+@Composable
+internal fun semicolonKeyLabel(key: String, isAsciiMode: Boolean, label: String): String =
+    if (key == ";" && label == ";" && LocalKeyboardPunctuation.current?.full == true &&
+        KeysConfigHelper.semicolonIsCode(isAsciiMode)) "；" else label

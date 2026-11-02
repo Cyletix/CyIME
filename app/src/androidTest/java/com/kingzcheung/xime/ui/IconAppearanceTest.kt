@@ -89,7 +89,8 @@ class IconAppearanceTest {
         rule.runOnIdle { IconAppearance.setLinked(context, true) }
         rule.onNodeWithTag("icon-frame-false").performClick().assertIsSelected()
         rule.onNodeWithTag("icon-frame-true").performClick().assertIsSelected()
-        rule.onNodeWithTag("icon-link").performScrollTo().performClick()
+        // 11-01：原「同步图标与视觉样式」开关合进「桌面图标」三选一；选「自己选」后才列出图标样式。
+        rule.onNodeWithTag("desktop-icon:CUSTOM").performScrollTo().performClick().assertIsSelected()
         rule.onNodeWithTag("icon-style-glass").performScrollTo().performClick().assertIsSelected()
         rule.assertGeometry("icon-settings", "reference icon settings")
         File(context.getExternalFilesDir(null), "icon-settings.png").outputStream().use {

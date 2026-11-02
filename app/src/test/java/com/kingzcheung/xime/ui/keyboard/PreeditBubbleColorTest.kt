@@ -30,6 +30,20 @@ class PreeditBubbleColorTest {
         assertTrue(bubble.alpha >= 0.9f)
     }
 
+    @Test fun userOpacityMakesTheBubbleSeeThroughAndGlassStillCapsIt() {
+        val key = Color(0xFF4A4658)
+        assertEquals(0.5f, preeditBubbleColor(darkSurface, key, blurBehind = false, opacity = 0.5f).alpha, 1f / 255f)
+        assertEquals(0.5f, preeditBubbleColor(darkSurface, key, blurBehind = true, opacity = 0.5f).alpha, 1f / 255f)
+        assertEquals(PREEDIT_BUBBLE_GLASS_ALPHA, preeditBubbleColor(darkSurface, key, blurBehind = true, opacity = 1f).alpha, 1f / 255f)
+        assertEquals(1f, preeditBubbleColor(darkSurface, key, blurBehind = false).alpha, 0f)
+    }
+
+    @Test fun opacitySettingSnapsToFivePercentWithinTwentyToHundred() {
+        assertEquals(0.2f, com.kingzcheung.xime.settings.SettingsPreferences.normalizePreeditBubbleOpacity(0.05f), 0.0001f)
+        assertEquals(0.65f, com.kingzcheung.xime.settings.SettingsPreferences.normalizePreeditBubbleOpacity(0.66f), 0.0001f)
+        assertEquals(1f, com.kingzcheung.xime.settings.SettingsPreferences.normalizePreeditBubbleOpacity(Float.NaN), 0f)
+    }
+
     @Test fun bubbleTextReachesKeycapContrastOnBothDarkAndLightThemes() {
         listOf(
             Triple(darkSurface, Color(0xFF4A4658), Color(0xFFB9A8E8)),

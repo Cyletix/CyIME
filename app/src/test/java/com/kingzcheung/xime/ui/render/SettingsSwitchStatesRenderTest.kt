@@ -64,7 +64,7 @@ class SettingsSwitchStatesRenderTest {
         Snapshot.sendApplyNotifications()
         val variants = listOf("light" to (false to false), "dark" to (true to false), "glass" to (true to true))
         val shown = mutableIntStateOf(0)
-        val lock = "已被「角标输入方式：长按」锁定"
+        val lock = "已被「按键角标的符号和数字：长按输入」锁定"
         rule.setContent {
             val (_, mode) = variants[shown.intValue]
             XimeTheme(darkTheme = mode.first) {

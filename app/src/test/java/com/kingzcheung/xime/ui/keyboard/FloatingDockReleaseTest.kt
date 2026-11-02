@@ -59,7 +59,8 @@ class FloatingDockReleaseTest {
 
     @Test fun releasedAsTheOutlineReachesTheDockedShapeItDocks() {
         showFloating()
-        rule.onNodeWithTag("floating-drag-bar").performTouchInput { down(center); moveBy(Offset(24f * density, 0f)) }
+        // 贴底改按纵向拖动距离判定（横移保留原模式）：在底边上往下拖满一次行程。
+        rule.onNodeWithTag("floating-drag-bar").performTouchInput { down(center); moveBy(Offset(0f, 160f * density)) }
         // The first frame the preview shows the docked shape, release.
         rule.waitUntil(3_000) { runCatching { previewState() == "ready" }.getOrDefault(false) }
         rule.onNodeWithTag("floating-drag-bar").performTouchInput { up() }

@@ -49,10 +49,22 @@ internal class DragOrderState(val list: LazyListState, initial: List<String>, va
         val info = list.layoutInfo
         val pointer = top + grabOffset
         return when {
-            pointer < info.viewportStartOffset + edge -> -((info.viewportStartOffset + edge - pointer) / edge).coerceIn(0f, 1f)
-            pointer > info.viewportEndOffset - edge -> ((pointer - info.viewportEndOffset + edge) / edge).coerceIn(0f, 1f)
+            pointer < info.viewportStartOffset + edge && canScrollToward(first = true) ->
+                -((info.viewportStartOffset + edge - pointer) / edge).coerceIn(0f, 1f)
+            pointer > info.viewportEndOffset - edge && canScrollToward(first = false) ->
+                ((pointer - info.viewportEndOffset + edge) / edge).coerceIn(0f, 1f)
             else -> 0f
         }
+    }
+    /** Edge scrolling stops once the end of the sortable cards is on screen. Scrolling on into the
+     * rows after them (e.g. the disabled schemes) pushed the held card's slot off screen; the list then
+     * disposed it, the gesture was cancelled and the card jumped back (user 11-02). */
+    private fun canScrollToward(first: Boolean): Boolean {
+        val key = (if (first) order.firstOrNull() else order.lastOrNull()) ?: return false
+        val info = list.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.key == key } ?: return true
+        return if (first) item.offset < info.viewportStartOffset
+            else item.offset + item.size > info.viewportEndOffset
     }
     suspend fun scroll(pixels: Float) { list.scrollBy(pixels); moveAcrossCards() }
     fun finish() { if (dragging == null) return; dragging = null; if (order != original) save(order) }

@@ -85,13 +85,16 @@ fun HardwareKeyboardCandidateBar(
     bottomDocked: Boolean = false,
     onPreeditBoundsChanged: (Rect?) -> Unit = {},
     showNumberLabels: Boolean = true,
+    showPreedit: Boolean = true,
     frostedGlass: com.kingzcheung.xime.settings.FrostedGlassConfig = com.kingzcheung.xime.settings.FrostedGlassConfig(),
     /** 「自动避开输入区域」开启时传入光标位置：浮卡盖住这一行就上下挪开。与 [cursorAnchor] 跟随无关。 */
     avoidCaret: HardwareCursorAnchor? = null,
+    commentsAreGlosses: Boolean = false,
 ) {
     val reportBounds by rememberUpdatedState(onBoundsChanged)
     val reportPreeditBounds by rememberUpdatedState(onPreeditBoundsChanged)
-    if (candidates.isEmpty() && inputText.isEmpty() && preeditText.isEmpty()) {
+    val displayText = if (showPreedit) preeditText.ifEmpty { inputText } else ""
+    if (candidates.isEmpty() && displayText.isEmpty()) {
         LaunchedEffect(Unit) { reportBounds(null); reportPreeditBounds(null) }
         return
     }
@@ -116,7 +119,6 @@ fun HardwareKeyboardCandidateBar(
     LaunchedEffect(inputText.isEmpty() && preeditText.isEmpty()) { if (inputText.isEmpty() && preeditText.isEmpty()) expanded = false }
     LaunchedEffect(showCandidates) { if (!showCandidates) reportBounds(null) }
 
-    val displayText = if (preeditText.isNotEmpty()) preeditText else inputText
     LaunchedEffect(displayText) { if (displayText.isEmpty()) reportPreeditBounds(null) }
 
     val view = LocalView.current
@@ -207,7 +209,7 @@ fun HardwareKeyboardCandidateBar(
                     else Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) {
                             HardwareCandidateRow(candidates, comments, highlightIndex, hasPrevPage, hasNextPage,
-                                visuals, onCandidateSelect, onPrevious, onNext, showNumberLabels)
+                                visuals, onCandidateSelect, onPrevious, onNext, showNumberLabels, commentsAreGlosses)
                         }
                         if (candidates.size > 1) KeyboardToolbarButton({ expanded = true }, Color.Transparent,
                             modifier = Modifier.testTag("hardware-candidate-expand")) {
@@ -268,6 +270,7 @@ internal fun HardwareCandidateRow(
     hasPrevPage: Boolean, hasNextPage: Boolean, visuals: CandidateBarVisuals,
     onCandidateSelect: ((Int) -> Unit)?, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?,
     showNumberLabels: Boolean = true,
+    commentsAreGlosses: Boolean = false,
 ) {
     val protectedVisuals = visuals.withTextSurface(LocalFrostedTextSurface.current)
     val context = LocalContext.current
@@ -277,6 +280,7 @@ internal fun HardwareCandidateRow(
             callbacks = CandidateBarCallbacks(onCandidateSelect = { onCandidateSelect?.invoke(it) }),
             fontSize = SettingsPreferences.getCandidateTextSize(context).sp,
             highlightIndex = highlightIndex, showNumberLabels = showNumberLabels, itemSpacing = 8.dp,
+            commentsAreGlosses = commentsAreGlosses,
             modifier = Modifier.weight(1f).padding(vertical = 4.dp))
         if (candidates.isNotEmpty() && onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
             KeyboardToolbarButton(onPrevious, Color.Transparent,

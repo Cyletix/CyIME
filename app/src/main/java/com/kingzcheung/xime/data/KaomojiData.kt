@@ -4,6 +4,19 @@ data class KaomojiCategory(val name: String, val faces: List<String>)
 
 /** Local, editable text; independent of emoji plugins and their recent-use history. */
 object KaomojiData {
+    private val facesByLength by lazy { categories.flatMap { it.faces }.sortedByDescending { it.length } }
+    internal val maxFaceLength get() = facesByLength.first().length
+
+    /** A picked ":-)" after a literal "o" must not be mistaken for the longer "o:-)". */
+    internal fun faceBeforeCursor(before: CharSequence?, picked: String?): String? {
+        if (before.isNullOrEmpty()) return null
+        if (picked != null && before.endsWith(picked) && picked in facesByLength) return picked
+        val face = facesByLength.firstOrNull { before.endsWith(it) } ?: return null
+        // With no recorded pick, leave a possible word ending intact ("hello" + ":-)").
+        val withoutWordPrefix = face.dropWhile { it.isLetterOrDigit() }
+        return if (withoutWordPrefix != face && withoutWordPrefix in facesByLength) withoutWordPrefix else face
+    }
+
     val categories = listOf(
         KaomojiCategory("经典", listOf(":-)", ":^)", "^_^", "(^^)", "o:-)", "B-)", "8-)", ":,-)", ":-D", "}:‑)", ";)", ";-)", ":-\$", ":-!", ":-P", ":-*", ":‑X", ":-|", ":-\\", ":-[", "=_=", "(TT)", ":'(", ":-(", ">.<", "(+_+)", "(*_*)", "O_o", "*\\0/*", ":0", "=-O", ":-O")),
         KaomojiCategory("微笑", listOf("(*´▽｀*)", "(＾▽＾)", "(≧▽≦)", "(*^▽^*)", "(o^▽^o)", "(´｡• ᵕ •｡`)", "(⌒▽⌒)☆", "(☆▽☆)", "( ´ ▽ ` )", "(｡•̀ᴗ-)✧", "(๑˃̵ᴗ˂̵)و", "ヽ(＾Д＾)ﾉ", "(•‿•)", "(・∀・)", "◉‿◉", "｡◕‿◕｡", "(✷‿✷)", "ʘ‿ʘ", "(θ‿θ)", "(. ❛ ᴗ ❛.)", "(◔‿◔)", "(◕ᴗ◕✿)", "(ʘᴗʘ✿)", "(人 •͈ᴗ•͈)", "( ╹▽╹ )", "(◍•ᴗ•◍)", "(✯ᴗ✯)", "ಡ ͜ ʖ ಡ", "(ㆁωㆁ)", "<(￣︶￣)>", "^_________^", "(✿^‿^)", "( ꈍᴗꈍ)", "(*´ω｀*)", "(◡ ω ◡)", "( ´◡‿ゝ◡`)", "(◠‿◕)", "(ﾉ◕ヮ◕)ﾉ*.✧", "(人*´∀｀)｡*ﾟ+", "✧◝(⁰▿⁰)◜✧", "(◠‿・)—☆")),

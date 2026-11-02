@@ -12,6 +12,8 @@ import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.KeyEffectPreferences
 
+private const val DEFAULT_KEY_TEXT_SCALE = 1.2f
+
 internal fun normalizeHandwritingPause(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.5f).coerceIn(0.1f, 2.5f) * 10).roundToInt() / 10f
 
@@ -31,6 +33,10 @@ internal fun normalizeSymbolKeyHoldSeconds(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 1f).coerceIn(0.3f, 2f) * 10).roundToInt() / 10f
 
 /** 九键「下一项」拖到候选算拖动选词的距离：键盘区宽或高的 20%–80%，每档 10%，默认 50%（用户 10-25 定的一半）。 */
+/** 角标不透明度：10%~100%，按 5% 一档；读坏了当 100%（原样）。 */
+internal fun normalizeCornerHintOpacity(value: Float): Float =
+    if (!value.isFinite()) 1f else (kotlin.math.round(value.coerceIn(0.1f, 1f) * 20f) / 20f)
+
 internal fun normalizeCandidateDragPercent(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 50f).coerceIn(20f, 80f) / 10f).roundToInt() * 10f
 
@@ -52,7 +58,14 @@ enum class CursorGestureMode(val label: String) {
 data class KeyboardInputPreferences(
     val spaceHold: SpaceHoldAction = SpaceHoldAction.CURSOR,
     val cursorStepDp: Float = 10f,
-    val keyTextScale: Float = 1.15f,
+    val keyTextScale: Float = DEFAULT_KEY_TEXT_SCALE,
+    /**
+     * 角标不透明度（主题与外观 › 角标与气泡），乘在角标原来的淡化上：1 = 原样（不开玻璃时按主字的 50%~70%，开玻璃时不淡化），
+     * 调低更淡。开不开玻璃都起作用（GitHub #7 #60）。
+     */
+    val cornerHintOpacity: Float = 1f,
+    /** 功能键不显示提示字：空格不写方案名，删除键等功能键不写上滑的「清空」；只改显示，滑动照旧（GitHub #11 #60，默认关）。 */
+    val hideFunctionKeyHints: Boolean = false,
     /** 字母键帽一律显示大写（只改显示，输入照旧跟 Shift）；默认关，保持小写。 */
     val uppercaseKeyLabels: Boolean = false,
     /** 像搜狗：中文时字母键显示大写，英文时照 Shift 显示（平时小写），只改显示（默认关）。 */
@@ -64,6 +77,13 @@ data class KeyboardInputPreferences(
     /** 手写边写边识别：每写完一笔就在后台先认，停顿一到直接出候选（默认关，见 HandwritingInputSession）。 */
     val handwritingRecognizeWhileWriting: Boolean = false,
     val showPressBubble: Boolean = false,
+    val showPreeditPreview: Boolean = true,
+    val inputTextLocation: String = SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR,
+    val inlinePreeditPreview: Boolean = false,
+    /** 拼音气泡底色的不透明度，见 [SettingsPreferences.preeditBubbleOpacity]。 */
+    val preeditBubbleOpacity: Float = 1f,
+    val chineseLetterSwipes: Map<String, String> = emptyMap(),
+    val englishLetterSwipes: Map<String, String> = emptyMap(),
     val splitKeyboardEnabled: Boolean = false,
     /** 分体 26 键右半中排再放一个 G（默认关）。 */
     val splitRightG: Boolean = false,
@@ -111,7 +131,7 @@ data class KeyboardInputPreferences(
     val doublePinyinSemicolonOnShift: Boolean = false,
     /** 中文全拼 26 键中英混输（nihaohello → 你好hello），默认关；见 app/data/cyime_mixed_input.lua。 */
     val mixedInput: Boolean = false,
-    /** 中文全拼 26 键和九键补出生僻字（瀺 chan、槻 gui），默认关；见 app/data/cyime_rare_chars.lua。 */
+    /** 中文全拼 26 键、双拼和九键补出生僻字（瀺 chan、槻 gui），默认关；见 app/data/cyime_rare_chars.lua。 */
     val rareCharacters: Boolean = false,
     /** 中文候选和上屏用台湾正体（台灣、計畫），默认关；Rime 选项 traditionalization，转换表见 assets/rime_chinese/opencc。 */
     val traditionalOutput: Boolean = false,
@@ -121,10 +141,16 @@ data class KeyboardInputPreferences(
     val englishAutoSpace: Boolean = false,
     /** 英文键盘打 , . ? ! : ; 后自动补一个空格（别人请求，默认关）；见 service/EnglishAutoSpace.kt。 */
     val englishPunctuationSpace: Boolean = false,
+    /** 打 @ 时候选栏给常用邮箱后缀（qq.com、gmail.com），别人请求，默认关；见 service/EmailSuffixes.kt。 */
+    val emailSuffixes: Boolean = false,
+    /** 网址、邮箱框一进去就是英文（默认开，原有行为）；关掉后沿用当前语言，密码框照旧锁英文。见 service/EditorSessionInputPolicy.kt。 */
+    val addressFieldsEnglish: Boolean = true,
     /** 中文候选在词后面多出对应表情（开心 😄），默认关；Rime 选项 emoji，表情表 opencc/emoji.json（雾凇）。 */
     val candidateEmoji: Boolean = false,
     /** 打符号名出符号（加号 +、问号 ？ ?），别人请求，默认关；Rime 选项 cyime_symbol_names，符号表 assets/rime_chinese/opencc/cyime_symbols.txt。 */
     val symbolNames: Boolean = false,
+    /** 打希腊字母名出希腊字母（xita θ、pi π、alpha α），别人请求，默认关；Rime 选项 cyime_greek_letters，见 app/data/cyime_greek_letters.lua。 */
+    val greekLetters: Boolean = false,
     val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
     val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
     val reverseSymbolSwipe: Boolean = false,
@@ -132,6 +158,8 @@ data class KeyboardInputPreferences(
     val clearAllWhileComposing: Boolean = false,
     /** 删除键清空只清光标前（和选中）的字，光标后的留着，默认关（10-31 用户要求）。 */
     val clearBeforeCursorOnly: Boolean = false,
+    /** 删除键左右滑动删字：左滑删光标前、右滑删光标后，滑得越远删得越多，默认开（11-01 用户要求可关）。 */
+    val swipeDistanceDelete: Boolean = true,
     val cursorHoldSeconds: Float = 0.2f,
     /** 移动光标时每走一字轻震一下；原来一直有，默认开保持手感（2026-10-22 起可关）。 */
     val cursorStepHaptic: Boolean = true,
@@ -149,14 +177,17 @@ data class KeyboardInputPreferences(
     val glideTyping: Boolean = false,
     /** 中文全拼、双拼 26 键滑行输入，与英文分开、默认关（用户 10-31：开着英文滑行的老用户不能被带着开）。 */
     val chineseGlideTyping: Boolean = false,
+    /** 滑行时在手指上方实时显示现在抬手会出的词；滑动中反复识别，多占 CPU，默认关（别的用户 11-02 提的，同 Gboard）。 */
+    val glidePreview: Boolean = false,
     /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
     val letterLongPressMenu: Boolean = false,
     /** 九键拂动选字母（左上右下），数字改为长按。 */
     val t9FlickLetters: Boolean = false,
-    /** 26 键 Z X C V 的上角标改成撤销/剪切/复制/粘贴（发 Ctrl+字母，同按住 !@# 当 Ctrl）；别人提的，默认关（10-31）。 */
-    val zxcvEditShortcuts: Boolean = false,
+    val t9GlideTyping: Boolean = false,
     /** 长按语言键弹出列表，与空格长按分开设置；默认 0.15 秒（2026-10-13 用户要求）。 */
     val languageMenuHoldSeconds: Float = 0.15f,
+    /** 长按语言键弹出系统的输入法选择框，不弹语言列表（GitHub #60 #68，别人的需求，默认关）。 */
+    val languageKeyImePicker: Boolean = false,
     /** 按住符号键当 Ctrl；不拖动且在这个时限内松手才打开符号面板，超过时限松手什么都不做；默认 1 秒（2026-10-24 用户要求）。 */
     val symbolKeyHoldSeconds: Float = 1f,
     /** 九键从「下一项」拖出超过键盘区宽或高的这个百分比才算拖动选词，没拖这么远仍是键自己的左右滑；默认 50（用户 10-31 要求可调）。 */
@@ -167,7 +198,13 @@ data class KeyboardInputPreferences(
     val cursorSwipeLines: Float = 1f,
     /** 固定键盘底部留白（调节键盘里往上拖出的那一条）上左右滑动移动光标；默认关（用户 10-31 要求新增）。 */
     val bottomLiftCursor: Boolean = false,
+    /** 按住空格说话时上滑取消：手指往上滑出空格约一个键高再松手，这次说的话不上屏（默认关，别人提的需求，11-02）。 */
+    val voiceSwipeCancel: Boolean = false,
 ) {
+    internal val showCodeInCandidateBar: Boolean get() = showPreeditPreview &&
+        com.kingzcheung.xime.service.TerminalEditor.inputTextLocation { inputTextLocation } == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR
+    /** 拼音放进候选栏左侧：只在「显示在候选栏」下生效；切到输入框后留着的旧值不把气泡挤进栏里。 */
+    internal val preeditInsideKeyboard: Boolean get() = showCodeInCandidateBar && inlinePreeditPreview
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
     /** 长按空格不再移动光标时，滑动移动光标改成哪种：键盘滑动；滑行输入锁着键盘滑动就关掉。 */
@@ -185,14 +222,14 @@ data class KeyboardInputPreferences(
         const val MIXED_INPUT_KEY = "mixed_input"
         /** 生僻字开关；同繁体输出，输入法按字母、数字键前读它（ImeKeyRouter）。 */
         const val RARE_CHARACTERS_KEY = "rare_characters"
-        /** Z X C V 上角标改成撤销/剪切/复制/粘贴，默认关。 */
-        const val ZXCV_EDIT_SHORTCUTS_KEY = "zxcv_edit_shortcuts"
         /** 繁体输出开关；同中英混输，输入法按键前读它（ImeKeyRouter）。 */
         const val TRADITIONAL_OUTPUT_KEY = "traditional_output"
         /** 打字中清空整个输入框；输入法在清空时读它（ImeKeyRouter）。 */
         const val CLEAR_ALL_WHILE_COMPOSING_KEY = "clear_all_while_composing"
         /** 只清空光标前的内容；输入法在清空时读它（ImeKeyRouter）。 */
         const val CLEAR_BEFORE_CURSOR_ONLY_KEY = "clear_before_cursor_only"
+        /** 删除键左右滑动删除；键盘界面读它决定删除键接不接横滑删字（KeyboardView）。 */
+        const val SWIPE_DISTANCE_DELETE_KEY = "swipe_distance_delete"
         /** 字母键帽显示大写。 */
         const val UPPERCASE_KEY_LABELS_KEY = "uppercase_key_labels"
         const val CHINESE_UPPERCASE_KEY_LABELS_KEY = "chinese_uppercase_key_labels"
@@ -200,6 +237,8 @@ data class KeyboardInputPreferences(
         const val DATETIME_CANDIDATES_KEY = "datetime_candidates"
         /** 中文滑行输入；新键，旧版本没写过，读不到就是关。 */
         const val CHINESE_GLIDE_KEY = "glide_typing_chinese"
+        /** 滑行实时预览；新键，读不到就是关。 */
+        const val GLIDE_PREVIEW_KEY = "glide_preview"
         /** 双拼键位提示开关；设置在「双拼方案」页。 */
         const val DOUBLE_PINYIN_KEY_HINTS_KEY = "double_pinyin_key_hints"
         /** 双拼键位提示和角标一起显示；设置在「双拼方案」页。新键，读不到就是关。 */
@@ -210,26 +249,41 @@ data class KeyboardInputPreferences(
         const val ENGLISH_AUTO_SPACE_KEY = "english_auto_space"
         /** 英文标点后自动加空格开关；输入法打标点时读它，改了下一个标点就生效。新键，读不到就是关。 */
         const val ENGLISH_PUNCTUATION_SPACE_KEY = "english_punctuation_space"
+        /** 打 @ 时给邮箱后缀开关；输入法打 @ 和后面的字时读它。新键，读不到就是关。 */
+        const val EMAIL_SUFFIXES_KEY = "email_suffix_candidates"
+        /** 网址、邮箱框自动切英文开关；输入法进输入框时读它。新键，读不到就是开。 */
+        const val ADDRESS_FIELDS_ENGLISH_KEY = "address_fields_english"
         /** 候选里显示表情开关；同繁体输出，输入法按键前读它（ImeKeyRouter）。 */
         const val CANDIDATE_EMOJI_KEY = "candidate_emoji"
         /** 打符号名出符号开关；同表情，输入法按键前读它（ImeKeyRouter），写 Rime 选项 cyime_symbol_names。新键，读不到就是关。 */
         const val SYMBOL_NAMES_KEY = "symbol_name_candidates"
+        /** 打希腊字母名出希腊字母开关；同符号名，写 Rime 选项 cyime_greek_letters。新键，读不到就是关。 */
+        const val GREEK_LETTERS_KEY = "greek_letter_candidates"
         /** 底部留白滑动移动光标，见 [bottomLiftCursor]。 */
         const val BOTTOM_LIFT_CURSOR_KEY = "bottom_lift_cursor"
+        /** 按住说话上滑取消，见 [voiceSwipeCancel]。 */
+        const val VOICE_SWIPE_CANCEL_KEY = "voice_swipe_cancel"
         const val HANDWRITING_RECOGNIZE_EARLY_KEY = "handwriting_recognize_while_writing"
+        const val LANGUAGE_KEY_IME_PICKER_KEY = "language_key_ime_picker"
 
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
+        /** 角标不透明度；新键，读不到就是 1（原样）。 */
+        const val CORNER_HINT_OPACITY_KEY = "corner_hint_opacity"
+        const val HIDE_FUNCTION_KEY_HINTS_KEY = "hide_function_key_hints"
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, SYMBOL_NAMES_KEY,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, ZXCV_EDIT_SHORTCUTS_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
-                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds", "t9_candidate_drag_percent",
+                SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
+                SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY,
+                com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
+                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
+                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
                 SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
-                BOTTOM_LIFT_CURSOR_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
+                BOTTOM_LIFT_CURSOR_KEY, VOICE_SWIPE_CANCEL_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
         }
 
@@ -243,6 +297,9 @@ data class KeyboardInputPreferences(
             val languageHold = prefs.getFloat("language_key_hold_seconds_v2", if (legacyLanguageHold == 0.1f) 0.15f else legacyLanguageHold)
             val hold = SpaceHoldAction.entries.firstOrNull { it.name == prefs.getString("space_hold_action", "CURSOR") }
                 ?: SpaceHoldAction.CURSOR
+            val numberRow = SettingsPreferences.isNumberRowEnabled(context)
+            // 开关一变，26 键第一排的角标跟着换（见 QwertySwipeSymbols.numberRowUp）；键盘随后按新设置重画。
+            com.kingzcheung.xime.settings.KeysConfigHelper.numberRowCorners = numberRow
             return KeyboardInputPreferences(
                 keyGlowEnabled = KeyEffectPreferences.glowEnabled(prefs),
                 keyAnimationEnabled = KeyEffectPreferences.animationEnabled(prefs),
@@ -250,12 +307,18 @@ data class KeyboardInputPreferences(
                 frostedGlass = FrostedGlassPreferences.read(context, isDark)
                     .legibleForTheme(SettingsPreferences.getKeyboardTheme(context), isDark),
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
+                showPreeditPreview = SettingsPreferences.showPreeditPreview(context),
+                inputTextLocation = SettingsPreferences.getInputTextLocation(context),
+                inlinePreeditPreview = SettingsPreferences.inlinePreeditPreview(context),
+                preeditBubbleOpacity = SettingsPreferences.preeditBubbleOpacity(context),
+                chineseLetterSwipes = com.kingzcheung.xime.settings.LetterSwipeBindings.load(context, false),
+                englishLetterSwipes = com.kingzcheung.xime.settings.LetterSwipeBindings.load(context, true),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
                 splitRightG = SettingsPreferences.isSplitRightGEnabled(context),
                 fillBlankAreas = SettingsPreferences.isKeyboardBlankFilled(context),
                 wideKeys = SettingsPreferences.isWideKeysEnabled(context),
                 evenMergedKeys = SettingsPreferences.isEvenMergedKeysEnabled(context),
-                numberRow = SettingsPreferences.isNumberRowEnabled(context),
+                numberRow = numberRow,
                 splitGapPortrait = SettingsPreferences.getSplitGapFraction(context, false),
                 splitGapLandscape = SettingsPreferences.getSplitGapFraction(context, true),
                 qwertyStagger = QwertyStaggerMode.entries.firstOrNull { it.name == prefs.getString("qwerty_stagger_mode", null) }
@@ -279,7 +342,9 @@ data class KeyboardInputPreferences(
                 cursorStepHaptic = prefs.getBoolean("cursor_step_haptic", true),
                 cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
                 bottomLiftCursor = prefs.getBoolean(BOTTOM_LIFT_CURSOR_KEY, false),
+                voiceSwipeCancel = prefs.getBoolean(VOICE_SWIPE_CANCEL_KEY, false),
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
+                languageKeyImePicker = prefs.getBoolean(LANGUAGE_KEY_IME_PICKER_KEY, false),
                 symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(prefs.getFloat("symbol_key_hold_seconds", 1f)),
                 candidateDragPercent = normalizeCandidateDragPercent(prefs.getFloat("t9_candidate_drag_percent", 50f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
@@ -295,8 +360,11 @@ data class KeyboardInputPreferences(
                 datetimeCandidates = prefs.getBoolean(DATETIME_CANDIDATES_KEY, false),
                 englishAutoSpace = prefs.getBoolean(ENGLISH_AUTO_SPACE_KEY, false),
                 englishPunctuationSpace = prefs.getBoolean(ENGLISH_PUNCTUATION_SPACE_KEY, false),
+                emailSuffixes = prefs.getBoolean(EMAIL_SUFFIXES_KEY, false),
+                addressFieldsEnglish = prefs.getBoolean(ADDRESS_FIELDS_ENGLISH_KEY, true),
                 candidateEmoji = prefs.getBoolean(CANDIDATE_EMOJI_KEY, false),
                 symbolNames = prefs.getBoolean(SYMBOL_NAMES_KEY, false),
+                greekLetters = prefs.getBoolean(GREEK_LETTERS_KEY, false),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
                 fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),
                 symbolInputMode = SymbolInputMode.entries.firstOrNull {
@@ -305,6 +373,7 @@ data class KeyboardInputPreferences(
                 reverseSymbolSwipe = prefs.getBoolean("reverse_symbol_swipe", false),
                 clearAllWhileComposing = prefs.getBoolean(CLEAR_ALL_WHILE_COMPOSING_KEY, false),
                 clearBeforeCursorOnly = prefs.getBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, false),
+                swipeDistanceDelete = prefs.getBoolean(SWIPE_DISTANCE_DELETE_KEY, true),
                 kanaDirectionHints = prefs.getBoolean("kana_direction_hints", false),
                 // 10.11 的默认关已写进旧键；v2 一次性恢复为开，之后用户手动关闭的保留。
                 flickDirectionDisc = prefs.getBoolean("flick_direction_disc_v2", true),
@@ -312,10 +381,14 @@ data class KeyboardInputPreferences(
                 // 分不出是不是用户自己开的，所以只认新键；没有新键就是默认关。
                 glideTyping = prefs.getBoolean("glide_typing_v2", false),
                 chineseGlideTyping = prefs.getBoolean(CHINESE_GLIDE_KEY, false),
+                glidePreview = prefs.getBoolean(GLIDE_PREVIEW_KEY, false),
                 letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
-                zxcvEditShortcuts = prefs.getBoolean(ZXCV_EDIT_SHORTCUTS_KEY, false),
-                keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
+                t9GlideTyping = prefs.getBoolean("t9_glide_typing", false),
+                keyTextScale = prefs.getFloat("key_text_scale", DEFAULT_KEY_TEXT_SCALE)
+                    .takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: DEFAULT_KEY_TEXT_SCALE,
+                cornerHintOpacity = normalizeCornerHintOpacity(prefs.getFloat(CORNER_HINT_OPACITY_KEY, 1f)),
+                hideFunctionKeyHints = prefs.getBoolean(HIDE_FUNCTION_KEY_HINTS_KEY, false),
                 uppercaseKeyLabels = prefs.getBoolean(UPPERCASE_KEY_LABELS_KEY, false),
                 chineseUppercaseKeyLabels = prefs.getBoolean(CHINESE_UPPERCASE_KEY_LABELS_KEY, false),
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
@@ -334,6 +407,7 @@ data class KeyboardInputPreferences(
             .putFloat("cursor_hold_seconds", normalizeCursorHoldSeconds(cursorHoldSeconds))
             .putFloat("language_key_hold_seconds_v2", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
             .putFloat("language_key_hold_seconds", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
+            .putBoolean(LANGUAGE_KEY_IME_PICKER_KEY, languageKeyImePicker)
             .putFloat("symbol_key_hold_seconds", normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds))
             .putFloat("t9_candidate_drag_percent", normalizeCandidateDragPercent(candidateDragPercent))
             .putBoolean("neighbor_correction", neighborCorrection)
@@ -347,14 +421,18 @@ data class KeyboardInputPreferences(
             .putBoolean(DATETIME_CANDIDATES_KEY, datetimeCandidates)
             .putBoolean(ENGLISH_AUTO_SPACE_KEY, englishAutoSpace)
             .putBoolean(ENGLISH_PUNCTUATION_SPACE_KEY, englishPunctuationSpace)
+            .putBoolean(EMAIL_SUFFIXES_KEY, emailSuffixes)
+            .putBoolean(ADDRESS_FIELDS_ENGLISH_KEY, addressFieldsEnglish)
             .putBoolean(CANDIDATE_EMOJI_KEY, candidateEmoji)
             .putBoolean(SYMBOL_NAMES_KEY, symbolNames)
+            .putBoolean(GREEK_LETTERS_KEY, greekLetters)
             .putBoolean("fourteen_letter_swipe", fourteenLetterSwipe)
             .putFloat("fourteen_letter_swipe_dp", normalizeLetterSwipeDistance(fourteenLetterSwipeDp))
             .putString("symbol_input_mode", symbolInputMode.name)
             .putBoolean("reverse_symbol_swipe", reverseSymbolSwipe)
             .putBoolean(CLEAR_ALL_WHILE_COMPOSING_KEY, clearAllWhileComposing)
             .putBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, clearBeforeCursorOnly)
+            .putBoolean(SWIPE_DISTANCE_DELETE_KEY, swipeDistanceDelete)
             .putBoolean("kana_direction_hints", kanaDirectionHints)
             .putBoolean("flick_direction_disc_v2", flickDirectionDisc)
             .putBoolean("flick_direction_disc", flickDirectionDisc)
@@ -362,14 +440,18 @@ data class KeyboardInputPreferences(
             .putBoolean("letter_long_press_menu", letterLongPressMenu)
             .putBoolean("glide_typing", glideTyping)
             .putBoolean(CHINESE_GLIDE_KEY, chineseGlideTyping)
+            .putBoolean(GLIDE_PREVIEW_KEY, glidePreview)
             .putBoolean("t9_flick_letters", t9FlickLetters)
-            .putBoolean(ZXCV_EDIT_SHORTCUTS_KEY, zxcvEditShortcuts)
+            .putBoolean("t9_glide_typing", t9GlideTyping)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
             .putFloat("cursor_swipe_lines", normalizeCursorSwipeLines(cursorSwipeLines))
             .putBoolean("cursor_step_haptic", cursorStepHaptic)
             .putBoolean("cursor_step_sound", cursorStepSound)
             .putBoolean(BOTTOM_LIFT_CURSOR_KEY, bottomLiftCursor)
+            .putBoolean(VOICE_SWIPE_CANCEL_KEY, voiceSwipeCancel)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
+            .putFloat(CORNER_HINT_OPACITY_KEY, normalizeCornerHintOpacity(cornerHintOpacity))
+            .putBoolean(HIDE_FUNCTION_KEY_HINTS_KEY, hideFunctionKeyHints)
             .putBoolean(UPPERCASE_KEY_LABELS_KEY, uppercaseKeyLabels)
             .putBoolean(CHINESE_UPPERCASE_KEY_LABELS_KEY, chineseUppercaseKeyLabels)
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
@@ -398,6 +480,8 @@ data class KeyboardInputPreferences(
 }
 
 data class KeyboardInputActions(
+    val englishLetters: Boolean = false,
+    val onLetterSwipeAction: ((String) -> Unit)? = null,
     val onCursorMove: ((Int) -> Unit)? = null,
     val onCursorMoveVertical: ((Int) -> Unit)? = null,
     val onCursorModeChange: ((Boolean) -> Unit)? = null,
@@ -405,6 +489,8 @@ data class KeyboardInputActions(
     val onVoiceToggle: (() -> Unit)? = null,
     /** 按住空格说话松手：还在听写就结束并上屏，没开起来就什么都不做（不能像 [onVoiceToggle] 那样反过来开麦）。 */
     val onVoiceHoldEnd: (() -> Unit)? = null,
+    /** 按住空格说话上滑后松手：停麦，这次说的字全部撤掉，什么都不上屏。 */
+    val onVoiceHoldCancel: (() -> Unit)? = null,
     val isSttEnabled: Boolean = false,
     val schemas: List<SchemaInfo> = emptyList(),
     val currentInputModeId: String = "",

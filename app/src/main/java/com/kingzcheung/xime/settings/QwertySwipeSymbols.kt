@@ -28,8 +28,19 @@ internal object QwertySwipeSymbols {
         "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
         "≈", "+", "_", "'", "=", "|", "{", "}", "/",
         "\"", "`", "×", "÷", "≤", "≥", "°")
-    fun up(english: Boolean) = if (english) englishUp else up
-    fun down(english: Boolean) = if (english) englishDown else down
+    // 开了「数字行」：数字和 ! @ # … 都在数字行上（和电脑键帽一样，见 numberRowShiftSymbol），
+    // 第一排 Q 到 P 的上下 20 格空出来，换成下面这些；第二、三排不变（用户 11-01 定）。
+    private fun firstRow(vararg values: String) = rows[0].map(Char::toString).zip(values.toList()).toMap()
+    // 中文下方补齐英文键盘有、中文原来没有的符号，{ } 在 O、P 和电脑上一样靠右；上方放直角引号和常用记号。
+    val numberRowUp = firstRow("「", "」", "『", "』", "℃", "←", "→", "√", "★", "※")
+    val numberRowDown = firstRow("+", "×", "÷", "≈", "≤", "≥", "°", "|", "{", "}")
+    // 英文上方照英文规则：这些没有半角写法，和中文同一格同一个；下方英文本来就全，补少用的。
+    val numberRowEnglishUp = numberRowUp
+    val numberRowEnglishDown = firstRow("€", "£", "±", "≠", "∞", "©", "®", "™", "§", "‰")
+    fun up(english: Boolean, numberRow: Boolean = false) =
+        (if (english) englishUp else up) + (if (!numberRow) emptyMap<String, String>() else if (english) numberRowEnglishUp else numberRowUp)
+    fun down(english: Boolean, numberRow: Boolean = false) =
+        (if (english) englishDown else down) + (if (!numberRow) emptyMap<String, String>() else if (english) numberRowEnglishDown else numberRowDown)
     // 2026-10-12 至 10-16 的预设：首次换成固定字符预设时，把当时看到的中文角标另存一份。
     private val v1012Up = preset(
         "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
@@ -141,7 +152,7 @@ internal object QwertySwipeSymbols {
         }
     }
 
-    fun save(context: Context, english: Boolean, values: Map<String, String>) {
+    fun save(context: Context, english: Boolean, values: Map<String, String>, swipes: Map<String, String>? = null) {
         val edit = SettingsPreferences.getPrefsPublic(context).edit()
         val prefix = prefix(english)
         for (key in keys) for (direction in listOf("up", "down")) {
@@ -149,15 +160,21 @@ internal object QwertySwipeSymbols {
             val value = values[id]
             if (value == null) edit.remove(prefix + id) else edit.putString(prefix + id, value)
         }
+        if (swipes != null) edit.putStringSet(LetterSwipeBindings.key(english),
+            swipes.map { (slot, value) -> "$slot\t$value" }.toSet())
         check(edit.commit()) { "无法保存符号设置" }
         KeysConfigHelper.loadConfig(context)
     }
 
     fun apply(key: String, original: KeyGestureConfig?, overrides: Map<String, String>,
-        custom: KeyGestureConfig?, english: Boolean = false): KeyGestureConfig? {
+        custom: KeyGestureConfig?, english: Boolean = false, numberRow: Boolean = false): KeyGestureConfig? {
         if (key !in up) return original
         fun gesture(direction: String, preset: String, configured: GestureDef?): GestureDef {
-            val override = overrides["$direction.$key"]
+            // 开着数字行时，第一排存着的数字或 ! @ # …（「恢复预设」或载入版本时写进去的旧预设）算预设，换成数字行那一套。
+            val saved = overrides["$direction.$key"]
+            val legacyFirstRow = numberRow && key in numberRowUp &&
+                saved == (if (direction == "up") up(english) else down(english))[key]
+            val override = if (legacyFirstRow) preset else saved
             if (override == null && configured != null) return configured
             val value = override ?: preset
             return GestureDef(label = value, value = value,
@@ -166,7 +183,7 @@ internal object QwertySwipeSymbols {
                     else com.kingzcheung.xime.keyboard.GestureAction.COMMIT)
         }
         return (original ?: KeyGestureConfig()).copy(
-            swipeUp = gesture("up", up(english).getValue(key), custom?.swipeUp),
-            swipeDown = gesture("down", down(english).getValue(key), custom?.swipeDown))
+            swipeUp = gesture("up", up(english, numberRow).getValue(key), custom?.swipeUp),
+            swipeDown = gesture("down", down(english, numberRow).getValue(key), custom?.swipeDown))
     }
 }

@@ -256,7 +256,7 @@ fun KeyButton(
                 val displayText = if (swipeText.length <= 4) swipeText else swipeText.take(4)
                 Text(
                     text = punctuationKeyLabel(displayText),
-                    color = keyHintColor(textColor, frostedGlass, 0.5f),
+                    color = keyHintColor(textColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                     fontSize = hintSize.sp,
                     lineHeight = (hintSize * 1.2f).sp,
                     fontWeight = FontWeight.Normal,
@@ -270,7 +270,7 @@ fun KeyButton(
             if (badgeText != null && !(flickPreview?.fromTop == true && flickPreview?.text == badgeText)) {
                 Text(
                     text = badgeText,
-                    color = keyHintColor(textColor, frostedGlass, 0.5f),
+                    color = keyHintColor(textColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                     fontSize = (10f * hintScale).sp,
                     lineHeight = (12f * hintScale).sp,
                     fontWeight = FontWeight.Normal,
@@ -442,7 +442,11 @@ fun SwipeableKeyButton(
     ).withSymbolInput(symbolInputMode, symbolInputText).let {
         if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
     }
-    val currentActions by rememberUpdatedState(gestureActions)
+    val inputActions = LocalKeyboardInputActions.current
+    val bindings = if (inputActions.englishLetters) inputPreferences.englishLetterSwipes else inputPreferences.chineseLetterSwipes
+    val currentActions by rememberUpdatedState(if (bindings.isEmpty() || letterSwipeLayout ||
+        flick != null || letterGroup?.length != 1 || inputActions.onLetterSwipeAction == null) gestureActions
+        else gestureActions.withLetterSwipes(letterGroup.lowercase(), bindings, inputActions.onLetterSwipeAction))
 
     // Keys whose flick directions are fixed letters (nine-key flick mode, fourteen-key pairs)
     // show the kana direction disc while held. Labels come from the live gesture mapping.
@@ -506,9 +510,10 @@ fun SwipeableKeyButton(
     val doublePinyinHints = LocalDoublePinyinKeyHints.current
     val doublePinyinHint = doublePinyinHints?.forKey(letterGroup ?: text)
     val dpHidesCorners = doublePinyinHints?.hidesCornerLabels(letterGroup ?: text) == true
-    // 「和角标一起显示」（默认关）：角标不藏，和提示分层排开，由 DoublePinyinCornerFace 一起画；紧凑键面不支持，照旧藏角标。
+    // 开着上方或下方角标提示时，角标不藏，和键位提示分层排开，由 DoublePinyinCornerFace 一起画（用户 11-01 去掉了
+    // 「和角标一起显示」开关；以前打开过它的照旧分层）。紧凑键面不支持，照旧藏角标。
     val dpWithCorners = dpHidesCorners && layoutMode != ButtonLayout.COMPACT &&
-        LocalKeyboardInputPreferences.current.doublePinyinKeyHintsWithCorners
+        LocalKeyboardInputPreferences.current.let { it.doublePinyinKeyHintsWithCorners || it.swipeUpHints || it.swipeDownHints }
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val hexagonal = LocalHoneycombKeys.current && (letterGroup ?: text).let { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }
@@ -633,7 +638,7 @@ fun SwipeableKeyButton(
                             val displayText = if (swipeUpHint.length <= 2) swipeUpHint else swipeUpHint.take(2)
                             Text(
                                 text = punctuationKeyLabel(displayText),
-                                color = keyHintColor(resolvedText, frostedGlass, 0.6f),
+                                color = keyHintColor(resolvedText, frostedGlass, 0.6f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                                 fontSize = effectiveSwipeFontSize,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.End,
@@ -655,7 +660,7 @@ fun SwipeableKeyButton(
                                 val displayText = if (swipeDownHint.length <= 12) swipeDownHint else swipeDownHint.take(12)
                                 Text(
                                     text = punctuationKeyLabel(displayText),
-                                    color = keyHintColor(resolvedText, frostedGlass, 0.7f),
+                                    color = keyHintColor(resolvedText, frostedGlass, 0.7f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                                     fontSize = adjustedFontSize,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Start,
@@ -703,7 +708,7 @@ fun SwipeableKeyButton(
                     val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
                     Text(
                         text = punctuationKeyLabel(displayText),
-                        color = keyHintColor(resolvedText, frostedGlass, 0.6f),
+                        color = keyHintColor(resolvedText, frostedGlass, 0.6f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                         fontSize = effectiveSwipeFontSize,
                         lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
                         fontWeight = FontWeight.Medium,
@@ -718,7 +723,7 @@ fun SwipeableKeyButton(
                     val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
                     Text(
                         text = punctuationKeyLabel(displayText),
-                        color = keyHintColor(resolvedText, frostedGlass, 0.5f),
+                        color = keyHintColor(resolvedText, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                         fontSize = effectiveSwipeFontSize,
                         lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
                         fontWeight = FontWeight.Normal,
@@ -732,7 +737,7 @@ fun SwipeableKeyButton(
                 if (badgeText != null && !(flickPreview?.fromTop == true && flickPreview?.text == badgeText)) {
                     Text(
                         text = badgeText,
-                        color = keyHintColor(resolvedText, frostedGlass, 0.5f),
+                        color = keyHintColor(resolvedText, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                         fontSize = (10f * hintScale).sp,
                         fontWeight = FontWeight.Normal,
                         textAlign = TextAlign.End,
@@ -747,13 +752,13 @@ fun SwipeableKeyButton(
             if (dpCornerLayout != null) DoublePinyinCornerFace(doublePinyinHint, dpCornerLayout,
                 upCorner = dpUpCorner?.takeIf { flickPreview?.fromTop != true },
                 downCorner = dpDownCorner?.takeIf { flickPreview?.fromTop != false },
-                initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f),
-                finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f),
-                upColor = keyHintColor(resolvedText, frostedGlass, 0.6f),
-                downColor = keyHintColor(resolvedText, frostedGlass, 0.5f), fontFamily = keyLabelFontFamily)
+                initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
+                finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
+                upColor = keyHintColor(resolvedText, frostedGlass, 0.6f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
+                downColor = keyHintColor(resolvedText, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity), fontFamily = keyLabelFontFamily)
             if (dpHint != null) DoublePinyinKeyHintFace(dpHint, dpFinals, effectiveSwipeFontSize,
-                initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f),
-                finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f), fontFamily = keyLabelFontFamily)
+                initialColor = keyHintColor(resolvedText, frostedGlass, 0.7f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
+                finalsColor = keyHintColor(resolvedText, frostedGlass, 0.6f, LocalKeyboardInputPreferences.current.cornerHintOpacity), fontFamily = keyLabelFontFamily)
         }
         if (ctrlLetter != null) Box(Modifier.matchParentSize().graphicsLayer { alpha = ctrlFade.value }) {
             CtrlShortcutFace(ctrlLetter, resolvedText, frostedGlass, labelSize,
@@ -944,6 +949,7 @@ fun SwipeableIconKeyButton(
     upFeedback: KeyFlickFeedback = KeyFlickFeedback.NORMAL,
     downFeedback: KeyFlickFeedback = KeyFlickFeedback.NORMAL,
     followSymbolSwipeDirection: Boolean = false,
+    distanceDelete: Boolean = false,
 ) {
     // Gesture coroutines survive recomposition; route to the current editor/input callbacks.
     val currentOnClick by rememberUpdatedState(onClick)
@@ -954,6 +960,7 @@ fun SwipeableIconKeyButton(
     val currentOnSwipeUp by rememberUpdatedState(onSwipeUp)
     val currentOnSwipeDown by rememberUpdatedState(onSwipeDown)
     val currentOnSwipeLeft by rememberUpdatedState(onSwipeLeft)
+    val startDeleteDrag by rememberUpdatedState(LocalDeleteDrag.current.takeIf { distanceDelete })
     val currentOnSwipeStateChange by rememberUpdatedState(onSwipeStateChange)
     val currentSwipeText by rememberUpdatedState(swipeText)
     val currentSwipeUpLabel by rememberUpdatedState(swipeUpLabel)
@@ -1028,6 +1035,7 @@ fun SwipeableIconKeyButton(
                         onLeft = currentOnSwipeLeft?.let { { currentOnSwipeLeft?.invoke(); Unit } },
                         upLabel = currentSwipeUpLabel ?: currentSwipeText,
                         downLabel = currentSwipeDownLabel,
+                        startDeleteDrag = startDeleteDrag,
                         onPreview = { state ->
                             flickPreview = state.keyFlick
                             currentOnSwipeStateChange?.invoke(state, buttonBounds)
@@ -1066,10 +1074,12 @@ fun SwipeableIconKeyButton(
         // Like a character key's corner hint: the hint itself becomes the moving label.
         // A half-hexagon edge key has no corner left for it, and a short key has no room above
         // the icon; the swipe still works.
-        if (!swipeText.isNullOrEmpty() && flickPreview?.text != swipeText && honeycombEdge == null && hintFits) {
+        // 「功能键不显示提示字」只藏这行字，滑动和滑动时的预览照旧（GitHub #60）。
+        if (!swipeText.isNullOrEmpty() && flickPreview?.text != swipeText && honeycombEdge == null && hintFits &&
+            !LocalKeyboardInputPreferences.current.hideFunctionKeyHints) {
             Text(
                 text = punctuationKeyLabel(swipeText),
-                color = keyHintColor(iconColor, frostedGlass, 0.5f),
+                color = keyHintColor(iconColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
                 fontSize = hintSize.sp,
                 lineHeight = (hintSize * 1.2f).sp,
                 fontWeight = FontWeight.Normal,

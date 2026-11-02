@@ -8,6 +8,9 @@ import android.provider.Settings
 import android.text.InputType
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.view.ViewGroup
+import com.kingzcheung.xime.keyboard.KeyboardPanelLaunch
+import com.kingzcheung.xime.ui.settings.StylePreviewEditor
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -99,6 +102,33 @@ class ResizeTransactionImeTest {
         }
         rule.waitUntil(30_000) {
             rule.onAllNodesWithTag("language-key-control", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test fun aStylePreviewSwallowsKeysAndToolbarTapsButAllowsExplicitResize() {
+        val toolbar = rule.onNodeWithContentDescription("键盘调节").fetchSemanticsNode()
+        val x = (toolbar.positionOnScreen.x + toolbar.size.width / 2).toInt()
+        val y = (toolbar.positionOnScreen.y + toolbar.size.height / 2).toInt()
+        val before = editor.text.toString()
+        val preview = StylePreviewEditor(rule.activity)
+        rule.runOnUiThread {
+            rule.activity.addContentView(preview, ViewGroup.LayoutParams(1, 1))
+            preview.showPreview(null)
+        }
+        try {
+            rule.waitUntil(10_000) { KeyboardPanelLaunch.previewVisible }
+            shell("input tap $x $y")
+            shell("input keyevent KEYCODE_A KEYCODE_DEL KEYCODE_ENTER")
+            rule.waitForIdle()
+            rule.onNodeWithTag("keyboard-resize-frame", true).assertDoesNotExist()
+            rule.runOnIdle { assertTrue(preview.isFocused); assertEquals(before, editor.text.toString()) }
+            rule.runOnUiThread { preview.showPreview(KeyboardPanelLaunch.Panel.RESIZE) }
+            rule.waitUntil(10_000) { rule.onAllNodesWithTag("keyboard-resize-frame", true).fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithContentDescription("确认").performClick()
+            rule.waitUntil(10_000) { rule.onAllNodesWithTag("keyboard-resize-frame", true).fetchSemanticsNodes().isEmpty() }
+            assertTrue(KeyboardPanelLaunch.previewVisible)
+        } finally {
+            rule.runOnUiThread { preview.hidePreview(); (preview.parent as? ViewGroup)?.removeView(preview) }
         }
     }
 

@@ -135,6 +135,19 @@ class FrostedKeyColorsTest {
         }
     }
 
+    /** 角标不透明度（GitHub #7 #60）：默认 1 和原来一模一样；调低时开不开玻璃都按比例变淡。 */
+    @Test fun cornerHintOpacityDefaultsToTodayAndFadesWithOrWithoutGlass() {
+        val text = Color(0xFF20242C)
+        listOf(0.5f, 0.6f, 0.7f).forEach { legacyAlpha ->
+            assertEquals(keyHintColor(text, enabled, legacyAlpha), keyHintColor(text, enabled, legacyAlpha, 1f))
+            val off = enabled.copy(enabled = false)
+            assertEquals(keyHintColor(text, off, legacyAlpha), keyHintColor(text, off, legacyAlpha, 1f))
+            assertEquals(0.4f, keyHintColor(text, enabled, legacyAlpha, 0.4f).alpha, tolerance)
+            assertEquals(legacyAlpha * 0.4f, keyHintColor(text, off, legacyAlpha, 0.4f).alpha, tolerance)
+            assertEquals(text.red, keyHintColor(text, enabled, legacyAlpha, 0.4f).red, 0f)
+        }
+    }
+
     @Test fun defaultLightHintsRemainReadableOverBlackAndWhiteHostContent() {
         val text = Color(0xFF20242C)
         val glass = enabled.copy(backgroundOpacity = 0.2f, keyOpacity = 0.8f)

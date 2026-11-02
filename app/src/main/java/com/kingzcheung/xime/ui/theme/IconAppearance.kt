@@ -75,12 +75,46 @@ object IconAppearance {
         LauncherIcons.apply(context, effective)
     }
 
+    /**
+     * 桌面图标三选一（用户 11-01）：只改和原来不同的那个值，少触发一次桌面刷新。
+     * 原来两个开关的值照旧存着，见 [DesktopIconChoice.stored]。
+     */
+    fun setChoice(context: Context, choice: DesktopIconChoice) {
+        reload(context)
+        val (follow, link) = choice.stored(linked)
+        if (link != linked) setLinked(context, link)
+        if (follow != followTheme) setFollowTheme(context, follow)
+    }
+
     /** 换键盘主题后：跟随主题时换桌面图标；字幕快捷方式的颜色总是跟随（原地更新，不会跳位）。 */
     fun onKeyboardThemeChanged(context: Context, themeId: String) {
         reload(context)
         // 字幕图标先换：三星换主图标入口时可能直接结束本应用进程，排在后面的更新会丢。
         runCatching { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.refresh(context, themeId) }
         if (followTheme) runCatching { LauncherIcons.apply(context, effective, themeId = themeId) }
+    }
+}
+
+/**
+ * 桌面图标三选一（用户 11-01：「同步图标与视觉样式」「桌面图标跟随主题色」两个开关合成一个选择）。
+ * 存的仍是原来两个值，老用户不用迁移：跟随主题色优先（原来它开着时另一个不起作用）。
+ */
+enum class DesktopIconChoice(val label: String) {
+    THEME("跟随主题色"), VISUAL_STYLE("跟随视觉样式"), CUSTOM("自己选");
+
+    /** 写回（跟随主题色，同步视觉样式）；选跟随主题色时不动「同步」，切回来还是原来那种。 */
+    fun stored(linked: Boolean): Pair<Boolean, Boolean> = when (this) {
+        THEME -> true to linked
+        VISUAL_STYLE -> false to true
+        CUSTOM -> false to false
+    }
+
+    companion object {
+        fun of(followTheme: Boolean, linked: Boolean): DesktopIconChoice = when {
+            followTheme -> THEME
+            linked -> VISUAL_STYLE
+            else -> CUSTOM
+        }
     }
 }
 

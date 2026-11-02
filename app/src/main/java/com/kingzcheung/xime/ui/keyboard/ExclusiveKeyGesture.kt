@@ -53,6 +53,41 @@ internal data class KeyGestureActions(
     val freeDirection: Boolean = false,
 )
 
+internal fun KeyGestureActions.withLetterSwipes(
+    letter: String, bindings: Map<String, String>, execute: (String) -> Unit,
+): KeyGestureActions {
+    val left = bindings["$letter.left"]
+    val right = bindings["$letter.right"]
+    val up = bindings["$letter.up"]
+    val down = bindings["$letter.down"]
+    if (left == null && right == null && up == null && down == null) return this
+    fun label(value: String?) = com.kingzcheung.xime.settings.LetterSwipeBindings.label(value)
+    return copy(leftText = label(left) ?: leftText, rightText = label(right) ?: rightText,
+        upText = label(up) ?: upText, downText = label(down) ?: downText,
+        upPreviewText = label(up) ?: upPreviewText, downPreviewText = label(down) ?: downPreviewText,
+        onLeft = left?.let { { execute(it) } } ?: onLeft,
+        onRight = right?.let { { execute(it) } } ?: onRight,
+        onUp = up?.let { action -> { _: String -> execute(action) } } ?: onUp,
+        onDown = down?.let { action -> { _: String -> execute(action) } } ?: onDown,
+        blockUpSwipe = up == null && blockUpSwipe, blockDownSwipe = down == null && blockDownSwipe,
+        inlineHorizontalPreview = inlineHorizontalPreview || left != null || right != null,
+        reserveHorizontalSwipe = reserveHorizontalSwipe || left != null || right != null)
+}
+
+/**
+ * 「按键符号」给单字母键设的上下滑动作，键面角标改写动作名（如 Z X C V 预设的撤销、剪切、复制、粘贴）。
+ * 条件和 SwipeableKeyButton 套用 [withLetterSwipes] 时一样；返回（上方角标, 下方角标），没设的方向为 null。
+ */
+@androidx.compose.runtime.Composable
+internal fun letterSwipeCornerLabels(key: String): Pair<String?, String?> {
+    val preferences = LocalKeyboardInputPreferences.current
+    val actions = LocalKeyboardInputActions.current
+    if (key.length != 1 || actions.onLetterSwipeAction == null || letterSwipeAvailable(LocalFourteenKeyLayout.current,
+            LocalCustomLayout.current?.mergedGroups?.isNotEmpty() == true)) return null to null
+    val bindings = if (actions.englishLetters) preferences.englishLetterSwipes else preferences.chineseLetterSwipes
+    return com.kingzcheung.xime.settings.LetterSwipeBindings.cornerLabels(bindings, key, preferences.reverseSymbolSwipe)
+}
+
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
     currentActions: () -> KeyGestureActions,
 ) = coroutineScope {

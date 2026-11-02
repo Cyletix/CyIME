@@ -1,46 +1,81 @@
 package com.kingzcheung.xime.ui.keyboard
 
 /**
- * 输入手势整套预设（用户 10-20 定，方案见 /mnt/project-files/输入手势预设方案.md）。
- * 预设只管下面这几项；选了预设后单独改其中任何一项，[of] 就认成 CUSTOM，与性能页同一做法。
- * 日文假名拂动与方向盘三套都一样（方向盘开，松手方向为准）。
- * 「反转上下滑方向」不归预设管（用户 10-30）：两种方向下预设都照常选中，说明文字跟着实际方向写。
+ * 设置页把原来互锁的几对开关合成一个选择（用户 11-01「脱裤子放屁的设置项」）。
+ * 只换设置页的写法：存的还是原来那几个值，键盘读法不变；旧值组合按 [of] 换算，效果和以前一样。
+ * 原「手势预设」（滑动／长按／英文滑行）只是「角标输入方式」和「滑行输入」的组合，已去掉。
  */
-enum class InputGesturePreset(val label: String) {
-    SWIPE("滑动"),
-    LONG_PRESS("长按"),
-    GLIDE("英文滑行"),
-    CUSTOM("自定义");
+enum class CornerInputChoice(val label: String) {
+    /** 滑动出角标，长按没有反应。 */
+    SWIPE("滑动输入"),
+    /** 滑动出角标，长按弹出字母气泡（大小写、带声调的字母）。原「长按弹出字母气泡」开关。 */
+    SWIPE_BUBBLE("滑动＋字母气泡"),
+    /** 长按出上方角标，另一个方向滑动出下方角标。 */
+    LONG_PRESS("长按输入");
 
-    /** 预设说明。上角标（九键是数字）默认下滑、反转后上滑，与 [withSymbolSwipeDirection] 一致。 */
-    fun summary(reverseSymbolSwipe: Boolean): String {
-        val top = if (reverseSymbolSwipe) "上滑" else "下滑"
-        val bottom = if (reverseSymbolSwipe) "下滑" else "上滑"
-        return when (this) {
-            SWIPE -> "${top}上角标、${bottom}下角标；九键${top}数字、长按选字母"
-            LONG_PRESS -> "长按出上角标、${bottom}下角标；九键长按数字、拂动选字母"
-            GLIDE -> "同“滑动”，英文 26 键可以一笔划出整个词"
-            CUSTOM -> "单独改过下面的某一项"
-        }
-    }
-
-    /** 套用预设：只改预设管的几项，其他设置原样保留。CUSTOM 不改任何东西。 */
-    fun applyTo(current: KeyboardInputPreferences): KeyboardInputPreferences = when (this) {
-        SWIPE -> current.copy(symbolInputMode = SymbolInputMode.SWIPE_UP,
-            letterLongPressMenu = false, glideTyping = false, t9FlickLetters = false,
-            fourteenLetterSwipe = true, flickDirectionDisc = true, cursorGesture = CursorGestureMode.SPACE)
-        LONG_PRESS -> SWIPE.applyTo(current).copy(symbolInputMode = SymbolInputMode.LONG_PRESS, t9FlickLetters = true)
-        GLIDE -> SWIPE.applyTo(current).copy(glideTyping = true)
-        CUSTOM -> current
+    /** 选它时写回的值；选「长按输入」照旧顺带打开九键拂动（[InputGestureLocks.withSymbolInputMode]）。 */
+    fun applyTo(settings: KeyboardInputPreferences): KeyboardInputPreferences = when (this) {
+        SWIPE -> InputGestureLocks.withSymbolInputMode(settings, SymbolInputMode.SWIPE_UP).copy(letterLongPressMenu = false)
+        SWIPE_BUBBLE -> InputGestureLocks.withSymbolInputMode(settings, SymbolInputMode.SWIPE_UP).copy(letterLongPressMenu = true)
+        LONG_PRESS -> InputGestureLocks.withSymbolInputMode(settings, SymbolInputMode.LONG_PRESS).copy(letterLongPressMenu = false)
     }
 
     companion object {
-        val presets = listOf(SWIPE, LONG_PRESS, GLIDE)
-
-        /** 当前设置正好是哪一套；对不上就是自定义。 */
-        fun of(settings: KeyboardInputPreferences): InputGesturePreset =
-            presets.firstOrNull { it.applyTo(settings) == settings } ?: CUSTOM
+        /** 角标“长按”时长按总是出角标，气泡出不来；加锁以前两个都开着的，照实际效果认作「长按输入」。 */
+        fun of(settings: KeyboardInputPreferences): CornerInputChoice = when {
+            settings.symbolInputMode == SymbolInputMode.LONG_PRESS -> LONG_PRESS
+            settings.letterLongPressMenu -> SWIPE_BUBBLE
+            else -> SWIPE
+        }
     }
+}
+
+/** 键帽上的字母：原「字母键显示大写」「中文键盘字母显示大写」两个互锁开关。 */
+enum class KeyLabelCaseChoice(val label: String) {
+    LOWER("小写"),
+    UPPER("大写"),
+    /** 中文时大写、英文时小写（按 Shift 才大写），像搜狗。 */
+    CHINESE_UPPER("中文大写");
+
+    fun applyTo(settings: KeyboardInputPreferences): KeyboardInputPreferences = settings.copy(
+        uppercaseKeyLabels = this == UPPER, chineseUppercaseKeyLabels = this == CHINESE_UPPER)
+
+    companion object {
+        /** 两个都开着（加锁以前）时键盘按「一律大写」画，见 QwertyRowOptions。 */
+        fun of(settings: KeyboardInputPreferences): KeyLabelCaseChoice = when {
+            settings.uppercaseKeyLabels -> UPPER
+            settings.chineseUppercaseKeyLabels -> CHINESE_UPPER
+            else -> LOWER
+        }
+    }
+}
+
+/**
+ * 空格长按和整个键盘滑动移光标：原「滑动移动光标」（长按空格／键盘滑动／关闭）和「长按空格」两处都能选
+ * “长按空格移动光标”。现在长按空格是一个三选一，整个键盘滑动是一个开关；存的仍是 cursorGesture 和 spaceHold。
+ * 长按空格=移动光标 ↔ cursorGesture=SPACE；开关开 ↔ KEYBOARD；其余 ↔ NONE。
+ */
+object CursorChoices {
+    val spaceHoldChoices = listOf(SpaceHoldAction.CURSOR, SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE)
+
+    fun spaceHold(settings: KeyboardInputPreferences): SpaceHoldAction = settings.effectiveSpaceHold
+
+    /** 选「移动光标」：整个键盘滑动随之关掉（两个都要占手指拖动）；选另两项沿用 [KeyboardInputPreferences.withSpaceHold]。 */
+    fun withSpaceHold(settings: KeyboardInputPreferences, action: SpaceHoldAction): KeyboardInputPreferences =
+        if (action == SpaceHoldAction.CURSOR) settings.copy(cursorGesture = CursorGestureMode.SPACE)
+        else settings.withSpaceHold(action)
+
+    fun keyboardSwipe(settings: KeyboardInputPreferences): Boolean = settings.cursorGesture == CursorGestureMode.KEYBOARD
+
+    /** 开关不能开的原因：长按空格正在移动光标，或被滑行输入锁住。 */
+    fun keyboardSwipeLock(settings: KeyboardInputPreferences): String? = when {
+        keyboardSwipe(settings) -> null
+        settings.cursorGesture == CursorGestureMode.SPACE -> "长按空格已经用来移动光标，上面换成连续空格或语音才能开"
+        else -> InputGestureLocks.lockFor(settings, InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD)?.message
+    }
+
+    fun withKeyboardSwipe(settings: KeyboardInputPreferences, on: Boolean): KeyboardInputPreferences =
+        settings.copy(cursorGesture = if (on) CursorGestureMode.KEYBOARD else CursorGestureMode.NONE)
 }
 
 /** 一个被锁住的选项值：[option] 不能设成 [lockedValue]，原因是 [by] 这个设置。 */
@@ -61,51 +96,33 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
 
 /**
  * 明显冲突的设置互相加锁（用户 10-20 要求）：先设好的那一项把冲突的选项锁死，并说明是谁锁的。
- * - 角标“长按” ↔ 字母键长按气泡：长按总是出角标，气泡出不来。
- * - 英文、中文滑行输入 ↔ 键盘区滑动移光标：都是在字母上拖动。
+ * - 英文、中文、九键滑行输入 ↔ 整个键盘滑动移光标：都是在字母上拖动。
  * - 角标“长按”时九键拂动必须开：长按被数字占了，不开拂动就没法指定字母。
- * - 双拼键位提示 ↔ 上方/下方角标提示：都写在键面四角，一起开会把符号挡住（用户 10-31「这个开了那个就开不了」）。
- *   打开「和角标一起显示」后不锁：键面分上中下三层排开（声母、上角标在上，韵母、下角标在下），见 fitDoublePinyinWithCorners。
  * - Shift 键分词 ↔ ing 放在 Shift 键上：打字时都把 Shift 键换成别的键。
- * - 字母键显示大写 ↔ 中文键盘字母显示大写：前者一律大写，后者就分不出中英文了。
- * 角标“滑动” + 字母气泡不锁：这正是用户要的可选项，慢拖会被打断已写在说明里。
+ * 11-01 起这几对不再靠锁，设置页合成了一个选择（[CornerInputChoice]、[KeyLabelCaseChoice]）或自动处理：
+ * 角标“长按” ↔ 字母气泡；字母键大写 ↔ 中文键盘大写；双拼键位提示 ↔ 上下角标提示（两个都开时自动分层显示，
+ * 见 KeyButton 的 dpWithCorners）。对应的 [InputGestureLock.Option] 留着不删，旧代码引用照常编译，只是不再产生锁。
  * 两项都已开着（加锁以前开的）时都不锁，关掉哪个都行；设置页只在被锁的一项关着时置灰它。
  */
 object InputGestureLocks {
     fun of(settings: KeyboardInputPreferences): List<InputGestureLock> = buildList {
         if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) {
-            add(InputGestureLock(InputGestureLock.Option.LETTER_LONG_PRESS_MENU, true, "角标输入方式：长按"))
-            add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "角标输入方式：长按"))
-        }
-        if (settings.letterLongPressMenu) {
-            add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.LONG_PRESS, "长按弹出字母气泡"))
+            add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "按键角标的符号和数字：长按输入"))
         }
         if (settings.glideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "滑行输入"))
         } else if (settings.chineseGlideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "中文滑行输入"))
+        } else if (settings.t9GlideTyping) {
+            add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "九键滑行输入"))
         }
         if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
-            add(InputGestureLock(InputGestureLock.Option.GLIDE_TYPING, true, "滑动移光标：键盘滑动"))
-        }
-        // 「和角标一起显示」开着时键位提示和角标分层排开、不重叠，两边都不锁。
-        if (settings.doublePinyinKeyHintsWithCorners) Unit
-        else if (settings.doublePinyinKeyHints) {
-            add(InputGestureLock(InputGestureLock.Option.CORNER_HINTS, true, "双拼键位提示"))
-        } else if (settings.swipeUpHints || settings.swipeDownHints) {
-            val corners = listOfNotNull("上方".takeIf { settings.swipeUpHints }, "下方".takeIf { settings.swipeDownHints })
-            add(InputGestureLock(InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true,
-                corners.joinToString("、") + "角标提示"))
+            add(InputGestureLock(InputGestureLock.Option.GLIDE_TYPING, true, "键盘面板滑动光标"))
         }
         if (settings.doublePinyinSemicolonOnShift) {
             add(InputGestureLock(InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true, "ing 放在 Shift 键上"))
         } else if (settings.shiftSyllableSplit) {
             add(InputGestureLock(InputGestureLock.Option.SEMICOLON_ON_SHIFT, true, "Shift 键分词"))
-        }
-        if (settings.uppercaseKeyLabels) {
-            add(InputGestureLock(InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true, "字母键显示大写"))
-        } else if (settings.chineseUppercaseKeyLabels) {
-            add(InputGestureLock(InputGestureLock.Option.UPPERCASE_KEY_LABELS, true, "中文键盘字母显示大写"))
         }
     }
 

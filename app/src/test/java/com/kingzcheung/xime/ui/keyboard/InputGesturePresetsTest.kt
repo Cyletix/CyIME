@@ -1,107 +1,108 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * 用户 11-01「脱裤子放屁的设置项」：互锁的几对开关在设置页合成一个选择，存的值不变。
+ * 这里检查旧值组合换算成的选项和键盘实际效果一致，选了以后写回的值也和以前一样。
+ */
 class InputGesturePresetsTest {
     private val base = KeyboardInputPreferences(cursorGesture = CursorGestureMode.SPACE)
 
-    @Test fun `defaults are the swipe preset and every preset is recognised after applying it`() {
-        assertEquals(InputGesturePreset.SWIPE, InputGesturePreset.of(base))
-        for (preset in InputGesturePreset.presets) assertEquals(preset, InputGesturePreset.of(preset.applyTo(base)))
+    @Test fun `corner input choice reads old values the way the keyboard behaves`() {
+        assertEquals(CornerInputChoice.SWIPE, CornerInputChoice.of(base))
+        assertEquals(CornerInputChoice.SWIPE_BUBBLE, CornerInputChoice.of(base.copy(letterLongPressMenu = true)))
+        assertEquals(CornerInputChoice.LONG_PRESS, CornerInputChoice.of(base.copy(symbolInputMode = SymbolInputMode.LONG_PRESS)))
+        // 加锁以前两个都开着：长按总是出角标、气泡出不来，按实际效果算「长按输入」。
+        assertEquals(CornerInputChoice.LONG_PRESS, CornerInputChoice.of(
+            base.copy(symbolInputMode = SymbolInputMode.LONG_PRESS, letterLongPressMenu = true)))
     }
 
-    @Test fun `changing one governed option turns the preset into custom`() {
-        val swipe = InputGesturePreset.SWIPE.applyTo(base)
-        assertEquals(InputGesturePreset.CUSTOM, InputGesturePreset.of(swipe.copy(letterLongPressMenu = true)))
-        // 预设不管的设置（如按键字号、上下滑反转）改了不影响。
-        assertEquals(InputGesturePreset.SWIPE, InputGesturePreset.of(swipe.copy(keyTextScale = 1.3f)))
-        for (preset in InputGesturePreset.presets) {
-            val reversed = preset.applyTo(base.copy(reverseSymbolSwipe = true))
-            assertTrue("${preset.name} keeps reverse", reversed.reverseSymbolSwipe)
-            assertEquals(preset, InputGesturePreset.of(reversed))
-        }
-    }
-
-    /** 实际手势：上角标（九键数字）在 upText 槽位，经方向设置后落到哪个物理方向。 */
-    private fun topSlotDirection(reverse: Boolean): String {
-        val actions = KeyGestureActions("a", {}, {}, {}, {}, upText = "@", downText = "1")
-            .withSymbolSwipeDirection(reverse)
-        return if (actions.upText == "@") "上滑" else { assertEquals("@", actions.downText); "下滑" }
-    }
-
-    @Test fun `preset summaries name the direction the keys actually use`() {
-        for (reverse in listOf(false, true)) {
-            val top = topSlotDirection(reverse)
-            val bottom = if (top == "上滑") "下滑" else "上滑"
-            assertEquals("${top}上角标、${bottom}下角标；九键${top}数字、长按选字母",
-                InputGesturePreset.SWIPE.summary(reverse))
-            assertEquals("长按出上角标、${bottom}下角标；九键长按数字、拂动选字母",
-                InputGesturePreset.LONG_PRESS.summary(reverse))
-        }
-        // 默认不反转：下滑出上角标和九键数字（B 站用户的情况）。
-        assertEquals("下滑上角标、上滑下角标；九键下滑数字、长按选字母", InputGesturePreset.SWIPE.summary(false))
-        assertEquals("上滑上角标、下滑下角标；九键上滑数字、长按选字母", InputGesturePreset.SWIPE.summary(true))
-    }
-
-    @Test fun `no preset contains a locked combination`() {
-        for (preset in InputGesturePreset.presets) {
-            val settings = preset.applyTo(base)
-            for (lock in InputGestureLocks.of(settings)) {
-                val value: Any = when (lock.option) {
-                    InputGestureLock.Option.SYMBOL_INPUT_MODE -> settings.symbolInputMode
-                    InputGestureLock.Option.LETTER_LONG_PRESS_MENU -> settings.letterLongPressMenu
-                    InputGestureLock.Option.GLIDE_TYPING -> settings.glideTyping
-                    InputGestureLock.Option.CURSOR_GESTURE -> settings.cursorGesture
-                    InputGestureLock.Option.T9_FLICK_LETTERS -> settings.t9FlickLetters
-                    InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS -> settings.doublePinyinKeyHints
-                    InputGestureLock.Option.CORNER_HINTS -> settings.swipeUpHints || settings.swipeDownHints
-                    InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT -> settings.shiftSyllableSplit
-                    InputGestureLock.Option.SEMICOLON_ON_SHIFT -> settings.doublePinyinSemicolonOnShift
-                    InputGestureLock.Option.UPPERCASE_KEY_LABELS -> settings.uppercaseKeyLabels
-                    InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS -> settings.chineseUppercaseKeyLabels
-                }
-                assertTrue("${preset.name} ${lock.option}", value != lock.lockedValue)
+    @Test fun `every corner input choice is recognised after applying it and keeps unrelated settings`() {
+        for (start in listOf(base, base.copy(reverseSymbolSwipe = true, keyTextScale = 1.3f, letterLongPressMenu = true))) {
+            for (choice in CornerInputChoice.entries) {
+                val applied = choice.applyTo(start)
+                assertEquals(choice, CornerInputChoice.of(applied))
+                assertEquals(start.reverseSymbolSwipe, applied.reverseSymbolSwipe)
+                assertEquals(start.keyTextScale, applied.keyTextScale, 0f)
             }
         }
+        val swipe = CornerInputChoice.SWIPE.applyTo(base)
+        assertEquals(SymbolInputMode.SWIPE_UP, swipe.symbolInputMode)
+        assertFalse(swipe.letterLongPressMenu)
+        val bubble = CornerInputChoice.SWIPE_BUBBLE.applyTo(base)
+        assertEquals(SymbolInputMode.SWIPE_UP, bubble.symbolInputMode)
+        assertTrue(bubble.letterLongPressMenu)
+        // 选长按：照旧顺带打开九键拂动，字母气泡关掉（长按被角标占了）。
+        val longPress = CornerInputChoice.LONG_PRESS.applyTo(base.copy(letterLongPressMenu = true))
+        assertEquals(SymbolInputMode.LONG_PRESS, longPress.symbolInputMode)
+        assertTrue(longPress.t9FlickLetters)
+        assertFalse(longPress.letterLongPressMenu)
     }
 
-    @Test fun `the setting chosen first locks the conflicting one and names itself`() {
-        val longPress = base.copy(symbolInputMode = SymbolInputMode.LONG_PRESS)
-        val bubbleLock = InputGestureLocks.lockFor(longPress, InputGestureLock.Option.LETTER_LONG_PRESS_MENU, true)
-        assertNotNull(bubbleLock)
-        assertEquals("已被「角标输入方式：长按」锁定", bubbleLock!!.message)
-        assertNotNull(InputGestureLocks.lockFor(base.copy(letterLongPressMenu = true),
-            InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.LONG_PRESS))
+    @Test fun `key label case choice maps the two old switches`() {
+        assertEquals(KeyLabelCaseChoice.LOWER, KeyLabelCaseChoice.of(base))
+        assertEquals(KeyLabelCaseChoice.UPPER, KeyLabelCaseChoice.of(base.copy(uppercaseKeyLabels = true)))
+        assertEquals(KeyLabelCaseChoice.CHINESE_UPPER, KeyLabelCaseChoice.of(base.copy(chineseUppercaseKeyLabels = true)))
+        // 加锁以前两个都开着：键盘按「一律大写」画（QwertyRowOptions）。
+        assertEquals(KeyLabelCaseChoice.UPPER, KeyLabelCaseChoice.of(
+            base.copy(uppercaseKeyLabels = true, chineseUppercaseKeyLabels = true)))
+        for (choice in KeyLabelCaseChoice.entries) {
+            val applied = choice.applyTo(base.copy(uppercaseKeyLabels = true, chineseUppercaseKeyLabels = true))
+            assertEquals(choice, KeyLabelCaseChoice.of(applied))
+            assertFalse("$choice writes at most one", applied.uppercaseKeyLabels && applied.chineseUppercaseKeyLabels)
+        }
+    }
+
+    @Test fun `space hold and keyboard swipe split the old cursor gesture without changing stored values`() {
+        // 原「滑动移动光标：长按空格」= 长按空格三选一的「移动光标」。
+        assertEquals(SpaceHoldAction.CURSOR, CursorChoices.spaceHold(base))
+        assertFalse(CursorChoices.keyboardSwipe(base))
+        val keyboard = base.copy(cursorGesture = CursorGestureMode.KEYBOARD, spaceHold = SpaceHoldAction.VOICE_TOGGLE)
+        assertTrue(CursorChoices.keyboardSwipe(keyboard))
+        assertEquals(SpaceHoldAction.VOICE_TOGGLE, CursorChoices.spaceHold(keyboard))
+        // 选「移动光标」写回 cursorGesture=SPACE；键盘面板滑动随之关掉。
+        assertEquals(CursorGestureMode.SPACE, CursorChoices.withSpaceHold(keyboard, SpaceHoldAction.CURSOR).cursorGesture)
+        // 从「移动光标」换成连续空格：和以前一样，移动光标改到键盘面板滑动（没被滑行锁住时）。
+        val repeat = CursorChoices.withSpaceHold(base, SpaceHoldAction.REPEAT)
+        assertEquals(SpaceHoldAction.REPEAT, CursorChoices.spaceHold(repeat))
+        assertEquals(CursorGestureMode.KEYBOARD, repeat.cursorGesture)
+        // 开关：开=KEYBOARD，关=NONE；长按空格的选择不动。
+        assertEquals(CursorGestureMode.NONE, CursorChoices.withKeyboardSwipe(keyboard, false).cursorGesture)
+        assertEquals(SpaceHoldAction.VOICE_TOGGLE, CursorChoices.spaceHold(CursorChoices.withKeyboardSwipe(keyboard, false)))
+        assertEquals(CursorGestureMode.KEYBOARD, CursorChoices.withKeyboardSwipe(repeat.copy(cursorGesture = CursorGestureMode.NONE), true).cursorGesture)
+    }
+
+    @Test fun `keyboard swipe switch says why it cannot be turned on`() {
+        assertNotNull(CursorChoices.keyboardSwipeLock(base))
+        assertEquals("已被「滑行输入」锁定", CursorChoices.keyboardSwipeLock(
+            base.copy(cursorGesture = CursorGestureMode.NONE, glideTyping = true)))
+        assertNull(CursorChoices.keyboardSwipeLock(base.copy(cursorGesture = CursorGestureMode.NONE)))
+        // 已经开着时不锁，关掉总行。
+        assertNull(CursorChoices.keyboardSwipeLock(base.copy(cursorGesture = CursorGestureMode.KEYBOARD, glideTyping = true)))
+    }
+
+    /** 合成一个选择的几对不再产生锁；剩下的锁照旧。 */
+    @Test fun `merged pairs no longer lock each other, the remaining locks still do`() {
+        val everything = base.copy(symbolInputMode = SymbolInputMode.LONG_PRESS, letterLongPressMenu = true,
+            doublePinyinKeyHints = true, uppercaseKeyLabels = true, chineseUppercaseKeyLabels = true)
+        val merged = setOf(InputGestureLock.Option.SYMBOL_INPUT_MODE, InputGestureLock.Option.LETTER_LONG_PRESS_MENU,
+            InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, InputGestureLock.Option.CORNER_HINTS,
+            InputGestureLock.Option.UPPERCASE_KEY_LABELS, InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS)
+        for (settings in listOf(base, everything)) {
+            assertTrue(InputGestureLocks.of(settings).none { it.option in merged })
+        }
         assertNotNull(InputGestureLocks.lockFor(base.copy(glideTyping = true),
             InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD))
-        assertNotNull(InputGestureLocks.lockFor(base.copy(cursorGesture = CursorGestureMode.KEYBOARD),
-            InputGestureLock.Option.GLIDE_TYPING, true))
-        // 没有冲突的值不锁。
-        assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.LETTER_LONG_PRESS_MENU, true))
-    }
-
-    /** 用户 10-31：「这个开了那个就开不了」——双拼键位提示和上下角标提示、两个占 Shift 键的开关各自互锁。 */
-    @Test fun `key hints and corner hints lock each other, so do the two shift key options`() {
-        // 默认角标开着：键位提示被锁，原因写出是哪个角标。
-        val hintLock = InputGestureLocks.lockFor(base, InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true)
-        assertEquals("已被「上方、下方角标提示」锁定", hintLock?.message)
-        assertEquals("已被「下方角标提示」锁定", InputGestureLocks.lockFor(base.copy(swipeUpHints = false),
-            InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true)?.message)
-        val clean = base.copy(swipeUpHints = false, swipeDownHints = false)
-        assertNull(InputGestureLocks.lockFor(clean, InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true))
-        // 键位提示开着：两个角标提示都不能开。
-        assertEquals("已被「双拼键位提示」锁定", InputGestureLocks.lockFor(clean.copy(doublePinyinKeyHints = true),
-            InputGestureLock.Option.CORNER_HINTS, true)?.message)
-        assertNull(InputGestureLocks.lockFor(clean, InputGestureLock.Option.CORNER_HINTS, true))
-        // 用户 10-31：「和角标一起显示」开着时分层排开，两边都不锁。
-        val together = base.copy(doublePinyinKeyHintsWithCorners = true)
-        assertNull(InputGestureLocks.lockFor(together, InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true))
-        assertNull(InputGestureLocks.lockFor(together.copy(doublePinyinKeyHints = true, swipeUpHints = false,
-            swipeDownHints = false), InputGestureLock.Option.CORNER_HINTS, true))
+        assertEquals("已被「键盘面板滑动光标」锁定", InputGestureLocks.lockFor(base.copy(cursorGesture = CursorGestureMode.KEYBOARD),
+            InputGestureLock.Option.GLIDE_TYPING, true)?.message)
+        assertEquals("已被「按键角标的符号和数字：长按输入」锁定", InputGestureLocks.lockFor(everything,
+            InputGestureLock.Option.T9_FLICK_LETTERS, false)?.message)
         // Shift：先开的锁住另一个。
         assertEquals("已被「ing 放在 Shift 键上」锁定", InputGestureLocks.lockFor(base.copy(doublePinyinSemicolonOnShift = true),
             InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true)?.message)
@@ -109,17 +110,23 @@ class InputGesturePresetsTest {
             InputGestureLock.Option.SEMICOLON_ON_SHIFT, true)?.message)
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true))
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.SEMICOLON_ON_SHIFT, true))
-        // 字母键大写：一律大写和中文大写只能开一个，先开的锁住另一个。
-        assertEquals("已被「字母键显示大写」锁定", InputGestureLocks.lockFor(base.copy(uppercaseKeyLabels = true),
-            InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true)?.message)
-        assertEquals("已被「中文键盘字母显示大写」锁定", InputGestureLocks.lockFor(base.copy(chineseUppercaseKeyLabels = true),
-            InputGestureLock.Option.UPPERCASE_KEY_LABELS, true)?.message)
-        assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.UPPERCASE_KEY_LABELS, true))
-        assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.CHINESE_UPPERCASE_KEY_LABELS, true))
     }
 
     @Test fun `choosing long press turns nine key flick on`() {
         assertTrue(InputGestureLocks.withSymbolInputMode(base, SymbolInputMode.LONG_PRESS).t9FlickLetters)
         assertEquals(false, InputGestureLocks.withSymbolInputMode(base, SymbolInputMode.SWIPE_UP).t9FlickLetters)
+    }
+
+    @Test fun `keyboard top style reads the two old switches the way the keyboard draws`() {
+        assertEquals(KeyboardTopStyle.ROUNDED, KeyboardTopStyle.of(roundedTop = true, softTopEdge = false, glass = true))
+        // 圆角开着时柔化本来就不生效（圆角缺口里没法渐变）。
+        assertEquals(KeyboardTopStyle.ROUNDED, KeyboardTopStyle.of(roundedTop = true, softTopEdge = true, glass = true))
+        assertEquals(KeyboardTopStyle.SOFT, KeyboardTopStyle.of(roundedTop = false, softTopEdge = true, glass = true))
+        // 没开玻璃时柔化不起作用，看到的是直角。
+        assertEquals(KeyboardTopStyle.SQUARE, KeyboardTopStyle.of(roundedTop = false, softTopEdge = true, glass = false))
+        assertEquals(KeyboardTopStyle.SQUARE, KeyboardTopStyle.of(roundedTop = false, softTopEdge = false, glass = true))
+        for (style in KeyboardTopStyle.entries) {
+            assertEquals(style, KeyboardTopStyle.of(style.roundedTop, style.softTopEdge, glass = true))
+        }
     }
 }

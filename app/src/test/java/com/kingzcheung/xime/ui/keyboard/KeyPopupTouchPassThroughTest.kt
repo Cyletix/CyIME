@@ -39,7 +39,7 @@ class KeyPopupTouchPassThroughTest {
     }
 
     /**
-     * 点按/滑动/长按气泡（26 键等，SwipeBubbleOverlay 两处）和 14 键、九键的方向盘（DirectionDiscPreview）
+     * 滑动/长按选项（SwipeBubbleOverlay）和 14 键、九键的方向盘（DirectionDiscPreview）
      * 都用 [DisplayOnlyPopupProperties]，这里直接检查它落到窗口上的标志。
      */
     @Test fun sharedPropertiesAreDisplayOnly() {

@@ -18,12 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
@@ -142,6 +143,25 @@ internal object SplitKeyboardGeometry {
     }
 
     /** 底排在空格键内部分开：左侧空格补足到中线，其余归右侧。[leftFixed] 是空格左边各键的总宽。 */
+    /**
+     * 两半靠中缝那侧的圆角半径：和卡片外侧四角同一圆角。上角只在中缝通到卡片顶边（工具栏／候选栏也分到两侧）时有，
+     * 栏是整条时两半挂在栏下面，那里是内角，保持直角；下角跟卡片底角（悬浮四角圆，固定看「底部圆角」）。
+     * 圆角放在两半上，不碰中缝本身的宽度；缝太矮放不下时两角平分高度。返回 (上角, 下角)。
+     */
+    fun innerCornerRadii(
+        radius: Float,
+        roundedTop: Boolean,
+        roundedBottom: Boolean,
+        reachesTop: Boolean,
+        holeHeight: Float,
+    ): Pair<Float, Float> {
+        if (!radius.isFinite() || radius <= 0f || !holeHeight.isFinite() || holeHeight <= 0f) return 0f to 0f
+        val top = if (roundedTop && reachesTop) radius else 0f
+        val bottom = if (roundedBottom) radius else 0f
+        val scale = if (top + bottom > holeHeight) holeHeight / (top + bottom) else 1f
+        return top * scale to bottom * scale
+    }
+
     fun spaceSplit(
         bottom: QwertyBottomRowWeights,
         space: Float = bottom.space,
@@ -204,6 +224,42 @@ internal class SplitKeyboardGap {
         onChanged?.invoke()
     }
 
+    /** 卡片外侧圆角（像素）和上下两角是否圆；两半靠中缝的那侧照这个画圆角（GitHub #78）。 */
+    private var cornerRadius by mutableFloatStateOf(0f)
+    private var cornerTop by mutableStateOf(false)
+    private var cornerBottom by mutableStateOf(false)
+
+    fun updateCorners(radiusPx: Float, roundedTop: Boolean, roundedBottom: Boolean) {
+        if (cornerRadius == radiusPx && cornerTop == roundedTop && cornerBottom == roundedBottom) return
+        cornerRadius = radiusPx
+        cornerTop = roundedTop
+        cornerBottom = roundedBottom
+        onChanged?.invoke()
+    }
+
+    /**
+     * 要清掉的形状（窗口坐标）：中缝矩形，加上两半靠中缝四个角圆角外的那一小块。
+     * 没有圆角时就是 [hole] 本身。触摸区仍按 [hole] 的矩形让出，角上那几个像素不影响按键。
+     */
+    fun cutout(bottom: Float): Path? {
+        val hole = hole(bottom) ?: return null
+        val (rt, rb) = SplitKeyboardGeometry.innerCornerRadii(cornerRadius, cornerTop, cornerBottom,
+            reachesTop = !barTop.isNaN(), holeHeight = hole.height)
+        return Path().apply {
+            val l = hole.left; val r = hole.right; val t = hole.top; val b = hole.bottom
+            moveTo(l - rt, t)
+            lineTo(r + rt, t)
+            if (rt > 0f) arcTo(Rect(r, t, r + 2f * rt, t + 2f * rt), 270f, -90f, false)
+            lineTo(r, b - rb)
+            if (rb > 0f) arcTo(Rect(r, b - 2f * rb, r + 2f * rb, b), 180f, -90f, false)
+            lineTo(l - rb, b)
+            if (rb > 0f) arcTo(Rect(l - 2f * rb, b - 2f * rb, l, b), 90f, -90f, false)
+            lineTo(l, t + rt)
+            if (rt > 0f) arcTo(Rect(l - 2f * rt, t, l, t + 2f * rt), 0f, -90f, false)
+            close()
+        }
+    }
+
     /** 中缝用键盘底色填满：仍分两侧排布，但不挖空、不让出触摸、玻璃整块。 */
     var filled by mutableStateOf(false)
         private set
@@ -254,9 +310,9 @@ internal fun Modifier.splitGapCutout(gap: SplitKeyboardGap?): Modifier {
     if (gap == null) return this
     var origin by remember(gap) { mutableStateOf(Offset.Zero) }
     return onGloballyPositioned { origin = it.positionInWindow() }.drawBehind {
-        val hole = gap.hole(origin.y + size.height) ?: return@drawBehind
-        drawRect(Color.Transparent, Offset(hole.left - origin.x, hole.top - origin.y),
-            Size(hole.width, hole.height), blendMode = BlendMode.Clear)
+        val cutout = gap.cutout(origin.y + size.height) ?: return@drawBehind
+        cutout.translate(Offset(-origin.x, -origin.y))
+        drawPath(cutout, Color.Transparent, blendMode = BlendMode.Clear)
     }
 }
 
@@ -272,11 +328,22 @@ internal fun rememberCalibratedKeyPitchDp(): Float? {
     }
 }
 
-/** 只按中缝的横向范围裁掉本节点（含背景与子内容）；用于分到两侧的工具栏和候选栏。 */
-internal fun Modifier.clipSplitGapColumn(gapWindowX: Pair<Float, Float>?, origin: () -> Offset): Modifier =
+/**
+ * 只按中缝的横向范围裁掉本节点（含背景与子内容）；用于分到两侧的工具栏和候选栏。
+ * 给了 [gap] 且键盘在挖中缝时按同一形状裁，两半靠中缝的上角和键盘一样是圆的。
+ */
+internal fun Modifier.clipSplitGapColumn(
+    gapWindowX: Pair<Float, Float>?,
+    gap: SplitKeyboardGap? = null,
+    origin: () -> Offset,
+): Modifier =
     if (gapWindowX == null) this else drawWithContent {
         val o = origin()
-        clipRect(gapWindowX.first - o.x, 0f, gapWindowX.second - o.x, size.height, ClipOp.Difference) {
+        val cutout = gap?.cutout(o.y + size.height)
+        if (cutout != null) {
+            cutout.translate(Offset(-o.x, -o.y))
+            clipPath(cutout, ClipOp.Difference) { this@drawWithContent.drawContent() }
+        } else clipRect(gapWindowX.first - o.x, 0f, gapWindowX.second - o.x, size.height, ClipOp.Difference) {
             this@drawWithContent.drawContent()
         }
     }

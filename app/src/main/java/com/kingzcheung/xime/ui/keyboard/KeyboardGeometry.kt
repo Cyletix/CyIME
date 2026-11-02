@@ -70,7 +70,8 @@ internal fun floatingResizeMaxAspect(landscape: Boolean): Float = if (landscape)
 /** 高度包含44dp工具栏与四行按键，不含悬浮拖条及系统导航栏。 */
 internal fun keyboardHeightBounds(screenHeight: Int, landscape: Boolean, navInset: Int = 24): IntRange {
     val max = if (landscape) (screenHeight - navInset - FLOATING_DRAG_BAR_HEIGHT_DP - 24).coerceAtLeast(160)
-        else (screenHeight * 45 / 100).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP)
+        // 竖屏上限是屏幕高度的一半（含工具栏）；原来 45%，手大的人拉到顶还嫌矮（GitHub #74，用户 11-02 同意）。只放宽上限，不动已存高度和默认高度。
+        else (screenHeight * 50 / 100).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP)
     // 固定与悬浮共享面板下限，不能随平板屏幕高度放大最小值。（1.14.25 规则，用户 2026-10-19 要求改回）
     val min = FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(max)
     return min..max

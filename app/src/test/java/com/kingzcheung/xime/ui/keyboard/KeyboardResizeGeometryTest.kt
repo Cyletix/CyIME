@@ -171,6 +171,20 @@ class KeyboardResizeGeometryTest {
         assertEquals(0f, fixedKeyboardRect(360f, 400f, 300f, 0f, 24f, 800f, -300f).left, 0.01f)
     }
 
+    @Test fun fixedWidthWithinOneDpOfTheScreenFillsItAndCannotMove() {
+        // 1080px / 2.625 = 411.43dp，存成 411dp = 1078.9px：差不到 1dp 就是整宽，调节时左右挪不动。
+        val density = 2.625f
+        val rect = fixedKeyboardRect(1080f, 2200f, 300f * density, 0f, 48f, 411f * density, density = density)
+        assertEquals(0f, rect.left, 0f)
+        assertEquals(1080f, rect.right, 0f)
+        val move = FixedKeyboardMoveGesture(rect, ResizeRect(0f, 0f, 1080f, 2152f), 12f * density)
+        assertEquals(0f, move.move(30f).left, 0f)
+        assertEquals(0f, move.move(-30f).left, 0f)
+        // 真正窄了 1dp 以上的照旧可以移动。
+        val narrow = fixedKeyboardRect(1080f, 2200f, 300f * density, 0f, 48f, 400f * density, density = density)
+        assertEquals((1080f - 400f * density) / 2f, narrow.left, 0.01f)
+    }
+
     @Test fun floatingFloorNeverHidesTheSquareKeyDetentOnPhones() {
         // 384dp 宽手机、26 键：方形点约 202dp（含工具栏），在 228dp 默认下限之下。
         val density = 2.75f
@@ -345,8 +359,9 @@ class KeyboardResizeGeometryTest {
         // 底边贴着或落进手势区：抬到手势区上沿之上 36px。
         assertEquals(2164f, fixedBottomHandleY(fixed, 2200f, 36f), 0.01f)
         assertEquals(2104f, fixedBottomHandleY(fixed, 2140f, 36f), 0.01f)
-        // 最多抬卡片高度的四分之一。
-        assertEquals(2000f, fixedBottomHandleY(fixed, 1500f, 36f), 0.01f)
+        // 手势区很高时把手继续上移，到键盘顶边为止。
+        assertEquals(1464f, fixedBottomHandleY(fixed, 1500f, 36f), 0.01f)
+        assertEquals(fixed.top, fixedBottomHandleY(fixed, 1350f, 36f), 0.01f)
 
         // 命中跟着抬起的把手：把手往上 hit 以内按住就是调底部留白，不是左右移动。
         val handle = fixedBottomHandleY(fixed, 2200f, 36f)

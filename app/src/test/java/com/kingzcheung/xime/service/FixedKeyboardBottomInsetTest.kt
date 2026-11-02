@@ -1,0 +1,167 @@
+package com.kingzcheung.xime.service
+
+import android.app.Activity
+import android.graphics.Insets
+import android.graphics.Rect
+import android.provider.Settings
+import android.view.DisplayCutout
+import android.view.WindowInsets
+import com.kingzcheung.xime.settings.SettingsPreferences
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowBuild
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = android.app.Application::class, qualifiers = "sw360dp-w360dp-h800dp-mdpi")
+class FixedKeyboardBottomInsetTest {
+    private val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+    private fun measure(controls: Int = 0, cutout: Int = 0): Int {
+        val insets = WindowInsets.Builder()
+            .setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, controls))
+        if (cutout > 0) {
+            @Suppress("DEPRECATION")
+            insets.setDisplayCutout(DisplayCutout(Rect(0, 0, 0, cutout), emptyList()))
+        }
+        val reported = insets.build()
+        return fixedKeyboardBottomInsetPx(reported, activity.window, extractBottomInset(reported, activity.window))
+    }
+    private fun mode(value: Int) = Settings.Secure.putInt(activity.contentResolver, "navigation_mode", value)
+
+    @Test fun aManualCorrectionCanReachZeroButNeverPassSystemButtonsOrACutout() {
+        ShadowBuild.setManufacturer("OPPO")
+        mode(2)
+        assertEquals(48, measure())
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -12)
+        assertEquals(36, measure())
+        assertEquals(0, SettingsPreferences.getKeyboardBottomPaddingDp(activity))
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -48)
+        assertEquals(0, measure())
+        assertEquals(20, measure(controls = 20))
+        assertEquals(16, measure(cutout = 16))
+        mode(0)
+        assertEquals(48, measure())
+        mode(2)
+        assertEquals(0, measure())
+        SettingsPreferences.setKeyboardBottomPaddingDp(activity, 0)
+        assertEquals(48, measure())
+        SettingsPreferences.setKeyboardBottomPaddingDp(activity, 17)
+        assertEquals(48, measure())
+        assertEquals(17, SettingsPreferences.getKeyboardBottomPaddingDp(activity))
+    }
+
+    @Test fun floatingHandleUsesTheMandatoryGestureAreaWhileAnUnsetPositionUsesTheEstimate() {
+        ShadowBuild.setManufacturer("OPPO")
+        mode(2)
+        val insets = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
+        val normal = extractBottomInset(insets, activity.window)
+        val floor = fixedKeyboardMinimumInsetPx(insets, activity.window, normal)
+        assertEquals(0, floor)
+        assertEquals(18, floatingMinimumInsetPx(activity.window, insets, floor))
+        assertEquals(48, SettingsPreferences.getFloatingOffsetY(activity, defaultDp = normal))
+        SettingsPreferences.setFloatingOffsetY(activity, 18)
+        assertEquals(18, SettingsPreferences.getFloatingOffsetY(activity, defaultDp = normal))
+    }
+
+    @Test fun anUnknownNavigationModeCanUseAnExplicitSystemGestureReport() {
+        ShadowBuild.setManufacturer("unknown")
+        Settings.Secure.putString(activity.contentResolver, "navigation_mode", null)
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -48)
+        val reported = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
+        assertEquals(0, fixedKeyboardBottomInsetPx(reported, activity.window, 48))
+        assertEquals(48, measure())
+    }
+
+    @Test fun onlyAnOptedInButtonFreeGesturePhoneCanDropTheReserve() {
+        ShadowBuild.setManufacturer("OPPO")
+        mode(2)
+        assertEquals(48, measure())
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        assertEquals(0, measure())
+        assertEquals(16, measure(cutout = 16))
+        assertEquals(20, measure(controls = 20))
+        assertEquals(48, measure(controls = 48))
+        mode(0)
+        assertEquals(48, measure())
+        Settings.Secure.putInt(activity.contentResolver, "hide_navigationbar_enable", 1)
+        assertEquals(0, measure())
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
+        assertEquals(48, measure())
+    }
+
+    @Test fun samsungHideButtonStillHasRoom() {
+        ShadowBuild.setManufacturer("samsung")
+        mode(2)
+        Settings.Global.putInt(activity.contentResolver, "navigation_bar_gesture_hint", 1)
+        Settings.Global.putInt(activity.contentResolver, "navigation_bar_button_to_hide_keyboard", 1)
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        assertEquals(48, measure())
+    }
+
+    @Test fun visibleAndroidNavigationFrameProtectsItsRealTopOnAGesturePhone() {
+        ShadowBuild.setManufacturer("samsung")
+        mode(2)
+        Settings.Global.putInt(activity.contentResolver, "navigation_bar_button_to_hide_keyboard", 0)
+        val decor = activity.window.decorView as android.widget.FrameLayout
+        val frame = Class.forName("android.inputmethodservice.navigationbar.NavigationBarFrame")
+            .getConstructor(android.content.Context::class.java).newInstance(activity) as android.view.View
+        decor.addView(frame, android.widget.FrameLayout.LayoutParams(-1, 18, android.view.Gravity.BOTTOM)
+            .apply { bottomMargin = 4 })
+        val exact = android.view.View.MeasureSpec.EXACTLY
+        decor.measure(android.view.View.MeasureSpec.makeMeasureSpec(360, exact), android.view.View.MeasureSpec.makeMeasureSpec(800, exact))
+        decor.layout(0, 0, 360, 800)
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -48)
+        assertEquals(22, measure())
+        assertEquals(32, measure(controls = 32))
+        frame.visibility = android.view.View.GONE
+        assertEquals(0, measure())
+        val host = android.view.View(activity)
+        decor.addView(host)
+        val reported = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48)).build()
+        val observed = mutableListOf<Int>()
+        host.observeKeyboardBottomInsets(activity.window) { observed += fixedKeyboardBottomInsetPx(it, activity.window, 48) }
+        host.dispatchApplyWindowInsets(reported)
+        frame.visibility = android.view.View.VISIBLE
+        decor.viewTreeObserver.dispatchOnPreDraw()
+        assertEquals(listOf(0, 22), observed)
+        mode(0)
+        assertEquals(48, measure())
+    }
+
+    @Test @Config(qualifiers = "sw800dp-w800dp-h1200dp")
+    fun tabletKeepsTheTaskbarEvenIfTheWindowReportsNoButtons() {
+        mode(2)
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        assertEquals(48, measure())
+    }
+
+    @Test @Config(qualifiers = "sw800dp-w800dp-h1200dp")
+    fun aGestureOnlyTabletWithoutABottomTaskbarCanLowerItsKeyboard() {
+        mode(2)
+        val insets = WindowInsets.Builder().setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
+        assertEquals(18, fixedKeyboardBottomInsetPx(insets, activity.window, 18))
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -18)
+        assertEquals(0, fixedKeyboardBottomInsetPx(insets, activity.window, 18))
+        assertEquals(18, floatingMinimumInsetPx(activity.window, insets, 0))
+    }
+
+    @Test @Config(sdk = [29])
+    @Suppress("DEPRECATION")
+    fun android10UsesItsLegacyTappableElementInsets() {
+        mode(2)
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        fun measureQ(tappable: Int): Int {
+            val insets = WindowInsets.Builder().setSystemWindowInsets(Insets.of(0, 0, 0, 48))
+                .setTappableElementInsets(Insets.of(0, 0, 0, tappable)).build()
+            return fixedKeyboardBottomInsetPx(insets, activity.window, extractBottomInset(insets, activity.window))
+        }
+        assertEquals(48, measureQ(48))
+        assertEquals(0, measureQ(0))
+    }
+}

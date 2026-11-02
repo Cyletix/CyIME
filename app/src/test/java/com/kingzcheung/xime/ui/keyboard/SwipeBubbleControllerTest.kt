@@ -11,6 +11,22 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwipeBubbleControllerTest {
+    @Test fun releasingThePreviousKeyDoesNotMoveOrHideTheHeldKey() = runTest {
+        val controller = SwipeBubbleController(this, showPressBubble = true)
+        val first = Rect(0f, 0f, 40f, 40f)
+        val second = Rect(40f, 0f, 80f, 40f)
+        controller.update(SwipeState(isPressed = true, pressedText = "a"), first)
+        controller.update(SwipeState(isPressed = true, pressedText = "s"), second)
+        controller.update(SwipeState(), first)
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals("s", controller.state.pressedText)
+        assertEquals(second, controller.keyBounds)
+        controller.update(SwipeState(), second)
+        advanceTimeBy(60)
+        runCurrent()
+        assertEquals(SwipeState(), controller.state)
+    }
     private val bounds = Rect(10f, 20f, 70f, 80f)
 
     @Test fun inKeyFlickClearsTapBubbleImmediatelyAndLeavesMenusAvailable() = runTest {

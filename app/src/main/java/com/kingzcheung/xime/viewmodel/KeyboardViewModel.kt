@@ -708,6 +708,11 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** Level 3: 在覆盖页面内回退 */
+    fun backFromOverlay() {
+        val current = _page.value as? KeyboardPage.Overlay ?: return
+        if (current.backStack.isEmpty()) closeOverlay() else popOverlay()
+    }
+
     fun popOverlay() {
         val current = _page.value
         if (current is KeyboardPage.Overlay && current.backStack.isNotEmpty()) {

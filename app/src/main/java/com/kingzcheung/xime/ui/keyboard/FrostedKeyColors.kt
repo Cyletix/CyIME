@@ -83,9 +83,12 @@ internal fun glassFunctionKeyScale(background: Color): Float {
         GLASS_FUNCTION_KEY_SCALE else 1f
 }
 
-/** On glass, size and position distinguish hints; fading them would expose the host through text. */
-internal fun keyHintColor(themeText: Color, config: FrostedGlassConfig, legacyAlpha: Float): Color =
-    themeText.copy(alpha = if (config.enabled) 1f else legacyAlpha)
+/**
+ * On glass, size and position distinguish hints; fading them would expose the host through text.
+ * [opacity] 是用户的「角标不透明度」（默认 1 = 原样），开不开玻璃都乘上去。
+ */
+internal fun keyHintColor(themeText: Color, config: FrostedGlassConfig, legacyAlpha: Float, opacity: Float = 1f): Color =
+    themeText.copy(alpha = (if (config.enabled) 1f else legacyAlpha) * opacity.coerceIn(0f, 1f))
 
 /** 玻璃材质上键面文字的最低对比度（按键字号大，取 WCAG AA 正文线 4.5:1）。 */
 internal const val GLASS_LABEL_CONTRAST = 4.5f

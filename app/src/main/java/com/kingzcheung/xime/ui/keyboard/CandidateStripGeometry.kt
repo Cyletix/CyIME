@@ -1,5 +1,9 @@
 package com.kingzcheung.xime.ui.keyboard
 
+/** A candidate's transparent tap padding may cross an edge while its whole label still fits. */
+internal fun candidateLabelFits(offset: Int, size: Int, padding: Int, start: Int, end: Int): Boolean =
+    offset + padding >= start && offset + size - padding <= end
+
 /** Keep a contiguous prefix, no clipped last candidate. A single oversized first word is ellipsized. */
 internal fun candidatePrefixCount(widths: List<Int>, available: Int, spacing: Int): Int =
     candidatePrefixCount(widths.size, available, spacing) { widths[it] }
@@ -8,20 +12,21 @@ internal fun candidatePrefixCount(widths: List<Int>, available: Int, spacing: In
  * Indices remain engine/display indices, never positions in the visible window. */
 internal inline fun candidateWindow(total: Int, highlighted: Int, available: Int, spacing: Int,
     windowStart: Int = 0,
+    noinline edgeWidthAt: ((Int) -> Int)? = null,
     widthAt: (Int) -> Int): IntRange {
     if (total <= 0 || available <= 0) return IntRange.EMPTY
     val focused = highlighted.takeIf { it in 0 until total } ?: 0
     val start = windowStart.coerceIn(0, total - 1)
     if (focused < start) {
-        val count = candidatePrefixCount(total - focused, available, spacing) { widthAt(focused + it) }
+        val count = fittingCandidateCount(total, available, spacing, focused, edgeWidthAt, widthAt).coerceAtLeast(1)
         return focused until focused + count
     }
-    val count = candidatePrefixCount(total - start, available, spacing) { widthAt(start + it) }
+    val count = fittingCandidateCount(total, available, spacing, start, edgeWidthAt, widthAt).coerceAtLeast(1)
     if (focused < start + count) return start until start + count
 
     // Fill backwards from the next focused word, so it stays last instead of jumping to first.
     var first = focused
-    var used = widthAt(focused)
+    var used = edgeWidthAt?.invoke(focused) ?: widthAt(focused)
     while (first > 0) {
         val next = used + spacing + widthAt(first - 1)
         if (next > available) break
@@ -34,15 +39,26 @@ internal inline fun candidateWindow(total: Int, highlighted: Int, available: Int
 /** Measure only the visible prefix and one overflow item, regardless of engine page size. */
 internal inline fun candidatePrefixCount(total: Int, available: Int, spacing: Int, widthAt: (Int) -> Int): Int {
     if (available <= 0 || total == 0) return 0
+    return fittingCandidateCount(total, available, spacing, 0, null, widthAt).coerceAtLeast(1)
+}
+
+/** A trailing gloss can cross the edge if the candidate itself fits; earlier items use their full width. */
+private inline fun fittingCandidateCount(total: Int, available: Int, spacing: Int, start: Int,
+    noinline edgeWidthAt: ((Int) -> Int)?, widthAt: (Int) -> Int): Int {
     var used = 0
     var count = 0
-    while (count < total) {
-        val next = used + (if (count == 0) 0 else spacing) + widthAt(count)
-        if (next > available) break
+    while (start + count < total) {
+        val offset = used + (if (count == 0) 0 else spacing)
+        val index = start + count
+        val next = offset + widthAt(index)
+        if (next > available) {
+            if (edgeWidthAt != null && offset + edgeWidthAt(index) <= available) count++
+            break
+        }
         used = next
         count++
     }
-    return count.coerceAtLeast(1)
+    return count
 }
 
 /**
@@ -74,24 +90,13 @@ internal data class CandidateWindowSplit(val range: IntRange, val leftCount: Int
 /** 分体候选：从窗口起点先填满中缝左侧，再接着填右侧；焦点不在其中时从焦点重新开始。 */
 internal fun splitCandidateWindow(
     total: Int, highlighted: Int, leftAvailable: Int, rightAvailable: Int, spacing: Int,
-    windowStart: Int, widthAt: (Int) -> Int,
+    windowStart: Int, edgeWidthAt: ((Int) -> Int)? = null, widthAt: (Int) -> Int,
 ): CandidateWindowSplit {
     if (total <= 0) return CandidateWindowSplit(IntRange.EMPTY, 0)
     val focused = highlighted.takeIf { it in 0 until total } ?: 0
-    fun fit(from: Int, available: Int): Int {
-        var used = 0
-        var count = 0
-        while (from + count < total) {
-            val next = used + (if (count == 0) 0 else spacing) + widthAt(from + count)
-            if (next > available) break
-            used = next
-            count++
-        }
-        return count
-    }
     fun fill(start: Int): CandidateWindowSplit {
-        val left = fit(start, leftAvailable)
-        val right = if (start + left < total) fit(start + left, rightAvailable) else 0
+        val left = fittingCandidateCount(total, leftAvailable, spacing, start, edgeWidthAt, widthAt)
+        val right = fittingCandidateCount(total, rightAvailable, spacing, start + left, edgeWidthAt, widthAt)
         val end = (start + (left + right).coerceAtLeast(1)).coerceAtMost(total)
         return CandidateWindowSplit(start until end, left)
     }

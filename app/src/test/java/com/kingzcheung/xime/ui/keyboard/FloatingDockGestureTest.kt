@@ -7,69 +7,46 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FloatingDockGestureTest {
-    @Test
-    fun aStationaryKeyboardAtTheEdgeNeverArmsRestoration() {
+    @Test fun aDeliberateDownwardDragDocksOnReleaseWithoutWaiting() {
         val gesture = FloatingDockGesture()
-        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 10_000L))
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 10_000L))
+        gesture.move(0f, 120f, false)
+        assertEquals(0f, gesture.progress, 0f)
+        gesture.move(0f, 26f, true)
+        assertEquals(1f, gesture.progress, 0f)
+        assertTrue(floatingDockOnRelease(gesture.progress, gesture.armed, true))
+        gesture.move(0f, -2f, false)
+        assertEquals(0f, gesture.progress, 0f)
+        gesture.move(0f, 10f, true)
+        assertTrue(gesture.progress < 1f)
     }
 
-    @Test
-    fun holdingAnEdgeArmsAfterTheHoldAndOnlyReleaseConfirms() {
-        // The holds below use one second; the real hold is 0.75 s (0.5 s docked a tall card by
-        // accident, 1 s was too slow).
-        assertEquals(750L, FLOATING_DOCK_DURATION_MILLIS)
-        val gesture = FloatingDockGesture(holdMillis = 1_000L)
-        gesture.start(FloatingDockEdge.BOTTOM, 100L)
-        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 1_099L))
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_100L))
-        assertTrue(gesture.release(FloatingDockEdge.BOTTOM, 1_200L))
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 1_300L))
-    }
-
-    @Test
-    fun releasingBeforeTheThresholdKeepsFloating() {
-        val gesture = FloatingDockGesture(holdMillis = 1_000L)
-        gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 999L))
-    }
-
-    @Test
-    fun leavingAnEdgeClearsThePreviewAndRestartsTheTimerOnReentry() {
-        val gesture = FloatingDockGesture(holdMillis = 1_000L)
-        gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
-        assertFalse(gesture.update(null, 2_100L))
-        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 2_200L))
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 3_199L))
-    }
-
-    @Test
-    fun movingToAnotherEdgeDoesNotCarryOverTheElapsedTime() {
-        val gesture = FloatingDockGesture(holdMillis = 1_000L)
-        gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
-        assertFalse(gesture.update(FloatingDockEdge.TOP, 2_100L))
-        assertFalse(gesture.release(FloatingDockEdge.TOP, 3_000L))
-    }
-
-    @Test
-    fun cancellationClearsAnArmedGesture() {
-        val gesture = FloatingDockGesture(holdMillis = 1_000L)
-        gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
+    @Test fun aShortDownwardDragNearTheEdgeCanUseTheShortHold() {
+        val gesture = FloatingDockGesture()
+        gesture.move(0f, 12f, true)
+        val first = gesture.epoch
+        gesture.advanceHold(299, first)
+        assertTrue(gesture.progress < 1f)
+        gesture.move(0f, -3f, false)
+        gesture.move(0f, 12f, true)
+        gesture.advanceHold(500, first)
+        assertEquals(0f, gesture.progress, 0f)
+        gesture.advanceHold(300, gesture.epoch)
+        assertEquals(1f, gesture.progress, 0f)
         gesture.cancel()
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 3_000L))
-        gesture.start(FloatingDockEdge.BOTTOM, 4_000L)
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 4_999L))
+        assertFalse(gesture.armed)
+        assertEquals(0f, gesture.progress, 0f)
     }
 
-    @Test
-    fun releaseOutsideTheEdgeRejectsAStalePreview() {
-        val gesture = FloatingDockGesture(holdMillis = 1_000L)
-        gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
-        assertFalse(gesture.release(null, 2_100L))
+    @Test fun beingAtTheBottomOrDraggingSidewaysCannotArmDocking() {
+        val gesture = FloatingDockGesture()
+        gesture.move(120f, 30f, true)
+        gesture.advanceHold(2000, gesture.epoch)
+        assertFalse(gesture.armed)
+        gesture.cancel()
+        gesture.move(0f, 0f, true)
+        gesture.advanceHold(2000, gesture.epoch)
+        assertFalse(gesture.armed)
+        assertTrue(modeSwitchPullProgress(150f, 90f) < 1f)
     }
 
     @Test
@@ -83,16 +60,6 @@ class FloatingDockGestureTest {
         assertNull(edge(0f, 200f))
         assertNull(edge(0f, 33f))
     }
-    @Test fun sideAndTopEdgesNeverArmEvenWhenHeld() {
-        for (edge in listOf(FloatingDockEdge.LEFT, FloatingDockEdge.RIGHT, FloatingDockEdge.TOP)) {
-            val gesture = FloatingDockGesture()
-            gesture.start(edge, 0)
-            assertFalse(gesture.update(edge, 2000))
-            assertFalse(gesture.release(edge, 3000))
-        }
-    }
-
-
     @Test fun releasingDocksExactlyWhenThePreviewShowsTheDockedShape() {
         // The outline has reached the docked shape and the card is on the edge: docks.
         assertTrue(floatingDockOnRelease(previewProgress = 1f, onBottomEdge = true, hasDestination = true))
@@ -105,9 +72,9 @@ class FloatingDockGestureTest {
 
     @Test fun pullingAFixedKeyboardUpHasResistanceBeforeItTurnsFloating() {
         // 轻轻一拖不动；过了死区才开始变，拉满一整段才算可以松手变悬浮。
-        assertEquals(0f, fixedToFloatingPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP), 0f)
-        assertEquals(0.5f, fixedToFloatingPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP + FIXED_TO_FLOATING_PULL_DP / 2f), 0.001f)
-        assertTrue(fixedToFloatingPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP + FIXED_TO_FLOATING_PULL_DP - 1f) < 1f)
-        assertEquals(1f, fixedToFloatingPullProgress(400f), 0f)
+        assertEquals(0f, modeSwitchPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP), 0f)
+        assertEquals(0.5f, modeSwitchPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP + FIXED_TO_FLOATING_PULL_DP / 2f), 0.001f)
+        assertTrue(modeSwitchPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP + FIXED_TO_FLOATING_PULL_DP - 1f) < 1f)
+        assertEquals(1f, modeSwitchPullProgress(400f), 0f)
     }
 }

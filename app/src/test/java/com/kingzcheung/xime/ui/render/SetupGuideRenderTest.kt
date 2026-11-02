@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -38,6 +39,13 @@ import com.kingzcheung.xime.model.SetupSource
 import com.kingzcheung.xime.model.VoiceUse
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.ui.settings.SetupGuideContent
+import com.kingzcheung.xime.ui.settings.SetupMoreContent
+import com.kingzcheung.xime.model.FeedbackChoice
+import com.kingzcheung.xime.model.SetupMore
+import com.kingzcheung.xime.model.SetupMoreChoices
+import com.kingzcheung.xime.model.SetupMoreFacts
+import com.kingzcheung.xime.model.TextSizeChoice
+import com.kingzcheung.xime.ui.keyboard.SpaceHoldAction
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.XimeTheme
 import org.junit.Assert.assertTrue
@@ -63,10 +71,10 @@ class SetupGuideRenderTest {
     private val mb = 1024L * 1024
 
     private fun facts(): SetupFacts {
-        val bundled = setOf(SpeechModelCatalog.SENSEVOICE, DeviceModelProfiles.BASE, DeviceModelProfiles.SMALL,
+        val bundled = setOf(SpeechModelCatalog.SENSEVOICE,
             BuiltinModelCatalog.SPEAKER_MODEL, "ochwpro", CandidateModelCatalog.NGRAM)
         val sizes = mapOf(SpeechModelCatalog.SENSEVOICE to 228 * mb, SpeechModelCatalog.PARAFORMER to 226 * mb,
-            SpeechModelCatalog.XASR to 136 * mb, DeviceModelProfiles.BASE to 35 * mb, DeviceModelProfiles.SMALL to 19 * mb,
+            SpeechModelCatalog.XASR to 136 * mb,
             BuiltinModelCatalog.SPEAKER_MODEL to 27 * mb, "ochwpro" to 7 * mb, CandidateModelCatalog.NGRAM to 203 * mb,
             CandidateModelCatalog.NGRAM_SMALL to 105 * mb)
         return SetupFacts(DeviceModelTier.ENHANCED, performanceTier = com.kingzcheung.xime.runtime.adaptation.PerformanceTier.HIGH,
@@ -149,7 +157,7 @@ class SetupGuideRenderTest {
         rule.onNodeWithTag("setup-fuzzy:NASAL").assertIsOn()
         rule.onNodeWithTag("setup-fuzzy:FH").assertIsOff()
         rule.onNodeWithTag("setup-fuzzy:none").assertIsNotSelected()
-        rule.onNodeWithTag("setup-hide-double-pinyin").assertExists()
+        rule.onNodeWithTag("setup-hide-double-pinyin").assertIsOff()
         val out = System.getenv("CYIME_RENDER_OUT")
         if (!out.isNullOrEmpty()) { File(out).mkdirs(); shot(out, "full-pinyin-fuzzy") }
         // 选双拼：出“用哪一种”，模糊音那题收起。
@@ -201,7 +209,7 @@ class SetupGuideRenderTest {
                             result = SetupGuide.Result(3, 249 * mb, 362 * mb, waitingForWifi = true, failed = emptyList(),
                                 downloadingIds = plan.keep.filter { it.source == SetupSource.DOWNLOAD }.map { it.id }),
                             firstRun = true, onAnswers = {}, onToggleRemove = { _, _ -> }, onAllowMetered = {},
-                            onApply = {}, onSkip = {}, onDone = {})
+                            onApply = {}, onSkip = {}, onDone = {}, onOpenMore = {})
                     }
                 }
             }
@@ -211,6 +219,99 @@ class SetupGuideRenderTest {
             rule.runOnIdle { dark.value = theme == "dark" }
             rule.waitForIdle()
             shot(out, theme)
+        }
+    }
+
+    private val moreNow = SetupMoreChoices(SpaceHoldAction.CURSOR, deleteSkipsAssociation = false, clearBeforeCursorOnly = false,
+        textSize = TextSizeChoice.STANDARD, feedback = FeedbackChoice.SOUND_AND_VIBRATION, glass = false, autoPunctuation = false)
+
+    /**
+     * 「更多配置」：打开时每题选着现在的设置（不点就不改，按钮写「不改了」）；点了别的才变「好了」，
+     * 只列改了的项。自己调过字号的多一张「保持现在的」，智能联想关着不问删除键那题。
+     */
+    @Test fun moreStartsFromCurrentSettings() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        KeyboardThemes.initFromConfig(context)
+        val facts = SetupMoreFacts(moreNow)
+        rule.setContent {
+            var answers by androidx.compose.runtime.remember { mutableStateOf(facts.current) }
+            XimeTheme(darkTheme = false) {
+                Box(Modifier.width(400.dp).fillMaxHeight()) {
+                    SetupMoreContent(facts, answers, result = null, onAnswers = { answers = it }, onBack = {}, onSkip = {},
+                        onApply = {}, onDone = {}, onOpenRoute = {})
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag("setup-more-space:CURSOR").assertIsSelected()
+        rule.onNodeWithTag("setup-more-space:VOICE_TOGGLE").assertIsNotSelected()
+        rule.onNodeWithTag("setup-more-text:STANDARD").assertIsSelected()
+        rule.onNodeWithTag("setup-more-text:CUSTOM").assertDoesNotExist()
+        rule.onNodeWithTag("setup-more-feedback:SOUND_ONLY").assertDoesNotExist()
+        rule.onNodeWithTag("setup-more-apply").performScrollTo().assertTextEquals("不改了")
+        for (tag in listOf("setup-more-space:REPEAT", "setup-more-feedback:NONE", "setup-more-glass:true")) {
+            val bounds = rule.onNodeWithTag(tag).getBoundsInRoot()
+            assertTrue("$tag 只有 ${bounds.bottom - bounds.top} 高", bounds.bottom - bounds.top >= 76.dp)
+        }
+        rule.onNodeWithTag("setup-more-space:VOICE_TOGGLE").performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("setup-more-space:VOICE_TOGGLE").assertIsSelected()
+        rule.onNodeWithTag("setup-more-space:CURSOR").assertIsNotSelected()
+        rule.onNodeWithTag("setup-more-apply").performScrollTo().assertTextEquals("好了")
+        rule.onNodeWithTag("setup-more-open:clipboard_sync").assertExists()
+        val out = System.getenv("CYIME_RENDER_OUT")
+        if (!out.isNullOrEmpty()) { File(out).mkdirs(); shot(out, "more") }
+    }
+
+    @Test fun moreHidesQuestionsThatDoNotApply() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        KeyboardThemes.initFromConfig(context)
+        val now = moreNow.copy(textSize = SetupMore.textSizeOf(17, 1.0f), feedback = FeedbackChoice.SOUND_ONLY)
+        val facts = SetupMoreFacts(now, sttEnabled = false, predictionEnabled = false, candidateSp = 17, keyScalePercent = 100)
+        rule.setContent {
+            XimeTheme(darkTheme = false) {
+                Box(Modifier.width(400.dp).fillMaxHeight()) {
+                    SetupMoreContent(facts, now, result = null, onAnswers = {}, onBack = {}, onSkip = {}, onApply = {}, onDone = {})
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag("setup-more-text:CUSTOM").assertIsSelected()
+        rule.onNodeWithTag("setup-more-feedback:SOUND_ONLY").assertIsSelected()
+        rule.onNodeWithTag("setup-more-delete:true").assertDoesNotExist()
+        rule.onNodeWithTag("setup-more-punctuation:true").assertDoesNotExist()
+        // 没给跳转（如测试、以后别处复用）就不列那几行。
+        rule.onNodeWithTag("setup-more-open:clipboard_sync").assertDoesNotExist()
+    }
+
+    @Test fun renderSetupMore() {
+        val out = System.getenv("CYIME_RENDER_OUT")
+        assumeTrue(!out.isNullOrEmpty())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        KeyboardThemes.initFromConfig(context)
+        val facts = SetupMoreFacts(moreNow)
+        val changed = moreNow.copy(spaceHold = SpaceHoldAction.VOICE_TOGGLE, textSize = TextSizeChoice.LARGE)
+        val dark = mutableStateOf(false)
+        rule.setContent {
+            XimeTheme(darkTheme = dark.value) {
+                Row {
+                    Box(Modifier.width(420.dp).fillMaxHeight()) {
+                        SetupMoreContent(facts, changed, result = null, onAnswers = {}, onBack = {}, onSkip = {}, onApply = {},
+                            onDone = {}, onOpenRoute = {})
+                    }
+                    Spacer(Modifier.width(40.dp))
+                    Box(Modifier.width(420.dp).fillMaxHeight()) {
+                        SetupMoreContent(facts, changed, result = SetupMore.changes(moreNow, changed), onAnswers = {}, onBack = {},
+                            onSkip = {}, onApply = {}, onDone = {})
+                    }
+                }
+            }
+        }
+        File(out!!).mkdirs()
+        for (theme in listOf("light", "dark")) {
+            rule.runOnIdle { dark.value = theme == "dark" }
+            rule.waitForIdle()
+            shot(out, "more-$theme")
         }
     }
 }

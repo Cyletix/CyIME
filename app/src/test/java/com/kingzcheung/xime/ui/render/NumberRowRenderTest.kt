@@ -103,9 +103,13 @@ class NumberRowRenderTest {
     private fun select(l: String, w: Int, h: Int, on: Boolean) {
         val s = schemaFor(l)
         KeysConfigHelper.setActiveKeyboardSchema(s)
+        // 输入法里由 KeyboardInputPreferences.read 跟着开关设；这里直接给出偏好，同步设上，第一排角标才会换。
+        KeysConfigHelper.numberRowCorners = on
         rule.runOnIdle { vm.resetKeyboard(l == "en26", s); layout = l; size = w to h; numberRow = on; revision++ }
         rule.waitForIdle()
     }
+
+    @org.junit.After fun resetCorners() { KeysConfigHelper.numberRowCorners = false }
 
     private fun bounds(tag: String): Rect = rule.onNodeWithTag(tag, true).fetchSemanticsNode().boundsInRoot
 

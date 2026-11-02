@@ -27,6 +27,13 @@ class LetterNeighborsTest {
         val split = keys.mapValues { (_, r) -> r.copy(x = r.x + if (r.x >= 200f) 400f else 0f) }
         assertFalse(near(split, 't').contains('y'))
     }
+    @Test fun correctionOffSendsNothingExceptMarkedLayoutForUnreadablePairs() {
+        val encoded = encodeLetterNeighbors(keyboard())
+        assertEquals(encoded, letterNeighborsForEngine(encoded, correction = true, unreadableOnly = false))
+        assertEquals("", letterNeighborsForEngine(encoded, correction = false, unreadableOnly = false))
+        assertEquals("~;$encoded", letterNeighborsForEngine(encoded, correction = false, unreadableOnly = true))
+        assertEquals("", letterNeighborsForEngine("", correction = false, unreadableOnly = true))
+    }
     @Test fun incompleteMergedOrInvalidGeometryCannotEnableWrongLayoutCorrection() {
         assertEquals("", encodeLetterNeighbors(keyboard() - 'a'))
         assertEquals("", encodeLetterNeighbors(keyboard() + ('a' to LetterKeyRect(0f, 0f, 0f, 60f))))

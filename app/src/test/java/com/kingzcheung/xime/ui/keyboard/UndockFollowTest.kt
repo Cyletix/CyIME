@@ -99,7 +99,7 @@ class UndockFollowTest {
     @Test fun pullingUpTurnsFloatingAndTheCardKeepsFollowingTheFinger() {
         show()
         val start = handleStart()
-        // 上拉 200dp：过了阻力（24 + 96dp）就变悬浮。
+        // 上拉 200dp：超过纵向切换门槛后就变悬浮。
         rule.onNodeWithTag("host").performTouchInput {
             down(start)
             for (step in 1..20) moveTo(start + Offset(0f, -10f * step * density))

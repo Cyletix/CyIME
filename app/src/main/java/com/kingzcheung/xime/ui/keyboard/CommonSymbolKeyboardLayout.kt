@@ -94,7 +94,6 @@ fun CommonSymbolKeyboardLayout(
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.screenWidthDp > configuration.screenHeightDp
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
-    val suppressCursorMove = LocalSuppressCursorMove.current
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
 
@@ -110,15 +109,6 @@ fun CommonSymbolKeyboardLayout(
         )
     }
 
-    val bubbleData = rememberSwipeBubbleDrawData(
-        swipeState = swipeBubble.state,
-        keyBounds = swipeBubble.keyBounds,
-        keyBackgroundColor = bubbleBackgroundColor,
-        keyTextColor = keyTextColor,
-        accentColor = specialKeyTextColor,
-        keyWidth = if (swipeBubble.state.isSwiping || swipeBubble.state.isPressed) swipeBubble.keyBounds.width else 0f,
-        keyboardWidth = keyboardBounds.width,
-    )
 
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius) {
     Box(
@@ -130,7 +120,7 @@ fun CommonSymbolKeyboardLayout(
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
-        SwipeBubbleOverlay(bubbleData)
+        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
         Column(Modifier.fillMaxSize()) {
         LocalKeyboardInputPreferences.current.symbolsFor(SideSymbolTarget.COMMON)?.let { symbols ->
             FixedSymbolStrip(symbols, LocalKeyboardInputActions.current.onCommitExactText
@@ -149,7 +139,6 @@ fun CommonSymbolKeyboardLayout(
                 shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
                 onKeyPressDown = onKeyPressDown,
-                suppressCursorMove = suppressCursorMove,
                 onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                 specialKeyTextColor = specialKeyTextColor,
                 isAsciiMode = localAsciiMode,
@@ -278,9 +267,7 @@ fun CommonSymbolKeyboardLayout(
                                 swipeDownLabel = "下滑撤回",
                                 onSwipeUp = { onKeyPress("clear_all") },
                                 onSwipeDown = { onKeyPress("undo_clear") },
-                                onSwipeLeft = {
-                                    suppressCursorMove.value = true; onKeyPress("clear_composition")
-                                },
+                                distanceDelete = true,
                                 onSwipeStateChange = { state, bounds ->
                                     processSwipeState(state, bounds)
                                 },
@@ -382,7 +369,6 @@ internal fun CommonSymbolLandscapeContent(
     shadowElevation: Dp,
     shadowShapeRadius: Dp,
     onKeyPressDown: ((String) -> Unit)?,
-    suppressCursorMove: androidx.compose.runtime.MutableState<Boolean>,
     onSwipeStateChange: (SwipeState, Rect) -> Unit,
     specialKeyTextColor: Color = Color.White,
     isAsciiMode: Boolean = false,
@@ -611,9 +597,7 @@ internal fun CommonSymbolLandscapeContent(
                         swipeDownLabel = "下滑撤回",
                         onSwipeUp = { onKeyPress("clear_all") },
                         onSwipeDown = { onKeyPress("undo_clear") },
-                        onSwipeLeft = {
-                            suppressCursorMove.value = true; onKeyPress("clear_composition")
-                        },
+                        distanceDelete = true,
                         onSwipeStateChange = onSwipeStateChange,
                         shadowEnabled = shadowEnabled,
                         shadowElevation = shadowElevation,

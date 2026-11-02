@@ -48,6 +48,10 @@ class CustomKeyboardLayoutTest {
         val base = File("build/generated/chinese-assets/rime_ice/rime_ice.schema.yaml").readText()
         val node = Yaml.default.parseToYamlNode(layout.schema(base)) as YamlMap
         fun entry(map: YamlMap, key: String) = map.entries.entries.first { it.key.content == key }.value
+        val shortcuts = entry(node, "cyime_particle_shortcuts") as YamlMap
+        val keys = (entry(shortcuts, "alphabet") as YamlScalar).content
+        // On this layout w shares q: the tail-initial shortcut for 我呢 must be qon.
+        assertEquals("qon", "won".map { keys[it - 'a'] }.joinToString(""))
         val translator = entry(node, "translator") as YamlMap
         assertEquals(layout.id, (entry(translator, "prism") as YamlScalar).content)
         assertEquals("rime_ice", (entry(translator, "dictionary") as YamlScalar).content)

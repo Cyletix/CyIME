@@ -48,13 +48,13 @@ class GlideCornerHintTest {
     private var schema by mutableStateOf("rime_ice")
     private var ascii by mutableStateOf(false)
 
-    private fun show(glide: Boolean = true, chinese: Boolean = true) {
+    private fun show(glide: Boolean = true, chinese: Boolean = true, preview: Boolean = false) {
         val app = ApplicationProvider.getApplicationContext<Application>()
         KeysConfigHelper.loadConfig(app)
         com.kingzcheung.xime.ui.theme.KeyboardThemes.initFromConfig(app)
         AppFonts.initialize(app)
         val vm = KeyboardViewModel(app)
-        val preferences = KeyboardInputPreferences(glideTyping = glide, chineseGlideTyping = chinese)
+        val preferences = KeyboardInputPreferences(glideTyping = glide, chineseGlideTyping = chinese, glidePreview = preview)
         rule.setContent {
             CompositionLocalProvider(LocalKeyboardExplicitWidth provides true, LocalKeyboardInputPreferences provides preferences) {
                 MaterialTheme {
@@ -133,15 +133,40 @@ class GlideCornerHintTest {
         assertTrue("14 键不滑行，角标照旧", hints(first).isNotEmpty())
     }
 
-    private fun glide(word: String) {
+    private fun glide(word: String, lift: Boolean = true) {
         val host = rule.onRoot().fetchSemanticsNode().boundsInRoot
         fun letter(char: Char) = rule.onNodeWithTag("qwerty-key:$char", true).fetchSemanticsNode().boundsInRoot.center - host.topLeft
         val path = word.map(::letter)
         rule.onRoot().performTouchInput {
             down(path.first())
             path.zipWithNext().forEach { (a, b) -> for (step in 1..6) moveTo(a + (b - a) * (step / 6f)) }
-            up()
+            if (lift) up()
         }
+    }
+
+    private fun previewText(): String? = rule.onAllNodes(hasTestTag("glide-preview"), useUnmergedTree = true).fetchSemanticsNodes()
+        .firstOrNull()?.config?.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text }
+
+    /** 别的用户 11-02（用惯 Gboard）：开着「滑行时实时显示词」时，手指没抬起就显示现在抬手会出的词，抬手后消失。 */
+    @Test fun livePreviewShowsTheWordBeforeLiftingAndGoesAwayAfter() {
+        show(glide = false, chinese = true, preview = true)
+        glide("nihao", lift = false)
+        // 第一次识别在刚确认是滑行时开始（只划过 ni），手指停下后最迟再隔一次识别就跟上整条轨迹。
+        rule.waitUntil(5000) { previewText() != null }
+        rule.waitUntil(5000) { previewText() == "ni hao" }
+        assertTrue("还没抬手，不上屏", codes.isEmpty())
+        rule.onRoot().performTouchInput { up() }
+        rule.waitUntil(5000) { codes.isNotEmpty() }
+        assertEquals(listOf("nihao"), codes.toList())
+        rule.waitForIdle()
+        assertEquals(null, previewText())
+    }
+
+    @Test fun noLivePreviewWhileTheSwitchIsOff() {
+        show(glide = false, chinese = true, preview = false)
+        glide("nihao")
+        rule.waitUntil(5000) { codes.isNotEmpty() }
+        assertEquals(null, previewText())
     }
 
     @Test fun chineseGlideTypesThePinyinOfOneWord() {

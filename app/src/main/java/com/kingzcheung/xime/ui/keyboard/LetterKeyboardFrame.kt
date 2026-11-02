@@ -83,3 +83,14 @@ internal fun letterKeyboardColumns(rows: List<List<String>>, fourteenKey: Boolea
 internal fun letterKeyboardBottomRow(rows: List<List<String>>, fourteenKey: Boolean): QwertyBottomRowWeights =
     if (fourteenKey || letterKeyboardFrame(rows) != null || isHoneycomb(rows) || rows.firstOrNull()?.size == 10)
         QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy
+
+/**
+ * 第一行一格的宽度（dp），给 xime.custom.yaml 的 geometry.middle_row_inset 当单位：
+ * 键不按字母数占格时一格就是第一行一个键宽，按字母数占格（14 键）时是一个字母宽。
+ * [cellWidthDp] 是键盘按 [columns] 列分出的格宽。
+ */
+internal fun firstRowCellDp(cellWidthDp: Float, columns: Float, firstRow: List<String>, weighted: Boolean): Float {
+    val units = firstRow.sumOf { letterKeySpan(it, weighted).toDouble() }.toFloat()
+    if (!cellWidthDp.isFinite() || cellWidthDp <= 0f || units <= 0f) return cellWidthDp.coerceAtLeast(0f)
+    return cellWidthDp * columns / units
+}

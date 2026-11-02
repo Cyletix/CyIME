@@ -10,6 +10,15 @@ class KeyLabelCaseTest {
         // 西班牙语的 ñ 键按 Shift 上屏 Ñ，键帽也要显示 Ñ。
         assertEquals("Ñ", keyLabelWithCase("ñ", isShifted = true))
         assertEquals("ñ", keyLabelWithCase("ñ", isShifted = false))
+        assertEquals("Й", keyLabelWithCase("й", isShifted = true))
+        assertEquals("É", keyLabelWithCase("é", isShifted = true))
+        // ß 没有单个大写字母，键帽不变成 SS。
+        assertEquals("ß", keyLabelWithCase("ß", isShifted = true))
+        // 韩语 Shift：ㄱ → ㄲ、ㅐ → ㅒ，没有双写的字母不变。
+        assertEquals("ㄲ", keyLabelWithCase("ㄱ", isShifted = true))
+        assertEquals("ㅒ", keyLabelWithCase("ㅐ", isShifted = true))
+        assertEquals("ㅁ", keyLabelWithCase("ㅁ", isShifted = true))
+        assertEquals("ㄱ", keyLabelWithCase("ㄱ", isShifted = false))
         for (label in listOf("手", "ㄅ", "，", "@language", "q1")) assertEquals(label, keyLabelWithCase(label, isShifted = true))
     }
 }

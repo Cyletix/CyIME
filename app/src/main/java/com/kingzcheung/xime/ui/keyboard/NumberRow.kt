@@ -31,7 +31,19 @@ internal fun numberRowSpans(count: Int, splitAt: Int): List<Float> =
     if (splitAt !in 1 until count) List(count) { 1f }
     else List(count) { index -> if (index < splitAt) 1f / splitAt else 1f / (count - splitAt) }
 
-/** 数字行的一排键：点按把键上写的原样上屏（[onInput]，和字母键上角标的数字同一条路，不拿来选候选）。 */
+/** 电脑键盘上数字键按 Shift 出的符号；中英文都一样，不跟全角/半角。 */
+private val NUMBER_SHIFT_SYMBOLS = "1234567890".zip("!@#$%^&*()").associate { (digit, symbol) -> digit.toString() to symbol.toString() }
+
+/**
+ * 数字行键的角标：和电脑键帽一样，1 上是 !，……，0 上是 )。跟着数字走，「按键符号 → 数字行」里改了顺序也不变；
+ * 不是数字的格子（自己加的符号、短语）没有角标。开了数字行，这些符号从 26 键第一排挪到这里（用户 11-01 定）。
+ */
+internal fun numberRowShiftSymbol(key: String): String? = NUMBER_SHIFT_SYMBOLS[key]
+
+/**
+ * 数字行的一排键：点按把键上写的原样上屏（[onInput]，和字母键上角标的数字同一条路，不拿来选候选）；
+ * 数字键上滑、下滑或长按出 [numberRowShiftSymbol]，[showHints] 关时只是不显示角标，照样能滑出。
+ */
 @Composable
 internal fun NumberKeyRow(
     keys: List<String>,
@@ -46,14 +58,22 @@ internal fun NumberKeyRow(
     onKeyPressDown: ((String) -> Unit)?,
     onKeyRelease: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    showHints: Boolean = true,
 ) {
     val spans = numberRowSpans(keys.size, splitAt)
     Row(modifier.fillMaxWidth().testTag("number-row")) {
         keys.forEachIndexed { index, key ->
             if (index == splitAt) SplitGapSpacer(NUMBER_ROW_SPLIT_ROW, splitGap)
+            val shift = numberRowShiftSymbol(key)
+            val commitShift: ((String) -> Unit)? = shift?.let { symbol -> { _: String -> onInput(symbol) } }
             KeyButton(
                 text = key,
                 onClick = { onInput(key) },
+                swipeText = shift?.takeIf { showHints },
+                swipeDownText = shift?.takeIf { showHints },
+                onSwipe = commitShift,
+                onSwipeDown = commitShift,
+                onLongClick = shift?.let { symbol -> { onInput(symbol) } },
                 backgroundColor = keyBackgroundColor,
                 textColor = keyTextColor,
                 modifier = Modifier.weight(spans[index]).testTag("number-row-key:$index"),

@@ -57,6 +57,7 @@ fun SpaceKeyButton(
     val onCursorMode by rememberUpdatedState(actions.onCursorModeChange)
     val onVoiceToggle by rememberUpdatedState(actions.onVoiceToggle)
     val onVoiceHoldEnd by rememberUpdatedState(actions.onVoiceHoldEnd)
+    val onVoiceHoldCancel by rememberUpdatedState(actions.onVoiceHoldCancel)
     val voiceOn by rememberUpdatedState(isVoiceMode)
     val holdAction = settings.effectiveSpaceHold
     val cursorUnitPx = rememberCursorUnitPx()
@@ -69,6 +70,9 @@ fun SpaceKeyButton(
     val density = LocalDensity.current
     var pressed by remember { mutableStateOf(false) }
     var cursorActive by remember { mutableStateOf(false) }
+    // 按住空格说话且开了「上滑取消」：键面写「上滑取消」；手指上滑过线后变成删除色、写「松手取消」。
+    var voiceHolding by remember { mutableStateOf(false) }
+    var voiceCancelArmed by remember { mutableStateOf(false) }
     val frostedGlass = settings.frostedGlass
     val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) Modifier.drawBehind {
@@ -76,9 +80,21 @@ fun SpaceKeyButton(
                 size = size, cornerRadius = CornerRadius(KeyShapes.current.radius(shadowShapeRadius).toPx()))
         } else Modifier
     }
+    val keyFill = frostedKeyColor(
+        backgroundColor, textColor, frostedGlass,
+        legacyStateColor = if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+        pressed = pressed,
+    )
+    // 上滑取消的提示只在麦克风真开着时显示（语音总开关关着时长按不会开麦）。
+    val showVoiceCancel = voiceHolding && isVoiceMode
+    // 过线后用删除键上滑清空同一套删除色，任何主题、玻璃下都认得出。
+    val cancelColors = if (showVoiceCancel && voiceCancelArmed) keyFlickFeedbackColors(keyFill, textColor,
+        com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.accent ?: androidx.compose.material3.MaterialTheme.colorScheme.primary,
+        KeyFlickFeedback.DELETE, 1f, frostedGlass.enabled) else null
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
-            .pointerInput(holdAction, settings.cursorStepDp, settings.cursorSwipeLines, cursorUnitPx, settings.spaceHoldDelayMs) {
+            .pointerInput(holdAction, settings.cursorStepDp, settings.cursorSwipeLines, cursorUnitPx, settings.spaceHoldDelayMs,
+                settings.voiceSwipeCancel) {
                 val step = settings.cursorStepDp * cursorUnitPx
                 val tapTolerance = maxOf(viewConfiguration.touchSlop, 24.dp.toPx())
                 awaitEachGesture {
@@ -114,6 +130,7 @@ fun SpaceKeyButton(
                                 // 工具栏麦克风已经在听时，长按只把它结束，松手不再动。
                                 startedVoice = !voiceOn
                                 onVoiceToggle?.invoke()
+                                voiceHolding = startedVoice && settings.voiceSwipeCancel
                             }
                         }
                     }
@@ -129,6 +146,14 @@ fun SpaceKeyButton(
                             lastX = change.position.x
                             val dy = change.position.y - lastY
                             lastY = change.position.y
+                            // 上滑取消：手指高过空格顶边一个键高才算，左右挪不管；滑回来就恢复松手上屏。
+                            if (voiceHolding) {
+                                val armed = change.position.y < -size.height.toFloat()
+                                if (armed != voiceCancelArmed) {
+                                    voiceCancelArmed = armed
+                                    if (armed) view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                                }
+                            }
                             // 拇指点空格常带几毫米横移：在约 4 mm 内仍算一次点击（三星、Gboard 偏移 3.6 mm 仍上屏），
                             // 超出才算滑动。系统 touchSlop 只有约 8 dp，曾让 2.4 mm 的偏移把空格吞掉（1.12.36 实测）。
                             if (!held && (abs(change.position.x - down.position.x) > tapTolerance ||
@@ -159,7 +184,11 @@ fun SpaceKeyButton(
                             SpaceCursorShift.end()
                         }
                         timer.cancel()
-                        if (startedVoice) onVoiceHoldEnd?.invoke()
+                        if (startedVoice) {
+                            if (voiceHolding && voiceCancelArmed) onVoiceHoldCancel?.invoke() else onVoiceHoldEnd?.invoke()
+                        }
+                        voiceHolding = false
+                        voiceCancelArmed = false
                         pressed = false
                         cursorActive = false
                         onCursorMode?.invoke(false)
@@ -170,11 +199,7 @@ fun SpaceKeyButton(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(frostedKeyColor(
-                backgroundColor, textColor, frostedGlass,
-                legacyStateColor = if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
-                pressed = pressed,
-            ))),
+            .background(cancelColors?.background ?: keyFill)),
         contentAlignment = Alignment.Center
     ) {
         val iconSize = keyIconSizeDp(maxWidth.value, maxHeight.value)
@@ -182,9 +207,15 @@ fun SpaceKeyButton(
         val labelSize = minOf(keyLabelSizeSp(schemaName, 10f,
             maxWidth.value, maxHeight.value, density.fontScale, settings.keyTextScale),
             labelHeight / (density.fontScale * 1.4f)).coerceAtLeast(1f)
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        if (showVoiceCancel) {
+            val hintSize = (maxHeight.value * 0.32f / density.fontScale).coerceIn(9f, 16f)
+            Text(if (voiceCancelArmed) "松手取消" else "上滑取消", color = cancelColors?.foreground ?: textColor,
+                fontSize = hintSize.sp, lineHeight = (hintSize * 1.2f).sp, maxLines = 1, softWrap = false,
+                fontFamily = AppFonts.keyFontFamily, modifier = Modifier.testTag("space-voice-cancel-hint"))
+        } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             // 键太矮时方案名会被压成看不清的小点，这时只留空格图标。
-            if (schemaName.isNotBlank() && schemaName != "空格" && labelSize >= 8f) Text(
+            // 「功能键不显示提示字」开着时空格只留图标（GitHub #11）。
+            if (!settings.hideFunctionKeyHints && schemaName.isNotBlank() && schemaName != "空格" && labelSize >= 8f) Text(
                 schemaName.replace("拼音九键", "拼音"), color = textColor,
                 fontSize = labelSize.sp, lineHeight = (labelSize * 1.2f).sp, maxLines = 1, softWrap = false,
                 fontFamily = AppFonts.keyFontFamily)

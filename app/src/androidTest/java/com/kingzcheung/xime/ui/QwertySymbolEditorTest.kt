@@ -22,25 +22,26 @@ class QwertySymbolEditorTest {
         val schema = SettingsPreferences.getCurrentSchema(context)
         try {
             rule.setContent { MaterialTheme { CustomLayoutManager("default", true) {} } }
-            rule.onNodeWithText("编辑符号").performClick()
-            rule.waitUntil(10_000) {
-                rule.onAllNodes(hasTestTag("symbol-editor-up") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+            // 点 Q 键弹出小框，改上方符号，点「完成」即保存（没有单独的保存按钮）。
+            fun openQ() {
+                rule.onNodeWithText("编辑符号").performClick()
+                rule.waitUntil(10_000) {
+                    rule.onAllNodes(hasTestTag("symbol-editor-key:q") and hasClickAction() and isEnabled())
+                        .fetchSemanticsNodes().isNotEmpty()
+                }
+                rule.onNodeWithTag("symbol-editor-key:q").performClick()
+                rule.onNodeWithTag("symbol-editor-up").assertExists()
             }
+            openQ()
             saveUiEvidence("qwerty-symbol-editor", rule.onRoot())
-            rule.onNodeWithTag("symbol-editor-up").performScrollTo().performTextReplacement("★")
+            rule.onNodeWithTag("symbol-editor-up").performTextReplacement("★")
             rule.onNodeWithTag("symbol-editor-up").assertTextContains("★")
-            rule.onNodeWithText("保存符号").performScrollTo().assertIsEnabled().performClick()
-            rule.waitUntil(10_000) {
-                rule.onAllNodesWithText("已保存，键盘上立即生效").fetchSemanticsNodes().isNotEmpty()
-            }
-            assertEquals(QwertySwipeSymbols.load(context, false).toString(), "★",
-                QwertySwipeSymbols.load(context, false)["up.q"])
+            rule.onNodeWithText("完成").performClick()
+            rule.waitUntil(10_000) { QwertySwipeSymbols.load(context, false)["up.q"] == "★" }
+            rule.onNodeWithTag("symbol-editor-up").assertDoesNotExist()
             rule.onNodeWithContentDescription("返回").performClick()
             rule.onNodeWithText("编辑符号").assertExists()
-            rule.onNodeWithText("编辑符号").performClick()
-            rule.waitUntil(10_000) {
-                rule.onAllNodes(hasTestTag("symbol-editor-up") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
-            }
+            openQ()
             rule.onNodeWithTag("symbol-editor-up").assertTextContains("★")
             saveUiEvidence("qwerty-symbol-editor-saved", rule.onRoot())
             assertEquals(layouts, CustomKeyboardLayouts.load(context))

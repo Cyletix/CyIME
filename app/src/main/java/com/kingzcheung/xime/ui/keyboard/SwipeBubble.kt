@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Typeface
+import androidx.core.graphics.withSave
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.KeyboardDimensions
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +39,7 @@ private val BubbleScreenMargin = 4.dp
 private val bubblePath = Path()
 private val bubbleFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 private val bubbleTextPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+private val bubbleMeasurePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 private val bubbleBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 private val bubbleLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 private val SHADOW_COLOR = android.graphics.Color.argb(0x26, 0, 0, 0)
@@ -93,10 +96,20 @@ class SwipeBubbleController(
     var keyBounds by mutableStateOf(Rect(0f, 0f, 0f, 0f))
         private set
     private var releaseJob: Job? = null
+    private var overlappingPress = false
+    internal var onPreviewChanged: ((SwipeState, Rect) -> Unit)? = null
+
+    private fun publish(value: SwipeState, bounds: Rect = keyBounds) {
+        if (state == value && keyBounds == bounds) return
+        state = value
+        keyBounds = bounds
+        onPreviewChanged?.invoke(value, bounds)
+    }
 
     fun dispose() {
         releaseJob?.cancel()
         releaseJob = null
+        overlappingPress = false
     }
 
     fun setPressBubbleEnabled(enabled: Boolean) {
@@ -104,43 +117,48 @@ class SwipeBubbleController(
         pressBubbleEnabled = enabled
         if (!enabled && state.isPressed && !state.isLongPress && !state.isSwiping) {
             dispose()
-            state = SwipeState()
+            publish(SwipeState())
         }
     }
 
     fun update(newState: SwipeState, bounds: Rect) {
+        val gestureActive = newState.isSwiping || newState.isPressed || newState.isLongPress
+        // The old finger can lift while the next key is still held. Its release
+        // must not move the preview back or start a timer for the new finger.
+        if (!gestureActive && newState.keyFlick == null &&
+            (releaseJob != null || (overlappingPress && keyBounds != bounds))) return
         // A vertical flick is rendered inside its key, including below the commit
         // threshold. Clear an existing tap bubble immediately instead of delaying it.
         if (newState.keyFlick != null) {
             dispose()
-            if (state != SwipeState()) state = SwipeState()
+            publish(SwipeState())
             return
         }
         // 默认关闭时，普通按下/抬起不能让整个键盘重组或启动延迟协程。
         // 拂动/长按是选择反馈，仍需显示；退出这些反馈时只清一次状态。
         if (!pressBubbleEnabled && !newState.isSwiping && !newState.isLongPress) {
             dispose()
-            if (state.isSwiping || state.isLongPress || state.isPressed) state = SwipeState()
+            if (state.isSwiping || state.isLongPress || state.isPressed) publish(SwipeState())
             return
         }
+        if (newState.isPressed && state.isPressed && bounds != keyBounds && releaseJob == null)
+            overlappingPress = true
+        if (!gestureActive) overlappingPress = false
         releaseJob?.cancel()
         releaseJob = null
         val prev = state
-        val gestureActive = newState.isSwiping || newState.isPressed || newState.isLongPress
         if (!gestureActive &&
             prev.isPressed && prev.pressedText != null &&
             !prev.isSwiping && !prev.isLongPress
         ) {
-            state = prev
-            keyBounds = bounds
             releaseJob = scope.launch {
                 delay(PRESS_BUBBLE_RELEASE_DELAY_MS)
-                state = SwipeState()
+                releaseJob = null
+                publish(SwipeState())
             }
             return
         }
-        state = newState
-        keyBounds = bounds
+        publish(newState, bounds)
     }
 }
 
@@ -169,15 +187,39 @@ fun rememberSwipeBubbleDrawData(
     if (swipeState.keyFlick != null) return null
     if (!swipeState.isSwiping && !(showPressBubble && swipeState.isPressed) && !swipeState.isLongPress) return null
 
+    val textColor = (if (swipeState.isDanger) Color.White else keyTextColor).toArgb()
+    val longPressIconBitmaps = remember(swipeState.longPressDrawableIds, textColor) {
+        swipeState.longPressDrawableIds.mapNotNull { id ->
+            val drawable = context.resources.getDrawable(id, context.theme)?.mutate() ?: return@mapNotNull null
+            drawable.setTint(textColor)
+            val w = drawable.intrinsicWidth.coerceAtLeast(1)
+            val h = drawable.intrinsicHeight.coerceAtLeast(1)
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val bmpCanvas = android.graphics.Canvas(bitmap)
+            drawable.setBounds(0, 0, w, h)
+            drawable.draw(bmpCanvas)
+            bitmap
+        }
+    }
+
+    return measureSwipeBubble(swipeState, keyBounds, keyBackgroundColor, keyTextColor, accentColor,
+        keyWidth, keyboardWidth, LocalDensity.current, bubbleReferenceHeightDp(), longPressIconBitmaps)
+}
+
+@Composable
+internal fun bubbleReferenceHeightDp() =
+    if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 44f else 56f
+
+internal fun measureSwipeBubble(swipeState: SwipeState, keyBounds: Rect, keyBackgroundColor: Color,
+    keyTextColor: Color, accentColor: Color, keyWidth: Float, keyboardWidth: Float, density: Density,
+    referenceHeightDp: Float, longPressIconBitmaps: List<Bitmap> = emptyList(),
+    keyLabelTypeface: Typeface = AppFonts.keyLabelTypeface): BubbleDrawData? {
     val isLongPressMode = swipeState.isLongPress && swipeState.longPressItems.isNotEmpty()
     val displayText = if (isLongPressMode) null
         else if (swipeState.isPressed) swipeState.pressedText
         else swipeState.swipeText
     if (!isLongPressMode && displayText.isNullOrEmpty()) return null
 
-    val density = LocalDensity.current
-    val referenceHeightDp =
-        if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 44f else 56f
     val contentScale = adaptiveKeyContentScale(
         keyHeightDp = keyBounds.height / density.density,
         referenceHeightDp = referenceHeightDp,
@@ -202,18 +244,11 @@ fun rememberSwipeBubbleDrawData(
     } else keyBackgroundColor).toArgb()
     val textColor = (if (swipeState.isDanger) Color.White else keyTextColor).toArgb()
 
-    val keyLabelTypeface = AppFonts.keyLabelTypeface
-
-    val textPaint = remember(bubbleScale) {
-        Paint().apply {
-            textSize = with(density) { 16.sp.toPx() } * bubbleScale
-            isAntiAlias = true
-        }
-    }
+    bubbleMeasurePaint.textSize = with(density) { 16.sp.toPx() } * bubbleScale
 
     // A single long-press choice (the digit of a nine-key flick key) is the round bubble too.
     val bodyWidth = if (isLongPressMode && swipeState.longPressItems.size == 1 && swipeState.longPressDrawableIds.isEmpty()) {
-        maxOf(textPaint.measureText(swipeState.longPressItems.first()) + with(density) { 20.dp.toPx() } * bubbleScale, minBodyWidthPx)
+        maxOf(bubbleMeasurePaint.measureText(swipeState.longPressItems.first()) + with(density) { 20.dp.toPx() } * bubbleScale, minBodyWidthPx)
     } else if (isLongPressMode) {
         val cellMin = if (swipeState.longPressDrawableIds.isNotEmpty())
             swipeState.longPressItems.size
@@ -221,7 +256,7 @@ fun rememberSwipeBubbleDrawData(
             maxOf(swipeState.longPressItems.size, 3)
         KeyboardKeyMetrics.longPressMenuWidthPx(keyWidthPx, cellMin, keyboardWidth, screenMarginPx)
     } else {
-        maxOf(textPaint.measureText(displayText!!) + with(density) { 20.dp.toPx() } * bubbleScale, minBodyWidthPx)
+        maxOf(bubbleMeasurePaint.measureText(displayText!!) + with(density) { 20.dp.toPx() } * bubbleScale, minBodyWidthPx)
     }
 
     val textSizePx = with(density) { 16.sp.toPx() } * bubbleScale
@@ -246,20 +281,6 @@ fun rememberSwipeBubbleDrawData(
     val pathBodyWidth = bodyWidth
 
     val paddingPx = with(density) { 10.dp.toPx() } * bubbleScale
-
-    val longPressIconBitmaps = remember(swipeState.longPressDrawableIds, textColor) {
-        swipeState.longPressDrawableIds.mapNotNull { id ->
-            val drawable = context.resources.getDrawable(id, context.theme)?.mutate() ?: return@mapNotNull null
-            drawable.setTint(textColor)
-            val w = drawable.intrinsicWidth.coerceAtLeast(1)
-            val h = drawable.intrinsicHeight.coerceAtLeast(1)
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val bmpCanvas = android.graphics.Canvas(bitmap)
-            drawable.setBounds(0, 0, w, h)
-            drawable.draw(bmpCanvas)
-            bitmap
-        }
-    }
 
     return BubbleDrawData(
         boxLeft = boxLeft,
@@ -294,9 +315,11 @@ fun rememberSwipeBubbleDrawData(
 }
 
 fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
-    drawIntoCanvas { composeCanvas ->
-        val canvas = composeCanvas.nativeCanvas
-        canvas.save()
+    drawIntoCanvas { paintSwipeBubble(it.nativeCanvas, data) }
+}
+
+internal fun paintSwipeBubble(canvas: android.graphics.Canvas, data: BubbleDrawData) {
+    canvas.withSave {
         canvas.translate(data.boxLeft, data.boxTop)
 
         val bodyLeft = data.pathBodyLeft
@@ -369,8 +392,6 @@ fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
             canvas.drawText(data.displayText, textCenterX, textY, bubbleTextPaint)
             canvas.restore()
         }
-
-        canvas.restore()
     }
 }
 

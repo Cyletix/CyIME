@@ -6,6 +6,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class KeyboardBackdropFrameTest {
+    @Test fun `measured card above estimated frame includes the candidate row and still reaches navigation`() {
+        val host = Offset(0f, 100f)
+        val frame = keyboardBackdropFrame(host, IntSize(380, 400), 300, cardTopInWindow = 156f)
+        assertEquals(Offset(0f, 156f), frame.origin)
+        assertEquals(344, frame.size.height)
+        assertEquals(500f, frame.origin.y + frame.size.height, 0f)
+        // A tool panel above the measured card remains part of the image.
+        assertEquals(200f, keyboardBackdropFrame(host, IntSize(380, 400), 300, 220f).origin.y, 0f)
+    }
     @Test fun `keyboard bottom and navigation top sample adjacent rows from one image`() {
         for (navHeight in listOf(24, 48, 96)) {
             val frame = keyboardBackdropFrame(Offset(0f, 1000f), IntSize(1200, 800), 400 + navHeight)
