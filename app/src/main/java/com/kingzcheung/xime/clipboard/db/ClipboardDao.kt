@@ -20,35 +20,36 @@ interface ClipboardDao {
     fun observeAll(): Flow<List<ClipboardEntry>>
 
     /**
-     * Every fixed record plus the newest [limit] unfixed ones. The board grows [limit] page by
+     * Every fixed or grouped record plus the newest [limit] other ones. The board grows [limit] page by
      * page as it scrolls, so a history of thousands is never read into memory at once.
      */
-    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND (isPinned = 1 OR id IN " +
-        "(SELECT id FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 ORDER BY timestamp DESC LIMIT :limit)) " +
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND (isPinned = 1 OR grouped = 1 OR id IN " +
+        "(SELECT id FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND grouped = 0 ORDER BY timestamp DESC LIMIT :limit)) " +
         "ORDER BY timestamp DESC")
     fun observeWindow(limit: Int): Flow<List<ClipboardEntry>>
 
-    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
+    /** History records: neither fixed nor in a group. */
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0")
     fun observeUnpinnedCount(): Flow<Int>
 
     /** Text fragment or pinyin initials, anywhere; fixed records first, then newest. */
-    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND " +
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND sensitive = 0 AND " +
         "(text LIKE :pattern ESCAPE '\\' OR searchKey LIKE :pattern ESCAPE '\\') " +
         "ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
     suspend fun search(pattern: String, limit: Int): List<ClipboardEntry>
 
     /** Pinyin initials only (a word still being typed); fixed records first, then newest. */
-    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND searchKey LIKE :pattern " +
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND sensitive = 0 AND searchKey LIKE :pattern " +
         "ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
     suspend fun searchKey(pattern: String, limit: Int): List<ClipboardEntry>
 
     /** Initials as 9-key digits ([pattern] holds digits): the search key read through the keypad. */
-    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND " +
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND sensitive = 0 AND " +
         com.kingzcheung.xime.clipboard.ClipboardSearch.T9_KEY_SQL +
         " LIKE :pattern ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
     suspend fun searchKeyDigits(pattern: String, limit: Int): List<ClipboardEntry>
 
-    @Query("SELECT id, substr(text, 1, 2000) AS text FROM clipboard_entries WHERE searchKey = '' AND isQuickSend = 0 LIMIT :limit")
+    @Query("SELECT id, substr(text, 1, 2000) AS text FROM clipboard_entries WHERE searchKey = '' AND isQuickSend = 0 AND sensitive = 0 LIMIT :limit")
     suspend fun missingSearchKeys(limit: Int): List<SearchKeySource>
 
     @Query("UPDATE clipboard_entries SET searchKey = :key WHERE id = :id")
@@ -70,8 +71,8 @@ interface ClipboardDao {
         "trim(text, " + CLIP_TRIM + ") = trim(:text, " + CLIP_TRIM + ") ORDER BY timestamp DESC LIMIT 1")
     suspend fun findPinnedSameText(text: String, code: String): ClipboardEntry?
 
-    /** Other history copies of this text; fixed records are never removed here. */
-    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND id != :keepId AND " +
+    /** Other history copies of this text; fixed and grouped records are never removed here. */
+    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND grouped = 0 AND id != :keepId AND " +
         "trim(text, " + CLIP_TRIM + ") = trim(:text, " + CLIP_TRIM + ")")
     suspend fun deleteHistoryCopies(text: String, keepId: Long)
 
@@ -79,9 +80,9 @@ interface ClipboardDao {
      * One record per text: drops history copies of a fixed text and, among history copies, all but
      * the newest. Fixed records (and their codes) are kept as they are.
      */
-    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND (" +
-        "trim(text, " + CLIP_TRIM + ") IN (SELECT trim(text, " + CLIP_TRIM + ") FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 1) " +
-        "OR id NOT IN (SELECT id FROM (SELECT id, MAX(timestamp) FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 " +
+    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND grouped = 0 AND (" +
+        "trim(text, " + CLIP_TRIM + ") IN (SELECT trim(text, " + CLIP_TRIM + ") FROM clipboard_entries WHERE isQuickSend = 0 AND (isPinned = 1 OR grouped = 1)) " +
+        "OR id NOT IN (SELECT id FROM (SELECT id, MAX(timestamp) FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND grouped = 0 " +
         "GROUP BY trim(text, " + CLIP_TRIM + "))))")
     suspend fun deleteDuplicateHistory(): Int
 
@@ -123,16 +124,17 @@ interface ClipboardDao {
     @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND id IN (:ids)")
     suspend fun deleteClipboardByIds(ids: List<Long>)
 
-    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
+    // Clearing and trimming history leaves fixed records and records in a group alone.
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0")
     suspend fun clearAllClipboard()
 
-    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0")
     suspend fun clearUnpinned()
 
-    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0")
     suspend fun countUnpinned(): Int
 
-    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0 AND id IN (SELECT id FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0 ORDER BY timestamp ASC LIMIT :limit)")
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0 AND id IN (SELECT id FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0 ORDER BY timestamp ASC LIMIT :limit)")
     suspend fun trimUnpinned(limit: Int)
 
     // An edit clears the search key; the backfill recomputes it from the new text.
@@ -160,16 +162,24 @@ interface ClipboardDao {
      * text; a fixed record keeps its text. A new one is added. One record per text remains. True when added.
      */
     @Transaction
-    suspend fun upsert(text: String, now: Long, searchKey: String = "", fromDevice: Boolean = false): Boolean {
+    suspend fun upsert(text: String, now: Long, searchKey: String = "", fromDevice: Boolean = false,
+        sensitive: Boolean = false): Boolean {
         val existing = findSameText(text)
         val keep = when {
-            existing == null -> insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey, fromDevice = fromDevice))
+            existing == null -> insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey,
+                fromDevice = fromDevice, sensitive = sensitive))
             !existing.isPinned && existing.text != text -> existing.id.also { replaceCopiedText(it, text, searchKey, now) }
             else -> existing.id.also { refreshCopiedItem(it, now) }
         }
         // Copied here again: a received record becomes this device's own. A received copy of text
         // already here only moves it up.
         if (existing != null && existing.fromDevice && !fromDevice) setFromDevice(keep, false)
+        // The latest copy decides: copied as a password, the record is hidden (and expires); copied
+        // again from an ordinary place, an unfixed one is ordinary again. A fixed one stays hidden.
+        if (existing != null && existing.sensitive != sensitive && (sensitive || !existing.isPinned)) {
+            setSensitive(keep, sensitive)
+            if (sensitive) setSearchKey(keep, "")
+        }
         deleteHistoryCopies(text, keep)
         return existing == null
     }
@@ -177,19 +187,26 @@ interface ClipboardDao {
     @Query("UPDATE clipboard_entries SET fromDevice = :fromDevice WHERE id = :id")
     suspend fun setFromDevice(id: Long, fromDevice: Boolean)
 
-    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE fromDevice = 1 AND isPinned = 0 AND isQuickSend = 0")
+    @Query("UPDATE clipboard_entries SET sensitive = :sensitive WHERE id = :id")
+    suspend fun setSensitive(id: Long, sensitive: Boolean)
+
+    /** Passwords copied before [cutoff] (an hour ago), or all of them when the switch is turned off; fixed or grouped ones stay. */
+    @Query("DELETE FROM clipboard_entries WHERE sensitive = 1 AND isPinned = 0 AND grouped = 0 AND isQuickSend = 0 AND timestamp < :cutoff")
+    suspend fun deleteSensitiveBefore(cutoff: Long): Int
+
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE fromDevice = 1 AND isPinned = 0 AND grouped = 0 AND isQuickSend = 0")
     suspend fun countReceived(): Int
 
     @Query("SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + length(searchKey)), 0) FROM clipboard_entries " +
-        "WHERE fromDevice = 1 AND isPinned = 0 AND isQuickSend = 0")
+        "WHERE fromDevice = 1 AND isPinned = 0 AND grouped = 0 AND isQuickSend = 0")
     suspend fun receivedBytes(): Long
 
     @Query("DELETE FROM clipboard_entries WHERE id IN (SELECT id FROM clipboard_entries " +
-        "WHERE fromDevice = 1 AND isPinned = 0 AND isQuickSend = 0 ORDER BY timestamp ASC, id ASC LIMIT :limit)")
+        "WHERE fromDevice = 1 AND isPinned = 0 AND grouped = 0 AND isQuickSend = 0 ORDER BY timestamp ASC, id ASC LIMIT :limit)")
     suspend fun deleteOldestReceived(limit: Int)
 
     /**
-     * A copy received from another device. Received records that are not fixed keep their own room
+     * A copy received from another device. Received records that are not fixed (or grouped) keep their own room
      * ([maxCount] records, [maxBytes]); only the oldest of them make way, never this device's own
      * copies or fixed records. True when added.
      */
@@ -219,14 +236,51 @@ interface ClipboardDao {
 
     /**
      * Bytes of text and search keys stored (fixed and history), re-read whenever records change.
-     * Received records that are not fixed have their own room and are not counted here.
+     * Received records that are not fixed or grouped have their own room and are not counted here.
      */
     @Query("SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + length(searchKey)), 0) FROM clipboard_entries " +
-        "WHERE isQuickSend = 0 AND (fromDevice = 0 OR isPinned = 1)")
+        "WHERE isQuickSend = 0 AND (fromDevice = 0 OR isPinned = 1 OR grouped = 1)")
     fun observeStoredBytes(): Flow<Long>
 
     suspend fun insertPinnedText(text: String, code: String, now: Long, searchKey: String = ""): Long =
         insert(ClipboardEntry(text = text, code = code, timestamp = now, isPinned = true, searchKey = searchKey))
+
+    /**
+     * Text added from a group's tab: the record holding this text (fixed or not) moves up, otherwise a
+     * new one; it is not fixed. The caller puts it into the group. Returns its id.
+     */
+    @Transaction
+    suspend fun addToGroup(text: String, code: String, now: Long, searchKey: String = ""): Long {
+        val existing = findSameText(text)
+        val id = existing?.id?.also { refreshCopiedItem(it, now) }
+            ?: insert(ClipboardEntry(text = text, code = code, timestamp = now, searchKey = searchKey, grouped = true))
+        setGrouped(listOf(id), true)
+        deleteHistoryCopies(text, id)
+        return id
+    }
+
+    @Query("UPDATE clipboard_entries SET grouped = :grouped WHERE id IN (:ids)")
+    suspend fun setGrouped(ids: List<Long>, grouped: Boolean)
+
+    @Query("UPDATE clipboard_entries SET grouped = 0 WHERE grouped = 1")
+    suspend fun ungroupAll()
+
+    /** The [grouped] marks follow the group preferences: exactly [ids] are in a group. */
+    @Transaction
+    suspend fun syncGrouped(ids: List<Long>) {
+        ungroupAll()
+        ids.chunked(500).forEach { setGrouped(it, true) }
+    }
+
+    @Query("SELECT id FROM clipboard_entries WHERE id IN (:ids)")
+    suspend fun existingIds(ids: List<Long>): List<Long>
+
+    /**
+     * Before 11-02 a record put into a group was fixed with it. Those records are unfixed once and
+     * stay in their group; a fixed record with a trigger code stays fixed.
+     */
+    @Query("UPDATE clipboard_entries SET isPinned = 0 WHERE grouped = 1 AND isPinned = 1 AND code = '' AND isQuickSend = 0")
+    suspend fun unpinGrouped(): Int
 
     /**
      * One record from an import file, keeping its own time. Records already here stay as they are

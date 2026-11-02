@@ -205,6 +205,7 @@ fun ClipboardSyncSettingsContent(
             }
             // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
             VerificationCodeSettings()
+            ClipboardSensitiveSetting()
             ClipboardCardLinesSetting(onNavigateToGroups)
             ClipboardExportSetting()
             ClipboardImportSetting()

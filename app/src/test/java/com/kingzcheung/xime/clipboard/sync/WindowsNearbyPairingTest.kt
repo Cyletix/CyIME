@@ -34,7 +34,7 @@ class WindowsNearbyPairingTest {
         runCurrent()
         assertTrue(h.pairing.confirmation.value!!.ready)
         assertTrue(h.saved.isEmpty())
-        val transport = WindowsSecureTransport({ _, _, _, _, _ -> error("Unconfirmed peer reached transport") }) { h.saved.lastOrNull() }
+        val transport = WindowsSecureTransport({ _, _, _, _, _ -> error("Unconfirmed peer reached transport") }, { h.saved.lastOrNull() })
         assertNotNull(transport.testConnection())
         assertTrue(h.saved.isEmpty())
     }

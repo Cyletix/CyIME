@@ -1,18 +1,26 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.twotone.CreateNewFolder
 import androidx.compose.material.icons.twotone.Email
+import androidx.compose.material.icons.twotone.Folder
 import androidx.compose.material.icons.twotone.Image
 import androidx.compose.material.icons.twotone.Link
 import androidx.compose.material.icons.twotone.Phone
@@ -35,10 +43,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.clipboard.ClipboardFilter
 import com.kingzcheung.xime.clipboard.ClipboardGroup
@@ -46,8 +57,8 @@ import com.kingzcheung.xime.clipboard.ClipboardGroupStore
 import com.kingzcheung.xime.clipboard.clipboardGroupNameError
 
 /**
- * 剪贴板分组：自带分类（按内容自动归类）和自己建的分组（常用语、工作……）都在这一页。
- * 自己建的分组排在剪贴板分类栏的自带分类后面；在剪贴板里长按记录选「分组」放进去，放进去的记录自动固定。
+ * 剪贴板分组：自带分类（按内容自动归类）和自己建的分组（常用语、工作……）在同一张卡片里，顺序和剪贴板分类栏一样：
+ * 自带分类在前，自己建的分组接在后面，最后是「新建分组」。放进分组的记录不固定，不会排到最前面，也不会被清空。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,32 +91,8 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Column {
-                SettingsSection(title = "自己建的分组", content = {
-                    state.groups.forEach { group ->
-                        SettingsListRow(group.name, "${state.count(group.id)} 条",
-                            Modifier.testTag("clipboard-group-row:${group.id}")) {
-                            IconButton(onClick = { naming = group }) {
-                                Icon(Icons.Default.Edit, contentDescription = "改名",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            IconButton(onClick = { deleting = group }) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = "删除",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        SettingsRowDivider()
-                    }
-                    SettingsItem(
-                        icon = Icons.TwoTone.CreateNewFolder,
-                        title = "新建分组",
-                        subtitle = "比如常用语、工作、家人",
-                        onClick = { naming = ClipboardGroup("", "") },
-                    )
-                })
-                SettingsNote("在剪贴板里长按记录，选「分组」放进去；放进分组的记录会固定下来。分组排在自带分类后面，左右滑动切换。")
-            }
-            Column {
-                SettingsSection(title = "自带分类", content = {
+                // One list in tab order: the built-in categories, the user's groups, then 新建分组.
+                SettingsSection(title = "分组", content = {
                     ClipboardFilter.entries.filter { it != ClipboardFilter.ALL }.forEach { filter ->
                         SettingsToggleItem(
                             icon = filter.icon(),
@@ -115,8 +102,19 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
                             onCheckedChange = { store.setHidden(filter, !it) },
                         )
                     }
+                    state.groups.forEach { group ->
+                        ClipboardGroupRow(group.name, "${state.count(group.id)} 条",
+                            Modifier.testTag("clipboard-group-row:${group.id}"),
+                            onRename = { naming = group }, onDelete = { deleting = group })
+                    }
+                    SettingsItem(
+                        icon = Icons.TwoTone.CreateNewFolder,
+                        title = "新建分组",
+                        subtitle = "比如常用语、工作、家人",
+                        onClick = { naming = ClipboardGroup("", "") },
+                    )
                 })
-                SettingsNote("关掉的分类不在剪贴板分类栏显示，记录仍在「全部」里。")
+                SettingsNote("长按剪贴板记录，选「分组」放入。关掉的分类不在分类栏显示，记录仍在「全部」里。")
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -133,7 +131,7 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("删除分组「${group.name}」？") },
-            text = { Text(if (count == 0) "分组里没有记录。" else "里面的 $count 条记录不会删除，仍然固定在剪贴板里。") },
+            text = { Text(if (count == 0) "分组里没有记录。" else "里面的 $count 条记录不会删除，仍在「全部」里。") },
             confirmButton = {
                 TextButton(onClick = { store.delete(group.id); deleting = null }, Modifier.testTag("clipboard-group-delete-confirm")) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
@@ -141,6 +139,36 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } },
         )
+    }
+}
+
+/**
+ * One of the user's groups, laid out like the category rows above it (icon tile, name, a grey line),
+ * with rename and delete where the categories have their switch. Tapping the row renames.
+ */
+@Composable
+private fun ClipboardGroupRow(name: String, detail: String, modifier: Modifier = Modifier,
+                              onRename: () -> Unit, onDelete: () -> Unit) {
+    Row(modifier.fillMaxWidth().clickable(onClick = onRename).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.TwoTone.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(12.dp))
+        IconButton(onClick = onRename) {
+            Icon(Icons.Default.Edit, contentDescription = "改名", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "删除", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

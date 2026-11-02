@@ -24,6 +24,11 @@ class ClipboardSyncSession(
     private val maxTextBytes: Int = Int.MAX_VALUE,
     private val allowPush: () -> Boolean = { true },
     private val reportSuccess: () -> Unit = {},
+    /**
+     * Fixed retry waits instead of the doubling backoff. After the last one the session waits for an
+     * event (a new copy or [retryNow]) instead of a timer, so an absent peer costs no wakeups.
+     */
+    private val retryDelaysMs: LongArray? = null,
 ) {
     private var pending: SyncClipboardSnapshot? = null
     private var lastObserved: SyncClipboardSnapshot? = null
@@ -33,6 +38,7 @@ class ClipboardSyncSession(
     // Push and pull share one backoff: an offline peer doubles the wait up to a day, not every few seconds.
     private var retryDelay = FIRST_RETRY_MS
     private var retryAt = 0L
+    private var failures = 0
     private var pumping = false
     val hasPendingPush: Boolean get() = pending != null
     /** Milliseconds until automatic network attempts resume; zero when not backing off. */
@@ -42,13 +48,19 @@ class ClipboardSyncSession(
     fun retryNow() { retryAt = 0L }
 
     private fun failed(error: Exception) {
-        retryAt = now() + retryDelay
-        retryDelay = (retryDelay * 2).coerceAtMost(MAX_RETRY_MS)
+        val fixed = retryDelaysMs
+        if (fixed != null) {
+            retryAt = fixed.getOrNull(failures)?.let { now() + it } ?: Long.MAX_VALUE
+            failures++
+        } else {
+            retryAt = now() + retryDelay
+            retryDelay = (retryDelay * 2).coerceAtMost(MAX_RETRY_MS)
+        }
         reportFailure(error)
     }
 
     private fun succeeded() {
-        retryAt = 0L; retryDelay = FIRST_RETRY_MS
+        retryAt = 0L; retryDelay = FIRST_RETRY_MS; failures = 0
         reportSuccess()
     }
 

@@ -25,6 +25,8 @@ import com.kingzcheung.xime.ui.common.CompactActionMenu
 import com.kingzcheung.xime.ui.common.CompactActionMenuEntry
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.kingzcheung.xime.ui.settings.idleBorderAlpha
+import com.kingzcheung.xime.ui.settings.isNearBlack
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -81,6 +83,7 @@ internal fun ConnectedClipboardBoard(
     val images by store.images.collectAsState()
     val failure by store.pasteFailure.collectAsState()
     val photoAccess by store.photoAccess.collectAsState()
+    val screenshotsNeedAccess by store.screenshotsNeedAccess.collectAsState()
     var storedPins by remember { mutableStateOf(prefs.getStringSet("pins", emptySet()).orEmpty().toSet()) }
     var pendingTextPins by remember { mutableStateOf(emptyMap<Long, Boolean>()) }
     var pendingPinJobs by remember { mutableStateOf(emptyMap<Long, Job>()) }
@@ -130,8 +133,6 @@ internal fun ConnectedClipboardBoard(
                     ?.let { id -> id to (key in updated) }
             }.toMap()
             pendingTextPins = pendingTextPins + changedTextPins
-            // A group holds fixed records: unfixing (or deleting) a record takes it out of its group.
-            groupStore.assign(pins - updated, null)
             storedPins = updated.filterTo(mutableSetOf()) { it.startsWith("image:") }
             synchronized(prefs) {
                 val unmigratedTextPins = prefs.getStringSet("pins", emptySet()).orEmpty()
@@ -178,6 +179,9 @@ internal fun ConnectedClipboardBoard(
         onOpenSearch = onOpenSearch, full = room.full, showControls = showControls,
         incognito = incognito && showControls,
         onIncognitoOff = { com.kingzcheung.xime.settings.SettingsPreferences.setIncognito(context, false) },
+        screenshotAccess = screenshotsNeedAccess && showControls,
+        onAllowScreenshots = { context.startActivity(Intent(context, ImageAccessActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+        onHideScreenshots = { store.enableRecentScreenshots(false) },
         closeAfterPaste = closeAfterPaste, onCloseAfterPasteChange = { value ->
             closeAfterPaste = value
             prefs.edit().putBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, value).apply()
@@ -241,6 +245,10 @@ internal fun ClipboardBoardView(
     /** The manual incognito switch is on: new copies are not being saved; existing records still work. */
     incognito: Boolean = false,
     onIncognitoOff: () -> Unit = {},
+    /** 最近截图开着但没有相册权限：「全部」「图片」顶上一行「允许」。 */
+    screenshotAccess: Boolean = false,
+    onAllowScreenshots: () -> Unit = {},
+    onHideScreenshots: () -> Unit = {},
     /** False hides the category / actions row (a short search results area). */
     showControls: Boolean = true,
     /** The "close after paste" switch shown in the more menu; null hides it. */
@@ -250,7 +258,7 @@ internal fun ClipboardBoardView(
     groups: ClipboardGroupState = ClipboardGroupState(),
     /** Tab key to open on instead of 全部 / 图片 (back from the add / edit form). */
     initialTabKey: String? = null,
-    /** Puts records into a group (null: out of their group); the board fixes them first. */
+    /** Puts records into a group (null: out of their group); they are not fixed. */
     onAssignGroup: (Set<String>, String?) -> Unit = { _, _ -> },
     /** Opens the group settings (new, rename, delete); null hides those entries. */
     onManageGroups: (() -> Unit)? = null,
@@ -279,6 +287,8 @@ internal fun ClipboardBoardView(
     var removing by remember { mutableStateOf(emptySet<String>()) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var selecting by remember { mutableStateOf(false) }
+    // Kept passwords the user chose to see (#95); hidden again when the board closes.
+    var revealed by remember { mutableStateOf(emptySet<String>()) }
     var pinsExpanded by remember(initialImages) { mutableStateOf(false) }
     var itemMenu by remember { mutableStateOf<ClipboardItemMenuAnchor?>(null) }
     // The 分组 choice opened from a record's menu, in the same place.
@@ -339,11 +349,8 @@ internal fun ClipboardBoardView(
         // can move a surviving record too; do not keep an obsolete source rectangle.
         menu = false; itemMenu = null; groupMenu = null; deleting = null
     }
-    fun assignGroup(keys: Set<String>, groupId: String?) {
-        // Group records are fixed ones, so a group never loses a record to history trimming.
-        if (groupId != null && keys.any { it !in pins }) onPinsChange(pins + keys)
-        onAssignGroup(keys, groupId)
-    }
+    // A group keeps its records (never cleared or trimmed with history) without fixing them.
+    fun assignGroup(keys: Set<String>, groupId: String?) = onAssignGroup(keys, groupId)
     val addPinned = onAddPinned?.let { add -> { onFormOpen(tab, true); add() } }
     val editText = onEditText?.let { edit -> { id: Long, text: String, code: String -> onFormOpen(tab, false); edit(id, text, code) } }
     DisposableEffect(keyboard) { onDispose { keyboard?.attach(null) } }
@@ -363,11 +370,14 @@ internal fun ClipboardBoardView(
         val visibleCards = remember(content) { content.visible }
         val focused = focusedKey?.takeIf { key -> visibleCards.any { it.key == key } }
             ?: visibleCards.firstOrNull()?.key
-        val gridKeys = remember(content, failure != null, full, incognito) {
+        val showScreenshotAccess = screenshotAccess && searchQuery == null &&
+            (tab as? ClipboardTab.Category)?.filter.let { it == ClipboardFilter.ALL || it == ClipboardFilter.IMAGE }
+        val gridKeys = remember(content, failure != null, full, incognito, showScreenshotAccess) {
             buildList {
                 if (incognito) add("incognito")
                 if (full) add("full")
                 if (failure != null) add("failure")
+                if (showScreenshotAccess) add("screenshot-access")
                 addAll(content.pinned.map { it.key })
                 if (content.pinned.isNotEmpty() && content.recent.isNotEmpty()) add("pins-end")
                 addAll(content.recent.map { it.key })
@@ -553,6 +563,9 @@ internal fun ClipboardBoardView(
                     if (failure != null) item(key = "failure", span = StaggeredGridItemSpan.FullLine) {
                         ClipboardImageFailureNotice(failure, onSystemPaste, onShare, onDismissFailure)
                     }
+                    if (showScreenshotAccess) item(key = "screenshot-access", span = StaggeredGridItemSpan.FullLine) {
+                        ClipboardScreenshotAccessNotice(onAllowScreenshots, onHideScreenshots)
+                    }
                     if (cards.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
                         Text(if (searchQuery != null) "没有找到「$searchQuery」" else when (val shown = tab) {
                             is ClipboardTab.Group -> "「${shown.label}」里还没有内容。长按记录选「分组」放进来，或点 + 新增。"
@@ -565,6 +578,7 @@ internal fun ClipboardBoardView(
                         items(records, key = { it.key }) { card ->
                             val chosen = card.key in selected
                             ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen, maxLines = cardMaxLines,
+                                masked = card is ClipboardCard.Text && card.item.sensitive && card.key !in revealed,
                                 selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
                                 // Pictures share the pinned preview height: a tall screenshot must not fill the board.
                                 // Pins are one line; a recent picture keeps the bounded preview height.
@@ -615,7 +629,14 @@ internal fun ClipboardBoardView(
                     add(LongPressMenuEntry(Icons.Default.Folder, groups.groupOf(card.key)?.let { "分组：${it.name}" } ?: "分组",
                         tag = "clipboard-item-group") { menuFocus = 0; groupMenu = anchor })
                 }
-                if (card is ClipboardCard.Text) {
+                if (card is ClipboardCard.Text && card.item.sensitive) {
+                    // A kept password: no 分词 (its pieces would be ordinary records), shown only on request.
+                    val shown = card.key in revealed
+                    add(LongPressMenuEntry(if (shown) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        if (shown) "隐藏" else "显示", tag = "clipboard-item-reveal") {
+                        revealed = if (shown) revealed - card.key else revealed + card.key
+                    })
+                } else if (card is ClipboardCard.Text) {
                     add(LongPressMenuEntry(Icons.Default.ContentCut, "分词") { onSplit(card.item.text, card.item.id) })
                     editText?.let { edit -> add(LongPressMenuEntry(Icons.Default.Edit, "编辑") {
                         edit(card.item.id, card.item.text, card.item.code)
@@ -652,7 +673,6 @@ internal fun ClipboardBoardView(
             keyboardMenuEntries[0] = actions
             LongPressMenuOverlay(anchor.position.bounds, anchor.position.occupied,
                 onDismiss = { groupMenu = null }, menuItems = actions, title = "放入分组",
-                message = if (key !in pins) "放进分组的记录会固定下来" else null,
                 highlightCorner = anchor.position.corner, tag = "clipboard-group-menu",
                 focusedIndex = menuFocus.takeIf { keyboard?.active == true })
         }
@@ -673,9 +693,11 @@ internal fun ClipboardBoardView(
                 closeAfterPaste?.let { on -> add(CompactActionMenuEntry(
                     if (on) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "上屏后自动关闭剪贴板",
                     tag = "clipboard-close-after-paste") { onCloseAfterPasteChange(!on) }) }
+                // Records in a group stay, like fixed ones.
                 add(CompactActionMenuEntry(Icons.Default.DeleteOutline, "清空未固定", colors.error,
-                    enabled = all.any { it.key !in pins }, tag = "clipboard-clear") {
-                    deleteAnchor = moreAnchor; clearingAll = onClearUnpinned != null; deleting = all.filterNot { it.key in pins }
+                    enabled = all.any { it.key !in pins && it.key !in groups.members }, tag = "clipboard-clear") {
+                    deleteAnchor = moreAnchor; clearingAll = onClearUnpinned != null
+                    deleting = all.filterNot { it.key in pins || it.key in groups.members }
                 })
                 add(CompactActionMenuEntry(Icons.Default.Close, "关闭菜单", tag = "clipboard-close-menu") {})
             }
@@ -700,6 +722,8 @@ internal fun ClipboardBoardView(
                     removing = removing + keys
                     if (clearAll) onClearUnpinned?.invoke(records) else onRemove(records)
                     onPinsChange(pins - keys)
+                    // A deleted record leaves its group.
+                    keys.filter { it in groups.members }.takeIf { it.isNotEmpty() }?.let { onAssignGroup(it.toSet(), null) }
                     selected = emptySet(); selecting = false
                 },
                 CompactActionMenuEntry(Icons.Default.Close, "取消", tag = "clipboard-cancel-delete") {},
@@ -737,6 +761,8 @@ private fun CompactClipboardFilter(label: String, isSelected: Boolean, onClick: 
 private fun ClipboardRecordCard(
     card: ClipboardCard, pinned: Boolean, chosen: Boolean, selecting: Boolean,
     keyboardFocused: Boolean, previewHeight: Dp?, maxLines: Int = 4,
+    /** A kept password not asked to be shown: dots instead of its text (#95). */
+    masked: Boolean = false,
     onClick: () -> Unit, onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -750,15 +776,17 @@ private fun ClipboardRecordCard(
         .clip(shape)
         .background(frostedKeyColor(if (highlighted) colors.secondaryContainer else clipboardCardColor(),
             colors.onSurface, glass))
+        // 黑白主题深色是纯黑底：卡片不铺灰，靠描边看出边界（与设置页卡片的 idleBorderAlpha 一致，#82）。
         .border(if (highlighted) 2.dp else .5.dp,
-            if (highlighted) colors.primary else colors.onSurface.copy(alpha = .08f), shape)
+            if (highlighted) colors.primary
+            else colors.onSurface.copy(alpha = if (colors.surface.isNearBlack()) idleBorderAlpha(colors.surface) else .08f), shape)
         .semantics { focused = keyboardFocused; if (selecting) selected = chosen }
         .testTag("clipboard-card:${card.key}")
         .combinedClickable(role = if (selecting) Role.Checkbox else Role.Button,
             onClick = onClick, onLongClick = onLongClick,
             onLongClickLabel = if (selecting) "切换选择" else "更多操作")) {
         when (card) {
-            is ClipboardCard.Text -> Text(card.item.text,
+            is ClipboardCard.Text -> Text(if (masked) com.kingzcheung.xime.clipboard.ClipboardLinkChoices.SENSITIVE_MASK else card.item.text,
                 // A one-line record is as tall as a pinned row and its line sits in the middle; the old
                 // 48dp floor left a strip under the text (user 10-30). Longer text grows the card.
                 Modifier.align(Alignment.CenterStart).fillMaxWidth()

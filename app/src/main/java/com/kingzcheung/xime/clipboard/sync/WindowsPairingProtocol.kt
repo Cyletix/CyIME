@@ -9,7 +9,12 @@ import java.util.UUID
 import org.json.JSONObject
 import org.json.JSONArray
 
-data class WindowsPeer(val id: String, val name: String, val origin: String, val fingerprint: String, val token: String = "")
+/**
+ * A device this one connects to. [clientId] is set only for a device that registered itself here
+ * (it scanned this device's code, then asked to be pushed to); it names that device's own grant.
+ */
+data class WindowsPeer(val id: String, val name: String, val origin: String, val fingerprint: String, val token: String = "",
+    val clientId: String = "")
 
 object WindowsPairingProtocol {
     fun received(peer: WindowsPeer, json: JSONObject): WindowsPeer {
@@ -85,6 +90,22 @@ object WindowsPairingProtocol {
             .put("pairing_id", uuid()).put("secret", Base64.getUrlEncoder().withoutPadding().encodeToString(take(32)))
             .put("expires_at", buffer.long)
     }
+    /** The order number of a clipboard item; 0 from an older CyIME that has none. */
+    fun stamp(json: JSONObject): Long = json.optLong("stamp", 0L).coerceAtLeast(0L)
+
+    /** Checks a push registration (`POST /api/peer`) and returns where to push to. */
+    fun registration(json: JSONObject, remoteHost: String): WindowsPeer {
+        require(json.getInt("v") == 2)
+        val id = UUID.fromString(json.getString("id")).toString()
+        val port = json.getInt("port")
+        require(port in 1..65535)
+        val token = json.getString("token")
+        require(token.matches(Regex("[A-Za-z0-9_-]{43}")))
+        val name = json.optString("name").filterNot { it.isISOControl() }.take(64).ifBlank { "CyIME 设备" }
+        val host = if (remoteHost.contains(':')) "[$remoteHost]" else remoteHost
+        return WindowsPeer(id, name, localOrigin("https://$host:$port"), fingerprint(json.getString("fingerprint")), token)
+    }
+
     fun profile(json: JSONObject): ClipboardProfile {
         val text = json.getString("text")
         val profile = ClipboardProfile.fromText(text)

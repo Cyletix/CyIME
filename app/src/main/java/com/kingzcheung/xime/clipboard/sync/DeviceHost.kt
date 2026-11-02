@@ -59,6 +59,9 @@ data class HostedDevice(val deviceId: String, val clientId: String, val name: St
  * Off by default. While on, it listens on the local network only, pins a device-bound
  * TLS key from Android Keystore, and serves the clipboard only to paired devices with a
  * valid access token. Sensitive or incognito clipboard content is never served.
+ *
+ * While clipboard sync is on it also listens without announcing itself, so the devices this
+ * one registered with (`POST /api/peer`, see [WindowsDevices]) can push their copies here.
  */
 object DeviceHost {
     private const val TAG = "DeviceHost"
@@ -88,6 +91,8 @@ object DeviceHost {
     private var acceptor: Job? = null
     private var fingerprint = ""
     private var nsdListener: NsdManager.RegistrationListener? = null
+    /** Clipboard sync is on: keep listening for pushes even when this device is not offering pairing. */
+    private var receiving = false
     private val lock = Any()
     private val prefs get() = context.getSharedPreferences("device_host", Context.MODE_PRIVATE)
 
@@ -102,7 +107,57 @@ object DeviceHost {
     fun setEnabled(on: Boolean) {
         prefs.edit().putBoolean("enabled", on).apply()
         _enabled.value = on
-        if (on) start() else stop()
+        refresh()
+    }
+
+    /** Clipboard sync started or stopped. */
+    fun setReceiving(on: Boolean) {
+        if (!::context.isInitialized) return
+        receiving = on
+        refresh()
+    }
+
+    @Synchronized
+    private fun refresh() {
+        if (!_enabled.value && !receiving) { stop(); return }
+        if (server == null) start()
+        val socket = server ?: return
+        // Only “允许其他设备连接本机” announces this device and offers a code.
+        if (_enabled.value && nsdListener == null) register(socket.localPort)
+        if (!_enabled.value) { unregister(); closeOffer(); _status.value = "" }
+    }
+
+    /** Port and certificate pin other devices push to, or null when this device cannot listen. */
+    fun receiver(): Pair<Int, String>? {
+        if (server == null) refresh()
+        val socket = server ?: return null
+        return socket.localPort to fingerprint.ifEmpty { return null }
+    }
+
+    /** The id this device announces and pairs as. */
+    fun hostId(): String = serverId()
+
+    /**
+     * A key for [clientId] (a device this one registered with), replacing an earlier one.
+     * Null when the list is full.
+     */
+    fun grantFor(clientId: String, name: String): String? = synchronized(lock) {
+        val existing = _devices.value.firstOrNull { it.clientId == clientId }
+        if (existing == null && _devices.value.size >= MAX_DEVICES) return null
+        val token = token()
+        val device = HostedDevice(existing?.deviceId ?: UUID.randomUUID().toString(), clientId,
+            name.filterNot { it.isISOControl() }.take(64).ifBlank { "CyIME 设备" }, hash(token))
+        val updated = listOf(device) + _devices.value.filterNot { it.clientId == clientId }
+        saveDevices(updated); _devices.value = updated
+        token
+    }
+
+    fun revokeClient(clientId: String) {
+        synchronized(lock) {
+            if (_devices.value.none { it.clientId == clientId }) return
+            val updated = _devices.value.filterNot { it.clientId == clientId }
+            saveDevices(updated); _devices.value = updated
+        }
     }
 
     private fun serverId(): String = prefs.getString("server_id", null) ?: UUID.randomUUID().toString().also {
@@ -144,8 +199,10 @@ object DeviceHost {
             if (socket.localPort != port) prefs.edit().putInt("port", socket.localPort).apply()
             server = socket
             acceptor = scope.launch { accept(socket) }
-            register(socket.localPort)
-            _status.value = "已开启，同一 Wi-Fi 的其他设备可连接本机"
+            if (_enabled.value) {
+                register(socket.localPort)
+                _status.value = "已开启，同一 Wi-Fi 的其他设备可连接本机"
+            }
         } catch (e: Exception) {
             Log.w(TAG, "host start failed (${e.javaClass.simpleName})")
             _status.value = "无法开启本机连接，请稍后重试"
@@ -157,10 +214,14 @@ object DeviceHost {
     fun stop() {
         acceptor?.cancel(); acceptor = null
         runCatching { server?.close() }; server = null
-        nsdListener?.let { listener -> runCatching { context.getSystemService(NsdManager::class.java).unregisterService(listener) } }
-        nsdListener = null
+        unregister()
         closeOffer()
         if (!_enabled.value) _status.value = ""
+    }
+
+    private fun unregister() {
+        nsdListener?.let { listener -> runCatching { context.getSystemService(NsdManager::class.java).unregisterService(listener) } }
+        nsdListener = null
     }
 
     private fun createKey() {
@@ -196,6 +257,7 @@ object DeviceHost {
 
     /** Opens a two-minute pairing window and returns the QR text another device scans. */
     fun openOffer(): String? {
+        if (!_enabled.value) return null
         if (server == null) start()
         val socket = server ?: return null
         val endpoints = JSONArray()
@@ -219,6 +281,8 @@ object DeviceHost {
             val updated = _devices.value.filterNot { it.deviceId == device.deviceId }
             saveDevices(updated); _devices.value = updated
         }
+        // It also stops getting this device's copies.
+        WindowsDevices.forgetRegistered(device.clientId)
     }
 
     private fun localAddresses(): List<String> = runCatching {
@@ -255,7 +319,7 @@ object DeviceHost {
                     runCatching {
                         it.soTimeout = 5_000
                         it.startHandshake()
-                        serve(it.inputStream, it.outputStream)
+                        serve(it.inputStream, it.outputStream, it.inetAddress?.hostAddress.orEmpty())
                     }
                 }
             }
@@ -264,7 +328,7 @@ object DeviceHost {
 
     private class Response(val code: Int, val body: JSONObject? = null, val etag: String? = null)
 
-    private fun serve(input: InputStream, output: OutputStream) {
+    private fun serve(input: InputStream, output: OutputStream, remote: String) {
         val head = readHead(input) ?: return
         val lines = head.split("\r\n")
         val parts = lines.first().split(" ")
@@ -278,7 +342,7 @@ object DeviceHost {
             var read = 0
             while (read < length) { val n = input.read(buffer, read, length - read); if (n < 0) return; read += n }
         }
-        val response = runCatching { route(parts[0], parts[1], headers, body) }.getOrElse { Response(400) }
+        val response = runCatching { route(parts[0], parts[1], headers, body, remote) }.getOrElse { Response(400) }
         write(output, response)
     }
 
@@ -309,42 +373,102 @@ object DeviceHost {
         output.write(head.toByteArray(Charsets.US_ASCII)); output.write(payload); output.flush()
     }
 
-    private fun route(method: String, path: String, headers: Map<String, String>, body: ByteArray): Response {
+    private fun route(method: String, path: String, headers: Map<String, String>, body: ByteArray, remote: String): Response {
         if (method == "POST" && path == "/api/pair") return pair(body)
         val device = authorize(headers["authorization"]) ?: return Response(401)
         return when {
-            method == "GET" && path == "/api/status" -> Response(200, JSONObject().put("v", 2).put("connected", true)
-                .put("send_enabled", true).put("receive_enabled", true).put("device_id", device.deviceId))
+            method == "GET" && path == "/api/status" -> {
+                // What this device holds for the caller, so it registers again only when that changed.
+                val back = runBlocking(Dispatchers.Main) { WindowsDevices.registeredBy(device.clientId) }
+                Response(200, JSONObject().put("v", 2).put("connected", true)
+                    .put("send_enabled", true).put("receive_enabled", true).put("device_id", device.deviceId)
+                    // This device pushes its copies only while its own clipboard sync is on.
+                    .put("push", receiving)
+                    .put("push_pin", back?.fingerprint ?: JSONObject.NULL)
+                    .put("push_port", back?.let { runCatching { java.net.URI(it.origin).port }.getOrNull() } ?: JSONObject.NULL)
+                    .put("push_failed", back != null && WindowsDevices.transport.pushFailed(back.id)))
+            }
+            method == "POST" && path == "/api/peer" -> {
+                val peer = WindowsPairingProtocol.registration(JSONObject(body.toString(Charsets.UTF_8)), remote)
+                    .copy(clientId = device.clientId)
+                val saved = runBlocking(Dispatchers.Main) { WindowsDevices.addRegisteredPeer(peer) }
+                if (saved) Response(200, JSONObject().put("v", 2).put("push", receiving)) else Response(409)
+            }
+            // 配对一次进组：两台都信任的设备（通常是电脑）替另一台要一把钥匙，再把它介绍过来。
+            method == "POST" && path == "/api/grant" -> {
+                val request = JSONObject(body.toString(Charsets.UTF_8))
+                require(request.getInt("v") == 2)
+                val clientId = UUID.fromString(request.getString("client_id")).toString()
+                if (clientId == serverId()) return Response(400)
+                val token = grantFor(clientId, request.optString("name")) ?: return Response(409)
+                Response(200, JSONObject().put("v", 2).put("token", token))
+            }
+            method == "POST" && path == "/api/introduce" -> {
+                val request = JSONObject(body.toString(Charsets.UTF_8))
+                require(request.getInt("v") == 2)
+                val token = request.getString("token")
+                require(token.matches(Regex("[A-Za-z0-9_-]{43}")))
+                val peer = WindowsPeer(UUID.fromString(request.getString("id")).toString(),
+                    request.optString("name").filterNot { it.isISOControl() }.take(64).ifBlank { "CyIME 设备" },
+                    WindowsPairingProtocol.localOrigin(request.getString("origin")),
+                    WindowsPairingProtocol.fingerprint(request.getString("fingerprint")), token)
+                if (peer.id == serverId()) return Response(400)
+                val added = runBlocking(Dispatchers.Main) { WindowsDevices.addIntroducedPeer(peer) }
+                if (added) Response(200, JSONObject().put("v", 2)) else Response(409)
+            }
             method == "GET" && path == "/api/clipboard" -> {
                 val profile = readClipboard() ?: return Response(204)
                 val match = headers["if-none-match"]?.trim('"')
-                if (match == profile.hash) Response(304, etag = profile.hash) else Response(200, json(profile), profile.hash)
+                if (match == profile.first.hash) Response(304, etag = profile.first.hash)
+                else Response(200, json(profile.first, profile.second), profile.first.hash)
             }
             method == "PUT" && path == "/api/clipboard" -> {
-                val incoming = WindowsPairingProtocol.profile(JSONObject(body.toString(Charsets.UTF_8)))
+                val payload = JSONObject(body.toString(Charsets.UTF_8))
+                val incoming = WindowsPairingProtocol.profile(payload)
                 if (incoming.size > MAX_TEXT) return Response(413)
-                runBlocking(Dispatchers.Main) { ClipboardManager.getInstance(context).copyReceivedToSystemClipboard(incoming.text) }
-                Response(200, json(incoming), incoming.hash)
+                val stamp = WindowsPairingProtocol.stamp(payload)
+                // 只收比手头新的；旧的不写，照样回“收到了”，对方也就不再重试。
+                runBlocking(Dispatchers.Main) {
+                    if (ClipboardClock.accept(incoming.hash, stamp))
+                        ClipboardManager.getInstance(context).copyReceivedToSystemClipboard(incoming.text)
+                }
+                Response(200, json(incoming, ClipboardClock.stampOf(incoming.hash) ?: stamp), incoming.hash)
             }
             else -> Response(404)
         }
     }
 
-    private fun json(profile: ClipboardProfile) = JSONObject().put("type", "text").put("text", profile.text)
+    private fun json(profile: ClipboardProfile, stamp: Long) = JSONObject().put("type", "text").put("text", profile.text)
         .put("hash", profile.hash).put("size", profile.size).put("has_data", false)
-        .put("data_name", JSONObject.NULL).put("source", "CyIME-Android")
+        .put("data_name", JSONObject.NULL).put("source", "CyIME-Android").put("stamp", stamp)
+
+    /** 电脑轮询时剪贴板没换（复制时间只看描述，不算读取）就给上次的结果，不再读内容（用户 11-01 嫌读剪贴板太多）。 */
+    private var lastServed: Pair<Long, ClipboardProfile?>? = null
+
+    /** The clipboard with its order number ([ClipboardClock]). */
+    private fun readClipboard(): Pair<ClipboardProfile, Long>? {
+        val profile = readClipboardText() ?: return null
+        val copiedAt = lastServed?.first ?: 0L
+        return profile to ClipboardClock.noteLocal(profile.hash, copiedAt)
+    }
 
     /** Only plain, non-sensitive text is served; incognito and password-manager copies stay local. */
-    private fun readClipboard(): ClipboardProfile? = runBlocking(Dispatchers.Main) {
+    private fun readClipboardText(): ClipboardProfile? = runBlocking(Dispatchers.Main) {
         if (IncognitoState.active || SettingsPreferences.isIncognito(context)) return@runBlocking null
         val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as AndroidClipboardManager
+        val stamp = try { manager.primaryClipDescription?.timestamp ?: 0L } catch (_: SecurityException) { return@runBlocking null }
+        lastServed?.takeIf { stamp != 0L && it.first == stamp }?.let { return@runBlocking it.second }
         val clip = try { manager.primaryClip } catch (_: SecurityException) { null } ?: return@runBlocking null
         val description = clip.description
-        if (description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
-            description?.label == VerificationCodeSmsReceiver.CLIP_LABEL) return@runBlocking null
-        val text = clip.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
-        if (text.isNullOrBlank() || text.contains('\u0000')) return@runBlocking null
-        ClipboardProfile.fromText(text).takeIf { it.size <= MAX_TEXT }
+        val profile = run profile@{
+            if (description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
+                description?.label == VerificationCodeSmsReceiver.CLIP_LABEL) return@profile null
+            val text = clip.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+            if (text.isNullOrBlank() || text.contains('\u0000')) return@profile null
+            ClipboardProfile.fromText(text).takeIf { it.size <= MAX_TEXT }
+        }
+        lastServed = (description?.timestamp ?: 0L) to profile
+        profile
     }
 
     private fun authorize(header: String?): HostedDevice? {

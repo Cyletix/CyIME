@@ -3,6 +3,7 @@
 package com.kingzcheung.xime.clipboard
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -39,7 +40,9 @@ data class ClipboardItem(
     val timestamp: Long = System.currentTimeMillis(),
     val isPinned: Boolean = false,
     val isQuickSend: Boolean = false,
-    val consumed: Boolean = false
+    val consumed: Boolean = false,
+    /** A password kept by 「记录密码等敏感内容」: shown as dots, pasted privately (#95). */
+    val sensitive: Boolean = false,
 )
 
 class ClipboardManager private constructor(private val context: Context) {
@@ -53,6 +56,8 @@ class ClipboardManager private constructor(private val context: Context) {
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
         private const val KEY_HISTORY_DEDUPED = "history_deduped_v1"
+        /** Records put into a group before 11-02 were fixed with it; set once they have been unfixed. */
+        private const val KEY_GROUPS_UNPINNED = "groups_unpinned_v1"
         private const val INTERNAL_IMAGE_CLIP_LABEL = "cyime_image"
         /** Label of text written by clipboard sync, so history files it as received from another device. */
         internal const val RECEIVED_CLIP_LABEL = "cyime_received"
@@ -68,6 +73,35 @@ class ClipboardManager private constructor(private val context: Context) {
         /** The candidate-bar pill shows a code only shortly after the SMS arrived. */
         internal fun smsCodeSuggested(timestamp: Long, now: Long): Boolean =
             now - timestamp < SMS_CODE_SUGGESTION_MS
+
+        /**
+         * 弹出键盘时只补读没读过的、还会显示出来的那一条：图片、链接等非纯文字、短信验证码，或 30 秒内复制的文字。
+         * [missed]：键盘一直在监听，复制时却没读到（有的系统在短信弹窗等界面盖住键盘时不给输入法读），
+         * 这一条不管多久前复制的都补读一次。
+         */
+        internal fun shouldReadOnOpen(timestamp: Long, lastRead: Long, now: Long, smsCode: Boolean, plainText: Boolean,
+            missed: Boolean = false): Boolean =
+            timestamp != lastRead && (smsCode || missed || !plainText || now - timestamp < RECENT_CLIP_ON_OPEN_MS)
+
+        internal const val RECENT_CLIP_ON_OPEN_MS = 30_000L
+        /** 弹出键盘时同一条复制最多补读几次：系统一直不给读时不每次弹出都去读。 */
+        internal const val OPEN_READ_TRIES = 2
+
+        /** 打开「记录密码等敏感内容」后记下的密码，复制 1 小时后自动删除（固定的留着，#95）。 */
+        internal const val SENSITIVE_LIFETIME_MS = 60 * 60_000L
+
+        /**
+         * What one copy may do in history. A copy the system marks sensitive (password managers) or made
+         * while a password field was open is [ClipPrivacy.PRIVATE] (never kept), or [ClipPrivacy.SECRET]
+         * (kept hidden) when the user turned on 「记录密码等敏感内容」. Incognito and clipboard search
+         * always keep a copy out, switch or not.
+         */
+        internal fun clipPrivacy(markedSensitive: Boolean, passwordField: Boolean, incognito: Boolean,
+            keepSensitive: Boolean): ClipPrivacy = when {
+            incognito -> ClipPrivacy.PRIVATE
+            markedSensitive || passwordField -> if (keepSensitive) ClipPrivacy.SECRET else ClipPrivacy.PRIVATE
+            else -> ClipPrivacy.NORMAL
+        }
 
         /** The code already sits right before the cursor: typed, pasted or filled in some other way. */
         internal fun smsCodeEntered(code: String, textBeforeCursor: CharSequence?): Boolean =
@@ -87,6 +121,8 @@ class ClipboardManager private constructor(private val context: Context) {
     private var lastSmsClipTimestamp = -1L
     /** Clips first read while private; reading them again later (another field, incognito off) never saves them. */
     private val privateClips = PrivateClipMemory()
+    /** Clips first read as passwords kept hidden; read again from an ordinary field they stay hidden. */
+    private val secretClips = PrivateClipMemory()
     val images = ClipboardImages.getInstance(context)
 
     private val clipboardListener = AndroidClipboardManager.OnPrimaryClipChangedListener {
@@ -96,7 +132,10 @@ class ClipboardManager private constructor(private val context: Context) {
     /** 这次开着无痕后已经提示过「复制的内容没记进来」；无痕开关一变就重新算。 */
     @Volatile private var incognitoCopyNoticed = false
     private val incognitoSwitchListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == com.kingzcheung.xime.settings.SettingsPreferences.KEY_INCOGNITO) incognitoCopyNoticed = false
+        if (key == com.kingzcheung.xime.settings.SettingsPreferences.KEY_INCOGNITO) {
+            incognitoCopyNoticed = false
+            if (listeningSince != Long.MAX_VALUE) listeningSince = System.currentTimeMillis()
+        }
     }
 
     init {
@@ -128,7 +167,11 @@ class ClipboardManager private constructor(private val context: Context) {
                     item.text ?: item.uri?.toString() ?: item.intent?.toUri(0))
                 val sensitive = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true
                 val manualIncognito = com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(context)
-                val privateNow = sensitive || com.kingzcheung.xime.settings.IncognitoState.active || manualIncognito
+                val privacy = clipPrivacy(sensitive, com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor,
+                    manualIncognito || com.kingzcheung.xime.settings.IncognitoState.manual ||
+                        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch,
+                    com.kingzcheung.xime.settings.SettingsPreferences.isClipboardSensitiveCaptureEnabled(context))
+                val privateNow = privacy == ClipPrivacy.PRIVATE
                 // 手动无痕挡下的一次新复制（不是密码、不是本来就私密的那条）：第一次提示为什么没记进来。
                 val incognitoCopy = manualIncognito && !sensitive && clipKey !in privateClips &&
                     clipData.description.label != INTERNAL_IMAGE_CLIP_LABEL &&
@@ -137,8 +180,10 @@ class ClipboardManager private constructor(private val context: Context) {
                 // A clip copied in a password field (or incognito) stays private: re-reading it within
                 // the next 30 s from a normal field once saved it to history.
                 if (privateNow) privateClips.remember(clipKey)
+                if (privacy == ClipPrivacy.SECRET) secretClips.remember(clipKey)
                 if (incognitoCopy) noticeIncognitoCopy()
                 val private = privateNow || clipKey in privateClips
+                val secret = !private && clipKey in secretClips
                 val imageMime = (0 until clipData.description.mimeTypeCount).map { clipData.description.getMimeType(it) }
                     .firstOrNull { it.startsWith("image/") }
                 val imageSource = copiedImageSource((0 until clipData.itemCount).mapNotNull { index ->
@@ -148,8 +193,10 @@ class ClipboardManager private constructor(private val context: Context) {
                     }
                 }, imageMime)
                 if (imageSource != null) {
+                    lastReadClipTimestamp = clipData.description.timestamp
                     // 图片粘贴失败时写入系统剪贴板是兼容回退，不是用户新复制。
-                    if (private || clipData.description.label == INTERNAL_IMAGE_CLIP_LABEL) {
+                    // Pictures copied as passwords are never kept, switch or not.
+                    if (private || secret || clipData.description.label == INTERNAL_IMAGE_CLIP_LABEL) {
                         images.dismissPreview()
                         return
                     }
@@ -165,6 +212,8 @@ class ClipboardManager private constructor(private val context: Context) {
                     else -> null
                 }
                 if (!text.isNullOrEmpty()) {
+                    // 读到内容才算读过：系统不给读时拿到的是空的，弹出键盘时还要补读。
+                    lastReadClipTimestamp = clipData.description.timestamp
                     if (clipData.description.label == VerificationCodeSmsReceiver.CLIP_LABEL && VerificationCodeExtractor.isCode(text)) {
                         // Automatic SMS codes stay in memory and never enter history or sync.
                         val timestamp = clipData.description.timestamp
@@ -186,7 +235,7 @@ class ClipboardManager private constructor(private val context: Context) {
                         return
                     }
                     _verificationCode.value = null
-                    if (!private) addItem(text, fromDevice = clipData.description.label == RECEIVED_CLIP_LABEL)
+                    if (!private) addItem(text, fromDevice = clipData.description.label == RECEIVED_CLIP_LABEL, sensitive = secret)
                     return
                 }
             }
@@ -234,15 +283,45 @@ class ClipboardManager private constructor(private val context: Context) {
     private val _verificationCode = MutableStateFlow<ClipboardItem?>(null)
     val verificationCode: StateFlow<ClipboardItem?> = _verificationCode.asStateFlow()
 
+    /** 监听或弹出键盘时已经读过的那一条（系统给每次复制记的时间），同一条不再读第二次。 */
+    @Volatile private var lastReadClipTimestamp = -1L
+    /** 从这时起的复制都该由监听读到；没读到的就是漏了（无痕开关一变就从那时重新算，开着无痕时的复制不补）。 */
+    @Volatile private var listeningSince = Long.MAX_VALUE
+    /** 弹出键盘时为哪一条复制补读过、补读了几次。 */
+    private var openTriedClip = -1L
+    private var openTries = 0
+
+    /**
+     * 弹出键盘时补看一眼，只为补上键盘进程不在时的复制。先只看描述（复制时间、类型、标签），
+     * 看描述不算读剪贴板；监听已经读过的同一条、30 秒前复制的普通文字（本来也不进候选栏）都不读内容。
+     * 以前每次弹出键盘都整条读一次，系统一直提示读了剪贴板（用户 11-01：「哪怕我没用剪贴板」）。
+     */
     fun refreshClipboard() {
         images.refresh()
-        val clip = androidClipboardManager.primaryClip ?: return
-        if (clip.itemCount == 0) return
-        if (clip.description.hasMimeType("image/*") || (0 until clip.itemCount).any { clip.getItemAt(it).uri != null || clip.getItemAt(it).intent?.data != null } ||
-            clip.description.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
-            (System.currentTimeMillis() - clip.description.timestamp < 30_000 &&
-                _clipboardItems.value.none { it.text == clip.getItemAt(0).text?.toString() })
-        ) readClipboard(retries = 0)
+        deleteExpiredSensitive()
+        readMissedCopy()
+    }
+
+    /**
+     * 只看描述，补读监听没读到的那一条。短信里点链接、电话弹出的「复制」菜单盖住了键盘，
+     * 有的系统这时不给输入法读剪贴板，监听读到的是空的，长按复制时键盘还在就读得到（用户 11-02 转述）。
+     * 键盘弹出（含输入框没变、只是键盘重新显示）时再读一次。
+     */
+    fun readMissedCopy() {
+        val description = runCatching { androidClipboardManager.primaryClipDescription }.getOrNull() ?: return
+        val timestamp = description.timestamp
+        if (timestamp != openTriedClip) { openTriedClip = timestamp; openTries = 0 }
+        if (openTries >= OPEN_READ_TRIES) return
+        val plainText = (0 until description.mimeTypeCount).all {
+            description.getMimeType(it) == ClipDescription.MIMETYPE_TEXT_PLAIN || description.getMimeType(it) == ClipDescription.MIMETYPE_TEXT_HTML
+        }
+        if (shouldReadOnOpen(timestamp, lastReadClipTimestamp, System.currentTimeMillis(),
+                smsCode = description.label == VerificationCodeSmsReceiver.CLIP_LABEL, plainText = plainText,
+                missed = timestamp >= listeningSince)
+        ) {
+            openTries++
+            readClipboard(retries = 0)
+        }
     }
 
     private val _quickSendItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
@@ -297,14 +376,15 @@ class ClipboardManager private constructor(private val context: Context) {
     /** Every text record (fixed and history) for a user-started export; read once from the database. */
     suspend fun exportItems(): List<ClipboardItem> {
         clipboardPinsReady.await()
-        return dao.observeAll().first().map { it.toClipboardItem() }
+        // Passwords kept by 「记录密码等敏感内容」 never leave the phone in a file.
+        return dao.observeAll().first().filterNot { it.sensitive }.map { it.toClipboardItem() }
     }
 
     /**
      * Records read from an import file the user chose. Fixed records go in first, then history in
      * file order, so a full clipboard leaves out the oldest history. Records keep their own time;
-     * text already here is not added twice. A record in a group is a fixed one; a group missing here
-     * is made. Nothing is sent to clipboard sync: this is not a copy.
+     * text already here is not added twice. A record in a group goes into it (not fixed); a group
+     * missing here is made. Nothing is sent to clipboard sync: this is not a copy.
      */
     internal suspend fun importItems(clips: List<ImportedClip>): ClipboardImportResult {
         clipboardPinsReady.await()
@@ -316,7 +396,7 @@ class ClipboardManager private constructor(private val context: Context) {
         val ordered = clips.withIndex().sortedByDescending { it.value.pinned || it.value.group != null }
         for ((index, clip) in ordered) {
             if (!ClipboardCapacity.fitsRow(clip.text)) { notSaved++; continue }
-            val fixed = clip.pinned || clip.group != null
+            val fixed = clip.pinned
             val key = searchKey(clip.text)
             val bytes = ClipboardCapacity.recordBytes(clip.text, key)
             val row = dao.importRecord(clip.text, clip.code, clip.timestamp.takeIf { it > 0 } ?: (now - index),
@@ -380,12 +460,17 @@ class ClipboardManager private constructor(private val context: Context) {
             } finally {
                 clipboardPinsReady.complete(Unit)
             }
+            // Before anything clears or expires history: records in a group are marked as kept.
+            val groups = ClipboardGroupStore.getInstance(context)
+            syncGroupedRecords(groups.state.value, boardPrefs)
+            scope.launch { groups.state.collect { syncGroupedRecords(it, boardPrefs) } }
             // Duplicates saved before copies were merged (user 10-30): removed once; new copies merge as they come.
             if (!prefs.getBoolean(KEY_HISTORY_DEDUPED, false)) {
                 runCatching { dao.deleteDuplicateHistory() }
                     .onSuccess { prefs.edit().putBoolean(KEY_HISTORY_DEDUPED, true).apply() }
                     .onFailure { Log.e(TAG, "Could not remove duplicate clipboard records", it) }
             }
+            deleteExpiredSensitive()
             scope.launch { dao.observeUnpinnedCount().collect { _unpinnedCount.value = it } }
             scope.launch {
                 dao.observeStoredBytes().collect { stored ->
@@ -409,6 +494,33 @@ class ClipboardManager private constructor(private val context: Context) {
             }
         }
         startListening()
+    }
+
+    /**
+     * Records in a group are marked in the database (the groups themselves are board preferences) so
+     * clearing history, the received-copies room and the password expiry leave them alone and the board
+     * always loads them, without fixing them. A member whose record is gone leaves its group. Records
+     * fixed only because they went into a group (before 11-02) are unfixed once, text and images.
+     */
+    private suspend fun syncGroupedRecords(state: ClipboardGroupState, boardPrefs: android.content.SharedPreferences) {
+        val ids = state.members.keys.mapNotNull { key -> key.removePrefix("text:").takeIf { it != key }?.toLongOrNull() }
+        try {
+            dao.syncGrouped(ids)
+            if (!prefs.getBoolean(KEY_GROUPS_UNPINNED, false)) {
+                dao.unpinGrouped()
+                val images = state.members.keys.filterTo(mutableSetOf()) { it.startsWith("image:") }
+                if (images.isNotEmpty()) synchronized(boardPrefs) {
+                    val pins = boardPrefs.getStringSet("pins", emptySet()).orEmpty()
+                    check(boardPrefs.edit().putStringSet("pins", pins - images).commit())
+                }
+                prefs.edit().putBoolean(KEY_GROUPS_UNPINNED, true).apply()
+            }
+            val present = ids.chunked(500).flatMap { dao.existingIds(it) }.toSet()
+            val gone = ids.filterNot { it in present }
+            if (gone.isNotEmpty()) ClipboardGroupStore.getInstance(context).assign(gone.map { "text:$it" }, null)
+        } catch (error: Exception) {
+            Log.e(TAG, "Could not mark grouped clipboard records", error)
+        }
     }
 
     /**
@@ -513,24 +625,27 @@ class ClipboardManager private constructor(private val context: Context) {
             timestamp = timestamp,
             isPinned = isPinned,
             isQuickSend = isQuickSend,
-            consumed = consumed
+            consumed = consumed,
+            sensitive = sensitive,
         )
     }
 
     private fun startListening() {
         androidClipboardManager.addPrimaryClipChangedListener(clipboardListener)
+        if (listeningSince == Long.MAX_VALUE) listeningSince = System.currentTimeMillis()
     }
 
     fun release() {
         // Singleton — no cleanup needed.
     }
 
-    fun addItem(text: String, fromDevice: Boolean = false) {
+    fun addItem(text: String, fromDevice: Boolean = false, sensitive: Boolean = false) {
         if (text.isBlank()) return
         scope.launch {
             clipboardPinsReady.await()
             if (!ClipboardCapacity.fitsRow(text)) return@launch
-            val key = searchKey(text)
+            // A password gets no search key: it is never searched.
+            val key = if (sensitive) "" else searchKey(text)
             val now = System.currentTimeMillis()
             if (fromDevice) {
                 // Received copies keep their own room and never push out or block this phone's own.
@@ -541,7 +656,13 @@ class ClipboardManager private constructor(private val context: Context) {
                 val same = dao.findSameText(text)
                 val needsRoom = same == null || (same.fromDevice && !same.isPinned)
                 if (needsRoom && !hasRoomFor(text, key)) return@launch
-                dao.upsert(text, now, key)
+                dao.upsert(text, now, key, sensitive = sensitive)
+            }
+            if (sensitive) {
+                // Deleted an hour after the copy; checked again whenever the keyboard opens, in case
+                // the keyboard process was gone when the hour ran out.
+                Handler(Looper.getMainLooper()).postDelayed({ deleteExpiredSensitive() }, SENSITIVE_LIFETIME_MS + 1_000L)
+                return@launch
             }
             _clipboardChanged.emit(
                 ClipboardItem(
@@ -549,6 +670,22 @@ class ClipboardManager private constructor(private val context: Context) {
                     timestamp = System.currentTimeMillis()
                 )
             )
+        }
+    }
+
+    /** Passwords kept longer than [SENSITIVE_LIFETIME_MS]; fixed ones stay. */
+    private fun deleteExpiredSensitive() {
+        scope.launch {
+            runCatching { dao.deleteSensitiveBefore(System.currentTimeMillis() - SENSITIVE_LIFETIME_MS) }
+                .onFailure { Log.e(TAG, "Could not delete expired passwords", it) }
+        }
+    }
+
+    /** 「记录密码等敏感内容」 turned off: every kept password that is not fixed goes at once. */
+    fun deleteSensitive() {
+        scope.launch {
+            runCatching { dao.deleteSensitiveBefore(Long.MAX_VALUE) }
+                .onFailure { Log.e(TAG, "Could not delete kept passwords", it) }
         }
     }
 
@@ -640,16 +777,20 @@ class ClipboardManager private constructor(private val context: Context) {
         addPinnedText(text, code)
     }
 
-    /** [groupId]: the clipboard group the fixed record goes into (added from that group's tab). */
+    /**
+     * [groupId]: added from that group's tab, the record goes into the group and is not fixed (a group
+     * keeps its records without moving them to the top); otherwise it is a fixed record.
+     */
     fun addPinnedText(text: String, code: String = "", groupId: String? = null) {
         if (text.isBlank() || !ClipboardCapacity.fitsRow(text)) return
         scope.launch {
             clipboardPinsReady.await()
             val key = searchKey(text)
-            // Text already saved is fixed in place and needs no room.
+            // Text already saved is fixed (or grouped) in place and needs no room.
             if (dao.findSameText(text) == null && !hasRoomFor(text, key)) return@launch
-            val id = dao.addPinned(text, code.trim(), System.currentTimeMillis(), key)
-            groupId?.let { ClipboardGroupStore.getInstance(context).assign(setOf("text:$id"), it) }
+            val now = System.currentTimeMillis()
+            if (groupId == null) dao.addPinned(text, code.trim(), now, key)
+            else ClipboardGroupStore.getInstance(context).assign(setOf("text:${dao.addToGroup(text, code.trim(), now, key)}"), groupId)
         }
     }
 
@@ -749,7 +890,7 @@ class ClipboardManager private constructor(private val context: Context) {
         return insertImageToMediaStore(imageFile)
     }
 
-    /** 把图片插入 MediaStore（Pictures/Xime），返回系统 content URI。 */
+    /** 把图片插入 MediaStore（Pictures/CyIME），返回系统 content URI。 */
     private fun insertImageToMediaStore(imageFile: File): Uri? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             Log.e(TAG, "MediaStore fallback requires API 29+, clipboard image copy failed")
@@ -760,7 +901,7 @@ class ClipboardManager private constructor(private val context: Context) {
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, imageFile.name)
                 put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Xime")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/CyIME")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -803,3 +944,6 @@ internal class PrivateClipMemory(private val capacity: Int = 16) {
         fun key(timestamp: Long, content: CharSequence?): String = "$timestamp:${content?.toString()?.hashCode() ?: 0}"
     }
 }
+
+/** What one copy may do in clipboard history; see [ClipboardManager.clipPrivacy]. */
+internal enum class ClipPrivacy { NORMAL, SECRET, PRIVATE }

@@ -53,6 +53,9 @@ class WindowsPairingTlsTest {
         val calls = AtomicInteger()
         val authorization = AtomicReference<String?>()
         var redirect: String? = null
+        /** 像电脑端 Kestrel 一样保持连接，一条连接上接着处理后面的请求。 */
+        @Volatile var keepAlive = false
+        val accepted = AtomicInteger()
         private val server: SSLServerSocket
         val peer: WindowsPeer
         init {
@@ -70,6 +73,7 @@ class WindowsPairingTlsTest {
             executor.submit {
                 while (!server.isClosed) {
                     val socket = try { server.accept() as SSLSocket } catch (_: java.io.IOException) { break }
+                    accepted.incrementAndGet()
                     executor.submit {
                         // A rejected TLS handshake is expected in the certificate-change test.
                         runCatching { socket.use { serve(it) } }
@@ -83,6 +87,9 @@ class WindowsPairingTlsTest {
             socket.soTimeout = 5_000
             socket.startHandshake()
             val input = BufferedInputStream(socket.inputStream)
+            do { serveOne(socket, input) } while (keepAlive)
+        }
+        private fun serveOne(socket: SSLSocket, input: BufferedInputStream) {
             fun line(): String {
                 val bytes = ByteArrayOutputStream()
                 while (true) {
@@ -108,7 +115,7 @@ class WindowsPairingTlsTest {
             if (pair) json.put("server_id", serverId).put("device_id", "11223344-5566-7788-99aa-bbccddeeff00").put("access_token", token)
             val bytes = if (location != null) byteArrayOf() else json.toString().toByteArray()
             val status = if (location != null) "302 Found" else if (pair) "201 Created" else "200 OK"
-            val response = "HTTP/1.1 $status\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n" +
+            val response = "HTTP/1.1 $status\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: ${if (keepAlive) "keep-alive" else "close"}\r\n" +
                 (if (location != null) "Location: $location\r\n" else "") + "\r\n"
             socket.outputStream.write(response.toByteArray())
             socket.outputStream.write(bytes)
@@ -158,6 +165,17 @@ class WindowsPairingTlsTest {
             saved = saved.copy(origin = trusted.peer.origin)
             assertNull(transport.testConnection())
         } }
+    }
+
+    @Test fun repeatedPollsToTheSameComputerReuseOneConnection() {
+        Fixture().use { trusted ->
+            trusted.keepAlive = true
+            val peer = trusted.peer.copy(token = token)
+            repeat(3) { assertEquals(200, WindowsSecureTransport.request(peer, "/api/status", token = true).first) }
+            assertEquals(3, trusted.calls.get())
+            // 键盘显示时每 2 秒取一次：不再每次重新连接、重新 TLS 握手。
+            assertEquals(1, trusted.accepted.get())
+        }
     }
 
     @Test fun redirectCannotMoveAnAuthenticatedRequestToAnotherEndpoint() {

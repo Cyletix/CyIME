@@ -67,6 +67,32 @@ class ClipboardSyncSessionTest {
         assertEquals("success resets the backoff", 5_000L, f.session.retryInMs)
     }
 
+    @Test fun `fixed retries stop after the last wait and resume on an event`() = runBlocking {
+        val f = Fixture()
+        val session = ClipboardSyncSession(f.transport, f.port, { f.clock }, f.errors::add, maxTextBytes = 65_536,
+            retryDelaysMs = longArrayOf(30_000, 120_000, 600_000))
+        f.transport.pullAction = { throw java.net.SocketTimeoutException() }
+        val waits = mutableListOf<Long>()
+        repeat(4) {
+            session.pump { true }
+            waits += session.retryInMs
+            f.clock += minOf(session.retryInMs, 600_000L)
+        }
+        assertEquals(4, f.transport.pulls)
+        assertEquals(listOf(30_000L, 120_000L, 600_000L), waits.take(3))
+        assertTrue("after the last retry only an event wakes it", waits.last() > 365L * 24 * 60 * 60 * 1_000L)
+        f.clock += 7L * 24 * 60 * 60 * 1_000L
+        session.pump { true }
+        assertEquals("no timer-driven attempt after the last retry", 4, f.transport.pulls)
+        session.retryNow()
+        f.transport.pullAction = {}
+        session.pump { true }
+        assertEquals(5, f.transport.pulls)
+        f.transport.pullAction = { throw java.net.SocketTimeoutException() }
+        session.pump { true }
+        assertEquals("success starts the fixed waits over", 30_000L, session.retryInMs)
+    }
+
     @Test fun `remote applies once acknowledges and does not echo`() = runBlocking {
         val f = Fixture()
         f.session.pump { true }

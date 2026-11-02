@@ -23,4 +23,14 @@ data class ClipboardEntry(
     @ColumnInfo(defaultValue = "") val searchKey: String = "",
     /** Received from a paired computer, phone or tablet rather than copied on this device. */
     @ColumnInfo(defaultValue = "0") val fromDevice: Boolean = false,
+    /**
+     * A password or card number kept because the user turned on 「记录密码等敏感内容」 (#95): shown as
+     * dots, pasted privately, never searched or exported, deleted an hour after the copy unless fixed.
+     */
+    @ColumnInfo(defaultValue = "0") val sensitive: Boolean = false,
+    /**
+     * In one of the user's clipboard groups (which group is in the board preferences): kept like a fixed
+     * record (not cleared, not trimmed, always loaded) without being fixed or moved to the top.
+     */
+    @ColumnInfo(defaultValue = "0") val grouped: Boolean = false,
 )

@@ -1,6 +1,6 @@
 package com.kingzcheung.xime.clipboard
 
-/** A group the user made (常用语, 工作 …). Records put into a group are fixed ones. */
+/** A group the user made (常用语, 工作 …). Records in a group are kept but not fixed (not moved to the top). */
 data class ClipboardGroup(val id: String, val name: String)
 
 /**
@@ -17,7 +17,7 @@ data class ClipboardGroupState(
 
     fun withGroup(group: ClipboardGroup) = copy(groups = groups + group)
     fun renamed(id: String, name: String) = copy(groups = groups.map { if (it.id == id) it.copy(name = name) else it })
-    /** The records stay (fixed) in the clipboard; only the group goes. */
+    /** The records stay in the clipboard (in 全部); only the group goes. */
     fun withoutGroup(id: String) = copy(groups = groups.filterNot { it.id == id }, members = members.filterValues { it != id })
     /** Null [groupId] takes the records out of their group. */
     fun assigned(keys: Collection<String>, groupId: String?) = copy(members =

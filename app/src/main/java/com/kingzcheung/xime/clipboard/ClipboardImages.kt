@@ -50,7 +50,7 @@ class ClipboardImages private constructor(private val context: Context) {
     // an unbounded number of full queries behind an image copy.
     private val refreshRequests = Channel<Unit>(Channel.CONFLATED)
     private val pinListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "pins") refresh()
+        if (key == "pins" || key == "group_members") refresh()
     }
     private val directory = File(context.cacheDir, "clipboard_images")
     private val _images = MutableStateFlow<List<ClipboardImage>>(emptyList())
@@ -59,6 +59,9 @@ class ClipboardImages private constructor(private val context: Context) {
     val preview = previewState.preview
     private val _recentScreenshotsEnabled = MutableStateFlow(false)
     val photoAccess = _recentScreenshotsEnabled.asStateFlow()
+    // 最近截图默认开（11-02：用户找不到截图）；还没给相册权限时剪贴板里出一行「允许」，关掉或拒绝权限后不再出。
+    private val _screenshotsNeedAccess = MutableStateFlow(false)
+    val screenshotsNeedAccess = _screenshotsNeedAccess.asStateFlow()
     private val _pasteFailure = MutableStateFlow<ImagePasteFailure?>(null)
     val pasteFailure = _pasteFailure.asStateFlow()
     fun reportPasteFailure(image: ClipboardImage, packageName: String) { _pasteFailure.value = ImagePasteFailure(image, packageName) }
@@ -117,7 +120,10 @@ class ClipboardImages private constructor(private val context: Context) {
         refresh()
     }
 
-    fun recentScreenshotsEnabled(): Boolean = prefs.getBoolean("recent_photos", false) && hasPhotoAccess()
+    /** 没拨过算开；拨过「关闭最近截图」、关掉权限提示或拒绝相册权限后才是关。 */
+    fun recentScreenshotsWanted(): Boolean = prefs.getBoolean("recent_photos", true)
+
+    fun recentScreenshotsEnabled(): Boolean = recentScreenshotsWanted() && hasPhotoAccess()
 
     fun capture(uri: Uri, timestamp: Long = System.currentTimeMillis(), mimeType: String = "image/png") {
         val key = previewState.beginCopy(uri.toString(), timestamp) ?: return
@@ -145,7 +151,9 @@ class ClipboardImages private constructor(private val context: Context) {
         return items.filter { "image:${it.uri}" in pins || recent++ < RECENT_CLIPBOARD_IMAGE_LIMIT }
     }
 
-    private fun pinnedKeys(): Set<String> = boardPrefs.getStringSet("pins", emptySet()).orEmpty().toSet()
+    /** Images kept out of the recent budget: fixed ones and ones in a group (group members are "groupId\tkey"). */
+    private fun pinnedKeys(): Set<String> = boardPrefs.getStringSet("pins", emptySet()).orEmpty().toSet() +
+        boardPrefs.getStringSet("group_members", emptySet()).orEmpty().map { it.substringAfter('\t') }.filter { it.startsWith("image:") }
 
     suspend fun prepare(image: ClipboardImage): ClipboardImage = withContext(Dispatchers.IO) {
         mutex.withLock {
@@ -371,6 +379,7 @@ class ClipboardImages private constructor(private val context: Context) {
 
     private fun publish() {
         _recentScreenshotsEnabled.value = recentScreenshotsEnabled()
+        _screenshotsNeedAccess.value = recentScreenshotsWanted() && !hasPhotoAccess()
         _images.value = retainedClipboardImages(history, media, pinnedKeys(), hidden)
         // 历史和最近截图只供手动浏览，不从列表挑一张图片反复弹出。
         previewState.expire(System.currentTimeMillis())

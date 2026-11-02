@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import com.kingzcheung.xime.clipboard.VerificationCodeSmsReceiver
 import com.kingzcheung.xime.clipboard.ClipboardManager
+import com.kingzcheung.xime.plugin.core.api.ClipboardProfile
 import com.kingzcheung.xime.plugin.core.api.ClipboardSyncPlugin
 import com.kingzcheung.xime.plugin.core.sync.ClipboardSyncSession
 import com.kingzcheung.xime.plugin.core.sync.SyncClipboardPort
@@ -40,21 +41,37 @@ class ClipboardSyncBridge(
     private var visible = false
     private var requested = false
     private var worker: Job? = null
+    private var pollingWatch: Job? = null
     private var session: ClipboardSyncSession? = null
     private var lastPullAt = Long.MIN_VALUE
     private var visibilityGeneration = 0L
+    private val mesh = pluginId == WindowsDevices.ID
+    /** 对端都会推送时不再定时拉取；只有旧版对端还要按老办法每 2 秒拉一次（键盘显示时）。 */
+    private val polling get() = pollInterval > 0 && (!mesh || WindowsDevices.needsPolling.value)
 
     private val port = object : SyncClipboardPort {
+        /** 上次读到的那一条。每次拉取要前后比对几次剪贴板：复制时间（只看描述，不算读取）没变就用它，不再读内容（用户 11-01 嫌读剪贴板太多）。 */
+        private var lastRead: SyncClipboardSnapshot? = null
+
         override fun read(): SyncClipboardSnapshot {
+            val stamp = try { systemClipboard.primaryClipDescription?.timestamp ?: 0L } catch (_: SecurityException) {
+                return SyncClipboardSnapshot(null, 0, sensitive = true)
+            }
+            lastRead?.takeIf { stamp != 0L && it.revision == stamp }?.let { return it }
             val clip = try { systemClipboard.primaryClip } catch (_: SecurityException) {
                 // Switching away from the default IME can revoke clipboard access.
                 return SyncClipboardSnapshot(null, 0, sensitive = true)
             }
             val description = clip?.description
             val text = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).text?.toString() else null
+            // A copy made while the keyboard was private (password field, incognito) stays on this phone,
+            // like one the system marks sensitive: history may keep it hidden (#95), sync never sends it.
+            // 「允许其他设备连接本机」 already follows the same rule.
             return SyncClipboardSnapshot(text, description?.timestamp ?: 0,
                 description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
-                    description?.label == VerificationCodeSmsReceiver.CLIP_LABEL)
+                    description?.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
+                    com.kingzcheung.xime.settings.IncognitoState.active ||
+                    com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(appContext)).also { lastRead = it }
         }
         override fun writeIfUnchanged(expected: SyncClipboardSnapshot, text: String): Boolean {
             if (read() != expected) return false
@@ -64,8 +81,17 @@ class ClipboardSyncBridge(
     }
     private val listener = AndroidClipboardManager.OnPrimaryClipChangedListener {
         // Use the system event, not delayed database history inserts or edits.
-        session?.localChanged(port.read())
+        val snapshot = port.read()
+        noteLocal(snapshot)
+        session?.localChanged(snapshot)
         wake.trySend(Unit)
+    }
+
+    /** Gives this copy its order number (a received one keeps the sender's). */
+    private fun noteLocal(snapshot: SyncClipboardSnapshot) {
+        val text = snapshot.text
+        if (!mesh || snapshot.sensitive || text.isNullOrBlank()) return
+        ClipboardClock.noteLocal(ClipboardProfile.fromText(text).hash, snapshot.revision)
     }
 
     fun start() {
@@ -80,13 +106,22 @@ class ClipboardSyncBridge(
             }
             failing = true
         }, maxTextBytes = maxTextBytes.takeIf { it > 0 } ?: Int.MAX_VALUE,
-            allowPush = { (plugin as? WindowsSecureTransport)?.sendAllowed != false },
-            reportSuccess = { failing = false })
+            allowPush = { (plugin as? WindowsSecureTransport)?.let { it.sendAllowed || it.hasOthers } != false },
+            reportSuccess = { failing = false },
+            // 推送失败只在 30 秒、2 分钟、10 分钟后各重试一次，之后等下次亮屏打开键盘或复制新内容。
+            retryDelaysMs = if (mesh) longArrayOf(30_000, 120_000, 600_000) else null)
         systemClipboard.addPrimaryClipChangedListener(listener)
+        if (mesh) {
+            noteLocal(port.read())
+            // 收起键盘时也要能收到对方推来的内容。
+            DeviceHost.setReceiving(true)
+            WindowsDevices.onCatchUp = { pullOnce() }
+            pollingWatch = scope.launch { WindowsDevices.needsPolling.collect { wake.trySend(Unit) } }
+        }
         worker = scope.launch {
             while (isActive) {
                 val now = SystemClock.elapsedRealtime()
-                val periodic = visible && pollInterval > 0 && (lastPullAt == Long.MIN_VALUE || now - lastPullAt >= pollInterval)
+                val periodic = visible && polling && (lastPullAt == Long.MIN_VALUE || now - lastPullAt >= pollInterval)
                 val pull = visible && (requested || periodic)
                 val requestVisibility = visibilityGeneration
                 requested = false
@@ -95,7 +130,8 @@ class ClipboardSyncBridge(
                     (plugin as? WindowsSecureTransport)?.receiveAllowed != false }
                 val backoff = session?.retryInMs ?: 0L
                 val wait = when {
-                    visible && pollInterval > 0 -> maxOf(pollInterval, backoff)
+                    backoff > MAX_TIMER_MS -> null
+                    visible && polling -> maxOf(pollInterval, backoff)
                     session?.hasPendingPush == true -> maxOf(5_000L, backoff)
                     else -> null
                 }
@@ -109,11 +145,14 @@ class ClipboardSyncBridge(
         visible = shown
         visibilityGeneration++
         if (shown) {
-            if (pluginId == WindowsDevices.ID) WindowsDevices.connectNow()
             val now = SystemClock.elapsedRealtime()
+            if (mesh) {
+                // 亮屏或换网络后第一次打开键盘报到一次：拉一次最新，没推出去的再推一次。平时靠对方推送。
+                if (WindowsDevices.setKeyboardShown(true)) { session?.retryNow(); requested = true }
+            }
             // Legacy WebDAV services retain their 30s visibility-triggered throttle.
-            if (pollInterval > 0 || lastPullAt == Long.MIN_VALUE || now - lastPullAt >= 30_000) requested = true
-        }
+            else if (pollInterval > 0 || lastPullAt == Long.MIN_VALUE || now - lastPullAt >= 30_000) requested = true
+        } else if (mesh) WindowsDevices.setKeyboardShown(false)
         wake.trySend(Unit)
     }
 
@@ -123,6 +162,11 @@ class ClipboardSyncBridge(
     fun usesPlugin(instance: ClipboardSyncPlugin): Boolean = plugin === instance
 
     fun stop() {
+        // 同步关掉或重建：键盘显示的标记一并清掉，免得之后在后台一直找电脑。
+        if (visible && mesh) { visible = false; WindowsDevices.setKeyboardShown(false) }
+        if (mesh && worker != null) { WindowsDevices.onCatchUp = null; DeviceHost.setReceiving(false) }
+        pollingWatch?.cancel()
+        pollingWatch = null
         session?.close()
         session = null
         worker?.cancel()
@@ -131,4 +175,9 @@ class ClipboardSyncBridge(
     }
 
     fun release() { stop(); scope.cancel() }
+
+    private companion object {
+        /** A wait this long means the session waits for an event, not a timer. */
+        const val MAX_TIMER_MS = 24 * 60 * 60 * 1_000L
+    }
 }

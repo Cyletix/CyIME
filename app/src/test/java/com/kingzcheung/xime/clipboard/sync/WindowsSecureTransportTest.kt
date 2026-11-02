@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 class WindowsSecureTransportTest {
     @Test fun transferFailureKeepsSafeStatusWithoutDiscardingThePairing() = runBlocking {
         for (code in listOf(401, 409, 413, 503)) {
-            val transport = WindowsSecureTransport({ _, _, _, _, _ -> code to null }) { device }
+            val transport = WindowsSecureTransport({ _, _, _, _, _ -> code to null }, { device })
             for (push in listOf(false, true)) {
                 val error = runCatching { if (push) transport.push(ClipboardProfile.fromText("fixture")) else transport.pull() }.exceptionOrNull()
                 assertTrue(error is WindowsSecureTransport.TransferFailure)
@@ -40,7 +40,7 @@ class WindowsSecureTransportTest {
             val flags = JSONObject().put("v", 2).put("send_enabled", sendOnComputer)
                 .put("receive_enabled", receiveOnComputer).put("sync_paused", true)
             if (path == "/api/status") 200 to flags else 403 to flags
-        }) { device }
+        }, { device })
         assertNull(transport.testConnection())
         assertFalse(transport.sendAllowed)
         assertTrue(transport.receiveAllowed)
@@ -63,7 +63,7 @@ class WindowsSecureTransportTest {
         val transport = WindowsSecureTransport({ _, path, body, _, _ ->
             if (path == "/api/status") 200 to JSONObject().put("v", 2).put("send_enabled", true).put("receive_enabled", false)
             else { assertNull("receive-only must not upload", body); requests++; 200 to json("电脑复制的内容") }
-        }) { device }
+        }, { device })
         assertNull(transport.testConnection())
         val port = object : SyncClipboardPort {
             override fun read() = SyncClipboardSnapshot(clipboardText, revision)
@@ -98,7 +98,7 @@ class WindowsSecureTransportTest {
                 suppliedTag = etag
                 200 to json("电脑后续 中文🙂")
             }
-        }) { device }
+        }, { device })
         val port = object : SyncClipboardPort {
             override fun read(): SyncClipboardSnapshot {
                 assertSame("clipboard read stays on owner", owner, Thread.currentThread())
@@ -132,7 +132,7 @@ class WindowsSecureTransportTest {
             entered.countDown()
             check(changed.await(3, TimeUnit.SECONDS))
             200 to json("旧电脑文本")
-        }) { peer.get() }
+        }, { peer.get() })
         val changer = Thread {
             if (entered.await(3, TimeUnit.SECONDS)) peer.set(device.copy(token = "c".repeat(43)))
             changed.countDown()
@@ -156,7 +156,7 @@ class WindowsSecureTransportTest {
                 body != null -> 200 to body
                 else -> { actualTag = etag; 304 to null }
             }
-        }) { device }
+        }, { device })
         val profile = ClipboardProfile.fromText("测试内容")
         assertTrue(transport.push(profile))
         assertNull(transport.testConnection())

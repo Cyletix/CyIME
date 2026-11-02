@@ -13,7 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 
 @Database(
     entities = [ClipboardEntry::class],
-    version = 6,
+    version = 8,
     exportSchema = false
 )
 abstract class ClipboardDatabase : RoomDatabase() {
@@ -67,6 +67,24 @@ abstract class ClipboardDatabase : RoomDatabase() {
             }
         }
 
+        /** v6 → v7：新增 sensitive 列（开关打开后记下的密码等，#95）；已有记录都不是。 */
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    "ALTER TABLE clipboard_entries ADD COLUMN sensitive INTEGER NOT NULL DEFAULT 0"
+                ).use { it.step() }
+            }
+        }
+
+        /** v7 → v8：新增 grouped 列（放进自定义分组的记录照样保留，但不再固定）；由分组偏好补齐。 */
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    "ALTER TABLE clipboard_entries ADD COLUMN grouped INTEGER NOT NULL DEFAULT 0"
+                ).use { it.step() }
+            }
+        }
+
         @Volatile
         private var instance: ClipboardDatabase? = null
 
@@ -78,7 +96,7 @@ abstract class ClipboardDatabase : RoomDatabase() {
                 )
                     .setDriver(AndroidSQLiteDriver())
                     .setQueryCoroutineContext(Dispatchers.IO)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                     .also { instance = it }
             }

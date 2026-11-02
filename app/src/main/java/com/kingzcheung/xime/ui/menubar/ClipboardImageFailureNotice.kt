@@ -73,6 +73,33 @@ internal fun ClipboardIncognitoNotice(onIncognitoOff: () -> Unit) {
     }
 }
 
+/**
+ * 最近截图默认开着、还没给相册权限时「全部」「图片」顶上的一行：「允许」弹系统权限框，× 关掉最近截图（⋯ 菜单里还能再开）。
+ * 和图片粘贴失败提示同一种小条，不另起样式。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ClipboardScreenshotAccessNotice(onAllow: () -> Unit, onHide: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxWidth()) {
+        Row(Modifier.widthIn(max = 480.dp).clip(RoundedCornerShape(8.dp))
+            .keyboardPanelBackground(colors.surfaceContainerHigh)
+            .padding(start = 8.dp, end = 2.dp, top = 2.dp, bottom = 2.dp)
+            .testTag("clipboard-screenshot-access"), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(Modifier.weight(1f, fill = false), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("显示最近截图需要相册权限", color = colors.onSurfaceVariant, fontSize = 12.sp,
+                    lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(vertical = 5.dp))
+                NoticeAction("允许", "clipboard-screenshot-allow", onAllow)
+            }
+            IconButton(onClick = onHide, modifier = Modifier.size(32.dp).testTag("clipboard-screenshot-hide")) {
+                Icon(Icons.Default.Close, "不显示最近截图", tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
 @Composable
 private fun NoticeAction(label: String, tag: String, onClick: () -> Unit) {
     Text(label, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, lineHeight = 18.sp,
