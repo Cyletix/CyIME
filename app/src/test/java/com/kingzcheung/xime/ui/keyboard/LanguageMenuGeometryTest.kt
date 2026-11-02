@@ -25,7 +25,7 @@ class LanguageMenuGeometryTest {
                 assertTrue(menu.bounds.left >= panel.left && menu.bounds.right <= panel.right)
                 assertTrue(menu.bounds.top >= panel.top && menu.bounds.bottom <= panel.bottom)
                 assertTrue(menu.bounds.width <= 280*d + 0.1f)
-                assertTrue(menu.rowHeightPx >= 44*d)
+                assertTrue(menu.rowHeightPx >= LANGUAGE_MENU_MIN_ROW_DP*d - 0.001f)
             }
         }
     }
@@ -80,5 +80,28 @@ class LanguageMenuGeometryTest {
         val menu = languageMenuGeometry(panel, key, density, 5)
         assertFalse(menu.anchoredAbove)
         assertEquals((3 * menu.rowHeightPx).toInt(), languageMenuInitialScroll(menu, 3, density))
+    }
+
+    @Test fun lowestKeyboardHeightShowsThreeWholeLanguagesAboveTheKey() {
+        // 用户 11-02：键盘调到最低（244dp，含 44dp 工具栏 + 四行 48dp），语言菜单至少整行放下三种语言。
+        for (d in listOf(2f, 2.625f, 2.8f, 3f)) for (count in listOf(3, 9)) {
+            val panel = Rect(0f, 1000f, 412f * d, 1000f + 244f * d)
+            val key = Rect(60f * d, panel.bottom - 52f * d, 110f * d, panel.bottom - 4f * d)
+            val menu = languageMenuGeometry(panel, key, d, count)
+            assertTrue(menu.anchoredAbove)
+            assertEquals(key.top, menu.bounds.bottom, .001f)
+            val list = menu.bounds.height - LANGUAGE_MENU_CHROME_DP * d
+            assertTrue("d=$d count=$count", list + .5f >= 3 * menu.rowHeightPx)
+            assertTrue(menu.rowHeightPx >= LANGUAGE_MENU_MIN_ROW_DP * d - .001f)
+        }
+    }
+
+    @Test fun tallKeyboardKeepsTheNormalRowHeight() {
+        val d = 2.8f
+        val panel = Rect(0f, 1000f, 412f * d, 1000f + 360f * d)
+        val key = Rect(60f * d, panel.bottom - 70f * d, 110f * d, panel.bottom - 4f * d)
+        val menu = languageMenuGeometry(panel, key, d, 9)
+        assertTrue(menu.anchoredAbove)
+        assertEquals(64f * d, menu.rowHeightPx, .001f)
     }
 }
