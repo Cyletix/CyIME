@@ -64,9 +64,9 @@ class T9GlideDecoderTest {
                     (start.second + (end.second - start.second) * fraction)
             }
         } + center('6')
-        // Consecutive 9->9 has no geometric movement and is intentionally folded;
-        // the recoverable sequence is 969636. Non-consecutive returns remain intact.
-        assertEquals("969636", decoder.decodeDigits(
+        // Consecutive 9->9 has no geometric movement, and straight-through
+        // intermediate keys are folded; the recoverable sequence is 96936.
+        assertEquals("96936", decoder.decodeDigits(
             path.map { it.first }.toFloatArray(), path.map { it.second }.toFloatArray()))
     }
 
