@@ -3,6 +3,7 @@ package com.kingzcheung.xime.ui.keyboard
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.theme.drawUnderTopFeather
+import com.kingzcheung.xime.ui.theme.liquidGlassEdge
 
 import com.kingzcheung.xime.service.PredictionManager
 import android.annotation.SuppressLint
@@ -777,6 +778,8 @@ internal fun ToolbarActionButton(
     }
     // 大屏参照 Gboard：整格都可点，按下/开启的底色是随格宽向两边拉长的胶囊；窄格仍是圆形。
     val listening = voiceActive && voiceState == RecognitionState.LISTENING
+    // 液态玻璃：胶囊露出来时（开启常亮，按下随底色淡出）加按键同款细亮边；听写音量光圈不加。
+    val liquidEdge = com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn() && !listening
     BoxWithConstraints(
         modifier.widthIn(min = 36.dp).height(40.dp)
             // 音量光圈画在不裁切的外层：始终正圆、比图标大，宽格也不会被拉成胶囊。
@@ -796,7 +799,9 @@ internal fun ToolbarActionButton(
                 else fill.copy(alpha = fill.alpha * pressAlpha)
             } ?: if (action.active) visuals.accentColor.copy(alpha = 0.28f)
                 else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha)
-                else Color(0xFFE0E0E0).copy(alpha = pressAlpha)),
+                else Color(0xFFE0E0E0).copy(alpha = pressAlpha))
+            .then(if (liquidEdge) Modifier.liquidGlassEdge(CAPSULE_RADIUS) { if (action.active) 1f else pressAlpha }
+                else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         if (voiceActive && voiceState == RecognitionState.PROCESSING) {
@@ -806,6 +811,9 @@ internal fun ToolbarActionButton(
     }
     }
 }
+
+/** 胶囊的圆角：比任何胶囊的半高都大，细亮边按半高画成全圆头。 */
+private val CAPSULE_RADIUS = 999.dp
 
 /** 麦克风峰值（0~1 线性）转成 0~1 的显示音量：-50 dB 以下当静音，-15 dB 以上算满，小声说话也能明显撑开。 */
 internal fun microphoneLevel(peak: Float): Float {
@@ -841,6 +849,7 @@ private fun ClipboardPreviewBar(
     val verticalTextPadding = with(density) { ((44.dp - tallestPreviewPx.toDp()) / 2).coerceIn(0.dp, 7.dp) }
     val capsuleColor = visuals.preeditBackgroundColor.takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.surfaceContainer
+    val liquidEdge = com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         KeyboardBackButton({ callbacks.onDismissClipboardPreview?.invoke() },
             iconButtonContainer, visuals.textColor, label = "返回工具栏")
@@ -865,7 +874,9 @@ private fun ClipboardPreviewBar(
                 Modifier.width(capsuleWidth).heightIn(min = 36.dp).testTag("clipboard-preview-pill")
                     .clip(CircleShape)
                     .background(capsuleColor)
-                    .border(1.dp, visuals.accentColor.copy(alpha = 0.45f), CircleShape)
+                    // 液态玻璃：强调色描边换成按键同款细亮边。
+                    .then(if (liquidEdge) Modifier.liquidGlassEdge(CAPSULE_RADIUS)
+                        else Modifier.border(1.dp, visuals.accentColor.copy(alpha = 0.45f), CircleShape))
                     .padding(start = 12.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

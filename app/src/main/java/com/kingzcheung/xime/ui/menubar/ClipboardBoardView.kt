@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import com.kingzcheung.xime.ui.settings.idleBorderAlpha
 import com.kingzcheung.xime.ui.settings.isNearBlack
+import com.kingzcheung.xime.ui.theme.liquidGlassEdge
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -773,15 +774,18 @@ private fun ClipboardRecordCard(
     val highlighted = chosen || keyboardFocused
     val shape = RoundedCornerShape(clipboardCardCorner(previewHeight == ClipboardPinnedRowHeight))
     val oneLine = previewHeight == ClipboardPinnedRowHeight
+    val liquid = com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn()
     BoxWithConstraints(modifier.fillMaxWidth()
         .then(if (previewHeight != null) Modifier.height(previewHeight) else Modifier)
         .clip(shape)
         .background(frostedKeyColor(if (highlighted) colors.secondaryContainer else clipboardCardColor(),
             colors.onSurface, glass))
         // 黑白主题深色是纯黑底：卡片不铺灰，靠描边看出边界（与设置页卡片的 idleBorderAlpha 一致，#82）。
-        .border(if (highlighted) 2.dp else .5.dp,
-            if (highlighted) colors.primary
-            else colors.onSurface.copy(alpha = if (colors.surface.isNearBlack()) idleBorderAlpha(colors.surface) else .08f), shape)
+        // 液态玻璃：没选中的卡片用按键同款细亮边代替淡描边；选中、键盘焦点的 2dp 强调色描边不变。
+        .then(if (!highlighted && liquid) Modifier.liquidGlassEdge(clipboardCardCorner(oneLine))
+            else Modifier.border(if (highlighted) 2.dp else .5.dp,
+                if (highlighted) colors.primary
+                else colors.onSurface.copy(alpha = if (colors.surface.isNearBlack()) idleBorderAlpha(colors.surface) else .08f), shape))
         .semantics { focused = keyboardFocused; if (selecting) selected = chosen }
         .testTag("clipboard-card:${card.key}")
         .combinedClickable(role = if (selecting) Role.Checkbox else Role.Button,

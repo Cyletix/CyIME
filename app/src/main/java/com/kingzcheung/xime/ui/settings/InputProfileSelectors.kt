@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import com.kingzcheung.xime.settings.*
+import com.kingzcheung.xime.ui.theme.liquidGlassEdge
 import kotlin.math.roundToInt
 
 /** Shared by language settings and IME; selection only changes real installed combinations. */
@@ -122,10 +123,14 @@ internal fun ProfileChoiceRow(
 private fun SchemeTextCard(label: String, preview: String, chosen: Boolean, tag: String,
     containerColor: Color, contentColor: Color, accentColor: Color, isAction: Boolean = false,
     width: Dp? = null, height: Dp? = null, onClick: () -> Unit) {
+    // 键盘里的选择面板开着液态玻璃：没选中的卡片把灰描边换成按键同款细亮边；选中的强调色描边不变。
+    val liquid = !chosen && com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn()
     Surface(shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(if (chosen) 1.5.dp else 1.dp, if (chosen) accentColor else contentColor.copy(alpha = idleBorderAlpha(containerColor))),
+        border = if (liquid) null else
+            BorderStroke(if (chosen) 1.5.dp else 1.dp, if (chosen) accentColor else contentColor.copy(alpha = idleBorderAlpha(containerColor))),
         color = if (chosen) chosenFill(containerColor, accentColor) else containerColor) {
-        Box(Modifier.then(if (width != null) Modifier.width(width) else Modifier)
+        Box(Modifier.then(if (liquid) Modifier.liquidGlassEdge(14.dp) else Modifier)
+            .then(if (width != null) Modifier.width(width) else Modifier)
             .then(if (height != null) Modifier.height(height) else Modifier.heightIn(min = 48.dp)).testTag(tag)
             .then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onClick)
                 else Modifier.selectable(chosen, role = Role.RadioButton, onClick = onClick))

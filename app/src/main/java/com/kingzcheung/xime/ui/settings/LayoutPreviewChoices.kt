@@ -43,6 +43,7 @@ import com.kingzcheung.xime.ui.keyboard.japaneseKanaKeys
 import com.kingzcheung.xime.ui.keyboard.letterKeyboardFrame
 import com.kingzcheung.xime.ui.keyboard.letterKeySpan
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
+import com.kingzcheung.xime.ui.theme.liquidGlassEdge
 import kotlin.math.roundToInt
 
 /** A view of the layout data, never a second keyboard or an engine session. */
@@ -119,11 +120,13 @@ internal fun PreviewChoiceCard(label: String, chosen: Boolean, width: Dp, previe
     containerColor: Color, contentColor: Color, accentColor: Color, tag: String,
     onSelect: () -> Unit, isAction: Boolean = false, unavailable: Boolean = false,
     preview: @Composable BoxScope.() -> Unit) {
+    // 同方案卡片：键盘里开着液态玻璃时，没选中的卡片用细亮边代替灰描边。
+    val liquid = !chosen && com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn()
     Surface(modifier = if (unavailable) Modifier.alpha(.4f).semantics { stateDescription = "没有当前方案" } else Modifier,
         shape = RoundedCornerShape(14.dp), color = containerColor,
-        border = BorderStroke(if (chosen) 1.5.dp else 1.dp,
+        border = if (liquid) null else BorderStroke(if (chosen) 1.5.dp else 1.dp,
             if (chosen) accentColor else contentColor.copy(alpha = idleBorderAlpha(containerColor)))) {
-        Column(Modifier.width(width).testTag(tag).then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onSelect)
+        Column(Modifier.then(if (liquid) Modifier.liquidGlassEdge(14.dp) else Modifier).width(width).testTag(tag).then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onSelect)
             else Modifier.selectable(chosen, role = Role.RadioButton, onClick = onSelect))) {
             Box(Modifier.fillMaxWidth().height(previewHeight).padding(4.dp), contentAlignment = Alignment.Center) {
                 preview()

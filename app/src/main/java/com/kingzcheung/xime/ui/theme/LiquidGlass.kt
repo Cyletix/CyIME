@@ -59,6 +59,25 @@ internal object LiquidGlass {
         return on.value
     }
 
+    /**
+     * 键盘里除按键以外的面板件（工具栏开启/按下的胶囊、剪贴板预览条、剪贴板卡片、布局/方案卡片）也画同一道细亮边。
+     * 跟按键同一个条件：当前外观开着玻璃、液态玻璃开着。设置页的同款卡片没有键盘偏好（玻璃视为关），不画。
+     */
+    @androidx.compose.runtime.Composable
+    fun surfacesOn(): Boolean =
+        com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences.current.frostedGlass.enabled &&
+            enabled(androidx.compose.ui.platform.LocalContext.current)
+
+    /** 测试换了 Application 后重新读开关并监听新的偏好。 */
+    @androidx.annotation.VisibleForTesting
+    @Synchronized
+    internal fun rebind(context: Context) {
+        val app = context.applicationContext ?: context
+        listener?.let { SettingsPreferences.getPrefsPublic(app).unregisterOnSharedPreferenceChangeListener(it) }
+        listener = null
+        bind(app)
+    }
+
     @Synchronized
     private fun bind(context: Context) {
         if (listener != null) return
@@ -177,23 +196,51 @@ private object LiquidRefractionShader {
  */
 private fun liquidRim(radius: Dp, dark: Boolean, held: androidx.compose.runtime.State<Boolean>): Modifier =
     Modifier.drawWithCache {
-        val stroke = .75f * density
-        val inset = stroke / 2f
-        val corner = (radius.toPx() - inset).coerceIn(0f, size.minDimension / 2f)
-        val bounds = Rect(inset, inset, size.width - inset, size.height - inset)
-        val path = Path().apply { addRoundRect(RoundRect(bounds, CornerRadius(corner))) }
-        val rim = Brush.linearGradient(
-            listOf(Color.White.copy(alpha = if (dark) .45f else .75f), Color.White.copy(alpha = .10f),
-                Color.White.copy(alpha = .06f), Color.White.copy(alpha = if (dark) .22f else .35f)),
-            Offset.Zero, Offset(size.width, size.height),
-        )
+        val rim = liquidRimGeometry(radius, dark)
         val heldFill = Color.White.copy(alpha = if (dark) .04f else .08f)
         onDrawWithContent {
             val down = held.value
-            if (bounds.width > 0f && bounds.height > 0f) clipPath(path) {
-                if (down) drawPath(path, heldFill)
-                drawPath(path, rim, style = Stroke(if (down) stroke * 1.6f else stroke))
+            if (rim.visible) clipPath(rim.path) {
+                if (down) drawPath(rim.path, heldFill)
+                drawPath(rim.path, rim.brush, style = Stroke(if (down) rim.stroke * 1.6f else rim.stroke))
             }
             drawContent()
         }
     }
+
+/**
+ * 面板件上的同一道细亮边（不含按住变亮）：画在底色上面、内容下面，[radius] 大于半高时就是胶囊。
+ * 路径和渐变按尺寸缓存，只在本来就要重画时跟着画；[alpha] 在绘制阶段读，跟随按下淡出也不多组合一次。
+ * 调用方先用 [LiquidGlass.surfacesOn] 判断，没开时原来的描边一点不变。
+ */
+internal fun Modifier.liquidGlassEdge(radius: Dp, alpha: () -> Float = { 1f }): Modifier = composed {
+    val colors = MaterialTheme.colorScheme
+    val palette = LocalMaterialPalette.current ?: MaterialPalette(colors.surface, colors.primary)
+    val dark = palette.surface.luminance() < .5f
+    drawWithCache {
+        val rim = liquidRimGeometry(radius, dark)
+        onDrawWithContent {
+            val shown = alpha().coerceIn(0f, 1f)
+            if (rim.visible && shown > 0f) clipPath(rim.path) {
+                drawPath(rim.path, rim.brush, alpha = shown, style = Stroke(rim.stroke))
+            }
+            drawContent()
+        }
+    }
+}
+
+private class LiquidRimGeometry(val path: Path, val brush: Brush, val stroke: Float, val visible: Boolean)
+
+private fun androidx.compose.ui.draw.CacheDrawScope.liquidRimGeometry(radius: Dp, dark: Boolean): LiquidRimGeometry {
+    val stroke = .75f * density
+    val inset = stroke / 2f
+    val corner = (radius.toPx() - inset).coerceIn(0f, size.minDimension / 2f)
+    val bounds = Rect(inset, inset, size.width - inset, size.height - inset)
+    val path = Path().apply { addRoundRect(RoundRect(bounds, CornerRadius(corner))) }
+    val brush = Brush.linearGradient(
+        listOf(Color.White.copy(alpha = if (dark) .45f else .75f), Color.White.copy(alpha = .10f),
+            Color.White.copy(alpha = .06f), Color.White.copy(alpha = if (dark) .22f else .35f)),
+        Offset.Zero, Offset(size.width, size.height),
+    )
+    return LiquidRimGeometry(path, brush, stroke, bounds.width > 0f && bounds.height > 0f)
+}
