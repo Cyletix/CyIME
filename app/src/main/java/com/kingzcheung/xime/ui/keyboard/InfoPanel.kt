@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,6 +42,9 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.plugin.core.config.UiNode
 import com.kingzcheung.xime.plugin.core.config.UiNodeType
+import com.kingzcheung.xime.plugin.core.api.TOOL_PANEL_EDIT_ACTION
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 private const val MAX_UI_NODES = 64
 
@@ -152,8 +157,9 @@ fun InfoPanel(
                 index++
                 when (node.type) {
                     UiNodeType.SECTION -> InfoSection(node.label ?: "", accentColor)
-                    UiNodeType.TEXT,
-                    UiNodeType.TEXTAREA -> InfoText(node, textColor)
+                    UiNodeType.TEXTAREA -> if (node.key == TOOL_PANEL_EDIT_ACTION)
+                        EditableSource(node, textColor, accentColor, onAction) else InfoText(node, textColor)
+                    UiNodeType.TEXT -> InfoText(node, textColor)
                     UiNodeType.METRIC -> InfoMetric(node, textColor, accentColor)
                     UiNodeType.DIVIDER -> HorizontalDivider(
                         modifier = Modifier.padding(vertical = 6.dp),
@@ -193,6 +199,33 @@ fun InfoPanel(
                 }
             }
         }
+    }
+}
+
+/** 可改的原文：画成输入框，点了在键盘上方打开输入栏改字（宿主处理 [TOOL_PANEL_EDIT_ACTION]）。 */
+@Composable
+private fun EditableSource(node: UiNode, textColor: Color, accentColor: Color, onAction: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, accentColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .clickable { onAction(TOOL_PANEL_EDIT_ACTION) }
+            .semantics { contentDescription = "改原文" }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = node.value.orEmpty().ifEmpty { node.placeholder.orEmpty() },
+            color = textColor.copy(alpha = if (node.value.isNullOrEmpty()) 0.5f else 0.95f),
+            fontSize = 15.sp,
+            maxLines = 6,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(Icons.Filled.Edit, contentDescription = null, tint = accentColor,
+            modifier = Modifier.padding(start = 8.dp).size(18.dp))
     }
 }
 

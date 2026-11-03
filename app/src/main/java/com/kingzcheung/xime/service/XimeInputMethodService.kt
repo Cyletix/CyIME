@@ -111,6 +111,8 @@ import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.TOOL_PANEL_SETTINGS_ACTION
+import com.kingzcheung.xime.plugin.core.api.TOOL_PANEL_EDIT_ACTION
+import com.kingzcheung.xime.plugin.core.api.TOOL_PANEL_EDITING_DISPLAY
 import com.kingzcheung.xime.plugin.core.api.ToolPlugin
 import com.kingzcheung.xime.plugin.core.api.ToolResult
 import com.kingzcheung.xime.plugin.core.lua.PluginEvent
@@ -1476,6 +1478,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             return
         }
+        if (actionId == TOOL_PANEL_EDIT_ACTION) {
+            // 面板里点了可改的原文：收起面板，在键盘上方打开输入栏改字，回车交回插件（11-03「输入框不合格」）。
+            val text = uiState.value.toolPanelUiNodes?.firstOrNull { it.key == TOOL_PANEL_EDIT_ACTION }?.value.orEmpty()
+            keyboardViewModel.closeOverlay()
+            uiState.value = uiState.value.copy(
+                toolPanelDisplay = TOOL_PANEL_EDITING_DISPLAY,
+                toolPanelInputFocused = true,
+                toolPanelPrefillText = text,
+                enterKeyText = "完成",
+            )
+            ToolPanelEditTextHolder.editText?.let { et ->
+                et.setText(text)
+                et.setSelection(text.length)
+            }
+            return
+        }
         val epoch = uiState.value.toolPanelRequestEpoch
         uiState.value = uiState.value.copy(toolPanelLoading = true)
         serviceScope.launch(Dispatchers.IO) {
@@ -1489,6 +1507,36 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (uiState.value.toolPanelRequestEpoch == epoch && uiState.value.toolPanelVisible) {
                     uiState.value = uiState.value.copy(
                         toolPanelUiNodes = state?.ui,
+                        toolPanelItems = state?.items ?: uiState.value.toolPanelItems,
+                        toolPanelLoading = state?.loading ?: false,
+                    )
+                }
+            }
+        }
+    }
+
+    /** 改完原文按回车：把字交给插件（onPanelInput），回到全屏面板并刷新。 */
+    private fun finishToolPanelEdit() {
+        val pluginId = uiState.value.toolPanelPluginId
+        val text = ToolPanelEditTextHolder.editText?.text?.toString() ?: uiState.value.toolPanelPrefillText
+        val epoch = uiState.value.toolPanelRequestEpoch
+        uiState.value = uiState.value.copy(
+            toolPanelDisplay = ToolResult.PASSIVE.name,
+            toolPanelInputFocused = false,
+            toolPanelLoading = true,
+            enterKeyText = "发送",
+        )
+        keyboardViewModel.showOverlay(OverlayRoute.ToolPanel)
+        serviceScope.launch(Dispatchers.IO) {
+            val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin ?: return@launch
+            val state = runCatching {
+                plugin.onPanelInput(text)
+                plugin.getPanelState("")
+            }.getOrNull()
+            withContext(Dispatchers.Main) {
+                if (uiState.value.toolPanelRequestEpoch == epoch && uiState.value.toolPanelVisible) {
+                    uiState.value = uiState.value.copy(
+                        toolPanelUiNodes = state?.ui ?: uiState.value.toolPanelUiNodes,
                         toolPanelItems = state?.items ?: uiState.value.toolPanelItems,
                         toolPanelLoading = state?.loading ?: false,
                     )
@@ -1643,6 +1691,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val pluginId = uiState.value.toolPanelPluginId
         // passive 纯展示面板：无生成语义，enter 不触发（数据由事件驱动 + InfoPanel 点击 action 刷新）
         if (uiState.value.toolPanelDisplay == ToolResult.PASSIVE.name) {
+            return
+        }
+        if (uiState.value.toolPanelDisplay == TOOL_PANEL_EDITING_DISPLAY) {
+            finishToolPanelEdit()
             return
         }
         // 使用前授权检测：插件有未授权网络域名时先引导授权，不发起请求

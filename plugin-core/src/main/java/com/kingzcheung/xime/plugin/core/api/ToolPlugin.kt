@@ -68,6 +68,16 @@ data class ToolPanelState(
 /** 面板按钮的宿主保留 key：点了打开插件自己的设置页。 */
 const val TOOL_PANEL_SETTINGS_ACTION = "host:settings"
 
+/**
+ * 面板里可改的文字框：TEXTAREA 节点的 key 用它时，宿主把节点画成输入框样子，点了在键盘上方
+ * 打开输入栏（预填节点的 value），按回车把改好的字经 [ToolPlugin.onPanelInput] 交回插件并回到面板。
+ * 旧宿主把它当只读文字显示。
+ */
+const val TOOL_PANEL_EDIT_ACTION = "host:edit"
+
+/** 宿主内部的面板显示状态：正在键盘上方改 [TOOL_PANEL_EDIT_ACTION] 的字。 */
+const val TOOL_PANEL_EDITING_DISPLAY = "EDITING"
+
 interface ToolPlugin : IPluginEntryClass, IPluginConfigurable {
     fun getPanelState(inputText: String): ToolPanelState
 

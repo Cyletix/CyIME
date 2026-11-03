@@ -357,31 +357,34 @@ function plugin.getSettingsSchema()
   if trim(host.config.get(KEY_BASE_URL) or "") == "" then host.config.set(KEY_BASE_URL, DEFAULT_BASE_URL) end
   if trim(host.config.get(KEY_MODEL) or "") == "" then host.config.set(KEY_MODEL, DEFAULT_MODEL) end
   local schema = {
-    { type = "section", label = "接口" },
     { key = KEY_API_KEY, label = "API 密钥", type = "secret", placeholder = "sk-…", required = true,
-      helpText = "只存在这台手机里，不进备份，只发给下面的接口地址" },
-    { key = KEY_BASE_URL, label = "接口地址", type = "text", defaultValue = DEFAULT_BASE_URL,
+      section = "接口", helpText = "只存在这台手机里，不进备份，只发给下面的接口地址" },
+    { key = KEY_BASE_URL, label = "接口地址", type = "text", defaultValue = DEFAULT_BASE_URL, section = "接口",
       helpText = "OpenAI 兼容接口，到 /v1 为止。例：https://api.deepseek.com/v1、https://api.siliconflow.cn/v1" },
-    { key = KEY_MODEL, label = "模型", type = "text", defaultValue = DEFAULT_MODEL,
+    { key = KEY_MODEL, label = "模型", type = "text", defaultValue = DEFAULT_MODEL, section = "接口",
       helpText = "例：gpt-4o-mini、deepseek-chat、Qwen/Qwen2.5-7B-Instruct" },
-    { key = "testConnection", label = "测试接口", type = "button" },
-    { type = "section", label = "提示词（清空就恢复默认）" },
+    { key = "testConnection", label = "测试接口", type = "button", section = "接口" },
   }
+  -- 提示词单独一组；框按内容长高
+  local function prompt(field)
+    field.section = "提示词"
+    schema[#schema + 1] = field
+  end
   for _, m in ipairs(MODES) do
     if m.custom then
-      schema[#schema + 1] = { key = KEY_CUSTOM_LABEL, label = "自定义动作的名字", type = "text",
+      prompt { key = KEY_CUSTOM_LABEL, label = "自定义动作的名字", type = "text",
         placeholder = "比如：翻成英文", helpText = "下面的提示词填了才会出现这个按钮" }
-      schema[#schema + 1] = { key = promptKey(m.id), label = "自定义动作的提示词", type = "textarea",
+      prompt { key = promptKey(m.id), label = "自定义动作的提示词", type = "textarea",
         placeholder = "比如：把下面这段话翻译成英文。",
         helpText = "自定义动作只拦套话和空结果，不比较长度和字" }
     elseif m.translate then
-      schema[#schema + 1] = { key = KEY_TARGET_LANG, label = "翻译成", type = "text",
+      prompt { key = KEY_TARGET_LANG, label = "翻译成", type = "text",
         placeholder = "自动", helpText = "空着：中文译成英文，其他译成简体中文" }
-      schema[#schema + 1] = { key = promptKey(m.id), label = m.label, type = "textarea",
+      prompt { key = promptKey(m.id), label = m.label, type = "textarea",
         defaultValue = m.prompt, helpText = "{lang} 换成上面的目标语言" }
     else
-      schema[#schema + 1] = { key = promptKey(m.id), label = m.label, type = "textarea",
-        defaultValue = m.prompt }
+      prompt { key = promptKey(m.id), label = m.label, type = "textarea",
+        defaultValue = m.prompt, helpText = "清空就恢复默认" }
     end
   end
   return schema
@@ -483,7 +486,8 @@ local function buildUi()
     return ui
   end
   ui[#ui + 1] = { type = "section", label = "原文" }
-  ui[#ui + 1] = { type = "text", value = preview(source, 200) }
+  -- 点了在键盘上方改字（宿主保留 key host:edit；旧宿主显示成只读文字）
+  ui[#ui + 1] = { type = "textarea", key = "host:edit", value = source }
   if notice ~= "" then
     ui[#ui + 1] = { type = "text", value = notice, style = "caption" }
   end
@@ -531,7 +535,14 @@ function plugin.getPanelState(inputText)
 end
 
 function plugin.onPanelInput(text)
-  -- passive 面板没有输入框，保留兼容
+  -- 面板里改完原文按回车：换成改好的字，之前的结果作废
+  local t = text or ""
+  if trim(t) ~= "" and t ~= source then
+    source = t
+    resetResult()
+    lastModeId = ""
+  end
+  awaitingRefresh = true
 end
 
 local function rewrite(mode)

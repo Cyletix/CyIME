@@ -136,4 +136,17 @@ class LuaAiRewritePluginTest {
         assertTrue(reopened.items.isEmpty())
         assertEquals("没有要改的字", reopened.ui?.firstOrNull()?.label)
     }
+
+    @Test
+    fun `面板里改了原文，之后按改好的字改写`() {
+        val (_, adapter, api) = setup()
+        val opened = adapter.getPanelState(source)
+        assertEquals(source, opened.ui?.firstOrNull { it.key == "host:edit" }?.value)
+        val edited = "预算部分可能需要再看看"
+        adapter.onPanelInput(edited)
+        assertEquals(edited, adapter.getPanelState("").ui?.firstOrNull { it.key == "host:edit" }?.value)
+        api.content = "预算部分可能还要再看看"
+        adapter.onPanelAction("mode:polish")
+        assertTrue("请求带的是改好的字", api.lastBody?.contains(edited) == true)
+    }
 }
