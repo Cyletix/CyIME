@@ -14,14 +14,33 @@ internal class InlineCompositionTracker {
     /** Offset in the last composing text. Ordinary setComposingText(..., 1) puts it at the end. */
     var caret = 0
         private set
-    fun shown(text: String?) { active = true; this.text = text; caret = text?.length ?: 0 }
+    fun shown(text: String?) {
+        if (!active) start = anchor
+        active = true; this.text = text; caret = text?.length ?: 0
+    }
     fun moveCaret(offset: Int) { caret = offset }
+
+    /** 编码在输入框里的起点（宿主报来的组合区起点，或开始打拼音前宿主报来的光标）；不知道是 -1。 */
+    var start = -1
+        private set
+    /** 还没打拼音时宿主最近报来的折叠光标：下一段编码从这里开始写。 */
+    private var anchor = -1
+
+    /**
+     * onUpdateSelection（和新输入框的初始选区）：记下编码起点。宿主换了整段文字（setText）后光标常被放回开头，
+     * 光标处找不到编码，要靠起点找回；上屏、清空后起点作废，等宿主重新报光标。
+     */
+    fun selectionReported(selStart: Int, selEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
+        if (active) {
+            if (text != null && candidatesStart >= 0 && candidatesEnd > candidatesStart) start = candidatesStart
+        } else anchor = if (selStart >= 0 && selStart == selEnd && (candidatesStart < 0 || candidatesStart == candidatesEnd)) selStart else -1
+    }
     fun hostCaret(start: Int, end: Int, selection: Int, selectionEnd: Int): Int? {
         val code = text ?: return null
         if (start < 0 || end - start != code.length || selection != selectionEnd || selection !in start..end) return null
         return (selection - start).takeIf { it != caret }
     }
-    fun ended() { active = false; text = null }
+    fun ended() { active = false; text = null; start = -1; anchor = -1 }
 
     /** 新的输入连接开始：旧组合区已不可再用，返回其拼音文字供核对。 */
     fun detach(): String? = text.takeIf { active }.also { ended() }
@@ -43,3 +62,29 @@ internal fun locateDetachedComposition(
     val start = selStart - split
     return if (start < 0) null else DetachedComposition(start, start + text.length)
 }
+
+/**
+ * 宿主整段换掉文字（setText）后光标常被放回开头，[locateDetachedComposition] 在光标处找不到编码。
+ * 这时看编码起点 [start]：那里的文字（[content] 从 [contentStart] 起）正好是原编码才算找到。
+ */
+internal fun locateFrozenCompositionAt(
+    text: String?, start: Int, content: CharSequence?, contentStart: Int,
+): DetachedComposition? {
+    if (text.isNullOrEmpty() || start < 0 || content == null || contentStart < 0) return null
+    val local = start - contentStart
+    if (local < 0 || local + text.length > content.length) return null
+    return if (content.subSequence(local, local + text.length).toString() == text)
+        DetachedComposition(start, start + text.length) else null
+}
+
+/**
+ * 宿主重启同一个输入框后找回还要接着打的编码。知道编码起点 [start] 时只认那个位置（[extracted] 读宿主文字和它的起始偏移），
+ * 不再到光标处找：光标被放回开头时，开头碰巧是同样的字母会认错。不知道起点才在光标处找（[locateDetachedComposition]）。
+ */
+internal fun locateResumableComposition(
+    text: String?, selStart: Int, selEnd: Int, before: CharSequence?, after: CharSequence?,
+    start: Int, extracted: () -> Pair<CharSequence?, Int>?,
+): DetachedComposition? = if (start >= 0) {
+    if (text.isNullOrEmpty()) null
+    else extracted()?.let { (content, contentStart) -> locateFrozenCompositionAt(text, start, content, contentStart) }
+} else locateDetachedComposition(text, selStart, selEnd, before, after)

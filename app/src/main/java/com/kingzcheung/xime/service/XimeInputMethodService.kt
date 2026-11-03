@@ -3394,6 +3394,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             settingsResizeBounds = null
             settingsArrangeBounds = null
         }
+        // 宿主在打拼音时重启了同一个输入框（QQ 留言板等每改一次字就重设文字）：编码原样还在就接着打。
+        if (resumeCompositionAfterRestart(attribute, restarting)) return
         // 新连接开始时旧组合区一律失效；同一输入框重启时撤掉被定格的拼音编码。
         val identity = attribute?.let { Triple(it.packageName, it.fieldId, it.inputType) }
         val sameField = restarting && identity != null && identity == lastEditorIdentity
@@ -3404,6 +3406,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (!sameField) rimeEngine.rejectedCommit.clear()
         val detachedComposition = inlineComposition.detach()
         detachedComposition?.let { removeDetachedComposition(it, attribute, restarting, sameField) }
+        // 新输入框的初始光标：之后打的拼音从这里开始写（重启后靠它找回编码）。
+        if (detachedComposition == null) inlineComposition.selectionReported(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1, -1, -1)
         englishEditorReadCapability.clear()
         if (inputStallWatchdog == null) inputStallWatchdog = InputStallWatchdog(serviceScope, mainHandler) { keyProcessingThread }
         inputStallWatchdog?.start()
@@ -3618,6 +3622,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 先对上回执，下面再问光标前文字时才知道记住的那份还算不算数。
         (currentInputConnection as? TrackedInputConnection)?.memory
             ?.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        inlineComposition.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
         if (oldSelStart != newSelStart || oldSelEnd != newSelEnd) {
             inlineComposition.hostCaret(candidatesStart, candidatesEnd, newSelStart, newSelEnd)?.let { offset ->
@@ -4216,6 +4221,60 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX)
             sessionController.refreshInputBoxComposition()
         else discardInlinePinyinBeforeFrameworkFinish()
+    }
+
+    /**
+     * 宿主在拼音组合中重启同一个输入框（文字一变就 setText、改回车键等），框架已把编码定格成普通文字。
+     * 原来一律撤掉编码、清空拼音，宿主每打一个字母重启一次时就是「打一两个字母全没了」。
+     * 编码原样还在原处时把它重新标成组合区，拼音、候选和引擎都不动，接着打。
+     * 换了框、成了密码/网址/数字等框、不在打拼音、找不到原编码时返回 false，照原来的流程重启。
+     */
+    private fun resumeCompositionAfterRestart(attribute: EditorInfo?, restarting: Boolean): Boolean {
+        val code = inlineComposition.text
+        val ic = currentInputConnection
+        val last = lastEditorIdentity
+        val state = uiState.value
+        if (!restarting || attribute == null || ic == null || last == null || code.isNullOrEmpty() || !inlineComposition.active ||
+            attribute.packageName.isNullOrEmpty() || attribute.packageName != last.first || attribute.fieldId != last.second ||
+            editorInputPolicy.field.scoped || EditorFieldPolicy.from(attribute).scoped ||
+            EditorInfoClassifier.isSecretEditor(attribute) || EditorInfoClassifier.isTerminalEditor(attribute) ||
+            state.inputTarget.isInternal || state.isVoiceMode || voiceRecordingStarted || !candidateState.value.isComposing ||
+            TerminalEditor.inputTextLocation(this) != SettingsPreferences.INPUT_TEXT_INPUT_BOX) return false
+        val selStart = attribute.initialSelStart
+        val selEnd = attribute.initialSelEnd
+        val window = code.length + 1
+        val before = (if (Build.VERSION.SDK_INT >= 30) attribute.getInitialTextBeforeCursor(window, 0) else null)
+            ?: runCatching { ic.getTextBeforeCursor(window, 0) }.getOrNull()
+        val after = (if (Build.VERSION.SDK_INT >= 30) attribute.getInitialTextAfterCursor(window, 0) else null)
+            ?: runCatching { ic.getTextAfterCursor(window, 0) }.getOrNull()
+        val region = locateResumableComposition(code, selStart, selEnd, before, after, inlineComposition.start) {
+            runCatching { ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) }.getOrNull()
+                ?.let { it.text to it.startOffset }
+        } ?: return false
+        // 新连接从未知光标开始记；重新标组合区后光标前文字混着编码，不拿来回答。
+        (ic as? TrackedInputConnection)?.memory?.started(-1, -1, enabled = true)
+        val adopted = runCatching {
+            ic.beginBatchEdit()
+            try {
+                ic.setComposingRegion(region.start, region.end).also { ok ->
+                    // 宿主把光标放进编码中间（早一个字）时放回拼音光标原处，免得被当成在拼音里移了光标。
+                    val caret = region.start + inlineComposition.caret
+                    if (ok && selStart == selEnd && selStart in region.start..region.end && selStart != caret) ic.setSelection(caret, caret)
+                }
+            } finally { ic.endBatchEdit() }
+        }.getOrDefault(false)
+        if (!adopted) return false
+        lastEditorIdentity = Triple(attribute.packageName, attribute.fieldId, attribute.inputType)
+        beginEditorField(attribute, restarting)
+        englishEditorReadCapability.clear()
+        uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
+        updateHardwareKeyboardConnection()
+        requestHardwareCursorUpdates()
+        updateEnterKeyText(attribute)
+        // 只记长度与位置，不记文字内容。
+        FileLogger.w("InputLifecycle", "inline composition resumed after restart: len=${code.length} " +
+            "sel=$selStart/$selEnd at=${region.start}")
+        return true
     }
 
     /**
