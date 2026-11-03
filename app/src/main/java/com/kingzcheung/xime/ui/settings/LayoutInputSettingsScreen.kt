@@ -320,6 +320,8 @@ internal fun FuzzyPinyinSection() {
                     t9Digits = on
                     scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
                 },
+                // 它只把下面开着的组用到数字上；一组都没开时没有效果，置灰写明（存的值不变）。
+                lockMessage = if (enabled.isEmpty()) "下面各组都没开，开了才起作用" else null,
                 extraCost = {
                     PerformanceCostTotalNote(enabled.mapTo(linkedSetOf()) { com.kingzcheung.xime.settings.PerformanceCosts.Item.t9Fuzzy(it) },
                         label = "性能开销(已开的 ${enabled.size} 组合计)", tag = "t9-fuzzy-digits")
