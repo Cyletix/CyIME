@@ -563,6 +563,8 @@ class SpeechRecognitionManager(
             @Volatile var active = true
             @Volatile var switching = false
             @Volatile var parts = prefix
+            /** The backend's own reason (e.g. model not downloaded); a failed start reports it instead of a generic line. */
+            @Volatile var reportedError: String? = null
             fun receive(text: String, partial: Boolean) {
                 if (!active) return
                 val segment = SpeechSegment(text.trim(), language, !partial && currentBackend.resultKeepsPunctuation)
@@ -583,6 +585,7 @@ class SpeechRecognitionManager(
                     if (active && !switching) postForSession(session) { if (active && !switching && !cancelRequested) setState(state) }
                 },
                 onError = { error ->
+                    if (error.isNotBlank()) reportedError = error
                     if (active) postForSession(session) { if (active && !cancelRequested) errorCallback?.invoke(error, true) }
                 },
             )
@@ -609,7 +612,8 @@ class SpeechRecognitionManager(
                 var activeLanguage = language
                 attempted = true
                 backendOperationStartedAt = System.nanoTime()
-                check(currentBackend.start(language)) { "启动语音引擎失败" }
+                // The later failure line replaces the backend's toast/notice, so it must carry the backend's reason.
+                check(currentBackend.start(language)) { callbacks.reportedError ?: "启动语音引擎失败" }
                 backendOperationStartedAt = 0L
                 FileLogger.i(TAG, "ASR backend ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
                 while (!cancelRequested && !released) {
@@ -625,7 +629,9 @@ class SpeechRecognitionManager(
                                 val prefix = callbacks.parts
                                 if (cancelRequested || released) break
                                 callbacks = SegmentCallbacks(prefix, chunk.language).also { it.bind() }
-                                check(currentBackend.start(chunk.language)) { "无法切换到${chunk.language.displayName}语音，请检查该语言模型" }
+                                check(currentBackend.start(chunk.language)) {
+                                    callbacks.reportedError ?: "无法切换到${chunk.language.displayName}语音，请检查该语言模型"
+                                }
                             }
                             activeLanguage = chunk.language
                         }

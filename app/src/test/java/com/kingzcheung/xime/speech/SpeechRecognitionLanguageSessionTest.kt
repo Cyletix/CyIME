@@ -34,6 +34,8 @@ class SpeechRecognitionLanguageSessionTest {
         @Volatile var allowClose = CountDownLatch(1)
         @Volatile var startGate: CountDownLatch? = null
         @Volatile var startSucceeds = true
+        /** Reported through onError before a failed start, like OfflineAsrBackend's "model not downloaded". */
+        @Volatile var startError: String? = null
         /** Holds on-demand model loading until the test opens it. */
         @Volatile var initGate: CountDownLatch? = null
         var compatibleLanguages = emptySet<InputLanguage>()
@@ -63,6 +65,7 @@ class SpeechRecognitionLanguageSessionTest {
                 startInterruptions.incrementAndGet()
                 throw error
             }
+            if (!startSucceeds) startError?.let { callbacks.error(it) }
             return startSucceeds
         }
         override fun processAudioChunk(buffer: ByteArray) {
@@ -423,6 +426,20 @@ class SpeechRecognitionLanguageSessionTest {
         assertEquals(RecognitionState.ERROR, f.manager.getState())
         assertTrue(f.backend.audio.isEmpty())
         assertTrue(f.results.isEmpty())
+    }
+
+    @Test fun backendStartupFailureKeepsTheBackendsReasonVisible() = Fixture().use { f ->
+        val reason = "所选中文语音模型尚未完整下载，请在模型管理中下载"
+        f.backend.startSucceeds = false
+        f.backend.startError = reason
+        f.backend.allowClose.countDown()
+        f.manager.startRecognition(InputLanguage.CHINESE)
+        f.session()
+        f.await { f.errors.any { it.startsWith("录音已停止") } && f.microphones.single().released.get() }
+
+        // The toast and keyboard notice show the last error; it must still say why, not only "启动语音引擎失败".
+        assertTrue(f.errors.toString(), f.errors.last().contains(reason))
+        assertTrue(f.errors.toString(), f.errors.none { it.contains("启动语音引擎失败") })
     }
 
     @Test fun cancellingQueuedRecordingDoesNotLetThirdRecordingBypassTheOriginalBackendStop() = Fixture().use { f ->
