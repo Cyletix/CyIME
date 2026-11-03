@@ -12,6 +12,7 @@ import java.util.Random;
  * what a person does and counts how often they have to stop.
  *
  * PROBE_OPTIONS (environment, optional): comma separated session switches, e.g. cyime_mixed_input=1.
+ * PROBE_SCHEMA (environment, optional): schema to type in, default rime_ice (e.g. double_pinyin_flypy, t9_pinyin).
  *
  * type  LIB USER CASES OUT NEIGHBORS
  *   Each case (id, typed letters, target) is typed key by key without picking. Per key the first candidate is
@@ -44,12 +45,17 @@ public final class RealTypingProbe {
     System.load(new File(lib, "librime_jni.so").getAbsolutePath());
     RimeEngine e = new RimeEngine();
     e.nativeInitialize(user, user);
-    if (!new File(user, "build/rime_ice.schema.yaml").isFile()) {
+    String schema = System.getenv("PROBE_SCHEMA");
+    if (schema == null || schema.isEmpty()) schema = "rime_ice";
+    t9 = schema.equals("t9_pinyin");
+    // Nine-key: the app writes its schema patches before deploying (as ChatReplay does).
+    if (t9) e.nativeEnsureT9SchemaPatches(schema);
+    if (!new File(user, "build/" + schema + ".schema.yaml").isFile()) {
       e.nativeStartMaintenance(true);
       while (e.nativeIsMaintaining()) Thread.sleep(100);
     }
     if (!e.nativeCreateSession()) throw new Exception("session unavailable");
-    if (!e.nativeSwitchSchema("rime_ice")) throw new Exception("schema unavailable");
+    if (!e.nativeSwitchSchema(schema)) throw new Exception("schema unavailable: " + schema);
     e.nativeSetOption("ascii_mode", false);
     // PROBE_OPTIONS=name=1,other=0 sets session switches the app sets from its settings (cyime_mixed_input).
     String options = System.getenv("PROBE_OPTIONS");
@@ -62,11 +68,35 @@ public final class RealTypingProbe {
     return e;
   }
 
+  /** Nine-key (t9_pinyin): digits go through the T9 processor, which needs a flush after each key. */
+  static boolean t9;
+
+  static void clear(RimeEngine e) {
+    if (t9) {
+      e.nativeT9ClearComposition(1);
+      e.nativeT9FlushRimeInput();
+    }
+    e.nativeSetInput("");
+  }
+
+  /** After the last key the person looks at the bar; nine-key finishes its pause refinement first (ChatReplay). */
+  static void settle(RimeEngine e) throws Exception {
+    if (!t9) return;
+    long start = System.nanoTime();
+    int state = e.nativeT9RefinementState();
+    while (state == 1 && System.nanoTime() - start < 2_000_000_000L) {
+      Thread.sleep(5);
+      state = e.nativeT9RefinementState();
+    }
+    if (state == 2) e.nativeRefineT9Sentences();
+  }
+
   static String clean(String s) { return s.replace('\t', ' ').replace('|', '/').replace('\n', ' '); }
 
   static void typeKeys(RimeEngine e, String keys, List<String> firsts) throws Exception {
     for (char c : keys.toCharArray()) {
       if (!e.nativeProcessKey(c, 0)) throw new Exception("unhandled key " + c + " in " + keys);
+      if (t9) e.nativeT9FlushRimeInput();
       if (firsts != null) {
         String[][] rows = e.nativeInspectCandidates(1);
         firsts.add(rows.length > 0 ? clean(rows[0][0]) : "");
@@ -109,8 +139,10 @@ public final class RealTypingProbe {
       for (String[] f : read(a[3])) {
         List<String> firsts = new ArrayList<>();
         long started = System.nanoTime();
+        clear(e);
         typeKeys(e, f[1], firsts);
         long typed = System.nanoTime() - started;
+        settle(e);
         String[][] rows = e.nativeInspectCandidates(PANEL);
         int rank = rankOf(e.nativeInspectCandidates(100), f[2]);
         String first = rows.length > 0 ? rows[0][0] : "";
@@ -140,7 +172,7 @@ public final class RealTypingProbe {
         out.println(String.join("\t", f[0], f[1], f[2], String.valueOf(rank), clean(first),
             String.valueOf(picks), String.valueOf(stops), stuck ? "1" : "0", stuck ? rest : "",
             String.join("\u001f", firsts), finalTop, String.valueOf(typed / 1000)));
-        e.nativeSetInput("");
+        clear(e);
       }
     } finally { e.nativeDestroy(); }
   }
