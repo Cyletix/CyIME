@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -81,11 +82,16 @@ class T9GlideInputTest {
             }
         }
         board.performTouchInput { up() }
+        // 抬手后在后台按词表比对整条线（来 lai = 524），再按点按同一路径送进去。
+        rule.waitUntil(5000) { input.isNotEmpty() }
         assertEquals("524", input)
         board.performTouchInput { click(four) }
         assertEquals("5244", input)
-        board.performTouchInput { down(five); moveTo(two); moveTo(five); up() }
-        assertEquals("5244525", input)
+        // 别的用户 11-03：从 9 直线划到 4 会路过 8 或 5，以前都算进去；现在只出 94（xi、yi、zi）。
+        val nine = centerOf("WXYZ")
+        board.performTouchInput { down(nine); moveTo(lerp(nine, four, 0.5f)); moveTo(four); up() }
+        rule.waitUntil(5000) { input.length > 4 }
+        assertEquals("524494", input)
     }
 
     @Test fun leavingDigitsCancellingOrChangingEditorDropsTheStroke() {
@@ -116,6 +122,7 @@ class T9GlideInputTest {
         show(true, inPreeditEditor = false)
         val five = centerOf("JKL"); val two = centerOf("ABC"); val four = centerOf("GHI")
         board.performTouchInput { down(five); moveTo(two); moveTo(four); up() }
+        rule.waitUntil(5000) { org.mockito.Mockito.mockingDetails(controller).invocations.count { it.method.name == "onDigitPressed" } >= 3 }
         inOrder(controller) {
             verify(controller).onDigitPressed("5")
             verify(controller).onDigitPressed("2")

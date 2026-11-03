@@ -16,7 +16,12 @@ import kotlin.math.ceil
 
 internal val LocalT9GlideKeys = staticCompositionLocalOf<MutableMap<Char, Rect>?> { null }
 
-/** Sample segments as well as events so the same path on a slower touchscreen gives the same digits. */
+/**
+ * Decides when a touch becomes a glide (it reached another digit key) and whether it left the digit grid.
+ * The digits it crosses are no longer what gets typed: the whole path goes to [t9GlideTyping]'s callback,
+ * which matches it against the dictionary (a line from 9 to 4 passes over 8 or 5 but means 94).
+ * Sample segments as well as events so the same path on a slower touchscreen behaves the same.
+ */
 private class DigitStroke(private val keys: Map<Char, Rect>, start: Offset, first: Char) {
     private var previous = start
     private val step = (keys.values.minOf { it.minDimension } / 4f).coerceAtLeast(1f)
@@ -43,11 +48,11 @@ private class DigitStroke(private val keys: Map<Char, Rect>, start: Offset, firs
 @Composable
 internal fun Modifier.t9GlideTyping(
     keys: Map<Char, Rect>?, trail: GlideTrail, rootOrigin: () -> Offset,
-    admission: () -> Long?, onDigits: (String) -> Unit,
+    admission: () -> Long?, onStroke: (xs: FloatArray, ys: FloatArray) -> Unit,
 ): Modifier {
     val origin = rememberUpdatedState(rootOrigin)
     val ticket = rememberUpdatedState(admission)
-    val submit = rememberUpdatedState(onDigits)
+    val submit = rememberUpdatedState(onStroke)
     if (keys == null) return this
     return pointerInput(keys, trail) {
         awaitEachGesture {
@@ -90,7 +95,9 @@ internal fun Modifier.t9GlideTyping(
                     if (claimed) change.consume() // the original button drops its tap/flick on this same event
                     if (stroke.cancelled || origin.value() != offset || ticket.value() != editor) break
                     if (!change.pressed) {
-                        if (claimed) submit.value(stroke.digits.toString())
+                        // Root coordinates, same as the key rectangles.
+                        if (claimed) submit.value(FloatArray(path.size) { path[it].x + offset.x },
+                            FloatArray(path.size) { path[it].y + offset.y })
                         break
                     }
                     if (claimed) trail.points = path.toList()

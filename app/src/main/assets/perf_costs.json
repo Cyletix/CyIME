@@ -61,7 +61,7 @@
         "t9_fuzzy_in_ing": {"keyMs": 2.5, "memoryMb": 2, "baselineKeyMs": 39.0, "estimated": true},
         "t9_fuzzy_ian_iang": {"keyMs": 1.2, "memoryMb": 1, "baselineKeyMs": 39.0, "estimated": true},
         "t9_fuzzy_uan_uang": {"keyMs": 1.0, "memoryMb": 1, "baselineKeyMs": 39.0, "estimated": true},
-        "t9_glide_typing": {"keyMs": 0.0, "memoryMb": 0, "baselineKeyMs": 39.0, "estimated": true}
+        "t9_glide_typing": {"keyMs": 0.0, "memoryMb": 6, "baselineKeyMs": 39.0, "estimated": true}
       }
     }
   ]

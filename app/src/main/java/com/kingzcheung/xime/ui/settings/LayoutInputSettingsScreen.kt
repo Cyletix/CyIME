@@ -156,7 +156,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsSection(title = "九键手势", content = {
                         SettingsToggleItem(Icons.TwoTone.Gesture, "九键滑行输入",
-                            "连续划过 2～9 键的中心，松手后照常选词。例如划 5→2→4 可以选“来”。",
+                            "一笔划过一个词的几个键，松手后按词库认出这笔划的是哪几个键，再照常选词：划 5→2→4 可以选“来”，从 9 直接划到 4 是 94，路过的键不算。",
                             checked = settings.t9GlideTyping, onCheckedChange = {
                                 settings = settings.copy(t9GlideTyping = it); settings.save(context)
                             },

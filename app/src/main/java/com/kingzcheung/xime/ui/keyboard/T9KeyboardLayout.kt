@@ -217,6 +217,20 @@ private fun T9KeyboardSwipeOverlay(
     val glide = input.t9GlideTyping && input.cursorGesture != CursorGestureMode.KEYBOARD
     val glideKeys = remember(glide, controller, uiState.inputProfile) { if (glide) mutableMapOf<Char, Rect>() else null }
     val trail = remember(glideKeys, controller) { GlideTrail() }
+    val glideScope = rememberCoroutineScope()
+    val glideContext = LocalContext.current.applicationContext
+    // 全拼、双拼九键按词表比对整条线（别的用户 11-03：路过的键都算进去，正确率低）；其他九键方案只取起点、拐弯和终点。
+    val glideProfile = uiState.inputProfile
+    val glideDoublePinyin = if (glideProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN)
+        com.kingzcheung.xime.settings.DoublePinyinSchemes.find(uiState.currentSchemaId) else null
+    val glideDictionary = glideProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
+        (glideProfile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN || glideDoublePinyin != null)
+    // 提前读入词表，第一次滑行少等一点。
+    androidx.compose.runtime.LaunchedEffect(glide, glideDictionary) {
+        if (glide && glideDictionary) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.kingzcheung.xime.glide.GlideLexicon.pinyin(glideContext) }
+        }
+    }
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
@@ -241,10 +255,28 @@ private fun T9KeyboardSwipeOverlay(
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys) {
     Box(
         modifier = modifier
-            .t9GlideTyping(glideKeys, trail, { keyboardBounds.topLeft }, callbacks.inputAdmissionTicket) { digits ->
-                for (digit in digits) {
-                    val key = digit.toString()
-                    if (callbacks.onPreeditKeyInput?.invoke(key) != true) controller.onDigitPressed(key)
+            .t9GlideTyping(glideKeys, trail, { keyboardBounds.topLeft }, callbacks.inputAdmissionTicket) { xs, ys ->
+                val keys = glideKeys?.mapValues { (_, rect) ->
+                    com.kingzcheung.xime.keyboard.LetterKeyRect(rect.left, rect.top, rect.width, rect.height)
+                } ?: return@t9GlideTyping
+                if (keys.isEmpty()) return@t9GlideTyping
+                // 输入框归属在抬手时确定；识别完成前换了输入框则作废（与 26 键滑行相同）。
+                val inputContext = runCatching { callbacks.captureInputContext() }.getOrNull() ?: return@t9GlideTyping
+                val dictionary = glideDictionary
+                val doublePinyin = glideDoublePinyin
+                glideScope.launch {
+                    val digits = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        runCatching {
+                            com.kingzcheung.xime.glide.GlideLexicon.t9Digits(glideContext, keys, xs, ys, dictionary, doublePinyin)
+                        }.getOrDefault("")
+                    }
+                    if (digits.isEmpty()) return@launch
+                    kotlinx.coroutines.withContext(inputContext) {
+                        for (digit in digits) {
+                            val key = digit.toString()
+                            if (callbacks.onPreeditKeyInput?.invoke(key) != true) controller.onDigitPressed(key)
+                        }
+                    }
                 }
             }
             .onGloballyPositioned { coordinates ->

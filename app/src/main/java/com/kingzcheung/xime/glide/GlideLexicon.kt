@@ -76,10 +76,25 @@ object GlideLexicon {
         return map[code]
     }
 
-    private fun cachedDecoder(kind: String, source: Any?, keyboard: GlideKeyboard, words: () -> List<String>): GlideDecoder =
+    /**
+     * 九键滑行出的数字串：全拼、双拼按词表比对整条线最像哪个词的编码（[dictionary] 为真）；
+     * 认不出或不是拼音方案时只取起点、拐弯和终点的键。须在后台线程调用。
+     */
+    fun t9Digits(context: Context, keys: Map<Char, LetterKeyRect>, xs: FloatArray, ys: FloatArray,
+        dictionary: Boolean, doublePinyin: DoublePinyinScheme?): String {
+        if (dictionary) {
+            val decoder = cachedDecoder(if (doublePinyin == null) "t9" else "t9sp", doublePinyin, T9Glide.keyboard(keys),
+                T9Glide.MAX_ENDPOINT) { T9Glide.codes(pinyin(context), doublePinyin) }
+            decoder.decode(xs, ys, limit = 1).firstOrNull()?.let { return it.word }
+        }
+        return T9Glide.turnDigits(xs, ys, keys)
+    }
+
+    private fun cachedDecoder(kind: String, source: Any?, keyboard: GlideKeyboard,
+        maxEndpoint: Float = GlideDecoder.MAX_ENDPOINT, words: () -> List<String>): GlideDecoder =
         synchronized(this) {
             cached[kind]?.takeIf { (cachedSource, decoder) -> cachedSource == source && decoder.revision == keyboard.revision }?.second
-                ?: GlideDecoder(keyboard, words()).also { cached[kind] = source to it }
+                ?: GlideDecoder(keyboard, words(), maxEndpoint).also { cached[kind] = source to it }
         }
 
     fun keyboard(keys: Map<Char, LetterKeyRect>): GlideKeyboard {

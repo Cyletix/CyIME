@@ -1,6 +1,6 @@
 package com.kingzcheung.xime.glide
 
-import kotlin.math.hypot
+import kotlin.math.sqrt
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -28,8 +28,13 @@ class GlideKeyboard(val keyUnit: Float, val centers: Map<Char, Pair<Float, Float
 /** [cost] 含词频先验，用来排序；[shape] 只算轨迹（形状与起止点），按上下文重排时与双词表相加。 */
 data class GlideCandidate(val word: String, val cost: Float, val shape: Float = cost)
 
-class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
-    private class Template(val word: String, val prior: Float, val xs: FloatArray, val ys: FloatArray)
+/**
+ * [maxEndpoint]：起点、终点离词的首末键中心最远多少（单位：键宽）；九键的键大、键少，收紧到不含上下相邻键，
+ * 否则每次要比对的词多好几倍。
+ */
+class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>, private val maxEndpoint: Float = MAX_ENDPOINT) {
+    /** [shape] 是合并相邻重复字母后的写法，形状相同的词只比一次。 */
+    private class Template(val word: String, val shape: String, val prior: Float, val xs: FloatArray, val ys: FloatArray)
 
     private val templates: List<Template>
     val revision: Int get() = keyboard.revision
@@ -43,7 +48,7 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
             val px = FloatArray(code.length) { keyboard.centers.getValue(code[it]).first / keyboard.keyUnit }
             val py = FloatArray(code.length) { keyboard.centers.getValue(code[it]).second / keyboard.keyUnit }
             val (xs, ys) = resample(px, py)
-            Template(word, ln(rank + 2.0).toFloat() / logMax, xs, ys)
+            Template(word, code, ln(rank + 2.0).toFloat() / logMax, xs, ys)
         }
     }
 
@@ -60,15 +65,21 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
         val last = SAMPLES - 1
         val results = ArrayList<GlideCandidate>()
         val shapes = HashMap<String, Float>()
+        // 已有 limit 个候选后，第 limit 好的代价；比它差的词不必算完。词表按常用程度排列，同形状的词后面的只会更差。
+        val kept = java.util.PriorityQueue<Float>(limit.coerceAtLeast(1), reverseOrder())
         for (template in templates) {
             val start = hypot(sx[0] - template.xs[0], sy[0] - template.ys[0])
-            if (start > MAX_ENDPOINT) continue
+            if (start > maxEndpoint) continue
             val end = hypot(sx[last] - template.xs[last], sy[last] - template.ys[last])
-            if (end > MAX_ENDPOINT) continue
-            val shape = shapes.getOrPut(collapseRepeats(template.word)) { dtw(sx, sy, template.xs, template.ys) }
+            if (end > maxEndpoint) continue
+            val fixed = (start + end) / 2f * ENDPOINT_WEIGHT + template.prior * PRIOR_WEIGHT
+            val bound = if (kept.size < limit) MAX_SHAPE else min(MAX_SHAPE, kept.peek() - fixed)
+            val shape = shapes.getOrPut(template.shape) { dtw(sx, sy, template.xs, template.ys, bound) }
             if (shape > MAX_SHAPE) continue
             val geometry = shape + (start + end) / 2f * ENDPOINT_WEIGHT
-            results += GlideCandidate(template.word, geometry + template.prior * PRIOR_WEIGHT, geometry)
+            val cost = geometry + template.prior * PRIOR_WEIGHT
+            results += GlideCandidate(template.word, cost, geometry)
+            if (kept.size < limit) kept += cost else if (cost < kept.peek()) { kept.poll(); kept += cost }
         }
         return results.sortedWith(compareBy<GlideCandidate> { it.cost }.thenBy { it.word }).take(limit)
     }
@@ -117,7 +128,14 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
         }
 
         /** 首尾固定、带宽为四分之一的 DTW，按样本数归一。 */
-        private fun dtw(ax: FloatArray, ay: FloatArray, bx: FloatArray, by: FloatArray): Float {
+        /** 两点距离；比 kotlin.math.hypot（走 Math.hypot，防溢出但慢很多）快，坐标都是几个键宽，不会溢出。 */
+        private fun hypot(dx: Float, dy: Float): Float = sqrt(dx * dx + dy * dy)
+
+        /**
+         * 一整行都超过 [bound]（不超过 [MAX_SHAPE]）时提前结束、当作筛掉：累计代价逐行只增不减，
+         * 最后的结果只会更大，这个词反正进不了前几名，排出的候选与算完一样。
+         */
+        private fun dtw(ax: FloatArray, ay: FloatArray, bx: FloatArray, by: FloatArray, bound: Float = MAX_SHAPE): Float {
             val n = SAMPLES
             val band = max(1, n / 4)
             var previous = FloatArray(n + 1) { Float.POSITIVE_INFINITY }
@@ -125,10 +143,13 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>) {
             previous[0] = 0f
             for (i in 1..n) {
                 current.fill(Float.POSITIVE_INFINITY)
+                var rowMin = Float.POSITIVE_INFINITY
                 for (j in max(1, i - band)..min(n, i + band)) {
                     current[j] = hypot(ax[i - 1] - bx[j - 1], ay[i - 1] - by[j - 1]) +
                         min(previous[j - 1], min(previous[j], current[j - 1]))
+                    if (current[j] < rowMin) rowMin = current[j]
                 }
+                if (rowMin > bound * n) return Float.POSITIVE_INFINITY
                 val swap = previous
                 previous = current
                 current = swap
