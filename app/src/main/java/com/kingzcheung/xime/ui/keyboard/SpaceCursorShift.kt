@@ -5,11 +5,14 @@ import com.kingzcheung.xime.viewmodel.ShiftMode
 /**
  * 空格长按移光标时的 Shift 扩选，同电脑 Shift+方向键：从锚点扩选，松开 Shift 后的下一步折叠选区、回到普通移动。
  * 按住 Shift（HELD）逐步实时判断；单次大写（SINGLE）在本次拖动第一步锁定整段扩选并被用掉；大写锁定（CAPS）不扩选。
+ * 按住符号键（当 Ctrl 用）拖动同样扩选（用户 11-03）。
  * 只在空格移光标、底部留白滑动移光标（[BottomLiftSpacer]，同一套扩选）期间生效，整个键盘滑动移光标等其他来源不受影响。
  */
 internal object SpaceCursorShift {
     private var active = false
     private var latched: Boolean? = null
+    /** 正按住符号键当 Ctrl 的那块键盘；没按住时为 null。 */
+    var ctrlHolder: ShiftSlideTargets? = null
 
     fun begin() { active = true; latched = null }
 
@@ -19,6 +22,6 @@ internal object SpaceCursorShift {
     fun selecting(mode: ShiftMode): Boolean {
         if (!active) return false
         val oneShot = latched ?: (mode == ShiftMode.SINGLE).also { latched = it }
-        return oneShot || mode == ShiftMode.HELD
+        return oneShot || mode == ShiftMode.HELD || ctrlHolder?.ctrlSelect() == true
     }
 }

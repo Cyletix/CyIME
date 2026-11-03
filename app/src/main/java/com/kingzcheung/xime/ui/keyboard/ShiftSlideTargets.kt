@@ -35,6 +35,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         ctrlFaces = false
         ctrlShortcut = shortcut
         ctrlUsed = false
+        SpaceCursorShift.ctrlHolder = this
     }
     /** 按满时限：字母键渐变成快捷键键面；不在按住符号键时什么都不做。 */
     fun showCtrlFaces() {
@@ -55,6 +56,13 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         val send = ctrlShortcut ?: return false
         ctrlUsed = true
         send(com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER)
+        return true
+    }
+
+    /** 长按空格移光标时按住符号键：和按住 Shift 一样扩选；算用过 Ctrl，松手不开符号（用户 11-03）。 */
+    fun ctrlSelect(): Boolean {
+        if (!ctrl) return false
+        ctrlUsed = true
         return true
     }
 
@@ -115,6 +123,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         ctrl = false
         ctrlFaces = false
         ctrlShortcut = null
+        if (SpaceCursorShift.ctrlHolder === this) SpaceCursorShift.ctrlHolder = null
     }
     fun clearDrag() {
         drag = null
