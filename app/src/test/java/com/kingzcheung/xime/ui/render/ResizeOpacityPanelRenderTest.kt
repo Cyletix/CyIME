@@ -135,6 +135,41 @@ class ResizeOpacityPanelRenderTest {
             .use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    /**
+     * 手指按住滑条拖动时：只留滑条（底板只包这一行），外框、把手、提示、按钮和遮罩都不画（11-03「就只留透明度那个条」）。
+     * 每个变体按住时各出一张 resize-opacity-dragging-<n>.png，同一张图里其他变体是松手的样子，正好对照。
+     */
+    @Test fun renderWhileDragging() {
+        val out = System.getenv("CYIME_RENDER_OUT")
+        assumeTrue(!out.isNullOrEmpty())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        KeyboardThemes.initFromConfig(context)
+        val themes = (System.getenv("CYIME_RENDER_THEMES") ?: "soft_blue/light,soft_blue/dark").split(",")
+            .map { it.trim().split("/") }.map { it[0] to (it[1] == "dark") }
+        val variants = buildList {
+            for ((id, dark) in themes) for (glass in listOf(false, true)) add(Triple(id, dark, glass))
+        }
+        rule.setContent {
+            Column(Modifier.background(Color(0xFF808080))) {
+                Row { for ((id, dark, glass) in variants) Variant(411, 300, id, dark, glass) }
+            }
+        }
+        rule.waitForIdle()
+        File(out!!).mkdirs()
+        val root = rule.activity.window.decorView
+        for (i in variants.indices) {
+            val slider = rule.onAllNodesWithTag("keyboard-opacity-slider", useUnmergedTree = true)[i]
+            slider.performTouchInput { down(center); moveBy(Offset(width * 0.15f, 0f)) }
+            rule.waitForIdle()
+            val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
+            File(out, "resize-opacity-dragging-$i.png").outputStream()
+                .use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            slider.performTouchInput { up() }
+            rule.waitForIdle()
+        }
+    }
+
     @Composable
     private fun Variant(width: Int, height: Int, id: String, dark: Boolean, glass: Boolean) {
         val palette = resolveKeyboardPalette(id, dark)

@@ -78,6 +78,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -371,7 +372,8 @@ internal fun KeyboardResizeOverlay(
                 .testTag(if (editingOpacity) "keyboard-opacity-backdrop" else "keyboard-resize-frame")
                 .semantics { contentDescription = if (editingOpacity) "透明度调整" else "拖动边框调整大小，拖动内部移动悬浮键盘" }
                 .drawBehind {
-                    if (editingOpacity) return@drawBehind
+                    // 拖透明度时只留滑条：外框、角标、把手、遮罩都不画（11-03「就只留透明度那个条」）。
+                    if (editingOpacity || adjustingOpacity) return@drawBehind
                     val stroke = frameStyle.strokeDp.dp.toPx()
                     val pillThickness = frameStyle.handleThicknessDp.dp.toPx()
                     val bracketThickness = frameStyle.bracketThicknessDp.dp.toPx()
@@ -809,8 +811,8 @@ internal fun KeyboardResizeOverlay(
         ) {
             Column(
                 modifier = Modifier.width(panelWidth).align(Alignment.Center)
-                    .background(panelColor, toolShape)
-                    .border(toolOutline, toolShape)
+                    // 拖透明度时底板只包住滑条那一行（下面画），按钮那一行藏起来，位置不动、不跳。
+                    .then(if (adjustingOpacity) Modifier else Modifier.background(panelColor, toolShape).border(toolOutline, toolShape))
                     .padding(start = panelInset, end = panelInset, top = (panelInset - sliderSlack).coerceAtLeast(0.dp),
                         bottom = panelInset),
                 verticalArrangement = Arrangement.spacedBy((rowGap - sliderSlack).coerceAtLeast(0.dp)),
@@ -821,11 +823,24 @@ internal fun KeyboardResizeOverlay(
                 // 放在滑条右边，不压在细轨道中间把它截成两段。
                 val thumbSize = 18.dp * controlScale
                 val trackHeight = frameStyle.handleThicknessDp.dp
-                val inactiveTrackColor = toolOutlineColor
+                // 没走过的一段是主题强调色压在底板上的浅色（实心），任何主题下都带主题的颜色，不是灰线。
+                val inactiveTrackColor = accentColor.copy(alpha = 0.30f).compositeOver(panelColor)
+                val sliderBandTop = (panelInset - sliderSlack).coerceAtLeast(0.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(opacityHeight)
+                        .drawBehind {
+                            if (!adjustingOpacity) return@drawBehind
+                            // 和平时的底板同一圆角、同一边距，只是只包这一行。
+                            val dx = panelInset.toPx()
+                            val dy = sliderBandTop.toPx()
+                            val topLeft = Offset(-dx, -dy)
+                            val band = Size(size.width + 2f * dx, size.height + 2f * dy)
+                            val corner = CornerRadius((actionRadius + panelInset).toPx())
+                            drawRoundRect(panelColor, topLeft, band, corner)
+                            drawRoundRect(toolOutlineColor, topLeft, band, corner, style = Stroke(1.dp.toPx()))
+                        }
                         .testTag("keyboard-resize-opacity-panel"),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -956,7 +971,8 @@ internal fun KeyboardResizeOverlay(
                     EqualActionButton(modifier = Modifier.weight(1f), description = "完成",
                         icon = { Text("完成") }, onClick = ::confirmResize)
                 } else Row(
-                    modifier = Modifier.fillMaxWidth().testTag("keyboard-resize-actions"),
+                    modifier = Modifier.fillMaxWidth().alpha(if (adjustingOpacity) 0f else 1f)
+                        .testTag("keyboard-resize-actions"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(rowGap),
                 ) {
@@ -1085,7 +1101,7 @@ internal fun KeyboardResizeOverlay(
                     style = LocalTextStyle.current.copy(platformStyle = PlatformTextStyle(includeFontPadding = false)))
             }
         }
-        if (!editingOpacity && !floatingMode) {
+        if (!editingOpacity && !adjustingOpacity && !floatingMode) {
             // 系统手势区抬高把手时，底部提示和工具面板一起给它留位。
             Box(Modifier.absoluteOffset {
                 IntOffset(frame.left.roundToInt(), (bottomHandleY - hintBandPx).roundToInt())
@@ -1109,7 +1125,7 @@ internal fun KeyboardResizeOverlay(
                 }
             }
         }
-        if (!editingOpacity && splitGapPx > 0f) {
+        if (!editingOpacity && !adjustingOpacity && splitGapPx > 0f) {
             Box(Modifier.absoluteOffset {
                 IntOffset(frame.left.roundToInt(), (frame.top + hintInset.toPx()).roundToInt())
             }.size(with(density) { frame.width.toDp() }, hintRowHeight)
@@ -1147,7 +1163,7 @@ internal fun KeyboardResizeOverlay(
                 },
             )
         }
-        if (!editingOpacity && !floatingMode && splitGapPx <= 0f) {
+        if (!editingOpacity && !adjustingOpacity && !floatingMode && splitGapPx <= 0f) {
             val centered = kotlin.math.abs(frame.centerX - viewRect.centerX) < 0.5f
             val edgeCentered = kotlin.math.abs(frame.left - viewRect.centerX) < 0.5f ||
                 kotlin.math.abs(frame.right - viewRect.centerX) < 0.5f
@@ -1208,7 +1224,7 @@ internal fun KeyboardResizeOverlay(
                 EdgeHint(Icons.Default.OpenWith, "拖动移动")
             }
         }
-        if (!editingOpacity && floatingMode && splitGapPx <= 0f) {
+        if (!editingOpacity && !adjustingOpacity && floatingMode && splitGapPx <= 0f) {
             // 悬浮模式也按设计图在顶边放「拖动移动」胶囊，拖它整块移动，和底部拖动条一样。
             Box(Modifier.absoluteOffset {
                 IntOffset((frame.left + RESIZE_CORNER_HIT_DP.dp.toPx()).roundToInt(), (frame.top + hintInset.toPx()).roundToInt())
@@ -1219,7 +1235,7 @@ internal fun KeyboardResizeOverlay(
                 EdgeHint(Icons.Default.OpenWith, "拖动移动")
             }
         }
-        if (!editingOpacity && floatingMode) {
+        if (!editingOpacity && !adjustingOpacity && floatingMode) {
             Box(
                 modifier = Modifier
                     .absoluteOffset {
@@ -1232,7 +1248,7 @@ internal fun KeyboardResizeOverlay(
                     .then(floatingMoveGesture),
             )
         }
-        if (!editingOpacity && floatingMode && rotationState != null) {
+        if (!editingOpacity && !adjustingOpacity && floatingMode && rotationState != null) {
             RotateHandle(frame, rotationState, overlayOrigin, viewRect, previewState, functionColor, functionTextColor,
                 accentColor, currentPreviewRectSink, onEnd = { currentPreviewState.onDragEnd() })
         }
