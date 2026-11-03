@@ -249,6 +249,9 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
             val committed = commitCompositionAndLiteral(paired, asTyped = true, caret = caret)
             // 打 @ 时给邮箱后缀（默认关）；邮箱框走上面的直接上屏，在那里给。
             if (committed && literal == "@") service.keyRouter.offerEmailSuffixesAfterAt()
+            // 数字行、角标打的数字：对得上「我的短语」编码的短语放到候选栏（默认关）。
+            if (committed && !hardware && literal.lastOrNull()?.let { it in '0'..'9' || it in '０'..'９' } == true)
+                service.keyRouter.offerDigitPhrases()
         }
         return submit
     }

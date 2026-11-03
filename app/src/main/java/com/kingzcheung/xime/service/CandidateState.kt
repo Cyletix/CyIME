@@ -36,11 +36,18 @@ data class CandidateState(
     val candidateFocus: CandidateFocus? = null,
     /** 「删字后给同音字」放上去的那一组（第一项是删掉的那一段）；联想位置换成别的词后自然不再算。见 DeletionRecovery。 */
     val deletionRecovery: List<String> = emptyList(),
+    /** 「打数字出短语」放上去的那一组；[digitPhraseText] 是光标前那串数字（原样），选了就换掉它。见 DigitPhrases。 */
+    val digitPhrases: List<String> = emptyList(),
+    val digitPhraseText: String = "",
 )
 
 /** 候选栏上现在是删字后放回的那一组：不挡退格、不被空格上屏、不进九键选词。 */
 internal val CandidateState.isDeletionRecovery: Boolean
     get() = deletionRecovery.isNotEmpty() && associationCandidates == deletionRecovery
+
+/** 候选栏上现在是打数字给的短语：不挡退格、不被空格上屏、不进九键选词，选了换掉光标前那串数字。 */
+internal val CandidateState.isDigitPhraseList: Boolean
+    get() = digitPhrases.isNotEmpty() && digitPhraseText.isNotEmpty() && associationCandidates == digitPhrases
 
 /** Appending expanded pages or updating suggestions does not change existing candidate identities. */
 internal fun CandidateState.hasSameSelectionSource(current: CandidateState): Boolean =

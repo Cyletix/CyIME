@@ -237,6 +237,16 @@ private fun LayoutDisplayPage(
                         onClick = { com.kingzcheung.xime.ui.keyboard.openSideSymbolEditor(context,
                             com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.NUMBER_ROW) },
                         showArrow = true)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    // 打数字出短语（别人请求，默认关）：见 service/DigitPhrases.kt。
+                    var digitPhrases by remember { mutableStateOf(com.kingzcheung.xime.service.DigitPhrases.isEnabled(context)) }
+                    SettingsToggleItem(Icons.TwoTone.Dialpad, "数字出短语",
+                        "打的数字是「我的短语」编码的开头时，候选栏给出这些短语，点一下换掉这串数字。",
+                        checked = digitPhrases, onCheckedChange = {
+                            digitPhrases = it
+                            com.kingzcheung.xime.service.DigitPhrases.setEnabled(context, it)
+                        },
+                        costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DIGIT_PHRASES)
                 })
             }
             if (page == "candidates") item {
@@ -568,7 +578,9 @@ private fun LayoutDisplayPage(
                     }
                     // 拼音气泡底色可调透明（用户 11-01「我就喜欢透明度」）；只在键盘上方会浮出气泡时显示。
                     val bubblePrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
-                    if (!bubblePrefs.preeditInsideKeyboard && bubblePrefs.showCodeInCandidateBar) {
+                    // 选「显示在输入框」时没有气泡；页面上的选择先于键盘偏好刷新，所以也看本页的选择。
+                    if (inputTextLocation == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR &&
+                        !bubblePrefs.preeditInsideKeyboard && bubblePrefs.showCodeInCandidateBar) {
                         var bubbleOpacity by remember(bubblePrefs.preeditBubbleOpacity) { mutableStateOf(bubblePrefs.preeditBubbleOpacity) }
                         Column(
                             modifier = Modifier.settingsSearchAnchor("拼音气泡不透明度")

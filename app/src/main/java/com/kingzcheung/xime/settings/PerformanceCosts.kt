@@ -84,7 +84,9 @@ object PerformanceCosts {
         DOUBLE_PINYIN_KEY_HINTS("double_pinyin_key_hints", "双拼键位提示"),
         DELETE_RECOVERY("delete_recovery", "删字后给同音字"),
         HANDWRITING_LIVE("handwriting_recognize_while_writing", "手写边写边识别"),
-        TYPING_STATS("typing_stats", "记录打字统计");
+        TYPING_STATS("typing_stats", "记录打字统计"),
+        // 只在数字上屏后读一次光标前的字、查一遍编码是数字的短语；打拼音不经过它。
+        DIGIT_PHRASES("digit_phrase_candidates", "数字出短语");
 
         val nineKey: Boolean get() = id.startsWith(T9_PREFIX)
 
@@ -137,6 +139,7 @@ object PerformanceCosts {
             Item.DELETE_RECOVERY -> SettingsPreferences.isDeleteRecovery(context)
             Item.HANDWRITING_LIVE -> input.handwritingRecognizeWhileWriting
             Item.TYPING_STATS -> com.kingzcheung.xime.stats.TypingStats.isEnabled(context)
+            Item.DIGIT_PHRASES -> com.kingzcheung.xime.service.DigitPhrases.isEnabled(context)
             else -> false
         }
     }
@@ -193,6 +196,7 @@ object PerformanceCosts {
             Item.DELETE_RECOVERY -> SettingsPreferences.setDeleteRecovery(context, on)
             Item.HANDWRITING_LIVE -> input.copy(handwritingRecognizeWhileWriting = on).save(context)
             Item.TYPING_STATS -> com.kingzcheung.xime.stats.TypingStats.setEnabled(context, on)
+            Item.DIGIT_PHRASES -> com.kingzcheung.xime.service.DigitPhrases.setEnabled(context, on)
             else -> Unit
         }
     }
