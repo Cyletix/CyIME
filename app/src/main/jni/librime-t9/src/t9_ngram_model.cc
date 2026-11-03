@@ -193,7 +193,21 @@ double T9NgramModel::LogProb(int32_t history, int32_t word) const {
 double T9NgramModel::LogProb3(int32_t history2, int32_t history, int32_t word) const {
   const double bigram = LogProb(history, word);
   if (history2 == kUnseen || history == kUnseen) return bigram;
-  const int64_t pair = FindBigram(begin_[history2], begin_[history2 + 1], static_cast<uint32_t>(history));
+  // The decoder scores every candidate word after one path before moving to the next path, so the
+  // same (history2, history) pair comes many times in a row: remember its index per thread.
+  struct PairMemo {
+    const T9NgramModel* model = nullptr;
+    int32_t history2 = 0, history = 0;
+    int64_t pair = -1;
+  };
+  static thread_local PairMemo memo;
+  if (memo.model != this || memo.history2 != history2 || memo.history != history) {
+    memo.pair = FindBigram(begin_[history2], begin_[history2 + 1], static_cast<uint32_t>(history));
+    memo.model = this;
+    memo.history2 = history2;
+    memo.history = history;
+  }
+  const int64_t pair = memo.pair;
   if (pair < 0) return bigram;
   const uint64_t b = static_cast<uint64_t>(pair);
   if (word != kUnseen) {
