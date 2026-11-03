@@ -20,4 +20,11 @@ class VisualStyleTest {
         assertEquals(VisualStyle.ORIGINAL, VisualStyle.fromId("unknown"))
         assertEquals(VisualStyle.FROST, VisualStyle.fromId("frost"))
     }
+    /** 11-03：流光玻璃、毛玻璃和真玻璃重复，列表只留三种；选过的人按原有外观画，存的值不动。 */
+    @Test fun fakeGlassStylesAreNoLongerOfferedAndDrawAsOriginal() {
+        assertEquals(listOf(VisualStyle.ORIGINAL, VisualStyle.NEON, VisualStyle.FACET), VisualStyle.offered)
+        assertEquals(VisualStyle.ORIGINAL, VisualStyle.forKeyboard(VisualStyle.GLASS))
+        assertEquals(VisualStyle.ORIGINAL, VisualStyle.forKeyboard(VisualStyle.FROST))
+        VisualStyle.offered.forEach { assertEquals(it, VisualStyle.forKeyboard(it)) }
+    }
 }

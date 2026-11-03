@@ -37,7 +37,7 @@ internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) ->
             color = MaterialTheme.colorScheme.primary)
         Text("只改变材质。明暗、配色和背景始终跟随主题设置。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        VisualStyle.entries.chunked(2).forEach { row ->
+        VisualStyle.offered.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { style ->
                     val palette = MaterialTheme.colorScheme

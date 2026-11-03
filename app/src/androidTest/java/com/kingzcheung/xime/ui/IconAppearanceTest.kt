@@ -44,8 +44,9 @@ class IconAppearanceTest {
     @Test fun bindingWorksBothWaysAndUnlinkedChoicesSurviveReload() = preserve {
         rule.runOnIdle {
             IconAppearance.setLinked(context, true)
-            SettingsPreferences.setVisualStyle(context, VisualStyle.GLASS)
-            assertEquals(VisualStyle.GLASS, IconAppearance.effective)
+            // 11-03 起键盘视觉样式只有原有、霓光、折面三种（流光玻璃、毛玻璃只剩图标）。
+            SettingsPreferences.setVisualStyle(context, VisualStyle.FACET)
+            assertEquals(VisualStyle.FACET, IconAppearance.effective)
             IconAppearance.setIconStyle(context, VisualStyle.NEON)
             assertEquals(VisualStyle.NEON, SettingsPreferences.getVisualStyle(context))
             IconAppearance.setLinked(context, false)

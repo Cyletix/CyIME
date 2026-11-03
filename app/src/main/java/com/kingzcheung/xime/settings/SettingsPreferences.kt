@@ -733,8 +733,9 @@ object SettingsPreferences {
 
     const val KEY_VISUAL_STYLE = "cyime_visual_style"
 
-    fun getVisualStyle(context: Context) = com.kingzcheung.xime.ui.theme.VisualStyle.fromId(
-        getPrefs(context).getString(KEY_VISUAL_STYLE, null))
+    /** 选过「流光玻璃」「毛玻璃」的按「原有外观」读（[com.kingzcheung.xime.ui.theme.VisualStyle.offered]）；存的值不改。 */
+    fun getVisualStyle(context: Context) = com.kingzcheung.xime.ui.theme.VisualStyle.forKeyboard(
+        com.kingzcheung.xime.ui.theme.VisualStyle.fromId(getPrefs(context).getString(KEY_VISUAL_STYLE, null)))
 
     fun setVisualStyle(context: Context, style: com.kingzcheung.xime.ui.theme.VisualStyle) {
         com.kingzcheung.xime.ui.theme.IconAppearance.setKeyboardStyle(context, style)

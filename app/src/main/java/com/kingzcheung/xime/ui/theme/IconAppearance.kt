@@ -41,7 +41,8 @@ object IconAppearance {
         if (linked) LauncherIcons.apply(context, style)
         val editor = SettingsPreferences.getPrefsPublic(context).edit().putString(SettingsPreferences.KEY_VISUAL_STYLE, style.id)
         if (linked) { editor.putString(KEY_STYLE, style.id); selected = style }
-        VisualStyles.current = style
+        // 图标可以是玻璃、毛玻璃；键盘材质只画还在提供的三种。
+        VisualStyles.current = VisualStyle.forKeyboard(style)
         editor.apply()
     }
 

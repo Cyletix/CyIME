@@ -59,7 +59,7 @@ class VisualStyleIntegrationTest {
                 } }
             }
         }
-        VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.forEach { style ->
+        VisualStyle.offered.filter { it != VisualStyle.ORIGINAL }.forEach { style ->
             rule.onNodeWithTag("visual-style-${style.id}").performClick().assertIsSelected()
             assertEquals(style, SettingsPreferences.getVisualStyle(context))
             assertEquals(originalId, SettingsPreferences.getKeyboardTheme(context))
@@ -96,7 +96,7 @@ class VisualStyleIntegrationTest {
                 }
             }
         }
-        VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.forEach { style ->
+        VisualStyle.offered.filter { it != VisualStyle.ORIGINAL }.forEach { style ->
           for (isDark in listOf(true, false)) {
             rule.runOnIdle { dark.value = isDark; SettingsPreferences.setVisualStyle(context, style); keys.clear() }
             rule.onNodeWithTag("qwerty-key:a").performTouchInput { click() }
@@ -127,7 +127,7 @@ class VisualStyleIntegrationTest {
         vm.setKeyboardState(KeyboardLayoutState.Chinese)
         val host = mutableStateOf("lavender_purple")
         val keyboard = mutableStateOf("soft_blue")
-        rule.runOnIdle { VisualStyles.current = VisualStyle.GLASS }
+        rule.runOnIdle { VisualStyles.current = VisualStyle.NEON }
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 XimeTheme(darkTheme = true, themeId = host.value) {
