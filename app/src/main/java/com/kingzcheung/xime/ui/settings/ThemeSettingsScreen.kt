@@ -159,7 +159,7 @@ private fun ThemeSettingsPage(
                         }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.GLASS)
                     // 液态玻璃不用先开玻璃：打开它就把玻璃一起打开。
                     SettingsToggleItem(icon = Icons.TwoTone.AutoAwesome, title = "液态玻璃",
-                        subtitle = "按键边缘加一道细亮线，按住时变亮",
+                        subtitle = "按键加细亮边，按住变亮；图片背景会在边缘折射",
                         checked = glass.dark.enabled && com.kingzcheung.xime.ui.theme.LiquidGlass.enabled(context),
                         onCheckedChange = { enabled ->
                             changeAppearance(context, onThemeChanged) {
