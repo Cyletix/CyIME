@@ -33,6 +33,27 @@ class EnglishAssociationStartupTest {
         assertEquals(lower.map { "hE" + it.drop(2) }, words("hE"))
         assertEquals(words("h").map { it.replaceFirstChar(Char::uppercaseChar) }, words("H"))
     }
+    @Test fun typedSpellingWithoutApostropheOffersTheContraction() = runBlocking {
+        val trie = bundledTrie()
+        val table = listOf(
+            File("src/main/assets/english_contractions.txt"),
+            File("app/src/main/assets/english_contractions.txt")
+        ).first { it.isFile }.readBytes()
+        val assets = mock<AssetManager>()
+        whenever(assets.list("")).thenReturn(arrayOf("english_trie.bin"))
+        whenever(assets.open("english_trie.bin")).thenAnswer { trie.inputStream() }
+        whenever(assets.open("english_contractions.txt")).thenAnswer { table.inputStream() }
+        val app = mock<Context>().also { whenever(it.assets).thenReturn(assets) }
+        suspend fun words(prefix: String) = AssociationService.getAssociations(app, prefix, true, 20)
+        assertEquals("I'm", words("im").first())
+        assertEquals("what's", words("whats").first())
+        assertEquals("Don't", words("Dont").first())
+        // its 本身是词：候选栏第一个仍是打的 its，缩写排第二，补全里不再重复 its。
+        assertEquals("it's", words("its").first())
+        assertFalse("its" in words("its"))
+        assertEquals("help", words("hel").first())
+    }
+
     @Before fun resetBefore() = AssociationService.release()
     @After fun resetAfter() = AssociationService.release()
 

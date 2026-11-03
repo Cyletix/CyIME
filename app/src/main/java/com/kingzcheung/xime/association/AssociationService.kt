@@ -10,8 +10,11 @@ import kotlinx.coroutines.withContext
 
 object AssociationService {
     private const val TAG = "AssociationService"
+    private const val CONTRACTIONS_FILE = "english_contractions.txt"
     
     @Volatile private var trieEngine: TrieAssociationEngine? = null
+    /** 英文补全用的缩写表（im → I'm）；读不到就不给缩写，补全照常。 */
+    @Volatile private var contractions: com.kingzcheung.xime.glide.EnglishContractions? = null
     @Volatile private var isInitialized = false
     private val initializationMutex = Mutex()
     
@@ -27,6 +30,10 @@ object AssociationService {
                 val engine = TrieAssociationEngine.getInstance()
                 val trieInit = engine.initialize(context)
                 if (trieInit) trieEngine = engine
+                if (trieInit) contractions = runCatching {
+                    context.assets.open(CONTRACTIONS_FILE).bufferedReader()
+                        .useLines { com.kingzcheung.xime.glide.EnglishContractions(it.toList().asSequence()) }
+                }.getOrNull()
                 isInitialized = trieInit
                 Log.i(TAG, "Association service initialized: trie=$trieInit")
                 trieInit
@@ -50,13 +57,11 @@ object AssociationService {
         }
         
         try {
-            val candidates = if (isAsciiMode) {
+            if (isAsciiMode) {
                 getEnglishAssociations(context, inputText, topK)
             } else {
-                getChineseAssociations(context, inputText, topK)
+                getChineseAssociations(context, inputText, topK).map { it.text }
             }
-            
-            candidates.map { it.text }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
@@ -69,7 +74,7 @@ object AssociationService {
         context: Context,
         prefix: String,
         topK: Int
-    ): List<AssociationCandidate> {
+    ): List<String> {
         // A first keystroke can precede PredictionManager's background warm-up.
         // Await that same IO initialization so it can still produce suggestions.
         if (!initialize(context)) {
@@ -77,7 +82,11 @@ object AssociationService {
             return emptyList()
         }
 
-        return trieEngine?.predict(prefix, topK).orEmpty()
+        val words = trieEngine?.predict(prefix, topK).orEmpty().map { it.text }
+        val table = contractions ?: return words
+        return EnglishContractionCompletion.apply(prefix, words, topK) { word ->
+            table.display(word).takeIf { it != word } ?: table.offer(word)
+        }
     }
     
     private suspend fun getChineseAssociations(
@@ -112,6 +121,7 @@ object AssociationService {
     fun release() {
         trieEngine?.release()
         trieEngine = null
+        contractions = null
         isInitialized = false
     }
 }
