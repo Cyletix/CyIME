@@ -18,7 +18,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.click
@@ -73,6 +72,7 @@ class KeyboardBottomEdgeRenderTest {
         KeyboardThemes.initFromConfig(context)
         AppFonts.initialize(context)
         val title = "手势导航时键盘贴底"
+        SettingsPreferences.setEdgeToEdgeKeyboard(context, false)
         SettingsSearchFocus.open(SettingsSearchIndex.first { it.title == title })
         rule.setContent { XimeTheme(darkTheme = false, themeId = "soft_blue") {
             LayoutDisplaySettingsContent(onBack = {}, initialPage = "bottom_gap")
@@ -90,6 +90,7 @@ class KeyboardBottomEdgeRenderTest {
         val app = rule.activity.application
         KeyboardThemes.initFromConfig(app)
         AppFonts.initialize(app)
+        SettingsPreferences.setEdgeToEdgeKeyboard(app, false)
         SettingsPreferences.setKeyboardBottomAdjustmentDp(app, 2)
         val entry = SettingsSearchIndex.first { it.title == "底部留白校准" }
         rule.setContent {
@@ -112,9 +113,12 @@ class KeyboardBottomEdgeRenderTest {
         repeat(2) { up.performTouchInput { click(center) } }
         assertEquals(2, SettingsPreferences.getKeyboardBottomPaddingDp(app))
         rule.onNodeWithTag("settings-search-anchor:手势导航时键盘贴底").performClick()
+        // 贴底另记一份调低值，从贴底位置算起；还能往下调（11-03：识别不出手势导航的手机也能自己去掉底下那段）。
+        rule.onNodeWithText("从安全下限抬高 2 dp").assertIsDisplayed()
         down.performTouchInput { click(center) }
-        down.assertIsNotEnabled()
         rule.onNodeWithText("已选安全下限").assertIsDisplayed()
+        down.performTouchInput { click(center) }
+        rule.onNodeWithText("从安全下限调低 2 dp").assertIsDisplayed()
         rule.onNodeWithText("恢复系统建议").performClick()
         rule.onNodeWithText("使用系统建议").assertIsDisplayed()
         assertEquals(false, SettingsPreferences.edgeToEdgeKeyboard(app))
@@ -142,6 +146,7 @@ class KeyboardBottomEdgeRenderTest {
             .setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48)).build()
         val win = rule.activity.window
         Settings.Secure.putInt(app.contentResolver, "navigation_mode", 2)
+        SettingsPreferences.setEdgeToEdgeKeyboard(app, false)
         val normal = extractBottomInset(insets, win)
         val bottom = mutableIntStateOf(fixedKeyboardBottomInsetPx(insets, win, normal))
         val schema = mutableStateOf("rime_ice")

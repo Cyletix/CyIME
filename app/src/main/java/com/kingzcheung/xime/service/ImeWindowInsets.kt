@@ -284,8 +284,10 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
 internal fun fixedKeyboardBottomInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
     minimumPx: Int = fixedKeyboardMinimumInsetPx(insets, window, normalPx)): Int {
     val context = window.context
-    if (SettingsPreferences.edgeToEdgeKeyboard(context)) return minimumPx
     val adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context).coerceAtMost(0)
+    // 贴底时「调低」从贴底位置再往下调，可以一直到 0（识别不出手势导航的手机也能自己去掉那段）。
+    if (SettingsPreferences.edgeToEdgeKeyboard(context))
+        return (minimumPx + adjustment * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(0)
     return (normalPx + adjustment * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(minimumPx)
 }
 

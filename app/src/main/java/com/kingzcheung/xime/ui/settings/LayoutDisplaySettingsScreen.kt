@@ -607,7 +607,8 @@ private fun FixedBottomCalibrationSettings() {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD ||
                 key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_PADDING_DP || key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP ||
-                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP) {
+                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP ||
+                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP) {
                 edge = SettingsPreferences.edgeToEdgeKeyboard(context)
                 adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context)
                 loweringLimit = SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)
@@ -617,7 +618,8 @@ private fun FixedBottomCalibrationSettings() {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     // 调低最多到安全下限（键盘量过才知道；没量过仍按 80 dp）：到了下限按钮变灰，数字也不再往下走。
-    val lowest = if (edge) 0 else -(loweringLimit ?: 80).coerceIn(0, 80)
+    // 贴底时从贴底位置还能再调低 80 dp（键盘那边到 0 为止），识别不出手势导航的手机也能自己去掉底下那段。
+    val lowest = if (edge) -80 else -(loweringLimit ?: 80).coerceIn(0, 80)
     val value = adjustment.coerceAtLeast(lowest)
     val reference = if (edge) "安全下限" else "系统建议"
     val position = when {

@@ -8,6 +8,7 @@ import android.view.DisplayCutout
 import android.view.WindowInsets
 import com.kingzcheung.xime.settings.SettingsPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -31,6 +32,38 @@ class FixedKeyboardBottomInsetTest {
         return fixedKeyboardBottomInsetPx(reported, activity.window, extractBottomInset(reported, activity.window))
     }
     private fun mode(value: Int) = Settings.Secure.putInt(activity.contentResolver, "navigation_mode", value)
+
+    /** 下面多数用例测「贴底」关着时的系统建议和校准；贴底默认开另有用例。 */
+    @Before fun edgeOff() = SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
+
+    @Test fun edgeIsOnByDefaultAndItsLoweringIsSeparateFromTheOldCalibration() {
+        ShadowBuild.setManufacturer("OPPO")
+        SettingsPreferences.getPrefsPublic(activity).edit().remove(SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD).commit()
+        // 老用户按系统建议调低过 20 dp（三键导航时那时的下限挡着，实际没压到按钮）。
+        SettingsPreferences.getPrefsPublic(activity).edit()
+            .putInt(SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP, 20).commit()
+        assertEquals(true, SettingsPreferences.edgeToEdgeKeyboard(activity))
+        assertEquals(0, SettingsPreferences.getKeyboardBottomAdjustmentDp(activity))
+        mode(2)
+        assertEquals(0, measure())
+        // 三键导航：贴底默认开也不动，老的调低值不会搬过来压住按钮。
+        mode(0)
+        assertEquals(48, measure(controls = 48))
+        // 识别不出手势导航时，贴底下还能自己调低，一直到 0。
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -30)
+        assertEquals(18, measure(controls = 48))
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -80)
+        assertEquals(0, measure(controls = 48))
+        // 关掉贴底回到原来的校准值和下限。
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
+        assertEquals(-20, SettingsPreferences.getKeyboardBottomAdjustmentDp(activity))
+        assertEquals(48, measure(controls = 48))
+        // 「恢复系统建议」明确记下贴底关。
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        SettingsPreferences.resetKeyboardBottomCalibration(activity)
+        assertEquals(false, SettingsPreferences.edgeToEdgeKeyboard(activity))
+        assertEquals(0, SettingsPreferences.getKeyboardBottomAdjustmentDp(activity))
+    }
 
     @Test fun aManualCorrectionCanReachZeroButNeverPassSystemButtonsOrACutout() {
         ShadowBuild.setManufacturer("OPPO")

@@ -866,7 +866,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             when (key) {
                 SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD, SettingsPreferences.KEY_KEYBOARD_BOTTOM_PADDING_DP,
-                SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP -> {
+                SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP, SettingsPreferences.KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP -> {
                     val decor = window.window?.decorView
                     val padding = SettingsPreferences.getKeyboardBottomPaddingDp(this@XimeInputMethodService)
                     if (uiState.value.keyboardBottomPaddingDp != padding)
