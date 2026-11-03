@@ -346,10 +346,27 @@ internal fun KeyboardResizeOverlay(
         // Do not consume down events on their common parent: that cancels Slider drags.
         // 一层只负责暗背景、边框和手势。真实键盘由同一个 previewRect 驱动。
         // 暗遮罩只盖键盘外面（11-03「这遮罩怎么还能把键盘挡住了」）：以前整屏盖 44% 黑，键盘也被压暗，
-        // 看不出真实的样子。遮罩在下面的外框图层里，挖掉键盘卡片画。
+        // 看不出真实的样子。现在挖掉键盘卡片（跟着转过的角度）再画，只画在这一层自己的范围里。
         val hostMaxWidth = maxWidth
         val hostMaxHeight = maxHeight
         val layerPivot = gesturePivot ?: Offset(frame.centerX, frame.centerY)
+        if (onPreviewControlsPositioned == null && !editingOpacity && !adjustingOpacity)
+            Box(Modifier.fillMaxSize().testTag("keyboard-resize-scrim").drawBehind {
+                val left = frame.left.roundToInt().toFloat()
+                val top = frame.top.roundToInt().toFloat()
+                val card = Size(frame.width.roundToInt().toFloat().coerceAtLeast(1f),
+                    frame.height.roundToInt().toFloat().coerceAtLeast(1f))
+                val hole = Path().apply {
+                    addOutline(panelShape.createOutline(card, layoutDirection, this@drawBehind))
+                    translate(Offset(left, top))
+                    if (rotation != 0f) transform(androidx.compose.ui.graphics.Matrix().apply {
+                        translate(layerPivot.x, layerPivot.y)
+                        rotateZ(rotation)
+                        translate(-layerPivot.x, -layerPivot.y)
+                    })
+                }
+                clipPath(hole, ClipOp.Difference) { drawRect(Color.Black.copy(alpha = 0.44f)) }
+            })
         Box(Modifier.fillMaxSize().graphicsLayer {
             rotationZ = rotation
             transformOrigin = TransformOrigin(layerPivot.x / size.width.coerceAtLeast(1f),
@@ -402,11 +419,6 @@ internal fun KeyboardResizeOverlay(
                     // 正在拖的把手放大一点，其余保持原样。
                     fun emphasis(vararg handles: ResizeHandle) = if (dragEdge in handles) RESIZE_HANDLE_ACTIVE_SCALE else 1f
 
-                    // 键盘外面压暗，键盘本身不盖（设置页里的预览外面是设置页，不压）。范围放大三倍，转过角度也盖得满。
-                    if (onPreviewControlsPositioned == null && !adjustingOpacity) clipPath(cardPath, ClipOp.Difference) {
-                        drawRect(Color.Black.copy(alpha = 0.44f), Offset(-size.width, -size.height),
-                            Size(size.width * 3f, size.height * 3f))
-                    }
                     // 线、角标、把手全部裁在卡片轮廓里：沿轮廓画 2 倍宽的描边，露出的那一半外沿正好压在卡片边上。
                     clipPath(cardPath) {
                         // 1. 整圈边框。
