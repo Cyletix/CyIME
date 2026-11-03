@@ -99,7 +99,7 @@ class TypingStatsComboTest {
         data.combo("kb/zh/pinyin/t9", "中文 · 拼音 · 九键")!!.apply { counts[Combo.CHARS] = 5 }
         val text = TypingStatsText.shareText(data, "手机", "1.15.40")
         assertEquals("""
-            我的 CyIME 打字速度（手机）
+            我的 CyIME 打字速度(手机)
             中文 · 拼音 · 26键：62 字/分，码长 2.8，使用 12 天，3.4 万 字
             英文 · 26键：180 字母/分，使用 3 天，2,000 字
             语音：使用 2 天，900 字
