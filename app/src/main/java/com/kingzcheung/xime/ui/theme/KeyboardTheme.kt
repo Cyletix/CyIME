@@ -138,16 +138,28 @@ object KeyboardThemes {
         // 1) 对硬编码主题应用配置覆盖
         val overridden = defaultThemes.map { applyConfigOverrides(context, it) }
         // 2) 把配置中有但硬编码列表中没有的新主题也加入缓存
-        //    （dynamic_color: true 的条目由 DynamicThemes 运行时从壁纸调色板构建）
+        //    （dynamic_color: true 的条目由 DynamicThemes 运行时从壁纸调色板构建；
+        //     内置莫奈取色由 withDynamicTheme 加在黑白后面）
         val existingIds = overridden.map { it.id }.toSet()
         val newThemes = configOverrides
             .filterKeys { it !in existingIds }
             .map { (id, entry) -> buildSchemeFromConfig(context, id, entry) }
             .filterNotNull()
-        val loaded = overridden + newThemes
+        val loaded = withDynamicTheme(context, overridden + newThemes)
         // 3) 用户选了自己的图片时，按沿用的主题配色生成「我的图片」
         themesCache = loaded + listOfNotNull(CustomImageTheme.build(context, loaded))
         themesMapCache = themesCache.associateBy { it.id }
+    }
+
+    /**
+     * 莫奈取色（Android 12+）排在黑白后面、纯色前面（用户 11-03：iOS、黑白、莫奈取色、几个纯色）。
+     * Android 12 以下不加，列表里就没有；xime.custom.yaml 已自定义 dynamic 条目时不重复加。
+     */
+    internal fun withDynamicTheme(context: Context, themes: List<KeyboardColorScheme>): List<KeyboardColorScheme> {
+        if (!DynamicThemes.isSupported() || themes.any { it.id == DynamicThemes.THEME_ID }) return themes
+        val dynamic = DynamicThemes.create(context) ?: return themes
+        val at = themes.indexOfFirst { it.id == PureBlackTheme.ID }.let { if (it < 0) 0 else it + 1 }
+        return themes.take(at) + dynamic + themes.drop(at)
     }
 
     /**
@@ -172,8 +184,14 @@ object KeyboardThemes {
             }
         }
         if (rebuilt) {
-            themesCache = refreshed
-            themesMapCache = refreshed.associateBy { it.id }
+            // 「我的图片」沿用莫奈取色时，图上的底色遮罩和键色跟着新壁纸重算。
+            val withImage = if (refreshed.any { it.id == CustomImageTheme.ID } &&
+                refreshed.firstOrNull { it.id == CustomImageTheme.baseThemeId }?.isDynamic == true) {
+                val base = refreshed.filter { it.id != CustomImageTheme.ID }
+                base + listOfNotNull(CustomImageTheme.build(context, base))
+            } else refreshed
+            themesCache = withImage
+            themesMapCache = withImage.associateBy { it.id }
         }
         return rebuilt
     }

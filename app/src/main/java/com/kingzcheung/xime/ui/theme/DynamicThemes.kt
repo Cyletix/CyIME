@@ -5,16 +5,20 @@ import android.os.Build
 import androidx.compose.ui.graphics.Color
 
 /**
- * Material You 动态配色（Android 12+）：从系统壁纸调色板（system_accent/neutral 资源）
+ * 莫奈取色（Material You 动态配色，Android 12+）：从系统壁纸调色板（system_accent/neutral 资源）
  * 构建键盘主题，随用户壁纸变化。
+ * 10-11 按「只留四个主题」从列表隐藏，11-03 用户要求加回配色方案；Android 12 以下不出现在列表里。
  *
  * framework 资源编号与 Material tonal tone 反向对应：编号 n ≈ tone (1000 - n) / 100 的近似档位，
  * 即 system_neutral1_10 近白（tone 99）、system_neutral1_900 近黑（tone 10）。
  * 档位选择对齐 material3 dynamicLight/DarkColorScheme 的浅深色规范。
  */
 object DynamicThemes {
-    /** 内置动态配色方案的 id（xime.yaml color_schemes 中的条目）。 */
+    /** 内置动态配色方案的 id；xime.custom.yaml 里 style.color_scheme 也可以写 dynamic。 */
     const val THEME_ID = "dynamic"
+
+    /** 配色方案列表里的名字（用户的叫法）。 */
+    const val NAME = "莫奈取色"
 
     /** 动态配色仅在 Android 12+ 可用。 */
     fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -29,21 +33,21 @@ object DynamicThemes {
         return p.accent1(600) to p.accent1(200)
     }
 
-    internal fun fallback(id: String = THEME_ID, name: String = "跟随系统动态配色") =
-        SoftBlueTheme.create(id, if (id == THEME_ID) "跟随系统动态配色" else name)
+    internal fun fallback(id: String = THEME_ID, name: String = NAME) =
+        SoftBlueTheme.create(id, if (id == THEME_ID) NAME else name)
 
     /**
      * 构建动态配色键盘主题：强调色来自壁纸，深色功能键使用柔和中性容器。
      * Android 12 以下使用中性深灰/蓝色兼容配色，保留同一主题入口。
      */
-    fun create(context: Context, id: String = THEME_ID, name: String = "跟随系统动态配色"): KeyboardColorScheme? {
+    fun create(context: Context, id: String = THEME_ID, name: String = NAME): KeyboardColorScheme? {
         if (!isSupported()) return fallback(id, name)
         val p = SystemPalette(context)
         val accentLight = p.accent1(600)
         val accentDark = p.accent1(200)
         return KeyboardColorScheme(
             id = id,
-            name = if (id == THEME_ID) "跟随系统动态配色" else name,
+            name = if (id == THEME_ID) NAME else name,
             // 浅色底用中性 100 色调，白键与底约 1.25:1；功能键再深一级，不与底色同一色调。
             specialKeyLight = p.accent1(200),
             specialKeyDark = softDarkKeyContainer(accentDark),
@@ -70,6 +74,9 @@ object DynamicThemes {
             dividerColorLight = p.neutral2(100),
             dividerColorDark = p.neutral2(700),
             isDynamic = true,
+            // 与其他完整主题同一套规则：设置页也按这些颜色生成，和键盘同源
+            // （10-11 用户截图里设置页偏蓝紫、键盘偏青蓝，两边不一致）。
+            useThemeColors = true,
         )
     }
 }

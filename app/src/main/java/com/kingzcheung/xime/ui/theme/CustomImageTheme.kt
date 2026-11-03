@@ -50,9 +50,12 @@ object CustomImageTheme {
         return src.takeIf { File(themesDir(context), src.removePrefix("themes/")).isFile }
     }
 
-    /** 透明玻璃、跟随壁纸和自身不能做底：它们没有固定的底色可压在图片上。 */
+    /**
+     * iOS 渐变和自身不能做底：它们没有固定的底色可压在图片上。
+     * 莫奈取色可以（11-03）：取当下壁纸色做遮罩和键色，换壁纸后由 [KeyboardThemes.refreshDynamicSchemes] 重算。
+     */
     private fun usableBase(theme: KeyboardColorScheme) =
-        theme.id != ID && theme.id != TransparentGlassTheme.ID && !theme.isDynamic
+        theme.id != ID && theme.id != TransparentGlassTheme.ID
 
     /** 选图时要沿用的主题：当前就是「我的图片」时沿用它原来的底。 */
     fun baseFor(context: Context, currentThemeId: String): String =
@@ -89,6 +92,9 @@ object CustomImageTheme {
         fun Color.rgb() = (toArgb() and 0xFFFFFF).toLong()
         return base.copy(
             id = ID, name = NAME,
+            // 莫奈取色做底时，「我的图片」本身只是这一刻壁纸色的快照：不能再被当成动态主题按壁纸整体重建
+            // （那样会丢掉图片），但取色规则仍按完整主题走。
+            isDynamic = false, useThemeColors = base.useThemeColors || base.isDynamic,
             keyboardBackground = BackgroundConfig(type = "image", src = src, fit = placement.fit,
                 zoom = placement.zoom, alignX = placement.alignX, alignY = placement.alignY,
                 overlayAlpha = OVERLAY_ALPHA, overlayAlphaDark = OVERLAY_ALPHA,

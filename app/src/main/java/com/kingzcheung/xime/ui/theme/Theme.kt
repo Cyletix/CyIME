@@ -5,8 +5,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -157,10 +155,8 @@ fun XimeTheme(
         currentThemeId
     }
     val scheme = KeyboardThemes.getRenderingScheme(effectiveThemeId)
-    val colorScheme = if (scheme.isDynamic && DynamicThemes.isSupported()) {
-        // Material You 动态配色：由系统壁纸调色板生成（官方实现），随壁纸自动更新
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else {
+    // 莫奈取色也走完整主题这条路：设置页颜色和键盘取自同一组壁纸色，不再另用系统 Material 动态色。
+    val colorScheme = run {
         val surface = if (darkTheme) scheme.surfaceDark else scheme.surfaceLight
         // Complete palettes own their surface colors; material effects do not override them.
         // Derive Material contrast from that actual surface, not the system appearance flag.

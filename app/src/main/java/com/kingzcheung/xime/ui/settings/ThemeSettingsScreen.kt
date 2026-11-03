@@ -187,9 +187,12 @@ private fun ThemeSettingsPage(
             }
             
             item {
+                val shownTheme = uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
+                    ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)
                 Text(
-                    text = "${(uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
-                        ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)).name}在各设备使用相同配色。点击可预览。",
+                    // 莫奈取色按每台设备的壁纸取色，不能说各设备相同。
+                    text = if (shownTheme.isDynamic) "${shownTheme.name}跟随系统壁纸取色。点击可预览。"
+                        else "${shownTheme.name}在各设备使用相同配色。点击可预览。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)

@@ -717,8 +717,9 @@ object SettingsPreferences {
     fun getKeyboardTheme(context: Context): String {
         val prefs = getPrefs(context)
         val stored = prefs.getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
-        // 不再提供的主题（如跟随系统动态配色）改用柔和蓝；只改选择，不删主题代码。
-        if (stored == "dynamic") {
+        // 莫奈取色只在 Android 12+ 有；更早的系统上（如备份恢复过来的选择）改用柔和蓝。
+        if (stored == com.kingzcheung.xime.ui.theme.DynamicThemes.THEME_ID &&
+            !com.kingzcheung.xime.ui.theme.DynamicThemes.isSupported()) {
             prefs.edit().putString(KEY_KEYBOARD_THEME, com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID).apply()
             return com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID
         }

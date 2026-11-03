@@ -12,11 +12,12 @@ import kotlinx.coroutines.flow.update
 
 /**
  * 2026-10-11 列表只留四个；2026-10-18 用户要求把 1.9.15 移除的主题按新配色加回，每个色系一套（[TonalThemes]）。
- * 跟随系统动态配色仍不在列表中。
+ * 2026-11-03 莫奈取色加回，排在黑白后面（顺序由 [KeyboardThemes.withDynamicTheme] 定）；Android 12 以下主题表里没有它，不显示。
  */
 internal val OFFERED_THEMES = setOf(
     com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID,
     com.kingzcheung.xime.ui.theme.PureBlackTheme.ID,
+    com.kingzcheung.xime.ui.theme.DynamicThemes.THEME_ID,
     "lavender_purple",
     com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID,
 ) + com.kingzcheung.xime.ui.theme.TonalThemes.create().map { it.id } +

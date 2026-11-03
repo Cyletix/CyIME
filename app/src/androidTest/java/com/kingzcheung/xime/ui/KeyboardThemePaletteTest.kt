@@ -39,7 +39,7 @@ class KeyboardThemePaletteTest {
 
     @Test fun dynamicThemeKeepsAnExplicitSystemFollowingEntryAndSoftDarkKeys() {
         val theme = KeyboardThemes.getThemeById(DynamicThemes.THEME_ID)
-        assertEquals("跟随系统动态配色", theme.name)
+        assertEquals(DynamicThemes.NAME, theme.name)
         if (DynamicThemes.isSupported()) {
             assertTrue(theme.isDynamic)
             assertEquals(softDarkKeyContainer(theme.accentDark), theme.specialKeyDark)
