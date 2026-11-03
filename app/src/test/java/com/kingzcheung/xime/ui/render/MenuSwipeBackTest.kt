@@ -122,7 +122,7 @@ class MenuSwipeBackTest {
         rule.runOnIdle { assertEquals(1, backs) }
     }
 
-    @Test fun shortcutMenuKeepsCenterPagingAndEdgeSwipePopsOnlyOneLevel() {
+    @Test fun shortcutMenuPagesFirstThenEdgeSwipePopsOnlyOneLevel() {
         val model = KeyboardViewModel(app)
         val keyboard = model.page.value
         model.showOverlay(OverlayRoute.Menu, listOf(OverlayRoute.SchemaList))
@@ -149,6 +149,10 @@ class MenuSwipeBackTest {
             assertEquals(1, taps)
             model.showOverlay(OverlayRoute.Menu)
         }
+        // 重新打开在第一页：还有下一页时边缘左滑先翻页（11-03 定），到最后一页再滑才退一层。
+        menu.performTouchInput { edgeSwipe() }
+        rule.onNodeWithTag("menu-item:${buttons[8].id}").assertIsDisplayed()
+        rule.runOnIdle { assertEquals(OverlayRoute.Menu, (model.page.value as KeyboardPage.Overlay).route) }
         menu.performTouchInput { edgeSwipe() }
         rule.runOnIdle { assertEquals(keyboard, model.page.value); assertEquals(1, taps); assertEquals(1, holds) }
     }
