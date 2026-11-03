@@ -44,6 +44,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("symbolNames", 1)
     inputs.property("greekLetters", 1)
     inputs.property("doublePinyinSentences", 1)
+    inputs.property("shortcutOrder", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -70,6 +71,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(rareChars)
     val greekLetters = file("data/cyime_greek_letters.lua")
     inputs.file(greekLetters)
+    val shortcutOrder = file("data/cyime_shortcut_order.lua")
+    inputs.file(shortcutOrder)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -206,6 +209,8 @@ val prepareChineseDictionaries by tasks.registering {
         rareChars.copyTo(File(root, "lua/cyime_rare_chars.lua"), overwrite = true)
         // 打希腊字母名出希腊字母（xita → θ），Rime 选项 cyime_greek_letters 打开才插入；设置默认关。
         greekLetters.copyTo(File(root, "lua/cyime_greek_letters.lua"), overwrite = true)
+        // 时间日期快捷码（sj rq xq dt nl）不再占满第一屏：第一个格式第 2 位，其余在后面 3 个词之后，简拼词照常出。
+        shortcutOrder.copyTo(File(root, "lua/cyime_shortcut_order.lua"), overwrite = true)
         val dateLua = File(root, "lua/date_translator.lua")
         val timestampYield = "yield_cand(seg, string.format('%d', current_time))"
         val dateSource = dateLua.readText()
@@ -340,7 +345,7 @@ val prepareChineseDictionaries by tasks.registering {
             // keeps Rime from dropping alternatives whose weight is a word penalty away.
             "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
-            .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_acronym_filter",
+            .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_shortcut_order", "    - lua_filter@*cyime_acronym_filter",
                 "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory")
                 else if (it == "    - script_translator") sequenceOf(it, "    - lua_translator@*cyime_mixed_input",
                     "    - lua_translator@*cyime_rare_chars") else sequenceOf(it) }
