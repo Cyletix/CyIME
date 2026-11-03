@@ -70,7 +70,10 @@ class PluginMarketTest {
         }
         rule.onNodeWithText(plugin.name).performClick()
         rule.onNodeWithText("安装此版本").performClick()
-        rule.waitUntil(10_000) { PluginManager.getAllInstallPlugins().any { it.id == plugin.id } }
+        // 装进列表之后才在后台线程里拨开关：等两件事都做完再看，整套跑时机器忙也不会抢在前面。
+        rule.waitUntil(10_000) {
+            PluginManager.getAllInstallPlugins().any { it.id == plugin.id } && SettingsPreferences.isPluginEnabled(app, plugin.id)
+        }
         val info = PluginManager.getAllInstallPlugins().single { it.id == plugin.id }
         assertEquals(TrustLevel.THIRD_PARTY, info.trustLevel)
         // 市场第一次装工具类插件直接启用（11-02 AI 插件找得到）；授权的网址仍要用户自己点。
