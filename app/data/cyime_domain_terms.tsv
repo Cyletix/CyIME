@@ -107,3 +107,24 @@
 上滑	shang hua	5000
 下滑	xia hua	5000
 复制	fu zhi	50000
+# B站评论回放 (2026-11-03, tools/ime_lab/comment_typing_bench.py): 讨论输入法和手机的句子里常用，却被同音词压住
+# (没有显示→没有现实，跨设备→夸设备，长按语言键→长安语言键)。日常聊天对照句没有变差；单独打这几个拼音时首选换成这些词。
+显示	xian shi	550000
+视频	shi pin	200000
+长按	chang an	120000
+跨设备	kua she bei	20000
+字符	zi fu	50000
+误触	wu chu	50000
+撤回	che hui	50000
+美化	mei hua	100000
+小写	xiao xie	50000
+互传	hu chuan	20000
+# 同一批评论里出现、词库里没有的词。
+段首	duan shou	5000
+段尾	duan wei	5000
+删字	shan zi	5000
+混拼	hun pin	5000
+三端	san duan	5000
+打字音	da zi yin	5000
+键盘音	jian pan yin	5000
+跨端	kua duan	5000
