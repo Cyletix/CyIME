@@ -33,7 +33,12 @@ open class LuaPluginAdapter(
 
     override suspend fun onAction(action: String): String? {
         if (action.isBlank()) return "未知操作"
-        val result = runtime.call(action)
+        // 插件出错要说出来：以前吞掉错误当成 nil，表单就显示「成功」。
+        val result = try {
+            runtime.callChecked(action)
+        } catch (e: Exception) {
+            return "插件出错：${e.message ?: e.javaClass.simpleName}"
+        }
         if (result.isnil()) return null
         val msg = result.tojstring()
         return if (msg.isBlank()) null else msg

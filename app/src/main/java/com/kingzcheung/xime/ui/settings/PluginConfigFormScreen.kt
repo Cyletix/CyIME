@@ -101,6 +101,22 @@ fun PluginConfigFormScreen(
             }
     }
 
+    // 插件声明 allowCustomHosts 时，配置中填写的 HTTP(S) 服务器域名自动获得联网授权，
+    // 兑现 manifest helpText「域名将自动获得联网授权」的承诺，无需用户再手动寻找授权入口。
+    fun autoAuthorizeConfiguredHosts() {
+        val allowCustom = PluginManager.getAllInstallPlugins()
+            .firstOrNull { it.id == pluginId }
+            ?.allowCustomHosts ?: false
+        if (!allowCustom) return
+        configStore.keys().forEach { key ->
+            configStore.get(key)?.let { value ->
+                NetworkPolicy.extractHttpHost(value)?.let { host ->
+                    SettingsPreferences.authorizePluginHost(context, pluginId, host)
+                }
+            }
+        }
+    }
+
     @Composable
     fun sectionContent(section: String, sectionFields: List<UiNode>) {
         SettingsSection(
@@ -117,28 +133,14 @@ fun PluginConfigFormScreen(
                             options = field.options.ifEmpty {
                                 field.key?.let { dynamicOptions[it].orEmpty() } ?: emptyList()
                             },
-                            plugin = plugin
+                            plugin = plugin,
+                            // 点测试前先把填的接口地址授权，不用先点「保存」
+                            beforeAction = { autoAuthorizeConfiguredHosts() }
                         )
                     }
                 }
             }
         )
-    }
-
-    // 插件声明 allowCustomHosts 时，配置中填写的 HTTP(S) 服务器域名自动获得联网授权，
-    // 兑现 manifest helpText「域名将自动获得联网授权」的承诺，无需用户再手动寻找授权入口。
-    fun autoAuthorizeConfiguredHosts() {
-        val allowCustom = PluginManager.getAllInstallPlugins()
-            .firstOrNull { it.id == pluginId }
-            ?.allowCustomHosts ?: false
-        if (!allowCustom) return
-        configStore.keys().forEach { key ->
-            configStore.get(key)?.let { value ->
-                NetworkPolicy.extractHttpHost(value)?.let { host ->
-                    SettingsPreferences.authorizePluginHost(context, pluginId, host)
-                }
-            }
-        }
     }
 
     @Composable
@@ -259,13 +261,16 @@ private fun UiNodeEditor(
     field: UiNode,
     configStore: PluginConfigStore,
     options: List<String>,
-    plugin: IPluginConfigurable
+    plugin: IPluginConfigurable,
+    beforeAction: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // 表单字段必须绑定 configStore key；无 key 的节点（展示型误入表单）不渲染
     val key = field.key ?: return
     var buttonBusy by remember(key) { mutableStateOf(false) }
+    // 按钮结果写在按钮下面：null 没点过；"" 成功；其他是错误原因
+    var buttonResult by rememberSaveable(key) { mutableStateOf<String?>(null) }
     var value by rememberSaveable(key) {
         mutableStateOf(configStore.get(key) ?: field.defaultValue ?: "")
     }
@@ -492,17 +497,16 @@ private fun UiNodeEditor(
                         Toast.makeText(context, "未配置动作", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    runCatching { beforeAction() }
                     buttonBusy = true
+                    buttonResult = null
                     scope.launch {
                         val error = withContext(Dispatchers.IO) {
-                            runCatching { plugin.onAction(action.toString()) }.getOrNull()
+                            runCatching { plugin.onAction(action.toString()) }
+                                .getOrElse { e -> "出错：${e.message ?: e.javaClass.simpleName}" }
                         }
                         buttonBusy = false
-                        if (error.isNullOrBlank()) {
-                            Toast.makeText(context, "成功", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                        }
+                        buttonResult = error.orEmpty()
                     }
                 },
                 enabled = !buttonBusy,
@@ -513,6 +517,16 @@ private fun UiNodeEditor(
                 )
             ) {
                 Text(if (buttonBusy) "处理中…" else field.label ?: "")
+            }
+            val result = buttonResult
+            if (!buttonBusy && result != null) {
+                Text(
+                    text = if (result.isEmpty()) "结果：成功" else "结果：$result",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (result.isEmpty()) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

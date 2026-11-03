@@ -69,8 +69,9 @@ class HttpHostApiImpl(
         val pluginInfo = PluginManager.getAllInstallPlugins()
             .firstOrNull { it.id == pluginId }
         val declaredHosts = pluginInfo?.declaredHosts ?: emptyList()
-        val authorizedHosts = SettingsPreferences.getPluginAuthorizedHosts(context, pluginId)
         val customHosts = ExtensionManager.getConfiguredNetworkHosts(context, pluginId).toSet()
+        val authorizedHosts = com.kingzcheung.xime.plugin.PluginNetworkAuthHelper
+            .runtimeAuthorizedHosts(context, pluginId, pluginInfo, customHosts)
 
         val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts, customHosts)
         if (reason != null) {
