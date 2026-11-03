@@ -141,3 +141,9 @@ containing the bundled schemas (enable all six schemas). Compile the probe with 
 and the replay's `RimeEngine.java`; arguments are the host library directory and disposable user directory.
 It checks every same-code candidate and selection, supplementary Unicode, backspacing and retyping,
 weight order, and coexistence with the double-pinyin schema's private table.
+
+`WordTypoProbe.java` (library dir, a freshly deployed user directory listing only `rime_ice`, the schema id, a
+case file from `../word_typo_bench.py make`, the output file and the neighbour map from `../typo_bench.py
+neighbors`) types common words and everyday clauses with one slip each and records where the intended text lands
+while typing and after the pause refinement. Score with `word_typo_bench.py score`. A copy of the user directory
+with `t9_ngram.lm` added measures the word-model configuration.
