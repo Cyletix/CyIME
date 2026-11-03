@@ -53,7 +53,7 @@ class PluginMarketTest {
     }
 
     @Test fun browseFromManagementAndInstallWithoutNetwork() {
-        val plugin = XimeIndexSource.bundledPlugins(app).plugins.first { it.name == "在线语音" }
+        val plugin = XimeIndexSource.bundledPlugins(app).plugins.first { it.name == "AI 改写" }
         rule.setContent { XimeTheme { SettingsScreen(initialRoute = "plugins") } }
         rule.onNodeWithContentDescription("从文件安装插件").assertIsDisplayed()
         rule.onNodeWithContentDescription("插件市场").performClick()
@@ -71,7 +71,8 @@ class PluginMarketTest {
         rule.waitUntil(10_000) { PluginManager.getAllInstallPlugins().any { it.id == plugin.id } }
         val info = PluginManager.getAllInstallPlugins().single { it.id == plugin.id }
         assertEquals(TrustLevel.THIRD_PARTY, info.trustLevel)
-        assertFalse(SettingsPreferences.isPluginEnabled(app, plugin.id))
+        // 市场第一次装工具类插件直接启用（11-02 AI 插件找得到）；授权的网址仍要用户自己点。
+        assertTrue(SettingsPreferences.isPluginEnabled(app, plugin.id))
         assertTrue(SettingsPreferences.getPluginAuthorizedHosts(app, plugin.id).isEmpty())
         rule.onNodeWithTag("market-installed").performClick()
         rule.onNodeWithText("插件管理").assertIsDisplayed()

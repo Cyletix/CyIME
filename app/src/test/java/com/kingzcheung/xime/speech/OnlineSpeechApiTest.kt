@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.speech
 
+import org.robolectric.annotation.Config
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import android.app.Application
@@ -14,6 +15,7 @@ import org.junit.runner.RunWith
 
 /** 内置在线语音：地址怎么拼、返回里怎么找字、从「在线语音」插件搬设置。 */
 @RunWith(AndroidJUnit4::class)
+@Config(sdk = [34], application = android.app.Application::class)
 class OnlineSpeechApiTest {
     private val app: Application = ApplicationProvider.getApplicationContext()
 
