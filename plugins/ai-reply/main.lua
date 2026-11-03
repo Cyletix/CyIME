@@ -120,6 +120,7 @@ function plugin.getSettingsSchema()
       defaultValue = DEFAULTS.model,
       helpText = "例：gpt-4o-mini、deepseek-chat、Qwen/Qwen2.5-7B-Instruct",
     },
+    { key = "testConnection", label = "测试接口", type = "button" },
     { type = "section", label = "提示词（清空就恢复默认）" },
     {
       key = KEY_PROMPT,
@@ -191,24 +192,10 @@ function plugin.onPanelInput(text)
   lastContext = text or ""
 end
 
-function plugin.onPanelAction(actionId)
-  if actionId ~= "generate" then return end
-  local context = trim(lastContext)
-  if context == "" then
-    lastError = "先复制对方的消息，再点 AI 回复。"
-    return
-  end
-  if generating then return end
-
+-- 调接口给 context 想几条回复。返回 items, err（err 非 nil 时 items 为 nil）
+local function requestReplies(context)
   local apiKey = trim(host.config.get(KEY_API_KEY) or "")
-  if apiKey == "" then
-    lastError = "还没填 API 密钥：点下面的「设置」"
-    return
-  end
-
-  generating = true
-  lastError = ""
-  cachedItems = {}
+  if apiKey == "" then return nil, "还没填 API 密钥：点下面的「设置」" end
 
   local function configOr(key, default)
     local v = trim(host.config.get(key) or "")
@@ -236,33 +223,62 @@ function plugin.onPanelAction(actionId)
 
   local resp = host.http.request("POST", url, headers, body, 60000)
   if resp == nil then
-    lastError = "连不上接口：" .. (host.http.lastError() or "未知错误") .. "。改过地址的话，到设置里点一次「保存」。"
-    host.logError(lastError)
-    generating = false
-    return
+    local err = "连不上接口：" .. (host.http.lastError() or "未知错误")
+    host.logError(err)
+    return nil, err
   end
   if resp.status ~= 200 then
-    lastError = "接口返回 " .. tostring(resp.status)
-    host.logError(lastError .. ": " .. resp.text)
-    generating = false
-    return
+    local err = "接口返回 " .. tostring(resp.status)
+    host.logError(err .. ": " .. tostring(resp.text))
+    return nil, err
   end
 
-  local data = host.json.decode(resp.text)
+  local data = host.json.decode(resp.text or "")
   local items = {}
-  if data ~= nil and data.choices ~= nil then
+  if type(data) == "table" and type(data.choices) == "table" then
     for _, choice in ipairs(data.choices) do
-      local content = choice.message and choice.message.content or ""
+      local content = type(choice) == "table" and choice.message and choice.message.content or ""
       for _, item in ipairs(parseCandidates(content)) do
         items[#items + 1] = item
       end
     end
   end
-  if #items == 0 then
-    lastError = "接口返回的格式看不懂，再试一次"
+  if #items == 0 then return nil, "接口返回的格式看不懂，再试一次" end
+  return items, nil
+end
+
+function plugin.onPanelAction(actionId)
+  if actionId ~= "generate" then return end
+  local context = trim(lastContext)
+  if context == "" then
+    lastError = "先复制对方的消息，再点 AI 回复。"
+    return
+  end
+  if generating then return end
+
+  if trim(host.config.get(KEY_API_KEY) or "") == "" then
+    lastError = "还没填 API 密钥：点下面的「设置」"
+    return
+  end
+
+  generating = true
+  lastError = ""
+  cachedItems = {}
+
+  local items, err = requestReplies(context)
+  if err ~= nil then
+    lastError = err
+    items = {}
   end
   cachedItems = items
   generating = false
+end
+
+-- 设置页「测试接口」：拿一句示例消息走一遍完整请求，能解析出回复才算通过。nil = 成功
+function plugin.testConnection()
+  if trim(host.config.get(KEY_API_KEY) or "") == "" then return "还没填 API 密钥" end
+  local _, err = requestReplies("明天上午十点开会，你能来吗？")
+  return err
 end
 
 function plugin.onPanelItemClick(itemId)

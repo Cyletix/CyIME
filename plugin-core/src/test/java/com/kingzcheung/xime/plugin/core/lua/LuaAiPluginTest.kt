@@ -248,4 +248,97 @@ class LuaAiPluginTest {
             )
         }
     }
+
+    private fun replyAdapter(store: PluginConfigStore, http: HttpHostApi): LuaToolPluginAdapter {
+        val dir = File("../plugins/ai-reply")
+        val runtime = LuaScriptRuntime(
+            "com.kingzcheung.xime.plugin.ai_reply", dir, "main.lua", store, httpHostApi = http
+        )
+        assertTrue(runtime.load())
+        return LuaToolPluginAdapter(runtime, com.kingzcheung.xime.plugin.core.model.PluginContext(
+            application = android.app.Application(),
+            pluginInfo = com.kingzcheung.xime.plugin.core.model.PluginInfo(
+                id = "com.kingzcheung.xime.plugin.ai_reply", name = "AI 回复", description = "测试",
+                iconResId = 0, versionCode = 1, versionName = "0.1.0",
+                path = File(dir, "main.lua").absolutePath, type = "tool"
+            ),
+            configStore = store,
+        ))
+    }
+
+    @Test
+    fun `ai-reply 设置页有测试接口按钮，测试走完整请求`() {
+        val store = InMemoryConfigStore()
+        val http = MockHttpHostApi(
+            HttpResponse(status = 200, body = """{"choices":[{"message":{"content":"{\"candidates\":[\"能来\"]}"}}]}""".toByteArray())
+        )
+        val adapter = replyAdapter(store, http)
+        val button = adapter.getSettingsSchema().firstOrNull { it.key == "testConnection" }
+        assertNotNull("应有「测试接口」按钮", button)
+        assertEquals(UiNodeType.BUTTON, button!!.type)
+
+        // 没填密钥：直接说没填，不发请求
+        assertEquals("还没填 API 密钥", kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
+        assertEquals(null, http.lastUrl)
+
+        store.set("apiKey", "k")
+        store.set("baseUrl", "https://api.example.com/v1/")
+        assertEquals(null, kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
+        assertEquals("https://api.example.com/v1/chat/completions", http.lastUrl)
+
+        // 接口报错、回包看不懂、连不上：都给出原因，不算成功
+        http.response = HttpResponse(status = 401, body = "no".toByteArray())
+        assertEquals("接口返回 401", kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
+        http.response = HttpResponse(status = 200, body = "{}".toByteArray())
+        assertTrue(kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") }!!.contains("看不懂"))
+        http.response = null
+        assertTrue(kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") }!!.startsWith("连不上接口"))
+    }
+
+    @Test
+    fun `ai-reply 生成失败时面板写出原因`() {
+        val store = InMemoryConfigStore()
+        store.set("apiKey", "k")
+        val adapter = replyAdapter(store, MockHttpHostApi(HttpResponse(status = 429, body = "x".toByteArray())))
+        adapter.onPanelInput("明天有空吗")
+        adapter.onPanelAction("generate")
+        val state = adapter.getPanelState("")
+        assertTrue(state.items.isEmpty())
+        assertFalse(state.loading)
+        assertTrue(state.ui!!.any { it.value == "接口返回 429" })
+    }
+
+    @Test
+    fun `插件按钮出错时报错，不当成功`() {
+        val dir = kotlin.io.path.createTempDirectory("lua-action").toFile()
+        File(dir, "main.lua").writeText(
+            """
+            local plugin = {}
+            function plugin.ok() return nil end
+            function plugin.bad() error("坏了") end
+            function plugin.say() return "密钥不对" end
+            return plugin
+            """.trimIndent()
+        )
+        val store = InMemoryConfigStore()
+        val runtime = LuaScriptRuntime("test.action", dir, "main.lua", store)
+        assertTrue(runtime.load())
+        val adapter = LuaToolPluginAdapter(runtime, com.kingzcheung.xime.plugin.core.model.PluginContext(
+            application = android.app.Application(),
+            pluginInfo = com.kingzcheung.xime.plugin.core.model.PluginInfo(
+                id = "test.action", name = "t", description = "t",
+                iconResId = 0, versionCode = 1, versionName = "0.1.0",
+                path = File(dir, "main.lua").absolutePath, type = "tool"
+            ),
+            configStore = store,
+        ))
+        kotlinx.coroutines.runBlocking {
+            assertEquals(null, adapter.onAction("ok"))
+            assertEquals("密钥不对", adapter.onAction("say"))
+            val err = adapter.onAction("bad")
+            assertNotNull(err)
+            assertTrue(err!!, err.startsWith("插件出错：") && err.contains("坏了"))
+        }
+        dir.deleteRecursively()
+    }
 }

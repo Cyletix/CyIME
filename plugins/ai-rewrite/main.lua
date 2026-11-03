@@ -433,7 +433,7 @@ local function callApi(instruction, text, systemPrompt)
   }
   local resp = host.http.request("POST", baseUrl .. "/chat/completions", headers, body, TIMEOUT_MS)
   if resp == nil then
-    return nil, "连不上接口：" .. (host.http.lastError() or "未知错误") .. "。改过地址的话，到插件设置里点一次「保存」。"
+    return nil, "连不上接口：" .. (host.http.lastError() or "未知错误")
   end
   if resp.status ~= 200 then
     host.logError("AI 改写 " .. httpErrorText(resp.status) .. ": " .. tostring(resp.text))
@@ -603,6 +603,7 @@ end
 
 -- 设置页「测试接口」按钮：nil = 成功，字符串 = 失败原因
 function plugin.testConnection()
+  if trim(host.config.get(KEY_API_KEY) or "") == "" then return "还没填 API 密钥" end
   local mode = MODE_BY_ID["fix"]
   local sample = "我明天早上八点到公司，你门先开会把。"
   local content, err = callApi(mode.prompt, sample)
