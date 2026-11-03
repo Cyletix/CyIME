@@ -14,8 +14,38 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import com.kingzcheung.xime.ui.common.menuSwipeBack
 import com.kingzcheung.xime.ui.common.wheelPages
+
+/**
+ * 横着划过了触摸阈值、而这一边又翻不了页时，吃掉后面的移动：格子的点击在松手时看到被消费就不触发。
+ * 以前在第一页往右划、或者在没压到右边缘的格子上往左划，手指没离开格子，松手就算点了一下（11-03 声音振动）。
+ */
+private fun Modifier.swallowDeadHorizontalDrag(rightDead: Boolean, leftDead: Boolean): Modifier {
+    if (!rightDead && !leftDead) return this
+    return pointerInput(rightDead, leftDead) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val slop = viewConfiguration.touchSlop
+            var swallowing = false
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                    ?: return@awaitEachGesture
+                if (!swallowing) {
+                    val dx = change.position.x - down.position.x
+                    val dy = kotlin.math.abs(change.position.y - down.position.y)
+                    if (kotlin.math.abs(dx) >= slop && kotlin.math.abs(dx) > dy &&
+                        ((dx > 0f && rightDead) || (dx < 0f && leftDead))) swallowing = true
+                }
+                if (swallowing) change.consume()
+                if (!change.pressed) return@awaitEachGesture
+            }
+        }
+    }
+}
 
 /** 菜单和方案共享受面板高度约束的网格；低高度时分页，卡片不能越界挤压下一行。 */
 @Composable
@@ -47,7 +77,11 @@ internal fun <T> KeyboardPanelGrid(
             maxOf(104.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight)
         val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else minOf(maxWidth, 144.dp * columns + spacing * (columns - 1))
         Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight)
-            .menuSwipeBack(pagerState.currentPage, onSwipeBack.takeUnless { pagerState.canScrollForward }, PointerEventPass.Initial),
+            .menuSwipeBack(pagerState.currentPage, onSwipeBack.takeUnless { pagerState.canScrollForward }, PointerEventPass.Initial,
+                edgeOnly = false)
+            // 划不动的方向（第一页往右、最后一页又没有返回时往左）：这一划什么也不做，也不能在松手时算成点了格子。
+            .swallowDeadHorizontalDrag(rightDead = !pagerState.canScrollBackward,
+                leftDead = !pagerState.canScrollForward && onSwipeBack == null),
             horizontalAlignment = Alignment.CenterHorizontally) {
             HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {

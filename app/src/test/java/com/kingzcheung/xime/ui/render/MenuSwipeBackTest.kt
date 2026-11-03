@@ -157,6 +157,27 @@ class MenuSwipeBackTest {
         rule.runOnIdle { assertEquals(keyboard, model.page.value); assertEquals(1, taps); assertEquals(1, holds) }
     }
 
+    /** 11-03：在「声音振动」上往右划直接算点了。划不动的方向、没压到右边缘的格子，横划都不算点。 */
+    @Test fun horizontalSwipesOnAMenuItemNeverCountAsATap() {
+        val buttons = listOf(ToolbarButton.SOUND, ToolbarButton.EMOJI, ToolbarButton.CLIPBOARD, ToolbarButton.SCHEMA)
+        var taps = 0
+        var backs = 0
+        val actions = buttons.map { ToolbarAction(ToolbarButtonItem.Builtin(it)) { taps++ } }
+        rule.setContent {
+            MenuBar(MenuBarState(true, false, backgroundColor = Color.LightGray), actions,
+                Modifier.width(360.dp).height(230.dp).testTag("menu-body"), onBack = { backs++ })
+        }
+        val sound = rule.onNodeWithTag("menu-item:${ToolbarButton.SOUND.id}")
+        // 只有一页：往右划翻不了页，什么也不做
+        sound.performTouchInput { swipe(Offset(width * .2f, centerY), Offset(width * .9f, centerY), 300) }
+        rule.runOnIdle { assertEquals(0, taps); assertEquals(0, backs) }
+        // 最后一页往左划：从哪个格子起手都退一层，不算点
+        sound.performTouchInput { swipe(Offset(width * .9f, centerY), Offset(width * .1f, centerY), 300) }
+        rule.runOnIdle { assertEquals(0, taps); assertEquals(1, backs) }
+        sound.performClick()
+        rule.runOnIdle { assertEquals(1, taps); assertEquals(1, backs) }
+    }
+
     private fun shot(name: String) {
         val out = System.getenv("CYIME_RENDER_OUT") ?: return
         rule.waitForIdle()
