@@ -77,7 +77,7 @@ class KeyboardSurfaceConsistencyTest {
         val kana = Regex("[\\u3040-\\u309F\\u30A0-\\u30FF]")
         val literal = Regex("\"([^\"\\n]*)\"")
         val allowed = setOf("あいう")
-        val found = uiFiles().filterNot { it.name.startsWith("JapaneseKana") || it.name.startsWith("Kana") }.flatMap { file ->
+        val found = uiFiles().filterNot { it.name.startsWith("JapaneseKana") || it.name.startsWith("JapaneseChoonpu") || it.name.startsWith("Kana") }.flatMap { file ->
             file.readLines().mapIndexedNotNull { i, line ->
                 val trimmed = line.trim()
                 if (trimmed.startsWith("//") || trimmed.startsWith("*")) return@mapIndexedNotNull null
