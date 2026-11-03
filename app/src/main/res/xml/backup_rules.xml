@@ -13,6 +13,9 @@
     <exclude domain="database" path="clipboard.db" />
     <exclude domain="database" path="clipboard.db-wal" />
     <exclude domain="database" path="clipboard.db-shm" />
+    <exclude domain="database" path="clipboard_history.db" />
+    <exclude domain="database" path="clipboard_history.db-wal" />
+    <exclude domain="database" path="clipboard_history.db-shm" />
     <exclude domain="sharedpref" path="clipboard_prefs.xml" />
     <exclude domain="sharedpref" path="clipboard_board.xml" />
     <exclude domain="sharedpref" path="clipboard_images.xml" />

@@ -10,6 +10,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import java.io.File
 
 @Database(
     entities = [ClipboardEntry::class],
@@ -20,7 +21,12 @@ abstract class ClipboardDatabase : RoomDatabase() {
     abstract fun clipboardDao(): ClipboardDao
 
     companion object {
-        private const val DATABASE_NAME = "clipboard.db"
+        private const val DATABASE_NAME = "clipboard_history.db"
+
+        /** 1.15.47 及以前的文件名，见 [moveLegacyDatabase]。 */
+        internal const val LEGACY_DATABASE_NAME = "clipboard.db"
+
+        private val SIDE_FILES = listOf("-wal", "-shm", "-journal")
 
         /** v1 → v2：新增 consumed 列（候选栏"已消费"剪贴板项过滤）。 */
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -85,17 +91,43 @@ abstract class ClipboardDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * 换文件名是为了能装回旧版：1.15.47 把 clipboard.db 升到 v8，旧版 Room 找不到 8→6 的迁移，
+         * 键盘进程一启动就崩，输入法打不开。搬走以后旧版只会新建一个空的 clipboard.db，装回新版记录都在。
+         * 只在新文件还没有时搬一次；旧版期间新建的 clipboard.db 留给旧版，不合并。
+         * 先搬日志文件、最后搬主文件；搬不动就退回旧文件名，不丢记录。返回这次要打开的文件名。
+         */
+        internal fun moveLegacyDatabase(legacy: File, target: File): String {
+            if (target.exists() || !legacy.exists()) return target.name
+            val moved = mutableListOf<String>()
+            for (suffix in SIDE_FILES) {
+                val from = File(legacy.path + suffix)
+                if (!from.exists()) continue
+                if (!from.renameTo(File(target.path + suffix))) {
+                    moved.forEach { File(target.path + it).renameTo(File(legacy.path + it)) }
+                    return legacy.name
+                }
+                moved += suffix
+            }
+            if (legacy.renameTo(target)) return target.name
+            moved.forEach { File(target.path + it).renameTo(File(legacy.path + it)) }
+            return legacy.name
+        }
+
         @Volatile
         private var instance: ClipboardDatabase? = null
 
         fun getInstance(context: Context): ClipboardDatabase {
             return instance ?: synchronized(this) {
+                val app = context.applicationContext
                 instance ?: Room.databaseBuilder<ClipboardDatabase>(
-                    context.applicationContext,
-                    DATABASE_NAME
+                    app,
+                    moveLegacyDatabase(app.getDatabasePath(LEGACY_DATABASE_NAME), app.getDatabasePath(DATABASE_NAME))
                 )
                     .setDriver(AndroidSQLiteDriver())
                     .setQueryCoroutineContext(Dispatchers.IO)
+                    // 以后再装回这一版时，更新的版本留下的高版本库清空重建，不崩。
+                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                     .also { instance = it }
