@@ -132,36 +132,13 @@ fun CellDictionarySettingsPanel(
         val listState = rememberLazyListState()
         LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-            item {
-                SettingsToggleItem(Icons.Default.Sync,
-                    "自动更新词库", "每天最多查一次新词，键盘收起后自动应用；只下载，不上传。",
-                    state.autoUpdate, onAutoUpdate)
-            }
-            item {
-                TextButton(onClick = onCheckWordUpdates, enabled = !state.busy) { Text("检查内置词库更新") }
-            }
-            item {
-                SettingsToggleItem(Icons.Default.Translate,
-                    "分类词库英文候选", "在中文键盘按字母查找导入词库中的英文词。点「应用更改」后生效。",
-                    dictionaries.selectedEnglish, onSelectEnglish,
-                    lockMessage = if (state.busy) "正在处理词库" else null)
-            }
+            // 顶上只留搜索和导入一行，词库列表紧跟着；开关和说明放到列表下面（11-03「占了半个屏幕」）。
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("搜索词库") },
-                        singleLine = true, modifier = Modifier.weight(1f))
+                    DictionarySearchField(query, { query = it }, "搜索词库", Modifier.weight(1f))
                     TextButton(onClick = onImport, enabled = !state.busy, modifier = Modifier.padding(start = 8.dp)) {
                         Text("导入文件")
                     }
-                }
-            }
-            // 导入认哪些文件：一行写出扩展名，点开看怎么导入和每种格式的示例。
-            item {
-                Row(Modifier.fillMaxWidth().clickable { showGuide = true }.padding(start = 4.dp)
-                    .testTag("cell-dictionary-import-hint"), verticalAlignment = Alignment.CenterVertically) {
-                    Text("可导入 .scel、.txt、.dict.yaml、.json 词库", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { showGuide = true }) { Text("格式与示例") }
                 }
             }
             state.message?.let { message -> item(key = "message") {
@@ -190,6 +167,32 @@ fun CellDictionarySettingsPanel(
                 TextButton(onClick = { onSource(CellDictionaryCatalog.SOURCE_URL) },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Text("到搜狗词库网站找更多")
+                }
+            }
+            item(key = "settings-title") { SettingsGroupTitle("设置", Modifier.padding(top = 8.dp)) }
+            item(key = "auto-update") {
+                SettingsGroupRow(0, 2) {
+                    SettingsToggleItem(Icons.Default.Sync, "自动更新词库", "每天查一次新词，只下载不上传",
+                        state.autoUpdate, onAutoUpdate)
+                }
+            }
+            item(key = "english") {
+                SettingsGroupRow(1, 2) {
+                    SettingsToggleItem(Icons.Default.Translate, "分类词库英文候选", "中文键盘里也出导入词库的英文词",
+                        dictionaries.selectedEnglish, onSelectEnglish,
+                        lockMessage = if (state.busy) "正在处理词库" else null)
+                }
+            }
+            item(key = "check-updates") {
+                TextButton(onClick = onCheckWordUpdates, enabled = !state.busy) { Text("检查内置词库更新") }
+            }
+            // 导入认哪些文件：一行写出扩展名，点开看怎么导入和每种格式的示例。
+            item(key = "import-hint") {
+                Row(Modifier.fillMaxWidth().clickable { showGuide = true }.padding(start = 4.dp)
+                    .testTag("cell-dictionary-import-hint"), verticalAlignment = Alignment.CenterVertically) {
+                    Text("可导入 .scel、.txt、.dict.yaml、.json 词库", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showGuide = true }) { Text("格式与示例") }
                 }
             }
         }
