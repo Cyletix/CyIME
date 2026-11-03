@@ -520,4 +520,32 @@ class KeyboardResizeGeometryTest {
         // 宽高按小的那边算：宽屏但很矮时不放大。
         assertTrue(resizeControlScale(1200f, 180f) < 1f)
     }
+
+    /** 11-03 手机 1.15.51 闪退：矩形伸出可拖范围时拖边，范围上限小于下限。不闪退，被拖的边停在边界上。 */
+    @Test fun dragDoesNotCrashWhenTheRectSticksOutOfBounds() {
+        val bounds = ResizeRect(0f, 0f, 1000f, 1876f)
+        // 下边已在边界外：top + minH = 1977.2 > 1876。
+        val low = ResizeRect(100f, 1577.2f, 900f, 2000f)
+        for (handle in listOf(ResizeHandle.BOTTOM, ResizeHandle.BOTTOM_LEFT, ResizeHandle.BOTTOM_RIGHT)) {
+            val moved = low.dragBy(handle, 0f, 10f, bounds, minWidth = 300f, minHeight = 400f)
+            assertEquals(1876f, moved.bottom, 0.01f)
+            assertEquals(low.top, moved.top, 0.01f)
+        }
+        // 上边在边界外。
+        val high = ResizeRect(100f, -300f, 900f, 200f)
+        for (handle in listOf(ResizeHandle.TOP, ResizeHandle.TOP_LEFT, ResizeHandle.TOP_RIGHT)) {
+            val moved = high.dragBy(handle, 0f, -10f, bounds, minWidth = 300f, minHeight = 400f)
+            assertEquals(0f, moved.top, 0.01f)
+            assertEquals(high.bottom, moved.bottom, 0.01f)
+        }
+        // 左右伸出去，宽度下限放不下。
+        val wide = ResizeRect(800f, 100f, 1100f, 600f)
+        assertEquals(1000f, wide.dragBy(ResizeHandle.RIGHT, 5f, 0f, bounds, 300f, 200f).right, 0.01f)
+        val left = ResizeRect(-200f, 100f, 100f, 600f)
+        assertEquals(0f, left.dragBy(ResizeHandle.LEFT, -5f, 0f, bounds, 300f, 200f).left, 0.01f)
+        // 传入的上限比下限小也不抛。
+        val inside = ResizeRect(100f, 1000f, 900f, 1800f)
+        val capped = inside.dragBy(ResizeHandle.TOP, 0f, -50f, bounds, minWidth = 300f, minHeight = 1977f, maxHeight = 1876f)
+        assertTrue(capped.top >= bounds.top && capped.bottom == inside.bottom)
+    }
 }

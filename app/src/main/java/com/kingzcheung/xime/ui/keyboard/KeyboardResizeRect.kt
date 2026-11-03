@@ -135,27 +135,32 @@ internal fun ResizeRect.dragBy(
     val rightMax = { kotlin.math.min(bounds.right, left + maxW) }
     val topMin = { kotlin.math.max(bounds.top, bottom - maxH) }
     val bottomMax = { kotlin.math.min(bounds.bottom, top + maxH) }
+    // 矩形有一部分在 [bounds] 外（窗口或边衬区变了、存的尺寸低于今天的下限）时，
+    // 「留够最小尺寸」和「不出边界」可能同时做不到，范围上限小于下限，coerceIn 会抛异常闪退
+    // （11-03 SM-S9180 1.15.51：maximum 1876.0 is less than minimum 1977.1982）。这时边界优先：边停在边界上。
+    fun Float.towardLow(low: Float, high: Float) = if (high < low) low else coerceIn(low, high)
+    fun Float.towardHigh(low: Float, high: Float) = if (high < low) high else coerceIn(low, high)
 
     when (handle) {
-        ResizeHandle.LEFT -> left = (left + dx).coerceIn(leftMin(), right - minW)
-        ResizeHandle.RIGHT -> right = (right + dx).coerceIn(left + minW, rightMax())
-        ResizeHandle.TOP -> top = (top + dy).coerceIn(topMin(), bottom - minH)
-        ResizeHandle.BOTTOM -> bottom = (bottom + dy).coerceIn(top + minH, bottomMax())
+        ResizeHandle.LEFT -> left = (left + dx).towardLow(leftMin(), right - minW)
+        ResizeHandle.RIGHT -> right = (right + dx).towardHigh(left + minW, rightMax())
+        ResizeHandle.TOP -> top = (top + dy).towardLow(topMin(), bottom - minH)
+        ResizeHandle.BOTTOM -> bottom = (bottom + dy).towardHigh(top + minH, bottomMax())
         ResizeHandle.TOP_LEFT -> {
-            left = (left + dx).coerceIn(leftMin(), right - minW)
-            top = (top + dy).coerceIn(topMin(), bottom - minH)
+            left = (left + dx).towardLow(leftMin(), right - minW)
+            top = (top + dy).towardLow(topMin(), bottom - minH)
         }
         ResizeHandle.TOP_RIGHT -> {
-            right = (right + dx).coerceIn(left + minW, rightMax())
-            top = (top + dy).coerceIn(topMin(), bottom - minH)
+            right = (right + dx).towardHigh(left + minW, rightMax())
+            top = (top + dy).towardLow(topMin(), bottom - minH)
         }
         ResizeHandle.BOTTOM_LEFT -> {
-            left = (left + dx).coerceIn(leftMin(), right - minW)
-            bottom = (bottom + dy).coerceIn(top + minH, bottomMax())
+            left = (left + dx).towardLow(leftMin(), right - minW)
+            bottom = (bottom + dy).towardHigh(top + minH, bottomMax())
         }
         ResizeHandle.BOTTOM_RIGHT -> {
-            right = (right + dx).coerceIn(left + minW, rightMax())
-            bottom = (bottom + dy).coerceIn(top + minH, bottomMax())
+            right = (right + dx).towardHigh(left + minW, rightMax())
+            bottom = (bottom + dy).towardHigh(top + minH, bottomMax())
         }
         // 中间留白：整体平移，宽高不变（悬浮键盘用来移动位置）。
         ResizeHandle.NONE -> {
