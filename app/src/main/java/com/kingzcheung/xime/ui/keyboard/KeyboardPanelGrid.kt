@@ -6,6 +6,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,9 +25,12 @@ import com.kingzcheung.xime.ui.common.wheelPages
  * 横着划过了触摸阈值、而这一边又翻不了页时，吃掉后面的移动：格子的点击在松手时看到被消费就不触发。
  * 以前在第一页往右划、或者在没压到右边缘的格子上往左划，手指没离开格子，松手就算点了一下（11-03 声音振动）。
  */
-private fun Modifier.swallowDeadHorizontalDrag(rightDead: Boolean, leftDead: Boolean): Modifier {
-    if (!rightDead && !leftDead) return this
-    return pointerInput(rightDead, leftDead) {
+@Composable
+private fun Modifier.swallowDeadHorizontalDrag(rightDead: () -> Boolean, leftDead: () -> Boolean): Modifier {
+    // 判断放在越过阈值的那一刻读：拖动中翻页会改变能不能往回翻，不能拿它当 key 重启手势（会打断正在翻的页）。
+    val right by androidx.compose.runtime.rememberUpdatedState(rightDead)
+    val left by androidx.compose.runtime.rememberUpdatedState(leftDead)
+    return pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             val slop = viewConfiguration.touchSlop
@@ -38,7 +42,7 @@ private fun Modifier.swallowDeadHorizontalDrag(rightDead: Boolean, leftDead: Boo
                     val dx = change.position.x - down.position.x
                     val dy = kotlin.math.abs(change.position.y - down.position.y)
                     if (kotlin.math.abs(dx) >= slop && kotlin.math.abs(dx) > dy &&
-                        ((dx > 0f && rightDead) || (dx < 0f && leftDead))) swallowing = true
+                        ((dx > 0f && right()) || (dx < 0f && left()))) swallowing = true
                 }
                 if (swallowing) change.consume()
                 if (!change.pressed) return@awaitEachGesture
@@ -80,8 +84,8 @@ internal fun <T> KeyboardPanelGrid(
             .menuSwipeBack(pagerState.currentPage, onSwipeBack.takeUnless { pagerState.canScrollForward }, PointerEventPass.Initial,
                 edgeOnly = false)
             // 划不动的方向（第一页往右、最后一页又没有返回时往左）：这一划什么也不做，也不能在松手时算成点了格子。
-            .swallowDeadHorizontalDrag(rightDead = !pagerState.canScrollBackward,
-                leftDead = !pagerState.canScrollForward && onSwipeBack == null),
+            .swallowDeadHorizontalDrag(rightDead = { !pagerState.canScrollBackward },
+                leftDead = { !pagerState.canScrollForward && onSwipeBack == null }),
             horizontalAlignment = Alignment.CenterHorizontally) {
             HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {

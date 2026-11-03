@@ -172,7 +172,8 @@ class MenuSwipeBackTest {
         sound.performTouchInput { swipe(Offset(width * .2f, centerY), Offset(width * .9f, centerY), 300) }
         rule.runOnIdle { assertEquals(0, taps); assertEquals(0, backs) }
         // 最后一页往左划：从哪个格子起手都退一层，不算点
-        sound.performTouchInput { swipe(Offset(width * .9f, centerY), Offset(width * .1f, centerY), 300) }
+        // 起手在格子里、没压到右边缘，划够返回距离（最多 112dp）
+        sound.performTouchInput { swipe(Offset(width * .8f, centerY), Offset(width * .8f - 150f, centerY), 300) }
         rule.runOnIdle { assertEquals(0, taps); assertEquals(1, backs) }
         sound.performClick()
         rule.runOnIdle { assertEquals(1, taps); assertEquals(1, backs) }
