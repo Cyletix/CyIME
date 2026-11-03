@@ -64,8 +64,11 @@ class FloatingCornerResizeTest {
                 -1000f * density, l, null, false, density)
             assertEquals(start.left, shrunk.left, 0.01f)
             assertEquals(start.top, shrunk.top, 0.01f)
-            assertEquals(floatingResizeMinWidthDp(600) * density, shrunk.width, 0.5f)
-            assertEquals((FLOATING_RESIZE_MIN_HEIGHT_DP + FLOATING_DRAG_BAR_HEIGHT_DP) * density, shrunk.height, 0.5f)
+            // 短边 600dp：内容高 250dp、宽 400dp，和调节界面同一组下限。
+            assertEquals(floatingResizeFloorWidthDp(600, 600) * density, shrunk.width, 0.5f)
+            assertEquals(400f * density, shrunk.width, 0.5f)
+            assertEquals((floatingResizeFloorContentDp(600, 800) + FLOATING_DRAG_BAR_HEIGHT_DP) * density, shrunk.height, 0.5f)
+            assertEquals((250 + FLOATING_DRAG_BAR_HEIGHT_DP) * density, shrunk.height, 0.5f)
         }
     }
 

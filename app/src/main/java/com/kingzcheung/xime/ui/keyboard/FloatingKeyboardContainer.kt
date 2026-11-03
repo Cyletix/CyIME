@@ -509,7 +509,7 @@ internal fun FloatingKeyboardContainer(
                                 val start = currentCardRect
                                 val limits = floatingCornerResizeLimits(start, hostWidthPx, hostHeightPx, bottomInsetPx,
                                     configuration.screenWidthDp, configuration.screenWidthDp > configuration.screenHeightDp,
-                                    density.density)
+                                    density.density, minOf(configuration.screenWidthDp, configuration.screenHeightDp))
                                 var raw = start
                                 var resized = false
                                 var tapped = false

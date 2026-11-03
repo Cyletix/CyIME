@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.roundToInt
 
 /**
  * 键盘调节几何：**拖边固定对边**、命中与绘制共用同一个矩形、矩形与渲染状态互为逆映射。
@@ -185,28 +186,48 @@ class KeyboardResizeGeometryTest {
         assertEquals((1080f - 400f * density) / 2f, narrow.left, 0.01f)
     }
 
-    @Test fun floatingFloorIsTheSameForEveryResizePathAndNeverGoesBelow244() {
-        // 384dp 宽手机、26 键：方形点约 202dp（含工具栏），在 244dp 下限之下（11-03 起不再为它放低下限）。
+    @Test fun floatingFloorFollowsTheScreenAndIsTheSameForEveryResizePath() {
+        // 下限按屏幕短边：手机 170×270dp（比原来横屏 244×400 小约 30%），平板 SM-X800（短边 934dp）300×480dp。
+        for (shortSide in listOf(360, 384, 411)) {
+            assertEquals(170, floatingResizeFloorContentDp(shortSide, 2000))
+            assertEquals(270, floatingResizeFloorWidthDp(shortSide, 2000))
+        }
+        assertEquals(200, floatingResizeFloorContentDp(480, 2000))
+        assertEquals(320, floatingResizeFloorWidthDp(480, 2000))
+        assertEquals(250, floatingResizeFloorContentDp(600, 2000))
+        assertEquals(400, floatingResizeFloorWidthDp(600, 2000))
+        for (shortSide in listOf(824, 934, 1200)) {
+            assertEquals(300, floatingResizeFloorContentDp(shortSide, 2000))
+            assertEquals(480, floatingResizeFloorWidthDp(shortSide, 2000))
+        }
+        // 横竖屏同一个值（只看短边）；可用高度、宽度不够时取可用的。
+        assertEquals(150 - FLOATING_DRAG_BAR_HEIGHT_DP, floatingResizeFloorContentDp(411, 150))
+        assertEquals(250, floatingResizeFloorWidthDp(411, 250))
+
+        // 点亮四角直接拖和调节界面同一组下限：手机竖屏、手机横屏、平板横屏。
+        data class Screen(val widthDp: Int, val heightDp: Int, val density: Float)
+        for (screen in listOf(Screen(411, 891, 2.625f), Screen(891, 411, 2.625f), Screen(1493, 934, 1.875f))) {
+            val d = screen.density
+            val shortSide = minOf(screen.widthDp, screen.heightDp)
+            val card = ResizeRect(0f, (screen.heightDp - 340f) * d, minOf(screen.widthDp, 600) * d, screen.heightDp * d)
+            val limits = floatingCornerResizeLimits(card, screen.widthDp * d, screen.heightDp * d, 0f, screen.widthDp,
+                screen.widthDp > screen.heightDp, d, shortSide)
+            val availableHeightDp = (limits.bounds.height / d).roundToInt()
+            val availableWidthDp = (limits.bounds.width / d).roundToInt()
+            assertEquals("$screen", (floatingResizeFloorContentDp(shortSide, availableHeightDp) + FLOATING_DRAG_BAR_HEIGHT_DP) * d,
+                limits.minHeight, 0.5f)
+            assertEquals("$screen", floatingResizeFloorWidthDp(shortSide, availableWidthDp) * d, limits.minWidth, 0.5f)
+        }
+
+        // 手机 26 键方形点（约 202dp）又在下限之上，吸得到。
         val density = 2.75f
-        val widthDp = 384f
         val geometry = KeyboardSquareSnap(10f, false, false)
-        val spacing: Pair<Float?, Float?> = null to null
-        val dragBarPx = FLOATING_DRAG_BAR_HEIGHT_DP * density
-        val bounds = ResizeRect(0f, 0f, widthDp * density, 900f * density)
-        val card = ResizeRect(0f, bounds.bottom - 300f * density, widthDp * density, bounds.bottom)
-        val squareTotalPx = geometry.squareTotalHeightPx(card, density, dragBarPx, true, spacing)!!
-        val squareContentDp = squareTotalPx / density - FLOATING_DRAG_BAR_HEIGHT_DP
-        assertTrue("square content $squareContentDp", squareContentDp in 180f..215f)
-        // 调节界面和点亮四角直接拖：同一个下限，就是 244dp。
-        val floor = floatingResizeFloorContentDp(900, 900, false)
-        assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floor)
-        val limits = floatingCornerResizeLimits(card, bounds.width, bounds.height, 0f, widthDp.toInt(), false, density)
-        assertEquals((floor + FLOATING_DRAG_BAR_HEIGHT_DP) * density, limits.minHeight, 0.5f)
-        // 横屏同样一致。
-        assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeFloorContentDp(800, 760, true))
-        // 可用高度不够时两条路都取可用高度。
-        assertEquals(200 - FLOATING_DRAG_BAR_HEIGHT_DP, floatingResizeFloorContentDp(900, 200, false))
-        // 已存高度仍能读回旧版本存下的方形高度（不改写用户已存的尺寸），默认范围不变。
+        val bounds = ResizeRect(0f, 0f, 384f * density, 900f * density)
+        val card = ResizeRect(0f, bounds.bottom - 300f * density, 384f * density, bounds.bottom)
+        val squareContentDp = geometry.squareTotalHeightPx(card, density, FLOATING_DRAG_BAR_HEIGHT_DP * density, true,
+            null to null)!! / density - FLOATING_DRAG_BAR_HEIGHT_DP
+        assertTrue("square content $squareContentDp", squareContentDp > floatingResizeFloorContentDp(384, 900))
+        // 已存高度范围和默认范围不变：旧尺寸照旧读回，默认尺寸不动。
         assertEquals(FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP, floatingStoredHeightBounds(900, false).first)
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeHeightBounds(900, false).first)
     }

@@ -49,14 +49,23 @@ internal fun floatingResizeMinHeightDp(availableHeightDp: Int): Int =
 internal const val FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP = 160
 
 /**
- * 悬浮键盘拖小时的最低内容高度（含工具栏，不含拖条）：调节界面拖边拖角、点亮的四角直接拖都用这一个。
- * 一律是 [FLOATING_RESIZE_MIN_HEIGHT_DP]（可用高度不够时取可用高度）。以前调节界面为了够到方形按键点
- * 会降到 244dp 以下，按键压扁、工具栏和底部拖条显得过大，且和直接拖角的最小值不一样（用户 11-03）；
- * 方形按键点在 244dp 以下时不再吸附。
+ * 悬浮键盘拖小的下限按屏幕短边算（用户 11-03「横屏下悬浮窗还不够小…平板上最小尺寸太小，手机上太大」）：
+ * 内容高（含工具栏，不含拖条）= 短边 × 0.42，取整到 10dp，夹在 170–300dp；宽 = 高 × 1.6，同样取整到 10dp，
+ * 各种屏幕上最小时的样子一样。手机（短边约 384–411dp）170×270dp，比原来的 244×400（横屏）小约 30%；
+ * 平板 SM-X800（短边 934dp）300×480dp。调节界面拖边拖角、点亮的四角直接拖都只用这一组，横竖屏同一个值。
  */
-internal fun floatingResizeFloorContentDp(hostHeightDp: Int, availableHeightDp: Int, landscape: Boolean): Int =
-    minOf(floatingResizeHeightBounds(hostHeightDp, landscape).first,
-        floatingResizeMinHeightDp(availableHeightDp - FLOATING_DRAG_BAR_HEIGHT_DP))
+internal fun floatingResizeFloorScreenContentDp(screenShortSideDp: Int): Int =
+    ((screenShortSideDp.coerceAtLeast(1) * 0.42f / 10f).roundToInt() * 10).coerceIn(170, 300)
+
+/** 悬浮键盘拖小的最低内容高度（见 [floatingResizeFloorScreenContentDp]）；可用高度不够时取可用高度。 */
+internal fun floatingResizeFloorContentDp(screenShortSideDp: Int, availableHeightDp: Int): Int =
+    minOf(floatingResizeFloorScreenContentDp(screenShortSideDp),
+        (availableHeightDp - FLOATING_DRAG_BAR_HEIGHT_DP).coerceAtLeast(1))
+
+/** 悬浮键盘拖小的最小宽度：最低内容高 × 1.6 取整到 10dp；可用宽度不够时取可用宽度。 */
+internal fun floatingResizeFloorWidthDp(screenShortSideDp: Int, availableWidthDp: Int): Int =
+    ((floatingResizeFloorScreenContentDp(screenShortSideDp) * 1.6f / 10f).roundToInt() * 10)
+        .coerceAtMost(availableWidthDp.coerceAtLeast(1))
 
 /** 已保存或拖出的悬浮高度的合法范围：下限放到绝对下限，上限同 [floatingResizeHeightBounds]。 */
 internal fun floatingStoredHeightBounds(hostHeightDp: Int, landscape: Boolean): IntRange {

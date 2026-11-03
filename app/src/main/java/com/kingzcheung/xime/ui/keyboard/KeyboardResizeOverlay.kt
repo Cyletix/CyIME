@@ -555,17 +555,15 @@ internal fun KeyboardResizeOverlay(
                         val squareSpacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig()
                             .spacingFor(session.squareSnap?.section ?: "qwerty")
                         // 悬浮最低高度和点亮四角直接拖用同一个（11-03「通过不同方法调整的最小尺寸不一致」）。
-                        val minContentHeightDp = floatingResizeFloorContentDp(hostMaxHeight.value.roundToInt(),
-                            availableHeightDp, isLandscape)
+                        // 下限按屏幕短边算（11-03），横竖屏同一个值。
+                        val screenShortSideDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
+                        val minContentHeightDp = floatingResizeFloorContentDp(screenShortSideDp, availableHeightDp)
                         val minHeightPx = ((if (gestureFloating) minContentHeightDp else
                             fixedRange.first + session.bottomPaddingDp) + dragBarDp) * density.density
                         val screenMaxHeightPx = ((if (gestureFloating) floatingHeightRange.last else
                             fixedRange.last + session.bottomPaddingDp) + dragBarDp) * density.density
                         val baseMinWidthPx = if (gestureFloating) {
-                            maxOf(
-                                floatingResizeMinWidthDp(availableWidthDp),
-                                minWidthDp.coerceAtMost(availableWidthDp.coerceAtLeast(1)),
-                            ).toFloat() * density.density
+                            floatingResizeFloorWidthDp(screenShortSideDp, availableWidthDp).toFloat() * density.density
                         } else gestureRect.width
                         val maxWidthPx = if (gestureFloating) {
                             minOf(stableBounds.width, maxWidthDp.toFloat() * density.density)
