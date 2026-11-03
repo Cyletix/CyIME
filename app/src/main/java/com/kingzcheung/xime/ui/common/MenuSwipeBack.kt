@@ -20,12 +20,19 @@ internal fun Modifier.menuSwipeBack(
     edgeOnly: Boolean = true,
     /** 退一层要划多远；null 按宽度的 22%，夹在 72–112dp。 */
     distanceDp: Float? = null,
+    /**
+     * 按下那一刻算不算数。会随手势变化的条件（翻页能不能往后翻）放这里，不能拿它把 [onBack] 换成 null：
+     * 手势中途把这个节点摘掉，系统会连带取消里面翻页的那一划（11-03 平板：第二页往右划回不到第一页）。
+     */
+    active: () -> Boolean = { true },
 ): Modifier {
     val latestBack by rememberUpdatedState(onBack)
+    val latestActive by rememberUpdatedState(active)
     if (onBack == null) return this
     return pointerInput(page, pass, edgeOnly, distanceDp) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = pass)
+            if (!latestActive()) return@awaitEachGesture
             val edgeWidth = minOf(size.width * 0.25f, 96.dp.toPx())
             if (down.type != PointerType.Touch || (edgeOnly && down.position.x < size.width - edgeWidth)) return@awaitEachGesture
             val distance = distanceDp?.dp?.toPx() ?: (size.width * 0.22f).coerceIn(72.dp.toPx(), 112.dp.toPx())

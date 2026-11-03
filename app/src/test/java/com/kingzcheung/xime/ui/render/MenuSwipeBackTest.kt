@@ -199,6 +199,29 @@ class MenuSwipeBackTest {
         rule.runOnIdle { assertEquals(1, backs); assertEquals(0, taps) }
     }
 
+    /** 11-03 平板：翻到最后一页以后往右划回不到前一页，只能关了菜单重开。 */
+    @Test fun lastPageSwipesRightBackToThePreviousPage() {
+        val buttons = ToolbarButton.entries.take(13)
+        var taps = 0
+        var backs = 0
+        val actions = buttons.map { ToolbarAction(ToolbarButtonItem.Builtin(it)) { taps++ } }
+        rule.setContent {
+            MenuBar(MenuBarState(true, false, backgroundColor = Color.LightGray), actions,
+                Modifier.width(360.dp).height(230.dp).testTag("menu-body"), onBack = { backs++ })
+        }
+        val menu = rule.onNodeWithTag("menu-body")
+        menu.performTouchInput { swipe(Offset(width * .68f, centerY), Offset(width * .04f, centerY), 330) }
+        rule.onNodeWithTag("menu-item:${buttons[8].id}").assertIsDisplayed()
+        menu.performTouchInput { swipe(Offset(width * .3f, centerY), Offset(width * .96f, centerY), 330) }
+        rule.onNodeWithTag("menu-item:${buttons[0].id}").assertIsDisplayed()
+        rule.runOnIdle { assertEquals(0, backs); assertEquals(0, taps) }
+        // 回到第一页后照样能翻过去，最后一页往左划照样退一层
+        menu.performTouchInput { swipe(Offset(width * .68f, centerY), Offset(width * .04f, centerY), 330) }
+        rule.onNodeWithTag("menu-item:${buttons[8].id}").assertIsDisplayed()
+        menu.performTouchInput { swipe(Offset(width * .8f, centerY), Offset(width * .2f, centerY), 330) }
+        rule.runOnIdle { assertEquals(1, backs); assertEquals(0, taps) }
+    }
+
     private fun shot(name: String) {
         val out = System.getenv("CYIME_RENDER_OUT") ?: return
         rule.waitForIdle()

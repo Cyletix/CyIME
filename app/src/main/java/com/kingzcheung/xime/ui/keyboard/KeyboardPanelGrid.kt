@@ -82,9 +82,11 @@ internal fun <T> KeyboardPanelGrid(
         val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else minOf(maxWidth, 144.dp * columns + spacing * (columns - 1))
         // 手势放在整块面板上，不只在居中的网格上：平板上网格两边空着一大块，从右边缘起手的一划以前落在网格外没人接
         // （11-03 平板实测）。最后一页往左划 64dp 就退一层，和翻页一样短，不用划过 112dp。
+        // 还有下一页时这一划交给翻页：在按下时判断，节点一直挂着。以前按能不能往后翻把返回换成 null，最后一页往右一划，
+        // 页面一动就能往后翻了，节点被摘掉，连带取消了翻页，回不到上一页（11-03 平板）。
         Box(Modifier.fillMaxSize()
-            .menuSwipeBack(pagerState.currentPage, onSwipeBack.takeUnless { pagerState.canScrollForward }, PointerEventPass.Initial,
-                edgeOnly = false, distanceDp = 64f)
+            .menuSwipeBack(Unit, onSwipeBack, PointerEventPass.Initial, edgeOnly = false, distanceDp = 64f,
+                active = { !pagerState.canScrollForward })
             // 划不动的方向（第一页往右、最后一页又没有返回时往左）：这一划什么也不做，也不能在松手时算成点了格子。
             .swallowDeadHorizontalDrag(rightDead = { !pagerState.canScrollBackward },
                 leftDead = { !pagerState.canScrollForward && onSwipeBack == null })) {
