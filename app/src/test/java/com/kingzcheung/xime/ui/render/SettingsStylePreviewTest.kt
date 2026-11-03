@@ -111,6 +111,37 @@ class SettingsStylePreviewTest {
         assertEquals(original, com.kingzcheung.xime.settings.SettingsPreferences.getCurrentSchema(app))
     }
 
+    /**
+     * 11-03「显示键盘…两边不能站满 应该做成浮动按钮」：按钮浮在列表上，列表铺到按钮两侧和下面；
+     * 滚到底时最后一项整个在按钮上方。
+     */
+    @Test fun showKeyboardFloatsOverTheListAndTheLastSettingClearsIt() {
+        val app = rule.activity.application
+        Settings.Secure.putString(app.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD,
+            app.packageName + "/com.kingzcheung.xime.service.XimeInputMethodService")
+        KeysConfigHelper.loadConfig(app)
+        KeyboardThemes.initFromConfig(app)
+        AppFonts.initialize(app)
+        rule.setContent {
+            XimeTheme(darkTheme = false, themeId = "soft_blue") {
+                LayoutDisplaySettingsContent(onBack = {}, initialPage = "gestures")
+            }
+        }
+        rule.onNodeWithText("显示键盘").assertIsDisplayed()
+        val list = rule.onNode(hasScrollToIndexAction())
+        val button = rule.onNodeWithTag("show-keyboard-button").fetchSemanticsNode().boundsInRoot
+        val listBounds = list.fetchSemanticsNode().boundsInRoot
+        // 列表一直铺到按钮下面，按钮两侧不是单独一栏。
+        assertTrue("列表底边 ${listBounds.bottom}，按钮底边 ${button.bottom}", listBounds.bottom > button.bottom)
+        assertTrue(button.width < listBounds.width * 0.6f)
+        save("gestures-floating-button")
+        repeat(30) { list.performTouchInput { swipeUp() } }
+        rule.waitForIdle()
+        val last = rule.onNodeWithTag("settings-search-anchor:按键技巧入口").fetchSemanticsNode().boundsInRoot
+        assertTrue("最后一项底边 ${last.bottom}，按钮上沿 ${button.top}", last.bottom <= button.top)
+        save("gestures-end")
+    }
+
     @Test fun sizePageShowsAndHidesTheReadOnlyKeyboard() {
         val app = rule.activity.application
         Settings.Secure.putString(app.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD,

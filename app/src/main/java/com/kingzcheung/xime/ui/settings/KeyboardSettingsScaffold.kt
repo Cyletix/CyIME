@@ -40,11 +40,18 @@ import com.kingzcheung.xime.keyboard.KeyboardPanelLaunch
 
 /**
  * 设置页预览键盘盖住的高度。预览显示时设置列表铺到键盘后面，固定键盘两侧镂空处透出列表，和在别的应用里一样；
- * 列表末尾留出这么高，最后几项仍能滚到键盘上方。没有预览键盘时为 0。
+ * 列表末尾留出这么高，最后几项仍能滚到键盘上方。键盘收起、显示悬浮「显示键盘」按钮时为
+ * [SHOW_KEYBOARD_BUTTON_SPACE]；没有预览的页为 0。
  */
 internal val LocalKeyboardPreviewInset = compositionLocalOf { 0.dp }
 
-/** 设置列表的内边距：原有的上下边距，再加上预览键盘盖住的那段。 */
+/** 悬浮「显示键盘」按钮离页面底边的距离。 */
+internal val SHOW_KEYBOARD_BUTTON_MARGIN = 12.dp
+
+/** 有悬浮「显示键盘」按钮时列表末尾空出的高度：按钮 48dp、上下各 12dp，最后一项能滚到按钮上方。 */
+internal val SHOW_KEYBOARD_BUTTON_SPACE = 48.dp + SHOW_KEYBOARD_BUTTON_MARGIN * 2
+
+/** 设置列表的内边距：原有的上下边距，再加上预览键盘盖住的那段（或悬浮「显示键盘」按钮占的那段）。 */
 @Composable
 internal fun keyboardPreviewContentPadding(top: Dp = 0.dp, bottom: Dp = 0.dp): PaddingValues =
     PaddingValues(top = top, bottom = bottom + LocalKeyboardPreviewInset.current)
@@ -193,12 +200,16 @@ internal fun KeyboardSettingsScaffold(
         val keyboardInset = if (visible) with(density) {
             (WindowInsets.ime.getBottom(this).toDp() - padding.calculateBottomPadding()).coerceAtLeast(0.dp)
         } else 0.dp
+        // 「显示键盘」做成悬浮按钮（11-03「两边不能站满 应该做成浮动按钮」）：列表铺到页面底边，两侧露出设置；
+        // 列表末尾空出按钮的高度，滚到底最后一项在按钮上方。
+        val floatingButton = preview && !visible
+        val listEndInset = keyboardInset + if (floatingButton) SHOW_KEYBOARD_BUTTON_SPACE else 0.dp
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
             .then(if (preview && !visible) Modifier.imePadding() else Modifier)) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
-              CompositionLocalProvider(LocalKeyboardPreviewInset provides keyboardInset) {
+              CompositionLocalProvider(LocalKeyboardPreviewInset provides listEndInset) {
                 if (editPanel == null) content(Modifier.fillMaxSize())
-                else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = keyboardInset)) {
+                else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = listEndInset)) {
                     content(Modifier.fillMaxWidth())
                     if (selected) OutlinedButton(
                         onClick = { autoShow = true; editor?.showPreview(editPanel) },
@@ -206,25 +217,25 @@ internal fun KeyboardSettingsScaffold(
                     ) { Text(if (editPanel == KeyboardPanelLaunch.Panel.RESIZE) "调整尺寸" else "编辑排列") }
                 }
               }
-            }
-            if (preview && !visible) {
-                Box(Modifier.align(Alignment.CenterHorizontally).fillMaxWidth(0.54f).padding(bottom = 8.dp),
-                    contentAlignment = Alignment.Center) {
-                    FilledTonalButton(
-                        modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth().heightIn(min = 48.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            contentColor = MaterialTheme.colorScheme.onSurface),
-                        onClick = {
-                            // 已选中 CyIME：直接打开试打框，键盘弹出就能打字。
-                            when {
-                                selected -> typing = true
-                                enabled -> imm?.showInputMethodPicker()
-                                else -> context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-                            }
-                            autoShow = true
-                        },
-                    ) { Text(if (selected) "显示键盘" else if (enabled) "选择 CyIME" else "启用 CyIME") }
-                }
+              if (floatingButton) {
+                FilledTonalButton(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = SHOW_KEYBOARD_BUTTON_MARGIN)
+                        .fillMaxWidth(0.54f).widthIn(max = 280.dp).heightIn(min = 48.dp).testTag("show-keyboard-button"),
+                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurface),
+                    // 浮在列表上面：带一点阴影，和后面滚过的设置分得开。
+                    elevation = ButtonDefaults.filledTonalButtonElevation(defaultElevation = 3.dp, pressedElevation = 3.dp),
+                    onClick = {
+                        // 已选中 CyIME：直接打开试打框，键盘弹出就能打字。
+                        when {
+                            selected -> typing = true
+                            enabled -> imm?.showInputMethodPicker()
+                            else -> context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                        }
+                        autoShow = true
+                    },
+                ) { Text(if (selected) "显示键盘" else if (enabled) "选择 CyIME" else "启用 CyIME") }
+              }
             }
         }
         if (preview) AndroidView(
