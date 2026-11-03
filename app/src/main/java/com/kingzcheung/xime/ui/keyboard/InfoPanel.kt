@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -84,7 +85,9 @@ fun InfoPanel(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxSize()
-            .keyboardPanelBackground(backgroundColor)
+            // 面板里是成段的字：玻璃或键盘调透明时后面的页面会透上来和字叠在一起（11-03「重叠在一起」），
+            // 垫一层几乎不透明的主题底色，和盖在键上的提示同一做法。
+            .keyboardOverlayBackground(backgroundColor)
             .padding(bottom = bottomPaddingDp.dp)
     ) {
         // 导航区：关闭按钮 + 标题
@@ -120,6 +123,15 @@ fun InfoPanel(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            // 生成中：标题右边写一句，按钮先不能点，免得连点几次结果叠着来。
+            if (isLoading && nodes.isNotEmpty()) {
+                Text(
+                    text = "生成中…",
+                    color = accentColor,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         Column(
@@ -150,7 +162,7 @@ fun InfoPanel(
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) { run.forEach { InfoAction(it, onAction) } }
+                    ) { run.forEach { InfoAction(it, itemBgColor, textColor, !isLoading, onAction) } }
                     index = end
                     continue
                 }
@@ -158,14 +170,14 @@ fun InfoPanel(
                 when (node.type) {
                     UiNodeType.SECTION -> InfoSection(node.label ?: "", accentColor)
                     UiNodeType.TEXTAREA -> if (node.key == TOOL_PANEL_EDIT_ACTION)
-                        EditableSource(node, textColor, accentColor, onAction) else InfoText(node, textColor)
+                        EditableSource(node, textColor, accentColor, if (isLoading) ({}) else onAction) else InfoText(node, textColor)
                     UiNodeType.TEXT -> InfoText(node, textColor)
                     UiNodeType.METRIC -> InfoMetric(node, textColor, accentColor)
                     UiNodeType.DIVIDER -> HorizontalDivider(
                         modifier = Modifier.padding(vertical = 6.dp),
                         color = textColor.copy(alpha = 0.15f),
                     )
-                    UiNodeType.BUTTON -> InfoAction(node, onAction)
+                    UiNodeType.BUTTON -> InfoAction(node, itemBgColor, textColor, !isLoading, onAction)
                     else -> // 表单型字段降级为只读文本（前向兼容，插件新节点跑旧宿主不崩溃）
                         Text(
                             text = node.value ?: node.label ?: "",
@@ -184,7 +196,7 @@ fun InfoPanel(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .background(itemBgColor)
-                            .clickable { onItemClick(item) }
+                            .clickable(enabled = !isLoading) { onItemClick(item) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                     ) {
                         Text(
@@ -284,14 +296,22 @@ private fun InfoMetric(node: UiNode, textColor: Color, accentColor: Color) {
     }
 }
 
+/** 按钮用键盘主题的键色和字色，不用系统的灰色（跟着主题走）。 */
 @Composable
-private fun InfoAction(node: UiNode, onAction: (String) -> Unit) {
+private fun InfoAction(node: UiNode, keyColor: Color, textColor: Color, enabled: Boolean, onAction: (String) -> Unit) {
     val actionId = node.key ?: return
     val label = node.label ?: return
     FilledTonalButton(
         onClick = { onAction(actionId) },
+        enabled = enabled,
         modifier = Modifier.heightIn(min = 40.dp),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = keyColor.copy(alpha = 1f),
+            contentColor = textColor,
+            disabledContainerColor = keyColor.copy(alpha = 0.5f),
+            disabledContentColor = textColor.copy(alpha = 0.4f),
+        ),
     ) {
         Text(text = label, fontSize = 14.sp)
     }
