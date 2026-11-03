@@ -135,6 +135,16 @@ class PluginLifecycleManager(
         return true
     }
 
+    /**
+     * 只给设置页填配置用：不看启用开关、不登记成已加载，用完调 onUnload。
+     * 插件停用或加载失败时设置页也要能填密钥和地址（用户 2026-11-03「装了插件啥都没有」）。
+     */
+    fun openForSettings(pluginId: String): IPluginEntryClass? {
+        val info = xmlManager.getPluginById(pluginId) ?: return null
+        val loaded = loadPlugin(info) ?: return null
+        return instantiatePlugin(loaded)
+    }
+
     private suspend fun reloadPlugin(pluginId: String): Boolean {
         unloadPlugin(pluginId)
         return launchSinglePlugin(pluginId)

@@ -61,9 +61,13 @@ data class ToolPanelState(
  *
  * - [getPanelState]：返回面板状态（输入框内容 + 候选列表）
  * - [onPanelInput]：面板输入框内容变化通知
- * - [onPanelAction]：`generate` 触发生成（宿主保留 action id）
+ * - [onPanelAction]：`generate` 触发生成（宿主保留 action id）；按钮 key 为 [TOOL_PANEL_SETTINGS_ACTION]
+ *   时宿主不转给插件，直接打开这个插件的设置页
  * - [onPanelItemClick]：点候选 → 宿主上屏（host 负责选区替换/追加）
  */
+/** 面板按钮的宿主保留 key：点了打开插件自己的设置页。 */
+const val TOOL_PANEL_SETTINGS_ACTION = "host:settings"
+
 interface ToolPlugin : IPluginEntryClass, IPluginConfigurable {
     fun getPanelState(inputText: String): ToolPanelState
 

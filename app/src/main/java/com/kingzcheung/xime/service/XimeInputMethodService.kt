@@ -110,6 +110,7 @@ import com.kingzcheung.xime.association.AssociationService
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
 import com.kingzcheung.xime.plugin.ExtensionManager
+import com.kingzcheung.xime.plugin.core.api.TOOL_PANEL_SETTINGS_ACTION
 import com.kingzcheung.xime.plugin.core.api.ToolPlugin
 import com.kingzcheung.xime.plugin.core.api.ToolResult
 import com.kingzcheung.xime.plugin.core.lua.PluginEvent
@@ -1350,8 +1351,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         )
                     }
                 }
+            // 已经装好、按钮还在「不使用」里的（2026-11-02 之前装的）也放进菜单一次
+            val menu = if (SettingsPreferences.placeNewPluginButtons(this@XimeInputMethodService, buttons.map { it.id }))
+                SettingsPreferences.getMenuButtons(this@XimeInputMethodService) else null
             withContext(Dispatchers.Main) {
                 uiState.value = uiState.value.copy(toolbarPluginButtons = buttons)
+                if (menu != null) uiState.value = uiState.value.copy(menuButtons = menu)
             }
         }
     }
@@ -1461,6 +1466,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun dispatchToolPanelAction(actionId: String) {
         val pluginId = uiState.value.toolPanelPluginId
+        if (actionId == TOOL_PANEL_SETTINGS_ACTION) {
+            // 宿主保留的动作：面板里的「设置」直接进这个插件的设置页
+            closeToolPanel()
+            try {
+                startActivity(com.kingzcheung.xime.MainActivity.buildPluginAuthIntent(this, pluginId))
+            } catch (e: Exception) {
+                FileLogger.e(TAG, "Failed to open plugin settings", e)
+            }
+            return
+        }
         val epoch = uiState.value.toolPanelRequestEpoch
         uiState.value = uiState.value.copy(toolPanelLoading = true)
         serviceScope.launch(Dispatchers.IO) {

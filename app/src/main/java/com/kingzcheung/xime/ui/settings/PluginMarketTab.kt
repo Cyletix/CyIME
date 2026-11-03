@@ -106,6 +106,7 @@ private fun PluginMarketDialog(
                 MarketVersionSelector(plugin.versions.map { it.version }, version, select)
                 if (plugin.warning.isNotBlank()) Text(plugin.warning)
                 if (!item.compatible) Text("需要 CyIME ${item.minAppVersion} 或更高版本")
+                else if (!item.installed && plugin.pluginType == "tool") Text("装好后在键盘菜单里；接口和密钥在「已安装」› 设置。")
                 else if (!item.installed) Text("安装后到「已安装」启用和配置，可在插件详情查看联网授权。")
             }
         },

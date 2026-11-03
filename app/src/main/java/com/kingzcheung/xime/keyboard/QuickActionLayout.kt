@@ -48,6 +48,19 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
             return normalize(merge(edited.toolbar, original.toolbar), merge(edited.menu, original.menu))
         }
 
+        /**
+         * 刚启用的插件按钮（[fresh]）放进菜单「排列」前面；已在工具栏或菜单里的不动。
+         * 以前启用插件后按钮落在「不使用」，键盘上找不到（用户 2026-11-02）。
+         */
+        fun withPluginButtons(toolbar: List<String>, menu: List<String>, fresh: List<String>): List<String> {
+            val result = menu.toMutableList()
+            fresh.filter { it.isNotEmpty() && it !in toolbar && it !in result }.forEach { id ->
+                val at = result.indexOf(ToolbarButton.ARRANGE.id).takeIf { it >= 0 } ?: result.size
+                result.add(at, id)
+            }
+            return result
+        }
+
         fun fromEditorOrder(order: List<String>): QuickActionLayout {
             val menuAt = order.indexOf(MENU_DIVIDER).takeIf { it >= 0 } ?: order.size
             val unusedAt = order.indexOf(UNUSED_DIVIDER).takeIf { it >= 0 } ?: order.size

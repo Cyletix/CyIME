@@ -161,6 +161,10 @@ object PluginManager {
         return result
     }
 
+    /** 设置页用的临时实例，见 [PluginLifecycleManager.openForSettings]。 */
+    fun openForSettings(pluginId: String): IPluginEntryClass? =
+        runCatching { requireContext().lifecycleManager.openForSettings(pluginId) }.getOrNull()
+
     fun getPluginInstance(pluginId: String): IPluginEntryClass? {
         return requireContext().pluginInstances[pluginId]
     }

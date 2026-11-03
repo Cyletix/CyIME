@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -31,7 +32,13 @@ fun PluginSettingsContent(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val pluginInstance = remember(pluginId) { ExtensionManager.getPluginById(pluginId) }
+    val loadedInstance = remember(pluginId) { ExtensionManager.getPluginById(pluginId) }
+    // 停用着或没加载上的插件也要能填密钥和地址：临时开一份只给这页用，离开时卸掉。
+    val detachedInstance = remember(pluginId, loadedInstance) {
+        if (loadedInstance == null) com.kingzcheung.xime.plugin.core.runtime.PluginManager.openForSettings(pluginId) else null
+    }
+    DisposableEffect(detachedInstance) { onDispose { runCatching { detachedInstance?.onUnload() } } }
+    val pluginInstance = loadedInstance ?: detachedInstance
     val pluginInfo = remember(pluginId) { ExtensionManager.getAllInstalledPlugins().find { it.id == pluginId } }
 
     if (pluginInfo == null) {
@@ -88,7 +95,7 @@ fun PluginSettingsContent(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("插件未加载，请在插件中心启用后重试")
+                Text("插件加载失败，到「已安装」点这个插件看错误")
             }
         }
         return

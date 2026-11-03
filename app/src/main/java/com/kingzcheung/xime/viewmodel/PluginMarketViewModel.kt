@@ -77,7 +77,8 @@ class PluginMarketViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 XimeIndexSource.installMarketPlugin(context, item.plugin.id, version)
                 refreshInstalled()
-                state.update { it.copy(message = "「${item.plugin.name}」已安装，可在插件管理中配置") }
+                val where = if (item.plugin.pluginType == "tool") "，在键盘菜单里" else ""
+                state.update { it.copy(message = "「${item.plugin.name}」已装好$where") }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

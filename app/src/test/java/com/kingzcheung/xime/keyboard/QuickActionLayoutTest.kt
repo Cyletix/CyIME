@@ -43,4 +43,16 @@ class QuickActionLayoutTest {
         assertEquals(saved, QuickActionLayout.restoreHidden(
             QuickActionLayout(saved.toolbar, saved.menu - hidden), saved, hidden))
     }
+
+    @Test fun enabledPluginButtonGoesIntoMenuBeforeArrange() {
+        val plugin = "com.example.plugin:open"
+        val menu = listOf("settings", "ocr", "arrange")
+        assertEquals(listOf("settings", "ocr", plugin, "arrange"),
+            QuickActionLayout.withPluginButtons(listOf("emoji"), menu, listOf(plugin)))
+        // 已经在工具栏或菜单里的不动，也不重复
+        assertEquals(menu, QuickActionLayout.withPluginButtons(listOf(plugin), menu, listOf(plugin)))
+        assertEquals(listOf("settings", plugin), QuickActionLayout.withPluginButtons(emptyList(), listOf("settings", plugin), listOf(plugin)))
+        // 菜单里没有「排列」就放最后
+        assertEquals(listOf("settings", plugin), QuickActionLayout.withPluginButtons(emptyList(), listOf("settings"), listOf(plugin, "")))
+    }
 }

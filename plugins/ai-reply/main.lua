@@ -1,4 +1,6 @@
--- AI 智能回复插件（Lua 脚本插件，同步全链路）
+-- AI 回复插件（Lua 脚本插件，同步全链路）
+--
+-- 用法：先复制对方的消息，再点键盘菜单里的「AI 回复」，点一条回复发到输入框。
 --
 -- 职责划分：
 --   Lua   = prompt 模板组装 + 调用 LLM（host.http.request）+ 解析候选列表
@@ -91,33 +93,40 @@ end
 -- ================= 配置 schema（与 manifest 一致，插件中心表单数据源） =================
 
 function plugin.getSettingsSchema()
+  -- 默认地址也写进配置：设置页点「保存」时宿主才会给配置里的域名联网授权
+  if trim(host.config.get(KEY_BASE_URL) or "") == "" then host.config.set(KEY_BASE_URL, DEFAULTS.baseUrl) end
+  if trim(host.config.get(KEY_MODEL) or "") == "" then host.config.set(KEY_MODEL, DEFAULTS.model) end
   return {
+    { type = "section", label = "接口" },
     {
       key = KEY_API_KEY,
-      label = "API Key",
+      label = "API 密钥",
       type = "secret",
-      placeholder = "输入 LLM API Key",
-      helpText = "OpenAI 兼容接口的 API Key",
+      placeholder = "sk-…",
+      required = true,
+      helpText = "只存在这台手机里，不进备份，只发给下面的接口地址",
     },
     {
       key = KEY_BASE_URL,
       label = "接口地址",
       type = "text",
       defaultValue = DEFAULTS.baseUrl,
-      helpText = "OpenAI 兼容接口地址（/chat/completions 前缀），域名将自动获得联网授权",
+      helpText = "OpenAI 兼容接口，到 /v1 为止。例：https://api.deepseek.com/v1、https://api.siliconflow.cn/v1",
     },
     {
       key = KEY_MODEL,
       label = "模型",
       type = "text",
       defaultValue = DEFAULTS.model,
+      helpText = "例：gpt-4o-mini、deepseek-chat、Qwen/Qwen2.5-7B-Instruct",
     },
+    { type = "section", label = "提示词（清空就恢复默认）" },
     {
       key = KEY_PROMPT,
-      label = "回复模板",
+      label = "提示词",
       type = "textarea",
       defaultValue = DEFAULTS.prompt,
-      helpText = "生成候选的 prompt 模板，{context} 会被替换为对方消息",
+      helpText = "{context} 换成对方的消息",
     },
   }
 end
@@ -129,9 +138,16 @@ end
 --   生成中 → 空 ui（loading 字段驱动宿主显示加载态）；有候选 → 提示文字（items 由宿主渲染）
 local function buildUi()
   local ui = {}
+  -- 没填密钥：一打开就说，先去设置
+  if trim(host.config.get(KEY_API_KEY) or "") == "" then
+    ui[#ui + 1] = { type = "section", label = "先填接口" }
+    ui[#ui + 1] = { type = "text", value = "AI 回复用你自己的 AI 接口，给复制来的消息想几条回复。点「设置」填 API 密钥、接口地址和模型。", style = "caption" }
+    ui[#ui + 1] = { type = "button", label = "设置", key = "host:settings" }
+    return ui
+  end
   if #cachedItems > 0 then
-    ui[#ui + 1] = { type = "section", label = "回复候选" }
-    ui[#ui + 1] = { type = "text", value = "点击候选直接上屏", style = "caption" }
+    ui[#ui + 1] = { type = "section", label = "回复" }
+    ui[#ui + 1] = { type = "text", value = "点一条发到输入框", style = "caption" }
   elseif generating then
     -- loading 态：宿主显示"加载中..."
   else
@@ -139,13 +155,15 @@ local function buildUi()
     if lastContext ~= "" then
       ui[#ui + 1] = { type = "text", value = lastContext }
     else
-      ui[#ui + 1] = { type = "text", value = "暂无上下文：先复制对方消息，再从工具栏打开本面板", style = "caption" }
+      ui[#ui + 1] = { type = "text", value = "先复制对方的消息，再点 AI 回复。", style = "caption" }
     end
     if lastError ~= "" then
       ui[#ui + 1] = { type = "text", value = lastError, style = "caption" }
     end
-    ui[#ui + 1] = { type = "button", label = lastError ~= "" and "重新生成" or "生成回复", key = "generate" }
+    ui[#ui + 1] = { type = "button", label = lastError ~= "" and "重试" or "生成回复", key = "generate" }
   end
+  -- 宿主保留的动作：打开这个插件的设置页
+  ui[#ui + 1] = { type = "button", label = "设置", key = "host:settings" }
   return ui
 end
 
@@ -177,14 +195,14 @@ function plugin.onPanelAction(actionId)
   if actionId ~= "generate" then return end
   local context = trim(lastContext)
   if context == "" then
-    lastError = "请先复制对方消息再打开本面板"
+    lastError = "先复制对方的消息，再点 AI 回复。"
     return
   end
   if generating then return end
 
-  local apiKey = host.config.get(KEY_API_KEY) or ""
+  local apiKey = trim(host.config.get(KEY_API_KEY) or "")
   if apiKey == "" then
-    lastError = "未配置 API Key，请到插件中心配置"
+    lastError = "还没填 API 密钥：点下面的「设置」"
     return
   end
 
@@ -192,11 +210,15 @@ function plugin.onPanelAction(actionId)
   lastError = ""
   cachedItems = {}
 
-  local baseUrl = host.config.get(KEY_BASE_URL) or DEFAULTS.baseUrl
-  baseUrl = baseUrl:gsub("/+$", "")
-  local model = host.config.get(KEY_MODEL) or DEFAULTS.model
-  local prompt = (host.config.get(KEY_PROMPT) or DEFAULTS.prompt)
-  prompt = string.gsub(prompt, "{context}", context)
+  local function configOr(key, default)
+    local v = trim(host.config.get(key) or "")
+    if v == "" then return default end
+    return v
+  end
+  local baseUrl = configOr(KEY_BASE_URL, DEFAULTS.baseUrl):gsub("/+$", "")
+  local model = configOr(KEY_MODEL, DEFAULTS.model)
+  local prompt = configOr(KEY_PROMPT, DEFAULTS.prompt)
+  prompt = prompt:gsub("{context}", function() return context end)
 
   local body = host.json.encode({
     model = model,
@@ -214,13 +236,13 @@ function plugin.onPanelAction(actionId)
 
   local resp = host.http.request("POST", url, headers, body, 60000)
   if resp == nil then
-    lastError = "AI 请求失败: " .. (host.http.lastError() or "未知错误")
+    lastError = "连不上接口：" .. (host.http.lastError() or "未知错误") .. "。改过地址的话，到设置里点一次「保存」。"
     host.logError(lastError)
     generating = false
     return
   end
   if resp.status ~= 200 then
-    lastError = "AI 接口返回 " .. tostring(resp.status)
+    lastError = "接口返回 " .. tostring(resp.status)
     host.logError(lastError .. ": " .. resp.text)
     generating = false
     return
@@ -237,7 +259,7 @@ function plugin.onPanelAction(actionId)
     end
   end
   if #items == 0 then
-    lastError = "未解析到候选，请重试"
+    lastError = "接口返回的格式看不懂，再试一次"
   end
   cachedItems = items
   generating = false

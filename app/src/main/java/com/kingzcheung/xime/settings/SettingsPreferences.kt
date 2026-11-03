@@ -301,6 +301,32 @@ object SettingsPreferences {
         editor.apply()
     }
     private const val KEY_CAPTION_MENU_INSERTED = "quick_actions_caption_inserted"
+    private const val KEY_PLUGIN_BUTTONS_PLACED = "quick_actions_plugin_buttons_placed"
+
+    /**
+     * 插件按钮第一次出现（启用、从市场装好）时放进菜单一次；之后用户拖到哪里都不再动。
+     * 返回是否改了菜单。
+     */
+    fun placeNewPluginButtons(context: Context, ids: List<String>): Boolean {
+        val prefs = getPrefs(context)
+        val placed = prefs.getString(KEY_PLUGIN_BUTTONS_PLACED, "").orEmpty().split(",").filter { it.isNotEmpty() }
+        val fresh = ids.filter { it.isNotEmpty() && it !in placed }.distinct()
+        if (fresh.isEmpty()) return false
+        val toolbar = getToolbarButtons(context)
+        val menu = getMenuButtons(context)
+        val updated = com.kingzcheung.xime.keyboard.QuickActionLayout.withPluginButtons(toolbar, menu, fresh)
+        val editor = prefs.edit().putString(KEY_PLUGIN_BUTTONS_PLACED, (placed + fresh).joinToString(","))
+        if (updated != menu) editor.putString(KEY_MENU_BUTTONS, updated.joinToString(","))
+        editor.apply()
+        return updated != menu
+    }
+
+    /** 插件按钮现在在哪：设置里「用法」那一行照这个写。 */
+    fun pluginButtonPlace(context: Context, id: String): String = when (id) {
+        in getToolbarButtons(context) -> "toolbar"
+        in getMenuButtons(context) -> "menu"
+        else -> "unused"
+    }
 
     fun setQuickActions(context: Context, layout: com.kingzcheung.xime.keyboard.QuickActionLayout) {
         getPrefs(context).edit()

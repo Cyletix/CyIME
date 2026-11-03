@@ -329,11 +329,12 @@ private fun ExtensionItem(
         }
     }
     
+    // 停用着的工具插件也给「设置」：设置页会临时加载它来填密钥和地址，并能在顶上直接启用。
     val hasSettings = pluginInstance?.let {
         (it as? com.kingzcheung.xime.plugin.core.config.IPluginConfigurable)
             ?.getSettingsSchema()?.isNotEmpty() == true ||
             (it as? com.kingzcheung.xime.plugin.core.api.EmojiPlugin)?.hasSettings() == true
-    } ?: false
+    } ?: (extension.type == "tool" && hostCompatible)
     
     if (showErrorDialog && hasErrors) {
         PluginErrorDialog(
@@ -459,6 +460,17 @@ private fun ExtensionItem(
                         text = extension.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+
+                val entryHint = remember(extension.id, isEnabled, resumeTick) {
+                    if (hostCompatible) pluginEntryHint(context, extension, isEnabled) else null
+                }
+                if (entryHint != null) {
+                    Text(
+                        text = entryHint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 

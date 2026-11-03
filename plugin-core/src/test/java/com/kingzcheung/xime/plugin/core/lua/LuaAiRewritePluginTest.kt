@@ -107,6 +107,12 @@ class LuaAiRewritePluginTest {
         assertTrue(validate(runtime, "polish", "下午3点在5号会议室，记得带电脑过来哈", "下午在会议室，记得带电脑过来。") != null)
         assertTrue(validate(runtime, "shorten", source, source + "我们下周再讨论。") != null)
         assertEquals(null, validate(runtime, "fix", "i has a apple and two banana", "I have an apple and two bananas"))
+        // 翻译（原「AI 翻译」并进来）：换了语言不比字，只拦答非所问和套话
+        assertEquals(null, validate(runtime, "translate", "明天晚上我们去哪吃饭？", "Where are we having dinner tomorrow night?"))
+        assertTrue(validate(runtime, "translate", "明天晚上我们去哪吃饭？", "We could go to the hot pot place.") != null)
+        assertEquals(null, validate(runtime, "translate", "对不起，我迟到了。", "I'm sorry, I'm late."))
+        assertEquals(null, validate(runtime, "translate", "Sure, see you tomorrow.", "当然，明天见。"))
+        assertTrue(validate(runtime, "translate", "去哪吃？", "好的，这是翻译：Where to eat?") != null)
     }
 
     @Test

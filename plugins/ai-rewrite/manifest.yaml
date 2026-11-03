@@ -6,9 +6,9 @@ id: com.kingzcheung.xime.plugin.ai_rewrite
 
 name: AI 改写
 icon: "改"
-description: 用你自己的 OpenAI 兼容接口改写选中的字；没选字就改整个输入框。润色、改错字、更正式、更口语、缩短，提示词可以改。结果先给你看，点了才替换；答非所问的结果会被拦下，原文不动。密钥只存在手机里。
+description: 选中一段字（不选就是整个输入框），点键盘菜单里的「AI 改写」，选润色、改错字、更正式、更口语、缩短或翻译，点结果替换原文。用你自己的 OpenAI 兼容接口，密钥只存在手机里。
 
-version: 0.1.0
+version: 0.2.0
 
 type: tool
 activation: multi

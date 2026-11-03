@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -169,6 +170,15 @@ fun PluginConfigFormScreen(
         }
     }
 
+    // 顶上的「启用」和入口：停用着的插件在这页就能打开，打开后告诉他去键盘哪里点。
+    val installedInfo = remember(pluginId) { PluginManager.getAllInstallPlugins().firstOrNull { it.id == pluginId } }
+    var pluginEnabled by remember(pluginId) { mutableStateOf(SettingsPreferences.isPluginEnabled(context, pluginId)) }
+    var placeTick by remember { mutableStateOf(0) }
+    val entryHint = remember(installedInfo, pluginEnabled, placeTick) {
+        installedInfo?.let { pluginEntryHint(context, it, pluginEnabled) }
+    }
+    val toggleScope = rememberCoroutineScope()
+
     if (embedded) {
         Column(
             modifier = Modifier
@@ -212,6 +222,23 @@ fun PluginConfigFormScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
             ) {
+                if (installedInfo != null && canEnableFromSettings(installedInfo)) item {
+                    SettingsSection(title = "插件") {
+                        SettingsToggleItem(
+                            icon = Icons.Default.Extension,
+                            title = "启用",
+                            subtitle = entryHint.orEmpty(),
+                            checked = pluginEnabled,
+                            onCheckedChange = { on ->
+                                pluginEnabled = on
+                                toggleScope.launch {
+                                    setToolPluginEnabled(context, pluginId, on)
+                                    placeTick++
+                                }
+                            },
+                        )
+                    }
+                } else if (entryHint != null) item { SettingsNote(entryHint) }
                 groupedFields.forEach { (section, sectionFields) ->
                     item {
                         sectionContent(section, sectionFields)

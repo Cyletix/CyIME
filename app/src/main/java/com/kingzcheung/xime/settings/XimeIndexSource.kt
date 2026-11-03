@@ -154,6 +154,7 @@ object XimeIndexSource {
     internal suspend fun installMarketPlugin(context: Context, pluginId: String, version: PluginVersion) =
         withContext(Dispatchers.IO) {
             val tmp = File.createTempFile("market-", ".xipk", context.cacheDir)
+            val firstInstall = PluginManager.getAllInstallPlugins().none { it.id == pluginId }
             try {
                 val copies = version.downloadUrls
                 val bundled = bundledPlugins(context).plugins.find { it.id == pluginId }
@@ -203,6 +204,18 @@ object XimeIndexSource {
                     PluginManager.unloadPlugin(pluginId)
                     PluginManager.launchPlugin(pluginId)
                 }
+                // 从自己的市场第一次装：直接启用，按钮放进键盘菜单，装完就能用（用户 2026-11-02「下载了怎么用」）。
+                // 更新不改用户的开关；停用着的等打开开关时再放按钮。
+                // 只管工具类（键盘菜单里有按钮的）；语音等单选类仍在各自的设置页里选用。
+                // 以前装过但从没拨过开关的（旧版市场装完默认停用）也算，再装一次就能用；拨过的不动。
+                val neverChosen = !com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.hasChoice(context, pluginId)
+                if ((firstInstall || neverChosen) && PluginManager.getAllInstallPlugins().find { it.id == pluginId }?.type == "tool") {
+                    SettingsPreferences.setPluginEnabled(context, pluginId, true)
+                    PluginManager.launchPlugin(pluginId)
+                }
+                PluginManager.getAllInstallPlugins().find { it.id == pluginId }
+                    ?.takeIf { SettingsPreferences.isPluginEnabled(context, it.id) }
+                    ?.let { info -> SettingsPreferences.placeNewPluginButtons(context, info.toolbarButtons.map { it.id }) }
             } finally {
                 tmp.delete()
             }

@@ -53,7 +53,7 @@ class PluginMarketTest {
     }
 
     @Test fun browseFromManagementAndInstallWithoutNetwork() {
-        val plugin = XimeIndexSource.bundledPlugins(app).plugins.first { it.name == "AI 翻译" }
+        val plugin = XimeIndexSource.bundledPlugins(app).plugins.first { it.name == "在线语音" }
         rule.setContent { XimeTheme { SettingsScreen(initialRoute = "plugins") } }
         rule.onNodeWithContentDescription("从文件安装插件").assertIsDisplayed()
         rule.onNodeWithContentDescription("插件市场").performClick()
@@ -80,7 +80,7 @@ class PluginMarketTest {
     @Test fun wrongIdentityOrBrokenUpdateKeepsInstalledFiles() = runBlocking {
         val catalog = XimeIndexSource.bundledPlugins(app).plugins
         for (entry in catalog) XimeIndexSource.installMarketPlugin(app, entry.id, entry.resolvedVersion()!!)
-        val plugin = catalog.single { it.name == "输入统计" }
+        val plugin = catalog.single { it.name == "AI 回复" }
         val version = plugin.resolvedVersion()!!
         val path = File(PluginManager.getAllInstallPlugins().single { it.id == plugin.id }.path)
         val original = path.readBytes()

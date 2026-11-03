@@ -23,7 +23,7 @@ package com.kingzcheung.xime.plugin.core.lua.sdk
  * ### tool 工具
  * - `getPanelState(inputText)` -> { inputText?, items: [], loading?, ui? }
  * - `onPanelInput(text)` 面板输入变化通知
- * - `onPanelAction(actionId)` 面板操作事件（宿主保留 `generate`）
+ * - `onPanelAction(actionId)` 面板操作事件（宿主保留 `generate`；按钮 key `host:settings` 由宿主打开插件设置页，不转给插件）
  * - `onPanelItemClick(itemId)` 点候选上屏
  * - `ui`（可选，display: passive 时渲染）：统一声明式 UI 节点数组（UiNode 模型），
  *   节点 = `{ type, key?, label?, value?, defaultValue?, options?, placeholder?, helpText?,

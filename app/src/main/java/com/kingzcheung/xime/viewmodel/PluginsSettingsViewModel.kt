@@ -146,6 +146,9 @@ class PluginsSettingsViewModel(application: Application) : AndroidViewModel(appl
             withContext(Dispatchers.IO) {
                 if (enabled) {
                     PluginManager.launchPlugin(pluginId)
+                    // 按钮放进键盘菜单，打开开关后键盘上就能找到
+                    PluginManager.getAllInstallPlugins().find { it.id == pluginId }?.toolbarButtons
+                        ?.let { buttons -> SettingsPreferences.placeNewPluginButtons(context, buttons.map { it.id }) }
                 } else {
                     PluginManager.unloadPlugin(pluginId)
                 }
