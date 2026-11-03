@@ -106,15 +106,15 @@ private fun PluginMarketDialog(
                 MarketVersionSelector(plugin.versions.map { it.version }, version, select)
                 if (plugin.warning.isNotBlank()) Text(plugin.warning)
                 if (!item.compatible) Text("需要 CyIME ${item.minAppVersion} 或更高版本")
-                else if (!item.installed && plugin.pluginType == "tool") Text("装好后在键盘菜单里；接口和密钥在「已安装」› 设置。")
-                else if (!item.installed) Text("安装后到「已安装」启用和配置，可在插件详情查看联网授权。")
+                else if (!item.installed && plugin.pluginType == "tool") Text("装好后在键盘菜单里；接口和密钥在这个插件的设置里。")
+                else if (!item.installed) Text("装好后到「已安装」点它，启用和设置都在那一页。")
             }
         },
         confirmButton = {
             TextButton(
                 onClick = if (installed) onManage else onInstall,
                 enabled = installed || (!busy && item.compatible && plugin.versions.any { it.version == version }),
-            ) { Text(if (installed) "查看已安装插件" else "安装此版本") }
+            ) { Text(if (installed) "打开设置" else "安装此版本") }
         },
         dismissButton = { TextButton(onClick = close) { Text("关闭") } },
     )

@@ -1,8 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
-import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,13 +33,11 @@ import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
@@ -86,11 +82,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.PluginIcon
 import com.kingzcheung.xime.plugin.core.model.Activation
 import com.kingzcheung.xime.plugin.core.model.PluginCategory
-import com.kingzcheung.xime.plugin.core.model.PluginSource
 import com.kingzcheung.xime.plugin.core.model.PluginInfo
 import com.kingzcheung.xime.plugin.core.model.TrustLevel
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
@@ -256,7 +250,6 @@ internal fun InstalledPluginsList(
                         pluginInstance = PluginManager.getPluginInstance(extension.id),
                         icon = uiState.icons[extension.id],
                         viewModel = viewModel,
-                        onClick = { onNavigateToPluginSettings(extension.id) },
                         onOpenMarketDetail = { onNavigateToPluginDetail(extension.id) },
                         isActive = when (extension.category) {
                             PluginCategory.ASR ->
@@ -273,17 +266,6 @@ internal fun InstalledPluginsList(
                     )
                 }
             }
-            
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "提示: 安装插件后点击右上角刷新按钮生效",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-            }
         }
     }
 }
@@ -294,7 +276,6 @@ private fun ExtensionItem(
     pluginInstance: Any?,
     icon: PluginIcon?,
     viewModel: PluginsSettingsViewModel,
-    onClick: () -> Unit = {},
     onOpenMarketDetail: () -> Unit = {},
     isActive: Boolean = false,
     onActivate: (() -> Unit)? = null
@@ -305,7 +286,6 @@ private fun ExtensionItem(
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { resumeTick++ }
     var isEnabled by remember(extension.id, resumeTick) { mutableStateOf(viewModel.isPluginEnabled(extension.id)) }
     var showErrorDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showTrustConfirm by remember { mutableStateOf(false) }
     var trustConfirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     
@@ -315,7 +295,8 @@ private fun ExtensionItem(
     val pendingHosts = remember(extension.id) {
         SettingsPreferences.getPluginPendingHosts(context, extension.id)
     }
-    val hasPendingNetwork = pendingHosts.isNotEmpty() ||
+    // 市场装的和内置的插件，填的地址直接放行：以前被拦过的旧地址不再标红。
+    val hasPendingNetwork = (pendingHosts.isNotEmpty() && !com.kingzcheung.xime.plugin.PluginNetworkAuthHelper.trustsConfiguredHosts(extension)) ||
         (extension.declaredHosts - SettingsPreferences.getPluginAuthorizedHosts(context, extension.id)).isNotEmpty()
 
     val hostCompatible = remember(extension.id) { viewModel.isHostCompatible(extension) }
@@ -328,13 +309,6 @@ private fun ExtensionItem(
             }
         }
     }
-    
-    // 停用着的工具插件也给「设置」：设置页会临时加载它来填密钥和地址，并能在顶上直接启用。
-    val hasSettings = pluginInstance?.let {
-        (it as? com.kingzcheung.xime.plugin.core.config.IPluginConfigurable)
-            ?.getSettingsSchema()?.isNotEmpty() == true ||
-            (it as? com.kingzcheung.xime.plugin.core.api.EmojiPlugin)?.hasSettings() == true
-    } ?: (extension.type == "tool" && hostCompatible)
     
     if (showErrorDialog && hasErrors) {
         PluginErrorDialog(
@@ -393,7 +367,8 @@ private fun ExtensionItem(
                             Icons.Default.Warning,
                             contentDescription = "有错误",
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(14.dp)
+                            // 点红色感叹号看错误（以前这个对话框打不开）
+                            modifier = Modifier.clickable { showErrorDialog = true }.padding(4.dp).size(14.dp)
                         )
                     }
 
@@ -459,35 +434,13 @@ private fun ExtensionItem(
                     Text(
                         text = extension.description,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                val entryHint = remember(extension.id, isEnabled, resumeTick) {
-                    if (hostCompatible) pluginEntryHint(context, extension, isEnabled) else null
-                }
-                if (entryHint != null) {
-                    Text(
-                        text = entryHint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                val networkHosts = remember(extension.id) {
-                    (extension.declaredHosts +
-                        ExtensionManager.getConfiguredNetworkHosts(context, extension.id) +
-                        SettingsPreferences.getPluginPendingHosts(context, extension.id))
-                        .distinct()
-                }
-                if (networkHosts.isNotEmpty()) {
-                    NetworkAccessSection(
-                        pluginId = extension.id,
-                        pluginName = extension.name,
-                        hosts = networkHosts
-                    )
-                }
-
+                // 入口说明、联网授权、设置、卸载都在点进去的那一页（11-03 一个插件一页）。
                 if (!hostCompatible) {
                     Text(
                         text = "该插件不支持当前主应用版本，已跳过加载" +
@@ -567,69 +520,9 @@ private fun ExtensionItem(
                         })
                     }
 
-                    // 设置按钮
-                    if (hasSettings) {
-                        OutlinedButton(
-                            onClick = onClick,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("设置", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-
-                    // 删除按钮
-                    if (extension.source == PluginSource.SYSTEM) {
-                        IconButton(
-                            onClick = {
-                                try {
-                                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    intent.data = Uri.parse("package:${extension.id}")
-                                    context.startActivity(intent)
-                                    Toast.makeText(context, "请在应用信息页面卸载", Toast.LENGTH_SHORT).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "无法打开: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "卸载",
-                                 tint = MaterialTheme.colorScheme.error)
-                        }
-                    } else {
-                        IconButton(
-                            onClick = { showDeleteConfirm = true }
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "卸载",
-                                 tint = MaterialTheme.colorScheme.error)
-                        }
-                    }
                 }
             }
         }
-    }
-
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("卸载插件") },
-            text = { Text("确定要卸载「${extension.name}」吗？\n插件文件和配置将被删除，此操作不可恢复。") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteConfirm = false
-                        viewModel.uninstallPlugin(extension.id)
-                    }
-                ) {
-                    Text("卸载", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("取消")
-                }
-            }
-        )
     }
 
     if (showTrustConfirm) {

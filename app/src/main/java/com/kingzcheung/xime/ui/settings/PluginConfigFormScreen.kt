@@ -308,9 +308,19 @@ fun PluginConfigFormScreen(
                             }
                         }
                     }
-                    if (installedInfo.source != PluginSource.SYSTEM) item {
+                    item {
                         OutlinedButton(
-                            onClick = { confirmUninstall = true },
+                            onClick = {
+                                if (installedInfo.source != PluginSource.SYSTEM) confirmUninstall = true
+                                // 独立安装包形式的插件：到系统的应用信息里卸载（原来「已安装」里的做法）
+                                else runCatching {
+                                    context.startActivity(android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.parse("package:$pluginId"),
+                                    ))
+                                    Toast.makeText(context, "请在应用信息页面卸载", Toast.LENGTH_SHORT).show()
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("卸载", color = MaterialTheme.colorScheme.error) }
                     }

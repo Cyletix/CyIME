@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import com.kingzcheung.xime.settings.XimeIndexSource
 import com.kingzcheung.xime.ui.settings.PluginSettingsContent
+import com.kingzcheung.xime.ui.settings.SettingsScreen
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.XimeTheme
 import kotlinx.coroutines.runBlocking
@@ -81,5 +82,17 @@ class PluginPageRenderTest {
         rule.onNodeWithText("卸载").assertIsDisplayed()
         rule.onAllNodesWithText("保存").assertCountEquals(0)
         shot("plugin-page-bottom.png")
+    }
+
+    /** 插件管理一行只留图标、名字、说明、开关；点一行进那一页。设置、卸载、联网都在页里。 */
+    @Test fun managementRowsOpenThePluginPage() {
+        rule.setContent { XimeTheme { SettingsScreen(initialRoute = "plugins") } }
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("AI 回复").fetchSemanticsNodes().isNotEmpty() }
+        rule.onAllNodesWithText("设置").assertCountEquals(0)
+        rule.onAllNodesWithContentDescription("卸载").assertCountEquals(0)
+        rule.onAllNodesWithText("提示: 安装插件后点击右上角刷新按钮生效").assertCountEquals(0)
+        shot("plugin-management.png")
+        rule.onNodeWithText("AI 回复").performClick()
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("API 密钥").fetchSemanticsNodes().isNotEmpty() }
     }
 }
