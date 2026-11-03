@@ -402,6 +402,42 @@ private fun LayoutDisplayPage(
                         Spacer(Modifier.height(10.dp))
                         CandidateCancelIllustration(showCandidateCancel)
                     }
+                    // 联想关闭键用叉号（用户 11-03，默认关）：只在取消按钮开着时有用，关着就不显示。
+                    if (showCandidateCancel) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+                        var associationCancelCross by remember {
+                            mutableStateOf(SettingsPreferences.isAssociationCancelCross(context))
+                        }
+                        Row(
+                            modifier = Modifier.settingsSearchAnchor("联想关闭键用叉号")
+                                .fillMaxWidth()
+                                .testTag("association-cancel-cross-setting")
+                                .toggleable(
+                                    value = associationCancelCross,
+                                    role = Role.Switch,
+                                    onValueChange = {
+                                        associationCancelCross = it
+                                        SettingsPreferences.setAssociationCancelCross(context, it)
+                                    },
+                                )
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("联想关闭键用叉号", style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium)
+                                Text("上屏后出联想词时，最左边的左箭头换成 ⊗",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Switch(checked = associationCancelCross, onCheckedChange = null)
+                        }
+                    }
                 })
             }
             if (page == "candidates") item {

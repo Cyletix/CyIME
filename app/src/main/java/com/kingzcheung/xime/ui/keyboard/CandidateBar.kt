@@ -257,17 +257,24 @@ fun CandidateBar(
     var showCancelButton by remember(preferences) {
         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
     }
+    var associationCancelCross by remember(preferences) {
+        mutableStateOf(SettingsPreferences.isAssociationCancelCross(context))
+    }
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON || key == null) {
                 showCancelButton = SettingsPreferences.shouldShowCandidateCancelButton(context)
+            }
+            if (key == SettingsPreferences.KEY_ASSOCIATION_CANCEL_CROSS || key == null) {
+                associationCancelCross = SettingsPreferences.isAssociationCancelCross(context)
             }
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
-    // 候选栏两端最多两个按钮（用户 11-03）：左边取消（打字时「<」，上屏后的联想是 ⊗），最右展开候选，位置固定；
+    // 候选栏两端最多两个按钮（用户 11-03）：左边取消，最右展开候选，位置固定。左边打字和联想都是「<」，
+    // 设置「联想关闭键用叉号」打开后联想时才是 ⊗（用户 11-03：两种状态图标不一样）；
     // 收起键盘只在空闲（没有候选）时有。手写候选也是纯联想态，但那里的取消是撤销当前字，仍用「<」。
     val closesAssociation = state is CandidateBarState.AssociationOnly &&
         !(page is KeyboardPage.Main && page.type == MainType.HANDWRITING)
@@ -464,16 +471,18 @@ fun CandidateBar(
                 .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (showCompositionCancel && closesAssociation) {
+            if (showCompositionCancel && closesAssociation && associationCancelCross) {
                 KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
-                    modifier = Modifier.testTag("association-cancel"), restingFill = edgeButtonFill,
+                    modifier = Modifier.testTag("association-cancel-cross"), restingFill = edgeButtonFill,
                     slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
                     Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
                         tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(4.dp))
             } else if (showCompositionCancel) {
-                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入",
+                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor,
+                    label = if (closesAssociation) "关闭联想" else "取消输入",
+                    modifier = if (closesAssociation) Modifier.testTag("association-cancel") else Modifier,
                     restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                 Spacer(Modifier.width(4.dp))
             }

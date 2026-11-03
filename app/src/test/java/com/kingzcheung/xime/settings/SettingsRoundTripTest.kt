@@ -40,6 +40,7 @@ class SettingsRoundTripTest {
         Case("候选注释内容", CandidateCommentContent.GLOSS, CandidateCommentContent.PINYIN,
             S::setCandidateCommentContent, S::candidateCommentContent),
         Case("候选栏取消按钮", true, false, S::setShowCandidateCancelButton, S::shouldShowCandidateCancelButton),
+        Case("联想关闭键用叉号", true, false, S::setAssociationCancelCross, S::isAssociationCancelCross),
         Case("编码显示位置", SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR, SettingsPreferences.INPUT_TEXT_INPUT_BOX,
             S::setInputTextLocation, S::getInputTextLocation),
         Case("深浅色", 0, 1, S::setDarkMode, S::getDarkMode),

@@ -68,6 +68,7 @@ class CandidateBarFeedbackTest {
         KeyboardThemes.initFromConfig(context)
         SettingsPreferences.getPrefsPublic(context).edit()
             .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON)
+            .remove(SettingsPreferences.KEY_ASSOCIATION_CANCEL_CROSS)
             .remove(SettingsPreferences.KEY_WIDE_CANDIDATE_SPACING).commit()
     }
 
@@ -112,14 +113,29 @@ class CandidateBarFeedbackTest {
         var cancelled = 0
         rule.setContent { Bar(association, onCancel = { cancelled++ }) }
         rule.waitForIdle()
-        // 联想：左边一个 ⊗，最右一个展开；没有「<」，也没有收起键盘。
+        // 联想：默认左边和打字时一样是「<」（关闭联想），最右一个展开；没有 ⊗，也没有收起键盘。
         assertEquals(1, count("关闭联想"))
+        assertEquals(1, countTag("association-cancel"))
+        assertEquals(0, countTag("association-cancel-cross"))
         assertEquals(0, count("取消输入"))
         assertEquals(0, countTag("toolbar-hide"))
         assertEquals(1, countTag("candidate-expansion"))
         val first = bounds("bar-association:0")
-        assertTrue("⊗ 在第一个联想词左边", cancelBounds("关闭联想").right <= first.left + 0.5f)
+        assertTrue("「<」在第一个联想词左边", cancelBounds("关闭联想").right <= first.left + 0.5f)
         assertTrue("展开在联想词右边", bounds("candidate-expansion").left >= first.right - 0.5f)
+        rule.onNodeWithContentDescription("关闭联想", useUnmergedTree = true).performClick()
+        assertEquals(1, cancelled)
+    }
+
+    @Test fun crossSettingTurnsAssociationCloseIntoCircledX() {
+        SettingsPreferences.setAssociationCancelCross(context, true)
+        var cancelled = 0
+        rule.setContent { Column { Bar(association, onCancel = { cancelled++ }); Bar(composing) } }
+        rule.waitForIdle()
+        // 打开「联想关闭键用叉号」：只有联想时换成 ⊗，打字时仍是「<」。
+        assertEquals(1, countTag("association-cancel-cross"))
+        assertEquals(0, countTag("association-cancel"))
+        assertEquals(1, count("取消输入"))
         rule.onNodeWithContentDescription("关闭联想", useUnmergedTree = true).performClick()
         assertEquals(1, cancelled)
     }

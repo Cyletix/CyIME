@@ -413,6 +413,7 @@ object SettingsPreferences {
     const val KEY_CANDIDATE_COMMENT_MODE = "candidate_comment_mode"
     const val KEY_CANDIDATE_COMMENT_CONTENT = "candidate_comment_content"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
+    const val KEY_ASSOCIATION_CANCEL_CROSS = "association_cancel_cross"
     const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     const val KEY_SHOW_PREEDIT_PREVIEW = "show_preedit_preview"
     const val KEY_INLINE_PREEDIT_PREVIEW = "inline_preedit_preview"
@@ -477,6 +478,17 @@ object SettingsPreferences {
 
     fun setShowCandidateCancelButton(context: Context, show: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_SHOW_CANDIDATE_CANCEL_BUTTON, show).apply()
+    }
+
+    /**
+     * 联想关闭键用叉号（用户 11-03，默认关）：默认上屏后的联想和打字时一样，最左边是「<」；
+     * 打开后联想时换成 ⊗。只在取消按钮开着时有用，动作不变。
+     */
+    fun isAssociationCancelCross(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_ASSOCIATION_CANCEL_CROSS, false)
+
+    fun setAssociationCancelCross(context: Context, cross: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ASSOCIATION_CANCEL_CROSS, cross).apply()
     }
 
     /**
