@@ -12,6 +12,7 @@ import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.geometry.Offset
@@ -67,7 +69,10 @@ internal fun Modifier.frostedGlassBackground(
     fallbackColor: Color,
     config: FrostedGlassConfig,
     translucentSurface: Boolean = false,
+    /** 动态背景时键盘本体的图交给这一层画（见 [BackgroundImageSlot]），这里只画图以外的底色。 */
+    imageSlot: BackgroundImageSlot? = null,
 ): Modifier {
+    @Suppress("NAME_SHADOWING") val background = background.withCurrentSlide()
     // Embedded keyboard surfaces sample the same window-space image. Popup windows
     // have their own coordinate origin and must keep their independent backdrop.
     val shared = LocalSharedKeyboardBackdrop.current
@@ -75,10 +80,32 @@ internal fun Modifier.frostedGlassBackground(
     // 「柔化顶部边缘」：只对输入法窗口里的固定键盘；弹窗另有坐标原点，不跟。
     val feather = LocalGlassTopFeather.current?.takeIf { !translucentSurface && it.windowRoot === root }
     if (!translucentSurface && shared != null && root === shared.windowRoot) {
-        var origin by remember { mutableStateOf(Offset.Zero) }
+        val originState = remember { mutableStateOf(Offset.Zero) }
+        var origin by originState
         val report = shared.reportSurfaceTop
         val surfaceKey = remember { Any() }
         DisposableEffect(report, surfaceKey) { onDispose { report(surfaceKey, null) } }
+        if (imageSlot != null) SideEffect {
+            // 图层里按原样画（缩放、位移由图层做）；柔化上沿也在图层外面那一层做，见 KeyboardBackgroundMotionLayer。
+            val frame: () -> androidx.compose.ui.geometry.Rect? = {
+                val offset = shared.frame.offsetIn(originState.value)
+                androidx.compose.ui.geometry.Rect(offset, androidx.compose.ui.geometry.Size(
+                    shared.frame.size.width.toFloat(), shared.frame.size.height.toFloat()))
+            }
+            val image = shared.image?.takeIf { shared.opacity > 0f }
+            val draw: (DrawScope.() -> Unit)? = if (image == null) null else ({
+                if (shared.frame.size.width > 0 && shared.frame.size.height > 0) {
+                    val offset = shared.frame.offsetIn(originState.value)
+                    clipRect {
+                        translate(offset.x, offset.y) {
+                            drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
+                                filterQuality = FilterQuality.Medium)
+                        }
+                    }
+                }
+            })
+            imageSlot.update(image, frame, draw)
+        }
         return onGloballyPositioned {
             origin = it.positionInWindow()
             report(surfaceKey, origin.y)
@@ -94,10 +121,12 @@ internal fun Modifier.frostedGlassBackground(
                         offset.y + shared.frame.size.height, androidx.compose.ui.graphics.ClipOp.Difference) {
                         drawRect(shared.fallback, alpha = shared.opacity)
                     }
-                    clipRect {
-                        translate(offset.x, offset.y) {
-                            drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
-                                filterQuality = FilterQuality.Medium)
+                    if (imageSlot == null) clipRect {
+                        withSharedBackdropMotion(shared, offset) {
+                            translate(offset.x, offset.y) {
+                                drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
+                                    filterQuality = FilterQuality.Medium)
+                            }
                         }
                     }
                 }
@@ -110,6 +139,14 @@ internal fun Modifier.frostedGlassBackground(
     // Floating capsules resize during docking; keep their backdrop cache stable throughout.
     val renderSize = if (translucentSurface) IntSize(512, 256) else targetSize
     val blurredImage = rememberFrostedBackgroundImage(background, isDark, fallbackColor, normalized, renderSize)
+    if (imageSlot != null) SideEffect {
+        val image = blurredImage?.takeIf { normalized.backgroundOpacity > 0f }
+        val draw: (DrawScope.() -> Unit)? = if (image == null) null else ({
+            drawImage(image, dstOffset = IntOffset.Zero, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                alpha = normalized.backgroundOpacity, filterQuality = FilterQuality.Medium)
+        })
+        imageSlot.update(image, { null }, draw)
+    }
 
     // 底部圆角时没有共用背景，各层自己画；柔化上沿要知道自己在窗口里的位置。
     var featherOrigin by remember { mutableStateOf(0f) }
@@ -121,7 +158,7 @@ internal fun Modifier.frostedGlassBackground(
         if (opacity > 0f) drawUnderTopFeather(feather?.top?.value?.minus(featherOrigin), feather?.heightPx ?: 0f) {
             val image = blurredImage
             if (image == null) drawRect(fallbackColor, alpha = opacity)
-            else drawImage(
+            else if (imageSlot == null) drawImage(
                 image,
                 dstOffset = IntOffset.Zero,
                 dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
@@ -148,18 +185,23 @@ internal fun rememberFrostedBackgroundImage(
     val source = if (background?.type == "image") {
         if (isDark) background.srcDark ?: background.src else background.src
     } else null
-    var sourceImage by remember(source) { mutableStateOf<FrostedSourceImage?>(null) }
+    // 记下解码的是哪张：换图（轮播）时新图解出来之前不重画，接着显示旧的，不闪一下底色。
+    var loaded by remember { mutableStateOf<Pair<String?, FrostedSourceImage?>?>(null) }
     LaunchedEffect(context, source) {
-        sourceImage = source?.takeIf { it.isNotBlank() }?.let {
+        val decoded = source?.takeIf { it.isNotBlank() }?.let {
             withContext(Dispatchers.IO) { decodeFrostedImage(context, it) }
         }
+        loaded = source to decoded
     }
+    val sourceReady = source.isNullOrBlank() || loaded?.first == source
+    val sourceImage = loaded?.takeIf { it.first == source }?.second
 
     val resizeCache = remember { ClipboardBackdropSizeCache() }
     val cachedSize = resizeCache.resolve(renderSize, clipboardInMotion)
-    var blurredImage by remember(background, isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(background, isDark, fallbackColor, sourceImage, cachedSize, density, normalized.blurRadiusDp) {
-        if (cachedSize.width <= 0 || cachedSize.height <= 0) return@LaunchedEffect
+    var blurredImage by remember(background?.copy(src = null, srcDark = null, fit = null, zoom = null, alignX = null, alignY = null),
+        isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(background, isDark, fallbackColor, sourceImage, sourceReady, cachedSize, density, normalized.blurRadiusDp) {
+        if (cachedSize.width <= 0 || cachedSize.height <= 0 || !sourceReady) return@LaunchedEffect
         blurredImage = withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
             renderFrostedBackground(

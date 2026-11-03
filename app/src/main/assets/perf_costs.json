@@ -53,6 +53,7 @@
         "handwriting_recognize_while_writing": {"keyMs": 0.0, "memoryMb": 2, "estimated": true},
         "typing_stats": {"keyMs": 0.1, "memoryMb": 0, "estimated": true},
         "digit_phrase_candidates": {"keyMs": 0.0, "memoryMb": 0, "estimated": true},
+        "background_motion": {"keyMs": 0.5, "memoryMb": 1, "estimated": true},
         "t9_fuzzy_z_zh": {"keyMs": 2.0, "memoryMb": 2, "baselineKeyMs": 39.0, "estimated": true},
         "t9_fuzzy_c_ch": {"keyMs": 2.0, "memoryMb": 2, "baselineKeyMs": 39.0, "estimated": true},
         "t9_fuzzy_s_sh": {"keyMs": 2.0, "memoryMb": 2, "baselineKeyMs": 39.0, "estimated": true},

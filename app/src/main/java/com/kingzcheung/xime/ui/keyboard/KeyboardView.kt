@@ -324,9 +324,17 @@ fun KeyboardView(
         alpha = keyboardLayerOpacity
         compositingStrategy = CompositingStrategy.Offscreen
     } else Modifier
+    // 动态背景：背景图换到最底下单独一层（KeyboardBackgroundMotionLayer），每帧只动这一层；面板或展开候选盖住键盘时钟停。
+    val backgroundMotion = com.kingzcheung.xime.ui.theme.LocalKeyboardBackgroundMotion.current
+        ?.takeIf { !state.handwritingExpanded }
+    val backgroundImageSlot = remember(backgroundMotion != null) {
+        if (backgroundMotion != null) com.kingzcheung.xime.ui.theme.BackgroundImageSlot() else null
+    }
+    if (backgroundMotion != null) SideEffect { backgroundMotion.covered = candidatePageExpanded || overlayVisible }
     // Compose background and keys into the same layer before applying opacity.
     val contentModifier = if (state.handwritingExpanded) previewModifier else previewModifier
-        .keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
+        .keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor,
+            imageSlot = backgroundImageSlot)
         .splitGapCutout(splitKeyboardGap)
     val panelMaterial = Modifier.inheritKeyboardBackground(!state.handwritingExpanded)
     var cursorControlActive by remember { mutableStateOf(false) }
@@ -512,6 +520,10 @@ fun KeyboardView(
                     size.height / resizeControlDensity.density - renderedBottomPaddingDp)
             }
         }) {
+        if (backgroundMotion != null && backgroundImageSlot != null) {
+            KeyboardBackgroundMotionLayer(backgroundImageSlot, backgroundMotion, splitKeyboardGap,
+                glass = inputPreferences.frostedGlass.enabled)
+        }
         // 长按候选删除自造词：确认覆盖层状态（键盘视图内渲染，不弹独立
         // 窗口——焦点型弹窗会抢焦点导致 IME 被系统收起）
         // 长按删除待确认项：词文本 + 确认后执行（候选栏/展开页共用同一确认覆盖层）

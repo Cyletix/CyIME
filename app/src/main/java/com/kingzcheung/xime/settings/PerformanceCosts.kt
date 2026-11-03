@@ -92,7 +92,9 @@ object PerformanceCosts {
         HANDWRITING_LIVE("handwriting_recognize_while_writing", "手写边写边识别"),
         TYPING_STATS("typing_stats", "记录打字统计"),
         // 只在数字上屏后读一次光标前的字、查一遍编码是数字的短语；打拼音不经过它。
-        DIGIT_PHRASES("digit_phrase_candidates", "数字出短语");
+        DIGIT_PHRASES("digit_phrase_candidates", "数字出短语"),
+        // 打字不经过它，代价在键盘显示时每秒 20 帧的合成；测它要用图片背景（我的图片或内置图片主题），纯色、渐变不动。
+        BACKGROUND_MOTION("background_motion", "动态背景");
 
         val nineKey: Boolean get() = id.startsWith(T9_PREFIX)
 
@@ -155,6 +157,7 @@ object PerformanceCosts {
             Item.HANDWRITING_LIVE -> input.handwritingRecognizeWhileWriting
             Item.TYPING_STATS -> com.kingzcheung.xime.stats.TypingStats.isEnabled(context)
             Item.DIGIT_PHRASES -> com.kingzcheung.xime.service.DigitPhrases.isEnabled(context)
+            Item.BACKGROUND_MOTION -> BackgroundMotionPreferences.read(context).enabled
             else -> false
         }
     }
@@ -219,6 +222,7 @@ object PerformanceCosts {
             Item.HANDWRITING_LIVE -> input.copy(handwritingRecognizeWhileWriting = on).save(context)
             Item.TYPING_STATS -> com.kingzcheung.xime.stats.TypingStats.setEnabled(context, on)
             Item.DIGIT_PHRASES -> com.kingzcheung.xime.service.DigitPhrases.setEnabled(context, on)
+            Item.BACKGROUND_MOTION -> BackgroundMotionPreferences.setEnabled(context, on)
             else -> Unit
         }
     }

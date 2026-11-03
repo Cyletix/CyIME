@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,10 +87,17 @@ fun Modifier.keyboardBackground(
     fallbackColor: Color = Color(0xFFE3E4E8),
     frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences(isDark).frostedGlass,
     translucentSurface: Boolean = false,
+    /**
+     * 动态背景：图片交给 [BackgroundImageSlot] 那一层画（KeyboardBackgroundMotionLayer），这里只画图以外的底色。
+     * 只有键盘本体传；别处不传时照原样画。
+     */
+    imageSlot: BackgroundImageSlot? = null,
 ): Modifier {
+    @Suppress("NAME_SHADOWING") val background = background.withCurrentSlide()
     if (frostedGlass.enabled) {
-        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass.forBackground(background), translucentSurface)
+        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass.forBackground(background), translucentSurface, imageSlot)
     }
+    if (imageSlot != null && background?.type != "image") SideEffect { imageSlot.update(null, { null }, null) }
     if (background == null) return this.then(Modifier.background(fallbackColor))
 
     when (background.type) {
@@ -120,9 +128,20 @@ fun Modifier.keyboardBackground(
         }
         "image" -> {
             val src = themeImageSource(background, isDark)
-            if (src.isNullOrBlank()) return this.then(Modifier.background(fallbackColor))
+            if (src.isNullOrBlank()) {
+                if (imageSlot != null) SideEffect { imageSlot.update(null, { null }, null) }
+                return this.then(Modifier.background(fallbackColor))
+            }
 
             val bitmap = rememberThemeImage(src)
+            if (imageSlot != null) SideEffect {
+                val draw: (androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit)? = if (bitmap == null) null else ({
+                    drawImageBackground(bitmap, background, fallbackColor)
+                    drawImageOverlay(background, isDark)
+                })
+                imageSlot.update(bitmap, { null }, draw)
+            }
+            if (bitmap != null && imageSlot != null) return this
             if (bitmap != null) {
                 return this.then(
                     Modifier.drawWithContent {
@@ -192,6 +211,7 @@ fun Modifier.keyboardBackgroundBelowCard(
     /** 「填满留空处」开着：两侧的图是卡片左右镜像，这条在两侧下面也接着镜像。 */
     filledSides: Boolean = false,
 ): Modifier {
+    @Suppress("NAME_SHADOWING") val background = background.withCurrentSlide()
     val continued = background != null && !frostedGlass.enabled && when (background.type) {
         "gradient" -> gradientColors(background, isDark) != null
         "image" -> !themeImageSource(background, isDark).isNullOrBlank()
@@ -199,6 +219,7 @@ fun Modifier.keyboardBackgroundBelowCard(
     }
     if (!continued || background == null) return keyboardBackground(background, isDark, fallbackColor, frostedGlass)
     val bitmap = if (background.type == "image") rememberThemeImage(themeImageSource(background, isDark)!!) else null
+    val motion = LocalKeyboardBackgroundMotion.current
     var origin by remember { mutableStateOf<Offset?>(null) }
     return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
         val frame = origin?.let { o -> card()?.takeIf { it.width > 0f && it.height > 0f }?.translate(-o.x, -o.y) }
@@ -211,16 +232,18 @@ fun Modifier.keyboardBackgroundBelowCard(
             drawRect(fallbackColor)
             clipRect {
                 // 卡片底边为轴上下翻转：卡片最后一行正好落在这条第一行。
+                // 动态背景：先按卡片里的样子动，再镜像过来，接缝处跟着卡片一起动。
+                val transform = motion?.transform
                 translate(frame.left, frame.bottom + frame.height) {
                     scale(1f, -1f, pivot = Offset.Zero) {
-                        drawImageBackground(bitmap, background, fallbackColor, frame.width, frame.height)
+                        drawMovingImageBackground(bitmap, background, fallbackColor, frame.width, frame.height, transform)
                     }
                 }
                 // 两侧的图沿卡片左右边镜像；这里再上下翻一次，接着两侧的最后一行。
                 if (filledSides) for (x in listOf(frame.left, frame.right + frame.width)) {
                     translate(x, frame.bottom + frame.height) {
                         scale(-1f, -1f, pivot = Offset.Zero) {
-                            drawImageBackground(bitmap, background, fallbackColor, frame.width, frame.height)
+                            drawMovingImageBackground(bitmap, background, fallbackColor, frame.width, frame.height, transform)
                         }
                     }
                 }
@@ -252,11 +275,13 @@ fun Modifier.keyboardBackgroundBesideCard(
     topCorner: Dp = 0.dp,
     bottomCorner: Dp = 0.dp,
 ): Modifier {
+    @Suppress("NAME_SHADOWING") val background = background.withCurrentSlide()
     var origin by remember { mutableStateOf<Offset?>(null) }
     val gradient = background?.takeIf { !frostedGlass.enabled && it.type == "gradient" }?.let { gradientColors(it, isDark) }
     val image = !frostedGlass.enabled && background?.type == "image"
     val imageBackground = background?.takeIf { image }
     val bitmap = imageBackground?.let { themeImageSource(it, isDark) }?.takeIf { it.isNotBlank() }?.let { rememberThemeImage(it) }
+    val motion = LocalKeyboardBackgroundMotion.current
     fun frame(): Rect? = origin?.let { o -> card()?.takeIf { it.width > 0f && it.height > 0f }?.translate(-o.x, -o.y) }
     val band = onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
         val f = frame() ?: return@drawWithContent
@@ -277,10 +302,11 @@ fun Modifier.keyboardBackgroundBesideCard(
                     image -> {
                         drawRect(fallbackColor)
                         if (bitmap != null && imageBackground != null) {
+                            val transform = motion?.transform
                             for (x in listOf(f.left, f.right + f.width)) {
                                 translate(x, f.top) {
                                     scale(-1f, 1f, pivot = Offset.Zero) {
-                                        drawImageBackground(bitmap, imageBackground, fallbackColor, f.width, f.height)
+                                        drawMovingImageBackground(bitmap, imageBackground, fallbackColor, f.width, f.height, transform)
                                     }
                                 }
                             }
@@ -305,6 +331,19 @@ internal fun gradientLine(background: BackgroundConfig, frame: Rect): Pair<Offse
     val (startRatio, endRatio) = angleToFractionalPoints(background.angle ?: 0)
     return Offset(frame.left + frame.width * startRatio.x, frame.top + frame.height * startRatio.y) to
         Offset(frame.left + frame.width * endRatio.x, frame.top + frame.height * endRatio.y)
+}
+
+/** 镜像出去的那几块：在卡片自己的坐标里按动态背景当前的样子画，裁在卡片那么大。 */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMovingImageBackground(
+    bitmap: ImageBitmap, background: BackgroundConfig, fallbackColor: Color, dstW: Float, dstH: Float,
+    transform: BackgroundMotionTransform?,
+) {
+    if (transform == null || transform.isIdentity) { drawImageBackground(bitmap, background, fallbackColor, dstW, dstH); return }
+    clipRect(right = dstW, bottom = dstH) {
+        withBackgroundMotion(transform, Rect(0f, 0f, dstW, dstH)) {
+            drawImageBackground(bitmap, background, fallbackColor, dstW, dstH)
+        }
+    }
 }
 
 /**

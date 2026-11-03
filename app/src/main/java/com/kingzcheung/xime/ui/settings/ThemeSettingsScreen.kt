@@ -370,6 +370,7 @@ private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit,
                 subtitle = "删掉这张图片和「我的图片」配色",
                 onClick = { confirmDelete = true })
         }
+        BackgroundMotionSettingsItems(hasCustomImage = hasImage)
     }
     editing?.let { (src, base) ->
         val existing = src == com.kingzcheung.xime.ui.theme.CustomImageTheme.imageSource(context)

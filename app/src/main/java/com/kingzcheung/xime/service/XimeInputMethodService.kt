@@ -401,6 +401,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     internal val hasHardwareKeyboard: Boolean get() = hardwareKeyboardDisplay.connected
     private val hardwareGamePackages = HardwareGamePackages { HardwareGamePassthrough.isGame(packageManager.getApplicationInfo(it, 0)) }
+    /** 动态背景：当前输入框所在应用是游戏时不动（和游戏直通同一个判断，不管接没接实体键盘）。 */
+    private val backgroundMotionGame = mutableStateOf(false)
+    /** 动态背景的钟只在键盘窗口显示时走。 */
+    private val backgroundMotionWindowShown = mutableStateOf(false)
     /** 游戏直通生效中：键盘不显示，实体按键不经过 CyIME（见 [HardwareGamePassthrough]）。 */
     private val hardwareGamePassthrough: Boolean get() = HardwareGamePassthrough.active(
         uiState.value.hardwareOptions.gamePassthrough, hasHardwareKeyboard,
@@ -2109,6 +2113,28 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val navigationStripCard = remember(state.isFloatingMode, state.isCompact, state.voiceCollapsed, state.showKeyboardResize) {
                     mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
                 }
+                // 动态背景（主题与外观 › 背景图片）：只动图片背景；游戏、系统省电、系统关了动画时不动，键盘收起时停。
+                val backgroundMotionSettings = com.kingzcheung.xime.ui.theme.rememberBackgroundMotionSettings()
+                // 轮播：「我的图片」主图在前，加上还在的轮播图片；不到两张不轮播。
+                val backgroundSlidesContext = androidx.compose.ui.platform.LocalContext.current
+                val backgroundSlides = remember(backgroundMotionSettings.slides, rootTheme.keyboardBackground) {
+                    rootTheme.keyboardBackground?.takeIf { com.kingzcheung.xime.ui.theme.CustomImageTheme.isCustomImage(it) }?.src
+                        ?.let { main -> (listOf(main) + com.kingzcheung.xime.ui.theme.CustomImageTheme.slides(
+                            backgroundSlidesContext, backgroundMotionSettings.slides)).distinct() }
+                        ?.takeIf { it.size > 1 } ?: emptyList()
+                }
+                val backgroundMotion = com.kingzcheung.xime.ui.theme.rememberKeyboardBackgroundMotion(
+                    backgroundMotionSettings,
+                    allowed = com.kingzcheung.xime.ui.theme.BackgroundMotionGate.allowed(
+                        enabled = backgroundMotionSettings.enabled,
+                        imageBackground = rootTheme.keyboardBackground?.type == "image",
+                        game = backgroundMotionGame.value,
+                        systemAllows = com.kingzcheung.xime.ui.theme.rememberSystemAllowsBackgroundMotion(backgroundMotionSettings.enabled),
+                        surface = !state.isCompact && !state.voiceCollapsed,
+                    ),
+                    running = backgroundMotionWindowShown.value,
+                    slides = backgroundSlides,
+                )
                 XimeTheme(darkTheme = isDarkTheme, themeId = state.themeId) {
                     com.kingzcheung.xime.ui.theme.KeyboardBackdropHost(
                         enabled = frostedGlass.enabled && !state.isCompact && !state.voiceCollapsed && !state.isFloatingMode && !roundedKeyboardBottom,
@@ -2119,6 +2145,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         clipboardInMotion = clipboardExpansion?.isInMotion == true,
                         topFeather = glassTopFeatherTop,
                         fixedCard = navigationStripCard.takeUnless { state.showKeyboardResize || handwritingExpanded },
+                        motion = backgroundMotion,
                     ) {
                         // Sync FrameLayout height with Compose content height
                         val totalDp = if (handwritingExpanded || state.showKeyboardResize || state.isCompact || state.voiceCollapsed || state.isFloatingMode) effectiveScreenH
@@ -3559,6 +3586,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
+        // 动态背景开着才查应用类别（每个包名只查一次，见 HardwareGamePackages）。
+        backgroundMotionGame.value = com.kingzcheung.xime.settings.BackgroundMotionPreferences.read(this).enabled &&
+            hardwareGamePackages.isGame(info?.packageName)
         KeyLatencyProbe.refresh(window.window)
         startRuntimeObservation()
         DictionaryPrefetch.onShow(this, serviceScope, rimeEngine)
@@ -4005,6 +4035,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        backgroundMotionWindowShown.value = false
         KeyboardPanelLaunch.previewVisible = false
         val keepVoice = voiceKeptAlive
         voiceKeptAlive = false
@@ -4040,6 +4071,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
+        backgroundMotionWindowShown.value = true
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
         mainHandler.removeCallbacks(hideGlassBlurWindows)
         glassWindowVisible = true

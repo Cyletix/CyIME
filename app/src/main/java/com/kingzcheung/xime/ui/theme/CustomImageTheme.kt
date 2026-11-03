@@ -25,6 +25,8 @@ object CustomImageTheme {
     private const val KEY_BASE = "custom_theme_image_base"
     private const val KEY_PLACEMENT = "custom_theme_image_placement"
     private const val FILE_PREFIX = "custom-keyboard-bg-"
+    /** 动态背景的轮播图片：同一前缀（[isCustomImage] 照样认、删除图片时一起删），换主图时留着。 */
+    private const val SLIDE_PREFIX = FILE_PREFIX + "slide-"
     /**
      * 遮罩强度，与大漠流金一致。照片纯黑（浅色）或纯白（深色）处压过之后，
      * 按键文字对底仍有 6:1 以上，次要的候选文字约 3.5:1。
@@ -125,10 +127,14 @@ object CustomImageTheme {
      * 还不启用：调整页确认后 [commit]，取消时 [discard]。
      * 在 IO 线程调用；读不出图片时抛异常，原来的图片和设置不变。
      */
-    fun importImage(context: Context, uri: Uri): String {
+    fun importImage(context: Context, uri: Uri): String = importAs(context, uri, FILE_PREFIX)
+
+    private fun importAs(context: Context, uri: Uri, prefix: String): String {
         val bitmap = com.kingzcheung.xime.ocr.loadOcrGalleryImage(context, uri)
         val dir = themesDir(context).apply { mkdirs() }
-        val name = "$FILE_PREFIX${System.currentTimeMillis()}.jpg"
+        // 轮播图片一次选好几张，同一毫秒里也不能重名。
+        val name = if (prefix == SLIDE_PREFIX) "$prefix${System.currentTimeMillis()}-${(0..99999).random()}.jpg"
+            else "$prefix${System.currentTimeMillis()}.jpg"
         val target = File(dir, name)
         try {
             target.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)) { "无法保存图片" } }
@@ -147,7 +153,33 @@ object CustomImageTheme {
             .putString(KEY_SRC, src).putString(KEY_BASE, baseThemeId)
             .putString(KEY_PLACEMENT, placement.encode()).commit()) { "无法保存设置" }
         val keep = src.removePrefix("themes/")
-        themesDir(context).listFiles()?.filter { it.name.startsWith(FILE_PREFIX) && it.name != keep }?.forEach { it.delete() }
+        themesDir(context).listFiles()?.filter { it.name.startsWith(FILE_PREFIX) && !it.name.startsWith(SLIDE_PREFIX) && it.name != keep }
+            ?.forEach { it.delete() }
+    }
+
+    /** 还在的轮播图片（themes/…）；文件没了的跳过。 */
+    fun slides(context: Context, stored: List<String>): List<String> =
+        stored.filter { it.removePrefix("themes/").startsWith(SLIDE_PREFIX) && File(themesDir(context), it.removePrefix("themes/")).isFile }
+
+    /**
+     * 加几张轮播图片（按 EXIF 摆正、长边缩到 2048，和主图同样存成 JPEG），连同已有的最多 [BackgroundMotionPreferences.MAX_SLIDES] 张。
+     * 读不出的图片跳过；返回加进去的张数。在 IO 线程调用。
+     */
+    fun addSlides(context: Context, uris: List<Uri>): Int {
+        val existing = slides(context, com.kingzcheung.xime.settings.BackgroundMotionPreferences.read(context).slides)
+        val room = (com.kingzcheung.xime.settings.BackgroundMotionPreferences.MAX_SLIDES - existing.size).coerceAtLeast(0)
+        val added = uris.take(room).mapNotNull { uri ->
+            runCatching { importAs(context, uri, SLIDE_PREFIX) }
+                .onFailure { com.kingzcheung.xime.util.FileLogger.e("Appearance", "Slide image failed", it) }.getOrNull()
+        }
+        if (added.isNotEmpty()) com.kingzcheung.xime.settings.BackgroundMotionPreferences.setSlides(context, existing + added)
+        return added.size
+    }
+
+    /** 清空轮播图片（主图不动）。在 IO 线程调用。 */
+    fun clearSlides(context: Context) {
+        com.kingzcheung.xime.settings.BackgroundMotionPreferences.setSlides(context, emptyList())
+        themesDir(context).listFiles()?.filter { it.name.startsWith(SLIDE_PREFIX) }?.forEach { it.delete() }
     }
 
     /** 调整页取消：删掉刚导入、没启用的图片；已在用的那张不动。 */
@@ -163,7 +195,8 @@ object CustomImageTheme {
     fun delete(context: Context): String {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val base = prefs.getString(KEY_BASE, null) ?: SoftBlueTheme.ID
-        check(prefs.edit().remove(KEY_SRC).remove(KEY_BASE).remove(KEY_PLACEMENT).commit()) { "无法保存设置" }
+        check(prefs.edit().remove(KEY_SRC).remove(KEY_BASE).remove(KEY_PLACEMENT)
+            .remove(com.kingzcheung.xime.settings.BackgroundMotionPreferences.KEY_SLIDES).commit()) { "无法保存设置" }
         themesDir(context).listFiles()?.filter { it.name.startsWith(FILE_PREFIX) }?.forEach { it.delete() }
         return base
     }

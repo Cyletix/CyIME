@@ -4,6 +4,7 @@ import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.theme.drawUnderTopFeather
 import com.kingzcheung.xime.ui.theme.liquidGlassEdge
+import com.kingzcheung.xime.ui.theme.withSharedBackdropMotion
 
 import com.kingzcheung.xime.service.PredictionManager
 import android.annotation.SuppressLint
@@ -1150,9 +1151,12 @@ private fun Modifier.glassStripBoost(alpha: Float): Modifier {
                     drawRect(fallback.copy(alpha = 1f), alpha = alpha)
                 }
                 clipRect {
-                    translate(offset.x, offset.y) {
-                        drawImage(image, dstSize = backdrop.frame.size, alpha = alpha,
-                            filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
+                    // 动态背景：和键盘本体同一个样子动。
+                    withSharedBackdropMotion(backdrop, offset) {
+                        translate(offset.x, offset.y) {
+                            drawImage(image, dstSize = backdrop.frame.size, alpha = alpha,
+                                filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
+                        }
                     }
                 }
             }

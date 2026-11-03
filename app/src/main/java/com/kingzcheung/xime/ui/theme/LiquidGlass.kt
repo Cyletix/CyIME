@@ -142,6 +142,11 @@ private fun Modifier.liquidRefraction33(radius: Dp): Modifier = composed {
             // 和 frostedGlassBackground 一样：整张图拉伸到 frame，再平移到本键的坐标。
             matrix.setScale(frame.size.width.toFloat() / bitmap.width, frame.size.height.toFloat() / bitmap.height)
             matrix.postTranslate(offset.x, offset.y)
+            // 动态背景：和键盘本体同一个样子动（以背景框中心缩放，再平移）。
+            backdrop.motion?.transform?.takeUnless { it.isIdentity }?.let { t ->
+                matrix.postScale(t.scale, t.scale, offset.x + frame.size.width / 2f, offset.y + frame.size.height / 2f)
+                matrix.postTranslate(t.shiftX * frame.size.width, t.shiftY * frame.size.height)
+            }
             imageShader.setLocalMatrix(matrix)
             LiquidRefractionShader.bind(shader, imageShader, size.width, size.height, radius.toPx(), 5f * density, 9.5f * density)
             paint.shader = shader

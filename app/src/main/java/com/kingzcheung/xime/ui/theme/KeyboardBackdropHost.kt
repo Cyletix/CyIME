@@ -59,6 +59,8 @@ internal data class SharedKeyboardBackdrop(
      * above the frame, painted as the flat fallback until glass was toggled (user 11-03).
      */
     val reportSurfaceTop: (key: Any, top: Float?) -> Unit = { _, _ -> },
+    /** 动态背景（[KeyboardBackgroundMotion]）；从共用背景取图的地方都按它当前的缩放、位移画，和键盘本体一起动。 */
+    val motion: KeyboardBackgroundMotion? = null,
 )
 
 /** Lowest-window-y (highest on screen) of the surfaces still attached; null when none reported. */
@@ -67,6 +69,13 @@ internal fun highestSurfaceTop(tops: Collection<Float>): Float? = tops.minOrNull
 /** The fixed card and every surface on it must sit inside the frame. */
 internal fun backdropCoverTop(cardTop: Float?, surfaceTop: Float?): Float? =
     listOfNotNull(cardTop, surfaceTop).minOrNull()
+
+/** 共用背景图放在本层 [offset] 处时，按动态背景当前的样子画；没开动态背景时原样。 */
+internal inline fun androidx.compose.ui.graphics.drawscope.DrawScope.withSharedBackdropMotion(
+    backdrop: SharedKeyboardBackdrop, offset: Offset, block: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit,
+) = withBackgroundMotion(backdrop.motion?.transform,
+    androidx.compose.ui.geometry.Rect(offset, androidx.compose.ui.geometry.Size(
+        backdrop.frame.size.width.toFloat(), backdrop.frame.size.height.toFloat())), block)
 
 internal val LocalSharedKeyboardBackdrop = staticCompositionLocalOf<SharedKeyboardBackdrop?> { null }
 /** Opted into only by clipboard expansion; other theme/resize behavior is unchanged. */
@@ -86,10 +95,14 @@ internal fun KeyboardBackdropHost(
     /** 「柔化顶部边缘」生效时固定卡片上沿在窗口里的 y，见 [GlassTopFeatherSource]。 */
     topFeather: androidx.compose.runtime.State<Float?>? = null,
     fixedCard: androidx.compose.runtime.State<androidx.compose.ui.geometry.Rect?>? = null,
+    /** 动态背景的钟（[rememberKeyboardBackgroundMotion]）；null = 背景不动。里面所有画背景图的地方都读它。 */
+    motion: KeyboardBackgroundMotion? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
     val windowRoot = LocalView.current.rootView
+    // 轮播：共用背景也换成现在轮到的那张（钟是这里提供给子项的，所以直接用参数）。
+    @Suppress("NAME_SHADOWING") val background = background.withCurrentSlide(motion)
     val backdropGlass = glass.forBackground(background)
     var origin by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
@@ -116,6 +129,7 @@ internal fun KeyboardBackdropHost(
             opacity = backdropGlass.normalized().backgroundOpacity,
             windowRoot = windowRoot,
             reportSurfaceTop = reportSurfaceTop,
+            motion = motion,
         )
     } else null
     val positionModifier = if (enabled) {
@@ -132,7 +146,8 @@ internal fun KeyboardBackdropHost(
     Box(modifier.then(positionModifier)) {
         CompositionLocalProvider(LocalSharedKeyboardBackdrop provides backdrop,
             LocalClipboardBackdropMotion provides clipboardInMotion,
-            LocalGlassTopFeather provides feather) { content() }
+            LocalGlassTopFeather provides feather,
+            LocalKeyboardBackgroundMotion provides motion) { content() }
     }
 }
 
