@@ -256,24 +256,20 @@ fun CandidateBar(
     var showCancelButton by remember(preferences) {
         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
     }
-    var associationCancelOnRight by remember(preferences) {
-        mutableStateOf(SettingsPreferences.isAssociationCancelOnRight(context))
-    }
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON || key == null) {
                 showCancelButton = SettingsPreferences.shouldShowCandidateCancelButton(context)
-            }
-            if (key == SettingsPreferences.KEY_ASSOCIATION_CANCEL_ON_RIGHT || key == null) {
-                associationCancelOnRight = SettingsPreferences.isAssociationCancelOnRight(context)
             }
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
-    // 设置「联想时关闭键放右边」：上屏后的联想不在第一个联想词旁边放「<」，改在右边放 ⊗（同一个动作）。
-    val associationCancelRight = showCompositionCancel && associationCancelOnRight && state is CandidateBarState.AssociationOnly
+    // 候选栏两端最多两个按钮（用户 11-03）：左边取消（打字时「<」，上屏后的联想是 ⊗），最右展开候选，位置固定；
+    // 收起键盘只在空闲（没有候选）时有。手写候选也是纯联想态，但那里的取消是撤销当前字，仍用「<」。
+    val closesAssociation = state is CandidateBarState.AssociationOnly &&
+        !(page is KeyboardPage.Main && page.type == MainType.HANDWRITING)
     // 手写候选的注释是读音，单字也放得下：「自动」在手写里照样显示，只有「隐藏」才不显示
     // （用户 10-31：手机竖屏「自动」把手写读音藏掉了，忘了读音的字正要靠它）。
     val commentsAllowed = rememberCandidateCommentsAllowed().let {
@@ -467,7 +463,15 @@ fun CandidateBar(
                 .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (showCompositionCancel && !associationCancelRight) {
+            if (showCompositionCancel && closesAssociation) {
+                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
+                    modifier = Modifier.testTag("association-cancel"), restingFill = edgeButtonFill,
+                    slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
+                    Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
+                        tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(4.dp))
+            } else if (showCompositionCancel) {
                 KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入",
                     restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                 Spacer(Modifier.width(4.dp))
@@ -708,15 +712,6 @@ fun CandidateBar(
             }
             // 打字时候选栏只放候选：亮着的开关（悬浮、繁体、全角等）只在空闲工具栏里显示，
             // 不再挤到候选右边（11-03：悬浮键盘里一直多一个蓝色悬浮按钮，候选只剩一个）。
-            if (associationCancelRight && !candidatePageExpanded) {
-                Spacer(Modifier.width(4.dp))
-                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
-                    modifier = Modifier.testTag("association-cancel-right"), restingFill = edgeButtonFill,
-                    slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
-                    Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
-                        tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
-                }
-            }
             if (state !is CandidateBarState.Idle && (candidatePageExpanded || hasAnyMore)) {
                 val action = if (candidatePageExpanded) callbacks.onBack else callbacks.onShowMoreCandidates
                 action?.let {

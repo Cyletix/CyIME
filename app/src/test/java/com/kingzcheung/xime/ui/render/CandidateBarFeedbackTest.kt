@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -48,11 +49,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * B站反馈（10-31）的候选栏开关，默认都关、关着时样子不变：
- * 「联想时关闭键放右边」——上屏后的联想不在第一个联想词旁放「<」，改在右边放 ⊗；
- * 「候选词间距加宽」——候选之间约空出一个字。
- * 设了 CYIME_RENDER_OUT=<目录> 时出对照图 candidate-feedback-0.png（原样）、-1.png（关闭键放右边）、
- * -2.png（再加宽间距），各主题。
+ * 候选栏两端按钮（用户 11-03）：最多两个——左边取消「<」，最右展开；收起键盘只在空闲时有。
+ * B站反馈（10-31）的「候选词间距加宽」默认关，关着时样子不变。
+ * 设了 CYIME_RENDER_OUT=<目录> 时出对照图 candidate-feedback-0.png（原样）、-1.png（加宽间距），各主题。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w900dp-h1400dp-hdpi")
@@ -69,7 +68,6 @@ class CandidateBarFeedbackTest {
         KeyboardThemes.initFromConfig(context)
         SettingsPreferences.getPrefsPublic(context).edit()
             .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON)
-            .remove(SettingsPreferences.KEY_ASSOCIATION_CANCEL_ON_RIGHT)
             .remove(SettingsPreferences.KEY_WIDE_CANDIDATE_SPACING).commit()
     }
 
@@ -106,38 +104,59 @@ class CandidateBarFeedbackTest {
         rule.onAllNodesWithContentDescription(description, useUnmergedTree = true).fetchSemanticsNodes().size
     private fun countTag(tag: String) = rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().size
 
-    @Test fun associationCancelStaysLeftByDefault() {
-        rule.setContent { Bar(association) }
-        rule.waitForIdle()
-        assertFalse(SettingsPreferences.isAssociationCancelOnRight(context))
-        assertEquals(1, count("取消输入"))
-        assertEquals(0, countTag("association-cancel-right"))
-    }
+    private fun bounds(tag: String) = rule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    private fun cancelBounds(description: String = "取消输入") =
+        rule.onNodeWithContentDescription(description, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
-    @Test fun switchMovesOnlyTheAssociationCancelToTheRight() {
-        SettingsPreferences.setAssociationCancelOnRight(context, true)
+    @Test fun associationShowsCloseOnTheLeftAndExpandOnTheRight() {
         var cancelled = 0
-        rule.setContent { Column { Bar(association, onCancel = { cancelled++ }); Bar(composing) } }
+        rule.setContent { Bar(association, onCancel = { cancelled++ }) }
         rule.waitForIdle()
-        // 联想：左边没有「<」，右边一个 ⊗；打字中的「<」照旧在左边。
-        assertEquals(1, count("取消输入"))
-        assertEquals(1, countTag("association-cancel-right"))
-        val close = rule.onNodeWithTag("association-cancel-right", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val first = rule.onNodeWithTag("bar-association:0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("⊗ 在第一个联想词右边", close.left > first.right)
-        assertEquals("联想不放收起键盘", 0, countTag("toolbar-hide"))
-        assertTrue("和打字的「<」不在同一行", close.top < 44f * rule.density.density)
-        rule.onNodeWithTag("association-cancel-right", useUnmergedTree = true).performClick()
+        // 联想：左边一个 ⊗，最右一个展开；没有「<」，也没有收起键盘。
+        assertEquals(1, count("关闭联想"))
+        assertEquals(0, count("取消输入"))
+        assertEquals(0, countTag("toolbar-hide"))
+        assertEquals(1, countTag("candidate-expansion"))
+        val first = bounds("bar-association:0")
+        assertTrue("⊗ 在第一个联想词左边", cancelBounds("关闭联想").right <= first.left + 0.5f)
+        assertTrue("展开在联想词右边", bounds("candidate-expansion").left >= first.right - 0.5f)
+        rule.onNodeWithContentDescription("关闭联想", useUnmergedTree = true).performClick()
         assertEquals(1, cancelled)
     }
 
-    @Test fun switchDoesNothingWhenTheCancelButtonIsOff() {
+    @Test fun expandButtonStaysAtTheSameRightEdgeWhileTypingAndAssociating() {
+        val state = androidx.compose.runtime.mutableStateOf<CandidateBarState>(composing)
+        rule.setContent { Bar(state.value) }
+        rule.waitForIdle()
+        // 打字：左边「<」，不是 ⊗。
+        assertEquals(1, count("取消输入"))
+        assertEquals(0, count("关闭联想"))
+        assertEquals(0, countTag("toolbar-hide"))
+        val typing = bounds("candidate-expansion")
+        assertTrue("「<」在第一个候选左边", cancelBounds().right <= bounds("bar-candidate:0").left + 0.5f)
+        rule.runOnIdle { state.value = association }
+        rule.waitForIdle()
+        assertEquals(1, count("关闭联想"))
+        assertEquals(typing.right, bounds("candidate-expansion").right, 0.5f)
+        assertEquals(typing.left, bounds("candidate-expansion").left, 0.5f)
+    }
+
+    @Test fun hideKeyboardOnlyWhenThereAreNoCandidates() {
+        rule.setContent { Bar(CandidateBarState.Idle) }
+        rule.waitForIdle()
+        assertEquals(1, countTag("toolbar-hide"))
+        assertEquals(0, countTag("candidate-expansion"))
+        assertEquals(0, count("取消输入"))
+    }
+
+    @Test fun cancelOffLeavesOnlyTheExpandButton() {
         SettingsPreferences.setShowCandidateCancelButton(context, false)
-        SettingsPreferences.setAssociationCancelOnRight(context, true)
-        rule.setContent { Bar(association) }
+        rule.setContent { Column { Bar(association); Bar(composing) } }
         rule.waitForIdle()
         assertEquals(0, count("取消输入"))
-        assertEquals(0, countTag("association-cancel-right"))
+        assertEquals(0, count("关闭联想"))
+        assertEquals(0, countTag("toolbar-hide"))
+        assertEquals(2, countTag("candidate-expansion"))
     }
 
     /** 相邻两个候选的起点距离（像素，留白算在候选里）：打字候选和联想各量一次。 */
@@ -170,7 +189,7 @@ class CandidateBarFeedbackTest {
         com.kingzcheung.xime.ui.keyboard.AppFonts.initialize(context)
         val themes = listOf(Triple("soft_blue", false, "柔和蓝·浅"), Triple("soft_blue", true, "柔和蓝·深"),
             Triple("pure_black", false, "黑白·纯白"), Triple("pure_black", true, "黑白·纯黑"))
-        val variants = listOf("原样" to false, "关闭键放右边" to true, "加宽间距" to true)
+        val variants = listOf("原样" to false, "加宽间距" to true)
         val root = rule.activity.window.decorView
         val shown = androidx.compose.runtime.mutableIntStateOf(-1)
         rule.setContent {
@@ -190,10 +209,9 @@ class CandidateBarFeedbackTest {
             }
         }
         File(out!!).mkdirs()
-        variants.forEachIndexed { index, (_, right) ->
+        variants.forEachIndexed { index, (_, wide) ->
             rule.runOnIdle {
-                SettingsPreferences.setAssociationCancelOnRight(context, right)
-                SettingsPreferences.setWideCandidateSpacing(context, index == 2)
+                SettingsPreferences.setWideCandidateSpacing(context, wide)
                 shown.intValue = index
             }
             rule.waitForIdle()

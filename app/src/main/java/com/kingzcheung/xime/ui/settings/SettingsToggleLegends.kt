@@ -15,13 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.outlined.HighlightOff
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -221,42 +214,6 @@ internal fun CandidateSpacingLegend(wide: Boolean) {
                 Text(word, fontSize = 13.sp, maxLines = 1,
                     color = if (index == 0) MaterialTheme.colorScheme.primary else onSurface,
                     fontWeight = if (index == 0) FontWeight.Medium else null)
-            }
-        }
-    }
-}
-
-/** 候选栏两端的圆底按钮。 */
-@Composable
-private fun LegendEdgeButton(icon: ImageVector, highlight: Boolean) {
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val primary = MaterialTheme.colorScheme.primary
-    Box(Modifier.size(26.dp).clip(CircleShape)
-        .background(if (highlight) primary.copy(alpha = 0.3f) else onSurface.copy(alpha = 0.08f)),
-        contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = if (highlight) primary else onSurface.copy(alpha = 0.6f),
-            modifier = Modifier.size(20.dp))
-    }
-}
-
-/** 「联想时关闭键放右边」（候选词页，行没有图标）：上屏后的联想，关闭键在最左边的 <，还是右边的 ⊗。 */
-@Composable
-internal fun AssociationCloseLegend(closeOnRight: Boolean) {
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    ToggleRowLegend("association-close-legend", start = 16.dp) {
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 4.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (!closeOnRight) LegendEdgeButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, highlight = true)
-            Spacer(Modifier.width(if (closeOnRight) 4.dp else 8.dp))
-            listOf("们", "的", "好").forEachIndexed { index, word ->
-                if (index > 0) Spacer(Modifier.width(12.dp))
-                Text(word, fontSize = 13.sp, maxLines = 1, color = onSurface)
-            }
-            Spacer(Modifier.weight(1f))
-            LegendEdgeButton(Icons.Filled.KeyboardArrowUp, highlight = false)
-            if (closeOnRight) {
-                Spacer(Modifier.width(4.dp))
-                LegendEdgeButton(Icons.Outlined.HighlightOff, highlight = true)
             }
         }
     }

@@ -18,7 +18,6 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.kingzcheung.xime.ui.settings.AssociationCloseLegend
 import com.kingzcheung.xime.ui.settings.AutoSpaceLegend
 import com.kingzcheung.xime.ui.settings.CandidateExtraLegend
 import com.kingzcheung.xime.ui.settings.CandidateSpacingLegend
@@ -66,7 +65,6 @@ class SettingsToggleLegendRenderTest {
         EvenMergedKeysLegend(on)
         SplitRightGLegend(on)
         CandidateSpacingLegend(on)
-        AssociationCloseLegend(on)
     }
 
     @Test fun legendsShowTheAddedItemOnlyWhenTheirSwitchIsOn() {
@@ -81,7 +79,7 @@ class SettingsToggleLegendRenderTest {
         // 每个图例都在限宽卡片里（SettingsLegend 打的 tag）。
         listOf("syllable-split-key-legend", "shift-syllable-split-legend", "semicolon-on-shift-legend",
             "double-pinyin-abbreviation-legend", "even-merged-keys-legend", "split-right-g-legend",
-            "candidate-spacing-legend", "association-close-legend", "email-suffix-legend").forEach {
+            "candidate-spacing-legend", "email-suffix-legend").forEach {
             assertEquals(it, 1, rule.onAllNodesWithTag(it).fetchSemanticsNodes().size)
         }
     }
