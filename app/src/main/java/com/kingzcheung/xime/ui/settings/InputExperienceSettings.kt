@@ -350,7 +350,8 @@ internal fun InputExperienceSettings(
                     })
             }
             Column(Modifier.settingsSearchAnchor("长按语言键弹出列表", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("长按语言键弹出列表：${"%.2f".format(settings.languageMenuHoldSeconds)} 秒")
+                // 开着「长按语言键切换输入法」时长按弹的是系统输入法框，不是列表；时长照样管它，标题跟着说实话。
+                Text("${if (settings.languageKeyImePicker) "长按语言键弹出输入法选择框" else "长按语言键弹出列表"}：${"%.2f".format(settings.languageMenuHoldSeconds)} 秒")
                 Text("默认 0.15 秒。", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.languageMenuHoldSeconds, modifier = Modifier.testTag("language-menu-hold-slider"),
                     onValueChange = { settings = settings.copy(languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(it)) },
