@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,108 +54,99 @@ internal fun PerformanceCostTotalNote(items: Set<PerformanceCosts.Item>, label: 
         modifier = modifier.padding(top = 2.dp).testTag("perf-cost-total:$tag"))
 }
 
+
 /**
- * 「性能与省电」里的“性能代价”：当前开着的耗性能开关合起来每键慢多少、多占多少内存，下面列出每一项。
- * [on] 由页面传入，方便页面刷新后重算。[voiceResident]：语音模型设成常驻（全部释放 = 永不），:asr 那份内存也算进去。
+ * 「性能与省电」里的“性能开销”：当前开着的、耗性能的东西合起来每键慢多少、多占多少内存，下面一项一项列出来，
+ * 每项右边就是它的开关（和各自设置页同一个值），在这一页就能关掉最耗的（用户 11-03「把所有的这个性能开销都考虑进来」）。
+ * 除了登记过的开关，还算上常驻的语音模型、九键词组模型和导入的词库（这三样不是开关，只列不关）。
+ * [shownOff]：这次在本页关掉的项，留在列表里方便开回来。
  */
 @Composable
-internal fun PerformanceCostTotalSection(on: Set<String>, voiceResident: Boolean = false) {
-    val source = rememberPerformanceCostSource()
-    val context = LocalContext.current
-    // 已应用的导入词库一共多少词（词库页「应用更改」之后才算）。
-    val dictionaryWords by produceState(0) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val state = com.kingzcheung.xime.settings.CellDictionaryManager.store(context).read()
-                state.installed.filter { it.id in state.applied }.sumOf { it.count }
-            }.getOrDefault(0)
-        }
-    }
+internal fun PerformanceCostTotalSection(
+    source: PerformanceCosts.Source?,
+    on: Set<String>,
+    load: PerformanceCosts.Load?,
+    voiceResident: Boolean,
+    t9Model: Boolean,
+    dictionaryWords: Int,
+    shownOff: Set<String>,
+    onToggle: (PerformanceCosts.Item, Boolean) -> Unit,
+) {
     SettingsSection(title = "性能开销") {
         Column(Modifier.fillMaxWidth().padding(16.dp).testTag("perf-cost-total"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (source == null) {
+            if (source == null || load == null) {
                 Text("读不到开销表(安装包里的 perf_costs.json)，暂时算不出总开销。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 return@Column
             }
-            val device = source.device
-            val switches = PerformanceCosts.total(device, on)
-            // 导入词库按实测曲线另加在开关合计上（词库和开关是同一次基线测的）。
-            val dictionaries = PerformanceCosts.dictionaryCost(device, dictionaryWords)
-                ?.copy(baselineKeyMs = device.dictionaryBaseline?.keyMs)
-            val withDictionaries = if (dictionaries == null) switches else switches.copy(
-                keyMs = switches.keyMs + (dictionaries.keyMs ?: 0.0),
-                memoryMb = switches.memoryMb + (dictionaries.memoryMb ?: 0.0),
-                measured = switches.measured)
-            // 常驻的语音模型在 :asr 进程，和开关、词库不是同一个进程，直接加上。
-            val voice = device.voiceResident?.takeIf { voiceResident && (it.memoryMb ?: 0.0) >= 1 }
-            val total = if (voice == null) withDictionaries
-                else withDictionaries.copy(memoryMb = withDictionaries.memoryMb + (voice.memoryMb ?: 0.0))
-            val listed = PerformanceCosts.Item.entries.filter { it.id in on }
             Row(Modifier.fillMaxWidth()) {
                 Text("当前总开销", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(8.dp))
-                Text(if (listed.isEmpty() && dictionaries == null && voice == null) "全关，没有额外开销"
-                    else PerformanceCosts.describe(PerformanceCosts.Cost(total.keyMs, total.memoryMb, total.baselineKeyMs,
-                        estimated = total.estimated.isNotEmpty()), device) ?: "测不出差别",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text(PerformanceCosts.describeLoad(load, source.device) ?: "没有额外开销",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.testTag("perf-cost-total-value"))
             }
-            val how = when {
-                listed.isEmpty() -> null
-                dictionaries != null && total.measured -> "开关这组一起实测过；导入的词库按实测曲线另加。"
-                dictionaries != null -> "开关按单项实测相加，再用最接近的一组实测组合校准；导入的词库按实测曲线另加。"
-                total.measured -> "这组开关一起实测过，直接用实测值。"
-                total.estimated.size == listed.size -> "按单项相加。"
-                else -> "几项会抢同一个线程，不能直接相加：按单项实测相加，再用最接近的一组实测组合校准。"
-            }
-            how?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Text(buildString {
-                append(when {
-                    source.local -> "本机实测"
-                    device.allEstimated -> "按 ${PerformanceCosts.deviceName(device)} 的基线${if (source.scaled) "，按本机档位折算" else ""}"
-                    source.sameModel -> "同型号实测"
-                    source.scaled -> "${PerformanceCosts.deviceName(device)} 实测按本机档位折算，仅供参考"
-                    else -> "${PerformanceCosts.deviceName(device)} 实测，仅供参考"
-                })
-                if (device.measuredAt.isNotBlank()) append("(${device.measuredAt}")
-                if (device.layout.isNotBlank()) append(if (device.measuredAt.isNotBlank()) "，${device.layout}" else "(${device.layout}")
-                if (device.measuredAt.isNotBlank() || device.layout.isNotBlank()) append(")")
-                append("。全关时每键 ${PerformanceCosts.oneDecimal(device.baseline.keyMs)} ms")
-                device.baseline.memoryMb?.let { append("，内存 ${Math.round(it)} MB") }
-                append("。")
-            }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (listed.isNotEmpty() || dictionaries != null || voice != null) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp), thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                // 按每键耗时从大到小，最耗的排前面；没测过的放最后写明。
-                val measured = total.items.mapNotNull { (id, cost) -> PerformanceCosts.Item.byId(id)?.let { it to cost } }
-                // 没有值得说的开销的项不列（开关下面也不写）。
-                measured.forEach { (item, cost) ->
-                    val text = PerformanceCosts.describe(cost, device) ?: return@forEach
-                    Row(Modifier.fillMaxWidth()) {
-                        Text(item.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(text, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                voice?.let { cost ->
-                    Row(Modifier.fillMaxWidth().testTag("perf-cost-voice-resident")) {
-                        Text("语音模型常驻", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(PerformanceCosts.describe(cost, device) ?: "", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                dictionaries?.let { cost ->
-                    Row(Modifier.fillMaxWidth().testTag("perf-cost-dictionaries")) {
-                        Text("导入的词库($dictionaryWords 词)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(PerformanceCosts.describe(cost, device) ?: "测不出差别", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                val missing = listed.filter { it.id in total.unmeasured }
-                if (missing.isNotEmpty()) Text("开着但表里没有：" + missing.joinToString("、") { it.title },
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(PerformanceCosts.basisLine(source, on + listOfNotNull(
+                PerformanceCosts.T9_MODEL_ID.takeIf { t9Model && source.device.t9Model != null })),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (source == null || load == null) return@SettingsSection
+        val device = source.device
+        // 模糊音按组登记，一组的开销小到不值一提，合成一行：26 键一行（去模糊音页改），九键「按数字也模糊」一行（这里能关）。
+        val fuzzy26 = PerformanceCosts.Item.entries.filter { !it.nineKey && it.id.startsWith("fuzzy_") }
+        val fuzzy9 = PerformanceCosts.Item.entries.filter { it.nineKey && it.id.startsWith(PerformanceCosts.T9_PREFIX + "fuzzy_") }
+        fun weight(cost: PerformanceCosts.Cost?) = (cost?.keyMs ?: 0.0) + (cost?.keyP95Ms ?: 0.0) + (cost?.memoryMb ?: 0.0) / 10
+        val listed = PerformanceCosts.Item.entries
+            .filter { it !in fuzzy26 && it !in fuzzy9 && (it.id in on || it.id in shownOff) }
+            .map { it to device.items[it.id] }
+            // 开销小到不值一提的不列（开关下面也不写），本页刚关的照样列着；开着的按耗时从大到小，关了的放后面。
+            .filter { (item, cost) -> item.id in shownOff || PerformanceCosts.describe(cost, device) != null }
+            .sortedByDescending { (item, cost) -> if (item.id in on) weight(cost) else -1.0 }
+        listed.forEach { (item, cost) ->
+            val enabled = item.id in on
+            CostDivider()
+            SettingsListRow(item.title, if (enabled) PerformanceCosts.describe(cost, device).orEmpty() else "已关",
+                modifier = Modifier.testTag("perf-cost-row:${item.id}")) {
+                Switch(checked = enabled, onCheckedChange = { onToggle(item, it) }, modifier = Modifier.padding(end = 12.dp))
             }
         }
+        fun groupCost(ids: List<PerformanceCosts.Item>) = PerformanceCosts.total(device, ids.mapTo(linkedSetOf()) { it.id }).let {
+            PerformanceCosts.Cost(it.keyMs, it.memoryMb, baselineKeyMs = it.baselineKeyMs, keyP95Ms = it.keyP95Ms.takeIf { p -> p > 0 })
+        }
+        val fuzzyOn = fuzzy26.filter { it.id in on }
+        if (fuzzyOn.isNotEmpty()) PerformanceCosts.describe(groupCost(fuzzyOn), device)?.let { text ->
+            CostDivider()
+            SettingsListRow("模糊音(${fuzzyOn.size} 组)", text, modifier = Modifier.testTag("perf-cost-row:fuzzy"))
+        }
+        val digitsOn = fuzzy9.filter { it.id in on }
+        if (digitsOn.isNotEmpty() || fuzzy9.first().id in shownOff) {
+            val text = if (digitsOn.isEmpty()) "已关" else PerformanceCosts.describe(groupCost(digitsOn), device).orEmpty()
+            CostDivider()
+            SettingsListRow("九键按数字也模糊", text, modifier = Modifier.testTag("perf-cost-row:t9-fuzzy-digits")) {
+                Switch(checked = digitsOn.isNotEmpty(), onCheckedChange = { onToggle(fuzzy9.first(), it) },
+                    modifier = Modifier.padding(end = 12.dp))
+            }
+        }
+        device.t9Model?.takeIf { t9Model }?.let { PerformanceCosts.describe(it, device) }?.let { text ->
+            CostDivider()
+            SettingsListRow("九键词组模型", text, modifier = Modifier.testTag("perf-cost-t9-model"))
+        }
+        device.voiceResident?.takeIf { voiceResident }?.let { PerformanceCosts.describe(it, device) }?.let { text ->
+            CostDivider()
+            SettingsListRow("语音模型常驻", text, modifier = Modifier.testTag("perf-cost-voice-resident"))
+        }
+        PerformanceCosts.dictionaryCost(device, dictionaryWords)?.copy(baselineKeyMs = device.dictionaryBaseline?.keyMs)?.let { cost ->
+            val text = PerformanceCosts.describe(cost, device) ?: "测不出差别"
+            CostDivider()
+            SettingsListRow("导入的词库($dictionaryWords 词)", text, modifier = Modifier.testTag("perf-cost-dictionaries"))
+        }
+        val missing = PerformanceCosts.Item.entries.filter { it.id in on && it.id !in device.items }
+        if (missing.isNotEmpty()) Text("开着但表里没有：" + missing.joinToString("、") { it.title },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(16.dp))
     }
 }
+
+@Composable
+private fun CostDivider() = HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp,
+    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

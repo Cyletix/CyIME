@@ -247,4 +247,45 @@ class PerformanceCostsTest {
         assertFalse(filled.items.getValue("neighbor_correction").estimated)
         assertEquals(1.18, PerformanceCosts.total(engine, setOf("neighbor_correction")).keyP95Ms, 1e-9)
     }
+
+    @Test fun projectedOnlyChangesTheSwitchesTheTierManages() {
+        val on = setOf("glass", "liquid_glass", "press_bubble", "key_glow", "neighbor_correction")
+        val low = PerformanceProfile.applied(PerformanceSettings(true, true, 0, 0, liquidGlass = true, pressBubble = true),
+            com.kingzcheung.xime.runtime.adaptation.PerformanceTier.LOW)
+        assertEquals(setOf("glass", "neighbor_correction"), PerformanceCosts.projected(on, low))
+        val high = PerformanceProfile.applied(PerformanceSettings(false, false, 1, 1, liquidGlass = true, pressBubble = true),
+            com.kingzcheung.xime.runtime.adaptation.PerformanceTier.HIGH)
+        // 高配只开动效和炫光，其余照旧；液态玻璃要玻璃开着才算。
+        assertEquals(on + "key_animation", PerformanceCosts.projected(on, high))
+        assertFalse("liquid_glass" in PerformanceCosts.projected(on - "glass", high))
+    }
+
+    @Test fun loadCountsVoiceNineKeyModelAndScoresAgainstEverythingOn() {
+        val withExtras = device.copy(voiceResident = PerformanceCosts.Cost(memoryMb = 600.0),
+            t9Model = PerformanceCosts.Cost(keyMs = 0.5, keyP95Ms = 4.0, basis = PerformanceCosts.BASIS_ENGINE))
+        val nothing = PerformanceCosts.load(withExtras, emptySet(), voiceResident = false, t9Model = false, dictionaryWords = 0)
+        assertEquals(0.0, nothing.memoryMb, 1e-9)
+        val voice = PerformanceCosts.load(withExtras, emptySet(), voiceResident = true, t9Model = true, dictionaryWords = 0)
+        assertEquals(600.0, voice.memoryMb, 1e-9)
+        assertEquals(4.0, voice.keyP95Ms, 1e-9)
+        val full = PerformanceCosts.load(withExtras, PerformanceCosts.fullOn(withExtras, nineKey = false), true, true, 0)
+        assertEquals(0, PerformanceCosts.loadScore(nothing, full))
+        assertEquals(100, PerformanceCosts.loadScore(full, full))
+        assertTrue(PerformanceCosts.loadScore(voice, full) in 1..99)
+    }
+
+    @Test fun totalLineSaysHowManyItemsAreMeasuredAndHowManyAreGuessed() {
+        val mixed = device.copy(items = device.items +
+            ("neighbor_correction" to PerformanceCosts.Cost(keyMs = 0.24, keyP95Ms = 1.18, basis = PerformanceCosts.BASIS_ENGINE)) +
+            ("glass" to PerformanceCosts.Cost(keyMs = 2.0, memoryMb = 12.0, estimated = true)),
+            t9Model = PerformanceCosts.Cost(keyMs = 0.54, keyP95Ms = 4.3, basis = PerformanceCosts.BASIS_ENGINE))
+        val source = PerformanceCosts.Source(mixed, local = false, sameModel = true)
+        assertEquals("开着的 4 项：电脑引擎实测 2 项，同型号实测 1 项，按同类推算 1 项。全关时每键 30.0 ms。",
+            PerformanceCosts.basisLine(source, listOf("neighbor_correction", "glass", "fuzzy_z_zh", PerformanceCosts.T9_MODEL_ID)))
+        assertEquals("全关时每键 30.0 ms。", PerformanceCosts.basisLine(source, emptyList()))
+        // 总开销一行和单项同一写法；慢键为 0 不写，小到测不出返回 null。
+        assertEquals("每键 +1.0 ms(慢 3%) · 慢键 +4.3 ms · 内存 +605 MB",
+            PerformanceCosts.describeLoad(PerformanceCosts.Load(1.0, 4.3, 605.0), mixed))
+        assertNull(PerformanceCosts.describeLoad(PerformanceCosts.Load(0.1, 0.0, 0.4), mixed))
+    }
 }

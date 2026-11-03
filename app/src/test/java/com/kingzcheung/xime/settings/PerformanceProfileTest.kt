@@ -69,4 +69,22 @@ class PerformanceProfileTest {
         assertEquals(PerformanceProfile.idleLevelIndex(30), PerformanceProfile.idleLevelIndex(25))
         assertEquals(PerformanceProfile.score(medium), PerformanceProfile.score(medium.copy(speechEngineIdleMinutes = 25)))
     }
+
+    @Test fun lowerTiersAlsoTurnOffHeavyEffectsButHighNeverTurnsThemOn() {
+        val high = PerformanceProfile.presets.getValue(PerformanceTier.HIGH)
+        // 高配不管后四项：开着点按气泡、液态玻璃也还是高配。
+        assertEquals(PerformanceTier.HIGH, PerformanceProfile.matching(high.copy(pressBubble = true, liquidGlass = true)))
+        val medium = PerformanceProfile.presets.getValue(PerformanceTier.MEDIUM)
+        assertEquals(PerformanceTier.MEDIUM, PerformanceProfile.matching(medium.copy(pressBubble = true)))
+        assertNull(PerformanceProfile.matching(medium.copy(liquidGlass = true)))
+        val low = PerformanceProfile.presets.getValue(PerformanceTier.LOW)
+        assertNull(PerformanceProfile.matching(low.copy(handwritingLive = true)))
+        // 选档：前四项换成这档的，要关的关掉，没开的不替用户打开。
+        val everything = PerformanceSettings(true, true, 0, 0, true, true, true, true)
+        assertEquals(low, PerformanceProfile.applied(everything, PerformanceTier.LOW))
+        assertEquals(medium.copy(pressBubble = true, glidePreview = true, handwritingLive = true),
+            PerformanceProfile.applied(everything, PerformanceTier.MEDIUM))
+        assertEquals(high, PerformanceProfile.applied(PerformanceSettings(false, false, 1, 1), PerformanceTier.HIGH))
+        PerformanceTier.entries.forEach { assertEquals(it, PerformanceProfile.matching(PerformanceProfile.applied(everything, it))) }
+    }
 }

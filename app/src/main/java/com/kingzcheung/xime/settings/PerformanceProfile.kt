@@ -5,7 +5,11 @@ import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTiers
 
-/** 性能预设页管的几项。都是已有设置，预设只是一组值，不另存一份。 */
+/**
+ * 性能预设页管的几项。都是已有设置，预设只是一组值，不另存一份。
+ * 前四项每档都写；后四项（11-03 用户「档位要更强」加的）只关不开：中配、低配把它们关掉，高配不动，
+ * 所以选高配不会替用户打开没开过的效果（见 [PerformanceProfile.turnsOff]）。
+ */
 data class PerformanceSettings(
     val keyAnimation: Boolean,
     val keyGlow: Boolean,
@@ -13,6 +17,14 @@ data class PerformanceSettings(
     val speechRefinerIdleMinutes: Int,
     /** 空闲多少分钟后卸掉全部语音模型；0 = 常驻。 */
     val speechEngineIdleMinutes: Int,
+    /** 液态玻璃（主题与外观）；玻璃关着时它不起作用，算不开。 */
+    val liquidGlass: Boolean = false,
+    /** 点按弹出气泡（主题与外观）。 */
+    val pressBubble: Boolean = false,
+    /** 滑行时实时显示词（26 键）。 */
+    val glidePreview: Boolean = false,
+    /** 手写边写边识别。 */
+    val handwritingLive: Boolean = false,
 )
 
 /**
@@ -31,11 +43,46 @@ object PerformanceProfile {
             speechRefinerIdleMinutes = 30, speechEngineIdleMinutes = 0),
     )
 
+    /** 档位只关不开的几项（见 [PerformanceSettings]）：高配不动，中配关液态玻璃，低配全关。 */
+    enum class Extra { LIQUID_GLASS, PRESS_BUBBLE, GLIDE_PREVIEW, HANDWRITING_LIVE }
+
+    val turnsOff: Map<PerformanceTier, Set<Extra>> = mapOf(
+        PerformanceTier.HIGH to emptySet(),
+        PerformanceTier.MEDIUM to setOf(Extra.LIQUID_GLASS),
+        PerformanceTier.LOW to Extra.entries.toSet(),
+    )
+
+    private fun PerformanceSettings.isOn(extra: Extra): Boolean = when (extra) {
+        Extra.LIQUID_GLASS -> liquidGlass
+        Extra.PRESS_BUBBLE -> pressBubble
+        Extra.GLIDE_PREVIEW -> glidePreview
+        Extra.HANDWRITING_LIVE -> handwritingLive
+    }
+
+    private fun PerformanceSettings.core() = PerformanceSettings(keyAnimation, keyGlow, speechRefinerIdleMinutes, speechEngineIdleMinutes)
+
+    /** 选这一档之后这几项是什么样：前四项换成这档的值，[turnsOff] 里的关掉，其余照旧。 */
+    fun applied(current: PerformanceSettings, tier: PerformanceTier): PerformanceSettings {
+        val preset = checkNotNull(presets[tier])
+        val off = turnsOff.getValue(tier)
+        return preset.copy(
+            liquidGlass = current.liquidGlass && Extra.LIQUID_GLASS !in off,
+            pressBubble = current.pressBubble && Extra.PRESS_BUBBLE !in off,
+            glidePreview = current.glidePreview && Extra.GLIDE_PREVIEW !in off,
+            handwritingLive = current.handwritingLive && Extra.HANDWRITING_LIVE !in off,
+        )
+    }
+
     fun read(context: Context): PerformanceSettings {
         val prefs = SettingsPreferences.getPrefsPublic(context)
+        val input = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(context)
         return PerformanceSettings(
             KeyEffectPreferences.animationEnabled(prefs), KeyEffectPreferences.glowEnabled(prefs),
-            SettingsPreferences.getSttRefinerIdleMinutes(context), SettingsPreferences.getSttEngineIdleMinutes(context))
+            SettingsPreferences.getSttRefinerIdleMinutes(context), SettingsPreferences.getSttEngineIdleMinutes(context),
+            liquidGlass = FrostedGlassPreferences.readProfiles(context).dark.enabled && SettingsPreferences.glassLiquid(context),
+            pressBubble = SettingsPreferences.shouldShowPressBubble(context),
+            glidePreview = input.glidePreview,
+            handwritingLive = input.handwritingRecognizeWhileWriting)
     }
 
     /** 空闲释放时间的几个档：1、5、10、30、60 分钟和“永不”（0）。明细滑条和 [score] 共用。 */
@@ -60,9 +107,11 @@ object PerformanceProfile {
         return Math.round(points).toInt().coerceIn(0, 100)
     }
 
-    /** 当前值对应的档位；null = 自定义。 */
+    /** 当前值对应的档位；null = 自定义。前四项要和这档一样，这档要关的几项要关着；高配不管后四项。 */
     fun matching(settings: PerformanceSettings): PerformanceTier? =
-        presets.entries.firstOrNull { it.value == settings }?.key
+        presets.entries.firstOrNull { (tier, preset) ->
+            preset.core() == settings.core() && turnsOff.getValue(tier).none { settings.isOn(it) }
+        }?.key
 
     /**
      * “自动”只在当前值仍是本机档位那一组时成立：在「按键效果」里单独改了动效、炫光，或别处改了语音释放，
@@ -80,12 +129,14 @@ object PerformanceProfile {
     fun applyAuto(context: Context): PerformanceTier {
         val tier = detectedTier(context)
         write(context, checkNotNull(presets[tier]))
+        turnOff(context, turnsOff.getValue(tier))
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(KEY_AUTO, true).apply()
         return tier
     }
 
     fun applyPreset(context: Context, tier: PerformanceTier) {
         write(context, checkNotNull(presets[tier]))
+        turnOff(context, turnsOff.getValue(tier))
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(KEY_AUTO, false).apply()
     }
 
@@ -106,6 +157,19 @@ object PerformanceProfile {
             .putInt(SettingsPreferences.KEY_STT_ENGINE_IDLE_MINUTES, settings.speechEngineIdleMinutes)
             .putBoolean(SettingsPreferences.KEY_STT_KEEP_ENGINE_ALIVE, settings.speechEngineIdleMinutes == 0)
             .putBoolean(KEY_AUTO, true)
+    }
+
+    /** 只关不开：和各自设置页写同样的值（[PerformanceCosts.set]）。新装时这几项本来就关着，自动档首次写入不用碰它们。 */
+    private fun turnOff(context: Context, extras: Set<Extra>) {
+        val current = read(context)
+        extras.filter { current.isOn(it) }.forEach { extra ->
+            PerformanceCosts.set(context, when (extra) {
+                Extra.LIQUID_GLASS -> PerformanceCosts.Item.LIQUID_GLASS
+                Extra.PRESS_BUBBLE -> PerformanceCosts.Item.PRESS_BUBBLE
+                Extra.GLIDE_PREVIEW -> PerformanceCosts.Item.GLIDE_PREVIEW
+                Extra.HANDWRITING_LIVE -> PerformanceCosts.Item.HANDWRITING_LIVE
+            }, false)
+        }
     }
 
     private fun write(context: Context, settings: PerformanceSettings) {

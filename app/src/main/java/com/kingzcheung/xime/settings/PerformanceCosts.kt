@@ -232,9 +232,7 @@ object PerformanceCosts {
      * 打九键时算九键那一项，打别的键盘时算 26 键那一项，不重复相加。
      */
     fun enabled(context: Context): Set<String> {
-        val nineKey = runCatching {
-            InputProfiles.describe(SettingsPreferences.getCurrentSchema(context)).layout.kind == LayoutKind.T9
-        }.getOrDefault(false)
+        val nineKey = nineKey(context)
         return Item.entries.filter { item -> if (nineKey) item.nineKey || fuzzyOf(item) == null else !item.nineKey }
             .filterTo(linkedSetOf()) { runCatching { isOn(context, it) }.getOrDefault(false) }
             .mapTo(linkedSetOf()) { it.id }
@@ -541,6 +539,101 @@ object PerformanceCosts {
         }
         return Cost(keyMs = at { it.keyMs }?.coerceAtLeast(0.0), memoryMb = at { it.memoryMb }?.coerceAtLeast(0.0))
     }
+
+    // ---- 档位 ----
+
+    /** 「性能与省电」档位管的开关在表里的 id（前两项每档都写，后四项只关不开，见 [PerformanceProfile.turnsOff]）。 */
+    private val tierItems = mapOf(
+        Item.KEY_ANIMATION.id to { s: PerformanceSettings -> s.keyAnimation },
+        Item.KEY_GLOW.id to { s: PerformanceSettings -> s.keyGlow },
+        Item.LIQUID_GLASS.id to { s: PerformanceSettings -> s.liquidGlass },
+        Item.PRESS_BUBBLE.id to { s: PerformanceSettings -> s.pressBubble },
+        Item.GLIDE_PREVIEW.id to { s: PerformanceSettings -> s.glidePreview },
+        Item.HANDWRITING_LIVE.id to { s: PerformanceSettings -> s.handwritingLive },
+    )
+
+    /** 当前开着的 [on] 换成 [settings] 这组档位值之后哪些开着；液态玻璃要玻璃也开着才算。别的开关原样不动。 */
+    fun projected(on: Set<String>, settings: PerformanceSettings): Set<String> =
+        (on - tierItems.keys) + tierItems.filter { (id, value) ->
+            value(settings) && (id != Item.LIQUID_GLASS.id || Item.GLASS.id in on)
+        }.keys
+
+    /** 一组开关加上常驻语音、九键模型、导入词库之后的总开销。 */
+    data class Load(val keyMs: Double, val keyP95Ms: Double, val memoryMb: Double)
+
+    fun load(device: Device, on: Set<String>, voiceResident: Boolean, t9Model: Boolean, dictionaryWords: Int): Load {
+        val switches = total(device, on)
+        val dictionaries = dictionaryCost(device, dictionaryWords)
+        val voice = device.voiceResident?.takeIf { voiceResident }
+        val t9 = device.t9Model?.takeIf { t9Model }
+        val extras = listOfNotNull(dictionaries, voice, t9)
+        return Load(switches.keyMs + extras.sumOf { it.keyMs ?: 0.0 },
+            switches.keyP95Ms + extras.sumOf { it.keyP95Ms ?: 0.0 },
+            switches.memoryMb + extras.sumOf { it.memoryMb ?: 0.0 })
+    }
+
+    /** 总开销一行（同 [describe] 的写法）；小到测不出返回 null。 */
+    fun describeLoad(load: Load, device: Device): String? =
+        describe(Cost(load.keyMs, load.memoryMb, keyP95Ms = load.keyP95Ms.takeIf { it > 0 }), device)
+
+    /**
+     * 总开销下面那行“数从哪来”：开着的几项里多少是电脑引擎实测、多少是设备实测、多少还是按同类推算的，
+     * 再写全关时的基线。用户 11-03「性能估算也不准」：推算的项数要写出来，不混成实测。
+     */
+    fun basisLine(source: Source, ids: Collection<String>): String {
+        val device = source.device
+        val costs = ids.distinct().mapNotNull { id -> if (id == T9_MODEL_ID) device.t9Model else device.items[id] }
+        val engine = costs.count { it.basis == BASIS_ENGINE }
+        val guessed = costs.count { it.basis != BASIS_ENGINE && it.estimated }
+        val measured = costs.size - engine - guessed
+        val who = when {
+            source.local -> "本机实测"
+            source.sameModel -> "同型号实测"
+            else -> "${deviceName(device)} 实测"
+        }
+        val parts = listOfNotNull(
+            "电脑引擎实测 $engine 项".takeIf { engine > 0 },
+            "$who $measured 项".takeIf { measured > 0 },
+            "按同类推算 $guessed 项".takeIf { guessed > 0 },
+        )
+        return buildString {
+            if (parts.isNotEmpty()) append("开着的 ${costs.size} 项：").append(parts.joinToString("，")).append("。")
+            append("全关时每键 ${oneDecimal(device.baseline.keyMs)} ms")
+            if (source.scaled) append("(${deviceName(device)} 按本机档位折算)")
+            append("。")
+        }
+    }
+
+    /** [basisLine] 里代表九键词组模型的 id（不是开关，不在 [Item] 里）。 */
+    const val T9_MODEL_ID = "t9_model"
+
+    /**
+     * 开销刻度 0～100：0 = 能关的全关，100 = 表里每一项都开（含常驻语音、九键模型）。
+     * 每键耗时和内存各占一半，各按“全开”时的值归一；有慢键数时每键耗时取中位和慢键的平均。
+     */
+    fun loadScore(load: Load, full: Load): Int {
+        fun part(value: Double, max: Double) = if (max <= 0.0) 0.0 else (value / max).coerceIn(0.0, 1.0)
+        val time = if (full.keyP95Ms > 0) (part(load.keyMs, full.keyMs) + part(load.keyP95Ms, full.keyP95Ms)) / 2
+            else part(load.keyMs, full.keyMs)
+        return Math.round(100 * (time + part(load.memoryMb, full.memoryMb)) / 2).toInt().coerceIn(0, 100)
+    }
+
+    /** “全开”：表里登记的开关全开（九键上用九键那一组），加常驻语音和九键模型，词库按当前的。 */
+    fun fullOn(device: Device, nineKey: Boolean): Set<String> =
+        Item.entries.filter { if (nineKey) it.nineKey || fuzzyOf(it) == null else !it.nineKey }
+            .map { it.id }.filterTo(linkedSetOf()) { it in device.items }
+
+    /** 本机现在打的是不是九键（模糊音两组按键盘分开算）。 */
+    fun nineKey(context: Context): Boolean = runCatching {
+        InputProfiles.describe(SettingsPreferences.getCurrentSchema(context)).layout.kind == LayoutKind.T9
+    }.getOrDefault(false)
+
+    /** 九键词组模型装着且没被停用（rime/ 里有 t9_ngram.lm）。 */
+    fun t9ModelActive(context: Context): Boolean = runCatching {
+        java.io.File(context.filesDir, "rime/t9_ngram.lm").isFile &&
+            listOf(com.kingzcheung.xime.model.CandidateModelCatalog.NGRAM, com.kingzcheung.xime.model.CandidateModelCatalog.NGRAM_SMALL)
+                .none { SettingsPreferences.getPrefsPublic(context).getBoolean("candidate_model_disabled_$it", false) }
+    }.getOrDefault(false)
 
     fun percent(ms: Double, baseline: Double): Int = if (baseline <= 0) 0 else (ms / baseline * 100).roundToInt()
 
