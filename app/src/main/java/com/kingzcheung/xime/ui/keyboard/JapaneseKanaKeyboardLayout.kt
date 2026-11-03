@@ -238,6 +238,7 @@ internal fun KanaFlickButton(
                 legacyStateColor = if (pressed) background.copy(alpha = 0.7f) else background,
                 pressed = pressed,
                 opacityScale = glassFunctionKeyScale(background),
+                functionDepth = glassFunctionKeyDepth(background),
             )).keyHeldHighlight(pressed)),
         contentAlignment = Alignment.Center,
     ) {

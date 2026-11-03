@@ -19,10 +19,13 @@ internal fun shiftKeyColors(
     legacyStateColor: Color,
     /** 玻璃下功能键更透（见 [glassFunctionKeyScale]）；Shift 开启时的状态色不受影响。 */
     opacityScale: Float = 1f,
+    /** 白色玻璃功能键深一档（见 [glassFunctionKeyDepth]）。 */
+    functionDepth: Float = 1f,
 ): KeyboardKeyColors {
     val ordinary = frostedKeyColor(background, foreground, config, legacyStateColor,
         pressed = pressed, highlighted = mode != ShiftMode.OFF,
-        opacityScale = if (mode == ShiftMode.OFF) opacityScale else 1f)
+        opacityScale = if (mode == ShiftMode.OFF) opacityScale else 1f,
+        functionDepth = if (mode == ShiftMode.OFF) functionDepth else 1f)
     if (mode == ShiftMode.OFF) return KeyboardKeyColors(ordinary, foreground)
 
     val base = frostedKeyColor(background, foreground, config)

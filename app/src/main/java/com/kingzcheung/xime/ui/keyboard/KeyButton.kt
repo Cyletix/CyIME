@@ -224,6 +224,7 @@ fun KeyButton(
                 else backgroundColor,
                 pressed = isPressed, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(backgroundColor),
+                functionDepth = glassFunctionKeyDepth(backgroundColor),
             )).keyHeldHighlight(isPressed)),
         contentAlignment = Alignment.Center
     ) {
@@ -564,6 +565,7 @@ fun SwipeableKeyButton(
                 else resolvedBackground,
                 pressed = isPressed || shiftHovered, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(resolvedBackground),
+                functionDepth = glassFunctionKeyDepth(resolvedBackground),
             )).keyHeldHighlight(isPressed || shiftHovered))
             .then(if (hexagonal) Modifier.honeycombLabelArea() else Modifier),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
@@ -897,6 +899,7 @@ fun IconKeyButton(
                 else backgroundColor,
                 pressed = isPressed, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(backgroundColor),
+                functionDepth = glassFunctionKeyDepth(backgroundColor),
             )), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
@@ -1011,7 +1014,8 @@ fun SwipeableIconKeyButton(
         legacyStateColor = if (isPressed) darkenColor(backgroundColor, .2f)
             else if (isHighlighted) backgroundColor.copy(alpha = .8f) else backgroundColor,
         pressed = isPressed, highlighted = isHighlighted,
-        opacityScale = glassFunctionKeyScale(backgroundColor))
+        opacityScale = glassFunctionKeyScale(backgroundColor),
+        functionDepth = glassFunctionKeyDepth(backgroundColor))
     val feedbackColors = keyFlickFeedbackColors(baseFill, iconColor,
         com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.accent ?: androidx.compose.material3.MaterialTheme.colorScheme.primary,
         feedback, flickPreview?.progress ?: 0f, frostedGlass.enabled)

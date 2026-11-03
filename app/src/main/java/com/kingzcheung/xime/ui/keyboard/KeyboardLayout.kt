@@ -1749,7 +1749,8 @@ internal fun ShiftCapsKeyButton(
         else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
         else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
         else backgroundColor,
-        opacityScale = glassFunctionKeyScale(backgroundColor))
+        opacityScale = glassFunctionKeyScale(backgroundColor),
+        functionDepth = glassFunctionKeyDepth(backgroundColor))
 
     Box(
         modifier = modifier

@@ -180,4 +180,32 @@ class FrostedKeyColorsTest {
         assertEquals(Color(0xFF55555A), frostedKeyColor(Color(0xFF55555A), Color.White, glass.copy(enabled = false)))
         assertEquals(Color(0xFF55555A), frostedKeyColor(Color(0xFF55555A), Color.White, glass.copy(keyOpacity = 1f)))
     }
+
+    @Test fun whiteGlassPanelIsThickOnlyForWhiteGlass() {
+        // 白色玻璃：底色最少 WHITE_GLASS_PANEL_OPACITY，后面是深色应用也不透成深灰；更厚的设置、深色玻璃、关着玻璃都原样。
+        val light = FrostedGlassConfig.defaults(false, enabled = true)
+        assertEquals(WHITE_GLASS_PANEL_OPACITY, light.whiteGlassPanel(true).backgroundOpacity, 0f)
+        assertEquals(light.keyOpacity, light.whiteGlassPanel(true).keyOpacity, 0f)
+        val thick = light.copy(backgroundOpacity = .95f)
+        assertEquals(thick, thick.whiteGlassPanel(true))
+        val dark = FrostedGlassConfig.defaults(true, enabled = true).copy(backgroundOpacity = .3f)
+        assertEquals(dark, dark.whiteGlassPanel(false))
+        assertEquals(light.copy(enabled = false), light.copy(enabled = false).whiteGlassPanel(true))
+    }
+
+    @Test fun whiteGlassFunctionKeysStayLighterThanTextButDarkerThanPanelOverDarkApps() {
+        // 用户 11-03 截图：白色玻璃功能键减半透明后，深色应用上成了深灰块。同样厚、深一档后：
+        // 字母键最亮，功能键比底色深一档，且都远亮于深字。
+        val config = FrostedGlassConfig.defaults(false, enabled = true).whiteGlassPanel(true)
+        val text = Color(0xFF202020)
+        val panelColor = Color(0xFFE8E8EA)
+        listOf(Color(0xFF141414), Color.White).forEach { app ->
+            val panel = panelColor.copy(alpha = config.backgroundOpacity).compositeOver(app)
+            val letter = frostedKeyColor(Color.White, text, config).compositeOver(panel)
+            val function = frostedKeyColor(Color(0xFFD4D4D8), text, config,
+                functionDepth = WHITE_GLASS_FUNCTION_DEPTH).compositeOver(panel)
+            assertTrue(letter.red > panel.red && function.red < panel.red - .02f)
+            assertTrue(function.red > .6f)
+        }
+    }
 }

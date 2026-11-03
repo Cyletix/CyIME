@@ -292,10 +292,12 @@ class KeyboardInputPreferencesTest {
         FrostedGlassPreferences.save(context, dark, true)
         FrostedGlassPreferences.save(context, light, false)
         val swappedDark = dark.copy(backgroundOpacity = light.keyOpacity, keyOpacity = light.backgroundOpacity)
+        // 白色玻璃显示时底色补到 WHITE_GLASS_PANEL_OPACITY（保存的值不变）。
+        val shownLight = light.copy(backgroundOpacity = WHITE_GLASS_PANEL_OPACITY)
         assertEquals(swappedDark, KeyboardInputPreferences.read(context, true).frostedGlass)
-        assertEquals(light, KeyboardInputPreferences.read(context, false).frostedGlass)
+        assertEquals(shownLight, KeyboardInputPreferences.read(context, false).frostedGlass)
         values["dark_mode"] = 1
-        assertEquals(light, KeyboardInputPreferences.read(context, false).frostedGlass)
+        assertEquals(shownLight, KeyboardInputPreferences.read(context, false).frostedGlass)
         assertEquals(swappedDark, KeyboardInputPreferences.read(context).frostedGlass)
     }
 

@@ -18,6 +18,8 @@ internal fun frostedKeyColor(
     pressed: Boolean = false,
     highlighted: Boolean = false,
     opacityScale: Float = 1f,
+    /** 白色玻璃的功能键再深一档（见 [glassFunctionKeyDepth]）；其他键为 1。 */
+    functionDepth: Float = 1f,
 ): Color {
     // 非玻璃主题的按下反馈也统一：键面向本键文字色靠一点（深色主题变亮、浅色主题变暗），
     // 不再有的键加深 10%、有的 20%、有的变透明 70%。高亮、禁用等其他状态仍用各自的 legacyStateColor。
@@ -30,7 +32,7 @@ internal fun frostedKeyColor(
     // For light surfaces the same rule preserves their distance from white.
     val base = if (opacity < 1f) com.kingzcheung.xime.ui.theme.TransparentGlassTheme.glassKeyBase(background) else background
     // 早期近黑键按 1/不透明度提亮（#1C1C1C → #8C8C8C），不走黑白主题的 3 倍。
-    val raisedTint = glassKeyTint(base, foreground, opacity, nearBlackLift = base == background)
+    val raisedTint = glassKeyTint(base, foreground, opacity, nearBlackLift = base == background, depth = functionDepth)
     val feedback = when {
         pressed -> 0.08f
         highlighted -> 0.04f
@@ -51,7 +53,8 @@ internal const val NEAR_BLACK_KEY_PEAK = .18f
 /** 近黑键帽在玻璃下的提亮倍数（可调参数；渲染测试会临时改它出对比图）。 */
 internal var glassNearBlackLift = 3f
 
-private fun glassKeyTint(background: Color, foreground: Color, opacity: Float, nearBlackLift: Boolean = true): Color {
+private fun glassKeyTint(background: Color, foreground: Color, opacity: Float, nearBlackLift: Boolean = true,
+    depth: Float = 1f): Color {
     if (opacity <= 0f || opacity >= 1f) return background
     val darkSurface = foreground.luminance() > background.luminance()
     val r = if (darkSurface) background.red else 1f - background.red
@@ -62,7 +65,7 @@ private fun glassKeyTint(background: Color, foreground: Color, opacity: Float, n
     // 近黑键帽（黑白主题深色）在玻璃下只提亮 GLASS_NEAR_BLACK_LIFT 倍：
     // 按 1/不透明度（默认 5 倍）会发灰，不提亮（1 倍）又和背景混在一起（2026-10-22 用户反馈）。
     val lift = if (nearBlackLift && darkSurface && peak < NEAR_BLACK_KEY_PEAK) glassNearBlackLift else 1f / opacity
-    val scale = minOf(lift, 1f / opacity, 1f / peak)
+    val scale = minOf(lift * depth, depth / opacity, 1f / peak)
     fun channel(value: Float) = if (darkSurface) value * scale else 1f - value * scale
     return Color(channel(r), channel(g), channel(b), background.alpha)
 }
@@ -77,10 +80,40 @@ internal const val GLASS_FUNCTION_KEY_SCALE = 0.5f
 internal fun glassFunctionKeyScale(background: Color): Float {
     val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current ?: return 1f
     if (com.kingzcheung.xime.ui.theme.TransparentGlassTheme.isGlassFunctionKey(background)) return 1f
+    // 白色玻璃不减半：后面是深色应用时，更透的功能键会透成深灰块（用户 11-03 截图）；改为同样厚、颜色深一档。
+    if (palette.isWhiteGlass()) return 1f
+    return if (palette.isThemeFunctionKey(background)) GLASS_FUNCTION_KEY_SCALE else 1f
+}
+
+/** 白色玻璃功能键离白色的距离再乘这么多：和字母键同样厚时，在白色和深色应用上都比底色深一档（像 iOS 浅色键盘）。 */
+internal const val WHITE_GLASS_FUNCTION_DEPTH = 1.5f
+
+@androidx.compose.runtime.Composable
+internal fun glassFunctionKeyDepth(background: Color): Float {
+    val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current ?: return 1f
+    return if (palette.isWhiteGlass() && palette.isThemeFunctionKey(background)) WHITE_GLASS_FUNCTION_DEPTH else 1f
+}
+
+private fun com.kingzcheung.xime.ui.theme.KeyboardPalette.isWhiteGlass() = background.luminance() >= .5f
+
+private fun com.kingzcheung.xime.ui.theme.KeyboardPalette.isThemeFunctionKey(background: Color): Boolean {
     fun Color.sameRgb(other: Color) = kotlin.math.abs(red - other.red) < 0.004f &&
         kotlin.math.abs(green - other.green) < 0.004f && kotlin.math.abs(blue - other.blue) < 0.004f
-    return if (background.sameRgb(palette.function) && !palette.key.sameRgb(palette.function))
-        GLASS_FUNCTION_KEY_SCALE else 1f
+    return background.sameRgb(function) && !key.sameRgb(function)
+}
+
+/**
+ * 白色玻璃（浅色玻璃）的底色最少这么厚。原来浅色默认底色 20%，后面是深色应用时整块透成近黑的灰，
+ * 按键和工具栏（补到按键厚度）浮在上面像几块不同的灰（用户 11-03「白色玻璃问题有点多」）。
+ * 88% 时深色应用后面也是浅灰白的玻璃，仍透出一点后面的颜色；用户设得更厚照旧。深色玻璃不变。
+ */
+internal const val WHITE_GLASS_PANEL_OPACITY = 0.88f
+
+/** [white]：浅色外观且主题底色是浅色（深底主题的浅色外观不算白色玻璃）。 */
+internal fun FrostedGlassConfig.whiteGlassPanel(white: Boolean): FrostedGlassConfig {
+    if (!enabled || !white) return this
+    val opacity = backgroundOpacity.takeIf { it.isFinite() } ?: return copy(backgroundOpacity = WHITE_GLASS_PANEL_OPACITY)
+    return if (opacity >= WHITE_GLASS_PANEL_OPACITY) this else copy(backgroundOpacity = WHITE_GLASS_PANEL_OPACITY)
 }
 
 /**
@@ -120,11 +153,11 @@ internal fun FrostedGlassConfig.legibleOver(
     return base.copy(backgroundOpacity = 1f, keyOpacity = 1f)
 }
 
-/** 当前主题的字母键与功能键都参与检查。 */
+/** 当前主题的字母键与功能键都参与检查。白色玻璃先把底色补到 [WHITE_GLASS_PANEL_OPACITY]。 */
 internal fun FrostedGlassConfig.legibleForTheme(themeId: String, isDark: Boolean): FrostedGlassConfig {
     if (!enabled) return this
     val palette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(themeId, isDark)
-    return legibleOver(palette.background,
+    return whiteGlassPanel(!isDark && palette.isWhiteGlass()).legibleOver(palette.background,
         listOf(palette.key to palette.text, palette.function to palette.functionText))
 }
 
