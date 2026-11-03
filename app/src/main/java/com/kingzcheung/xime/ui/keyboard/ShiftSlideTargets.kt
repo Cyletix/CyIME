@@ -49,6 +49,20 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         return true
     }
 
+    /** 按住符号键时另一根手指点回车：Ctrl+回车，发送（用户 11-03）。不在按住符号键时返回 false，回车照常。 */
+    fun ctrlEnter(): Boolean {
+        if (!ctrl) return false
+        val send = ctrlShortcut ?: return false
+        ctrlUsed = true
+        send(com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER)
+        return true
+    }
+
+    /** 回车键的位置：按住符号键拖到回车上松手发 Ctrl+回车；按住 Shift 拖过去不算目标。 */
+    fun putEnter(id: Any, bounds: Rect) {
+        targets[id] = listOf(Target(ENTER_KEY, bounds) {})
+    }
+
     /** 合并字母键按左右半区选单个字母，绝不调用它的长按或符号手势。 */
     fun put(id: Any, letters: String, bounds: Rect, commit: (String) -> Unit) {
         if (letters.length !in 1..2 || letters.any { it.lowercaseChar() !in 'a'..'z' }) {
@@ -64,7 +78,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     }
     fun remove(id: Any) { targets.remove(id) }
     fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) candidateAt(point)?.takeUnless { ctrl }
-        else targets.values.asSequence().flatten().firstOrNull { it.bounds.contains(point) }
+        else targets.values.asSequence().flatten().firstOrNull { it.bounds.contains(point) && (ctrl || it.key != ENTER_KEY) }
 
     /** 拖出键盘、落在候选上：松手等于按住 Shift 点这个候选（释义模式上屏英文）。 */
     private fun candidateAt(point: Offset): Target? =
@@ -73,6 +87,8 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     companion object {
         /** 候选目标的 key；不是字母，键帽高亮不会匹配到它。 */
         const val CANDIDATE_KEY = "candidate"
+        /** 回车目标的 key：一个字符，符号键松手时按 Ctrl+这个字符发出（[com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER]）。 */
+        val ENTER_KEY = com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER.toString()
     }
 
     fun move(shiftBounds: Rect, pointer: Offset): Target? {

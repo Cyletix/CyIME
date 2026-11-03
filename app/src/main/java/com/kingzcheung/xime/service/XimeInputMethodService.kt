@@ -2990,6 +2990,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private val hardwareCandidateNavigationKeys = mutableSetOf<Int>()
     /** Shift 加数字或空格已用来选候选（上屏英文）的键，松开时一并吞掉。 */
     private val glossShiftKeys = mutableSetOf<Int>()
+    /** 实体键盘 Ctrl+回车按下时已发送，抬起也不再交给应用。 */
+    private val ctrlEnterKeys = mutableSetOf<Int>()
     private val clipboardKeyboard = com.kingzcheung.xime.clipboard.ClipboardKeyboardNavigation {
         keyboardViewModel.leaveClipboard()
         if (clipboardRestoreCompact) collapseScreenKeyboardToHardwareToolbar()
@@ -3075,6 +3077,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             shortcut.switchMode?.let { switchHardwareLanguage(it) }
             shortcut.tool?.let { handleHardwareTool(it) }
             if (shortcut.consume) return true
+            // 实体键盘 Ctrl+回车：和屏幕上按住 !@# 点回车同一条规则，发送（终端照旧交给终端）。
+            if ((keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) && e.isCtrlPressed &&
+                !e.isAltPressed && !e.isMetaPressed && !e.isShiftPressed && !isTerminalEditor()) {
+                if (e.repeatCount == 0) ctrlEnter()
+                ctrlEnterKeys += keyCode
+                return true
+            }
             val continuingCandidatePress = e.repeatCount > 0 && hardwareCandidateNavigationKeys.contains(keyCode)
             if ((e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) && !continuingCandidatePress && !isHardwareArrow(keyCode)) {
                 return super.onKeyDown(keyCode, event)
@@ -3195,6 +3204,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = event?.isShiftPressed == true
         }
         if (glossShiftKeys.remove(keyCode)) return true
+        if (ctrlEnterKeys.remove(keyCode)) return true
         val clipboardConsumed = clipboardNavigationKeys.remove(keyCode)
         val candidateConsumed = hardwareCandidateNavigationKeys.remove(keyCode)
         if (candidateConsumed) keyRouter.releaseHardwareCandidateKey(keyCode)
@@ -3270,6 +3280,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 @Suppress("DEPRECATION")
                 imm.showInputMethodPicker()
             }
+            com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER_COMMAND -> ctrlEnter()
             else -> com.kingzcheung.xime.keyboard.CtrlShortcuts.letterOf(name)?.let { letter ->
                 // Ctrl+A/C/X/V 和编辑面板的全选、复制、剪切、粘贴同一路；终端里 Ctrl+C 等是终端自己的键，照旧发按键。
                 val editing = com.kingzcheung.xime.keyboard.CtrlShortcuts.editingAction(letter)
@@ -3283,6 +3294,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val connection = editorConnection()
                 com.kingzcheung.xime.keyboard.CtrlShortcuts.keyEvents(letter, now).forEach { connection?.sendKeyEvent(it) }
             } ?: FileLogger.w(TAG, "Unknown command: $name")
+        }
+    }
+
+    /**
+     * Ctrl+回车 = 发送（屏幕上按住 !@# 点回车、实体键盘 Ctrl+回车）。还在打字、或在键盘自己的输入框里（快捷发送、
+     * 工具面板）时和回车一样，只上屏编码，不把拼音发出去；终端照实体键盘发 Ctrl+回车；其他按 [EnterKeyAction.ctrlEnter]，
+     * 和 Ctrl+A/C/X/V 同一条编辑队列。
+     */
+    private fun ctrlEnter() {
+        val composing = candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() || it.preeditText.isNotEmpty() } ||
+            t9PartialSegments.isNotEmpty()
+        val state = uiState.value
+        when {
+            composing || state.inputTarget.isInternal || state.toolPanelInputFocused || state.showQuickSendForm ->
+                keyRouter.handleKeyPress("enter", false)
+            isTerminalEditor() -> currentInputConnection?.let { ic ->
+                com.kingzcheung.xime.keyboard.CtrlShortcuts.enterKeyEvents(SystemClock.uptimeMillis()).forEach(ic::sendKeyEvent)
+            }
+            else -> schemaController.handleToolbarEditingAction("send")
         }
     }
 
