@@ -17,13 +17,19 @@ class LuaScriptRuntimeTest {
 
     @Test
     fun `loads main lua and calls exported functions`() {
-        // 直接加载 kaomoji-lua 插件项目源码验证（cwd = plugin-core/）
-        val dir = File("../plugins/kaomoji")
-        val runtime = LuaScriptRuntime(
-            "com.kingzcheung.xime.plugin.kaomoji",
-            dir,
-            "main.lua",
-            NoopPluginConfigStore
+        val dir = File("build/lua-runtime-export-test")
+        val runtime = runtimeFor(
+            """
+            local plugin = {}
+            function plugin.getCategories() return { "颜文字" } end
+            function plugin.getEmojis(args)
+              local out = {}
+              for i = 0, args.topK - 1 do out[#out + 1] = { id = "kaomoji_" .. i, text = "(^_^)" } end
+              return out
+            end
+            return plugin
+            """.trimIndent(),
+            dir
         )
         assertTrue("main.lua 应能加载", runtime.load())
 

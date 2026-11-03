@@ -16,7 +16,6 @@ import java.io.File
 /**
  * 验证 AI 插件端到端数据链路（Lua 侧）：
  * - ai-reply：同步 host.http.request 生成候选列表 → getPanelState 解析
- * - ai-write：host.http.stream 流式累积 → getPanelState 实时文本 → closeStream 中断
  */
 class LuaAiPluginTest {
 
@@ -218,116 +217,8 @@ class LuaAiPluginTest {
     }
 
     @Test
-    fun `ai-write 流式累积文本并支持中断`() {
-        val dir = File("../plugins/ai-write")
-        assertTrue("ai-write 插件目录应存在: ${dir.absolutePath}", dir.exists())
-        val store = InMemoryConfigStore()
-        store.set("apiKey", "test-key")
-        store.set("baseUrl", "https://api.example.com/v1")
-        val sse = MockSseHostApi()
-        val runtime = LuaScriptRuntime(
-            "com.kingzcheung.xime.plugin.ai_write",
-            dir,
-            "main.lua",
-            store,
-            httpHostApi = MockHttpHostApi(),
-            sseHostApi = sse
-        )
-        assertTrue("main.lua 应能加载", runtime.load())
-        val adapter = LuaToolPluginAdapter(runtime, com.kingzcheung.xime.plugin.core.model.PluginContext(
-            application = android.app.Application(),
-            pluginInfo = com.kingzcheung.xime.plugin.core.model.PluginInfo(
-                id = "com.kingzcheung.xime.plugin.ai_write", name = "AI 帮写", description = "测试",
-                iconResId = 0, versionCode = 1, versionName = "0.1.0",
-                path = File(dir, "main.lua").absolutePath, type = "tool"
-            ),
-            configStore = store,
-        ))
-
-        adapter.onPanelInput("帮我写一条好评")
-        adapter.onPanelAction("generate")
-
-        var state = adapter.getPanelState("帮我写一条好评")
-        assertTrue("生成中 loading=true", state.loading)
-
-        sse.listener?.onData("""{"choices":[{"delta":{"content":"这家"}}]}""")
-        sse.listener?.onData("""{"choices":[{"delta":{"content":"店很好"}}]}""")
-        sse.listener?.onData("""{"choices":[{"delta":{"content":"，值得推荐"}}]}""")
-
-        state = adapter.getPanelState("帮我写一条好评")
-        assertEquals("流式增量累积", "这家店很好，值得推荐", state.items.single().text)
-        assertTrue("仍在加载中", state.loading)
-
-        // 生成中途可关停：closeStream 中断会话（此后宿主不再回调）
-        adapter.onPanelAction("stop")
-        assertEquals("closeStream 中断会话", listOf(100), sse.closedIds)
-        state = adapter.getPanelState("帮我写一条好评")
-        assertFalse("中断后不再加载", state.loading)
-
-        // 正常流结束路径：重新生成 → 累积 → onDone 收尾
-        adapter.onPanelAction("generate")
-        sse.listener?.onData("""{"choices":[{"delta":{"content":"新"}}]}""")
-        sse.listener?.onData("""{"choices":[{"delta":{"content":"结果"}}]}""")
-        sse.listener?.onDone("新结果")
-        state = adapter.getPanelState("帮我写一条好评")
-        assertFalse("onDone 后不再加载", state.loading)
-        assertEquals("onDone 收尾文本", "新结果", state.items.single().text)
-    }
-
-    @Test
-    fun `ai-translate 流式翻译生成译文`() {
-        val dir = File("../plugins/ai-translate")
-        assertTrue("ai-translate 插件目录应存在: ${dir.absolutePath}", dir.exists())
-        val store = InMemoryConfigStore()
-        store.set("apiKey", "test-key")
-        store.set("baseUrl", "https://api.example.com/v1")
-        store.set("targetLang", "English")
-        val sse = MockSseHostApi()
-        val runtime = LuaScriptRuntime(
-            "com.kingzcheung.xime.plugin.ai_translate",
-            dir,
-            "main.lua",
-            store,
-            sseHostApi = sse
-        )
-        assertTrue("main.lua 应能加载", runtime.load())
-
-        val adapter = LuaToolPluginAdapter(runtime, com.kingzcheung.xime.plugin.core.model.PluginContext(
-            application = android.app.Application(),
-            pluginInfo = com.kingzcheung.xime.plugin.core.model.PluginInfo(
-                id = "com.kingzcheung.xime.plugin.ai_translate", name = "AI 翻译", description = "测试",
-                iconResId = 0, versionCode = 1, versionName = "0.1.0",
-                path = File(dir, "main.lua").absolutePath, type = "tool"
-            ),
-            configStore = store,
-        ))
-        adapter.onPanelInput("你好世界")
-        adapter.onPanelAction("generate")
-
-        assertEquals("应发起 SSE 流式连接", 1, sse.connectedCount)
-        assertEquals("SSE 应使用 POST", "POST", sse.connectedMethod)
-        assertNotNull("SSE 应携带 JSON body", sse.connectedBody)
-
-        var state = adapter.getPanelState("你好世界")
-        assertTrue("生成中应 loading", state.loading)
-
-        // 流式增量累积
-        sse.listener?.onData("""{"choices":[{"delta":{"content":"Hello"}}]}""")
-        state = adapter.getPanelState("你好世界")
-        assertTrue("流式期间应 loading", state.loading)
-        assertEquals("增量累积", "Hello", state.items.single().text)
-
-        sse.listener?.onData("""{"choices":[{"delta":{"content":" world"}}]}""")
-        sse.listener?.onDone("Hello world")
-
-        state = adapter.getPanelState("你好世界")
-        assertFalse("onDone 后不再加载", state.loading)
-        assertEquals("译文解析", "Hello world", state.items.single().text)
-    }
-
-    @Test
     fun `AI 插件均导出配置 schema（插件中心设置入口依据）`() {
-        for (name in listOf("ai-reply", "ai-write", "ai-translate")) {
+        for (name in listOf("ai-reply")) {
             val dir = File("../plugins/$name")
             assertTrue("$name 插件目录应存在: ${dir.absolutePath}", dir.exists())
             val runtime = LuaScriptRuntime(

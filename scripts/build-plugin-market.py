@@ -7,7 +7,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 STORE = ROOT / "store/plugins"
 PUBLIC = "https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages"
-PLUGINS = ("ai-translate", "ai-write", "ai-reply", "typing-stats")
+PLUGINS = ("ai-reply", "ai-rewrite", "online-asr")
 
 
 def package(name):
