@@ -3,3 +3,5 @@
 app/src/main/assets/rime_japanese/jaroomaji.* -whitespace
 app/src/main/assets/rime_japanese/README.md -whitespace
 app/src/main/assets/rime_japanese/LICENSE -whitespace
+# OCR 字符表按字节和目录 sha256 一致；Windows 上不能换成 CRLF (安装包直接打工作区文件)。
+app/src/main/assets/ocr/ppocr-v5/* -text
