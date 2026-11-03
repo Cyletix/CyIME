@@ -533,9 +533,7 @@ fun CandidateBar(
                         Box(modifier = Modifier.fillMaxHeight()) {
                             InlineSuggestionView(
                                 suggestion = suggestion,
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(180.dp),
+                                modifier = Modifier.fillMaxHeight(),
                             )
                             // 每条尾部 1dp 分隔线：条目之间为间隔，最后一条的尾线
                             // 同时充当与候选词区的分界（与旧平铺布局视觉一致）

@@ -135,8 +135,9 @@ class InlineSuggestionManager(private val context: Context) {
             val styleBundle = UiVersions.newStylesBuilder()
                 .addStyle(style)
                 .build()
+            // 最宽到屏幕宽：按内容排宽时，长账号、长邮箱也能整条显示（GitHub #117）。
             val spec = InlinePresentationSpec.Builder(
-                Size(0, 0), Size(800, 400)
+                Size(0, 0), Size(maxOf(800, context.resources.displayMetrics.widthPixels), 400)
             ).setStyle(styleBundle).build()
             InlineSuggestionsRequest.Builder(listOf(spec))
                 .setMaxSuggestionCount(InlineSuggestionsRequest.SUGGESTION_COUNT_UNLIMITED)

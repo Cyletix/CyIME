@@ -33,16 +33,16 @@ fun InlineSuggestionView(
     val density = LocalDensity.current
 
     BoxWithConstraints(modifier = modifier) {
-        val targetWidthPx = with(density) { maxWidth.toPx().toInt() }
         val targetHeightPx = with(density) { maxHeight.toPx().toInt() }
 
         // InlineSuggestion#inflate 对同一对象只能调用一次（平台限制），
         // 已 inflate 的结果由进程级缓存保存，避免重组/进出组合时重复 inflate 崩溃。
+        // 宽度按内容（WRAP_CONTENT）：原来每条固定 180dp，账号、邮箱长一点就被截掉（GitHub #117）。
         LaunchedEffect(realSuggestion) {
             InlineSuggestionViews.inflate(
                 realSuggestion,
                 context,
-                Size(targetWidthPx, targetHeightPx),
+                Size(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, targetHeightPx),
             )
         }
 
@@ -51,7 +51,7 @@ fun InlineSuggestionView(
             key(System.identityHashCode(realSuggestion)) {
                 AndroidView(
                     factory = { view },
-                    modifier = Modifier.matchParentSize(),
+                    modifier = Modifier.fillMaxHeight(),
                 )
             }
         }
