@@ -5,6 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +52,7 @@ private const val MAX_UI_NODES = 64
  * 表单型节点（TEXTAREA/SECRET/SELECT 等）在面板降级为只读文本；
  * 节点数截断 [MAX_UI_NODES]；不做嵌套渲染。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun InfoPanel(
     title: String,
@@ -127,7 +132,24 @@ fun InfoPanel(
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
-            nodes.take(MAX_UI_NODES).forEach { node ->
+            // 相邻的按钮排成一行、放不下再换行（11-03：一个按钮占一行，右边空出一大片）。
+            val shown = nodes.take(MAX_UI_NODES)
+            var index = 0
+            while (index < shown.size) {
+                val node = shown[index]
+                if (node.type == UiNodeType.BUTTON) {
+                    var end = index
+                    while (end < shown.size && shown[end].type == UiNodeType.BUTTON) end++
+                    val run = shown.subList(index, end)
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) { run.forEach { InfoAction(it, onAction) } }
+                    index = end
+                    continue
+                }
+                index++
                 when (node.type) {
                     UiNodeType.SECTION -> InfoSection(node.label ?: "", accentColor)
                     UiNodeType.TEXT,
@@ -235,10 +257,9 @@ private fun InfoAction(node: UiNode, onAction: (String) -> Unit) {
     val label = node.label ?: return
     FilledTonalButton(
         onClick = { onAction(actionId) },
-        modifier = Modifier
-            .padding(top = 6.dp)
-            .height(34.dp),
+        modifier = Modifier.heightIn(min = 40.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
     ) {
-        Text(text = label, fontSize = 12.sp)
+        Text(text = label, fontSize = 14.sp)
     }
 }
