@@ -1472,7 +1472,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // 宿主保留的动作：面板里的「设置」直接进这个插件的设置页
             closeToolPanel()
             try {
-                startActivity(com.kingzcheung.xime.MainActivity.buildPluginAuthIntent(this, pluginId))
+                startActivity(com.kingzcheung.xime.MainActivity.buildPluginSettingsIntent(this, pluginId))
             } catch (e: Exception) {
                 FileLogger.e(TAG, "Failed to open plugin settings", e)
             }

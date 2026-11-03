@@ -59,8 +59,8 @@ class MainActivity : ComponentActivity() {
         handleSharedIntent(intent)
         // A plain Settings tap only brings this instance forward. Do not reset its
         // navigation, focused test field or text. Explicit shortcuts still navigate.
-        // 插件授权页：冷启动走 initialPluginId，已打开时直接进该插件的详情页。
-        (intent.getStringExtra("open_plugin_id")?.let { "plugin_detail/$it" }
+        // 插件授权页：冷启动走 initialPluginId，已打开时直接进该插件的详情页；面板里的「设置」直接进设置页。
+        (intent.getStringExtra("open_plugin_id")?.let { pluginLaunchRoute(it, intent.getBooleanExtra(EXTRA_OPEN_PLUGIN_SETTINGS, false)) }
             ?: intent.getStringExtra("open_fragment"))?.let { route ->
             settingsNavigationRequest = SettingsNavigationRequest(
                 route, (settingsNavigationRequest?.id ?: 0) + 1,
@@ -73,11 +73,29 @@ class MainActivity : ComponentActivity() {
         /** A real permission dialog takes the user longer than this to answer. */
         private const val NO_DIALOG_MS = 500L
 
+        /** 插件面板「设置」：直接进插件设置页，不经过详情页（11-03 要点两次设置）。 */
+        const val EXTRA_OPEN_PLUGIN_SETTINGS = "open_plugin_settings"
+
+        /** 打开插件时落到哪一页：要设置页进设置页，否则进详情页（网络授权在详情页）。 */
+        fun pluginLaunchRoute(pluginId: String, settings: Boolean): String =
+            if (settings) "plugin_settings/$pluginId" else "plugin_detail/$pluginId"
+
         /** 构造跳转到指定插件网络授权页的 Intent（IME 等后台场景调用）。 */
         fun buildPluginAuthIntent(context: android.content.Context, pluginId: String): Intent {
             return Intent(context, MainActivity::class.java).apply {
                 putExtra("open_fragment", "plugins")
                 putExtra("open_plugin_id", pluginId)
+                // 设置已打开时只带 NEW_TASK 不会调 onNewIntent，停在旧页面；和 settingsActivityIntent 一样复用。
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+        }
+
+        /** 构造直接打开指定插件设置页的 Intent（键盘里插件面板的「设置」）。 */
+        fun buildPluginSettingsIntent(context: android.content.Context, pluginId: String): Intent {
+            return Intent(context, MainActivity::class.java).apply {
+                putExtra("open_fragment", "plugins")
+                putExtra("open_plugin_id", pluginId)
+                putExtra(EXTRA_OPEN_PLUGIN_SETTINGS, true)
                 // 设置已打开时只带 NEW_TASK 不会调 onNewIntent，停在旧页面；和 settingsActivityIntent 一样复用。
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
@@ -154,6 +172,7 @@ class MainActivity : ComponentActivity() {
         
         val openFragment = intent?.getStringExtra("open_fragment")
         val openPluginId = intent?.getStringExtra("open_plugin_id")
+        val openPluginSettings = intent?.getBooleanExtra(EXTRA_OPEN_PLUGIN_SETTINGS, false) == true
 
         com.kingzcheung.xime.model.DefaultModelInstaller.start(applicationContext)
 
@@ -241,6 +260,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             initialRoute = openFragment,
                             initialPluginId = openPluginId,
+                            initialPluginSettings = openPluginSettings,
                             navigationRequest = settingsNavigationRequest,
                             onThemeChanged = {
                                 darkMode = SettingsPreferences.getEffectiveDarkMode(context)

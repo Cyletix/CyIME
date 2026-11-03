@@ -22,6 +22,7 @@ data class SettingsNavigationRequest(val route: String, val id: Int)
 fun SettingsScreen(
     initialRoute: String? = null,
     initialPluginId: String? = null,
+    initialPluginSettings: Boolean = false,
     onThemeChanged: () -> Unit = {},
     onWizardBack: () -> Unit = {},
     navigationRequest: SettingsNavigationRequest? = null,
@@ -45,8 +46,8 @@ fun SettingsScreen(
 
     LaunchedEffect(initialPluginId) {
         if (initialPluginId != null) {
-            // 网络授权也从这里进：详情页有域名授权，也能点「设置」「卸载」。
-            navController.navigate("plugin_detail/$initialPluginId")
+            // 网络授权也从这里进：详情页有域名授权，也能点「设置」「卸载」；面板里的「设置」直接进设置页。
+            navController.navigate(com.kingzcheung.xime.MainActivity.pluginLaunchRoute(initialPluginId, initialPluginSettings))
         }
     }
 
