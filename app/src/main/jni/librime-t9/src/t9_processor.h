@@ -211,6 +211,9 @@ private:
         size_t* out_end = nullptr) const;
     // 纯字母输入里选掉的前一段，剩下的字母删光后退格把它整段还回来（同数字串撤销右选）。
     bool UndoLetterCommit();
+    // 纯字母输入（整句拂动）中点了数字键：先把 RIME 里的字母当作拂动字母并进数字串
+    // （每位记字母约束、分隔符记分词位置），数字串和字母一起继续组，不丢前面的字母。
+    void AdoptLetterInput();
 
     // ════════════════════════════════════════
     // 状态成员（对应 Kotlin T9InputController 的私有字段）

@@ -6,7 +6,8 @@ import java.util.Arrays;
  * Nine-key flick letters typed for a whole sentence (2026-11-03 report): with no digits in the T9 buffer,
  * each flicked letter goes to Rime as a plain letter. Choosing the first word used to count as the whole
  * sentence, so the rest of the code vanished. Now the chosen word takes only its letters and the rest
- * stays; deleting the rest and one more backspace brings the chosen word's letters back.
+ * stays; deleting the rest and one more backspace brings the chosen word's letters back. A digit tapped after
+ * flicked letters joins them (each letter kept as a fixed letter) instead of replacing them.
  * Arguments: the built library directory and a separate test user directory (as T9PartialClearProbe).
  */
 public final class T9FlickSentenceProbe {
@@ -55,6 +56,22 @@ public final class T9FlickSentenceProbe {
       String last = rows[0][0];
       if (!choose(e, last)) throw new Exception("choosing " + last + " for the rest was not a full commit");
       System.out.println("PASS 我们 + " + last + " (rest kept, undo restores the chosen letters)");
+
+      // Flicked letters, then one tap: the letters must stay (11-03: a single tap lost everything typed so far).
+      e.nativeT9ClearComposition(1);
+      e.nativeT9FlushRimeInput();
+      type(e, "wo");
+      key(e, '6');
+      expect("letters joined the digits", "966", e.nativeT9GetRemainingDigits());
+      String[][] after = e.nativeInspectCandidates(20);
+      if (after.length == 0 || !after[0][1].replace(" ", "").replace("'", "").startsWith("wo"))
+        throw new Exception("w and o not kept after the tap: " + Arrays.deepToString(Arrays.copyOf(after, Math.min(after.length, 5))));
+      // Further flicks join the same code; the word then takes all of it.
+      if (!e.nativeT9FixLetter("E") || !e.nativeT9FixLetter("N")) throw new Exception("flick did not join the digits");
+      e.nativeT9FlushRimeInput();
+      expect("flicks after the tap", "96636", e.nativeT9GetRemainingDigits());
+      if (!choose(e, "我们")) throw new Exception("我们 did not take the whole code");
+      System.out.println("PASS wo + tap 6 + e n -> 我们 (letters kept after a tap)");
     } finally { e.nativeDestroy(); }
   }
 

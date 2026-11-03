@@ -83,7 +83,8 @@ clear leaves, which is the 2026-10-23 report (old digits came back after Enter).
 `T9FlickSentenceProbe.java` (same arguments) types a whole sentence as flicked letters (`womenquchifan`, the
 letters go to Rime because the T9 digit buffer is empty), chooses 我们 and expects `quchifan` to remain, then
 deletes the rest and checks that one more backspace brings back `women`. 2026-11-03 report: choosing the first
-word committed only that word and the rest of the sentence vanished.
+word committed only that word and the rest of the sentence vanished. It then types `wo`, taps 6 and flicks e, n:
+the letters must stay (remaining digits `96636`, 我们 takes all of it); a tap used to replace the flicked letters.
 
 `CustomPhraseReloadProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists
 `rime_ice`) adds a phrase to `custom_phrase.txt` while a session is open and reports which step makes

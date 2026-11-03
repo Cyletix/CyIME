@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.asContextElement
 
@@ -85,6 +86,8 @@ class T9InputController(
      * 防止「同步刷新（如右选）→ 旧的异步刷新 post 后执行」把 UI 回退到旧状态。
      */
     private val uiGeneration = AtomicLong()
+    /** 已排队、还没处理完的数字键和拂动字母。左栏状态要等它们处理完才刷新，拂动判断不能只看左栏。 */
+    private val queuedT9Keys = AtomicInteger()
     private val inputEpoch = AtomicLong()
     @Volatile private var closed = false
 
@@ -98,18 +101,18 @@ class T9InputController(
     private var cachedInput: String = ""
 
     /** 将 T9 处理任务排入单线程后台队列（FIFO 保序）。 */
-    private fun enqueue(kind: String = "t9-other", block: suspend CoroutineScope.() -> Unit) {
+    private fun enqueue(kind: String = "t9-other", block: suspend CoroutineScope.() -> Unit): kotlinx.coroutines.Job? {
         synchronized(enqueueLock) {
-            if (closed) return
-            commands.submit(kind = kind) { if (!closed) block() }
+            if (closed) return null
+            return commands.submit(kind = kind) { if (!closed) block() }
         }
     }
 
-    private fun enqueueInput(kind: String = "t9-other", block: suspend CoroutineScope.(Long, Long) -> Unit) {
-        val admission = inputAdmissionTicket() ?: return
+    private fun enqueueInput(kind: String = "t9-other", block: suspend CoroutineScope.(Long, Long) -> Unit): kotlinx.coroutines.Job? {
+        val admission = inputAdmissionTicket() ?: return null
         val epoch = inputEpoch.get()
         val ownerContext = captureInputContext()
-        enqueue(kind) {
+        return enqueue(kind) {
             kotlinx.coroutines.withContext(ownerContext + commandValidity(admission, epoch)) {
                 if (accepts(admission, epoch)) block(admission, epoch)
             }
@@ -399,6 +402,16 @@ class T9InputController(
         )
     }
 
+    /**
+     * 排入队列的数字键/拂动字母：入队时加一，处理完（含作废）后在 Main 上减一。
+     * 处理时的界面刷新先 post 到 Main，减一排在它后面，所以计数归零时左栏已是新状态。
+     */
+    private fun enqueueT9Key(kind: String, block: suspend CoroutineScope.(Long, Long) -> Unit) {
+        val job = enqueueInput(kind, block) ?: return
+        queuedT9Keys.incrementAndGet()
+        job.invokeOnCompletion { mainHandler.post { queuedT9Keys.decrementAndGet() } }
+    }
+
     fun onDigitPressed(digit: String) {
         if (inputAdmissionTicket() == null) return
         val code = digit[0].code
@@ -406,7 +419,7 @@ class T9InputController(
         // Read before queuing: the engine uses it only if this digit starts a composition.
         val context = leftContext()
         KeyLatencyProbe.fired("t9")
-        enqueueInput("t9-digit") { admission, epoch ->
+        enqueueT9Key("t9-digit") { admission, epoch ->
             KeyLatencyProbe.started()
             try {
                 val transaction = InputLatencyTrace.phase(traceId, "engine-jni-flush") {
@@ -426,9 +439,15 @@ class T9InputController(
      * 没有组合中的数字时返回 false，调用方按普通字母输入处理。
      */
     fun onLetterFlicked(letter: String): Boolean {
-        if (leftPanelState == LeftPanelState.IDLE) return false
-        enqueueInput("t9-fix-letter") { admission, epoch ->
-            val result = rimeEngine.fixQueuedT9Letter(letter) ?: return@enqueueInput
+        // 左栏是处理完才刷新的快照：刚点的数字还在队列里时它仍是 IDLE。这时拂出的字母也要并进
+        // 数字串，否则按普通字母进 RIME，下一个数字一到就被顶掉（用户 11-03：单击一下前功尽弃）。
+        if (!letterJoinsDigits(leftPanelState == LeftPanelState.IDLE, queuedT9Keys.get())) return false
+        val context = leftContext()
+        enqueueT9Key("t9-fix-letter") { admission, epoch ->
+            val result = rimeEngine.fixQueuedT9Letter(letter)
+                // 排在前面的退格把数字串删空了：照普通字母进 RIME，不丢这一下。
+                ?: rimeEngine.processQueuedT9KeyAndGetResult(letter.lowercase()[0].code, context)?.state
+                ?: return@enqueueT9Key
             refreshOnBackground(result = result, admission = admission, epoch = epoch)
         }
         return true
@@ -596,3 +615,9 @@ class T9InputController(
 
 
 }
+
+/**
+ * 九键拂出一个字母时是否并进数字串（[T9InputController.onLetterFlicked]）。左栏不是空闲，或者还有
+ * 数字键/拂动字母排着没处理完（左栏快照还没跟上），都算在组数字串；否则照普通字母输入。
+ */
+internal fun letterJoinsDigits(leftPanelIdle: Boolean, queuedKeys: Int): Boolean = !leftPanelIdle || queuedKeys > 0

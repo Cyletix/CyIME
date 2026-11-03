@@ -199,6 +199,9 @@ ProcessResult T9Processor::HandleDigitKey(char ch) {
     // 对应 Kotlin onDigitPressed
     T9_SCOPED_TIMER_TAG("T9Processor", "HandleDigitKey");
     T9_PERF_SCOPED_TIMER("[T9] HandleDigitKey");
+    // 拂出的字母已在 RIME 里（整句拂动时数字串为空）：先把它们按拂动字母并进数字串，
+    // 不能让这个数字把前面的字母顶掉（用户 11-03：单击一下前功尽弃）。
+    if (input_buffer_.is_empty() && state_machine_.is_idle()) AdoptLetterInput();
     if (state_machine_.is_idle()) {
         state_machine_.EnterInput();
         original_digit_sequence_.clear();
@@ -757,11 +760,46 @@ bool T9Processor::UpdateDictEntry(const std::string& text,
     return WriteDictEntry(text, entry.code, commits);
 }
 
+static const char* kDigitOfLetter = "22233344455566677778889999";
+
+void T9Processor::AdoptLetterInput() {
+    Context* ctx = engine_->context();
+    if (!ctx || pending_action_ != RimePendingAction::kNone) return;
+    const std::string input = ctx->input();
+    if (input.empty()) return;
+    const auto is_delimiter = [this](char c) { return c == manual_delimiter_ || c == '\'' || c == ' '; };
+    // 只接纯小写字母（和分隔符）：别的输入（如数字、大写、符号）保持原样。
+    for (char c : input) {
+        if (!(c >= 'a' && c <= 'z') && !is_delimiter(c)) return;
+    }
+    state_machine_.EnterInput();
+    original_digit_sequence_.clear();
+    for (char c : input) {
+        const int pos = static_cast<int>(input_buffer_.digit_sequence.size());
+        if (is_delimiter(c)) {
+            if (pos == 0 || (!input_buffer_.separator_positions.empty() &&
+                             input_buffer_.separator_positions.back() == pos)) continue;
+            input_buffer_.separator_positions.push_back(pos);
+            undo_model_.SeparatorPressed(pos);
+            continue;
+        }
+        const char digit = kDigitOfLetter[c - 'a'];
+        undo_model_.DigitPressed(digit);
+        input_buffer_ = input_buffer_.AddDigit(digit);
+        letter_constraints_[pos] = c;
+        original_digit_sequence_ += digit;
+    }
+    if (input_buffer_.has_separator()) {
+        separator_consumed_digits_ = input_buffer_.digit_sequence.substr(0, input_buffer_.separator_position());
+        left_column_locked_ = true;
+    }
+    T9LOG(">> AdoptLetterInput: '%s' → digits '%s'", input.c_str(), input_buffer_.digit_sequence.c_str());
+}
+
 bool T9Processor::FixLetter(char letter) {
     if (letter >= 'A' && letter <= 'Z') letter = static_cast<char>(letter - 'A' + 'a');
     if (letter < 'a' || letter > 'z') return false;
     if (input_buffer_.is_empty() || state_machine_.is_idle()) return false;
-    static const char* kDigitOfLetter = "22233344455566677778889999";
     const char digit = kDigitOfLetter[letter - 'a'];
     HandleDigitKey(digit);
     letter_constraints_[static_cast<int>(input_buffer_.digit_sequence.size()) - 1] = letter;
