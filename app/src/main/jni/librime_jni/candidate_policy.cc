@@ -243,6 +243,20 @@ class PolicyTranslation : public Translation {
       if (alternatives && !alternatives->exhausted() && alternatives->Peek() &&
           alternatives->Peek()->text() != head_.front()->text()) {
         const auto original = head_;
+        // Letter-input corrections the typing already found (neighbour key, swapped, doubled or extra letter)
+        // are not pushed down by a rarer omission reading: an omission reading goes above such a correction in the
+        // first five only when its word weight is higher (2026-11-03: a pause moved 今天 for jintiab from 3rd to
+        // 6th; jntian still gets 今天 above 纪念日). The two translators' qualities are on different scales.
+        // Only corrections of the whole input count: a shorter word's weight is not comparable with a sentence's.
+        auto weight = [](const an<Candidate>& item) {
+          const auto p = As<Phrase>(Candidate::GetGenuineCandidate(item));
+          return p ? p->weight() : 0.0;
+        };
+        auto corrected = [&](const an<Candidate>& item) {
+          if (numeric || item->type() == "cyime_omission" || item->end() != end_) return false;
+          const auto p = As<Phrase>(Candidate::GetGenuineCandidate(item));
+          return p && p->correction_marks().find('=') != std::string::npos;
+        };
         for (size_t i = 0; i < 10 && inserted < 2 && !alternatives->exhausted(); ++i) {
           auto c = alternatives->Peek();
           alternatives->Next();
@@ -251,12 +265,20 @@ class PolicyTranslation : public Translation {
           auto same = [&](const auto& item) { return item->text() == c->text(); };
           auto first_five = original.begin() + std::min<size_t>(5, original.size());
           if (std::any_of(original.begin(), first_five, same) ||
-              std::any_of(head_.begin() + 2, head_.begin() + 2 + inserted, same)) continue;
+              std::any_of(head_.begin() + 2, head_.begin() + std::min<size_t>(7, head_.size()), [&](const auto& item) {
+                return item->type() == "cyime_omission" && same(item);
+              })) continue;
+          const double own = weight(c);
           auto old = std::find_if(head_.begin(), head_.end(), same);
           if (old != head_.end()) { c = *old; head_.erase(old); }
           seen_.insert(c->text());
-          head_.insert(head_.begin() + 2 + inserted++,
+          size_t at = 2;
+          while (at < std::min<size_t>(5 + inserted, head_.size()) &&
+                 (head_[at]->type() == "cyime_omission" || (corrected(head_[at]) && weight(head_[at]) >= own)))
+            ++at;
+          head_.insert(head_.begin() + std::min(at, head_.size()),
                        New<ShadowCandidate>(c, "cyime_omission", c->text(), "纠错", false));
+          ++inserted;
           omission_inserted = true;
         }
       }
