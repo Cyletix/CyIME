@@ -226,6 +226,8 @@ object PerformanceCosts {
         val baselineKeyMs: Double? = null,
         /** true = 还没实测，是估算（安装包表里写的，或本机表缺这项时从安装包表补的）；显示时标“估算”。 */
         val estimated: Boolean = false,
+        /** 不按每键算的开销（只在用到时才有，如滑行预览只在滑动中占 CPU），原样写在数字后面。 */
+        val note: String? = null,
     )
 
     @Serializable
@@ -317,11 +319,12 @@ object PerformanceCosts {
         return reference
     }
 
-    /** [device] 缺的项从 [reference] 补，补上的都标估算（不是这台机器测的）。 */
+    /** [device] 缺的项从 [reference] 补，补上的都标估算（不是这台机器测的）；本机测过的项没写 note 时沿用 [reference] 的。 */
     fun fillFrom(device: Device, reference: Device?): Device {
         reference ?: return device
         val missing = reference.items.filterKeys { it !in device.items }.mapValues { it.value.copy(estimated = true) }
-        return if (missing.isEmpty()) device else device.copy(items = device.items + missing)
+        val noted = device.items.mapValues { (id, c) -> if (c.note == null) c.copy(note = reference.items[id]?.note) else c }
+        return if (missing.isEmpty() && noted == device.items) device else device.copy(items = noted + missing)
     }
 
     /** 每键耗时都乘 [factor]（基线一起乘，“慢百分之几”不变）；内存不变。 */
@@ -371,6 +374,7 @@ object PerformanceCosts {
             if (ms >= device.noiseMs) parts += "每键 +${oneDecimal(ms)} ms(慢 ${percent(ms, cost.baselineKeyMs ?: device.baseline.keyMs)}%)"
         }
         cost.memoryMb?.let { mb -> if (mb >= 1) parts += "内存 +${mb.roundToInt()} MB" }
+        cost.note?.takeIf { it.isNotBlank() }?.let { parts += it }
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
     }
 

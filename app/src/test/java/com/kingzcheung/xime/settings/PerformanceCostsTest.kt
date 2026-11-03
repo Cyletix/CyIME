@@ -52,6 +52,9 @@ class PerformanceCostsTest {
             assertNotNull(item.id, reference.items[item.id]?.keyMs)
             // 11-03 起开销小到不值一提的开关不出这一行（note 为 null），这里只要求表里有数。
         }
+        // 滑行预览那行写的间隔跟代码里的一致。
+        assertTrue(reference.items.getValue("glide_preview").note!!
+            .contains("每 ${com.kingzcheung.xime.ui.keyboard.GLIDE_PREVIEW_INTERVAL_MS} ms"))
     }
 
     @Test fun everyFuzzyGroupHasAnItem() {
@@ -106,6 +109,17 @@ class PerformanceCostsTest {
         assertEquals("性能开销：内存 +8 MB", PerformanceCosts.note(source, "glide_typing"))
         assertEquals("合计：内存 +8 MB",
             PerformanceCosts.totalNote(source, setOf("t9_glide_typing", "glide_typing"), "合计"))
+    }
+
+    @Test fun costThatIsNotPerKeyStillGetsALine() {
+        // 滑行预览不拖慢点按、不占内存，只在滑动中后台识别：照样出一行，写清楚什么时候占。
+        val preview = PerformanceCosts.Cost(0.0, 0.0, estimated = true, note = "滑动中每 60 ms 在后台识别一次")
+        val source = PerformanceCosts.Source(device.copy(items = mapOf("glide_preview" to preview)), local = false, sameModel = true)
+        assertEquals("性能开销：滑动中每 60 ms 在后台识别一次", PerformanceCosts.note(source, "glide_preview"))
+        // 本机测过这一项（没写 note）时沿用安装包表的说明。
+        val mine = device.copy(items = mapOf("glide_preview" to PerformanceCosts.Cost(0.1, 0.0)))
+        assertEquals("滑动中每 60 ms 在后台识别一次",
+            PerformanceCosts.fillFrom(mine, source.device).items.getValue("glide_preview").note)
     }
 
     @Test fun noteShowsMeasuredCostAndHidesUnmeasured() {
