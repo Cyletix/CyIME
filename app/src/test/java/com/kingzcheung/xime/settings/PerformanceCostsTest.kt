@@ -9,7 +9,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * 开关性能代价：实测过的显示实测，没实测的标估算，登记过的开关都有数；总代价组合实测过用实测，
+ * 开关性能开销：有值得说的开销才写一行，不标估算；总代价组合实测过用实测，
  * 没测过按单项相加再用最接近的实测组合校准。
  */
 class PerformanceCostsTest {
@@ -92,26 +92,27 @@ class PerformanceCostsTest {
         assertFalse(source.device.items.getValue("glass").estimated)
         assertEquals(0.8, source.device.items.getValue("glass").keyMs!!, 1e-9)
         assertTrue(source.device.items.getValue("neighbor_correction").estimated)
-        assertEquals("性能代价（估算）：每键约 +3.0 ms（慢 10%） · 内存约 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
+        assertEquals("性能开销：每键 +3.0 ms（慢 10%） · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
         assertEquals(listOf("neighbor_correction"), PerformanceCosts.total(source.device, setOf("glass", "neighbor_correction")).estimated)
     }
 
-    @Test fun estimatesSayAboutAndNeverBlank() {
+    @Test fun negligibleCostsShowNoLineAndNoAbout() {
         val estimates = device.copy(items = mapOf("t9_glide_typing" to PerformanceCosts.Cost(0.0, 0.0, estimated = true),
             "glide_typing" to PerformanceCosts.Cost(0.2, 8.0, estimated = true)))
         val source = PerformanceCosts.Source(estimates, local = false, sameModel = false)
         assertTrue(estimates.allEstimated)
-        assertEquals("性能代价（估算）：每键基本不变慢", PerformanceCosts.note(source, "t9_glide_typing"))
-        assertEquals("性能代价（估算）：每键基本不变慢 · 内存约 +8 MB", PerformanceCosts.note(source, "glide_typing"))
-        assertEquals("合计（含估算）：每键基本不变慢 · 内存约 +8 MB",
+        // 11-03：没有值得说的开销不出这一行；不写「估算」「约」。
+        assertNull(PerformanceCosts.note(source, "t9_glide_typing"))
+        assertEquals("性能开销：内存 +8 MB", PerformanceCosts.note(source, "glide_typing"))
+        assertEquals("合计：内存 +8 MB",
             PerformanceCosts.totalNote(source, setOf("t9_glide_typing", "glide_typing"), "合计"))
     }
 
     @Test fun noteShowsMeasuredCostAndHidesUnmeasured() {
         val source = PerformanceCosts.Source(device, local = true, sameModel = true)
-        assertEquals("性能代价：每键 +3.0 ms（慢 10%） · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
+        assertEquals("性能开销：每键 +3.0 ms（慢 10%） · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
         // 低于测量误差不说“慢 1%”，内存不到 1 MB 不写。
-        assertEquals("性能代价：每键测不出变慢", PerformanceCosts.note(source, "glass"))
+        assertNull(PerformanceCosts.note(source, "glass"))
         assertNull(PerformanceCosts.note(source, "mixed_input"))
         val reference = source.copy(local = false, sameModel = false)
         assertTrue(PerformanceCosts.note(reference, "fuzzy_z_zh")!!.endsWith("（Galaxy Tab S8+ 实测，仅供参考）"))
@@ -136,9 +137,9 @@ class PerformanceCostsTest {
     @Test fun nineKeyItemsUseTheirOwnBaselineForThePercentage() {
         val source = PerformanceCosts.Source(device, local = true, sameModel = true)
         // 九键那次全关基线 20 ms：+2.0 ms 是慢 10%，不按 26 键的 30 ms 算成 7%。
-        assertEquals("九键性能代价：每键 +2.0 ms（慢 10%） · 内存 +4 MB", PerformanceCosts.note(source, "t9_fuzzy_s_sh", "九键性能代价"))
-        assertEquals("性能代价（已开的 2 组合计）：每键 +5.0 ms（慢 25%） · 内存 +9 MB",
-            PerformanceCosts.totalNote(source, setOf("t9_fuzzy_s_sh", "t9_fuzzy_an_ang"), "性能代价（已开的 2 组合计）"))
+        assertEquals("九键性能开销：每键 +2.0 ms（慢 10%） · 内存 +4 MB", PerformanceCosts.note(source, "t9_fuzzy_s_sh", "九键性能开销"))
+        assertEquals("性能开销（已开的 2 组合计）：每键 +5.0 ms（慢 25%） · 内存 +9 MB",
+            PerformanceCosts.totalNote(source, setOf("t9_fuzzy_s_sh", "t9_fuzzy_an_ang"), "性能开销（已开的 2 组合计）"))
         // 一组都没测过（或一组都没开）不显示。
         assertNull(PerformanceCosts.totalNote(source, setOf("t9_fuzzy_z_zh"), "合计"))
         assertNull(PerformanceCosts.totalNote(source, emptySet(), "合计"))

@@ -361,26 +361,24 @@ object PerformanceCosts {
     // ---- 文字 ----
 
     /**
-     * “每键 +1.2 ms（慢 4%）· 内存 +30 MB”；测不出来的项写“测不出差别”。估算的写“约”，小到测不出的写“基本不变慢”。
-     * 表里没有这项返回 null。
+     * “每键 +1.2 ms（慢 4%）· 内存 +30 MB”。每键低于测量误差、内存不到 1 MB 的部分不写；两样都没有返回 null，
+     * 开关下面就不出这一行（用户 11-03「这种东西还有必要写性能开销吗」「也不用大约了」）。表里没有这项也返回 null。
      */
     fun describe(cost: Cost?, device: Device): String? {
         cost ?: return null
-        val about = if (cost.estimated) "约" else ""
         val parts = mutableListOf<String>()
         cost.keyMs?.let { ms ->
-            parts += if (ms < device.noiseMs) (if (cost.estimated) "每键基本不变慢" else "每键测不出变慢")
-            else "每键$about +${oneDecimal(ms)} ms（慢 ${percent(ms, cost.baselineKeyMs ?: device.baseline.keyMs)}%）"
+            if (ms >= device.noiseMs) parts += "每键 +${oneDecimal(ms)} ms（慢 ${percent(ms, cost.baselineKeyMs ?: device.baseline.keyMs)}%）"
         }
-        cost.memoryMb?.let { mb -> if (mb >= 1) parts += "内存$about +${mb.roundToInt()} MB" }
+        cost.memoryMb?.let { mb -> if (mb >= 1) parts += "内存 +${mb.roundToInt()} MB" }
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
     }
 
-    /** 开关下面那一行：“性能代价：每键 +1.2 ms（慢 4%）”，别的机器测的补上是哪台，没实测的标“估算”。 */
-    fun note(source: Source, id: String, label: String = "性能代价"): String? {
+    /** 开关下面那一行：“性能开销：每键 +1.2 ms（慢 4%）”，别的机器测的补上是哪台；没有值得说的开销不出这一行。 */
+    fun note(source: Source, id: String, label: String = "性能开销"): String? {
         val cost = source.device.items[id]
         val text = describe(cost, source.device) ?: return null
-        return if (cost?.estimated == true) "$label（估算）：$text" else "$label：$text" + reference(source)
+        return "$label：$text" + if (cost?.estimated == true) "" else reference(source)
     }
 
     /**
@@ -391,7 +389,7 @@ object PerformanceCosts {
         if (total.items.isEmpty()) return null
         val estimated = total.estimated.isNotEmpty()
         val text = describe(Cost(total.keyMs, total.memoryMb, total.baselineKeyMs, estimated = estimated), source.device) ?: return null
-        return if (estimated) "$label（含估算）：$text" else "$label：$text" + reference(source)
+        return "$label：$text" + if (estimated) "" else reference(source)
     }
 
     private fun reference(source: Source) = when {

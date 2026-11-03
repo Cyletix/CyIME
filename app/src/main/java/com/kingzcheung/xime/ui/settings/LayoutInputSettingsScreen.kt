@@ -277,7 +277,7 @@ internal fun FuzzyPinyinSection() {
                 },
                 extraCost = {
                     PerformanceCostTotalNote(enabled.mapTo(linkedSetOf()) { com.kingzcheung.xime.settings.PerformanceCosts.Item.t9Fuzzy(it) },
-                        label = "性能代价（已开的 ${enabled.size} 组合计）", tag = "t9-fuzzy-digits")
+                        label = "性能开销（已开的 ${enabled.size} 组合计）", tag = "t9-fuzzy-digits")
                 })
             if (showDoublePinyinSwitch) {
                 HorizontalDivider()
@@ -302,7 +302,7 @@ internal fun FuzzyPinyinSection() {
                     }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.fuzzy(item),
                     // 「九键按数字也模糊」开着时，再写这一组在九键上的代价（另在九键上实测）。
                     extraCost = if (!t9Digits) null else {
-                        { PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.t9Fuzzy(item), label = "九键性能代价") }
+                        { PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.t9Fuzzy(item), label = "九键性能开销") }
                     })
             }
         })

@@ -37,7 +37,7 @@ internal fun rememberPerformanceCostSource(): PerformanceCosts.Source? {
  * 和「已被…锁定」那行同一位置、同一字号，用次要色，不当成警告。
  */
 @Composable
-internal fun PerformanceCostNote(item: PerformanceCosts.Item, modifier: Modifier = Modifier, label: String = "性能代价") {
+internal fun PerformanceCostNote(item: PerformanceCosts.Item, modifier: Modifier = Modifier, label: String = "性能开销") {
     val source = rememberPerformanceCostSource() ?: return
     val text = PerformanceCosts.note(source, item.id, label) ?: return
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -70,10 +70,10 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
             }.getOrDefault(0)
         }
     }
-    SettingsSection(title = "性能代价") {
+    SettingsSection(title = "性能开销") {
         Column(Modifier.fillMaxWidth().padding(16.dp).testTag("perf-cost-total"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (source == null) {
-                Text("读不到代价表（安装包里的 perf_costs.json），暂时算不出总代价。",
+                Text("读不到开销表（安装包里的 perf_costs.json），暂时算不出总开销。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 return@Column
             }
@@ -88,9 +88,9 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                 measured = switches.measured)
             val listed = PerformanceCosts.Item.entries.filter { it.id in on }
             Row(Modifier.fillMaxWidth()) {
-                Text("当前总代价", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text("当前总开销", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(8.dp))
-                Text(if (listed.isEmpty() && dictionaries == null) "全关，没有额外代价"
+                Text(if (listed.isEmpty() && dictionaries == null) "全关，没有额外开销"
                     else PerformanceCosts.describe(PerformanceCosts.Cost(total.keyMs, total.memoryMb, total.baselineKeyMs,
                         estimated = total.estimated.isNotEmpty()), device) ?: "测不出差别",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
@@ -100,14 +100,14 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                 dictionaries != null && total.measured -> "开关这组一起实测过；导入的词库按实测曲线另加。"
                 dictionaries != null -> "开关按单项实测相加，再用最接近的一组实测组合校准；导入的词库按实测曲线另加。"
                 total.measured -> "这组开关一起实测过，直接用实测值。"
-                total.estimated.size == listed.size -> "这几项都还没实测，按估算相加。"
+                total.estimated.size == listed.size -> "按单项相加。"
                 else -> "几项会抢同一个线程，不能直接相加：按单项实测相加，再用最接近的一组实测组合校准。"
             }
             how?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text(buildString {
                 append(when {
                     source.local -> "本机实测"
-                    device.allEstimated -> "估算（按 ${PerformanceCosts.deviceName(device)} 的基线${if (source.scaled) "，按本机档位折算" else ""}，还没实测）"
+                    device.allEstimated -> "按 ${PerformanceCosts.deviceName(device)} 的基线${if (source.scaled) "，按本机档位折算" else ""}"
                     source.sameModel -> "同型号实测"
                     source.scaled -> "${PerformanceCosts.deviceName(device)} 实测按本机档位折算，仅供参考"
                     else -> "${PerformanceCosts.deviceName(device)} 实测，仅供参考"
@@ -124,26 +124,24 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 // 按每键耗时从大到小，最耗的排前面；没测过的放最后写明。
                 val measured = total.items.mapNotNull { (id, cost) -> PerformanceCosts.Item.byId(id)?.let { it to cost } }
+                // 没有值得说的开销的项不列（开关下面也不写）。
                 measured.forEach { (item, cost) ->
+                    val text = PerformanceCosts.describe(cost, device) ?: return@forEach
                     Row(Modifier.fillMaxWidth()) {
                         Text(item.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(PerformanceCosts.describe(cost, device) ?: "测不出差别", style = MaterialTheme.typography.bodySmall,
+                        Text(text, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 dictionaries?.let { cost ->
                     Row(Modifier.fillMaxWidth().testTag("perf-cost-dictionaries")) {
-                        Text("导入的词库（约 $dictionaryWords 词）", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text("导入的词库（$dictionaryWords 词）", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         Text(PerformanceCosts.describe(cost, device) ?: "测不出差别", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 val missing = listed.filter { it.id in total.unmeasured }
                 if (missing.isNotEmpty()) Text("开着但表里没有：" + missing.joinToString("、") { it.title },
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // 全是估算时上面已经写了，这里只在实测和估算混着时点出哪几项是估的。
-                val estimated = listed.filter { it.id in total.estimated }
-                if (estimated.isNotEmpty() && !device.allEstimated) Text("其中按估算计入（还没实测）：" + estimated.joinToString("、") { it.title },
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
