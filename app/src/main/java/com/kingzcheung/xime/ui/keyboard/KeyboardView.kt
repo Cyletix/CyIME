@@ -691,7 +691,8 @@ fun KeyboardView(
                     ToolbarButton.TRADITIONAL -> if (traditionalSwitchApplies) ({
                         inputPreferences.copy(traditionalOutput = !inputPreferences.traditionalOutput).save(quickContext)
                     }) else return null
-                    ToolbarButton.VOICE -> ({
+                    // 「语音转文本」关着时麦克风入口不出现（工具栏和菜单都是），不再显示一个点了只弹提示的图标。
+                    ToolbarButton.VOICE -> if (!state.isSttEnabled) return null else ({
                         if (PermissionHelper.hasRecordAudioPermission(quickContext)) {
                             if (!state.isVoiceMode) {
                                 if (keyboardState is KeyboardLayoutState.T9Pinyin) callbacks.onT9SwitchAway?.invoke()

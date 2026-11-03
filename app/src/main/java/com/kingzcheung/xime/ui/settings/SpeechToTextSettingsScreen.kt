@@ -111,7 +111,7 @@ fun SpeechToTextSettingsContent(
             SettingsSection(title = "语音输入") {
                 SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "语音转文本",
                     subtitle = if (sttEnabled) "点工具栏麦克风说话，转成文字上屏；想按住空格说话，在「按键与手势 › 长按空格」选「语音开关」"
-                        else "已关闭：工具栏麦克风、按住空格说话和物理键盘 Alt + H 都不会开麦",
+                        else "已关闭：键盘上不显示麦克风，按住空格和 Alt + H 不开麦，不自动下载语音模型",
                     subtitleJumps = listOf("按键与手势 › 长按空格"),
                     checked = sttEnabled, onCheckedChange = { sttEnabled = it; SettingsPreferences.setSttEnabled(context, it) })
                 // 开车连续语音：别人提的需求，默认关（VoicePillResume）。只在语音打开时生效，关着语音就不显示。

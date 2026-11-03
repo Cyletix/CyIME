@@ -2278,7 +2278,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onShowKeyboard = { showScreenKeyboardFromHardware() },
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
-                                onVoice = { handleHardwareTool(HardwareToolShortcut.MICROPHONE) },
+                                // 「语音转文本」关着时物理键盘工具条不放麦克风。
+                                onVoice = if (state.isSttEnabled) ({ handleHardwareTool(HardwareToolShortcut.MICROPHONE) }) else null,
                                 voiceActive = state.isVoiceMode,
                                 onSwitchLanguage = { switchHardwareLanguage() },
                                 languageLabel = hardwareLanguage,
