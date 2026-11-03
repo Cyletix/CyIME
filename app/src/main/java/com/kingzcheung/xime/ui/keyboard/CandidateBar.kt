@@ -333,9 +333,8 @@ fun CandidateBar(
         }
         is CandidateBarState.AssociationOnly -> {
             displayCandidates = emptyList()
-            // The expanded grid continues after the first suggestion, even when all would fit on a tablet.
-            displayAssociation = if (candidatePageExpanded && s.hasMore) s.candidates.take(1)
-                else s.candidates.take(maxOf(PredictionManager.MAX_ASSOCIATION_COUNT, s.highlightIndex + 1))
+            // 展开时和打字候选一样：栏里能放几个放几个，展开页从放不下的那个接着排（用户 11-03：只显示一个「除」）。
+            displayAssociation = s.candidates.take(maxOf(PredictionManager.MAX_ASSOCIATION_COUNT, s.highlightIndex + 1))
             hasAnyMore = s.hasMore
             showLeftIcon = false
             displayComments = s.comments
@@ -1594,6 +1593,8 @@ internal fun FixedCandidateStrip(
             .widthIn(max = with(density) { segmentPx.toDp() }).clipToBounds(),
             horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
             segmentIndices.forEach { index ->
+                // 联想按词定身份：按下后联想换了一组，手指松开不选中换上来的那个词（和展开页一样）。
+                androidx.compose.runtime.key(index, if (index < candidates.size) "" else all[index]) {
                 CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size), index, {
                     if (index < candidates.size) callbacks.onCandidateSelect(index)
                     else callbacks.onAssociationSelect?.invoke(index - candidates.size)
@@ -1609,6 +1610,7 @@ internal fun FixedCandidateStrip(
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     correction = if (index < candidates.size) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
                     selectionFill = shiftDragFree && !highlightShown, horizontalPadding = itemPadding, fit = window.fits[index])
+                }
             }
         }
         }

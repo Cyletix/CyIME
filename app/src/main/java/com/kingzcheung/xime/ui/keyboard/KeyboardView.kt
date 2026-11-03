@@ -905,6 +905,12 @@ fun KeyboardView(
                     visibleBarAssociations = emptyList(); visibleBarCandidates = emptyList()
                 }
             }
+            // 上屏后换了一组联想：栏里上一组放下了几个不再作数，展开页按新的一组重新接。
+            LaunchedEffect(Unit) {
+                snapshotFlow { candidateState.value.associationCandidates }.drop(1).collect {
+                    visibleBarAssociations = emptyList()
+                }
+            }
             // 候选状态只在候选栏自己的组合范围里读：每次按键只重组候选栏，不再连带整块键盘
             // （Box/Column 是内联的，在外层读候选状态会让整个键盘一起重组）。
             val renderCandidateBar: @Composable (KeyboardPage) -> Unit = { barPage ->
@@ -1138,6 +1144,8 @@ fun KeyboardView(
                             selectHandwriting(index)
                         } else {
                             callbacks.onAssociationSelect?.invoke(index)
+                            // 展开着点栏里的联想和点展开页里的一样：上屏后收起。
+                            if (candidatePageExpanded) viewModel.setCandidatePageExpanded(false)
                         }
                     },
                 ),
