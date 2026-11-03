@@ -91,6 +91,8 @@ internal fun ConnectedClipboardBoard(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { store.refresh() }
     LaunchedEffect(Unit) { store.refresh() }
     val manager = remember(context) { ClipboardManager.getInstance(context) }
+    // 短信里点链接、电话「复制」时键盘可能一直没收起，监听又没读到：打开面板时补读那一条（用户 11-03）。
+    LaunchedEffect(manager) { runCatching { manager.readMissedCopy(boardOpened = true) } }
     val groupStore = remember(context) { ClipboardGroupStore.getInstance(context) }
     val groups by groupStore.state.collectAsState()
     // Back from the add / edit form: the board opens on the tab it was closed from.

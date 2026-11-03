@@ -83,6 +83,20 @@ class ClipboardManager private constructor(private val context: Context) {
             missed: Boolean = false): Boolean =
             timestamp != lastRead && (smsCode || missed || !plainText || now - timestamp < RECENT_CLIP_ON_OPEN_MS)
 
+        /**
+         * 一条复制里记进历史的文字：按顺序找第一项不空的文字、链接、intent，都没有再让系统转成文字。
+         * 以前只看第一项、文字不为 null 就用：有的短信应用点链接、电话「复制」时第一项文字是空串，
+         * 真正的内容在链接或后面的项里，读到空的就当没读到（用户 11-03）。
+         */
+        internal fun clipText(parts: List<ClipPart>): String? {
+            for (part in parts) {
+                part.text?.toString()?.takeIf { it.isNotBlank() }?.let { return it }
+                part.uri?.takeIf { it.isNotBlank() }?.let { return it }
+                part.intentUri?.takeIf { it.isNotBlank() }?.let { return it }
+            }
+            return parts.firstNotNullOfOrNull { part -> part.coerce()?.toString()?.takeIf { it.isNotBlank() } }
+        }
+
         internal const val RECENT_CLIP_ON_OPEN_MS = 30_000L
         /** 弹出键盘时同一条复制最多补读几次：系统一直不给读时不每次弹出都去读。 */
         internal const val OPEN_READ_TRIES = 2
@@ -205,12 +219,15 @@ class ClipboardManager private constructor(private val context: Context) {
                     return
                 }
                 images.dismissPreview()
-                val text = when {
-                    item.text != null -> item.text.toString()
-                    item.uri != null -> item.uri.toString()
-                    item.intent != null -> item.intent.toUri(0)
-                    else -> null
-                }
+                val text = clipText((0 until clipData.itemCount).map { index ->
+                    val entry = clipData.getItemAt(index)
+                    ClipPart(entry.text, entry.uri?.toString(), entry.intent?.toUri(0)) { entry.coerceToText(context) }
+                })
+                // 只记这条复制长什么样（类型、标签、各项有什么），不记内容：排查哪种复制没进剪贴板。
+                Log.i(TAG, "clip read: mimes=" + (0 until clipData.description.mimeTypeCount).map { clipData.description.getMimeType(it) } +
+                    " label=" + clipData.description.label + " items=" + (0 until clipData.itemCount).map { index ->
+                        clipData.getItemAt(index).let { "t${it.text?.length ?: -1}u${if (it.uri != null) 1 else 0}i${if (it.intent != null) 1 else 0}" }
+                    } + " sensitive=" + sensitive + " privacy=" + privacy + " empty=" + text.isNullOrEmpty())
                 if (!text.isNullOrEmpty()) {
                     // 读到内容才算读过：系统不给读时拿到的是空的，弹出键盘时还要补读。
                     lastReadClipTimestamp = clipData.description.timestamp
@@ -307,11 +324,12 @@ class ClipboardManager private constructor(private val context: Context) {
      * 有的系统这时不给输入法读剪贴板，监听读到的是空的，长按复制时键盘还在就读得到（用户 11-02 转述）。
      * 键盘弹出（含输入框没变、只是键盘重新显示）时再读一次。
      */
-    fun readMissedCopy() {
+    fun readMissedCopy(boardOpened: Boolean = false) {
         val description = runCatching { androidClipboardManager.primaryClipDescription }.getOrNull() ?: return
         val timestamp = description.timestamp
         if (timestamp != openTriedClip) { openTriedClip = timestamp; openTries = 0 }
-        if (openTries >= OPEN_READ_TRIES) return
+        // 打开剪贴板面板就是要看刚复制的：不受弹出键盘的补读次数限制，读过的照样不再读。
+        if (openTries >= OPEN_READ_TRIES && !boardOpened) return
         val plainText = (0 until description.mimeTypeCount).all {
             description.getMimeType(it) == ClipDescription.MIMETYPE_TEXT_PLAIN || description.getMimeType(it) == ClipDescription.MIMETYPE_TEXT_HTML
         }
@@ -947,3 +965,7 @@ internal class PrivateClipMemory(private val capacity: Int = 16) {
 
 /** What one copy may do in clipboard history; see [ClipboardManager.clipPrivacy]. */
 internal enum class ClipPrivacy { NORMAL, SECRET, PRIVATE }
+
+/** 一条复制里的一项：文字、链接、intent 各自原样，[coerce] 交给系统转成文字（只在前面都没有时才调）。 */
+internal class ClipPart(val text: CharSequence?, val uri: String?, val intentUri: String?,
+    val coerce: () -> CharSequence? = { null })
