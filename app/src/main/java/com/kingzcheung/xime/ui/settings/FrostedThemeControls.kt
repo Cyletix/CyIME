@@ -29,12 +29,15 @@ internal fun FrostedThemeControls(config: FrostedGlassConfig, isDark: Boolean,
             if (blurAvailable) "" else " · 当前系统不可用", config.blurRadiusDp, 0f..40f, enabled = blurAvailable) {
             onChange(config.copy(blurRadiusDp = it.roundToInt().toFloat()))
         }
-        // 白色玻璃底色最少 WHITE_GLASS_PANEL_OPACITY（见 FrostedKeyColors），调得更透时写出实际值。
+        // 白色玻璃底色最少 WHITE_GLASS_PANEL_OPACITY（见 FrostedKeyColors），没拖过时写出实际值；
+        // 在浅色页拖过就按滑条显示，工具栏也跟着（lightPanelCustom）。
         val whiteGlassFloor = com.kingzcheung.xime.ui.keyboard.WHITE_GLASS_PANEL_OPACITY
         GlassSlider("背景不透明度", "${(config.backgroundOpacity * 100).roundToInt()}%" +
-            if (!isDark && config.backgroundOpacity < whiteGlassFloor) " · 实际 ${(whiteGlassFloor * 100).roundToInt()}%" else "",
+            if (!isDark && !config.lightPanelCustom && config.backgroundOpacity < whiteGlassFloor)
+                " · 实际 ${(whiteGlassFloor * 100).roundToInt()}%" else "",
             config.backgroundOpacity) {
-            onChange(config.copy(backgroundOpacity = (it * 100).roundToInt() / 100f))
+            onChange(config.copy(backgroundOpacity = (it * 100).roundToInt() / 100f,
+                lightPanelCustom = config.lightPanelCustom || !isDark))
         }
         GlassSlider("按键不透明度", "${(config.keyOpacity * 100).roundToInt()}%", config.keyOpacity) {
             onChange(config.copy(keyOpacity = (it * 100).roundToInt() / 100f))

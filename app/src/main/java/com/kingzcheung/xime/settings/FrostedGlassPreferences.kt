@@ -9,6 +9,11 @@ data class FrostedGlassConfig(
     val blurRadiusDp: Float = 10f,
     val backgroundOpacity: Float = 0.8f,
     val keyOpacity: Float = 0.2f,
+    /**
+     * 只对浅色外观：用户在浅色页亲手拖过「背景不透明度」。拖过后白色玻璃不再补到 88%，
+     * 工具栏也不再单独补厚，整块跟着滑条走（用户反馈 11-03：更新后工具栏不跟着透明度调整）。
+     */
+    val lightPanelCustom: Boolean = false,
 ) {
     fun normalized(defaults: FrostedGlassConfig = FrostedGlassConfig.defaults(true)): FrostedGlassConfig = copy(
         blurRadiusDp = (blurRadiusDp.takeIf { it.isFinite() } ?: defaults.blurRadiusDp).coerceIn(0f, 40f),
@@ -47,13 +52,14 @@ object FrostedGlassPreferences {
     private const val KEY_APPEARANCE_MIGRATED = "frosted_glass_appearance_migrated"
     private const val KEY_PAIRED_DARK_BACKGROUND = "frosted_glass_paired_dark_background_opacity"
     private const val KEY_PAIRED_DARK_KEY = "frosted_glass_paired_dark_key_opacity"
+    const val KEY_LIGHT_PANEL_CUSTOM = "frosted_glass_light_panel_custom"
     private val parameterKeys = listOf(KEY_BLUR_RADIUS, KEY_BACKGROUND_OPACITY, KEY_KEY_OPACITY)
     private fun appearanceKey(key: String, dark: Boolean) = key + if (dark) "_dark" else "_light"
 
     val keys: Set<String> = (parameterKeys + parameterKeys.map { appearanceKey(it, true) } +
         parameterKeys.map { appearanceKey(it, false) } +
         listOf(KEY_ENABLED, KEY_APPEARANCE_MIGRATED, KEY_PAIRED_DARK_BACKGROUND, KEY_PAIRED_DARK_KEY,
-            "keyboard_theme", "dark_mode")).toSet()
+            KEY_LIGHT_PANEL_CUSTOM, "keyboard_theme", "dark_mode")).toSet()
 
     fun isDark(context: Context): Boolean = when (SettingsPreferences.getEffectiveDarkMode(context)) {
         0 -> false
@@ -81,6 +87,7 @@ object FrostedGlassPreferences {
                 prefs.getFloat(appearanceKey(KEY_BLUR_RADIUS, dark), defaults.blurRadiusDp),
                 if (dark) paired.backgroundOpacity else paired.keyOpacity,
                 if (dark) paired.keyOpacity else paired.backgroundOpacity,
+                lightPanelCustom = !dark && prefs.getBoolean(KEY_LIGHT_PANEL_CUSTOM, false),
             ).normalized(defaults)
         }
         return FrostedGlassProfiles(readAppearance(false), readAppearance(true))
@@ -138,6 +145,7 @@ object FrostedGlassPreferences {
         val normalized = profiles.withAppearance(profiles.dark, true)
         editor.putFloat(KEY_PAIRED_DARK_BACKGROUND, normalized.dark.backgroundOpacity)
             .putFloat(KEY_PAIRED_DARK_KEY, normalized.dark.keyOpacity)
+            .putBoolean(KEY_LIGHT_PANEL_CUSTOM, profiles.light.lightPanelCustom)
         writeAppearance(editor, normalized.dark, true)
         writeAppearance(editor, normalized.light.normalized(FrostedGlassConfig.defaults(false)), false)
         editor.apply()

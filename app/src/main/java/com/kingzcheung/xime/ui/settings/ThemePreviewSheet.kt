@@ -99,9 +99,10 @@ internal fun FrostedGlassSettingsSheet(
     val context = LocalContext.current
     var glass by rememberSaveable(theme.id, stateSaver = listSaver<FrostedGlassProfiles, Any>(
         save = { listOf(it.dark.enabled, it.light.blurRadiusDp, it.light.backgroundOpacity, it.light.keyOpacity,
-            it.dark.blurRadiusDp, it.dark.backgroundOpacity, it.dark.keyOpacity) },
+            it.dark.blurRadiusDp, it.dark.backgroundOpacity, it.dark.keyOpacity, it.light.lightPanelCustom) },
         restore = { FrostedGlassProfiles(
-            light = FrostedGlassConfig(it[0] as Boolean, it[1] as Float, it[2] as Float, it[3] as Float),
+            light = FrostedGlassConfig(it[0] as Boolean, it[1] as Float, it[2] as Float, it[3] as Float,
+                lightPanelCustom = it.getOrNull(7) as? Boolean ?: false),
             dark = FrostedGlassConfig(it[0] as Boolean, it[4] as Float, it[5] as Float, it[6] as Float),
         ) },
     )) { mutableStateOf(FrostedGlassPreferences.readProfiles(context)) }

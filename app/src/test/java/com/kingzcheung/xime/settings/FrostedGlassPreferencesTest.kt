@@ -245,4 +245,15 @@ class FrostedGlassPreferencesTest {
         }
         assertTrue(FrostedGlassPreferences.keys.contains("dark_mode"))
     }
+
+    @Test fun `light panel custom mark survives saving either appearance and never reaches dark`() {
+        // 浅色页亲手拖过背景不透明度：记下来，之后切深色再保存也不丢；深色外观永远不带这个标记。
+        FrostedGlassPreferences.save(context, FrostedGlassConfig(true, 10f, 0.3f, 0.8f, lightPanelCustom = true), false)
+        assertTrue(FrostedGlassPreferences.read(context, false).lightPanelCustom)
+        assertFalse(FrostedGlassPreferences.read(context, true).lightPanelCustom)
+        FrostedGlassPreferences.save(context, FrostedGlassPreferences.read(context, true).copy(blurRadiusDp = 14f), true)
+        assertTrue(FrostedGlassPreferences.read(context, false).lightPanelCustom)
+        assertEquals(0.3f, FrostedGlassPreferences.read(context, false).backgroundOpacity, 0f)
+        assertTrue(FrostedGlassPreferences.keys.contains(FrostedGlassPreferences.KEY_LIGHT_PANEL_CUSTOM))
+    }
 }

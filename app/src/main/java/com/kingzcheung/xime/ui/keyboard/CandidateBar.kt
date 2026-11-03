@@ -225,7 +225,8 @@ fun CandidateBar(
     val glassNormalized = glass.normalized()
     val panelOpacity = com.kingzcheung.xime.ui.theme.LocalSharedKeyboardBackdrop.current?.opacity
         ?: glassNormalized.backgroundOpacity
-    val stripBoost = if (glassEnabled) glassStripBoostAlpha(panelOpacity, glassNormalized.keyOpacity) else 0f
+    // 浅色页亲手调过背景不透明度时，工具栏跟着键盘底色走，不再单独补厚（用户反馈 11-03）。
+    val stripBoost = if (glassEnabled && !glass.lightPanelCustom) glassStripBoostAlpha(panelOpacity, glassNormalized.keyOpacity) else 0f
     val stripGlass = if (stripBoost > 0f)
         glass.copy(backgroundOpacity = maxOf(panelOpacity, glassNormalized.keyOpacity)) else glass
     val textSurface = remember(stripGlass, themeSurface, themeKey, shadowRadius, visuals.textColor, visuals.selectedTextColor, visuals.accentColor) {

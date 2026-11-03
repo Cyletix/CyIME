@@ -191,6 +191,9 @@ class FrostedKeyColorsTest {
         val dark = FrostedGlassConfig.defaults(true, enabled = true).copy(backgroundOpacity = .3f)
         assertEquals(dark, dark.whiteGlassPanel(false))
         assertEquals(light.copy(enabled = false), light.copy(enabled = false).whiteGlassPanel(true))
+        // 浅色页亲手拖过背景不透明度：按滑条来，不补（用户反馈 11-03：工具栏和底色要跟着透明度走）。
+        val custom = light.copy(lightPanelCustom = true)
+        assertEquals(custom, custom.whiteGlassPanel(true))
     }
 
     @Test fun whiteGlassFunctionKeysStayLighterThanTextButDarkerThanPanelOverDarkApps() {

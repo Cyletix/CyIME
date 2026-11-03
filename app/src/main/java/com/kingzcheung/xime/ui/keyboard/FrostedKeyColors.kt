@@ -111,7 +111,8 @@ internal const val WHITE_GLASS_PANEL_OPACITY = 0.88f
 
 /** [white]：浅色外观且主题底色是浅色（深底主题的浅色外观不算白色玻璃）。 */
 internal fun FrostedGlassConfig.whiteGlassPanel(white: Boolean): FrostedGlassConfig {
-    if (!enabled || !white) return this
+    // 用户在浅色页亲手拖过背景不透明度：按滑条来，不再补。
+    if (!enabled || !white || lightPanelCustom) return this
     val opacity = backgroundOpacity.takeIf { it.isFinite() } ?: return copy(backgroundOpacity = WHITE_GLASS_PANEL_OPACITY)
     return if (opacity >= WHITE_GLASS_PANEL_OPACITY) this else copy(backgroundOpacity = WHITE_GLASS_PANEL_OPACITY)
 }
