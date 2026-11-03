@@ -149,6 +149,8 @@ class SettingsSearchTest {
         assertTrue("生僻字" in titles("罕用字"))
         assertTrue("插件市场" in titles("扩展市场"))
         assertTrue("按键音色" in titles("案件音色"))
+        assertTrue("浅色遮罩" in titles("变暗"))
+        assertTrue("深色遮罩" in titles("背景暗度"))
     }
 
     /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */

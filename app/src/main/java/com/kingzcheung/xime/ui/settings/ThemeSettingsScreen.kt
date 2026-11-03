@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -239,6 +240,9 @@ private fun ThemeSettingsPage(
                     if (uiState.colorTheme == com.kingzcheung.xime.ui.theme.CustomImageTheme.ID) {
                         changeAppearance(context, onThemeChanged) { viewModel.setColorTheme(baseThemeId) }
                     } else onThemeChanged()
+                }, onVeilChanged = {
+                    viewModel.refreshThemes()
+                    onThemeChanged()
                 })
             }
 
@@ -292,11 +296,39 @@ private fun ThemeSettingsPage(
 }
 
 /**
+ * 「我的图片」上压的遮罩（浅色、深色各一条）：越高图片越淡、按键文字越清楚，0% 是原图。
+ * 拖动时只改数字，松手才存并刷新键盘；默认 72%，与原来一样。
+ */
+@Composable
+private fun CustomImageVeilSlider(dark: Boolean, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val title = if (dark) "深色遮罩" else "浅色遮罩"
+    var veil by remember { mutableStateOf(com.kingzcheung.xime.ui.theme.CustomImageTheme.veil(context, dark)) }
+    Column(Modifier.settingsSearchAnchor(title).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text("$title：${kotlin.math.round(veil * 100).toInt()}%", style = MaterialTheme.typography.bodyLarge)
+        androidx.compose.material3.Slider(
+            value = veil,
+            onValueChange = { veil = kotlin.math.round(it * 20f) / 20f },
+            onValueChangeFinished = {
+                changeAppearance(context, onChanged) {
+                    com.kingzcheung.xime.ui.theme.CustomImageTheme.setVeil(context, dark, veil)
+                    com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
+                }
+            },
+            valueRange = 0f..com.kingzcheung.xime.ui.theme.CustomImageTheme.MAX_VEIL,
+            steps = 17,
+            modifier = Modifier.testTag(if (dark) "custom-image-veil-dark" else "custom-image-veil-light"),
+        )
+    }
+}
+
+/**
  * 「用自己的图片」：从相册选一张图，先在调整页拖动、缩放、贴齐边缘，确认后换成「我的图片」主题。
  * 设置过以后可以再调整或删除。
  */
 @Composable
-private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit, onDeleted: (String) -> Unit) {
+private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit, onDeleted: (String) -> Unit,
+    onVeilChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var hasImage by remember { mutableStateOf(com.kingzcheung.xime.ui.theme.CustomImageTheme.hasImage(context)) }
@@ -332,6 +364,8 @@ private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit,
                     }
                 },
                 showArrow = true)
+            CustomImageVeilSlider(dark = false, onChanged = onVeilChanged)
+            CustomImageVeilSlider(dark = true, onChanged = onVeilChanged)
             SettingsItem(icon = Icons.TwoTone.Delete, title = "删除图片",
                 subtitle = "删掉这张图片和「我的图片」配色",
                 onClick = { confirmDelete = true })

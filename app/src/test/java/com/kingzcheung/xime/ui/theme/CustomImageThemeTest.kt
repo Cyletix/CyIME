@@ -36,7 +36,8 @@ class CustomImageThemeTest {
     @After fun clear() {
         SettingsPreferences.getPrefsPublic(context).edit()
             .remove("custom_theme_image_src").remove("custom_theme_image_base")
-            .remove("custom_theme_image_placement").commit()
+            .remove("custom_theme_image_placement")
+            .remove("custom_theme_image_veil_light").remove("custom_theme_image_veil_dark").commit()
         File(SchemaManager.getRimeDir(context), "themes").listFiles()
             ?.filter { it.name.startsWith("custom-keyboard-bg-") }?.forEach { it.delete() }
     }
@@ -105,6 +106,33 @@ class CustomImageThemeTest {
         assertFalse(file.exists())
         assertFalse(CustomImageTheme.hasImage(context))
         assertNull(CustomImageTheme.build(context, themes))
+    }
+
+    /** 遮罩没调过时与原来一样 72%；浅色、深色各自存，超出 0~90% 的值收回范围里。 */
+    @Test fun veilDefaultsToTheOldStrengthAndIsStoredPerAppearance() {
+        choose("mint_green")
+        val untouched = CustomImageTheme.build(context, themes)!!.keyboardBackground!!
+        assertEquals(0.72f, untouched.overlayAlpha!!, 1e-6f)
+        assertEquals(0.72f, untouched.overlayAlphaDark!!, 1e-6f)
+
+        CustomImageTheme.setVeil(context, dark = false, value = 0.3f)
+        CustomImageTheme.setVeil(context, dark = true, value = 0.55f)
+        val tuned = CustomImageTheme.build(context, themes)!!.keyboardBackground!!
+        assertEquals(0.3f, tuned.overlayAlpha!!, 1e-6f)
+        assertEquals(0.55f, tuned.overlayAlphaDark!!, 1e-6f)
+
+        CustomImageTheme.setVeil(context, dark = false, value = -1f)
+        CustomImageTheme.setVeil(context, dark = true, value = 2f)
+        assertEquals(0f, CustomImageTheme.veil(context, dark = false), 1e-6f)
+        assertEquals(CustomImageTheme.MAX_VEIL, CustomImageTheme.veil(context, dark = true), 1e-6f)
+    }
+
+    /** 调整页预览用传进来的遮罩，和存好后的键盘一样。 */
+    @Test fun previewUsesTheGivenVeil() {
+        val bg = CustomImageTheme.preview(themes, "mint_green", "themes/custom-keyboard-bg-1.jpg",
+            ThemeImagePlacement.DEFAULT, veilLight = 0.2f, veilDark = 0.4f)!!.keyboardBackground!!
+        assertEquals(0.2f, bg.overlayAlpha!!, 1e-6f)
+        assertEquals(0.4f, bg.overlayAlphaDark!!, 1e-6f)
     }
 
     /** 第一次选图时主题表里还没有「我的图片」：调整页预览按沿用的主题取键色，不能落到全局的半透明白键。 */

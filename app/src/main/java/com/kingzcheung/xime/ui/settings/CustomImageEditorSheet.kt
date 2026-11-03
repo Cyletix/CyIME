@@ -211,7 +211,8 @@ private fun CustomImageEditorCanvas(
     val colorThemeId = remember(baseThemeId) { CustomImageTheme.previewColorThemeId(KeyboardThemes.themes, baseThemeId) }
     val previewGlass = glass.forAppearance(isDark).legibleForTheme(colorThemeId, isDark)
     val previewTheme = remember(src, baseThemeId, placement) {
-        CustomImageTheme.preview(KeyboardThemes.themes, baseThemeId, src, placement)
+        CustomImageTheme.preview(KeyboardThemes.themes, baseThemeId, src, placement,
+            CustomImageTheme.veil(context, false), CustomImageTheme.veil(context, true))
     }
     val fallback = previewTheme?.let { if (isDark) it.keyboardBgDark else it.keyboardBgLight }
         ?: MaterialTheme.colorScheme.surface

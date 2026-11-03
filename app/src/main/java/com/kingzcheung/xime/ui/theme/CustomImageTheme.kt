@@ -30,6 +30,11 @@ object CustomImageTheme {
      * 按键文字对底仍有 6:1 以上，次要的候选文字约 3.5:1。
      */
     private const val OVERLAY_ALPHA = 0.72f
+    /** 用户调过的遮罩（背景图片 › 浅色遮罩／深色遮罩）；没调过按 [OVERLAY_ALPHA]。 */
+    private const val KEY_VEIL_LIGHT = "custom_theme_image_veil_light"
+    private const val KEY_VEIL_DARK = "custom_theme_image_veil_dark"
+    /** 遮罩最高 90%：再高图片几乎看不见，和不用图片一样。 */
+    const val MAX_VEIL = 0.9f
 
     /** 当前沿用的主题；桌面图标配色按它走（[ThemeIconColors.forTheme]）。 */
     @Volatile var baseThemeId: String = SoftBlueTheme.ID
@@ -62,6 +67,16 @@ object CustomImageTheme {
         if (currentThemeId == ID) SettingsPreferences.getPrefsPublic(context).getString(KEY_BASE, null) ?: SoftBlueTheme.ID
         else currentThemeId
 
+    /** 图片上压的遮罩（0 不压，越大图片越淡、按键文字越清楚）；浅色、深色各自一份。 */
+    fun veil(context: Context, dark: Boolean): Float =
+        SettingsPreferences.getPrefsPublic(context).getFloat(if (dark) KEY_VEIL_DARK else KEY_VEIL_LIGHT, OVERLAY_ALPHA)
+            .takeIf { it.isFinite() }?.coerceIn(0f, MAX_VEIL) ?: OVERLAY_ALPHA
+
+    fun setVeil(context: Context, dark: Boolean, value: Float) {
+        SettingsPreferences.getPrefsPublic(context).edit()
+            .putFloat(if (dark) KEY_VEIL_DARK else KEY_VEIL_LIGHT, value.coerceIn(0f, MAX_VEIL)).apply()
+    }
+
     /** 已存的摆放；旧版本没有这一项，按原来的居中铺满。 */
     internal fun placement(context: Context): ThemeImagePlacement =
         ThemeImagePlacement.decode(SettingsPreferences.getPrefsPublic(context).getString(KEY_PLACEMENT, null))
@@ -71,12 +86,13 @@ object CustomImageTheme {
         val baseId = SettingsPreferences.getPrefsPublic(context).getString(KEY_BASE, null)
         val base = resolveBase(themes, baseId) ?: return null
         baseThemeId = base.id
-        return scheme(base, src, placement(context))
+        return scheme(base, src, placement(context), veil(context, false), veil(context, true))
     }
 
-    /** 调整页预览用：[baseId] 的配色加上还没存的 [src] 与 [placement]。 */
-    internal fun preview(themes: List<KeyboardColorScheme>, baseId: String, src: String, placement: ThemeImagePlacement) =
-        resolveBase(themes, baseId)?.let { scheme(it, src, placement) }
+    /** 调整页预览用：[baseId] 的配色加上还没存的 [src] 与 [placement]，遮罩用已存的 [veilLight]/[veilDark]。 */
+    internal fun preview(themes: List<KeyboardColorScheme>, baseId: String, src: String, placement: ThemeImagePlacement,
+        veilLight: Float = OVERLAY_ALPHA, veilDark: Float = OVERLAY_ALPHA) =
+        resolveBase(themes, baseId)?.let { scheme(it, src, placement, veilLight, veilDark) }
 
     /**
      * 调整页预览取键色、字色用的主题 id：预览主题还没存进主题表，按 [ID] 取色会落到全局默认色；
@@ -88,7 +104,8 @@ object CustomImageTheme {
     private fun resolveBase(themes: List<KeyboardColorScheme>, baseId: String?) =
         themes.firstOrNull { it.id == baseId && usableBase(it) } ?: themes.firstOrNull { it.id == SoftBlueTheme.ID }
 
-    private fun scheme(base: KeyboardColorScheme, src: String, placement: ThemeImagePlacement): KeyboardColorScheme {
+    private fun scheme(base: KeyboardColorScheme, src: String, placement: ThemeImagePlacement,
+        veilLight: Float, veilDark: Float): KeyboardColorScheme {
         fun Color.rgb() = (toArgb() and 0xFFFFFF).toLong()
         return base.copy(
             id = ID, name = NAME,
@@ -97,7 +114,7 @@ object CustomImageTheme {
             isDynamic = false, useThemeColors = base.useThemeColors || base.isDynamic,
             keyboardBackground = BackgroundConfig(type = "image", src = src, fit = placement.fit,
                 zoom = placement.zoom, alignX = placement.alignX, alignY = placement.alignY,
-                overlayAlpha = OVERLAY_ALPHA, overlayAlphaDark = OVERLAY_ALPHA,
+                overlayAlpha = veilLight, overlayAlphaDark = veilDark,
                 overlayColor = base.keyboardBgLight.rgb(), overlayColorDark = base.keyboardBgDark.rgb()),
             candidateBarBackground = null,
         )
