@@ -78,7 +78,7 @@ fun LayoutDisplaySettingsContent(
     }
     // 首页直接进入的子页（候选词、按键与手势）返回首页，不经过「键盘布局」。
     val direct = initialPage != null
-    SettingsSubPages(openPage, onBack = { if (direct) onBack() else openPage = null }) { page ->
+    SettingsSubPages(openPage, onBack = { if (direct) onBack() else openPage = null }, handleBack = !direct) { page ->
         LayoutDisplayPage(page, onBack, onOpenLayout, openPage = { openPage = it },
             closePage = { if (direct) onBack() else openPage = null })
     }

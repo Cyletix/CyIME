@@ -54,11 +54,14 @@ internal fun rememberSettingsMotionEnabled(): Boolean {
 /**
  * 页内子页（同一路由里用状态切换的二级页）走与 NavHost 相同的推入/退出与预测性返回。
  * [page] 为 null 表示父页；[onBack] 负责把它置回 null。
+ * [handleBack] 为 false 时返回手势交给外层 NavHost：从首页直接进的子页返回首页，预览里露出的也是首页，
+ * 不能先露出本页的父页（GitHub #127）。
  */
 @Composable
 internal fun <T> SettingsSubPages(
     page: T?,
     onBack: () -> Unit,
+    handleBack: Boolean = true,
     content: @Composable (T?) -> Unit,
 ) {
     val motion = rememberSettingsMotionEnabled()
@@ -69,7 +72,7 @@ internal fun <T> SettingsSubPages(
         if (motion) state.animateTo(page) else state.snapTo(page)
     }
     if (motion) {
-        PredictiveBackHandler(enabled = page != null) { events ->
+        PredictiveBackHandler(enabled = handleBack && page != null) { events ->
             val current = page
             try {
                 events.collect { state.seekTo(it.progress, targetState = null) }
@@ -80,7 +83,7 @@ internal fun <T> SettingsSubPages(
             }
         }
     } else {
-        BackHandler(enabled = page != null, onBack = onBack)
+        BackHandler(enabled = handleBack && page != null, onBack = onBack)
     }
     rememberTransition(state).AnimatedContent(
         transitionSpec = { subPageTransform(motion) },
