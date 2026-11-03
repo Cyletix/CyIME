@@ -18,6 +18,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kingzcheung.xime.ui.keyboard.FLICK_DISC_HOLD_MS
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.LocalFourteenKeyLayout
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
@@ -28,7 +29,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Held flick keys show the kana direction disc; the gesture result is unchanged. */
+/** Flicked or held (not quickly tapped) flick keys show the kana direction disc; the gesture result is unchanged. */
 class FlickDirectionDiscTest {
     @get:Rule val rule = createComposeRule()
 
@@ -53,8 +54,20 @@ class FlickDirectionDiscTest {
                 }
             }
         }
-        // Held without moving: the disc shows every direction, none selected.
+        rule.mainClock.autoAdvance = false
+        // A quick tap enters the key and never opens the disc (user 11-03: the disc made fast tapping lag).
         rule.onNodeWithTag("t9-abc").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(60)
+        rule.onNodeWithTag("letter-flick-preview").assertDoesNotExist()
+        rule.onNodeWithTag("t9-abc").performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(FLICK_DISC_HOLD_MS)
+        rule.onNodeWithTag("letter-flick-preview").assertDoesNotExist()
+        // Held without moving: after a moment the disc shows every direction, none selected.
+        rule.onNodeWithTag("t9-abc").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(60)
+        rule.onNodeWithTag("letter-flick-preview").assertDoesNotExist()
+        rule.mainClock.advanceTimeBy(FLICK_DISC_HOLD_MS)
+        rule.mainClock.autoAdvance = true
         rule.onNodeWithTag("letter-flick-preview").assertIsDisplayed()
         rule.onNodeWithTag("letter-preview-choice:LEFT", useUnmergedTree = true).assertIsNotSelected()
         save("t9-held")
@@ -67,6 +80,7 @@ class FlickDirectionDiscTest {
         rule.onNodeWithTag("t9-abc").performTouchInput { up() }
         rule.onNodeWithTag("letter-flick-preview").assertDoesNotExist()
 
+        // A flick shows the disc at once, without waiting for the hold delay.
         rule.onNodeWithTag("fourteen-qw").performTouchInput { down(center); moveBy(Offset(90f, 0f)) }
         rule.onNodeWithTag("letter-preview-choice:RIGHT", useUnmergedTree = true).assertIsSelected()
         save("fourteen-right")
@@ -77,18 +91,18 @@ class FlickDirectionDiscTest {
         rule.onNodeWithTag("fourteen-qw").performTouchInput { moveBy(Offset(90f, -110f)) }
         rule.onNodeWithTag("letter-preview-choice:RIGHT", useUnmergedTree = true).assertIsSelected()
         rule.onNodeWithTag("fourteen-qw").performTouchInput { up() }
-        rule.runOnIdle { assertEquals("same results as before the disc", listOf("A", "w"), committed) }
+        rule.runOnIdle { assertEquals("same results as before the disc", listOf("tap", "A", "w"), committed) }
 
         // Long press: the digit is offered, not entered, until the finger lifts; the disc gives way.
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("t9-abc").performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(500)
         rule.onNodeWithTag("letter-flick-preview").assertDoesNotExist()
-        rule.runOnIdle { assertEquals("long press must not commit while held", listOf("A", "w"), committed) }
+        rule.runOnIdle { assertEquals("long press must not commit while held", listOf("tap", "A", "w"), committed) }
         rule.onNodeWithTag("t9-abc").performTouchInput { up() }
         rule.mainClock.advanceTimeBy(100)
         rule.mainClock.autoAdvance = true
-        rule.runOnIdle { assertEquals(listOf("A", "w", "2"), committed) }
+        rule.runOnIdle { assertEquals(listOf("tap", "A", "w", "2"), committed) }
         rule.onNodeWithTag("letter-flick-preview").assertDoesNotExist()
     }
 

@@ -364,11 +364,24 @@ fun SwipeableKeyButton(
     var isPressed by remember { mutableStateOf(false) }
     var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     var longPressShown by remember { mutableStateOf(false) }
+    // 方向圆盘只在手指拂出去或按住一会儿后出现；快速点按不弹（用户 11-03：只点不拂时轮盘让打字发卡）。
+    var discRevealed by remember { mutableStateOf(false) }
     var buttonBounds by remember { mutableStateOf(Rect.Zero) }
 
     val view = LocalView.current
     val density = LocalDensity.current
     val flick = flickLetters?.takeIf { onFlickLetter != null && it.isNotEmpty() }
+    // Keys whose flick directions are fixed letters (nine-key flick mode, fourteen-key pairs)
+    // show the kana direction disc while held. Labels come from the live gesture mapping.
+    // 14 键里落单的字母键（l、m，分体或 Shift 拖动时拆开的单字母）和双字母键用同一个方向盘，
+    // 不再一个出方向盘、一个键面渐变（用户 10-21）。
+    val fourteenSingle = LocalFourteenKeyLayout.current && inputPreferences.fourteenLetterSwipe &&
+        text.length == 1 && text[0].lowercaseChar() in 'a'..'z'
+    val discKey = inputPreferences.flickDirectionDisc && (flick != null || letters != null || fourteenSingle)
+    fun keyPreview(state: SwipeState): KeyFlickPreview? {
+        if (discKey && state.movedOffPress()) discRevealed = true
+        return discFlickPreview(state.keyFlick, discKey)
+    }
     // In flick mode the held key's own value (the digit) is a one-item long-press popup: it shows
     // what will be entered and commits only on release, like every other long-press choice.
     val flickLongPressLabel = (badgeText ?: swipeText ?: text).takeIf { onFlickLongPress != null }
@@ -389,9 +402,9 @@ fun SwipeableKeyButton(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
         onTap = tapOrCtrl,
-        onPress = { isPressed = true; onPress?.invoke() },
+        onPress = { isPressed = true; discRevealed = false; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { flickPreview = it.keyFlick; longPressShown = it.isLongPress; onSwipeStateChange?.invoke(it, buttonBounds) },
+        onPreview = { flickPreview = keyPreview(it); longPressShown = it.isLongPress; onSwipeStateChange?.invoke(it, buttonBounds) },
         inlineVerticalPreview = true,
         inlineHorizontalPreview = true,
         leftText = flickAt(0), onLeft = flickAction(0),
@@ -412,9 +425,9 @@ fun SwipeableKeyButton(
     ) else KeyGestureActions(
         text = text,
         onTap = tapOrCtrl,
-        onPress = { isPressed = true; onPress?.invoke() },
+        onPress = { isPressed = true; discRevealed = false; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it, buttonBounds) },
+        onPreview = { flickPreview = keyPreview(it); onSwipeStateChange?.invoke(it, buttonBounds) },
         inlineVerticalPreview = true,
         upText = swipeText,
         downText = swipeDownText,
@@ -449,20 +462,21 @@ fun SwipeableKeyButton(
         flick != null || letterGroup?.length != 1 || inputActions.onLetterSwipeAction == null) gestureActions
         else gestureActions.withLetterSwipes(letterGroup.lowercase(), bindings, inputActions.onLetterSwipeAction))
 
-    // Keys whose flick directions are fixed letters (nine-key flick mode, fourteen-key pairs)
-    // show the kana direction disc while held. Labels come from the live gesture mapping.
-    // 14 键里落单的字母键（l、m，分体或 Shift 拖动时拆开的单字母）和双字母键用同一个方向盘，
-    // 不再一个出方向盘、一个键面渐变（用户 10-21）。
-    val fourteenSingle = LocalFourteenKeyLayout.current && inputPreferences.fourteenLetterSwipe &&
-        text.length == 1 && text[0].lowercaseChar() in 'a'..'z'
+    // 同一组文字只建一次：手指移动时圆盘不因标签“换了个对象”而整个重画。
     val discLabels = if (flick == null && letters == null && !fourteenSingle) null else gestureActions.let { actions ->
-        buildMap {
-            put(KanaFlickDirection.TAP, text)
-            actions.leftText?.let { put(KanaFlickDirection.LEFT, it) }
-            (actions.upPreviewText ?: actions.upText)?.let { put(KanaFlickDirection.UP, it) }
-            actions.rightText?.let { put(KanaFlickDirection.RIGHT, it) }
-            (actions.downPreviewText ?: actions.downText)?.let { put(KanaFlickDirection.DOWN, it) }
-        }.filterValues { it.isNotEmpty() }
+        val left = actions.leftText
+        val up = actions.upPreviewText ?: actions.upText
+        val right = actions.rightText
+        val down = actions.downPreviewText ?: actions.downText
+        remember(text, left, up, right, down) {
+            buildMap {
+                put(KanaFlickDirection.TAP, text)
+                left?.let { put(KanaFlickDirection.LEFT, it) }
+                up?.let { put(KanaFlickDirection.UP, it) }
+                right?.let { put(KanaFlickDirection.RIGHT, it) }
+                down?.let { put(KanaFlickDirection.DOWN, it) }
+            }.filterValues { it.isNotEmpty() }
+        }
     }
     val discDirection = flickPreview?.takeIf { it.progress >= 1f }?.let { preview ->
         when (preview.origin) {
@@ -476,7 +490,13 @@ fun SwipeableKeyButton(
                     discLabels[KanaFlickDirection.DOWN] != preview.text) KanaFlickDirection.UP else KanaFlickDirection.DOWN
         }
     } ?: KanaFlickDirection.TAP
-    val showDisc = inputPreferences.flickDirectionDisc && isPressed && !longPressShown &&
+    if (discKey) LaunchedEffect(isPressed) {
+        if (isPressed) {
+            delay(FLICK_DISC_HOLD_MS)
+            discRevealed = true
+        }
+    }
+    val showDisc = inputPreferences.flickDirectionDisc && isPressed && discRevealed && !longPressShown &&
         discLabels != null && discLabels.size > 1
     val flickFade = rememberKeyFlickFade(flickPreview)
 

@@ -27,6 +27,23 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 
+/**
+ * How long a key must be held, without moving, before its direction disc appears (user 11-03).
+ * A quick tap ends well before this, so tapping never opens the disc window; a flick shows it at once.
+ * Shorter than the 300 ms long press, which then replaces the disc with the key's own value.
+ */
+internal const val FLICK_DISC_HOLD_MS = 180L
+
+/** The finger has left the press point (a flick has started); the gesture still owns the touch. */
+internal fun SwipeState.movedOffPress(): Boolean = !isPressed && !isLongPress && pressedText != null
+
+/**
+ * With the disc shown the in-key labels are hidden, so only "past the threshold or not" matters.
+ * Keeping just that lets equal states skip recomposition while the finger moves.
+ */
+internal fun discFlickPreview(preview: KeyFlickPreview?, disc: Boolean): KeyFlickPreview? =
+    if (preview == null || !disc) preview else preview.copy(progress = if (preview.progress >= 1f) 1f else 0f)
+
 /** Five choices stay at fixed positions above the key; only the selected choice changes. */
 @Composable
 internal fun KanaFlickPreview(key: KanaFlickKey, direction: KanaFlickDirection,
