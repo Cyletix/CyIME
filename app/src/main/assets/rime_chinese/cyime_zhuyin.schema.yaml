@@ -131,7 +131,7 @@ menu:
 
 punctuator:
   import_preset: default
-  __include: symbols:/punctuator
+  __include: cyime_punctuator:/punctuator
 
 # 不引默认的 key_binder：它把有候选时的数字键、空格当选词键，而大千的数字键是 ㄅㄉ…，空格是第一声。
 key_binder:

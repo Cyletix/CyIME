@@ -491,7 +491,7 @@ class DoublePinyinSchemeTest {
             assertFalse(text.contains("double_pinyin_flypy_14jian"))
             // 词库、候选规则、符号和编码显示照 14 键小鹤双拼。
             for (line in listOf("  dictionary: rime_ice\n", "    - cyime_candidate_policy\n", "  alphabet: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB\n",
-                "    - xlit/QETUOADGJZCB/qetuoadgjzcb/\n", "  __include: symbols:/punctuator\n"))
+                "    - xlit/QETUOADGJZCB/qetuoadgjzcb/\n", "  __include: cyime_punctuator:/punctuator\n"))
                 assertTrue(line, text.contains(line))
             val rules = text.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
                 .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }

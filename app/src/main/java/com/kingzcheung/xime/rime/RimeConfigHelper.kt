@@ -137,19 +137,34 @@ object RimeConfigHelper {
         }.toMap()
         if (broken.isEmpty()) return recordProblem(context, "", usable = true)
         val current = SettingsPreferences.getCurrentSchema(context)
-        val usable = enabled.any { it !in broken } && current !in broken && broken.keys.none { isAppSchema(context, it) }
+        // 一个方案编译不出来（内置的也一样）只提示它，不再挡住整个键盘：2026-11-02 用户手机上 14 键两个方案没编译出来，
+        // 26 键明明能用，键盘却一直卡在「正在加载词库」。当前方案坏了就先换到同语言能用的方案。
+        val fallback = if (current in broken) fallbackSchema(current, enabled, broken.keys) else current
+        val usable = fallback != null
+        if (fallback != null && fallback != current) SettingsPreferences.setCurrentSchema(context, fallback)
         val names = broken.entries.joinToString("；") { (id, reason) ->
             "${SchemaManager.getSchemaDisplayName(context, id) ?: id}（$id，$reason）"
         }
-        FileLogger.w(TAG, "Deployment problems: $broken, current=$current, usable=$usable, " +
+        FileLogger.w(TAG, "Deployment problems: $broken, current=$current, fallback=$fallback, " +
             "free=${context.filesDir.usableSpace / (1L shl 20)}MB")
-        val message = if (usable) "这些方案没有编译成功，暂时不能用：$names。其他方案正常；可在「已安装的方案」停用或卸载它们。"
-            else "部署失败：$names。" + (if (current in broken && broken.keys.none { isAppSchema(context, it) })
-                "先在「已安装的方案」切到别的方案再部署，或停用、卸载这个方案。" else "") + storageHint(context)
+        val message = if (usable) "这些方案没有编译成功，暂时不能用：$names。其他方案正常；" +
+            (if (broken.keys.any { isAppSchema(context, it) }) "可在「已安装的方案」点「应用方案更改」重试。" else "可在「已安装的方案」停用或卸载它们。") +
+            storageHint(context)
+            else "部署失败：$names。" + storageHint(context)
         return recordProblem(context, message, usable)
     }
 
-    /** CyIME 自带或自己生成的方案：这些编译失败说明内置资源坏了，必须当作部署失败。 */
+    /** 当前方案没编译出来时换用的方案：同语言优先，其次任一能用的输入方案；都不能用返回 null。 */
+    internal fun fallbackSchema(current: String, enabled: List<String>, broken: Set<String>): String? {
+        val working = enabled.filter {
+            it !in broken && it !in com.kingzcheung.xime.settings.CyimeInputDefaults.dependencies &&
+                it != com.kingzcheung.xime.settings.InputModes.ENGLISH
+        }
+        val language = com.kingzcheung.xime.settings.InputLanguage.forSchema(current)
+        return working.firstOrNull { com.kingzcheung.xime.settings.InputLanguage.forSchema(it) == language } ?: working.firstOrNull()
+    }
+
+    /** CyIME 自带或自己生成的方案：编译失败多半是它引用的文件被改坏，提示里让用户重试而不是卸载。 */
     internal fun isAppSchema(context: Context, id: String): Boolean =
         id in com.kingzcheung.xime.settings.ChineseSchemas.ids || id in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended ||
             com.kingzcheung.xime.settings.DoublePinyinSchemes.isGenerated(id) ||
