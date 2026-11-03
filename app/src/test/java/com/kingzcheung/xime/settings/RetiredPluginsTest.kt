@@ -18,4 +18,11 @@ class RetiredPluginsTest {
         assertFalse(id("ai_rewrite") in XimeIndexSource.RETIRED_PLUGIN_IDS)
         assertFalse(id("ai_reply") in XimeIndexSource.RETIRED_PLUGIN_IDS)
     }
+
+    @Test fun `已下架的插件不自动往键盘菜单里放按钮`() {
+        assertFalse(XimeIndexSource.mayAutoPlaceButtons(id("ai_translate")))
+        assertFalse(XimeIndexSource.mayAutoPlaceButtons(id("ai_write")))
+        assertTrue(XimeIndexSource.mayAutoPlaceButtons(id("ai_rewrite")))
+        assertTrue(XimeIndexSource.mayAutoPlaceButtons(id("ai_reply")))
+    }
 }

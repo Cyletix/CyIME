@@ -1354,7 +1354,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     }
                 }
             // 已经装好、按钮还在「不使用」里的（2026-11-02 之前装的）也放进菜单一次
-            val menu = if (SettingsPreferences.placeNewPluginButtons(this@XimeInputMethodService, buttons.map { it.id }))
+            val autoPlaced = buttons.filter { com.kingzcheung.xime.settings.XimeIndexSource.mayAutoPlaceButtons(it.pluginId) }
+            val menu = if (SettingsPreferences.placeNewPluginButtons(this@XimeInputMethodService, autoPlaced.map { it.id }))
                 SettingsPreferences.getMenuButtons(this@XimeInputMethodService) else null
             withContext(Dispatchers.Main) {
                 uiState.value = uiState.value.copy(toolbarPluginButtons = buttons)
