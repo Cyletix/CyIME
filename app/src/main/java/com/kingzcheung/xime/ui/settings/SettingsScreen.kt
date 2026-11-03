@@ -59,7 +59,15 @@ fun SettingsScreen(
             else -> request.route
         }
         if (destination == SettingsRoutes.Main) {
-            navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
+            // 冷启动直接进了方案、插件、词库时起始页不是首页：换成首页，不停在那一页。
+            if (navController.graph.startDestinationRoute == SettingsRoutes.Main) {
+                navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
+            } else runCatching {
+                navController.navigate(SettingsRoutes.Main) {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
         } else if (navController.currentDestination?.route != destination) {
             runCatching {
                 navController.navigate(destination) {

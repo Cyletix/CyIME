@@ -291,11 +291,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     }
     
     internal fun openSettings(route: String? = null) {
-        // The keyboard is already editing CyIME's own settings test field.
-        // A generic Settings tap should not even relaunch the activity or disturb focus.
-        if (route == null && service.currentInputEditorInfo?.packageName == service.packageName) return
+        // 菜单「设置」不带页面时进设置首页：在设置自己的测试框里点也照样跳（以前直接 return，菜单一关什么也没有），
+        // 设置已经开着时也不停在上次那一页（11-03 平板）。
         try {
-            service.startActivity(settingsActivityIntent(service, route))
+            service.startActivity(settingsActivityIntent(service, route ?: com.kingzcheung.xime.ui.settings.SettingsRoutes.Main))
         } catch (e: Exception) {
             FileLogger.e(XimeInputMethodService.TAG, "Failed to open settings", e)
         }

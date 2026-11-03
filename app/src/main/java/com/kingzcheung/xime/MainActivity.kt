@@ -57,8 +57,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleSharedIntent(intent)
-        // A plain Settings tap only brings this instance forward. Do not reset its
-        // navigation, focused test field or text. Explicit shortcuts still navigate.
+        // 键盘菜单「设置」带的是首页（main），回到设置首页；长按跳转带具体页面。没带页面的不动导航。
         // 插件授权页：冷启动走 initialPluginId，已打开时直接进该插件的详情页；面板里的「设置」直接进设置页。
         (intent.getStringExtra("open_plugin_id")?.let { pluginLaunchRoute(it, intent.getBooleanExtra(EXTRA_OPEN_PLUGIN_SETTINGS, false)) }
             ?: intent.getStringExtra("open_fragment"))?.let { route ->
