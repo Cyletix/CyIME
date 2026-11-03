@@ -8,6 +8,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -49,8 +50,11 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             }
             Text("浮窗", style = MaterialTheme.typography.titleMedium)
             HardwareOption("候选跟随光标", "应用提供光标位置时生效；否则显示在底部", options.followCursor) { save("follow_cursor", it) }
+            // 联想词只在「智能联想」开着时才有（PredictionManager）；关着时这项没有效果，置灰写明。
+            val predictionOn = remember { com.kingzcheung.xime.settings.SettingsPreferences.isSmartPredictionEnabled(context) }
             HardwareOption("联想也显示在候选窗", "上屏后的联想词和打字候选显示在同一个浮窗里；关闭时联想显示在工具条上",
-                options.associationInWindow) { save("association_in_window", it) }
+                options.associationInWindow,
+                lockMessage = if (predictionOn) null else "「智能联想」关着，没有联想词") { save("association_in_window", it) }
             HardwareOption("自动避开输入区域", "有位置数据时避让输入框；大文档优先避让光标附近", options.avoidEditor) { save("avoid_editor", it) }
             HardwareOption("靠边停靠", "浮窗拖到屏幕左右边变成竖条，拖到底边变成候选长条；拖近时有蓝色轮廓", options.dockAtEdge) { save("dock_edge", it) }
             // 原「底边使用三星式通栏」（用户 11-01 改名「底部候选」）：只在停靠到底边时起作用（HardwareKeyboardToolbar 里
@@ -95,15 +99,19 @@ private fun BottomCandidatesLegend(on: Boolean) {
 }
 
 @Composable
-private fun HardwareOption(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun HardwareOption(title: String, detail: String, checked: Boolean,
+                           /** 当前用不上时写原因：整行置灰、点不动，原因写在说明下面；存的值不变。 */
+                           lockMessage: String? = null, onChange: (Boolean) -> Unit) {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(Modifier.settingsSearchAnchor(title, bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange)
+        Row(Modifier.settingsSearchAnchor(title, bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth()
+            .toggleable(checked, enabled = lockMessage == null, role = Role.Switch, onValueChange = onChange)
             .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Column(Modifier.weight(1f).padding(end = 12.dp).alpha(if (lockMessage == null) 1f else 0.6f)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
                 Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                lockMessage?.let { SettingsLockNote(it) }
             }
-            Switch(checked = checked, onCheckedChange = null)
+            Switch(checked = checked, onCheckedChange = null, enabled = lockMessage == null)
         }
     }
 }
