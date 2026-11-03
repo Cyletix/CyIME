@@ -194,8 +194,6 @@ android {
     // 九键长句重排已停用（t9_pinyin.schema.yaml），两种包都不再带这个模型；源文件只留给电脑回放对照。
     // Keep vocabulary and licenses; both editions offer the large grammar separately.
     androidResources.ignoreAssetsPatterns.add("t9_sentence.onnx")
-    // Retain the old model files for the local comparison, exclude them from delivery.
-    androidResources.ignoreAssetsPatterns.add("*.traineddata")
     // 拍照识别模型（约 21 MB）：轻量版用到时再下载（模型目录 ocr-ppocr-v5，国内魔搭、海外 GitHub）；
     // 带模型的完整版、老人包、朋友包照旧内置，不联网也能识别。
     if (providers.gradleProperty("bundleModels").orNull != "true")
