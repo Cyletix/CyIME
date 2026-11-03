@@ -366,8 +366,14 @@ function plugin.getSettingsSchema()
     { key = "testConnection", label = "测试接口", type = "button", section = "接口" },
   }
   -- 提示词单独一组；框按内容长高
+  local hinted = false
   local function prompt(field)
     field.section = "提示词"
+    -- 「清空就恢复默认」只写在第一个提示词框下面，不每个都写一遍
+    if field.type == "textarea" and field.defaultValue ~= nil and not hinted then
+      hinted = true
+      field.helpText = field.helpText and (field.helpText .. "；清空就恢复默认") or "清空就恢复默认"
+    end
     schema[#schema + 1] = field
   end
   for _, m in ipairs(MODES) do
@@ -384,7 +390,7 @@ function plugin.getSettingsSchema()
         defaultValue = m.prompt, helpText = "{lang} 换成上面的目标语言" }
     else
       prompt { key = promptKey(m.id), label = m.label, type = "textarea",
-        defaultValue = m.prompt, helpText = "清空就恢复默认" }
+        defaultValue = m.prompt }
     end
   end
   return schema

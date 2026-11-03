@@ -20,12 +20,12 @@ plugins:
   description: 选中一段字（不选就是整个输入框），点键盘菜单里的「AI 改写」，选润色、改错字、更正式、更口语、缩短或翻译，点结果替换原文。用你自己的 OpenAI 兼容接口，密钥只存在手机里。
   pluginType: tool
   appVersion: '>=1.15.40'
-  currentVersion: 0.3.0
+  currentVersion: 0.3.1
   versions:
-  - version: 0.3.0
+  - version: 0.3.1
     downloadUrl:
-    - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/ai-rewrite-0.3.0.xipk
-      sha256: 66a1ffbb0ccc5fad42822ab6425e18dfa6856e0cd714da9084aa1c101fb05de3
+    - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/ai-rewrite-0.3.1.xipk
+      sha256: 165fd372a298eea30f62f90dfc498170e7d0bd0d5a81ad247f7d8e5451070763
   - version: 0.2.0
     downloadUrl:
     - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/ai-rewrite-0.2.0.xipk
