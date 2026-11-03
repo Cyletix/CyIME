@@ -136,6 +136,15 @@ object XimeIndexSource {
         }
     }
 
+    /**
+     * 已经内置或已并入别的插件、市场不再列出的插件（11-03 瘦身）。线上旧索引还没更新时也照样隐藏；
+     * 已装的照常能用，在「插件」页卸载。
+     */
+    internal val RETIRED_PLUGIN_IDS = setOf(
+        "online_asr", "typing_stats", "ai_translate", "ai_write", "kaomoji", "meme_bunny", "quick_send_demo",
+        "funasr_asr", "tencent_asr", "volc_asr", "webdav_backup", "webdav_clipboard_sync", "ximed_sync",
+    ).mapTo(HashSet()) { "com.kingzcheung.xime.plugin.$it" }
+
     internal fun bundledPlugins(context: Context): PluginsDirectIndex =
         context.assets.open("plugin-market/index.yaml").bufferedReader().use {
             XimeIndexParser.parsePluginsDirectIndex(it.readText())

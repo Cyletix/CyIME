@@ -53,7 +53,8 @@ class PluginMarketViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun showCatalog(source: String, index: PluginsDirectIndex) {
         val installed = installedVersions()
-        val items = index.plugins.distinctBy { it.id }.filter { it.id.isNotBlank() }.map {
+        val items = index.plugins.distinctBy { it.id }
+            .filter { it.id.isNotBlank() && it.id !in XimeIndexSource.RETIRED_PLUGIN_IDS }.map {
             XimeIndexParser.toPluginItem(it, BuildConfig.VERSION_NAME, installed)
         }
         state.update { it.copy(plugins = items, source = source) }
