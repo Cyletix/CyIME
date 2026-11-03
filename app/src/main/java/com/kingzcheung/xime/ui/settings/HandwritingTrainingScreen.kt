@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -958,7 +959,9 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                 modifier = Modifier
                     .matchParentSize()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    // 画板跟页面分得开：浅色是白纸加一圈描边，深色是更深的底加描边（原来半透明 surfaceVariant 在浅色下灰底灰页看不清边）。
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
                     .testTag("training-board")
                     .onSizeChanged { canvasSize = it.width to it.height }
                     .pointerInput(stylusPresence) {
