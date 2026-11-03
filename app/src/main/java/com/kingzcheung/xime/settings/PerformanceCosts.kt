@@ -275,6 +275,11 @@ object PerformanceCosts {
         val dictionaries: List<DictionaryPoint> = emptyList(),
         /** 测词库曲线那次的基线：开关保持原样、导入词库一个都不开；空时用 [baseline]。 */
         val dictionaryBaseline: Baseline? = null,
+        /**
+         * 语音模型常驻（「语音模型空闲后全部释放」= 永不）时 :asr 进程一直占的内存。模型在单独的 :asr 进程里，
+         * 不在开关基线里，以前总开销漏了它（平板 11-03：总开销写 +82 MB，:asr 实际 605 MB）。
+         */
+        val voiceResident: Cost? = null,
     ) {
         /** 一项都还没实测（安装包表里的估算）。 */
         val allEstimated: Boolean get() = items.isNotEmpty() && items.values.all { it.estimated }
@@ -324,7 +329,9 @@ object PerformanceCosts {
         reference ?: return device
         val missing = reference.items.filterKeys { it !in device.items }.mapValues { it.value.copy(estimated = true) }
         val noted = device.items.mapValues { (id, c) -> if (c.note == null) c.copy(note = reference.items[id]?.note) else c }
-        return if (missing.isEmpty() && noted == device.items) device else device.copy(items = noted + missing)
+        val voice = device.voiceResident ?: reference.voiceResident?.copy(estimated = true)
+        return if (missing.isEmpty() && noted == device.items && voice === device.voiceResident) device
+            else device.copy(items = noted + missing, voiceResident = voice)
     }
 
     /** 每键耗时都乘 [factor]（基线一起乘，“慢百分之几”不变）；内存不变。 */

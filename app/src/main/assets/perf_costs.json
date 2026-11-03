@@ -10,6 +10,7 @@
       "layout": "",
       "baseline": {"keyMs": 34.0},
       "noiseMs": 0.5,
+      "voiceResident": {"memoryMb": 605},
       "items": {
         "neighbor_correction": {"keyMs": 1.5, "memoryMb": 3, "estimated": true},
         "double_pinyin_correction": {"keyMs": 1.0, "memoryMb": 2, "estimated": true},

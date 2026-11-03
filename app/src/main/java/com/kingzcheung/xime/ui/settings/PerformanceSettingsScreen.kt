@@ -150,7 +150,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
             item {
                 // 当前开着的耗性能开关合起来的代价，和各开关下面那行同一张实测表（用户 11-02）。档位变了（动效、炫光）跟着重算。
                 val on = remember(settings) { runCatching { PerformanceCosts.enabled(context) }.getOrDefault(emptySet()) }
-                PerformanceCostTotalSection(on)
+                PerformanceCostTotalSection(on, voiceResident = settings.speechEngineIdleMinutes == 0)
             }
             onOpenSetupGuide?.let { open ->
                 item {

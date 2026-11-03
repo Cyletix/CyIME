@@ -99,6 +99,27 @@ class PerformanceCostsTest {
         assertEquals(listOf("neighbor_correction"), PerformanceCosts.total(source.device, setOf("glass", "neighbor_correction")).estimated)
     }
 
+    @Test fun voiceResidentMemoryIsInTheBundledTableAndFillsLocalTables() {
+        var dir: File? = File(System.getProperty("user.dir")).absoluteFile
+        var file: File? = null
+        while (dir != null && file == null) {
+            file = listOf(File(dir, "src/main/assets/perf_costs.json"), File(dir, "app/src/main/assets/perf_costs.json")).firstOrNull { it.isFile }
+            dir = dir.parentFile
+        }
+        val bundled = checkNotNull(PerformanceCosts.parse(checkNotNull(file).readText()))
+        // 平板 11-03 实测：语音常驻时 :asr 一直占 605 MB，总开销不能再漏掉它。
+        val tablet = bundled.devices.first { it.model == "SM-X800" }
+        assertEquals(605.0, tablet.voiceResident!!.memoryMb!!, 1e-9)
+        assertFalse(tablet.voiceResident!!.estimated)
+        assertEquals("内存 +605 MB", PerformanceCosts.describe(tablet.voiceResident, tablet))
+        // 本机实测表没测这一项：从安装包表补上。
+        val mine = bundled.copy(devices = listOf(tablet.copy(voiceResident = null)))
+        assertEquals(605.0, PerformanceCosts.pick(mine, bundled, "SM-X800", "HIGH")!!.device.voiceResident!!.memoryMb!!, 1e-9)
+        // 本机测过就用本机的。
+        val measured = bundled.copy(devices = listOf(tablet.copy(voiceResident = PerformanceCosts.Cost(memoryMb = 500.0))))
+        assertEquals(500.0, PerformanceCosts.pick(measured, bundled, "SM-X800", "HIGH")!!.device.voiceResident!!.memoryMb!!, 1e-9)
+    }
+
     @Test fun negligibleCostsShowNoLineAndNoAbout() {
         val estimates = device.copy(items = mapOf("t9_glide_typing" to PerformanceCosts.Cost(0.0, 0.0, estimated = true),
             "glide_typing" to PerformanceCosts.Cost(0.2, 8.0, estimated = true)))

@@ -55,10 +55,10 @@ internal fun PerformanceCostTotalNote(items: Set<PerformanceCosts.Item>, label: 
 
 /**
  * 「性能与省电」里的“性能代价”：当前开着的耗性能开关合起来每键慢多少、多占多少内存，下面列出每一项。
- * [on] 由页面传入，方便页面刷新后重算。
+ * [on] 由页面传入，方便页面刷新后重算。[voiceResident]：语音模型设成常驻（全部释放 = 永不），:asr 那份内存也算进去。
  */
 @Composable
-internal fun PerformanceCostTotalSection(on: Set<String>) {
+internal fun PerformanceCostTotalSection(on: Set<String>, voiceResident: Boolean = false) {
     val source = rememberPerformanceCostSource()
     val context = LocalContext.current
     // 已应用的导入词库一共多少词（词库页「应用更改」之后才算）。
@@ -82,15 +82,19 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
             // 导入词库按实测曲线另加在开关合计上（词库和开关是同一次基线测的）。
             val dictionaries = PerformanceCosts.dictionaryCost(device, dictionaryWords)
                 ?.copy(baselineKeyMs = device.dictionaryBaseline?.keyMs)
-            val total = if (dictionaries == null) switches else switches.copy(
+            val withDictionaries = if (dictionaries == null) switches else switches.copy(
                 keyMs = switches.keyMs + (dictionaries.keyMs ?: 0.0),
                 memoryMb = switches.memoryMb + (dictionaries.memoryMb ?: 0.0),
                 measured = switches.measured)
+            // 常驻的语音模型在 :asr 进程，和开关、词库不是同一个进程，直接加上。
+            val voice = device.voiceResident?.takeIf { voiceResident && (it.memoryMb ?: 0.0) >= 1 }
+            val total = if (voice == null) withDictionaries
+                else withDictionaries.copy(memoryMb = withDictionaries.memoryMb + (voice.memoryMb ?: 0.0))
             val listed = PerformanceCosts.Item.entries.filter { it.id in on }
             Row(Modifier.fillMaxWidth()) {
                 Text("当前总开销", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(8.dp))
-                Text(if (listed.isEmpty() && dictionaries == null) "全关，没有额外开销"
+                Text(if (listed.isEmpty() && dictionaries == null && voice == null) "全关，没有额外开销"
                     else PerformanceCosts.describe(PerformanceCosts.Cost(total.keyMs, total.memoryMb, total.baselineKeyMs,
                         estimated = total.estimated.isNotEmpty()), device) ?: "测不出差别",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
@@ -119,7 +123,7 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                 device.baseline.memoryMb?.let { append("，内存 ${Math.round(it)} MB") }
                 append("。")
             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (listed.isNotEmpty() || dictionaries != null) {
+            if (listed.isNotEmpty() || dictionaries != null || voice != null) {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp), thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 // 按每键耗时从大到小，最耗的排前面；没测过的放最后写明。
@@ -130,6 +134,13 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                     Row(Modifier.fillMaxWidth()) {
                         Text(item.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         Text(text, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                voice?.let { cost ->
+                    Row(Modifier.fillMaxWidth().testTag("perf-cost-voice-resident")) {
+                        Text("语音模型常驻", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(PerformanceCosts.describe(cost, device) ?: "", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
