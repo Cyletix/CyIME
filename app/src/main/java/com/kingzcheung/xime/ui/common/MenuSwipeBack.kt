@@ -18,15 +18,17 @@ internal fun Modifier.menuSwipeBack(
     page: Any?, onBack: (() -> Unit)?, pass: PointerEventPass = PointerEventPass.Main,
     /** false：从哪儿起手都算（键盘菜单的最后一页，和前面几页往左划翻页一样，11-03 声音振动上划不动）。 */
     edgeOnly: Boolean = true,
+    /** 退一层要划多远；null 按宽度的 22%，夹在 72–112dp。 */
+    distanceDp: Float? = null,
 ): Modifier {
     val latestBack by rememberUpdatedState(onBack)
     if (onBack == null) return this
-    return pointerInput(page, pass, edgeOnly) {
+    return pointerInput(page, pass, edgeOnly, distanceDp) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = pass)
             val edgeWidth = minOf(size.width * 0.25f, 96.dp.toPx())
             if (down.type != PointerType.Touch || (edgeOnly && down.position.x < size.width - edgeWidth)) return@awaitEachGesture
-            val distance = (size.width * 0.22f).coerceIn(72.dp.toPx(), 112.dp.toPx())
+            val distance = distanceDp?.dp?.toPx() ?: (size.width * 0.22f).coerceIn(72.dp.toPx(), 112.dp.toPx())
             val slop = viewConfiguration.touchSlop
             var horizontal = false
             while (true) {

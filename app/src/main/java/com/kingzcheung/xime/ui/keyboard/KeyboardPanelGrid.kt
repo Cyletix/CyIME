@@ -80,12 +80,15 @@ internal fun <T> KeyboardPanelGrid(
             maxOf(120.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight) else minOf(maxHeight,
             maxOf(104.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight)
         val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else minOf(maxWidth, 144.dp * columns + spacing * (columns - 1))
-        Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight)
+        // 手势放在整块面板上，不只在居中的网格上：平板上网格两边空着一大块，从右边缘起手的一划以前落在网格外没人接
+        // （11-03 平板实测）。最后一页往左划 64dp 就退一层，和翻页一样短，不用划过 112dp。
+        Box(Modifier.fillMaxSize()
             .menuSwipeBack(pagerState.currentPage, onSwipeBack.takeUnless { pagerState.canScrollForward }, PointerEventPass.Initial,
-                edgeOnly = false)
+                edgeOnly = false, distanceDp = 64f)
             // 划不动的方向（第一页往右、最后一页又没有返回时往左）：这一划什么也不做，也不能在松手时算成点了格子。
             .swallowDeadHorizontalDrag(rightDead = { !pagerState.canScrollBackward },
-                leftDead = { !pagerState.canScrollForward && onSwipeBack == null }),
+                leftDead = { !pagerState.canScrollForward && onSwipeBack == null })) {
+        Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight),
             horizontalAlignment = Alignment.CenterHorizontally) {
             HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -107,6 +110,7 @@ internal fun <T> KeyboardPanelGrid(
                         .clip(CircleShape).background(if (index == pagerState.currentPage) textColor else textColor.copy(alpha = 0.3f)))
                 }
             }
+        }
         }
     }
 }

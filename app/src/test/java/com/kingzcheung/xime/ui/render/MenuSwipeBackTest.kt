@@ -179,6 +179,26 @@ class MenuSwipeBackTest {
         rule.runOnIdle { assertEquals(1, taps); assertEquals(1, backs) }
     }
 
+    /** 11-03 平板：网格在宽面板里居中，从右边缘（网格外）起手、只划 100dp 都退不出去。 */
+    @Test fun lastPageBacksFromOutsideTheCenteredGridWithAShortSwipe() {
+        // 两项时网格 296dp 宽、在 336dp 里居中，两边各空 20dp
+        val buttons = listOf(ToolbarButton.SOUND, ToolbarButton.EMOJI)
+        var taps = 0
+        var backs = 0
+        val actions = buttons.map { ToolbarAction(ToolbarButtonItem.Builtin(it)) { taps++ } }
+        rule.setContent {
+            MenuBar(MenuBarState(true, false, backgroundColor = Color.LightGray), actions,
+                Modifier.width(360.dp).height(230.dp).testTag("menu-body"), onBack = { backs++ })
+        }
+        val body = rule.onNodeWithTag("menu-body")
+        // 从网格右边的空白起手（离面板右边 22dp）往左 70dp
+        body.performTouchInput { swipe(Offset(width - 22f, centerY), Offset(width - 92f, centerY), 250) }
+        rule.runOnIdle { assertEquals(1, backs); assertEquals(0, taps) }
+        // 不够 64dp 不退
+        body.performTouchInput { swipe(Offset(width * .5f, centerY), Offset(width * .5f - 40f, centerY), 250) }
+        rule.runOnIdle { assertEquals(1, backs); assertEquals(0, taps) }
+    }
+
     private fun shot(name: String) {
         val out = System.getenv("CYIME_RENDER_OUT") ?: return
         rule.waitForIdle()
