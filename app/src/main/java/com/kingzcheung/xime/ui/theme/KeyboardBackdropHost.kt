@@ -25,10 +25,15 @@ import androidx.compose.ui.unit.IntSize
 import com.kingzcheung.xime.settings.BackgroundConfig
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /** One window-space image frame for the keyboard, bottom padding and navigation inset. */
 internal data class KeyboardBackdropFrame(val origin: Offset, val size: IntSize) {
     fun offsetIn(surfaceOrigin: Offset): Offset = origin - surfaceOrigin
+
+    /** The frame of a picture placed at [rect] (relative to this frame). */
+    fun placing(rect: androidx.compose.ui.geometry.Rect): KeyboardBackdropFrame = KeyboardBackdropFrame(
+        origin + rect.topLeft, IntSize(rect.width.roundToInt(), rect.height.roundToInt()))
 }
 
 internal fun keyboardBackdropFrame(
@@ -118,14 +123,16 @@ internal fun KeyboardBackdropHost(
     // Resize and expanded handwriting deliberately keep the requested height (no fixed card).
     val coverTop = fixedCard?.let { backdropCoverTop(it.value?.top, highestSurfaceTop(surfaceTops.values)) }
     val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() }, coverTop)
-    val image = if (enabled) {
+    val pixels = if (enabled) {
         rememberFrostedBackgroundImage(background, isDark, fallback, backdropGlass, frame.size, clipboardInMotion)
     } else null
+    // 拉剪贴板时整图按当前高度摆放（见 ResizingBackdropImage）：所有取共用背景的地方都按 frame 画，换 frame 即可。
+    val layer = pixels?.layer(frame.size)
     val backdrop = if (enabled) {
         SharedKeyboardBackdrop(
-            frame = frame,
-            image = image,
-            fallback = fallback,
+            frame = layer?.let { frame.placing(it.frame) } ?: frame,
+            image = layer?.image ?: pixels?.image,
+            fallback = layer?.uncovered ?: fallback,
             opacity = backdropGlass.normalized().backgroundOpacity,
             windowRoot = windowRoot,
             reportSurfaceTop = reportSurfaceTop,

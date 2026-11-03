@@ -138,11 +138,15 @@ internal fun Modifier.frostedGlassBackground(
     var targetSize by remember { mutableStateOf(IntSize.Zero) }
     // Floating capsules resize during docking; keep their backdrop cache stable throughout.
     val renderSize = if (translucentSurface) IntSize(512, 256) else targetSize
-    val blurredImage = rememberFrostedBackgroundImage(background, isDark, fallbackColor, normalized, renderSize)
+    val pixels = rememberFrostedBackgroundImage(background, isDark, fallbackColor, normalized, renderSize,
+        clipboardInMotion = LocalClipboardBackdropMotion.current && !translucentSurface)
+    val blurredImage = pixels.image
     if (imageSlot != null) SideEffect {
         val image = blurredImage?.takeIf { normalized.backgroundOpacity > 0f }
         val draw: (DrawScope.() -> Unit)? = if (image == null) null else ({
-            drawImage(image, dstOffset = IntOffset.Zero, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+            val layer = pixels.layer(IntSize(size.width.roundToInt(), size.height.roundToInt()))
+            if (layer != null) drawBackdropLayer(layer, normalized.backgroundOpacity)
+            else drawImage(image, dstOffset = IntOffset.Zero, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
                 alpha = normalized.backgroundOpacity, filterQuality = FilterQuality.Medium)
         })
         imageSlot.update(image, { null }, draw)
@@ -157,7 +161,9 @@ internal fun Modifier.frostedGlassBackground(
         val opacity = normalized.backgroundOpacity
         if (opacity > 0f) drawUnderTopFeather(feather?.top?.value?.minus(featherOrigin), feather?.heightPx ?: 0f) {
             val image = blurredImage
-            if (image == null) drawRect(fallbackColor, alpha = opacity)
+            val layer = pixels.layer(IntSize(size.width.roundToInt(), size.height.roundToInt()))
+            if (layer != null) { if (imageSlot == null) drawBackdropLayer(layer, opacity) }
+            else if (image == null) drawRect(fallbackColor, alpha = opacity)
             else if (imageSlot == null) drawImage(
                 image,
                 dstOffset = IntOffset.Zero,
@@ -178,7 +184,7 @@ internal fun rememberFrostedBackgroundImage(
     config: FrostedGlassConfig,
     renderSize: IntSize,
     clipboardInMotion: Boolean = LocalClipboardBackdropMotion.current,
-): ImageBitmap? {
+): FrostedBackdropPixels {
     val context = LocalContext.current.applicationContext
     val density = LocalDensity.current.density
     val normalized = config.normalized()
@@ -200,6 +206,8 @@ internal fun rememberFrostedBackgroundImage(
     val cachedSize = resizeCache.resolve(renderSize, clipboardInMotion)
     var blurredImage by remember(background?.copy(src = null, srcDark = null, fit = null, zoom = null, alignX = null, alignY = null),
         isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
+    var renderedFor by remember(background?.copy(src = null, srcDark = null, fit = null, zoom = null, alignX = null, alignY = null),
+        isDark, fallbackColor) { mutableStateOf(IntSize.Zero) }
     LaunchedEffect(background, isDark, fallbackColor, sourceImage, sourceReady, cachedSize, density, normalized.blurRadiusDp) {
         if (cachedSize.width <= 0 || cachedSize.height <= 0 || !sourceReady) return@LaunchedEffect
         blurredImage = withContext(Dispatchers.Default) {
@@ -210,9 +218,32 @@ internal fun rememberFrostedBackgroundImage(
                 checkCancelled = { coroutineContext.ensureActive() },
             ).asImageBitmap()
         }
+        renderedFor = cachedSize
     }
 
-    return blurredImage
+    // 拉剪贴板时的整图，见 [ResizingBackdropImage]。只在拖动、回弹和其后重画的那一下存在。
+    var picture by remember(background, isDark, fallbackColor, normalized.blurRadiusDp) {
+        mutableStateOf<ResizingBackdropImage?>(null)
+    }
+    LaunchedEffect(clipboardInMotion, background, isDark, fallbackColor, sourceImage, cachedSize, density, normalized.blurRadiusDp) {
+        val image = sourceImage
+        val imageBackground = background?.takeIf { it.type == "image" }
+        if (!clipboardInMotion || picture != null || imageBackground == null || image == null ||
+            cachedSize.width <= 0 || cachedSize.height <= 0) return@LaunchedEffect
+        picture = withContext(Dispatchers.Default) {
+            val coroutineContext = currentCoroutineContext()
+            renderResizingBackdrop(
+                imageBackground, isDark, fallbackColor.toArgb(), image, cachedSize,
+                normalized.blurRadiusDp * density,
+                checkCancelled = { coroutineContext.ensureActive() },
+            )
+        }
+    }
+    val isImage = background?.type == "image" && sourceImage != null
+    val draw = backdropResizeDraw(clipboardInMotion, picture != null, isImage, renderedFor, renderSize)
+    if (picture != null && draw != BackdropResizeDraw.Picture) SideEffect { picture = null }
+    return FrostedBackdropPixels(blurredImage, renderedFor, clipboardInMotion, isImage,
+        picture.takeIf { draw == BackdropResizeDraw.Picture })
 }
 
 private data class FrostedSourceImage(val bitmap: Bitmap, val originalWidth: Int, val originalHeight: Int)
@@ -300,6 +331,54 @@ private fun renderFrostedBackground(
     } catch (error: Throwable) {
         bitmap.recycle()
         throw error
+    }
+}
+
+/**
+ * The whole picture for [ResizingBackdropImage], as [renderFrostedBackground] would show it (overlay, blur),
+ * at the resolution it has in [viewport]. Its place is computed per frame from the current size.
+ */
+private fun renderResizingBackdrop(
+    background: BackgroundConfig,
+    isDark: Boolean,
+    fallback: Int,
+    image: FrostedSourceImage,
+    viewport: IntSize,
+    blurRadiusPx: Float,
+    checkCancelled: () -> Unit,
+): ResizingBackdropImage {
+    val placed = frostedImageBounds(image, viewport, background)
+    val maxDimension = if (blurRadiusPx < 1f) 2048 else 512
+    val scale = minOf(1f, maxDimension / max(placed.width(), placed.height()).coerceAtLeast(1f),
+        image.bitmap.width / placed.width().coerceAtLeast(1f))
+    val width = (placed.width() * scale).roundToInt().coerceAtLeast(1)
+    val height = (placed.height() * scale).roundToInt().coerceAtLeast(1)
+    val overlayAlpha = (if (isDark) background.overlayAlphaDark ?: background.overlayAlpha
+        else background.overlayAlpha)?.coerceIn(0f, 1f) ?: 0f
+    val overlay = Color(0xff000000L or ((if (isDark) background.overlayColorDark ?: background.overlayColor
+        else background.overlayColor) ?: 0L))
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    try {
+        val canvas = Canvas(bitmap)
+        canvas.drawBitmap(image.bitmap, null, android.graphics.Rect(0, 0, width, height),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        if (overlayAlpha > 0f) canvas.drawColor(overlay.copy(alpha = overlayAlpha).toArgb())
+        checkCancelled()
+        if (blurRadiusPx >= 1f) {
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            blurFrostedPixels(pixels, width, height, blurRadiusPx * scale, checkCancelled)
+            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        }
+    } catch (error: Throwable) {
+        bitmap.recycle()
+        throw error
+    }
+    val uncovered = androidx.compose.ui.graphics.lerp(Color(fallback or 0xff000000.toInt()),
+        overlay, overlayAlpha)
+    return ResizingBackdropImage(bitmap.asImageBitmap(), uncovered) { size ->
+        val rect = frostedImageBounds(image, size, background)
+        androidx.compose.ui.geometry.Rect(rect.left, rect.top, rect.right, rect.bottom)
     }
 }
 
