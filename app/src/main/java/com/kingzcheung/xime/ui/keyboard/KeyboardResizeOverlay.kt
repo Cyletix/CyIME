@@ -77,6 +77,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -343,8 +344,8 @@ internal fun KeyboardResizeOverlay(
         // This full-size pointer layer catches uncovered hits below the controls.
         // Do not consume down events on their common parent: that cancels Slider drags.
         // 一层只负责暗背景、边框和手势。真实键盘由同一个 previewRect 驱动。
-        if (onPreviewControlsPositioned == null && !editingOpacity && !adjustingOpacity)
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.44f)))
+        // 暗遮罩只盖键盘外面（11-03「这遮罩怎么还能把键盘挡住了」）：以前整屏盖 44% 黑，键盘也被压暗，
+        // 看不出真实的样子。遮罩在下面的外框图层里，挖掉键盘卡片画。
         val hostMaxWidth = maxWidth
         val hostMaxHeight = maxHeight
         val layerPivot = gesturePivot ?: Offset(frame.centerX, frame.centerY)
@@ -399,10 +400,13 @@ internal fun KeyboardResizeOverlay(
                     // 正在拖的把手放大一点，其余保持原样。
                     fun emphasis(vararg handles: ResizeHandle) = if (dragEdge in handles) RESIZE_HANDLE_ACTIVE_SCALE else 1f
 
+                    // 键盘外面压暗，键盘本身不盖（设置页里的预览外面是设置页，不压）。范围放大三倍，转过角度也盖得满。
+                    if (onPreviewControlsPositioned == null && !adjustingOpacity) clipPath(cardPath, ClipOp.Difference) {
+                        drawRect(Color.Black.copy(alpha = 0.44f), Offset(-size.width, -size.height),
+                            Size(size.width * 3f, size.height * 3f))
+                    }
                     // 线、角标、把手全部裁在卡片轮廓里：沿轮廓画 2 倍宽的描边，露出的那一半外沿正好压在卡片边上。
                     clipPath(cardPath) {
-                        if (onPreviewControlsPositioned != null && !adjustingOpacity)
-                            drawPath(cardPath, Color.Black.copy(alpha = 0.44f))
                         // 1. 整圈边框。
                         drawPath(cardPath, accentColor.copy(alpha = 0.55f), style = Stroke(stroke * 2f))
                         // 2. 四角角标：贴着卡片圆角的一段弧，沿两条直边各延伸 cornerLeg，圆头；直角处是 L。
