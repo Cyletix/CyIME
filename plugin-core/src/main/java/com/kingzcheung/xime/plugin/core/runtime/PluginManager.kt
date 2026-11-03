@@ -153,6 +153,14 @@ object PluginManager {
         updateFlows()
     }
 
+    /**
+     * 覆盖安装之后调用：正在运行的旧实例换成刚装的新版（11-03 0.3.0 上装 0.3.1，设置页还是旧版，要关了再开）。
+     * 没在运行的不动，等启用时再加载。
+     */
+    suspend fun reloadIfRunning(pluginId: String) {
+        if (requireContext().loadedPlugins.containsKey(pluginId)) launchPlugin(pluginId)
+    }
+
     suspend fun loadEnabledPlugins(): Int {
         Log.d(TAG, "loadEnabledPlugins called")
         val result = requireContext().lifecycleManager.loadEnabledPlugins()
@@ -233,6 +241,8 @@ object PluginManager {
             val result = installerManager.installPlugin(pluginFile, forceOverwrite, source = PluginSource.ASSET)
             pluginFile.delete()
             val success = result is com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.InstallResult.Success
+            (result as? com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.InstallResult.Success)
+                ?.let { reloadIfRunning(it.pluginInfo.id) }
             Log.d(TAG, "installPluginFromAssets result: $success")
             success
         } catch (e: Exception) {

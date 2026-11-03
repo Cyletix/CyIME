@@ -59,7 +59,11 @@ object ImportManager {
 
         if (isPluginFile(name)) {
             when (val r = PluginManager.installerManager.installPluginFromUri(uri)) {
-                is InstallerManager.InstallResult.Success -> ImportResult.Plugin(r.pluginInfo)
+                is InstallerManager.InstallResult.Success -> {
+                    // 覆盖安装：正在运行的旧版立刻换成新版
+                    PluginManager.reloadIfRunning(r.pluginInfo.id)
+                    ImportResult.Plugin(r.pluginInfo)
+                }
                 is InstallerManager.InstallResult.Failure -> ImportResult.Failed(r.reason)
             }
         } else {

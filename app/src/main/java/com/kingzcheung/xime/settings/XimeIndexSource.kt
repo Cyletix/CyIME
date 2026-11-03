@@ -209,10 +209,7 @@ object XimeIndexSource {
                     expectedId = pluginId, expectedVersion = version.version,
                 )
                 if (result is InstallerManager.InstallResult.Failure) throw IOException(result.reason)
-                if (PluginManager.getPluginInfo(pluginId) != null) {
-                    PluginManager.unloadPlugin(pluginId)
-                    PluginManager.launchPlugin(pluginId)
-                }
+                PluginManager.reloadIfRunning(pluginId)
                 // 从自己的市场第一次装：直接启用，按钮放进键盘菜单，装完就能用（用户 2026-11-02「下载了怎么用」）。
                 // 更新不改用户的开关；停用着的等打开开关时再放按钮。
                 // 只管工具类（键盘菜单里有按钮的）；语音等单选类仍在各自的设置页里选用。
