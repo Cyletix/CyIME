@@ -3,6 +3,7 @@ package com.kingzcheung.xime.ui.theme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class KeyboardBackdropFrameTest {
@@ -15,6 +16,22 @@ class KeyboardBackdropFrameTest {
         // A tool panel above the measured card remains part of the image.
         assertEquals(200f, keyboardBackdropFrame(host, IntSize(380, 400), 300, 220f).origin.y, 0f)
     }
+    @Test fun `toolbar above a missing or stale card position is still inside the frame`() {
+        val host = Offset(0f, 100f)
+        // Card position lost (null) or stale (below the toolbar): the toolbar surface at y=156
+        // reported its own top, so the frame starts there and the strip is never the flat fallback.
+        for (staleCard in listOf(null, 230f)) {
+            val top = backdropCoverTop(staleCard, highestSurfaceTop(listOf(260f, 156f, 400f)))
+            val frame = keyboardBackdropFrame(host, IntSize(380, 400), 300, top)
+            assertEquals(156f, frame.origin.y, 0f)
+            assertEquals(500f, frame.origin.y + frame.size.height, 0f)
+        }
+        // No surfaces: unchanged behaviour (card or requested height).
+        assertNull(highestSurfaceTop(emptyList()))
+        assertEquals(220f, backdropCoverTop(220f, null)!!, 0f)
+        assertNull(backdropCoverTop(null, null))
+    }
+
     @Test fun `keyboard bottom and navigation top sample adjacent rows from one image`() {
         for (navHeight in listOf(24, 48, 96)) {
             val frame = keyboardBackdropFrame(Offset(0f, 1000f), IntSize(1200, 800), 400 + navHeight)

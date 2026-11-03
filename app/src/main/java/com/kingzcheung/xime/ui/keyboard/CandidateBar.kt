@@ -1133,8 +1133,15 @@ private fun Modifier.glassStripBoost(alpha: Float): Modifier {
     val feather = com.kingzcheung.xime.ui.theme.LocalGlassTopFeather.current?.takeIf { it.windowRoot === root }
     val fallback = backdrop?.fallback ?: com.kingzcheung.xime.ui.theme.LocalMaterialPalette.current?.surface
     var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    val surfaceKey = remember { Any() }
+    if (backdrop != null) DisposableEffect(backdrop.reportSurfaceTop, surfaceKey) {
+        onDispose { backdrop.reportSurfaceTop(surfaceKey, null) }
+    }
     if (fallback == null) return this
-    return onGloballyPositioned { origin = it.positionInWindow() }.drawBehind {
+    return onGloballyPositioned {
+        origin = it.positionInWindow()
+        backdrop?.reportSurfaceTop?.invoke(surfaceKey, origin.y)
+    }.drawBehind {
         drawUnderTopFeather(feather?.top?.value?.minus(origin.y), feather?.heightPx ?: 0f) {
             val image = backdrop?.image?.takeIf { backdrop.frame.size.width > 0 && backdrop.frame.size.height > 0 }
             if (image == null) drawRect(fallback.copy(alpha = 1f), alpha = alpha)

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,7 +53,20 @@ internal data class SharedKeyboardBackdrop(
     val fallback: Color,
     val opacity: Float,
     val windowRoot: View,
+    /**
+     * Each surface drawing from this frame reports its window top (null when it leaves), so the
+     * frame always reaches the highest one. Without it a stale card position left the toolbar
+     * above the frame, painted as the flat fallback until glass was toggled (user 11-03).
+     */
+    val reportSurfaceTop: (key: Any, top: Float?) -> Unit = { _, _ -> },
 )
+
+/** Lowest-window-y (highest on screen) of the surfaces still attached; null when none reported. */
+internal fun highestSurfaceTop(tops: Collection<Float>): Float? = tops.minOrNull()
+
+/** The fixed card and every surface on it must sit inside the frame. */
+internal fun backdropCoverTop(cardTop: Float?, surfaceTop: Float?): Float? =
+    listOfNotNull(cardTop, surfaceTop).minOrNull()
 
 internal val LocalSharedKeyboardBackdrop = staticCompositionLocalOf<SharedKeyboardBackdrop?> { null }
 /** Opted into only by clipboard expansion; other theme/resize behavior is unchanged. */
@@ -79,7 +93,18 @@ internal fun KeyboardBackdropHost(
     val backdropGlass = glass.forBackground(background)
     var origin by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
-    val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() }, fixedCard?.value?.top)
+    val surfaceTops = remember { mutableStateMapOf<Any, Float>() }
+    val reportSurfaceTop: (Any, Float?) -> Unit = remember(surfaceTops) {
+        { key, top ->
+            when {
+                top == null -> { surfaceTops.remove(key) }
+                surfaceTops[key] != top -> { surfaceTops[key] = top }
+            }
+        }
+    }
+    // Resize and expanded handwriting deliberately keep the requested height (no fixed card).
+    val coverTop = fixedCard?.let { backdropCoverTop(it.value?.top, highestSurfaceTop(surfaceTops.values)) }
+    val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() }, coverTop)
     val image = if (enabled) {
         rememberFrostedBackgroundImage(background, isDark, fallback, backdropGlass, frame.size, clipboardInMotion)
     } else null
@@ -90,6 +115,7 @@ internal fun KeyboardBackdropHost(
             fallback = fallback,
             opacity = backdropGlass.normalized().backgroundOpacity,
             windowRoot = windowRoot,
+            reportSurfaceTop = reportSurfaceTop,
         )
     } else null
     val positionModifier = if (enabled) {

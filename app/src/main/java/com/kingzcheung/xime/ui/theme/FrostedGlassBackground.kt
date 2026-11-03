@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,7 +76,13 @@ internal fun Modifier.frostedGlassBackground(
     val feather = LocalGlassTopFeather.current?.takeIf { !translucentSurface && it.windowRoot === root }
     if (!translucentSurface && shared != null && root === shared.windowRoot) {
         var origin by remember { mutableStateOf(Offset.Zero) }
-        return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
+        val report = shared.reportSurfaceTop
+        val surfaceKey = remember { Any() }
+        DisposableEffect(report, surfaceKey) { onDispose { report(surfaceKey, null) } }
+        return onGloballyPositioned {
+            origin = it.positionInWindow()
+            report(surfaceKey, origin.y)
+        }.drawWithContent {
             if (shared.opacity > 0f) drawUnderTopFeather(feather?.top?.value?.minus(origin.y), feather?.heightPx ?: 0f) {
                 val image = shared.image?.takeIf { shared.frame.size.width > 0 && shared.frame.size.height > 0 }
                 if (image == null) drawRect(shared.fallback, alpha = shared.opacity)
