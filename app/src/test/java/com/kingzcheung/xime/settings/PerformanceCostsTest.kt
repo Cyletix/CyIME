@@ -120,6 +120,22 @@ class PerformanceCostsTest {
         assertEquals(500.0, PerformanceCosts.pick(measured, bundled, "SM-X800", "HIGH")!!.device.voiceResident!!.memoryMb!!, 1e-9)
     }
 
+    @Test fun neverReleaseWarningSaysHowMuchAndWhatHappensWhenMemoryRunsOut() {
+        val withVoice = device.copy(voiceResident = PerformanceCosts.Cost(memoryMb = 605.0))
+        val same = PerformanceCosts.voiceResidentWarning(PerformanceCosts.Source(withVoice, local = false, sameModel = true))
+        assertTrue(same, same.startsWith("语音模型会一直占着 605 MB 内存，"))
+        assertTrue(same.contains("系统内存紧张时会自动卸掉语音模型"))
+        assertTrue(same.contains("打字不受影响"))
+        // 用户 11-03：说明一律英文括号。
+        assertFalse(same.contains('（') || same.contains('）'))
+        val other = PerformanceCosts.voiceResidentWarning(PerformanceCosts.Source(withVoice, local = false, sameModel = false))
+        assertTrue(other, other.startsWith("语音模型会一直占着 605 MB 内存(Galaxy Tab S8+ 实测)，"))
+        // 表里没有这项或读不到表：不写数，提醒照样有。
+        assertTrue(PerformanceCosts.voiceResidentWarning(null).startsWith("语音模型会一直占着内存，"))
+        assertTrue(PerformanceCosts.voiceResidentWarning(PerformanceCosts.Source(device, local = false, sameModel = true))
+            .startsWith("语音模型会一直占着内存，"))
+    }
+
     @Test fun negligibleCostsShowNoLineAndNoAbout() {
         val estimates = device.copy(items = mapOf("t9_glide_typing" to PerformanceCosts.Cost(0.0, 0.0, estimated = true),
             "glide_typing" to PerformanceCosts.Cost(0.2, 8.0, estimated = true)))

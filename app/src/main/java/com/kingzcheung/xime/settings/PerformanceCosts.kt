@@ -411,6 +411,18 @@ object PerformanceCosts {
 
     fun deviceName(device: Device) = device.name.ifBlank { device.model }
 
+    /**
+     * 「语音模型空闲后全部释放」选到“永不”时滑条下面的提醒（用户 11-03：设成永不要给足提醒，占多少、内存满了会怎样说清楚）。
+     * 内存数取实测表的 [Device.voiceResident]，没有就不写数。重新加载 1.9 秒是平板 11-03 实测 (Paraformer 流式，logcat CyIME-AsrTiming)。
+     */
+    fun voiceResidentWarning(source: Source?): String {
+        val mb = source?.device?.voiceResident?.memoryMb?.takeIf { it >= 1 }
+        val amount = if (source == null || mb == null) "语音模型会一直占着内存"
+            else "语音模型会一直占着 ${mb.roundToInt()} MB 内存" + if (source.sameModel) "" else "(${deviceName(source.device)} 实测)"
+        return "$amount，其他应用退到后台后更容易被系统关掉。系统内存紧张时会自动卸掉语音模型，" +
+            "下次按麦克风先重新加载(平板实测 1.9 秒)，打字不受影响。"
+    }
+
     data class Total(
         val keyMs: Double,
         val memoryMb: Double,

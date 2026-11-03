@@ -141,9 +141,13 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                                 "speech-refiner-idle-slider") { custom(settings.copy(speechRefinerIdleMinutes = it)) }
                             HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         }
+                        val costSource = rememberPerformanceCostSource()
                         IdleLevelSlider("语音模型空闲后全部释放", settings.speechEngineIdleMinutes,
                             "“永不”= 一直常驻，按麦克风最快，占内存最多",
-                            "speech-engine-idle-slider") { custom(settings.copy(speechEngineIdleMinutes = it)) }
+                            "speech-engine-idle-slider",
+                            neverWarning = PerformanceCosts.voiceResidentWarning(costSource)) {
+                            custom(settings.copy(speechEngineIdleMinutes = it))
+                        }
                     }
                 }
             }
@@ -200,7 +204,12 @@ internal fun TierRow(title: String, subtitle: String, selected: Boolean, enabled
 private val idleLevels = PerformanceProfile.idleLevels
 
 @Composable
-private fun IdleLevelSlider(title: String, minutes: Int, description: String, tag: String, onChoose: (Int) -> Unit) {
+private fun IdleLevelSlider(
+    title: String, minutes: Int, description: String, tag: String,
+    /** 滑到“永不”时（拖动中就显示）在滑条下面用醒目色写的提醒；null 不写。 */
+    neverWarning: String? = null,
+    onChoose: (Int) -> Unit,
+) {
     // 旧设置里可能有不在档位上的值：落到最接近的档显示，拖动后才改。
     val index = PerformanceProfile.idleLevelIndex(minutes)
     var position by remember(minutes) { mutableStateOf(index.toFloat()) }
@@ -221,6 +230,10 @@ private fun IdleLevelSlider(title: String, minutes: Int, description: String, ta
             Text(idleLabel(idleLevels.first()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             Text(idleLabel(idleLevels.last()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (shown == 0 && neverWarning != null) {
+            Text(neverWarning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp).testTag("$tag-never-warning"))
         }
     }
 }
