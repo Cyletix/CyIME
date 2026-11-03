@@ -75,7 +75,9 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
             item { Text("点开语言，分别设置输入方案和键盘布局；下次切换到该语言时使用。长按可调整语言顺序。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(dragOrder.order + InputLanguage.supported.filterNot { it in languages }.map { it.id }, key = { it }) { id ->
+            // 拖动顺序要等下一帧才跟上开关：刚关掉的语言还在 dragOrder.order 里，又出现在未启用那段，
+            // 同一个 key 出现两次，LazyColumn 直接崩溃、设置页重开（11-02 关西班牙语）。这里只认当前真启用的。
+            items(languageRows(dragOrder.order + orderedLanguages.map { it.id }, languages), key = { it }) { id ->
                 val language = InputLanguage.entries.first { it.id == id }
                 val checked = language in languages
                 val canChange = language != InputLanguage.ENGLISH && !saving
@@ -205,4 +207,10 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
             item { Spacer(Modifier.height(16.dp)) }
         }
     }
+}
+
+/** 语言卡片的顺序：启用的按拖动顺序，后面是没启用的；每种语言只出现一次（LazyColumn 的 key 不能重复）。 */
+internal fun languageRows(enabledOrder: List<String>, enabled: Set<InputLanguage>): List<String> {
+    val head = enabledOrder.distinct().filter { id -> enabled.any { it.id == id } }
+    return head + InputLanguage.supported.map { it.id }.filterNot { it in head }
 }

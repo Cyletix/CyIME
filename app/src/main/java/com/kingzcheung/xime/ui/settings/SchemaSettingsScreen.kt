@@ -355,7 +355,8 @@ fun SchemaSettingsContent(
                 val listedOff = disabledAll.filter { it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.listedWhenOff }
                 val extraOff = disabledAll.filterNot { it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.listedWhenOff }
 
-                itemsIndexed(listedOff, key = { _, schema -> schema.schemaId }) { row, schema ->
+                // 关掉一个方案的那一帧，上面拖动排序的列表还没更新，同一个 id 会在两段里各出现一次；关着的行加前缀，key 不撞（11-03 关自然码崩溃）。
+                itemsIndexed(listedOff, key = { _, schema -> "off:${schema.schemaId}" }) { row, schema ->
                     SchemaToggleItem(
                         schema = schema,
                         enabled = false,
@@ -399,7 +400,7 @@ fun SchemaSettingsContent(
                     }
                 }
 
-                if (showExtraSchemas) itemsIndexed(extraOff, key = { _, schema -> schema.schemaId }) { row, schema ->
+                if (showExtraSchemas) itemsIndexed(extraOff, key = { _, schema -> "off:${schema.schemaId}" }) { row, schema ->
                     SchemaToggleItem(
                         schema = schema,
                         enabled = false,
