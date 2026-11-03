@@ -172,6 +172,19 @@ internal fun imeBottomInsetPx(
     return minOf(fullPx, gestureBarPx)
 }
 
+/** 系统资源里的导航栏高度（px），读不到为 0。 */
+private fun systemNavBarHeightPx(context: Context): Int {
+    val resId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+    return if (resId > 0) runCatching { context.resources.getDimensionPixelSize(resId) }.getOrDefault(0) else 0
+}
+
+/**
+ * 系统导航栏高度只有手势条那么高（1..[GESTURE_BAR_MAX_DP] dp），而给输入法的底部 inset 比它高：
+ * 说明是手势导航，多出来的是给输入法按钮框留的。三键导航时两者一样高（约 48dp）。
+ */
+internal fun navBarResourceShowsGestureBar(resourcePx: Int, insetPx: Int, density: Float): Boolean =
+    resourcePx > 0 && resourcePx <= (GESTURE_BAR_MAX_DP * density).roundToInt() && insetPx > resourcePx
+
 /** 系统的手势条高度：手势导航时 navigation_bar_height 是手势条那一小条，限制在 [GESTURE_BAR_MAX_DP] 内。 */
 private fun gestureBarHeightPx(context: Context, hintHidden: Boolean): Int {
     val max = ((if (hintHidden) GESTURE_HINT_HIDDEN_DP else GESTURE_BAR_MAX_DP) *
@@ -254,7 +267,10 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     val mandatory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
         insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
     else @Suppress("DEPRECATION") insets.mandatorySystemGestureInsets.bottom
-    val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null
+    // 贴底时再看系统自己的导航栏高度：有的厂商手势导航时 navigation_mode 仍写 0、自家开关也读不到，
+    // 但系统的 navigation_bar_height 已换成手势条那一小条（三键时是整条 48dp），这也算手势导航（11-03「调到最低还不行」）。
+    val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null ||
+        (edge && navBarResourceShowsGestureBar(systemNavBarHeightPx(context), normalPx, context.resources.displayMetrics.density))
     if (!gesture) return safe
     if (edge) return maxOf(cutout, navButtons)
     if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&

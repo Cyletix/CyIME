@@ -97,6 +97,17 @@ class FixedKeyboardBottomInsetTest {
         assertEquals(48, measure())
     }
 
+    @Test fun aGestureSizedSystemNavBarCountsAsGestureNavigation() {
+        // 手势条 16dp、给输入法 48dp：手势导航。
+        assertEquals(true, navBarResourceShowsGestureBar(resourcePx = 42, insetPx = 126, density = 2.625f))
+        // 三键：资源和 inset 一样高。
+        assertEquals(false, navBarResourceShowsGestureBar(resourcePx = 126, insetPx = 126, density = 2.625f))
+        // 资源已是手势条，但 inset 也只有这么高：没有多出来的，不算。
+        assertEquals(false, navBarResourceShowsGestureBar(resourcePx = 42, insetPx = 42, density = 2.625f))
+        // 读不到资源。
+        assertEquals(false, navBarResourceShowsGestureBar(resourcePx = 0, insetPx = 126, density = 2.625f))
+    }
+
     @Test fun samsungHideButtonKeepsRoomUnlessEdgeIsOn() {
         ShadowBuild.setManufacturer("samsung")
         mode(2)
