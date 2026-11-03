@@ -20,17 +20,25 @@ object SpeechModelCatalog {
     val models = listOf(
         ModelInfo(ZIPFORMER_JA_INT8, "Zipformer · 日语轻量", "约 153 MB，原版的 INT8 量化版；说话中预览、停顿后定稿，准确度与原版可能不同。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "291488c8151b", size = "153.0 MB", files = listOf(
-                ModelFile("encoder-epoch-99-avg-1.int8.onnx", "$reazonBase/encoder-epoch-99-avg-1.int8.onnx", "2c7bd08a8a99f9ddd0d9e458456577b1f6279214e51426f114f9eced44c54e1d", 154670139L),
-                ModelFile("decoder-epoch-99-avg-1.int8.onnx", "$reazonBase/decoder-epoch-99-avg-1.int8.onnx", "8f0bff94d38797b03b762634ed03211a8e303d06cc4603cdd0cf4199d6eb1485", 2959337L),
-                ModelFile("joiner-epoch-99-avg-1.int8.onnx", "$reazonBase/joiner-epoch-99-avg-1.int8.onnx", "49cc7ea1d3d35a40a27442db5e89996da64bf0e683a903dce76e99e57a12e4de", 2696970L),
-                ModelFile("tokens.txt", "$reazonBase/tokens.txt", "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def", 45754L)
+                ModelFile("encoder-epoch-99-avg-1.int8.onnx", "$reazonBase/encoder-epoch-99-avg-1.int8.onnx", "2c7bd08a8a99f9ddd0d9e458456577b1f6279214e51426f114f9eced44c54e1d", 154670139L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-int8-291488c8151b-encoder-epoch-99-avg-1.int8.onnx")),
+                ModelFile("decoder-epoch-99-avg-1.int8.onnx", "$reazonBase/decoder-epoch-99-avg-1.int8.onnx", "8f0bff94d38797b03b762634ed03211a8e303d06cc4603cdd0cf4199d6eb1485", 2959337L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-int8-291488c8151b-decoder-epoch-99-avg-1.int8.onnx")),
+                ModelFile("joiner-epoch-99-avg-1.int8.onnx", "$reazonBase/joiner-epoch-99-avg-1.int8.onnx", "49cc7ea1d3d35a40a27442db5e89996da64bf0e683a903dce76e99e57a12e4de", 2696970L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-int8-291488c8151b-joiner-epoch-99-avg-1.int8.onnx")),
+                ModelFile("tokens.txt", "$reazonBase/tokens.txt", "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def", 45754L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-int8-291488c8151b-tokens.txt"))
             )))),
         ModelInfo(ZIPFORMER_JA, "Zipformer · 日语原版", "约 586 MB，FP32 原版；说话中预览、停顿后定稿，加载及识别耗时较长。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "291488c8151b", size = "586.4 MB", files = listOf(
-                ModelFile("encoder-epoch-99-avg-1.onnx", "$reazonBase/encoder-epoch-99-avg-1.onnx", "ecdb0b771e16104aaf8e579cb3c1e32fbd589eb641c5946d82b615bd366c5f96", 592347848L),
-                ModelFile("decoder-epoch-99-avg-1.onnx", "$reazonBase/decoder-epoch-99-avg-1.onnx", "58b18211ae06265466bfa17172dab574df94f76c8bcb61a3640c28ba860e4124", 11767836L),
-                ModelFile("joiner-epoch-99-avg-1.onnx", "$reazonBase/joiner-epoch-99-avg-1.onnx", "d38a81d1191c9ed6de6a1719503692e07e3e973e2364adde0abae5eaaded1174", 10720115L),
-                ModelFile("tokens.txt", "$reazonBase/tokens.txt", "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def", 45754L)
+                ModelFile("encoder-epoch-99-avg-1.onnx", "$reazonBase/encoder-epoch-99-avg-1.onnx", "ecdb0b771e16104aaf8e579cb3c1e32fbd589eb641c5946d82b615bd366c5f96", 592347848L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-fp32-291488c8151b-encoder-epoch-99-avg-1.onnx")),
+                ModelFile("decoder-epoch-99-avg-1.onnx", "$reazonBase/decoder-epoch-99-avg-1.onnx", "58b18211ae06265466bfa17172dab574df94f76c8bcb61a3640c28ba860e4124", 11767836L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-fp32-291488c8151b-decoder-epoch-99-avg-1.onnx")),
+                ModelFile("joiner-epoch-99-avg-1.onnx", "$reazonBase/joiner-epoch-99-avg-1.onnx", "d38a81d1191c9ed6de6a1719503692e07e3e973e2364adde0abae5eaaded1174", 10720115L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-fp32-291488c8151b-joiner-epoch-99-avg-1.onnx")),
+                ModelFile("tokens.txt", "$reazonBase/tokens.txt", "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def", 45754L,
+                    mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "zipformer-ja-reazonspeech-fp32-291488c8151b-tokens.txt"))
             )))),
         ModelInfo("paraformer-zh-en-int8", "Paraformer · 中英", "中英流式识别，边说边出字；int8 量化。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "8e40c43232a1", size = "226.2 MB", files = listOf(
