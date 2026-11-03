@@ -318,7 +318,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("新短信验证码自动复制", clipboard, SettingsRoutes.ClipboardSync, "验证码 短信 自动复制 code"),
         SettingsSearchEntry("记录密码等敏感内容", clipboard, SettingsRoutes.ClipboardSync, "密码 敏感 银行卡 密码管理器 剪贴板 password"),
         SettingsSearchEntry("上屏后自动关闭剪贴板", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 关闭 粘贴 连续贴"),
-        SettingsSearchEntry("剪贴板卡片最多显示", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 卡片 行数 几行 显示 记录 折叠"),
+        SettingsSearchEntry("卡片显示行数", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 卡片 行数 几行 显示 记录 折叠 最多显示 剪贴板卡片最多显示"),
         SettingsSearchEntry("剪贴板数量上限", clipboard, SettingsRoutes.ClipboardSync,
             "剪贴板 条数 数量 最多 上限 保存 历史记录 不限 存文档", anchor = "数量上限", section = "历史记录"),
         SettingsSearchEntry("剪贴板保留时间", clipboard, SettingsRoutes.ClipboardSync,

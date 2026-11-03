@@ -83,7 +83,7 @@ class SettingsSearchTest {
         assertTrue("游戏直通" in titles("WASD"))
         assertTrue("显示模式" in titles("夜间模式"))
         assertTrue("玻璃效果" in titles("毛玻璃"))
-        assertTrue("剪贴板卡片最多显示" in titles("剪切板"))
+        assertTrue("卡片显示行数" in titles("剪切板"))
         assertTrue("性能与省电" in titles("卡顿"))
         assertTrue("我的短语" in titles("快捷短语"))
         assertTrue("Ctrl + 空格" in titles("ctrl"))
@@ -96,7 +96,7 @@ class SettingsSearchTest {
         assertTrue("繁体输出" in titles("繁體"))
         assertEquals(titles("14键"), titles("十四鍵"))
         assertTrue(titles("十四鍵").isNotEmpty())
-        assertTrue("剪贴板卡片最多显示" in titles("剪貼板"))
+        assertTrue("卡片显示行数" in titles("剪貼板"))
     }
 
     /** 「时间日期候选」按说法能搜到（用户 10-31 要的功能）。 */

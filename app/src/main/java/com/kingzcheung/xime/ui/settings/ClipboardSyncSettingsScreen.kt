@@ -250,8 +250,8 @@ private fun ClipboardCardLinesSetting(onNavigateToGroups: () -> Unit) {
                 prefs.edit().putBoolean(com.kingzcheung.xime.ui.menubar.CLIPBOARD_CLOSE_AFTER_PASTE_KEY, it).apply()
             },
         )
-        Column(Modifier.settingsSearchAnchor("剪贴板卡片最多显示").fillMaxWidth().padding(16.dp)) {
-            Text("剪贴板卡片最多显示", style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.settingsSearchAnchor("卡片显示行数").fillMaxWidth().padding(16.dp)) {
+            Text("卡片显示行数", style = MaterialTheme.typography.titleSmall)
             Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             listOf(2, 4, 8).forEach { option ->
