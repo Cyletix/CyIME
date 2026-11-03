@@ -45,6 +45,7 @@ fun SettingsScreen(
 
     LaunchedEffect(initialPluginId) {
         if (initialPluginId != null) {
+            // 网络授权也从这里进：详情页有域名授权，也能点「设置」「卸载」。
             navController.navigate("plugin_detail/$initialPluginId")
         }
     }
@@ -157,9 +158,7 @@ fun SettingsScreen(
                 onNavigateToModelDetail = { modelId ->
                     navController.navigate("model_market_detail/$modelId")
                 },
-                onNavigateToPluginDetail = { pluginId ->
-                    navController.navigate("plugin_detail/$pluginId")
-                },
+                onNavigateToPluginDetail = { pluginId -> openInstalledPlugin(navController, pluginId) },
                 // 方案的已安装管理与「语言与方案 › 已安装的方案」是同一页，不再另开一份本地方案页。
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
@@ -204,6 +203,7 @@ fun SettingsScreen(
             PluginDetailContent(
                 pluginId = pluginId,
                 onBack = { navController.popBackStack() },
+                onOpenSettings = { id -> navController.navigate("${SettingsRoutes.PluginSettings}/$id") },
             )
         }
         composable(SettingsRoutes.Theme) {
@@ -223,9 +223,7 @@ fun SettingsScreen(
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
                 },
-                onNavigateToPluginDetail = { pluginId ->
-                    navController.navigate("plugin_detail/$pluginId")
-                },
+                onNavigateToPluginDetail = { pluginId -> openInstalledPlugin(navController, pluginId) },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) }
             )
@@ -367,5 +365,17 @@ fun SettingsScreen(
             CreditsContent(onBack = { navController.popBackStack() })
         }
     }
+    }
+}
+
+/**
+ * 点已装的插件：能用的直接进它的设置页（填密钥、开关、网络授权都在那里）；已下架的进详情页，
+ * 那里写着功能去了哪里、可以卸载（11-03「装完了点开啥都没有，空页面」）。
+ */
+private fun openInstalledPlugin(navController: androidx.navigation.NavController, pluginId: String) {
+    if (pluginId in com.kingzcheung.xime.settings.XimeIndexSource.RETIRED_PLUGIN_IDS) {
+        navController.navigate("plugin_detail/$pluginId")
+    } else {
+        navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
     }
 }

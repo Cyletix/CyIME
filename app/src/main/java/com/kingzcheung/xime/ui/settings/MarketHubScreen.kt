@@ -1677,9 +1677,32 @@ internal fun modelFormatSize(bytes: Long): String {
 fun PluginDetailContent(
     pluginId: String,
     onBack: () -> Unit,
+    onOpenSettings: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val plugin = remember(pluginId) { PluginManager.getAllInstallPlugins().find { it.id == pluginId } }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var confirmUninstall by remember { mutableStateOf(false) }
+    if (confirmUninstall && plugin != null) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { confirmUninstall = false },
+        title = { Text("卸载插件") },
+        text = { Text("确定要卸载「${plugin.name.ifEmpty { plugin.id }}」吗？插件文件和配置会删掉。") },
+        confirmButton = {
+            TextButton(onClick = {
+                confirmUninstall = false
+                if (SettingsPreferences.getSttOnlinePluginId(context) == plugin.id) SettingsPreferences.setSttOnlinePluginId(context, "")
+                if (SettingsPreferences.getClipboardSyncPluginId(context) == plugin.id) SettingsPreferences.setClipboardSyncPluginId(context, "")
+                scope.launch {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        PluginManager.unloadPlugin(plugin.id)
+                        PluginManager.installerManager.uninstallPlugin(plugin.id)
+                    }
+                    onBack()
+                }
+            }) { Text("卸载", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton(onClick = { confirmUninstall = false }) { Text("取消") } },
+    )
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1764,6 +1787,18 @@ fun PluginDetailContent(
             if (plugin.versionName.isNotEmpty()) {
                 item { DetailMetaRow("版本", plugin.versionName) }
             }
+            // 详情页以前只有介绍，点进来什么都做不了（11-03 截图）：这里直接能进设置、能卸载。
+            val retired = plugin.id in com.kingzcheung.xime.settings.XimeIndexSource.RETIRED_PLUGIN_IDS
+            if (retired) item {
+                Text(retiredPluginNote(plugin.id), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error)
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!retired) FilledTonalButton(onClick = { onOpenSettings(plugin.id) }) { Text("设置") }
+                    OutlinedButton(onClick = { confirmUninstall = true }) { Text("卸载") }
+                }
+            }
             if (networkHosts.isNotEmpty()) {
                 item {
                     Text(
@@ -1790,4 +1825,13 @@ fun PluginDetailContent(
             }
         }
     }
+}
+
+/** 已下架插件在详情页的一句说明：功能去了哪里。 */
+internal fun retiredPluginNote(id: String): String = when (id.substringAfterLast('.')) {
+    "ai_translate", "ai_write" -> "已并入「AI 改写」，可以卸载"
+    "online_asr" -> "已内置：语音转文本 › 在线语音，可以卸载"
+    "typing_stats" -> "已内置：打字统计，可以卸载"
+    "kaomoji" -> "已内置：颜文字键盘，可以卸载"
+    else -> "已不再提供，可以卸载"
 }
