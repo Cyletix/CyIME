@@ -230,6 +230,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal val rimeEngine = RimeEngine.getInstance()
     internal val inputReadiness = InputReadiness(android.os.SystemClock::uptimeMillis)
+    private val inputDrops = InputDropLog(android.os.SystemClock::uptimeMillis, { FileLogger.w("InputDrop", it) })
+    /** When the current editor connection started; only for [noteInputDropped]. */
+    private var editorStartedAt = 0L
+
+    /** Logs input refused while no overlay explains it; see [InputDropLog]. Reason and gate state only. */
+    internal fun noteInputDropped(reason: String) = inputDrops.drop(reason) {
+        val editor = currentInputEditorInfo
+        "${inputReadiness.describe()} deploying=${uiState.value.isDeploying} " +
+            "pendingCommit=${keyRouter.hasPendingCandidateCommit} queued=${inputCommands.hasPendingCommands} " +
+            "editorAgeMs=${android.os.SystemClock.uptimeMillis() - editorStartedAt} " +
+            "app=${editor?.packageName} inputType=0x${Integer.toHexString(editor?.inputType ?: 0)} " +
+            "connection=${currentInputConnection != null} shown=$isInputViewShown"
+    }
     
     internal lateinit var clipboardManager: ClipboardManager
 
@@ -1893,7 +1906,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onCreateInputView(): View {
         keyboardContainer = VoiceKeyboardContainer(
             context = this,
-            acceptTouchDown = { downTime -> uiState.value.isDeploying || inputReadiness.acceptsEvent(downTime) },
+            acceptTouchDown = { downTime ->
+                (uiState.value.isDeploying || inputReadiness.acceptsEvent(downTime)).also { accepted ->
+                    if (!accepted) noteInputDropped(if (inputReadiness.ticket() == null) "touch_not_ready" else "touch_before_ready")
+                }
+            },
             allowPreviewTouch = ::allowSettingsPreviewTouch,
             uiStateProvider = { uiState.value },
             onUiStateChanged = { newState -> uiState.value = newState },
@@ -3362,6 +3379,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        editorStartedAt = android.os.SystemClock.uptimeMillis()
         val preview = KeyboardPanelLaunch.isPreview(attribute, packageName)
         val requestedTool = if (preview) KeyboardPanelLaunch.editorPanel(attribute) else null
         if ((preview || settingsPreviewEditor) && requestedTool != KeyboardPanelLaunch.Panel.RESIZE) cancelKeyboardResize()

@@ -61,7 +61,10 @@ internal fun rememberImeKeyboardCallbacks(
             onGlideWord = service.keyRouter::commitGlideWord,
             onGlideCode = service.keyRouter::typeGlideCode,
             glidePreviewer = service.keyRouter::glidePreviewer,
-            inputAdmissionTicket = { if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket() },
+            inputAdmissionTicket = {
+                (if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket())
+                    ?: null.also { service.noteInputDropped("t9_no_ticket") }
+            },
             captureInputContext = service.keyRouter::captureInputContext,
             t9LeftContext = {
                 if (service.candidateState.value.inputText.isNotEmpty() || service.t9PartialSegments.isNotEmpty() ||
@@ -78,7 +81,10 @@ internal fun rememberImeKeyboardCallbacks(
             onSelectPinyinSyllable = syllableSelector::select,
             onUndoPinyinSyllable = syllableSelector::undo,
             onKeyPress = keyPress@{ key, isShifted ->
-                if (service.inputReadiness.ticket() == null) return@keyPress
+                if (service.inputReadiness.ticket() == null) {
+                    service.noteInputDropped("key_not_ready")
+                    return@keyPress
+                }
                 if (service.keyRouter.usesDirectFieldInput) {
                     service.keyRouter.handleKeyPress(key, isShifted)
                     return@keyPress

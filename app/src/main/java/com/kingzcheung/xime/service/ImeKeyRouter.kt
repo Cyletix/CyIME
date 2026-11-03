@@ -664,7 +664,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal fun handleKeyPress(key: String, isShifted: Boolean, hardwarePageDirection: Int = 0,
         languageSwitchMode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null,
         hardwareEvent: KeyEvent? = null, mergedKey: Boolean = false) {
-        if (hasPendingCandidateCommit) return
+        if (hasPendingCandidateCommit) {
+            service.noteInputDropped("key_pending_commit")
+            return
+        }
         val inherited = InputCommandOwner.current.get()
         if (inherited != null) {
             inherited.requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
@@ -674,7 +677,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         check(android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
             "Only a direct Main input entry may create command ownership"
         }
-        val admission = service.inputReadiness.ticket() ?: return
+        val admission = service.inputReadiness.ticket() ?: return service.noteInputDropped("key_not_ready")
         // 实体键盘 Tab：手写板上还没确认的字先排队上屏，再处理 Tab（否则 Tab 换了输入框，这些字就丢了）
         if (hardwareEvent?.keyCode == KeyEvent.KEYCODE_TAB) service.keyboardViewModel.confirmPendingHandwriting?.invoke()
         commandOwner(admission).runInline { routeKeyPress(key, isShifted, hardwarePageDirection, languageSwitchMode, hardwareEvent, mergedKey) }

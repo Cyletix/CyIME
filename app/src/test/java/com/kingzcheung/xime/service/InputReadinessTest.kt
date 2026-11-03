@@ -58,4 +58,12 @@ class InputReadinessTest {
         assertNull(gate.ticket())
         assertFalse(gate.accepts(old))
     }
+    @Test fun describeReportsTheGateWithoutInput() {
+        var clock = 50L
+        val gate = InputReadiness { clock }
+        assertEquals("ready=false startup=false closed=false gen=0 readyAgoMs=-", gate.describe())
+        gate.completeStartup()
+        clock = 80L
+        assertEquals("ready=true startup=true closed=false gen=0 readyAgoMs=30", gate.describe())
+    }
 }

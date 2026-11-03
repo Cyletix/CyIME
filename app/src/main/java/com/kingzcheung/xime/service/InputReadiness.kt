@@ -19,4 +19,8 @@ internal class InputReadiness(private val uptimeMillis: () -> Long = { System.na
     @Synchronized fun acceptsEvent(downTime: Long): Boolean = ready && downTime >= readySince
     @Synchronized fun ticket(): Long? = if (ready) generation else null
     @Synchronized fun accepts(ticket: Long): Boolean = ready && generation == ticket
+    /** Gate state for a dropped-input log line; no input content. */
+    @Synchronized fun describe(): String =
+        "ready=$ready startup=$startupComplete closed=$closed gen=$generation readyAgoMs=" +
+            (if (readySince == Long.MAX_VALUE) "-" else (uptimeMillis() - readySince).toString())
 }
