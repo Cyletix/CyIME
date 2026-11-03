@@ -118,6 +118,62 @@ object HandwritingInference {
         return simplified
     }
 
+    /** 连笔时一笔最多取这么多点。 */
+    private const val MAX_POINTS_CURSIVE = 40
+    /** 拐点数（Douglas-Peucker，容差为字大小的 [CORNER_TOLERANCE]）超过这个数的笔算连笔。 */
+    private const val CURSIVE_CORNERS = 5
+    /** 连笔每多这么多个拐点多给 8 个点。 */
+    private const val CORNERS_PER_8_POINTS = 4
+    private const val CORNER_TOLERANCE = 0.05f
+
+    /**
+     * 中文单字识别用：普通的笔仍均匀取 8 点；几笔连成一笔、拐点多的笔多取点（每 4 个拐点 8 点，最多 40 点），
+     * 不然拐角全被丢掉，连笔字认不出。总点数超过模型输入长度时退回每笔 8 点。
+     * 只用于 [recognize]（中文候选）；[recognizeRaw] 给假名、字母模板当特征，模板按每笔 8 点做的，不能改。
+     */
+    internal fun simplifyStrokesCursive(
+        strokes: List<List<Pair<Float, Float>>>
+    ): List<List<Pair<Float, Float>>> {
+        val all = strokes.flatten()
+        if (all.isEmpty()) return simplifyStrokes(strokes)
+        val size = max(max(all.maxOf { it.first } - all.minOf { it.first }, all.maxOf { it.second } - all.minOf { it.second }), 1f)
+        val out = strokes.map { stroke ->
+            val corners = if (stroke.size > 2) cornerCount(stroke, CORNER_TOLERANCE * size) else stroke.size
+            if (corners <= CURSIVE_CORNERS) sample(stroke, MAX_POINTS_PER_STROKE)
+            else sample(stroke, min(MAX_POINTS_CURSIVE, 8 * ((corners - 1 + CORNERS_PER_8_POINTS - 1) / CORNERS_PER_8_POINTS)))
+        }
+        return if (out.sumOf { it.size } > FIXED_LEN) simplifyStrokes(strokes) else out
+    }
+
+    /** 按下标均匀取 [k] 个点（与 [simplifyStrokes] 同一取法）。 */
+    private fun sample(stroke: List<Pair<Float, Float>>, k: Int): List<Pair<Float, Float>> {
+        if (stroke.size <= k) return stroke
+        val step = (stroke.size - 1).toFloat() / (k - 1)
+        return (0 until k).map { i -> stroke[(i * step).roundToInt().coerceIn(0, stroke.size - 1)] }
+    }
+
+    /** Douglas-Peucker 保留的点数（含两端），偏离连线超过 [eps] 的点才算拐点。 */
+    internal fun cornerCount(stroke: List<Pair<Float, Float>>, eps: Float): Int {
+        val keep = BooleanArray(stroke.size)
+        keep[0] = true; keep[stroke.size - 1] = true
+        val stack = ArrayDeque<Pair<Int, Int>>()
+        stack.addLast(0 to stroke.size - 1)
+        while (stack.isNotEmpty()) {
+            val (a, b) = stack.removeLast()
+            if (b - a < 2) continue
+            val (ax, ay) = stroke[a]; val (bx, by) = stroke[b]
+            val vx = bx - ax; val vy = by - ay
+            val len = kotlin.math.hypot(vx, vy).takeIf { it > 0f } ?: 1f
+            var best = -1f; var at = -1
+            for (i in a + 1 until b) {
+                val d = kotlin.math.abs(vx * (stroke[i].second - ay) - vy * (stroke[i].first - ax)) / len
+                if (d > best) { best = d; at = i }
+            }
+            if (best > eps) { keep[at] = true; stack.addLast(a to at); stack.addLast(at to b) }
+        }
+        return keep.count { it }
+    }
+
     internal data class SequenceData(
         val data: FloatArray,
         val originalLen: Int,
@@ -200,7 +256,7 @@ object HandwritingInference {
         topK: Int
     ): List<HandwritingCandidate> {
         if (topK <= 0 || chars.isEmpty()) return emptyList()
-        val simplified = simplifyStrokes(strokes)
+        val simplified = simplifyStrokesCursive(strokes)
         if (simplified.isEmpty()) return emptyList()
 
         val seqData = strokesToSequence(simplified)
