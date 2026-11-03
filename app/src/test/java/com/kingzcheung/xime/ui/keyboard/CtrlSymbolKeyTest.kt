@@ -160,19 +160,48 @@ class CtrlSymbolKeyTest {
         assertEquals(emptyList<String>(), commands)
     }
 
-    @Test fun releasingOffTheLettersDoesNothing() {
-        show()
+    private fun dragFromSymbolKeyTo(tag: String) {
         val symbol = bounds("mode-slot-1")
-        val space = bounds("qwerty-enter-key")
+        val goal = bounds(tag)
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput {
             down(center)
-            val target = space.center - symbol.topLeft
+            val target = goal.center - symbol.topLeft
             for (step in 1..8) moveTo(center + (target - center) * (step / 8f))
             up()
         }
         rule.waitForIdle()
+    }
+
+    @Test fun releasingOffTheLettersDoesNothing() {
+        show()
+        dragFromSymbolKeyTo("space-key")
         assertEquals(emptyList<String>(), keys)
         assertEquals(emptyList<String>(), commands)
+    }
+
+    /** 用户 11-03：从 !@# 拖到回车上松手是 Ctrl+回车（发送），不打字、不开符号；第一次拖、拖第二次都一样。 */
+    @Test fun dragToEnterSendsCtrlEnter() {
+        show()
+        dragFromSymbolKeyTo("qwerty-enter-key")
+        assertEquals(listOf(CtrlShortcuts.ENTER_COMMAND), commands)
+        dragFromSymbolKeyTo("qwerty-enter-key")
+        assertEquals(listOf(CtrlShortcuts.ENTER_COMMAND, CtrlShortcuts.ENTER_COMMAND), commands)
+        assertEquals(emptyList<String>(), keys)
+    }
+
+    /** 用户 11-03：按住 !@#，另一根手指点回车：Ctrl+回车，不发普通回车，松开 !@# 也不开符号。 */
+    @Test fun secondFingerTapOnEnterSendsCtrlEnter() {
+        show()
+        val symbol = bounds("mode-slot-1").center
+        val enter = bounds("qwerty-enter-key").center
+        rule.onRoot().performTouchInput { down(0, symbol) }
+        rule.waitForIdle()
+        rule.onRoot().performTouchInput { down(1, enter); up(1) }
+        rule.waitForIdle()
+        rule.onRoot().performTouchInput { up(0) }
+        rule.waitForIdle()
+        assertEquals(listOf(CtrlShortcuts.ENTER_COMMAND), commands)
+        assertEquals("不打回车也不开符号", emptyList<String>(), keys)
     }
 
     /** 一根手指按住 !@#，另一根手指点字母：和按住 Shift 再点一样，发 Ctrl+字母、不打字，松开 !@# 也不开符号。 */

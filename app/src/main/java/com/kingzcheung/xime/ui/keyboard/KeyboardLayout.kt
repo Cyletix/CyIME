@@ -1360,14 +1360,21 @@ fun KeyboardLayout(
                             }
 
                             // 回车 — 硬编码。按住 !@# 时另一根手指点回车、或从 !@# 拖到回车上松手：Ctrl+回车，发送（用户 11-03）。
-                            DisposableEffect(shiftSlideTargets) { onDispose { shiftSlideTargets.remove("qwerty-enter-key") } }
+                            // 和字母键同一种登记：位置记成状态，每次重组都按当前位置登记到当前这块键盘的目标里，
+                            // 不靠某一次布局回调（键盘重建、目标换了一份时回车不会漏登记）；id 每个回车键各一个，别的键盘撤销不到它。
+                            val enterTargetId = remember { Any() }
+                            var enterBounds by remember { mutableStateOf(Rect.Zero) }
+                            DisposableEffect(shiftSlideTargets) { onDispose { shiftSlideTargets.remove(enterTargetId) } }
+                            androidx.compose.runtime.SideEffect {
+                                if (enterBounds != Rect.Zero) shiftSlideTargets.putEnter(enterTargetId, enterBounds)
+                            }
                             ActionKeyButton(
                                 text = enterKeyText,
                                 onClick = { if (!shiftSlideTargets.ctrlEnter()) onKeyPress("enter") },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
                                 modifier = Modifier.weight(bottom.enter).testTag("qwerty-enter-key")
-                                    .onGloballyPositioned { shiftSlideTargets.putEnter("qwerty-enter-key", it.boundsInRoot()) },
+                                    .onGloballyPositioned { enterBounds = it.boundsInRoot() },
                                 onPress = { onKeyPressDown?.invoke("enter") },
                                 onRelease = { onKeyRelease?.invoke("enter") },
                                 shadowEnabled = shadowEnabled,
