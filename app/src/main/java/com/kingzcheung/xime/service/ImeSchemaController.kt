@@ -377,7 +377,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     // 内部输入框每次新建连接会让 EditorCursor 当成换了输入框而丢掉选择锚点，同一输入框复用一个连接。
     private var internalConnection: Pair<android.widget.EditText, InputConnection>? = null
 
-    private fun internalConnectionFor(editor: android.widget.EditText): InputConnection? =
+    internal fun internalConnectionFor(editor: android.widget.EditText): InputConnection? =
         internalConnection?.takeIf { it.first === editor }?.second
             ?: editor.onCreateInputConnection(android.view.inputmethod.EditorInfo())?.also { internalConnection = editor to it }
 

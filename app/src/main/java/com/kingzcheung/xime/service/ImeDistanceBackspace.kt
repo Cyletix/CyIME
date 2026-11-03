@@ -10,7 +10,9 @@ import kotlinx.coroutines.withContext
 internal class ImeDistanceBackspace(private val service: XimeInputMethodService, private val editor: Long) {
     private val initial = service.uiState.value
     private val ticket = service.inputReadiness.ticket()
-    private val ic = service.currentInputConnection
+    // 焦点在键盘自己的输入框（新增固定等）时删那个框，和点按删除同一个框。
+    private val ic = service.editorConnection()
+    private val internal = initial.inputTarget.isInternal
     private var document: DistanceBackspace? = null
     private var code: DragCode? = null
     private var english = ""
@@ -21,7 +23,9 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
 
     private fun current() = ticket != null && service.inputReadiness.accepts(ticket) &&
         service.uiState.value.let { it.inputSessionId == editor && it.currentSchemaId == initial.currentSchemaId &&
-            it.isAsciiMode == initial.isAsciiMode && !it.inputTarget.isInternal && !it.showQuickSendForm } &&
+            it.isAsciiMode == initial.isAsciiMode && it.inputTarget == initial.inputTarget &&
+            // 新增固定开着而焦点不在它上面：点按删除删的是它，滑动也不能去删应用的框。
+            (internal || !it.showQuickSendForm) } &&
         !service.keyRouter.hasPendingCandidateCommit
 
     fun move(signed: Int) {
@@ -31,7 +35,7 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
         val count = kotlin.math.abs(signed)
         val forward = this.forward == true
         desired = count
-        if (!current() || ic == null || service.isSecretEditor() || service.currentInputConnection !== ic ||
+        if (!current() || ic == null || (!internal && service.isSecretEditor()) || service.editorConnection() !== ic ||
             service.keyboardCallbacks?.onPreeditKeyInput != null) return
         service.keyRouter.postRimeJob("distance-backspace") {
             if (invalid || !current()) return@postRimeJob
@@ -45,7 +49,7 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
                 } else if (composing == false && !candidates.isComposing && candidates.inputText.isEmpty() &&
                     candidates.preeditText.isEmpty() && service.t9PartialSegments.isEmpty()) {
                     withContext(Dispatchers.Main) {
-                        if (current() && service.currentInputConnection === ic) {
+                        if (current() && service.editorConnection() === ic) {
                             english = service.candidateState.value.pendingEnglishText
                             document = DistanceBackspace.open(ic, forward)
                         }
@@ -58,7 +62,7 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
             if (preedit != null) {
                 val result = preedit.move(engine, count, ::current) ?: run { invalid = true; return@postRimeJob }
                 withContext(Dispatchers.Main) {
-                    if (current() && service.currentInputConnection === ic) {
+                    if (current() && service.editorConnection() === ic) {
                         if (preedit.t9) service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
                         service.sessionController.updateUIWithResult(result)
                     }
@@ -71,9 +75,10 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
                 withContext(Dispatchers.Main) {
                     val cs = service.candidateState.value
                     if (!current() || cs.isComposing || cs.inputText.isNotEmpty() || cs.preeditText.isNotEmpty() ||
-                        service.currentInputConnection !== ic || !text.move(count)) { invalid = true; return@withContext }
+                        service.editorConnection() !== ic || !text.move(count)) { invalid = true; return@withContext }
                     // Text before the caret is untouched: keep prediction, association and English state.
-                    if (text.forward) return@withContext
+                    // 键盘自己的输入框不进联想上下文（和在里面上屏一样）。
+                    if (text.forward || internal) return@withContext
                     service.predictionManager.invalidatePendingPredictions()
                     service.predictionManager.replaceCommittedText(text.remainingContext)
                     val pending = english.dropLast(text.removedUnits.coerceAtMost(english.length))

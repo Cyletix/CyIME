@@ -561,6 +561,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal var lastClearedText: String = ""
     /** 空闲态上滑清空掉的整框文字，供下滑撤回原位恢复；与 [lastClearedText]（清掉的编码）互斥。 */
     @Volatile internal var lastClearedDocument: ClearedDocument? = null
+    /** 上面两样是从哪个输入框清掉的：下滑撤回只放回同一个框（应用的框清掉的字不能撤回到「新增固定」里）。 */
+    internal var lastClearedTarget: InputTarget = InputTarget.Host
     /** 累积的 partial commit 段列表（多段选词场景下逐段追加，文本+拼音同源，供调频/回滚） */
     internal val t9PartialSegments = mutableListOf<T9PartialSegment>()
     /** 键盘回调引用，用于在 RIME selectCandidate 前同步通知 T9 控制器 */
@@ -2738,9 +2740,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun performEditorMenuAction(actionId: Int) {
         when (actionId) {
             android.R.id.undo, android.R.id.redo ->
-                currentInputConnection?.let { sendUndoShortcut(it, redo = actionId == android.R.id.redo) }
-            android.R.id.paste -> if (!pasteIntoTerminal()) currentInputConnection?.performContextMenuAction(actionId)
-            else -> currentInputConnection?.performContextMenuAction(actionId)
+                editorConnection()?.let { sendUndoShortcut(it, redo = actionId == android.R.id.redo) }
+            android.R.id.paste -> if (!pasteIntoTerminal()) editorConnection()?.performContextMenuAction(actionId)
+            else -> editorConnection()?.performContextMenuAction(actionId)
         }
     }
 
@@ -3247,8 +3249,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             schemaController.moveEditorCursorVertical(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1)
             return
         }
-        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+        val connection = editorConnection() ?: return
+        connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
     }
 
     override fun executeCommand(name: String) {
@@ -3275,7 +3278,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 // 屏幕上的符号键按住当 Ctrl：和实体键盘一样把 Ctrl+字母交给应用，编码中的拼音不动。
                 val now = SystemClock.uptimeMillis()
-                com.kingzcheung.xime.keyboard.CtrlShortcuts.keyEvents(letter, now).forEach { currentInputConnection?.sendKeyEvent(it) }
+                // 焦点在键盘自己的输入框时 Ctrl+Z 等给那个框，不给后面的应用。
+                val connection = editorConnection()
+                com.kingzcheung.xime.keyboard.CtrlShortcuts.keyEvents(letter, now).forEach { connection?.sendKeyEvent(it) }
             } ?: FileLogger.w(TAG, "Unknown command: $name")
         }
     }
@@ -4756,15 +4761,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             QuickSendFormCodeEditTextHolder.editText
         else QuickSendFormEditTextHolder.editText
         et?.let { box ->
-            val start = box.selectionStart.coerceAtLeast(0)
-            val end = box.selectionEnd.coerceAtLeast(start)
-            if (end > start) {
-                box.text?.delete(start, end)
-                try { box.setSelection(start) } catch (_: Exception) {}
-            } else if (start > 0) {
-                box.text?.delete(start - 1, start)
-                try { box.setSelection(start - 1) } catch (_: Exception) {}
-            }
+            val text = box.text ?: return@let
+            // 和应用里一样：开着「输入成对符号」时光标夹在一对空符号中间，两边一起删。
+            if (box.selectionStart == box.selectionEnd && uiState.value.inputTarget.editText() === box &&
+                SettingsPreferences.isPairedSymbolsEnabled(this) && deleteEmptyPairAroundCursor()) return@let
+            val range = internalBackspaceRange(text, box.selectionStart, box.selectionEnd) ?: return@let
+            text.delete(range.first, range.last + 1)
+            try { box.setSelection(range.first) } catch (_: Exception) {}
         }
         return true
     }
@@ -4865,6 +4868,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         typingStatsComboKey = key
         typingStatsComboValue = combo
         return combo
+    }
+
+    /**
+     * 键盘这一下要改的输入框：焦点在键盘自己的输入框（新增固定、剪贴板搜索、工具面板）时是那个框，否则是应用的。
+     * 清空、撤回、左右滑删除、Ctrl 键、自定义手势都走这里，不能把操作落到后面应用的输入框
+     * （用户 11-03：新增固定里上滑清空没反应，其实清的是后面应用的框）。主线程调用。
+     */
+    internal fun editorConnection(): InputConnection? {
+        val target = uiState.value.inputTarget
+        if (!target.isInternal) return currentInputConnection
+        return target.editText()?.let(schemaController::internalConnectionFor)
     }
 
     /** 退格：开着「输入成对符号」且光标夹在一对空符号中间时两边一起删，否则照常发退格键。 */

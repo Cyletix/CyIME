@@ -48,4 +48,23 @@ class InputTargetTest {
     @Test fun hostHasNoInternalEditor() {
         assertEquals(null, InputTarget.Host.editText())
     }
+
+    /** 新增固定等键盘自己的输入框里点删除（11-03）：和应用里的退格一样删一个完整的字，有选区删选区。 */
+    @Test fun internalBackspaceDeletesOneWholeCharacterOrTheSelection() {
+        assertEquals(1 until 2, internalBackspaceRange("ab", 2, 2))
+        assertEquals(null, internalBackspaceRange("ab", 0, 0))
+        assertEquals(null, internalBackspaceRange("", -1, -1))
+        // 选区：正着拖、反着拖都删整段。
+        assertEquals(1 until 3, internalBackspaceRange("abcd", 1, 3))
+        assertEquals(1 until 3, internalBackspaceRange("abcd", 3, 1))
+        // 表情占两个 UTF-16 单元，以前只删半个，留下乱码。
+        val face = "a\uD83D\uDE00"
+        assertEquals(1 until 3, internalBackspaceRange(face, 3, 3))
+        // 国旗是两个区域字母，删一下删整面旗。
+        val flag = "x\uD83C\uDDE8\uD83C\uDDF3"
+        assertEquals(1 until 5, internalBackspaceRange(flag, 5, 5))
+        // 长草稿只看光标前一小段，结果照样落在整段里的正确位置。
+        val long = "字".repeat(200) + "好"
+        assertEquals(200 until 201, internalBackspaceRange(long, 201, 201))
+    }
 }

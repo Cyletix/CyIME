@@ -505,7 +505,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 if (!service.uiState.value.isAsciiMode) return@withEditor
                 service.predictionManager.invalidatePendingPredictions()
                 val state = service.candidateState.value
-                val textBefore = service.currentInputConnection?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+                val textBefore = service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
                 val replaceSupported = service.supportsEnglishCandidateReplace()
                 val previous = previousGlide(state, textBefore, replaceSupported)
                 fun planFor(previous: com.kingzcheung.xime.glide.PreviousGlide?) = com.kingzcheung.xime.glide.planGlideCommit(
@@ -519,7 +519,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 // 换上一个词没成功（宿主拒绝）就只选这一笔，不留整对候选。
                 if (previous != null && plan.replacePrevious != null && head == previous.text) plan = planFor(null)
                 val word = plan.word
-                val before = service.currentInputConnection?.getTextBeforeCursor(1, 0)?.lastOrNull()
+                val before = service.editorConnection()?.getTextBeforeCursor(1, 0)?.lastOrNull()
                 val text = com.kingzcheung.xime.glide.glideCommitText(word, before)
                 if (!service.commitTextAndPredict(text, isPaste = false, allowPrediction = false).accepted) return@withEditor
                 lastGlide = com.kingzcheung.xime.glide.PreviousGlide(word, candidates.take(com.kingzcheung.xime.glide.PAIR_TOP), case)
@@ -548,7 +548,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal fun glidePreviewer(): ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> String)? {
         if (!service.uiState.value.isAsciiMode) return null
         val state = service.candidateState.value
-        val textBefore = runCatching { service.currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() }.getOrNull().orEmpty()
+        val textBefore = runCatching { service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString() }.getOrNull().orEmpty()
         val previous = previousGlide(state, textBefore, service.supportsEnglishCandidateReplace())
         val before = com.kingzcheung.xime.glide.glideContextWord(if (previous != null) textBefore.dropLast(previous.text.length) else textBefore)
         return { candidates, case ->
@@ -976,6 +976,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val beforeOnly = clearPrefs.getBoolean(
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
                     val scope = ClearAllScope.of(hasInputState(candState), wholeField)
+                    // 清的是焦点所在的框：键盘自己的输入框（新增固定等）有焦点时清它，不清后面应用的框。
+                    service.lastClearedTarget = service.uiState.value.inputTarget
                     if (!scope.field) {
                         service.lastClearedDocument = null
                         // 输入态：只清输入态（等价于 clear_composition），并记录 lastClearedText 供下滑撤回。
@@ -985,7 +987,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             // 直接上屏模式：英文编码已逐字落盘，"清输入态"需回删屏上对应字符；
                             // 校验光标前文本一致才删除并记录撤回，否则只清状态不动已上屏文本。
                             val removed = withEditor {
-                                val ic = service.currentInputConnection ?: return@withEditor false
+                                val ic = service.editorConnection() ?: return@withEditor false
                                 val before = runCatching {
                                     ic.getTextBeforeCursor(pendingEnglish.length, 0)?.toString()
                                 }.getOrNull()
@@ -1025,12 +1027,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             service.lastClearedText = ""
                             service.lastClearedDocument = null
                             rejected = rejectedCommitBefore(clearing = true)
-                            service.currentInputConnection?.let { ic ->
-                                service.endComposingInputBox()
+                            service.editorConnection()?.let { ic ->
+                                if (!service.uiState.value.inputTarget.isInternal) service.endComposingInputBox()
                                 val limit = XimeInputMethodService.SAFE_TEXT_LIMIT
                                 val document = ic.readDocumentForClear(limit) ?: return@let
                                 service.lastClearedDocument = ic.clearDocument(document, limit,
-                                    stillCurrent = { service.currentInputConnection === ic }, beforeOnly = beforeOnly)
+                                    stillCurrent = { service.editorConnection() === ic }, beforeOnly = beforeOnly)
                             }
                             if (service.lastClearedDocument == null) service.lastClearedText = composedText
                         }
@@ -1041,17 +1043,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 "undo_clear" -> {
                     // 下滑撤回 = 撤销"上滑清空"，仅空闲态有效（输入态恢复会插入错误位置），
                     // 判定与 clear_all 共用 hasInputState()。
-                    if (!hasInputState(candState)) {
+                    // 只放回清掉它的那个框（应用的框 / 新增固定等键盘自己的框）。
+                    if (!hasInputState(candState) && service.lastClearedTarget == service.uiState.value.inputTarget) {
                         val text = service.lastClearedText
                         val document = service.lastClearedDocument
                         if (document != null) withEditor {
                             // 整框清空的撤回：原位放回、光标回原处；清空后输入框被改过就不放（审计 F06）。
-                            val ic = service.currentInputConnection ?: return@withEditor
+                            val ic = service.editorConnection() ?: return@withEditor
                             if (ic.restoreDocument(document, XimeInputMethodService.SAFE_TEXT_LIMIT)) service.lastClearedDocument = null
                         } else if (text.isNotEmpty()) {
                             service.lastClearedText = ""
                             withEditor {
-                                val ic = service.currentInputConnection
+                                val ic = service.editorConnection()
                                 if (ic != null) {
                                     // newCursorPosition=1：光标停在撤回内容末尾；
                                     // 传 text.length 会被 clamp 到整段文本末尾。
@@ -1849,15 +1852,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     /** Backspace in the tool panel / clipboard search field: the selection, or the character before the caret. */
     private fun deleteInToolPanelField() {
         ToolPanelEditTextHolder.editText?.let { et ->
-            val start = et.selectionStart.coerceAtLeast(0)
-            val end = et.selectionEnd.coerceAtLeast(start)
-            if (start == end && start > 0) {
-                et.text?.delete(start - 1, start)
-                try { et.setSelection(start - 1) } catch (_: Exception) {}
-            } else if (end > start) {
-                et.text?.delete(start, end)
-                try { et.setSelection(start) } catch (_: Exception) {}
-            }
+            val text = et.text ?: return@let
+            val range = internalBackspaceRange(text, et.selectionStart, et.selectionEnd) ?: return@let
+            text.delete(range.first, range.last + 1)
+            try { et.setSelection(range.first) } catch (_: Exception) {}
         }
     }
 
