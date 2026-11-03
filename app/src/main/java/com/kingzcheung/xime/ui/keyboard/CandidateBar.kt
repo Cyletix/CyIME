@@ -52,7 +52,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -600,7 +599,6 @@ fun CandidateBar(
                             fontSize = candidateTextSize.sp,
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
-                            learned = state is CandidateBarState.ChineseCandidates && candidate in LocalLearnedCandidates.current,
                             correction = if (state is CandidateBarState.ChineseCandidates) LocalCorrectedCandidates.current[candidate].orEmpty() else "",
                             horizontalPadding = candidateItemPadding,
                         )
@@ -929,8 +927,6 @@ internal fun candidatePrimaryTextStyle(
 internal fun candidateTwoLineTextStyle(primary: TextStyle, fontSize: androidx.compose.ui.unit.TextUnit) =
     primary.copy(fontSize = fontSize, lineHeight = (fontSize.value * CANDIDATE_TWO_LINE_SPACING).sp)
 
-/** 当前候选中用户以前打过的词（按文字），由键盘根部提供。 */
-internal val LocalLearnedCandidates = androidx.compose.runtime.compositionLocalOf<Set<String>> { emptySet() }
 internal val LocalCorrectedCandidates = androidx.compose.runtime.compositionLocalOf<Map<String, String>> { emptyMap() }
 
 private val CorrectionRed = Color(0xFFE53935)
@@ -968,8 +964,6 @@ fun CandidateItem(
     onLongClick: (() -> Unit)? = null,
     opaqueComment: Boolean = false,
     textShadow: androidx.compose.ui.graphics.Shadow? = null,
-    /** 用户以前打过的词：文字右上角画一个小编辑图标。 */
-    learned: Boolean = false,
     /** 纠错来的候选：引擎给的逐音节纠正，代替拼音注释标出怎么改的。 */
     correction: String = "",
     /** Shift 拖动指着别的候选时由候选栏统一画底色，这里先不画，保证只亮一个。 */
@@ -1022,15 +1016,6 @@ fun CandidateItem(
             style = primaryStyle,
             overflow = TextOverflow.Ellipsis,
         )
-        if (learned) {
-            androidx.compose.material3.Icon(
-                imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
-                contentDescription = null,
-                tint = accentColor,
-                modifier = Modifier.align(Alignment.Top).size(with(LocalDensity.current) { learnedMarkSize(fontSize).toDp() })
-                    .testTag("candidate-learned:$index"),
-            )
-        }
         if (correction.isNotEmpty() || comment.isNotEmpty()) {
             Spacer(modifier = Modifier.width(3.dp))
             val commentColor = if (isSelected) selectedTextColor.copy(alpha = if (opaqueComment) 1f else 0.6f) else textColor.copy(alpha = if (opaqueComment) 1f else 0.5f)
@@ -1049,10 +1034,6 @@ fun CandidateItem(
         }
     }
 }
-
-/** 「打过的词」小图标的边长：画图标和量候选宽度共用，量少了最后一个候选会被挤到栏外。 */
-internal fun learnedMarkSize(fontSize: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.TextUnit =
-    (fontSize.value * 0.45f).sp
 
 /** 候选后面那段小字：有纠错显示纠错，否则显示注释（和 [CandidateItem] 一致）。 */
 internal fun candidateSecondaryText(comment: String, correction: String): AnnotatedString =
@@ -1474,10 +1455,9 @@ internal fun FixedCandidateStrip(
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
-        // 小图标、纠错和画出来的一样算进宽度，否则放不下的最后一个候选也算「显示了」，「下一项」移到它时被栏边切掉。
-        val learnedCandidates = LocalLearnedCandidates.current
+        // 纠错和画出来的一样算进宽度，否则放不下的最后一个候选也算「显示了」，「下一项」移到它时被栏边切掉。
         val correctedCandidates = LocalCorrectedCandidates.current
-        val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, learnedCandidates, correctedCandidates) {
+        val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, correctedCandidates) {
             val bodyWidths = HashMap<Int, Int>()
             fun bodyWidth(index: Int): Int = bodyWidths.getOrPut(index) {
                 val numbered = index < candidates.size
@@ -1485,9 +1465,7 @@ internal fun FixedCandidateStrip(
                 val primary = measurer.measure(AnnotatedString(text),
                     candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused),
                     softWrap = false).size.width
-                val learnedMark = if (numbered && all[index] in learnedCandidates)
-                    with(density) { learnedMarkSize(fontSize).toDp().roundToPx() } else 0
-                primary + learnedMark + with(density) { 2 * itemPadding.roundToPx() }
+                primary + with(density) { 2 * itemPadding.roundToPx() }
             }
             val fullWidths = HashMap<Int, Int>()
             fun widthAt(index: Int): Int = fullWidths.getOrPut(index) {
@@ -1611,7 +1589,6 @@ internal fun FixedCandidateStrip(
                     modifier = Modifier.testTag("bar-candidate:$index")
                         .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
-                    learned = index < candidates.size && all[index] in LocalLearnedCandidates.current,
                     correction = if (index < candidates.size) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
                     selectionFill = shiftDragFree && !highlightShown, horizontalPadding = itemPadding, fit = window.fits[index])
             }
@@ -1726,7 +1703,6 @@ private fun ScrollableCandidateRow(
                 modifier = if (hidden) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier.testTag("bar-candidate:$index")
                     .then(if (index == focused) Modifier.onGloballyPositioned { onFocusedBounds(it.boundsInRoot()) } else Modifier),
                 onLongClick = if (numbered) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
-                learned = numbered && all[index] in LocalLearnedCandidates.current,
                 correction = if (numbered) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
                 selectionFill = selectionFill,
                 interactive = !hidden, horizontalPadding = itemPadding, fit = fits[index])

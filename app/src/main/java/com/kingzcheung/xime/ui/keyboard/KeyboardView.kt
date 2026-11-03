@@ -984,7 +984,6 @@ fun KeyboardView(
             }
 
             androidx.compose.runtime.CompositionLocalProvider(
-                LocalLearnedCandidates provides candidateState.value.learnedCandidates,
                 LocalCorrectedCandidates provides candidateState.value.correctedCandidates) {
             ScaledCandidateBar(candidateBarScaleState.floatValue) {
             CandidateBar(

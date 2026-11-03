@@ -169,7 +169,6 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             preeditText = displayText,
             candidates = displayCandidates,
             candidateComments = displayComments,
-            learnedCandidates = candidatesWithComments.filter { it.learned }.mapTo(HashSet()) { it.text },
             correctedCandidates = candidatesWithComments.filter { it.correction.isNotEmpty() }.associate { it.text to it.correction },
             isComposing = isComposing,
             // 刚打 @ 给的邮箱后缀（默认关）不是英文补全，跟着这次刷新留着。
@@ -317,7 +316,6 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             preeditText = displayText,
             candidates = displayCandidates,
             candidateComments = displayComments,
-            learnedCandidates = candidatesWithComments.filter { it.learned }.mapTo(HashSet()) { it.text },
             correctedCandidates = candidatesWithComments.filter { it.correction.isNotEmpty() }.associate { it.text to it.correction },
             isComposing = isComposing,
             // 刚打 @ 给的邮箱后缀（默认关）不是英文补全，跟着这次刷新留着。
