@@ -81,23 +81,13 @@ fun ModelLocalContent(
     var pendingDelete by remember { mutableStateOf<ModelItemState?>(null) }
 
     pendingDelete?.let { model ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("删除模型") },
-            text = { Text("确定删除「${model.model.name}」？模型文件将被删除，此操作不可撤销。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingDelete = null
-                    viewModel.deleteModel(model.model.id)
-                }) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
-                }
+        ModelDeleteDialog(
+            item = model,
+            onConfirm = {
+                pendingDelete = null
+                viewModel.deleteModel(model.model.id)
             },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) {
-                    Text("取消")
-                }
-            },
+            onDismiss = { pendingDelete = null },
         )
     }
 
@@ -170,6 +160,47 @@ fun ModelLocalContent(
             }
         }
     }
+}
+
+/** 删除模型的确认框：模型管理页和模型详情页共用。 */
+@Composable
+internal fun ModelDeleteDialog(
+    item: ModelItemState,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val note = remember(item.model.id) { modelDeleteNote(context, item.model.id) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("删除模型") },
+        text = {
+            Text("确定删除「${item.model.name}」？模型文件将被删除，此操作不可撤销。" +
+                (note?.let { "\n$it" } ?: ""))
+        },
+        confirmButton = {
+            TextButton(modifier = Modifier.testTag("model-delete-confirm"), onClick = onConfirm) {
+                Text("删除", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
+}
+
+/**
+ * 补全词表跟着语言走：语言开着时，打这门语言发现词表不在就会在后台重新下载。
+ * 删之前说清楚，免得以为没删掉；语言没开时不提示。
+ */
+internal fun modelDeleteNote(context: android.content.Context, modelId: String): String? {
+    val letters = com.kingzcheung.xime.settings.LetterLanguage.entries
+        .firstOrNull { it.wordsModel == modelId } ?: return null
+    if (letters.language !in com.kingzcheung.xime.settings.LanguagePreferences.enabled(context)) return null
+    val name = letters.language.displayName
+    return "${name}还开着，打${name}时会重新下载。"
 }
 
 /** 下载线路：网络慢或无法访问时换线路。 */

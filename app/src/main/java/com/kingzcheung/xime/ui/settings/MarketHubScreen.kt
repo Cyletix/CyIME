@@ -1337,6 +1337,15 @@ private fun ModelDetailBody(
     val selectedVersion = uiState.selectedVersions[model.id]
         ?: model.downloadableVersions.firstOrNull()?.version.orEmpty()
     val selectedVersionObj = model.downloadableVersions.firstOrNull { it.version == selectedVersion }
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete && item.isDownloaded) ModelDeleteDialog(
+        item = item,
+        onConfirm = {
+            confirmDelete = false
+            viewModel.deleteModel(model.id)
+        },
+        onDismiss = { confirmDelete = false },
+    )
 
     val listState = rememberLazyListState()
     LazyColumn(
@@ -1420,6 +1429,16 @@ private fun ModelDetailBody(
         } else if (model.size.isNotEmpty()) {
             item {
                 DetailMetaRow("大小", model.size)
+            }
+        }
+
+        // 详情页以前只能下载，删除只在右上「已安装」里（11-03 截图）：装好的模型这里也能删，同插件详情的「卸载」。
+        if (item.isDownloaded && item.downloadState !is ModelDownloadState.Downloading) {
+            item {
+                OutlinedButton(
+                    modifier = Modifier.testTag("model-detail-delete"),
+                    onClick = { confirmDelete = true },
+                ) { Text("删除") }
             }
         }
 

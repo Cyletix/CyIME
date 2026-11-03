@@ -228,6 +228,9 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
                     }
                 }
                 _uiState.update { s -> s.copy(toastMessage = "模型已删除") }
+            } else {
+                // 以前删不掉时什么都不提示，看起来像按钮没反应。
+                _uiState.update { s -> s.copy(toastMessage = "删除失败") }
             }
         }
     }
