@@ -230,4 +230,21 @@ class PerformanceCostsTest {
         assertEquals(10.0, CellDictionaryCost.slowdown(50_000, curve), 1e-9)
         assertNull(CellDictionaryCost.Curve.fromDevice(device))
     }
+
+    // ---- 11-03 设置排查：引擎实测、慢键、档位预估 ----
+
+    @Test fun engineMeasuredCostsShowSlowKeysAndSayWhereTheyCameFrom() {
+        val engine = device.copy(items = device.items + ("neighbor_correction" to
+            PerformanceCosts.Cost(keyMs = 0.24, keyP95Ms = 1.18, basis = PerformanceCosts.BASIS_ENGINE)))
+        val source = PerformanceCosts.Source(engine, local = false, sameModel = true)
+        // 中位数低于误差不写，慢键多出 1.2 ms 要写；来源写电脑引擎实测，不冒充平板实测。
+        assertEquals("性能开销：慢键 +1.2 ms(电脑引擎实测)", PerformanceCosts.note(source, "neighbor_correction"))
+        // 按档位折算的系数是手机芯片的，电脑上测的不乘。
+        val low = PerformanceCosts.scale(engine, 2.8)
+        assertEquals(0.24, low.items.getValue("neighbor_correction").keyMs!!, 1e-9)
+        // 本机表缺这项时从安装包表补，引擎实测不标成估算。
+        val filled = PerformanceCosts.fillFrom(device.copy(items = emptyMap()), engine)
+        assertFalse(filled.items.getValue("neighbor_correction").estimated)
+        assertEquals(1.18, PerformanceCosts.total(engine, setOf("neighbor_correction")).keyP95Ms, 1e-9)
+    }
 }

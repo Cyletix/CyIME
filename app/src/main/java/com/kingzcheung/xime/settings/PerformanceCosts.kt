@@ -254,7 +254,20 @@ object PerformanceCosts {
         val estimated: Boolean = false,
         /** 不按每键算的开销（只在用到时才有，如滑行预览只在滑动中占 CPU），原样写在数字后面。 */
         val note: String? = null,
+        /**
+         * 最慢 5% 的按键多几毫秒（卡不卡主要看它）。引擎类开关平时每键只多零点几毫秒，慢键多出几毫秒，
+         * 只写中位数会显得没影响；空时不写。
+         */
+        val keyP95Ms: Double? = null,
+        /**
+         * 数从哪来：空 = 这台设备触摸到出字实测（或估算，看 [estimated]）；[BASIS_ENGINE] = 电脑上用同一份输入法引擎
+         * 逐键实测（`/mnt/project-files/perf-matrix-1103`，只含引擎查词排序，不含画面），不是这台设备测的。
+         */
+        val basis: String? = null,
     )
+
+    /** [Cost.basis]：电脑同源引擎实测。 */
+    const val BASIS_ENGINE = "engine"
 
     @Serializable
     data class Combo(val name: String = "", val on: List<String> = emptyList(), val keyMs: Double? = null, val memoryMb: Double? = null)
@@ -306,6 +319,8 @@ object PerformanceCosts {
          * 不在开关基线里，以前总开销漏了它（平板 11-03：总开销写 +82 MB，:asr 实际 605 MB）。
          */
         val voiceResident: Cost? = null,
+        /** 九键词组模型（t9_ngram.lm）装着时九键每键多花的时间；不是开关，在九键上且模型装着时计入总开销。 */
+        val t9Model: Cost? = null,
     ) {
         /** 一项都还没实测（安装包表里的估算）。 */
         val allEstimated: Boolean get() = items.isNotEmpty() && items.values.all { it.estimated }
@@ -353,11 +368,14 @@ object PerformanceCosts {
     /** [device] 缺的项从 [reference] 补，补上的都标估算（不是这台机器测的）；本机测过的项没写 note 时沿用 [reference] 的。 */
     fun fillFrom(device: Device, reference: Device?): Device {
         reference ?: return device
-        val missing = reference.items.filterKeys { it !in device.items }.mapValues { it.value.copy(estimated = true) }
+        val missing = reference.items.filterKeys { it !in device.items }
+            .mapValues { (_, c) -> if (c.basis == BASIS_ENGINE) c else c.copy(estimated = true) }
         val noted = device.items.mapValues { (id, c) -> if (c.note == null) c.copy(note = reference.items[id]?.note) else c }
         val voice = device.voiceResident ?: reference.voiceResident?.copy(estimated = true)
-        return if (missing.isEmpty() && noted == device.items && voice === device.voiceResident) device
-            else device.copy(items = noted + missing, voiceResident = voice)
+        // 引擎实测不是哪台设备的数，补过来照原样标来源，不改成估算。
+        val t9 = device.t9Model ?: reference.t9Model?.let { if (it.basis == BASIS_ENGINE) it else it.copy(estimated = true) }
+        return if (missing.isEmpty() && noted == device.items && voice === device.voiceResident && t9 === device.t9Model) device
+            else device.copy(items = noted + missing, voiceResident = voice, t9Model = t9)
     }
 
     /** 每键耗时都乘 [factor]（基线一起乘，“慢百分之几”不变）；内存不变。 */
@@ -368,7 +386,9 @@ object PerformanceCosts {
         return device.copy(
             baseline = device.baseline.x(),
             noiseMs = device.noiseMs * factor,
-            items = device.items.mapValues { (_, c) -> c.copy(keyMs = c.keyMs.x(), baselineKeyMs = c.baselineKeyMs.x()) },
+            // 引擎实测是电脑上的数，不按档位折算（折算系数是按手机芯片定的）。
+            items = device.items.mapValues { (_, c) -> if (c.basis == BASIS_ENGINE) c
+                else c.copy(keyMs = c.keyMs.x(), keyP95Ms = c.keyP95Ms.x(), baselineKeyMs = c.baselineKeyMs.x()) },
             combos = device.combos.map { it.copy(keyMs = it.keyMs.x()) },
             dictionaries = device.dictionaries.map { it.copy(keyMs = it.keyMs.x(), keyP95Ms = it.keyP95Ms.x()) },
             dictionaryBaseline = device.dictionaryBaseline?.x(),
@@ -406,6 +426,7 @@ object PerformanceCosts {
         cost.keyMs?.let { ms ->
             if (ms >= device.noiseMs) parts += "每键 +${oneDecimal(ms)} ms(慢 ${percent(ms, cost.baselineKeyMs ?: device.baseline.keyMs)}%)"
         }
+        cost.keyP95Ms?.let { ms -> if (ms >= device.noiseMs) parts += "慢键 +${oneDecimal(ms)} ms" }
         cost.memoryMb?.let { mb -> if (mb >= 1) parts += "内存 +${mb.roundToInt()} MB" }
         cost.note?.takeIf { it.isNotBlank() }?.let { parts += it }
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
@@ -415,7 +436,11 @@ object PerformanceCosts {
     fun note(source: Source, id: String, label: String = "性能开销"): String? {
         val cost = source.device.items[id]
         val text = describe(cost, source.device) ?: return null
-        return "$label：$text" + if (cost?.estimated == true) "" else reference(source)
+        return "$label：$text" + when {
+            cost?.basis == BASIS_ENGINE -> "(电脑引擎实测)"
+            cost?.estimated == true -> ""
+            else -> reference(source)
+        }
     }
 
     /**
@@ -462,6 +487,8 @@ object PerformanceCosts {
         val baselineKeyMs: Double? = null,
         /** 开着、按估算计入的项（还没实测）。 */
         val estimated: List<String> = emptyList(),
+        /** 各项慢键多出的毫秒直接相加（只有引擎实测有这个数，不校准）；没有为 0。 */
+        val keyP95Ms: Double = 0.0,
     )
 
     /**
@@ -477,9 +504,10 @@ object PerformanceCosts {
         val baselines = known.filter { it.second.keyMs != null }.map { it.second.baselineKeyMs }.distinct()
         val baseline = baselines.singleOrNull()
         val estimated = known.filter { it.second.estimated }.map { it.first }
+        val sumP95 = known.sumOf { it.second.keyP95Ms ?: 0.0 }
         device.combos.firstOrNull { it.on.toSet() == on && it.keyMs != null }?.let { exact ->
             return Total(exact.keyMs!!, exact.memoryMb ?: sumMemory, measured = true, unmeasured = unmeasured, items = sorted,
-                baselineKeyMs = baseline)
+                baselineKeyMs = baseline, keyP95Ms = sumP95)
         }
         fun ratio(measured: Double?, items: Collection<String>, field: (Cost) -> Double?): Double? {
             val sum = items.sumOf { device.items[it]?.let(field) ?: 0.0 }
@@ -491,7 +519,7 @@ object PerformanceCosts {
         val keyRatio = nearest?.let { ratio(it.keyMs, it.on) { c -> c.keyMs } } ?: 1.0
         val memoryRatio = nearest?.let { ratio(it.memoryMb, it.on) { c -> c.memoryMb } } ?: 1.0
         return Total(sumKey * keyRatio, sumMemory * memoryRatio, measured = false, unmeasured = unmeasured, items = sorted,
-            baselineKeyMs = baseline, estimated = estimated)
+            baselineKeyMs = baseline, estimated = estimated, keyP95Ms = sumP95)
     }
 
     /**
