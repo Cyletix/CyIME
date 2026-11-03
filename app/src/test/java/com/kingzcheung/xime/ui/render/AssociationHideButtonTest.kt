@@ -62,7 +62,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 上屏后的联想保留独立的收键盘入口，最右箭头与组词共用展开/返回语义。
+ * 上屏后的联想不放收起键盘按钮，最右箭头与组词共用展开/返回语义。
  * 设了 CYIME_RENDER_OUT=<目录> 时另出一张各主题的对照图 association-hide.png。
  */
 @RunWith(AndroidJUnit4::class)
@@ -117,15 +117,13 @@ class AssociationHideButtonTest {
         }
         rule.waitForIdle()
         val hides = rule.onAllNodesWithTag("toolbar-hide", useUnmergedTree = true).fetchSemanticsNodes()
-        // 空闲和联想各一个，打字候选没有。
-        assertEquals(2, hides.size)
+        // 只有空闲有；联想和打字候选都没有。
+        assertEquals(1, hides.size)
         val arrows = rule.onAllNodesWithTag("candidate-expansion", useUnmergedTree = true)
         val (assoc, typing) = arrows.fetchSemanticsNodes().map { it.boundsInRoot }
         assertEquals(typing.right, assoc.right, 0.5f)
-        assertTrue(hides.last().boundsInRoot.right <= assoc.left + 0.5f)
         arrows[0].performClick(); arrows[1].performClick()
-        rule.onAllNodesWithTag("toolbar-hide", useUnmergedTree = true)[1].performClick()
-        assertEquals(listOf("open-association", "open-composing", "hide"), actions)
+        assertEquals(listOf("open-association", "open-composing"), actions)
     }
 
     @Test fun expandedAssociationShowsOnlyTheBackButton() {

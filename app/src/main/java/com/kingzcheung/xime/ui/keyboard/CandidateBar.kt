@@ -440,7 +440,7 @@ fun CandidateBar(
         // 空闲工具栏：菜单、收起与中间各图标同为等宽一格，胶囊同尺寸（分体时扣除中缝）。
         val rowDensity = LocalDensity.current
         var toolbarRowWidth by remember { mutableStateOf(0.dp) }
-        // 联想态的收键盘按钮沿用空闲工具栏的格宽，展开按钮单独占最右一格。
+        // 联想态不放收起键盘按钮，最右只有展开按钮（用户 11-02）。
         val idleToolbarCell = if (inlineSuggestions.isEmpty() && toolbarRowWidth > 0.dp) {
             val gap = splitGapX?.let { (l, r) -> with(rowDensity) { (r - l).toDp() } } ?: 0.dp
             // 空闲时左侧菜单／返回总在，固定格＝它加收起按钮。
@@ -722,11 +722,6 @@ fun CandidateBar(
                     Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
                         tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
                 }
-            }
-            if (state is CandidateBarState.AssociationOnly && !candidatePageExpanded && callbacks.onHideKeyboard != null) {
-                // 和空闲工具栏同一个下箭头（用户 11-02：「我之前不是下箭头吗」），不换成键盘图标。
-                HideKeyboardButton(callbacks.onHideKeyboard, iconButtonContainer, isVoiceSticky,
-                    protectedVisuals.textColor, idleToolbarCell)
             }
             if (state !is CandidateBarState.Idle && (candidatePageExpanded || hasAnyMore)) {
                 val action = if (candidatePageExpanded) callbacks.onBack else callbacks.onShowMoreCandidates

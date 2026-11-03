@@ -125,8 +125,7 @@ class CandidateBarFeedbackTest {
         val close = rule.onNodeWithTag("association-cancel-right", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val first = rule.onNodeWithTag("bar-association:0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("⊗ 在第一个联想词右边", close.left > first.right)
-        val hide = rule.onAllNodesWithTag("toolbar-hide", useUnmergedTree = true).fetchSemanticsNodes().single().boundsInRoot
-        assertTrue("收起键盘仍在最右", hide.left >= close.right - 0.5f)
+        assertEquals("联想不放收起键盘", 0, countTag("toolbar-hide"))
         assertTrue("和打字的「<」不在同一行", close.top < 44f * rule.density.density)
         rule.onNodeWithTag("association-cancel-right", useUnmergedTree = true).performClick()
         assertEquals(1, cancelled)
