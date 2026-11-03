@@ -420,6 +420,8 @@ private fun T9KeyboardContent(
     }
 
     fun swipesFor(id: String): T9KeySwipes {
+        // 读一次版本号：手势配置热重载时本层重组。以前靠每次按键顺带重组才更新。
+        if (configVersion < 0) return T9KeySwipes()
         val gesture = KeysConfigHelper.getT9KeyGesture(id) ?: return T9KeySwipes()
         val upHint = gesture.swipeUp?.let { it.label.ifEmpty { it.value } }
         val downHint = gesture.swipeDown?.let { it.label.ifEmpty { it.value } }
@@ -767,7 +769,10 @@ private fun T9KeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
-            val nextCandidate = candidateState.value.usesT9CandidateNavigation(uiState.inputProfile)
+            // 只在「0 键是不是下一项」变化时重组九键整块，每按一个数字只重组候选栏和左栏。
+            val nextCandidate by remember(candidateState, uiState.inputProfile) {
+                androidx.compose.runtime.derivedStateOf { candidateState.value.usesT9CandidateNavigation(uiState.inputProfile) }
+            }
             // 长按“下一项”= 按住 Shift：按住期间候选中英对调，松手就恢复（用户 10-30：松手不恢复就再也变不回去）；
             // 长按那次松手不切下一项。
             var glossHoldUsed by remember { mutableStateOf(false) }
