@@ -616,7 +616,7 @@ index f363419f..801a118d 100644
  
  template <class... Cs>
 diff --git a/src/rime/dict/dictionary.cc b/src/rime/dict/dictionary.cc
-index 1dc47f8f..99ca7c57 100644
+index 1dc47f8f..0d02d2f5 100644
 --- a/src/rime/dict/dictionary.cc
 +++ b/src/rime/dict/dictionary.cc
 @@ -8,6 +8,7 @@
@@ -636,7 +636,49 @@ index 1dc47f8f..99ca7c57 100644
          credibility(cr),
          quality_len(q) {}
  
-@@ -88,14 +89,20 @@ struct CodeMatch {
+@@ -67,8 +68,20 @@ struct Chunk {
+   bool is_predictive_match() const { return matching_code_size < code.size(); }
+ };
+ 
++// The order key of a chunk's head entry, as compare_chunk_by_head_element reads it: rank is
++// kExhausted for a spent chunk, else (not exact) * 2^31 + remaining code length; ties go to the
++// higher score (credibility + weight, the same sum the comparison computes).
++struct HeadKey {
++  static constexpr uint64_t kExhausted = ~uint64_t(0);
++  uint64_t rank = kExhausted;
++  double score = 0.0;
++};
++
+ struct QueryResult {
+   vector<Chunk> chunks;
++  // Head keys in chunk order for DictEntryIterator::Sort; empty when not in use. Every reordering
++  // of chunks moves the keys along or clears them, and every cursor move reads its key again.
++  vector<HeadKey> keys;
+ };
+ 
+ bool compare_chunk_by_head_element(const Chunk& a, const Chunk& b) {
+@@ -84,18 +97,41 @@ bool compare_chunk_by_head_element(const Chunk& a, const Chunk& b) {
+          b.credibility + b.entries[b.cursor].weight;  // by weight desc
+ }
+ 
++inline HeadKey head_key(const Chunk& c) {
++  HeadKey k;
++  if (!c.entries || c.cursor >= c.size)
++    return k;
++  k.rank = (c.is_exact_match() ? 0 : uint64_t(1) << 31) +
++           std::min<uint64_t>(c.remaining_code.length(), (uint64_t(1) << 31) - 1);
++  k.score = c.credibility + c.entries[c.cursor].weight;
++  return k;
++}
++
++// Same result as compare_chunk_by_head_element on the chunks the keys were read from.
++inline bool head_key_before(const HeadKey& a, const HeadKey& b) {
++  if (a.rank != b.rank)
++    return a.rank < b.rank;
++  return a.rank != HeadKey::kExhausted && a.score > b.score;
++}
++
+ struct CodeMatch {
    bool success;
    size_t depth;
    size_t end_pos;
@@ -659,7 +701,7 @@ index 1dc47f8f..99ca7c57 100644
    if (!extra_code || depth >= extra_code->size)
      return {true, depth, current_pos};
    if (current_pos >= syll_graph.interpreted_length) {
-@@ -114,10 +121,26 @@ CodeMatch match_extra_code(const table::Code* extra_code,
+@@ -114,10 +150,26 @@ CodeMatch match_extra_code(const table::Code* extra_code,
    CodeMatch best_match = kFailed;
    for (const SpellingProperties* props : spellings->second) {
      CodeMatch match = match_extra_code(extra_code, depth + 1, syll_graph,
@@ -688,25 +730,51 @@ index 1dc47f8f..99ca7c57 100644
        best_match = match;
    }
    return best_match;
-@@ -128,7 +151,7 @@ CodeMatch match_extra_code(const table::Code* extra_code,
+@@ -128,7 +180,8 @@ CodeMatch match_extra_code(const table::Code* extra_code,
  DictEntryIterator::DictEntryIterator()
      : query_result_(New<dictionary::QueryResult>()) {}
  
 -void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) {
 +void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) { T9_WORK_COUNT(dict_chunks); T9_WORK_ADD(dict_chunk_entries, chunk.size);
++  query_result_->keys.clear();
    query_result_->chunks.push_back(std::move(chunk));
    entry_count_ += chunk.size;
  }
-@@ -136,9 +159,41 @@ void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) {
+@@ -136,9 +189,66 @@ void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) {
  void DictEntryIterator::Sort() {
    auto& chunks = query_result_->chunks;
    // partial-sort remaining chunks, move best match to chunk_index_
 +  if (!preferred_) {
-+    std::partial_sort(chunks.begin() + chunk_index_,
-+                      chunks.begin() + chunk_index_ + 1, chunks.end(),
-+                      dictionary::compare_chunk_by_head_element);
++    // std::partial_sort(first, first + 1, last) walks first + 1 .. last once and swaps an element
++    // with *first whenever it comes strictly before it. Large results (nine-key decoding: hundreds
++    // of chunks, one sort per entry taken) do the same walk over cached head keys instead of
++    // calling the comparison on the chunks, so the swaps and the resulting order are unchanged.
++    auto& keys = query_result_->keys;
++    const size_t n = chunks.size();
++    if (chunk_index_ >= n)
++      return;
++    if (keys.empty() && n - chunk_index_ <= 16) {
++      std::partial_sort(chunks.begin() + chunk_index_,
++                        chunks.begin() + chunk_index_ + 1, chunks.end(),
++                        dictionary::compare_chunk_by_head_element);
++      return;
++    }
++    if (keys.size() != n) {
++      keys.resize(n);
++      for (size_t i = 0; i < n; ++i)
++        keys[i] = dictionary::head_key(chunks[i]);
++    }
++    auto* key = keys.data();
++    auto* chunk = chunks.data();
++    for (size_t i = chunk_index_ + 1; i < n; ++i) {
++      if (dictionary::head_key_before(key[i], key[chunk_index_])) {
++        std::swap(chunk[chunk_index_], chunk[i]);
++        std::swap(key[chunk_index_], key[i]);
++      }
++    }
 +    return;
 +  }
++  query_result_->keys.clear();
    std::partial_sort(chunks.begin() + chunk_index_,
                      chunks.begin() + chunk_index_ + 1, chunks.end(),
 -                    dictionary::compare_chunk_by_head_element);
@@ -740,7 +808,28 @@ index 1dc47f8f..99ca7c57 100644
  }
  
  void DictEntryIterator::AddFilter(DictEntryFilter filter) {
-@@ -242,9 +297,11 @@ static void lookup_table(Table* table,
+@@ -180,7 +290,10 @@ bool DictEntryIterator::FindNextEntry() {
+     return false;
+   }
+   auto& chunk = query_result_->chunks[chunk_index_];
+-  if (++chunk.cursor >= chunk.size) {
++  ++chunk.cursor;
++  if (chunk_index_ < query_result_->keys.size())
++    query_result_->keys[chunk_index_] = dictionary::head_key(chunk);
++  if (chunk.cursor >= chunk.size) {
+     ++chunk_index_;
+   }
+   if (exhausted()) {
+@@ -209,6 +322,8 @@ bool DictEntryIterator::Skip(size_t num_entries) {
+     auto& chunk = query_result_->chunks[chunk_index_];
+     if (chunk.cursor + num_entries < chunk.size) {
+       chunk.cursor += num_entries;
++      if (chunk_index_ < query_result_->keys.size())
++        query_result_->keys[chunk_index_] = dictionary::head_key(chunk);
+       return true;
+     }
+     num_entries -= (chunk.size - chunk.cursor);
+@@ -242,9 +357,11 @@ static void lookup_table(Table* table,
                           size_t start_pos,
                           bool predict_word,
                           double initial_credibility,
@@ -754,7 +843,7 @@ index 1dc47f8f..99ca7c57 100644
      return;
    }
    // copy result
-@@ -256,14 +313,16 @@ static void lookup_table(Table* table,
+@@ -256,14 +373,16 @@ static void lookup_table(Table* table,
        if (a.extra_code()) {
          do {
            dictionary::CodeMatch match = dictionary::match_extra_code(
@@ -773,7 +862,7 @@ index 1dc47f8f..99ca7c57 100644
          } while (a.Next());
        } else {
          (*collector)[end_pos].AddChunk({table, a, cr, q});
-@@ -278,7 +337,8 @@ static void collect_chunks(DictEntryCollector* collector,
+@@ -278,7 +397,8 @@ static void collect_chunks(DictEntryCollector* collector,
                             const SyllableGraph& syllable_graph,
                             bool predict_word,
                             double initial_credibility,
@@ -783,7 +872,7 @@ index 1dc47f8f..99ca7c57 100644
    for (auto& v : result) {
      size_t end_pos = v.first;
      for (TableAccessor& a : v.second) {
-@@ -287,14 +347,16 @@ static void collect_chunks(DictEntryCollector* collector,
+@@ -287,14 +407,16 @@ static void collect_chunks(DictEntryCollector* collector,
        if (a.extra_code()) {
          do {
            dictionary::CodeMatch match = dictionary::match_extra_code(
@@ -802,7 +891,7 @@ index 1dc47f8f..99ca7c57 100644
          } while (a.Next());
        } else {
          (*collector)[end_pos].AddChunk({table, a, cr, q});
-@@ -320,15 +382,18 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
+@@ -320,15 +442,18 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
                                            const hash_set<string>* blacklist,
                                            bool predict_word,
                                            double initial_credibility,
@@ -825,7 +914,7 @@ index 1dc47f8f..99ca7c57 100644
    }
    if (collector->empty())
      return nullptr;
-@@ -342,7 +407,9 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -342,7 +467,9 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
      const vector<size_t>& start_positions,
      const hash_set<string>* blacklist,
      bool predict_word,
@@ -836,7 +925,7 @@ index 1dc47f8f..99ca7c57 100644
    map<int, an<DictEntryCollector>> result;
    if (!loaded() || start_positions.empty())
      return result;
-@@ -350,7 +417,7 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -350,7 +477,7 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
    // start 产生——3 层每层的边跨度 ≤ 图中观测到的最大跨度。
    // 据此把 start 窗口和 advance 下限压到新桶附近，避免全图遍历。
    size_t min_start_pos = 0;
@@ -845,7 +934,7 @@ index 1dc47f8f..99ca7c57 100644
    if (min_end_pos != 0) {
      size_t max_span = 0;
      for (const auto& x : syllable_graph.edges) {
-@@ -376,15 +443,16 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -376,15 +503,16 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
      if (!table->IsOpen())
        continue;
      map<int, TableQueryResult> per_start;
