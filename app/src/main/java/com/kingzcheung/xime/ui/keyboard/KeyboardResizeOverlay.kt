@@ -554,15 +554,9 @@ internal fun KeyboardResizeOverlay(
                         val availableHeightDp = (stableBounds.height / density.density).roundToInt()
                         val squareSpacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig()
                             .spacingFor(session.squareSnap?.section ?: "qwerty")
-                        val floorContentHeightDp = minOf(
-                            floatingHeightRange.first,
-                            floatingResizeMinHeightDp(availableHeightDp - dragBarDp),
-                        )
-                        // 下限不能挡住方形按键吸附点：方形点在下限之下时把下限放到方形点下方一点。
-                        val squareContentHeightDp = if (gestureFloating) session.squareSnap?.squareTotalHeightPx(
-                            gestureRect, density.density, dragBarDp * density.density, true, squareSpacing,
-                        )?.let { it / density.density - dragBarDp } else null
-                        val minContentHeightDp = squareAwareFloatingMinHeightDp(floorContentHeightDp, squareContentHeightDp)
+                        // 悬浮最低高度和点亮四角直接拖用同一个（11-03「通过不同方法调整的最小尺寸不一致」）。
+                        val minContentHeightDp = floatingResizeFloorContentDp(hostMaxHeight.value.roundToInt(),
+                            availableHeightDp, isLandscape)
                         val minHeightPx = ((if (gestureFloating) minContentHeightDp else
                             fixedRange.first + session.bottomPaddingDp) + dragBarDp) * density.density
                         val screenMaxHeightPx = ((if (gestureFloating) floatingHeightRange.last else

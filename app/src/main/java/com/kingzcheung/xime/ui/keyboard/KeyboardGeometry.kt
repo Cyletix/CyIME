@@ -45,18 +45,18 @@ internal fun floatingResizeMinWidthDp(availableWidthDp: Int): Int =
 internal fun floatingResizeMinHeightDp(availableHeightDp: Int): Int =
     minOf(FLOATING_RESIZE_MIN_HEIGHT_DP, availableHeightDp.coerceAtLeast(1))
 
-/** 悬浮键盘为了落到方形按键点可以低到的绝对下限（含工具栏，不含拖条）。 */
+/** 旧版本为方形按键吸附存下的悬浮高度可以低到这里（含工具栏，不含拖条）；只用来读已存高度，拖动不再低于 [FLOATING_RESIZE_MIN_HEIGHT_DP]。 */
 internal const val FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP = 160
 
 /**
- * 悬浮下限不能把方形按键吸附点挡在范围外：手机上 26 键全宽时方形点约 202dp，
- * 低于默认下限 228dp。方形点在下限之下时，下限降到方形点下方一点，
- * 让吸附带能够到它；再低不去，默认和重置仍用 [floatingResizeMinHeightDp]。
+ * 悬浮键盘拖小时的最低内容高度（含工具栏，不含拖条）：调节界面拖边拖角、点亮的四角直接拖都用这一个。
+ * 一律是 [FLOATING_RESIZE_MIN_HEIGHT_DP]（可用高度不够时取可用高度）。以前调节界面为了够到方形按键点
+ * 会降到 244dp 以下，按键压扁、工具栏和底部拖条显得过大，且和直接拖角的最小值不一样（用户 11-03）；
+ * 方形按键点在 244dp 以下时不再吸附。
  */
-internal fun squareAwareFloatingMinHeightDp(floorDp: Int, squareContentHeightDp: Float?): Int {
-    if (squareContentHeightDp == null || squareContentHeightDp >= floorDp) return floorDp
-    return (squareContentHeightDp - 2f).toInt().coerceIn(FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP.coerceAtMost(floorDp), floorDp)
-}
+internal fun floatingResizeFloorContentDp(hostHeightDp: Int, availableHeightDp: Int, landscape: Boolean): Int =
+    minOf(floatingResizeHeightBounds(hostHeightDp, landscape).first,
+        floatingResizeMinHeightDp(availableHeightDp - FLOATING_DRAG_BAR_HEIGHT_DP))
 
 /** 已保存或拖出的悬浮高度的合法范围：下限放到绝对下限，上限同 [floatingResizeHeightBounds]。 */
 internal fun floatingStoredHeightBounds(hostHeightDp: Int, landscape: Boolean): IntRange {

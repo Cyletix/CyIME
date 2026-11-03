@@ -68,8 +68,7 @@ internal fun floatingCornerResizeLimits(
     val minWidthDp = maxOf(floatingResizeMinWidthDp(availableWidthDp),
         widthRange.first.coerceAtMost(availableWidthDp.coerceAtLeast(1)))
     val heightRange = floatingResizeHeightBounds((hostHeightPx / d).roundToInt(), landscape)
-    val minContentDp = minOf(heightRange.first,
-        floatingResizeMinHeightDp(availableHeightDp - FLOATING_DRAG_BAR_HEIGHT_DP))
+    val minContentDp = floatingResizeFloorContentDp((hostHeightPx / d).roundToInt(), availableHeightDp, landscape)
     return FloatingCornerResizeLimits(
         bounds = bounds,
         minWidth = (minWidthDp * d).coerceAtMost(start.width),
