@@ -1,7 +1,10 @@
 package com.kingzcheung.xime.ui.theme
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.runtime.getValue
@@ -154,6 +157,7 @@ object LauncherIcons {
             name to if (name == target) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
         }.filter { (name, state) -> pm.getComponentEnabledSetting(name) != state }
         if (changes.isEmpty()) return
+        val disabled = changes.filter { it.second == PackageManager.COMPONENT_ENABLED_STATE_DISABLED }.mapTo(HashSet()) { it.first }
         if (Build.VERSION.SDK_INT >= 33) {
             pm.setComponentEnabledSettings(changes.map { (name, state) ->
                 PackageManager.ComponentEnabledSetting(name, state, PackageManager.DONT_KILL_APP)
@@ -165,5 +169,26 @@ object LauncherIcons {
                 pm.setComponentEnabledSetting(name, state, PackageManager.DONT_KILL_APP)
             }
         }
+        reopenIfHosted(context, disabled, target)
+    }
+
+    /**
+     * 设置页正开在刚关掉的桌面入口上时，系统随后会结束它，设置页约 1 秒后退回桌面（GitHub #120）。
+     * 先用新入口重新打开「主题与外观」，下面照旧是设置首页；不是从桌面图标进来的设置页不受影响。
+     */
+    private fun reopenIfHosted(context: Context, disabled: Set<ComponentName>, target: ComponentName) {
+        val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<Activity>().firstOrNull() ?: return
+        if (activity.componentName !in disabled || activity.isFinishing) return
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(target)
+            .putExtra("open_fragment", com.kingzcheung.xime.ui.settings.SettingsRoutes.Theme)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        runCatching { activity.startActivity(intent) }.recoverCatching {
+            // 个别系统刚启用的入口还解析不到：直接开设置页本身。
+            activity.startActivity(intent.setComponent(ComponentName(activity, "com.kingzcheung.xime.MainActivity")))
+        }.onSuccess {
+            @Suppress("DEPRECATION")
+            activity.overridePendingTransition(0, 0)
+        }.onFailure { com.kingzcheung.xime.util.FileLogger.e("LauncherIcons", "Reopen settings failed", it) }
     }
 }
