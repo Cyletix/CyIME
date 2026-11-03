@@ -233,22 +233,28 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 service.keyRouter.commitDirectFieldLiteral(literal)
                 return@literal
             }
+            // 候选栏上是邮箱后缀（刚打了 @）：接着打的点、数字是后缀的一部分。中文键盘的句号按半角 . 上屏，不补空格。
+            val emailDomain = !hardware && EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)
+            val output = if (emailDomain && literal in EmailSuffixes.DOTS) "." else paired
             // 角标、符号面板打的标点同样跟英文选词后自动补的空格换位置（默认关）。
             if (service.keyRouter.englishAutoSpace.isArmed && service.keyRouter.consumeEnglishAutoSpace(literal)) return@literal
             // 英文标点后自动加空格（默认关）：只管屏幕键盘，成对符号不在其中。
-            if (!hardware && paired == literal && service.keyRouter.commitEnglishPunctuationSpace(literal)) return@literal
+            if (!hardware && !emailDomain && paired == literal && service.keyRouter.commitEnglishPunctuationSpace(literal)) return@literal
             val engine = service.rimeEngine
             if (isT9Schema(service.uiState.value.currentSchemaId)) {
                 // 前驱九键已结束，但它的候选刷新在 Main 队列；先让这一帧同步落地。
                 // onT9RefreshComposition 不再二次 post，屏上候选与本队列的引擎输入因此同源。
                 withContext(Dispatchers.Main) { Unit }
             }
-            if (candidateFirst && owner == service.uiState.value.inputSessionId &&
+            if (candidateFirst && !emailDomain && owner == service.uiState.value.inputSessionId &&
                 commitCandidateAndPunctuation(paired, caret)) return@literal
             if (owner != service.uiState.value.inputSessionId) return@literal
-            val committed = commitCompositionAndLiteral(paired, asTyped = true, caret = caret)
-            // 打 @ 时给邮箱后缀（默认关）；邮箱框走上面的直接上屏，在那里给。
-            if (committed && literal == "@") service.keyRouter.offerEmailSuffixesAfterAt()
+            val committed = commitCompositionAndLiteral(output, asTyped = true, caret = caret)
+            // 打 @（中文符号面板是全角 ＠）时给邮箱后缀（默认开），给着后缀时接着打的点、数字重新筛；
+            // 邮箱框走上面的直接上屏，在那里给。
+            if (committed && (literal == "@" || literal == "＠" ||
+                    emailDomain && output.all { it == '.' || it == '-' || it in '0'..'9' }))
+                service.keyRouter.offerEmailSuffixesAfterAt()
             // 数字行、角标打的数字：对得上「我的短语」编码的短语放到候选栏（默认关）。
             if (committed && !hardware && literal.lastOrNull()?.let { it in '0'..'9' || it in '０'..'９' } == true)
                 service.keyRouter.offerDigitPhrases()

@@ -113,17 +113,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             return@withEditor true
         }
         val committed = service.currentInputConnection?.commitText(literal, 1) == true
-        // 邮箱框里打 @ 和后面的字：给对得上的邮箱后缀（默认关）。
+        // 邮箱框里打 @ 和后面的字：给对得上的邮箱后缀（默认开）。
         if (committed && service.editorInputPolicy.field.kind == EditorFieldPolicy.Kind.ADDRESS) offerEmailSuffixes()
         committed
     }
 
     /**
-     * 打 @ 时给邮箱后缀（默认关，见 [EmailSuffixes]）：光标前是「邮箱名@…」就把对得上的后缀放到候选栏。
-     * 开关关着时不读输入框；密码框、键盘里的面板输入框、打着拼音时不给。主线程调用。
+     * 打 @ 时给邮箱后缀（默认开，见 [EmailSuffixes]）：光标前是「邮箱名@…」就把对得上的后缀放到候选栏；
+     * 接着打的字对不上了就收起这一组。开关关着时不读输入框；密码框、键盘里的面板输入框、打着拼音时不给。主线程调用。
      */
     private fun offerEmailSuffixes() {
-        if (!SettingsPreferences.getPrefsPublic(service).getBoolean(EmailSuffixes.PREF_KEY, false)) return
+        if (!SettingsPreferences.getPrefsPublic(service).getBoolean(EmailSuffixes.PREF_KEY, true)) return
         if (service.uiState.value.inputTarget.isInternal || service.isSecretEditor()) return
         // 接着实体键盘时数字键、空格会选候选栏上的词：打 126.com 的 1 会选走 qq.com，不给。
         if (service.hasHardwareKeyboard) return
@@ -132,7 +132,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val ic = service.currentInputConnection ?: return
         val before = runCatching { ic.getTextBeforeCursor(EmailSuffixes.CONTEXT_LENGTH, 0)?.toString() }.getOrNull() ?: return
         val domains = EmailSuffixes.suggestions(before)
-        if (domains.isEmpty()) return
+        if (domains.isEmpty()) {
+            if (EmailSuffixes.isSuggestionList(state.associationCandidates))
+                service.candidateState.value = state.copy(associationCandidates = emptyList())
+            return
+        }
         service.predictionManager.invalidatePendingPredictions()
         // 联想上下文对上光标前的文字：光标更新时才不会当成上下文变了，把后缀清掉。
         service.predictionManager.replaceCommittedText(before)
@@ -140,7 +144,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             isShowingRecentClipboard = false)
     }
 
-    /** 屏幕键盘、实体键盘和符号面板打的 @ 上屏之后（不在邮箱框）：给邮箱后缀（默认关）。 */
+    /** 屏幕键盘、角标、长按和符号面板打的 @ 上屏之后，或给着后缀时接着打的数字、点（不在邮箱框）：重新给邮箱后缀。 */
     internal suspend fun offerEmailSuffixesAfterAt() = withEditor { offerEmailSuffixes() }
 
     /**
@@ -224,6 +228,55 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.candidateState.value = CandidateState()
         val rest = EmailSuffixes.remainder(before, domain)?.let(service.editorInputPolicy.field::typedLiteral)
         return !rest.isNullOrEmpty() && ic.commitText(rest, 1)
+    }
+
+    /**
+     * 候选栏上是邮箱后缀、没在打字时，这个键是不是接着打后缀：数字都算；字母只在中文、日语以外的拼音类键盘算
+     * （英文键盘的字母另有入口）。九键数字是编码，不算。按键队列里调用，只看状态不读输入框。
+     */
+    private fun typesEmailDomainKey(key: String): Boolean {
+        if (key.length != 1) return false
+        val c = key[0]
+        val digit = c in '0'..'9'
+        if (!digit && c !in 'a'..'z' && c !in 'A'..'Z') return false
+        val candidates = service.candidateState.value
+        if (!EmailSuffixes.isSuggestionList(candidates.associationCandidates)) return false
+        if (candidates.isComposing || candidates.inputText.isNotEmpty() || service.t9PartialSegments.isNotEmpty()) return false
+        val ui = service.uiState.value
+        val english = ui.isAsciiMode || ui.inputProfile.language.typesLettersDirectly
+        if (!digit && english) return false
+        if (!english && isT9Schema(ui.currentSchemaId)) return false
+        if (!english && ui.inputProfile.language != com.kingzcheung.xime.settings.InputLanguage.CHINESE) return false
+        return english || ui.inputProfile.scheme != com.kingzcheung.xime.settings.InputScheme.ZHUYIN
+    }
+
+    /** 光标前接上 [text] 还对得上后缀就原样上屏并重新给后缀，返回 true；对不上返回 false，这个键照常处理。主线程调用。 */
+    private fun commitEmailDomainKey(text: String): Boolean {
+        val ic = service.currentInputConnection ?: return false
+        val before = runCatching { ic.getTextBeforeCursor(EmailSuffixes.CONTEXT_LENGTH, 0)?.toString() }.getOrNull()
+        if (!EmailSuffixes.continues(before, text)) return false
+        service.predictionManager.invalidatePendingPredictions()
+        englishAutoSpace.disarm()
+        service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList(), pendingEnglishText = "")
+        if (!service.commitTextAndPredict(text, isPaste = false, allowPrediction = false).accepted) return true
+        offerEmailSuffixes()
+        return true
+    }
+
+    /** 普通输入框里点候选栏的邮箱后缀：把光标前「@ 已经打的」换成「@ 整个后缀」；光标前已经对不上就只收起。主线程调用。 */
+    private fun selectEmailSuffix(domain: String): Boolean {
+        service.predictionManager.invalidatePendingPredictions()
+        englishAutoSpace.disarm()
+        val before = runCatching {
+            service.currentInputConnection?.getTextBeforeCursor(EmailSuffixes.CONTEXT_LENGTH, 0)?.toString()
+        }.getOrNull()
+        val replaced = EmailSuffixes.completion(before, domain)?.let { (typed, full) ->
+            service.replaceBeforeCursor(typed, full)
+        } == true
+        service.candidateState.value = service.candidateState.value.copy(pendingEnglishText = "", associationCandidates = emptyList())
+        hardwareNavigation.clear()
+        publishHardwareCandidateSelection()
+        return replaced
     }
 
     private val keyEventFieldKinds = setOf(EditorFieldPolicy.Kind.NUMBER_PASSWORD, EditorFieldPolicy.Kind.NUMBER,
@@ -891,8 +944,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     }
                     if (next != null) service.candidateState.value = next
                     // 打邮箱后缀：只给开头对得上的后缀，不出英文补全；都对不上了照常出英文补全。
+                    // 按光标前的整段后缀筛（打了点以后 qq.c 的 c 才是一个新词）。
                     val domains = if (next != null && emailDomainTyping && next.englishReplaceSupported && !service.isSecretEditor())
-                        EmailSuffixes.matching(next.pendingEnglishText) else emptyList()
+                        EmailSuffixes.suggestions(runCatching {
+                            service.currentInputConnection?.getTextBeforeCursor(EmailSuffixes.CONTEXT_LENGTH, 0)
+                        }.getOrNull()) else emptyList()
                     if (next != null && domains.isNotEmpty()) {
                         service.candidateState.value = next.copy(associationCandidates = domains)
                         return@withEditor null
@@ -914,6 +970,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
                 return@command
             }
+            // 给着邮箱后缀时接着打的数字（中文键盘下还有字母）：对得上某个后缀就原样上屏、筛后缀，不进拼音。
+            if (hardwareEvent == null && schemeCode == null && !mergedKey && typesEmailDomainKey(key) &&
+                withEditor { commitEmailDomainKey(if (isShifted) key.uppercase() else key) }) return@command
             // Most composing keys have nothing to clear. Do not make every key wait
             // for a Main round trip before it can even reach the decoder.
             if (key.length == 1) {
@@ -1824,6 +1883,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (usesDirectFieldInput) return selectDirectFieldEmailSuffix(index)
         val state = service.candidateState.value
         if (state.isDigitPhraseList) return selectDigitPhrase(state, index)
+        if (EmailSuffixes.isSuggestionList(state.associationCandidates))
+            associationWordAt(state, index)?.takeIf { it in EmailSuffixes.DOMAINS }?.let { return selectEmailSuffix(it) }
         service.predictionManager.invalidatePendingPredictions()
         englishAutoSpace.disarm()
         // 邮箱后缀：上屏后不补空格，也不接着联想。

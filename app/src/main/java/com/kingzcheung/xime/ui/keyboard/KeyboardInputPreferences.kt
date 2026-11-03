@@ -143,8 +143,8 @@ data class KeyboardInputPreferences(
     val englishAutoSpace: Boolean = false,
     /** 英文键盘打 , . ? ! : ; 后自动补一个空格（别人请求，默认关）；见 service/EnglishAutoSpace.kt。 */
     val englishPunctuationSpace: Boolean = false,
-    /** 打 @ 时候选栏给常用邮箱后缀（qq.com、gmail.com），别人请求，默认关；见 service/EmailSuffixes.kt。 */
-    val emailSuffixes: Boolean = false,
+    /** 打 @ 时候选栏给常用邮箱后缀（qq.com、gmail.com），默认开（用户 11-03 要求）；见 service/EmailSuffixes.kt。 */
+    val emailSuffixes: Boolean = true,
     /** 网址、邮箱框一进去就是英文（默认开，原有行为）；关掉后沿用当前语言，密码框照旧锁英文。见 service/EditorSessionInputPolicy.kt。 */
     val addressFieldsEnglish: Boolean = true,
     /** 中文候选在词后面多出对应表情（开心 😄），默认关；Rime 选项 emoji，表情表 opencc/emoji.json（雾凇）。 */
@@ -253,8 +253,11 @@ data class KeyboardInputPreferences(
         const val ENGLISH_AUTO_SPACE_KEY = "english_auto_space"
         /** 英文标点后自动加空格开关；输入法打标点时读它，改了下一个标点就生效。新键，读不到就是关。 */
         const val ENGLISH_PUNCTUATION_SPACE_KEY = "english_punctuation_space"
-        /** 打 @ 时给邮箱后缀开关；输入法打 @ 和后面的字时读它。新键，读不到就是关。 */
-        const val EMAIL_SUFFIXES_KEY = "email_suffix_candidates"
+        /**
+         * 打 @ 时给邮箱后缀开关；输入法打 @ 和后面的字时读它。读不到就是开。
+         * 1.15.50/51 默认关，存这一页任何开关都会把旧键 email_suffix_candidates 一起写成关；换新键，旧值不再算数。
+         */
+        const val EMAIL_SUFFIXES_KEY = "email_suffix_candidates_on"
         /** 网址、邮箱框自动切英文开关；输入法进输入框时读它。新键，读不到就是开。 */
         const val ADDRESS_FIELDS_ENGLISH_KEY = "address_fields_english"
         /** 候选里显示表情开关；同繁体输出，输入法按键前读它（ImeKeyRouter）。 */
@@ -365,7 +368,7 @@ data class KeyboardInputPreferences(
                 datetimeCandidates = prefs.getBoolean(DATETIME_CANDIDATES_KEY, false),
                 englishAutoSpace = prefs.getBoolean(ENGLISH_AUTO_SPACE_KEY, false),
                 englishPunctuationSpace = prefs.getBoolean(ENGLISH_PUNCTUATION_SPACE_KEY, false),
-                emailSuffixes = prefs.getBoolean(EMAIL_SUFFIXES_KEY, false),
+                emailSuffixes = prefs.getBoolean(EMAIL_SUFFIXES_KEY, true),
                 addressFieldsEnglish = prefs.getBoolean(ADDRESS_FIELDS_ENGLISH_KEY, true),
                 candidateEmoji = prefs.getBoolean(CANDIDATE_EMOJI_KEY, false),
                 symbolNames = prefs.getBoolean(SYMBOL_NAMES_KEY, false),
