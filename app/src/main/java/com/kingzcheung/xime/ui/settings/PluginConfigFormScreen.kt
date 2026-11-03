@@ -288,7 +288,8 @@ private fun UiNodeEditor(
                 },
                 label = { Text(field.label ?: "") },
                 placeholder = field.placeholder?.let { { Text(it) } },
-                minLines = 4,
+                // 按内容长高：一行字就一行，最多 8 行再滚动（11-03「每一行都是一个大框…自适应高度不行吗」）。
+                minLines = 1,
                 maxLines = 8,
                 supportingText = field.helpText?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
