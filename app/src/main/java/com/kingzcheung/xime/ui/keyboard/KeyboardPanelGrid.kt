@@ -13,13 +13,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.PointerEventPass
+import com.kingzcheung.xime.ui.common.menuSwipeBack
 import com.kingzcheung.xime.ui.common.wheelPages
 
 /** 菜单和方案共享受面板高度约束的网格；低高度时分页，卡片不能越界挤压下一行。 */
 @Composable
 internal fun <T> KeyboardPanelGrid(
     items: List<T>, isLandscape: Boolean, textColor: Color, pagerTag: String,
-    modifier: Modifier = Modifier, compactCards: Boolean = false, preferSinglePage: Boolean = false, content: @Composable (T, Modifier) -> Unit,
+    modifier: Modifier = Modifier, compactCards: Boolean = false, preferSinglePage: Boolean = false,
+    /** 从右边缘往左划返回；还有下一页时这一划交给翻页（11-03：悬浮键盘菜单分两页，往左划直接关掉了菜单）。 */
+    onSwipeBack: (() -> Unit)? = null,
+    content: @Composable (T, Modifier) -> Unit,
 ) {
     if (items.isEmpty()) return
     BoxWithConstraints(modifier.padding(horizontal = if (isLandscape) 16.dp else 12.dp, vertical = 8.dp)) {
@@ -41,7 +46,9 @@ internal fun <T> KeyboardPanelGrid(
             maxOf(120.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight) else minOf(maxHeight,
             maxOf(104.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight)
         val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else minOf(maxWidth, 144.dp * columns + spacing * (columns - 1))
-        Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight)
+            .menuSwipeBack(pagerState.currentPage, onSwipeBack.takeUnless { pagerState.canScrollForward }, PointerEventPass.Initial),
+            horizontalAlignment = Alignment.CenterHorizontally) {
             HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {
                     repeat(rows) { row ->

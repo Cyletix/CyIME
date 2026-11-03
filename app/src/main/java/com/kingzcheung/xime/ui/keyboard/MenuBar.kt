@@ -60,8 +60,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
-import com.kingzcheung.xime.ui.common.menuSwipeBack
-import androidx.compose.ui.input.pointer.PointerEventPass
 
 internal fun menuAppearanceLabel(mode: Int): String = when (mode) {
     0 -> "浅色模式"
@@ -115,8 +113,8 @@ fun MenuBar(
             selected = if (toggle) action.active else null, toolbarItem = action.item, onLongClick = action.onLongClick)
     }
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
-        modifier.fillMaxWidth().keyboardPanelBackground(state.backgroundColor)
-            .menuSwipeBack(Unit, onBack, PointerEventPass.Initial), preferSinglePage = true) { item, cellModifier ->
+        modifier.fillMaxWidth().keyboardPanelBackground(state.backgroundColor),
+        preferSinglePage = true, onSwipeBack = onBack) { item, cellModifier ->
         MenuItemButton(item, state.keyBgColor, textColor,
             cellModifier.testTag("menu-item:${item.id}"), isLandscape)
     }
