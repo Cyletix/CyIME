@@ -278,7 +278,9 @@ internal fun KeyboardResizeOverlay(
         val panelColor = (palette?.key ?: MaterialTheme.colorScheme.surface).copy(alpha = 1f)
         val keyText = (palette?.text ?: MaterialTheme.colorScheme.onSurface).copy(alpha = 1f)
         val panelText = if (contrastRatio(panelColor, keyText) >= 4.5f) keyText else readableOn(panelColor)
-        val toolOutlineColor = panelText.copy(alpha = 0.28f)
+        // 描边和滑条没走过的一段带主题强调色（11-03「不会跟随主题变化 一直都是灰色的」）：
+        // 原来用文字色 28%，任何主题下都是一条灰线。
+        val toolOutlineColor = lerp(panelText, accentColor, 0.6f).copy(alpha = 0.40f)
         val toolOutline = BorderStroke(1.dp, toolOutlineColor)
         val panelShape = remember(floatingMode, roundedBottom, roundedTop) {
             keyboardPanelShape(floatingMode, roundedBottom, roundedTop)
