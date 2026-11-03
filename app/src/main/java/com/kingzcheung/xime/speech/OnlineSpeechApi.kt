@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
 /**
  * 内置在线语音：设置 › 语音转文本 › 在线语音里直接填地址、密钥、模型，不用装插件。
  * 两种接口按地址区分：OpenAI 兼容 `/audio/transcriptions`（OpenAI、Groq、硅基流动等，multipart 上传），
- * 腾讯 TokenHub 同步语音识别（地址含 /asrproxy/ 或以 sync_transcribe 结尾，JSON 上传 Base64 WAV，文字在 output.text）。
+ * 腾讯 TokenHub 同步语音识别（地址含 /asrproxy/ 或以 sync_transcribe 结尾，JSON 上传 Base64 WAV，文字在 output.text），
+ * 火山引擎(豆包)语音识别（地址是 openspeech.bytedance.com 或 wss:// 开头，见 [VolcengineSpeechApi]）。
  * 配置单独存一个设置文件：不进备份，密钥只留在本机。
  */
 object OnlineSpeechApi {
@@ -38,11 +39,13 @@ object OnlineSpeechApi {
     private const val KEY_BASE_URL = "base_url"
     private const val KEY_API_KEY = "api_key"
     private const val KEY_MODEL = "model"
+    /** 火山引擎旧版鉴权的 App ID；新版控制台 API Key 不用填。 */
+    private const val KEY_APP_ID = "app_id"
     private const val KEY_STATUS = "status"
     private const val KEY_PLUGIN_MIGRATED = "plugin_migrated"
     private const val SAMPLE_RATE = 16000
 
-    data class Config(val baseUrl: String, val apiKey: String, val model: String)
+    data class Config(val baseUrl: String, val apiKey: String, val model: String, val appId: String = "")
 
     private val client by lazy {
         OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
@@ -56,13 +59,15 @@ object OnlineSpeechApi {
     fun config(context: Context): Config = prefs(context).let {
         Config(it?.getString(KEY_BASE_URL, null)?.takeIf { url -> url.isNotBlank() } ?: DEFAULT_BASE_URL,
             it?.getString(KEY_API_KEY, "").orEmpty(),
-            it?.getString(KEY_MODEL, null)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL)
+            it?.getString(KEY_MODEL, null)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL,
+            it?.getString(KEY_APP_ID, "").orEmpty())
     }
 
     /** 改了配置就清掉旧的测试结果，状态不会停在“可用”误导人。 */
     fun save(context: Context, config: Config) {
         prefs(context)?.edit()?.putString(KEY_BASE_URL, config.baseUrl.trim())?.putString(KEY_API_KEY, config.apiKey.trim())
-            ?.putString(KEY_MODEL, config.model.trim())?.remove(KEY_STATUS)?.apply()
+            ?.putString(KEY_MODEL, config.model.trim())?.putString(KEY_APP_ID, config.appId.trim())
+            ?.remove(KEY_STATUS)?.apply()
     }
 
     fun isConfigured(context: Context): Boolean = config(context).apiKey.isNotBlank()
@@ -117,6 +122,7 @@ object OnlineSpeechApi {
 
     /** 用户填的地址 → 实际请求地址：OpenAI 兼容填到 /v1 为止也行，填到 /audio/transcriptions 也行。 */
     internal fun endpoint(baseUrl: String): String {
+        if (VolcengineSpeechApi.isVolcengine(baseUrl)) return VolcengineSpeechApi.endpoint(baseUrl)
         val url = baseUrl.trim().trimEnd('/')
         return if (isTokenHub(url) || url.endsWith("/audio/transcriptions")) url else "$url/audio/transcriptions"
     }
@@ -125,6 +131,10 @@ object OnlineSpeechApi {
     fun transcribe(context: Context, pcm: ByteArray, language: InputLanguage): Result<String> = runCatching {
         val config = config(context)
         require(config.apiKey.isNotBlank()) { "未填写密钥" }
+        if (VolcengineSpeechApi.isVolcengine(config.baseUrl)) {
+            return@runCatching VolcengineSpeechApi.transcribe(client, config.baseUrl, config.appId, config.apiKey,
+                config.model, pcm, ::httpError)
+        }
         val url = endpoint(config.baseUrl)
         val body = if (isTokenHub(url)) {
             // 语种不传：中英混说、方言都交给接口自己认。
@@ -205,7 +215,7 @@ object OnlineSpeechApi {
         }
     }
 
-    private fun wav(pcm: ByteArray): ByteArray {
+    internal fun wav(pcm: ByteArray): ByteArray {
         val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
             put("RIFF".toByteArray()); putInt(36 + pcm.size); put("WAVE".toByteArray())
             put("fmt ".toByteArray()); putInt(16); putShort(1); putShort(1)
