@@ -365,13 +365,20 @@ class RimeEngine {
     }
 
     /** Return the state after all deletion cleanup, with the revision that can actually be published. */
-    internal fun deleteCompositionAndGetResult(): RimeProcessResult = locked {
-        val result = processKeyAndGetResult(0xff08, 0)
-        if (result.inputText.isNotEmpty()) result else {
-            clearComposition()
-            getProcessResult(result.processed)
-        }
-    }
+    internal fun deleteCompositionAndGetResult(): RimeProcessResult = locked { deleteCompositionKey() }
+
+    /**
+     * [deleteCompositionAndGetResult] for the keyboard's own fields (clipboard search, tool panel, new pin), which
+     * route keys on Main: skipped while the engine is busy, like [clearComposition].
+     */
+    internal fun tryDeleteCompositionAndGetResult(): RimeProcessResult =
+        tryLocked(RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)) { deleteCompositionKey() }
+
+    private fun deleteCompositionKey(): RimeProcessResult = backspaceComposition(
+        backspace = { processKeyAndGetResult(0xff08, 0) },
+        clear = ::clearComposition,
+        reread = { getProcessResult(it.processed) },
+    )
 
     /** Called on the serial input executor; properties affect the next native query only. */
     internal fun setNeighborMap(encoded: String) = locked { nativeSetNeighborMap(encoded) }
@@ -1553,4 +1560,20 @@ internal fun compositionCaretStep(input: String, caret: Int, confirmed: Int, del
         while (target > low && input[target] == '\'') target--
     }
     return target
+}
+
+/**
+ * One Backspace in a composition. When it empties the input the composition is cleared, and the clear starts a
+ * new candidate revision, so the result to publish is read after it. The one read before the clear is stale:
+ * publishing drops it and the last letter stays on screen (clipboard search, 11-03).
+ */
+internal inline fun backspaceComposition(
+    backspace: () -> RimeProcessResult,
+    clear: () -> Unit,
+    reread: (RimeProcessResult) -> RimeProcessResult,
+): RimeProcessResult {
+    val result = backspace()
+    if (result.inputText.isNotEmpty()) return result
+    clear()
+    return reread(result)
 }

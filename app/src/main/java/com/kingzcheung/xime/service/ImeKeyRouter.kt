@@ -743,13 +743,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
                 "delete" -> {
                     if (hasComposing) {
-                        // 组合态：退格走 Rime，更新候选栏
-                        service.rimeEngine.processKey(0xff08, 0)
-                        val result = service.rimeEngine.getProcessResult(true)
-                        if (result.inputText.isEmpty()) {
-                            service.rimeEngine.clearComposition()
-                        }
-                        sendTransformedResult(result)
+                        // 组合态：退格走 Rime，更新候选栏。删空时清掉组合后再读结果，旧结果过期会被丢掉，最后一个字母删不掉（11-03）。
+                        sendTransformedResult(service.rimeEngine.tryDeleteCompositionAndGetResult())
                     } else {
                         deleteInToolPanelField()
                     }
@@ -818,13 +813,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val candState = service.candidateState.value
                     val isComposing = candState.isComposing || candState.inputText.isNotEmpty()
                     if (isComposing) {
-                        // Rime 有组合态 → 转发退格到 Rime 清空候选字母/联想词
-                        service.rimeEngine.processKey(0xff08, 0)
-                        val result = service.rimeEngine.getProcessResult(true)
-                        if (result.inputText.isEmpty()) {
-                            service.rimeEngine.clearComposition()
-                        }
-                        sendTransformedResult(result)
+                        // Rime 有组合态 → 转发退格到 Rime 清空候选字母/联想词（同上，删空后的结果在清掉组合后读）
+                        sendTransformedResult(service.rimeEngine.tryDeleteCompositionAndGetResult())
                     } else {
                         // 无组合态 → 按焦点路由删除表单内（文本框/触发编码框）已上屏文字
                         service.deleteInQuickSendForm()
