@@ -32,6 +32,8 @@ struct T9ScriptOptions {
 
   bool t9_joint_ = false;
   bool t9_sentence_rescore_ = false;
+  // t9/rescore_keys_per_syllable: double pinyin counts syllables by keys (2) for the rescoring's gate.
+  size_t t9_rescore_keys_per_syllable_ = 0;
   using T9Readings = std::unordered_map<string, vector<std::pair<string, double>>>;
   std::shared_ptr<const T9Readings> t9_readings_;
   bool t9_decoded_cache_ = true;

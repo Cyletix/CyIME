@@ -14,7 +14,8 @@
 
 namespace rime {
 
-void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start, Poet* poet,
+void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
+                        size_t keys_per_syllable, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences) {
@@ -33,6 +34,13 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
     if (v && !vowel) ++groups;
     vowel = v;
     if (ch < 'a' || ch > 'z' || v) consonants_only = false;
+  }
+  if (keys_per_syllable) {
+    // Double pinyin: every key pair is a whole syllable (tkgjxp is ting gan xie), and the vowels sit on
+    // any key, so 挺感谢 never reached the word model. Syllables are counted by keys instead.
+    const size_t keys = static_cast<size_t>(std::count_if(in.begin(), in.end(), [](char ch) { return ch != '\''; }));
+    groups = keys / keys_per_syllable;
+    consonants_only = false;
   }
   // Initials and short abbreviations (zjqa, zdky) keep Rime's dictionary order.
   if (ngram && !consonants_only && groups >= 2) {

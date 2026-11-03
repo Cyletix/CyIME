@@ -16,8 +16,11 @@ class Sentence;
 
 // Leaves one sentence in `sentences`: the word model's choice among Rime's n-best made without
 // corrected words, followed by Rime's best when that one is a correction. `sentence_graph` is the
-// word graph the n-best came from; without it no second n-best is made.
-void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start, Poet* poet,
+// word graph the n-best came from; without it no second n-best is made. `keys_per_syllable`
+// (t9/rescore_keys_per_syllable) counts syllables by keys for double pinyin, whose keys say nothing
+// about vowels; 0 counts the vowel groups of pinyin letters.
+void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
+                        size_t keys_per_syllable, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences);

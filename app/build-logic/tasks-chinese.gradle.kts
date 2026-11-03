@@ -43,6 +43,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("datetimeHints", 2)
     inputs.property("symbolNames", 1)
     inputs.property("greekLetters", 1)
+    inputs.property("doublePinyinSentences", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -486,8 +487,17 @@ val prepareChineseDictionaries by tasks.registering {
         // no corrector at all. With it on, the keyboard decides: 双拼邻键纠错 on sends its layout (full correction), off
         // sends it marked "~;" so only a pair that spells nothing is corrected (wp for wo had no candidate at all).
         check(!doublePinyin.readText().contains("enable_correction")) { "Upstream double_pinyin_flypy now sets enable_correction" }
+        // Sentences as in full pinyin (the same position rules, four single-character homophones per syllable, four
+        // n-best) and the same word model choosing among them (t9/sentence_rescore): with Rime's one sentence by
+        // character weights alone, 挺感谢 (tkgjxp) came out 听感谢 and 挺 + word could not be typed at all. Double
+        // pinyin keys carry no vowels, so the rescoring counts a syllable per two keys (rescore_keys_per_syllable).
+        // Without t9_ngram.lm the first sentence stays, as before. Generated double pinyin schemes copy all of it.
         doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
-            "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+            "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
+            "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
+            "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
+            "  sentence_position_initial_only: [把, 被]\n" +
+            "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
             .let { withGreekLetters(withSymbolNames(withDatetimeHints(it))) }
             // 生僻字 also for double pinyin (GitHub #72, same default-off switch): the Lua translator maps the two keys
@@ -495,7 +505,9 @@ val prepareChineseDictionaries by tasks.registering {
             .let { schema ->
                 check(schema.split("    - script_translator\n").size == 2) { "Upstream double_pinyin_flypy translator list changed" }
                 schema.replace("    - script_translator\n", "    - script_translator\n    - lua_translator@*cyime_rare_chars\n") +
-                    "\ncyime_rare_double_pinyin: true\n"
+                    "\ncyime_rare_double_pinyin: true\n" +
+                    "\nt9:\n  sentence_rescore: true\n  rescore_keys_per_syllable: 2\n  ngram_model: t9_ngram\n" +
+                    "  ngram_sentence_start: false\n"
             })
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",
