@@ -139,6 +139,7 @@ import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.keyboard.isBottomDocked
 import com.kingzcheung.xime.ui.keyboard.HardwareCandidateRow
 import com.kingzcheung.xime.ui.keyboard.CandidateBarVisuals
+import com.kingzcheung.xime.ui.keyboard.NavigationStripBelowCard
 import kotlin.math.roundToInt
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.theme.XimeTheme
@@ -2418,22 +2419,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             )
                         }
                         if (!state.isFloatingMode && !roundedKeyboardBottom) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(activeBottomDp.dp)
-                                    .align(androidx.compose.ui.Alignment.BottomCenter)
-                                    .onGloballyPositioned { coordinates ->
-                                        val position = coordinates.positionInWindow()
-                                        updateGlassSurface("navigation", android.graphics.Rect(
-                                            position.x.roundToInt(), position.y.roundToInt(),
-                                            (position.x + coordinates.size.width).roundToInt(),
-                                            (position.y + coordinates.size.height).roundToInt()))
-                                    }
+                            val filledSides = !handwritingExpanded &&
+                                com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).fillBlankAreas
+                            // 卡片底下系统按钮那条只和卡片一样宽，卡片底色接到屏幕底边；「填满留空处」开着时仍整宽。
+                            NavigationStripBelowCard(
+                                height = activeBottomDp.dp,
+                                card = navigationStripCard.value,
+                                followCard = !filledSides && !handwritingExpanded,
+                                onBounds = { updateGlassSurface("navigation", it) },
+                                surface = Modifier
                                     .graphicsLayer { alpha = keyboardLayerOpacity }
                                     .keyboardBackgroundBelowCard(rootTheme.keyboardBackground, isDark, keyboardBgColor,
-                                        card = { navigationStripCard.value }, filledSides = !handwritingExpanded &&
-                                            com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).fillBlankAreas)
+                                        card = { navigationStripCard.value }, filledSides = filledSides),
                             )
                         }
                         Box(
