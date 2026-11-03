@@ -779,6 +779,52 @@ object SchemaManager {
         }
     }
 
+    @Volatile private var recognizerLeads: Pair<String, Set<Char>>? = null
+
+    /**
+     * 导入方案作者自己写的 recognizer/patterns 里以固定字符开头的规则（`^V` 计算、`` ^` `` 部件组字）的开头字符（GitHub #118）。
+     * 只读方案文件和它的 .custom.yaml，不算 default 预设里的通用规则（/ 符号、大写），所以不改其他方案原来的按键。
+     * 小写字母、数字不算：小写本来就交给 Rime，数字按 #106 的规则走。读不到返回空集。
+     */
+    fun recognizerLeadChars(context: Context, schemaId: String): Set<Char> {
+        recognizerLeads?.takeIf { it.first == schemaId }?.let { return it.second }
+        val dir = getRimeDir(context)
+        val leads = runCatching {
+            val schema = File(dir, "$schemaId.schema.yaml").takeIf { it.isFile }?.readText().orEmpty()
+            val custom = File(dir, "$schemaId.custom.yaml").takeIf { it.isFile }?.readText().orEmpty()
+            parseRecognizerLeads(schema, custom)
+        }.getOrDefault(emptySet())
+        recognizerLeads = schemaId to leads
+        return leads
+    }
+
+    /** 纯解析：方案的 recognizer: → patterns: 下各条，加上 custom.yaml 里 `recognizer/patterns/<名字>: "..."` 的补丁。 */
+    internal fun parseRecognizerLeads(schemaText: String, customText: String = ""): Set<Char> {
+        val patterns = mutableListOf<String>()
+        runCatching {
+            val block = topLevelSection(schemaText.trimStart('\uFEFF'), "recognizer")
+            val map = block?.let { yaml.parseToYamlNode(it) as? YamlMap }
+            val inner = map?.entries?.values?.firstOrNull() as? YamlMap
+            (inner?.get<YamlNode>("patterns") as? YamlMap)?.entries?.values?.forEach { node ->
+                (node as? YamlScalar)?.content?.let(patterns::add)
+            }
+        }
+        Regex("""recognizer/patterns/[^:\s]+\s*:\s*(.+)""").findAll(customText).forEach { m ->
+            patterns.add(m.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'"))
+        }
+        return patterns.mapNotNullTo(LinkedHashSet()) { regexLeadChar(it) }
+    }
+
+    /** `^V…` → V，`` ^\`… `` → `；开头是字符类、分组、点等不是固定字符时为 null。 */
+    internal fun regexLeadChar(pattern: String): Char? {
+        if (!pattern.startsWith("^") || pattern.length < 2) return null
+        val first = pattern[1]
+        val c = if (first == '\\') pattern.getOrNull(2)?.takeIf { !it.isLetterOrDigit() } ?: return null
+            else first.takeIf { it !in "[(.|?*+{}^$" } ?: return null
+        if (c.code !in 0x21..0x7E || c.isLowerCase() || c.isDigit()) return null
+        return c
+    }
+
     @Volatile private var bundledSchemaIds: Set<String>? = null
 
     /**

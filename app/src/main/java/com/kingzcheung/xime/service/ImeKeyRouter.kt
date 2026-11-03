@@ -658,7 +658,26 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (c.code !in 0x21..0x7E || c.isLetter()) return null
         if (c.isDigit() && (!service.candidateState.value.isComposing || state.inputProfile.layout.kind !in
                 setOf(com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC, com.kingzcheung.xime.settings.LayoutKind.MERGED))) return null
-        return c.toString().takeIf { service.rimeEngine.spellerAlphabetHas(state.currentSchemaId, c) }
+        return c.toString().takeIf { service.rimeEngine.spellerAlphabetHas(state.currentSchemaId, c) || schemeLeadKey(c) }
+    }
+
+    /**
+     * 导入方案自己的 recognizer 规则以这个字符开头（`` ^` `` 部件组字、`^V` 计算，#118），且还没在打字：交给 Rime 起头，
+     * 和桌面 Rime 一样；打字中照旧。内置方案不经过这里。
+     */
+    private fun schemeLeadKey(c: Char): Boolean {
+        val state = service.uiState.value
+        return state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.EXTERNAL &&
+            !service.candidateState.value.isComposing &&
+            c in com.kingzcheung.xime.settings.SchemaManager.recognizerLeadChars(service, state.currentSchemaId)
+    }
+
+    /** 导入方案的大写字母交给 Rime（#118）：字母表里有这个大写，或方案的 recognizer 规则以它起头（没在打字时）。 */
+    private fun externalCapitalInRime(letter: Char): Boolean {
+        val state = service.uiState.value
+        if (state.inputProfile.scheme != com.kingzcheung.xime.settings.InputScheme.EXTERNAL) return false
+        val upper = letter.uppercaseChar()
+        return service.rimeEngine.spellerAlphabetHas(state.currentSchemaId, upper) || schemeLeadKey(upper)
     }
 
     internal fun handleKeyPress(key: String, isShifted: Boolean, hardwarePageDirection: Int = 0,
@@ -1452,8 +1471,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             // 大写字母（Shift、Caps Lock 或 Shift 拖线中途在字母区松手）在雾凇系 26 键方案里
                             // 参与组字：字母表含 A–Z，大写串进当前输入（zuogeDNAjiance → 做个DNA检测，
                             // Transformer、KFC 由英文词库和自动大写给出），已打的拼音不被顶上屏。
-                            val capitalsInRime = isShiftedChinese && !mergedKey &&
-                                isRimeIceCapitalSchema(state.currentSchemaId) && service.t9PartialSegments.isEmpty()
+                            val capitalsInRime = isShiftedChinese && !mergedKey && service.t9PartialSegments.isEmpty() &&
+                                (isRimeIceCapitalSchema(state.currentSchemaId) || externalCapitalInRime(char[0]))
                             // 其他方案（双拼、14 键合并键等）没有大写字母编码：已打的字母按原样连同大写字母上屏，
                             // 不丢弃拼音（与桌面端“整串按原样处理”一致）。
                             if (isShiftedChinese && !capitalsInRime && (service.rimeEngine.readQueuedComposition()?.input?.isNotEmpty() == true ||
