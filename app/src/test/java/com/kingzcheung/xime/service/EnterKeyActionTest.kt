@@ -2,13 +2,14 @@ package com.kingzcheung.xime.service
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import com.kingzcheung.xime.service.EnterKeyAction.CtrlEnterKey
 import com.kingzcheung.xime.service.EnterKeyAction.EditorAction
 import com.kingzcheung.xime.service.EnterKeyAction.EnterKey
 import com.kingzcheung.xime.service.EnterKeyAction.Newline
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 回车键面写什么就做什么（用户 11-03：键上写换行，聊天软件里回车却发了出去）。 */
+/** 回车键面写什么就做什么，Ctrl+回车发送（用户 11-03：键上写换行，聊天软件里回车却发了出去）。 */
 class EnterKeyActionTest {
     private val text = InputType.TYPE_CLASS_TEXT
     private val multiLine = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -44,5 +45,18 @@ class EnterKeyActionTest {
         assertEquals(EnterKey, EnterKeyAction.enter(EditorInfo.IME_ACTION_UNSPECIFIED, InputType.TYPE_NULL, terminal = false))
         assertEquals(EnterKey, EnterKeyAction.enter(EditorInfo.IME_ACTION_UNSPECIFIED,
             InputType.TYPE_CLASS_NUMBER or InputType.TYPE_TEXT_FLAG_MULTI_LINE, terminal = false))
+    }
+
+    @Test fun ctrlEnterSends() {
+        // 声明了发送：多行框也执行发送。
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(send or noEnter, multiLine, terminal = false))
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(send, multiLine, terminal = false))
+        // 普通多行框不执行「完成」（会收起键盘），发 Ctrl+回车由应用自己发送。
+        assertEquals(CtrlEnterKey, EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_DONE or noEnter, multiLine, false))
+        assertEquals(CtrlEnterKey, EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_UNSPECIFIED, multiLine, false))
+        // 回车本来就执行动作的输入框：照回车。
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_SEARCH), EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_SEARCH, text, false))
+        // 终端：Ctrl+回车交给终端。
+        assertEquals(CtrlEnterKey, EnterKeyAction.ctrlEnter(send, multiLine, terminal = true))
     }
 }

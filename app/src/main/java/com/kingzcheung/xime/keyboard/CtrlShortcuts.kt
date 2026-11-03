@@ -47,8 +47,29 @@ object CtrlShortcuts {
         )
     }
 
+    /**
+     * Ctrl+回车的按键：输入框没有「发送」动作时交给应用自己发送（见 EnterKeyAction）。
+     * 只给回车用；上面 Ctrl+A/C/X/V 走编辑面板、其他字母发按键的规则不变。
+     */
+    fun enterKeyEvents(now: Long): List<KeyEvent> {
+        val meta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
+        fun event(action: Int, keyCode: Int, metaState: Int) =
+            KeyEvent(now, now, action, keyCode, 0, metaState, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags)
+        return listOf(
+            event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, meta),
+            event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, meta),
+            event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, meta),
+            event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0),
+        )
+    }
+
+    /** 按住符号键点回车、拖到回车上松手：Ctrl+回车，发送（用户 11-03）。 */
+    const val ENTER = '\n'
+    const val ENTER_COMMAND = "ctrl:enter"
+
     /** 键盘层经 [GestureAction.COMMAND] 传给服务的命令名。 */
-    fun command(letter: Char): String = "ctrl:${letter.lowercaseChar()}"
+    fun command(letter: Char): String = if (letter == ENTER) ENTER_COMMAND else "ctrl:${letter.lowercaseChar()}"
     fun letterOf(command: String): Char? =
         command.removePrefix("ctrl:").takeIf { command.startsWith("ctrl:") && it.length == 1 && it[0] in 'a'..'z' }?.get(0)
 }

@@ -1359,13 +1359,15 @@ fun KeyboardLayout(
                                 )
                             }
 
-                            // 回车 — 硬编码
+                            // 回车 — 硬编码。按住 !@# 时另一根手指点回车、或从 !@# 拖到回车上松手：Ctrl+回车，发送（用户 11-03）。
+                            DisposableEffect(shiftSlideTargets) { onDispose { shiftSlideTargets.remove("qwerty-enter-key") } }
                             ActionKeyButton(
                                 text = enterKeyText,
-                                onClick = { onKeyPress("enter") },
+                                onClick = { if (!shiftSlideTargets.ctrlEnter()) onKeyPress("enter") },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
-                                modifier = Modifier.weight(bottom.enter).testTag("qwerty-enter-key"),
+                                modifier = Modifier.weight(bottom.enter).testTag("qwerty-enter-key")
+                                    .onGloballyPositioned { shiftSlideTargets.putEnter("qwerty-enter-key", it.boundsInRoot()) },
                                 onPress = { onKeyPressDown?.invoke("enter") },
                                 onRelease = { onKeyRelease?.invoke("enter") },
                                 shadowEnabled = shadowEnabled,

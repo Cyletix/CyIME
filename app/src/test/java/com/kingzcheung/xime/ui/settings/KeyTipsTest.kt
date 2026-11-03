@@ -15,6 +15,7 @@ class KeyTipsTest {
         val t = text(KeyboardInputPreferences())
         assertTrue(t.contains("连点两下 Shift"))
         assertTrue(t.contains("按住 !@#"))
+        assertTrue(t.contains("按住 !@# 点回车|发送消息"))
         assertTrue(t.contains("1.0 秒内"))
         assertTrue(t.contains("下拉字母键|输入键上方的角标；上拉输入下方的角标。"))
         assertTrue(t.contains("删除键下拉|"))
