@@ -400,6 +400,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return bounds.contains((origin[0] + event.x).toInt(), (origin[1] + event.y).toInt())
     }
     internal val hasHardwareKeyboard: Boolean get() = hardwareKeyboardDisplay.connected
+    private val hardwareGamePackages = HardwareGamePackages { HardwareGamePassthrough.isGame(packageManager.getApplicationInfo(it, 0)) }
+    /** 游戏直通生效中：键盘不显示，实体按键不经过 CyIME（见 [HardwareGamePassthrough]）。 */
+    private val hardwareGamePassthrough: Boolean get() = HardwareGamePassthrough.active(
+        uiState.value.hardwareOptions.gamePassthrough, hasHardwareKeyboard,
+        hardwareGamePackages.isGame(currentInputEditorInfo?.packageName))
     private val hardwareInputManager by lazy { getSystemService(android.hardware.input.InputManager::class.java) }
     private val hardwareInputListener = object : android.hardware.input.InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = refresh()
@@ -411,6 +416,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (previous != hasHardwareKeyboard) {
                 applyCompactMode()
                 requestHardwareCursorUpdates()
+                // 玩游戏途中接上实体键盘：已经弹出的键盘收起，按键交给游戏。
+                if (hardwareGamePassthrough && isInputViewShown) requestHideSelf(0)
             }
         }
     }
@@ -3094,6 +3101,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (keyCode == KeyEvent.KEYCODE_BACK) return true
             return if (event?.isSystem == true) super.onKeyDown(keyCode, event) else true
         }
+        if (hardwareGamePassthrough) return super.onKeyDown(keyCode, event)
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
         if (hasHardwareKeyboard) event?.let { feedbackManager.playHardwareKeySound(it) }
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {
@@ -3240,6 +3248,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             return if (event?.isSystem == true) super.onKeyUp(keyCode, event) else true
         }
+        if (hardwareGamePassthrough) return super.onKeyUp(keyCode, event)
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) return true
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)) {
@@ -3704,10 +3713,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onEvaluateInputViewShown(): Boolean {
-        return true
+        return !hardwareGamePassthrough
     }
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        if (hardwareGamePassthrough) {
+            debugLog("Game passthrough: keyboard stays hidden package=${currentInputEditorInfo?.packageName}")
+            voicePillSelfShow = false
+            return false
+        }
         // 悬浮条状态下再点输入框：App 会再次请求弹出键盘，换回完整键盘；语音照常听写，与展开按钮相同。
         if (!voicePillResumePending &&
             voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, voicePillSelfShow, configChange)) expandFromVoicePill()

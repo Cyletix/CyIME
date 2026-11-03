@@ -61,6 +61,9 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
                 BottomCandidatesLegend(options.bottomBar)
             }
             Text("浮条任意位置均可拖动；长按语言键选择语言。", style = MaterialTheme.typography.bodyMedium)
+            Text("游戏", style = MaterialTheme.typography.titleMedium)
+            HardwareOption("游戏直通", "游戏类应用里不显示键盘，按键直接交给游戏；按应用声明的类别识别",
+                options.gamePassthrough) { save("game_passthrough", it) }
         }
     }
 }

@@ -43,6 +43,14 @@ class HardwareKeyboardPreferencesTest {
         assertEquals(HardwareKeyboardOptions(associationInWindow = true), HardwareKeyboardPreferences.read(context))
     }
 
+    @Test fun gamePassthroughIsOffByDefaultAndPersists() {
+        assertFalse(HardwareKeyboardPreferences.read(context).gamePassthrough)
+        HardwareKeyboardPreferences.set(context, "game_passthrough", true)
+        assertEquals(HardwareKeyboardOptions(gamePassthrough = true), HardwareKeyboardPreferences.read(context))
+        HardwareKeyboardPreferences.set(context, "game_passthrough", false)
+        assertEquals(HardwareKeyboardOptions(), HardwareKeyboardPreferences.read(context))
+    }
+
     @Test fun eachPagingChoicePersistsIndependentlyAndDoesNotChangeShortcuts() {
         for (mask in 0..7) {
             HardwareKeyboardPreferences.set(context, "page_minus_equals", mask and 1 != 0)

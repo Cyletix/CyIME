@@ -79,6 +79,8 @@ class SettingsSearchTest {
         assertTrue("空格两侧的标点" in titles("拳角"))
         assertTrue("空格两侧的标点" in titles("板角"))
         assertTrue("靠边停靠" in titles("扶窗"))
+        assertTrue("游戏直通" in titles("打游戏"))
+        assertTrue("游戏直通" in titles("WASD"))
         assertTrue("显示模式" in titles("夜间模式"))
         assertTrue("玻璃效果" in titles("毛玻璃"))
         assertTrue("剪贴板卡片最多显示" in titles("剪切板"))
