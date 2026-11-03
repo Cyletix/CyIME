@@ -11,8 +11,9 @@ import android.view.inputmethod.EditorInfo
  * 当实体键盘的「发送」，键上写着换行、软件里设的也是换行，照样发出去（用户 11-03）。Gboard 同样上屏 "\n"。
  * 终端、单行框、不收文字的输入框仍发回车键。
  *
- * Ctrl+回车：发送。输入框声明了「发送」就执行发送（多行框也一样）；回车本来就执行动作的照回车；
- * 其他输入框发 Ctrl+回车键，由应用自己发送（和 Ctrl+字母一样交给应用）。
+ * Ctrl+回车：发送。回车键面上写着动作（发送、搜索等）的输入框照回车执行动作；其他输入框发一次回车键，
+ * 聊天软件收到回车键就发送（用户 11-03 实测：QQ、微信的聊天框标了「回车不做动作」，执行发送动作和
+ * 发 Ctrl+回车键都发不出去，只有搜索框能发；以前回车发回车键时这两个软件都会发出去）。终端发 Ctrl+回车键。
  */
 internal object EnterKeyAction {
     sealed interface Plan
@@ -21,7 +22,7 @@ internal object EnterKeyAction {
     data object Newline : Plan
     /** 发回车键。 */
     data object EnterKey : Plan
-    /** 发 Ctrl+回车键。 */
+    /** 发 Ctrl+回车键（只给终端）。 */
     data object CtrlEnterKey : Plan
 
     private val actions = setOf(EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_SEND,
@@ -40,8 +41,7 @@ internal object EnterKeyAction {
 
     fun ctrlEnter(imeOptions: Int, inputType: Int, terminal: Boolean): Plan {
         if (terminal) return CtrlEnterKey
-        if (imeOptions and EditorInfo.IME_MASK_ACTION == EditorInfo.IME_ACTION_SEND) return EditorAction(EditorInfo.IME_ACTION_SEND)
-        return editorAction(imeOptions)?.let(::EditorAction) ?: CtrlEnterKey
+        return editorAction(imeOptions)?.let(::EditorAction) ?: EnterKey
     }
 
     /** 回车键面上的动作名，和 [enter] 同一判断。 */
