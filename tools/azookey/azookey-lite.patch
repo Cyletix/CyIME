@@ -1,6 +1,6 @@
 diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Package.swift akkc-lite/Package.swift
 --- pristine/Package.swift	2026-10-28 13:39:27.000000000 +0000
-+++ akkc-lite/Package.swift	2026-11-02 08:29:48.617378397 +0000
++++ akkc-lite/Package.swift	2026-11-03 03:25:39.488469735 +0000
 @@ -21,7 +21,8 @@
  ]
  
@@ -34,7 +34,19 @@ diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_stor
          swiftSettings: swiftSettings
      ),
      .target(
-@@ -164,6 +170,7 @@
+@@ -75,6 +81,11 @@
+         ],
+         swiftSettings: swiftSettings
+     ),
++    .executableTarget(
++        name: "SuppTool",
++        dependencies: ["KanaKanjiConverterModule"],
++        swiftSettings: swiftSettings
++    ),
+     .testTarget(
+         name: "SwiftUtilsTests",
+         dependencies: ["SwiftUtils"],
+@@ -164,6 +175,7 @@
      .target(
          name: "KanaKanjiConverterModule",
          dependencies: [
@@ -1013,6 +1025,59 @@ diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_stor
  
  public enum InputTableID: Sendable, Equatable, Hashable {
      case defaultRomanToKana
+diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SuppTool/main.swift akkc-lite/Sources/SuppTool/main.swift
+--- pristine/Sources/SuppTool/main.swift	1970-01-01 00:00:00.000000000 +0000
++++ akkc-lite/Sources/SuppTool/main.swift	2026-11-03 03:42:47.655963616 +0000
+@@ -0,0 +1,49 @@
++// CyIME tool: dump the dictionary's louds/ entries to TSV, and build louds/ files back from TSV
++// (CyIME adds Mozc words to the azooKey dictionary this way; see tools/azookey/README.md).
++//   SuppTool dump <dictionaryDir> <out.tsv>        lines: ruby \t word \t lcid \t rcid \t mid \t value
++//   SuppTool build <in.tsv> <outLoudsDir> <charID.chid>
++// Dumping and building back the unchanged dictionary reproduces its louds/ files byte for byte.
++import FoundationLite
++import KanaKanjiConverterModule
++
++func unescape(_ id: String) -> String {
++    guard id.hasPrefix("["), id.hasSuffix("]") else { return id }
++    let units = id.dropFirst().dropLast().split(separator: "_").compactMap { UInt16($0, radix: 16) }
++    return String(decoding: units, as: UTF16.self)
++}
++
++let args = CommandLine.arguments
++if args.count == 4 && args[1] == "dump" {
++    let dictionaryURL = URL(fileURLWithPath: args[2])
++    let loudsDir = args[2] + "/louds"
++    let names = try FileManager.default.contentsOfDirectory(atPath: loudsDir).filter { $0.hasSuffix(".louds") }.sorted()
++    let store = DicdataStore(dictionaryURL: dictionaryURL)
++    let state = store.prepareState()
++    var out = ""
++    var count = 0
++    for name in names {
++        let escaped = String(name.dropLast(6))
++        guard let louds = LOUDS.load(escaped, dictionaryURL: dictionaryURL) else { continue }
++        let indices = louds.prefixNodeIndices(chars: [], maxDepth: .max, maxCount: .max)
++        for e in store.getDicdataFromLoudstxt3(identifier: unescape(escaped), indices: indices, state: state) {
++            out += "\(e.ruby)\t\(e.word)\t\(e.lcid)\t\(e.rcid)\t\(e.mid)\t\(e.value())\n"
++            count += 1
++        }
++    }
++    try out.write(toFile: args[3], atomically: true, encoding: .utf8)
++    print("entries", count)
++} else if args.count == 5 && args[1] == "build" {
++    let text = try String(contentsOfFile: args[2], encoding: .utf8)
++    var entries: [DicdataElement] = []
++    for line in text.split(separator: "\n") {
++        let f = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
++        guard f.count == 6, let l = Int(f[2]), let r = Int(f[3]), let m = Int(f[4]), let v = Float(f[5]) else { continue }
++        entries.append(DicdataElement(word: f[1], ruby: f[0], lcid: l, rcid: r, mid: m, value: PValue(v)))
++    }
++    try FileManager.default.createDirectory(atPath: args[3], withIntermediateDirectories: true)
++    try DictionaryBuilder.exportDictionary(entries: entries, to: URL(fileURLWithPath: args[3]), baseName: "",
++        shardByFirstCharacter: true, charIDFileURL: URL(fileURLWithPath: args[4]))
++    print("built", entries.count)
++} else {
++    print("usage: SuppTool dump <dictionaryDir> <out.tsv> | build <in.tsv> <outLoudsDir> <charID.chid>")
++}
 diff -ruN '--exclude=.build' '--exclude=.git' '--exclude=azooKey_dictionary_storage' '--exclude=azooKey_emoji_dictionary_storage' '--exclude=Package.resolved' '--exclude=CliTool' pristine/Sources/SwiftUtils/ArrayUtils.swift akkc-lite/Sources/SwiftUtils/ArrayUtils.swift
 --- pristine/Sources/SwiftUtils/ArrayUtils.swift	2026-10-28 13:39:27.000000000 +0000
 +++ akkc-lite/Sources/SwiftUtils/ArrayUtils.swift	2026-11-02 08:26:00.125249601 +0000

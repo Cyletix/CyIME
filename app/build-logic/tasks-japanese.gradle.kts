@@ -5,11 +5,18 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-// Japanese conversion: azooKey (tools/azookey). Its dictionary comes unmodified from the pinned upstream
-// commit and is bundled in each APK as one zip; JapaneseSchemas extracts it on the phone.
+// Japanese conversion: azooKey (tools/azookey). Its dictionary comes from the pinned upstream commit, with
+// the Mozc nouns it lacks merged into louds/, and is bundled in each APK as one zip; JapaneseSchemas
+// extracts it on the phone.
 val azooKeyDictionaryCommit = "4d418525b090cf49c219819d05a7e3cc2a4346eb"
 // SHA-256 over the sorted lines "<path>\0<sha256 of file>\n" of the Dictionary/ files (3382 files, 25,315,483 bytes).
 val azooKeyDictionaryContentHash = "72336c1a22b96fc7e06ae710e84dd3b9223799fe7fea213b7617fa3f67ea6dd9"
+// louds/ files with the Mozc nouns azooKey lacks (names such as 暁山, places, organisations; ~400k words),
+// built by tools/azookey/build-dictionary.sh. They replace every upstream louds/ file except charID.chid.
+// Found like the libraries below (local copy by SHA-256 first, else downloaded).
+val azooKeyLoudsZipHash = "ebbb69a26d958a6d3498d1422f6c1315530a08ee730877cfdc33d0248c20e510"
+// Content hash (same scheme) of the merged dictionary: dictionary.version, checked again on the phone.
+val azooKeyMergedDictionaryHash = "7776faa0dc60bea48b2e24824d6e45924bed3a85a0b8263d7d4859d39f9a9745"
 // Own asset root holding only azookey/: the old generated/japanese-assets root kept the jaroomaji
 // dictionaries (rime_japanese/, ~89 MB) from earlier builds, which would otherwise still be packaged.
 val japaneseAssetRoot = layout.buildDirectory.dir("generated/japanese-azookey-assets/azookey")
@@ -46,15 +53,20 @@ val prepareJapaneseDictionaries by tasks.registering {
     description = "Fetch and verify the pinned azooKey dictionary for offline APK assets"
     inputs.property("commit", azooKeyDictionaryCommit)
     inputs.property("contentHash", azooKeyDictionaryContentHash)
+    inputs.property("loudsZip", azooKeyLoudsZipHash)
     val targetRoot = japaneseAssetRoot.get().asFile
     val zip = File(targetRoot, "dictionary.zip")
     val version = File(targetRoot, "dictionary.version")
     outputs.files(zip, version)
-    outputs.upToDateWhen { zip.isFile && version.isFile && version.readText() == azooKeyDictionaryContentHash }
+    outputs.upToDateWhen { zip.isFile && version.isFile && version.readText() == azooKeyMergedDictionaryHash }
     val retiredRoot = retiredJapaneseAssetRoot.get().asFile
+    val loudsZipName = "azookey-louds-mozc-${azooKeyLoudsZipHash.take(8)}.zip"
+    val localDirs = listOfNotNull(providers.gradleProperty("cyime.azookeyLibDir").orNull,
+        providers.environmentVariable("CYIME_AZOOKEY_LIB_DIR").orNull).map { File(it) } +
+        rootProject.file(".codex-artifacts/azookey-1102/libs")
     doLast {
         retiredRoot.deleteRecursively()
-        if (zip.isFile && version.isFile && version.readText() == azooKeyDictionaryContentHash) return@doLast
+        if (zip.isFile && version.isFile && version.readText() == azooKeyMergedDictionaryHash) return@doLast
         targetRoot.mkdirs()
         val archive = File(targetRoot, "upstream.zip.download")
         try {
@@ -74,6 +86,29 @@ val prepareJapaneseDictionaries by tasks.registering {
             }
             val manifest = files.entries.joinToString("") { (path, bytes) -> "$path\u0000${sha256(bytes)}\n" }
             check(sha256(manifest.toByteArray()) == azooKeyDictionaryContentHash) { "azooKey dictionary content mismatch" }
+            val louds = localDirs.map { File(it, loudsZipName) }.firstOrNull { it.isFile && sha256(it) == azooKeyLoudsZipHash }
+                ?: File(targetRoot, "$loudsZipName.download").also { pending ->
+                    val urls = listOf("https://github.com/Cyletix/CyIME/releases/download/models/$loudsZipName",
+                        "https://www.modelscope.cn/models/Cyletix/cyime-model/resolve/master/$loudsZipName")
+                    val fetched = urls.any { url ->
+                        runCatching { download(url, pending, "azooKey dictionary with Mozc words") }.isSuccess &&
+                            sha256(pending) == azooKeyLoudsZipHash
+                    }
+                    check(fetched) { "$loudsZipName unavailable or SHA-256 mismatch" }
+                }
+            try {
+                files.keys.removeAll { it.startsWith("louds/") && it != "louds/charID.chid" }
+                ZipInputStream(louds.inputStream().buffered()).use { input ->
+                    while (true) {
+                        val entry = input.nextEntry ?: break
+                        if (!entry.isDirectory && entry.name.startsWith("louds/")) files[entry.name] = input.readBytes()
+                    }
+                }
+            } finally {
+                if (louds.name.endsWith(".download")) louds.delete()
+            }
+            val merged = files.entries.joinToString("") { (path, bytes) -> "$path\u0000${sha256(bytes)}\n" }
+            check(sha256(merged.toByteArray()) == azooKeyMergedDictionaryHash) { "merged azooKey dictionary mismatch" }
             val pending = File(targetRoot, "dictionary.zip.pending")
             ZipOutputStream(pending.outputStream().buffered()).use { output ->
                 output.setLevel(9)
@@ -84,7 +119,7 @@ val prepareJapaneseDictionaries by tasks.registering {
                 }
             }
             java.nio.file.Files.move(pending.toPath(), zip.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            version.writeText(azooKeyDictionaryContentHash)
+            version.writeText(azooKeyMergedDictionaryHash)
         } finally {
             archive.delete()
         }

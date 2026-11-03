@@ -55,6 +55,8 @@ object Credits {
                 "https://github.com/thu-coai/CDial-GPT"),
             CreditItem("azooKey 词典", "Miwa / Ensan", "日语词库", "Apache-2.0",
                 "https://github.com/azooKey/azooKey_dictionary_storage"),
+            CreditItem("Mozc 词典", "Google / IPAdic / 沖縄辞書", "日语人名地名", "BSD-3-Clause",
+                "https://github.com/google/mozc"),
             CreditItem("rime-jaroomaji", "lazy fox chan", "日语方案", "Apache-2.0",
                 "https://github.com/lazyfoxchan/rime-jaroomaji"),
             CreditItem("倉頡五代", "Jackchows", "仓颉码表", "MIT", "https://github.com/Jackchows/Cangjie5"),
