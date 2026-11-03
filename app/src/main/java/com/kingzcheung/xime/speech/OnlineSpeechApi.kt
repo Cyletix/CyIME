@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * 内置在线语音：设置 › 语音转文本 › 在线语音里直接填地址、密钥、模型，不用装插件。
- * 两种接口按地址区分：OpenAI 兼容 `/audio/transcriptions`（OpenAI、Groq、硅基流动等，multipart 上传），
+ * 接口按地址和模型区分：OpenAI 兼容 `/audio/transcriptions`（OpenAI、Groq、硅基流动等，multipart 上传），
+ * 对话接口带音频 `/chat/completions`（小米 MiMo mimo-v2.5-asr、阿里 qwen3-asr：音频 Base64 放进 input_audio，文字在 choices[0].message.content），
  * 腾讯 TokenHub 同步语音识别（地址含 /asrproxy/ 或以 sync_transcribe 结尾，JSON 上传 Base64 WAV，文字在 output.text），
  * 火山引擎(豆包)语音识别（地址是 openspeech.bytedance.com 或 wss:// 开头，见 [VolcengineSpeechApi]）。
  * 配置单独存一个设置文件：不进备份，密钥只留在本机。
@@ -120,12 +121,62 @@ object OnlineSpeechApi {
     /** 腾讯 TokenHub 的同步识别地址。 */
     internal fun isTokenHub(url: String): Boolean = url.contains("/asrproxy/") || url.endsWith("sync_transcribe")
 
-    /** 用户填的地址 → 实际请求地址：OpenAI 兼容填到 /v1 为止也行，填到 /audio/transcriptions 也行。 */
-    internal fun endpoint(baseUrl: String): String {
+    /**
+     * 走对话接口带音频的识别：小米 MiMo（api.xiaomimimo.com，模型 mimo-v2.5-asr）、阿里百炼 qwen3-asr，
+     * 或地址直接填到 /chat/completions。它们没有 /audio/transcriptions，按 OpenAI 那样请求是 404（11-03 截图）。
+     */
+    internal fun isChatAudio(baseUrl: String, model: String): Boolean {
+        val url = baseUrl.trim().trimEnd('/').lowercase()
+        val m = model.trim().lowercase()
+        return url.endsWith("/chat/completions") || "xiaomimimo.com" in url ||
+            m.startsWith("mimo-") || m.startsWith("qwen3-asr") || m.startsWith("qwen-audio-asr")
+    }
+
+    /** 用户填的地址 → 实际请求地址：填到 /v1 为止也行，填全也行。 */
+    internal fun endpoint(baseUrl: String, model: String = ""): String {
         if (VolcengineSpeechApi.isVolcengine(baseUrl)) return VolcengineSpeechApi.endpoint(baseUrl)
         val url = baseUrl.trim().trimEnd('/')
-        return if (isTokenHub(url) || url.endsWith("/audio/transcriptions")) url else "$url/audio/transcriptions"
+        if (isTokenHub(url) || url.endsWith("/audio/transcriptions") || url.endsWith("/chat/completions")) return url
+        return if (isChatAudio(url, model)) "$url/chat/completions" else "$url/audio/transcriptions"
     }
+
+    /** OpenAI 式地址 404 时，同一前缀换成对话接口再试一次（用户填到 /v1 为止时才试）。 */
+    internal fun chatFallback(baseUrl: String): String? {
+        val url = baseUrl.trim().trimEnd('/')
+        if (isTokenHub(url) || url.endsWith("/audio/transcriptions") || url.endsWith("/chat/completions")) return null
+        return "$url/chat/completions"
+    }
+
+    /** 对话接口识别的请求体：一条用户消息只带音频；语种只给中文、英文，其他交给接口自己认。 */
+    internal fun chatAudioBody(model: String, wav: ByteArray, language: InputLanguage): JSONObject {
+        val audio = JSONObject().put("data", "data:audio/wav;base64," + Base64.getEncoder().encodeToString(wav)).put("format", "wav")
+        val content = JSONArray().put(JSONObject().put("type", "input_audio").put("input_audio", audio))
+        return JSONObject().put("model", model)
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
+            .apply {
+                when (language) {
+                    InputLanguage.CHINESE -> put("asr_options", JSONObject().put("language", "zh"))
+                    InputLanguage.ENGLISH -> put("asr_options", JSONObject().put("language", "en"))
+                    else -> Unit
+                }
+            }
+    }
+
+    /** 对话接口的回包：choices[0].message.content，可能是字符串，也可能是分段列表。 */
+    internal fun chatText(json: JSONObject): String? {
+        val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message") ?: return null
+        return when (val content = message.opt("content")) {
+            is String -> content
+            is JSONArray -> (0 until content.length()).mapNotNull { i ->
+                content.opt(i).let { it as? String ?: (it as? JSONObject)?.optString("text")?.takeIf { t -> t.isNotEmpty() } }
+            }.joinToString("")
+            JSONObject.NULL, null -> ""
+            else -> null
+        }
+    }
+
+    /** HTTP 失败：带上请求地址，404 时能说出试的是哪个地址。 */
+    private class HttpFailure(val code: Int, val url: String, message: String) : IllegalStateException(message)
 
     /** [pcm] 为 16 kHz 单声道 16 位小端 PCM。在后台线程调用。 */
     fun transcribe(context: Context, pcm: ByteArray, language: InputLanguage): Result<String> = runCatching {
@@ -135,30 +186,59 @@ object OnlineSpeechApi {
             return@runCatching VolcengineSpeechApi.transcribe(client, config.baseUrl, config.appId, config.apiKey,
                 config.model, pcm, ::httpError)
         }
-        val url = endpoint(config.baseUrl)
-        val body = if (isTokenHub(url)) {
-            // 语种不传：中英混说、方言都交给接口自己认。
-            JSONObject().put("model", config.model).put("data", Base64.getEncoder().encodeToString(wav(pcm)))
-                .put("voice_encode_format", "wav").toString().toRequestBody("application/json".toMediaType())
-        } else {
-            MultipartBody.Builder().setType(MultipartBody.FORM)
-                .addFormDataPart("model", config.model)
-                .addFormDataPart("response_format", "json")
-                .apply { if (language != InputLanguage.UNSPECIFIED) addFormDataPart("language", language.id) }
-                .addFormDataPart("file", "speech.wav", wav(pcm).toRequestBody("audio/wav".toMediaType()))
-                .build()
-        }
-        val request = Request.Builder().url(url).header("Authorization", "Bearer ${config.apiKey}").post(body).build()
-        client.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            val json = runCatching { JSONObject(text) }.getOrNull()
-            check(response.isSuccessful) { httpError(response.code, serverMessage(json, text)) }
-            checkNotNull(json) { "接口返回的格式看不懂" }
-            businessError(json)?.let { error(it) }
-            (extractText(json, 0) ?: if (json.optString("status") == "completed") "" else error("接口返回的格式看不懂")).trim()
+        val url = endpoint(config.baseUrl, config.model)
+        val wav = wav(pcm)
+        try {
+            post(url, config, wav, language)
+        } catch (e: HttpFailure) {
+            // 不认识的服务商：OpenAI 式地址 404，换成对话接口再试一次；还不行就把两个地址都写出来。
+            val fallback = if (e.code == 404 && !isChatAudio(config.baseUrl, config.model)) chatFallback(config.baseUrl) else null
+            if (fallback == null) throw e
+            try {
+                post(fallback, config, wav, language)
+            } catch (second: HttpFailure) {
+                if (second.code != 404) throw second
+                error("接口地址或模型名不对（404）：试过 ${e.url} 和 ${second.url}")
+            }
         }
     }.recoverCatching { error ->
         throw if (error is java.io.IOException) IllegalStateException("连不上服务器", error) else error
+    }
+
+    /** 发一次识别请求，返回文字。HTTP 失败抛 [HttpFailure]。 */
+    private fun post(url: String, config: Config, wav: ByteArray, language: InputLanguage): String {
+        val chat = url.endsWith("/chat/completions")
+        val body = when {
+            // 语种不传：中英混说、方言都交给接口自己认。
+            isTokenHub(url) -> JSONObject().put("model", config.model).put("data", Base64.getEncoder().encodeToString(wav))
+                .put("voice_encode_format", "wav").toString().toRequestBody("application/json".toMediaType())
+            chat -> chatAudioBody(config.model, wav, language).toString().toRequestBody("application/json".toMediaType())
+            else -> MultipartBody.Builder().setType(MultipartBody.FORM)
+                .addFormDataPart("model", config.model)
+                .addFormDataPart("response_format", "json")
+                .apply { if (language != InputLanguage.UNSPECIFIED) addFormDataPart("language", language.id) }
+                .addFormDataPart("file", "speech.wav", wav.toRequestBody("audio/wav".toMediaType()))
+                .build()
+        }
+        val request = Request.Builder().url(url).header("Authorization", "Bearer ${config.apiKey}")
+            // 小米 MiMo 文档写的是 api-key 头；两个都带，哪种都认。
+            .apply { if (chat) header("api-key", config.apiKey) }
+            .post(body).build()
+        client.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(text) }.getOrNull()
+            if (!response.isSuccessful) {
+                val detail = serverMessage(json, text)
+                // 404 时写出试的完整地址，一眼看出是地址错了还是模型名错了。
+                val message = if (response.code == 404) "接口地址或模型名不对（404）：$url" + (detail?.let { "（$it）" } ?: "")
+                    else httpError(response.code, detail)
+                throw HttpFailure(response.code, url, message)
+            }
+            checkNotNull(json) { "接口返回的格式看不懂" }
+            businessError(json)?.let { error(it) }
+            if (chat) return (chatText(json) ?: error("接口返回的格式看不懂")).trim()
+            return (extractText(json, 0) ?: if (json.optString("status") == "completed") "" else error("接口返回的格式看不懂")).trim()
+        }
     }
 
     private fun httpError(code: Int, detail: String?): String {

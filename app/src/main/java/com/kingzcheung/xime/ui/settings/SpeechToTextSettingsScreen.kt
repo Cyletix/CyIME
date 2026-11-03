@@ -387,7 +387,7 @@ internal fun OnlineSpeechApiSection() {
                 }, modifier = Modifier.testTag("speech-api-test")) { Text("测试") }
             }
             Text(if (volcengine) "火山引擎：新版控制台填 API Key，App ID 留空；旧版填 App ID 和 Access Token。资源 ID 如 volc.seedasr.sauc.duration，要和控制台开通的一致。密钥只存在本机。"
-                else "OpenAI 兼容接口填到 /v1 为止，如 Groq、硅基流动；腾讯 TokenHub 填完整的 sync_transcribe 地址；火山引擎(豆包)填 wss:// 开头的地址。密钥只存在本机。",
+                else "OpenAI 兼容接口填到 /v1 为止，如 Groq、硅基流动、小米 MiMo(模型 mimo-v2.5-asr)；腾讯 TokenHub 填完整的 sync_transcribe 地址；火山引擎(豆包)填 wss:// 开头的地址。密钥只存在本机。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (configured) SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "优先使用在线语音",
