@@ -14,6 +14,7 @@ import android.view.Window
 import android.view.WindowManager
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
+import androidx.compose.ui.unit.IntOffset
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.ui.theme.SamsungWindowBlur
 import java.util.function.Consumer
@@ -38,6 +39,13 @@ internal class ImeGlassBlurWindow(
     private val context: Context,
     private val role: String = "keyboard",
     private val windowType: Int = WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA,
+    /**
+     * Where the view that measured [setRegion] bounds sits in the IME window now. The IME window can
+     * grow or shrink at the top (status bar shown/hidden) while the keyboard stays put on screen:
+     * the keyboard's window-space y changes but Compose sends no position callback, and the blur
+     * stayed at the old y, over the app above the keyboard (user 11-03). Null keeps bounds as given.
+     */
+    private val anchorOrigin: () -> IntOffset? = { null },
     private val parentDecor: () -> View?,
 ) {
     private var enabled = false
@@ -46,6 +54,7 @@ internal class ImeGlassBlurWindow(
     private var blurRadiusPx = 0
     private var cornerRadiusPx = 0f
     private var region: Rect? = null
+    private var regionMeasuredAt: IntOffset? = null
     private var dialog: Dialog? = null
     private var background: GradientDrawable? = null
     private var boundToken: IBinder? = null
@@ -75,11 +84,16 @@ internal class ImeGlassBlurWindow(
         refresh()
     }
 
-    /** The rectangle is in the parent IME window's coordinates, as returned by positionInWindow. */
-    fun setRegion(bounds: Rect?) {
+    /**
+     * The rectangle is in the parent IME window's coordinates, as returned by positionInWindow.
+     * [measuredAt] is [anchorOrigin] when those coordinates were measured; the window follows the
+     * anchor from there on every parent layout.
+     */
+    fun setRegion(bounds: Rect?, measuredAt: IntOffset? = null) {
         val next = bounds?.takeUnless { it.isEmpty }?.let(::Rect)
-        if (region == next) return
+        if (region == next && regionMeasuredAt == measuredAt) return
         region = next
+        regionMeasuredAt = measuredAt
         refresh()
     }
 
@@ -126,7 +140,10 @@ internal class ImeGlassBlurWindow(
         val parent = parentDecor()
         observeParent(parent)
         val token = parent?.windowToken
-        val bounds = region
+        val bounds = region?.let { measured ->
+            val shift = blurAnchorShift(regionMeasuredAt, anchorOrigin())
+            if (shift == IntOffset.Zero) measured else Rect(measured).apply { offset(shift.x, shift.y) }
+        }
         if (parent == null || !parent.isAttachedToWindow || token == null || bounds == null) {
             removeWindow()
             return
@@ -331,3 +348,7 @@ internal class ImeGlassBlurWindow(
         const val TAG = "ImeGlassBlurWindow"
     }
 }
+
+/** How far the measuring view moved inside the IME window since the region was measured. */
+internal fun blurAnchorShift(measuredAt: IntOffset?, now: IntOffset?): IntOffset =
+    if (measuredAt == null || now == null) IntOffset.Zero else now - measuredAt

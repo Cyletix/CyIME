@@ -420,6 +420,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var hardwarePreeditBounds: android.graphics.Rect? = null
     private val glassBlurWindows = mutableMapOf<String, ImeGlassBlurWindow>()
     private val glassSurfaceBounds = mutableMapOf<String, android.graphics.Rect>()
+    /** Where [keyboardContainer] sat in the IME window when each of [glassSurfaceBounds] was measured. */
+    private val glassSurfaceOrigins = mutableMapOf<String, androidx.compose.ui.unit.IntOffset>()
     internal val editorInputPolicy = EditorSessionInputPolicy()
     private var glassConfig = com.kingzcheung.xime.settings.FrostedGlassConfig()
     private var glassWindowVisible = false
@@ -433,12 +435,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 生效时固定卡片上沿在窗口里的 y：Compose 的玻璃底色按它渐隐，和下面的细条模糊对齐。 */
     private val glassTopFeatherTop = mutableStateOf<Float?>(null)
 
-    /** Blur windows follow measured content bounds; they never determine keyboard geometry. */
-    private fun updateGlassSurface(name: String, bounds: android.graphics.Rect?) {
-        if (bounds == null || bounds.isEmpty) glassSurfaceBounds.remove(name)
-        else glassSurfaceBounds[name] = android.graphics.Rect(bounds)
+    /** The keyboard view's place in the IME window; blur bounds are measured relative to it. */
+    private fun glassAnchorOrigin(): androidx.compose.ui.unit.IntOffset? {
+        if (!::keyboardContainer.isInitialized || !keyboardContainer.isAttachedToWindow) return null
+        val location = IntArray(2)
+        keyboardContainer.getLocationInWindow(location)
+        return androidx.compose.ui.unit.IntOffset(location[0], location[1])
+    }
+
+    /**
+     * Blur windows follow measured content bounds; they never determine keyboard geometry.
+     * [measuredAt] is [glassAnchorOrigin] when [bounds] was measured (now, for a fresh report).
+     */
+    private fun updateGlassSurface(name: String, bounds: android.graphics.Rect?,
+        measuredAt: androidx.compose.ui.unit.IntOffset? = glassAnchorOrigin()) {
+        if (bounds == null || bounds.isEmpty) {
+            glassSurfaceBounds.remove(name)
+            glassSurfaceOrigins.remove(name)
+        } else {
+            glassSurfaceBounds[name] = android.graphics.Rect(bounds)
+            if (measuredAt == null) glassSurfaceOrigins.remove(name) else glassSurfaceOrigins[name] = measuredAt
+        }
         val surface = glassBlurWindows[name] ?: if (glassConfig.enabled && bounds != null) {
-            ImeGlassBlurWindow(this, name) { window.window?.decorView }.also { glassBlurWindows[name] = it }
+            ImeGlassBlurWindow(this, name, anchorOrigin = { glassAnchorOrigin() }) { window.window?.decorView }
+                .also { glassBlurWindows[name] = it }
         } else return
         val density = resources.displayMetrics.density
         // 固定键盘关了顶部圆角时卡片顶边是直角，模糊也用直角，顶角不露出没模糊的应用。
@@ -447,7 +467,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (name == "navigation" || squareTop && name.startsWith("keyboard")) 0f
             else 16f * density)
         surface.setOpacity(glassOpacity * (glassAlphaScale[name] ?: 1f))
-        surface.setRegion(glassSurfaceBounds[name])
+        surface.setRegion(glassSurfaceBounds[name], glassSurfaceOrigins[name])
         surface.setVisible(glassWindowVisible)
     }
 
@@ -472,19 +492,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 全屏手写时只模糊底部控件区，书写区保持清晰、能看见后面的应用。 */
     private var handwritingGlassControls: android.graphics.Rect? = null
+    private var handwritingGlassControlsOrigin: androidx.compose.ui.unit.IntOffset? = null
     private val handwritingGlassRegionReporter: (android.graphics.Rect?) -> Unit = { bounds ->
-        if (handwritingGlassControls != bounds) {
+        val origin = glassAnchorOrigin()
+        if (handwritingGlassControls != bounds || handwritingGlassControlsOrigin != origin) {
             handwritingGlassControls = bounds
+            handwritingGlassControlsOrigin = origin
             updateKeyboardGlass()
         }
     }
 
     /** 分体时模糊分三块：上方工具栏整宽，左右两半各一块，中缝保持清晰。 */
     private fun updateKeyboardGlass() {
-        val card = withFilledSides(if (uiState.value.handwritingExpanded) handwritingGlassControls else keyboardGlassCard)
+        val handwriting = uiState.value.handwritingExpanded
+        val card = withFilledSides(if (handwriting) handwritingGlassControls else keyboardGlassCard)
+        // All pieces below come from the card's measurement, so they share its anchor origin.
+        val origin = if (handwriting) handwritingGlassControlsOrigin else keyboardGlassCardOrigin
         val hole = card?.let { splitKeyboardGap.hole(it.bottom.toFloat()) }
         if (card == null || hole == null) {
-            updateTopGlass(card)
+            updateTopGlass(card, origin)
             updateGlassSurface("keyboard-left", null)
             updateGlassSurface("keyboard-right", null)
             return
@@ -492,28 +518,28 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val top = hole.top.roundToInt().coerceIn(card.top, card.bottom)
         // 两半向上压住工具栏那块的圆角，拼接处不露缺口。
         val halfTop = (top - (16f * resources.displayMetrics.density).roundToInt()).coerceAtLeast(card.top)
-        updateTopGlass(android.graphics.Rect(card.left, card.top, card.right, top))
-        updateGlassSurface("keyboard-left", android.graphics.Rect(card.left, halfTop, hole.left.roundToInt(), card.bottom))
-        updateGlassSurface("keyboard-right", android.graphics.Rect(hole.right.roundToInt(), halfTop, card.right, card.bottom))
+        updateTopGlass(android.graphics.Rect(card.left, card.top, card.right, top), origin)
+        updateGlassSurface("keyboard-left", android.graphics.Rect(card.left, halfTop, hole.left.roundToInt(), card.bottom), origin)
+        updateGlassSurface("keyboard-right", android.graphics.Rect(hole.right.roundToInt(), halfTop, card.right, card.bottom), origin)
     }
 
     /**
      * 卡片最上面那块模糊。「柔化顶部边缘」开着时上沿 16dp 切成几条细窗口，透明度一级级升到满，
      * 那块整的从这段下面开始；Compose 里的玻璃底色按同一段渐隐（GlassTopFeather.kt）。
      */
-    private fun updateTopGlass(rect: android.graphics.Rect?) {
+    private fun updateTopGlass(rect: android.graphics.Rect?, origin: androidx.compose.ui.unit.IntOffset?) {
         val featherPx = (com.kingzcheung.xime.ui.theme.GLASS_TOP_FEATHER_HEIGHT.value * resources.displayMetrics.density).roundToInt()
         val bands = if (glassTopFeatherOn && rect != null) com.kingzcheung.xime.ui.theme.glassTopFeatherBands(
             rect.left, rect.top, rect.right, rect.bottom, featherPx) else emptyList()
         glassTopFeatherTop.value = if (bands.isEmpty()) null else rect!!.top.toFloat()
         updateGlassSurface("keyboard", if (bands.isEmpty()) rect
-            else android.graphics.Rect(rect!!.left, rect.top + featherPx, rect.right, rect.bottom))
+            else android.graphics.Rect(rect!!.left, rect.top + featherPx, rect.right, rect.bottom), origin)
         for (i in 0 until com.kingzcheung.xime.ui.theme.GLASS_TOP_FEATHER_STEPS) {
             val name = "keyboard-edge-$i"
             val band = bands.getOrNull(i)
             if (band == null) glassAlphaScale.remove(name) else glassAlphaScale[name] = band.alpha
             if (band != null || glassBlurWindows.containsKey(name) || glassSurfaceBounds.containsKey(name)) {
-                updateGlassSurface(name, band?.let { android.graphics.Rect(it.left, it.top, it.right, it.bottom) })
+                updateGlassSurface(name, band?.let { android.graphics.Rect(it.left, it.top, it.right, it.bottom) }, origin)
             }
         }
     }
@@ -539,11 +565,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (glassSurfaceMode != mode) {
             glassSurfaceMode = mode
             glassSurfaceBounds.clear()
+            glassSurfaceOrigins.clear()
             glassBlurWindows.values.forEach { it.setRegion(null) }
         }
         glassConfig = config.normalized()
         (glassSurfaceBounds.keys + glassBlurWindows.keys).toSet().forEach { name ->
-            updateGlassSurface(name, glassSurfaceBounds[name])
+            updateGlassSurface(name, glassSurfaceBounds[name], glassSurfaceOrigins[name])
         }
     }
     /** 当前输入框是否受限（密码/终端/NO_SUGGESTIONS，见 EditorInfoClassifier）。
@@ -579,6 +606,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var floatingCornerHandleBounds: List<android.graphics.Rect> = emptyList()
     private var fixedCardBounds: android.graphics.Rect? = null
     private var keyboardGlassCard: android.graphics.Rect? = null
+    private var keyboardGlassCardOrigin: androidx.compose.ui.unit.IntOffset? = null
     /** 分体中缝（窗口坐标）：触摸区让给宿主，玻璃模糊也避开它。 */
     internal val splitKeyboardGap = com.kingzcheung.xime.ui.keyboard.SplitKeyboardGap().also {
         it.onChanged = { onSplitGapChanged() }
@@ -2639,6 +2667,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     keyboardGlassCard = if (state.isFloatingMode && com.kingzcheung.xime.ui.keyboard
                                             .isFloatingRotated(state.floatingRotation)) null
                                         else android.graphics.Rect(left, top, right, bottom)
+                                    keyboardGlassCardOrigin = glassAnchorOrigin()
                                     updateKeyboardGlass()
                                     if (!state.isFloatingMode) navigationStripCard.value = androidx.compose.ui.geometry.Rect(
                                         left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
@@ -4267,6 +4296,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         glassBlurWindows.values.forEach { it.dispose() }
         glassBlurWindows.clear()
         glassSurfaceBounds.clear()
+        glassSurfaceOrigins.clear()
         hardwareInputManager.unregisterInputDeviceListener(hardwareInputListener)
         inputStallWatchdog?.stop()
         runtimeObserver?.stop()
