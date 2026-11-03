@@ -222,6 +222,30 @@ class MenuSwipeBackTest {
         rule.runOnIdle { assertEquals(1, backs); assertEquals(0, taps) }
     }
 
+    /** 三页的菜单：翻到第三页以后一页一页往右划回去，中间那页也照样能往回翻。 */
+    @Test fun threePageMenuSwipesBackPageByPage() {
+        val buttons = ToolbarButton.entries.take(20)
+        var taps = 0
+        var backs = 0
+        val actions = buttons.map { ToolbarAction(ToolbarButtonItem.Builtin(it)) { taps++ } }
+        rule.setContent {
+            MenuBar(MenuBarState(true, false, backgroundColor = Color.LightGray), actions,
+                Modifier.width(360.dp).height(230.dp).testTag("menu-body"), onBack = { backs++ })
+        }
+        val menu = rule.onNodeWithTag("menu-body")
+        val forward: TouchInjectionScope.() -> Unit = { swipe(Offset(width * .68f, centerY), Offset(width * .04f, centerY), 330) }
+        val backward: TouchInjectionScope.() -> Unit = { swipe(Offset(width * .3f, centerY), Offset(width * .96f, centerY), 330) }
+        menu.performTouchInput(forward)
+        rule.onNodeWithTag("menu-item:${buttons[8].id}").assertIsDisplayed()
+        menu.performTouchInput(forward)
+        rule.onNodeWithTag("menu-item:${buttons[16].id}").assertIsDisplayed()
+        menu.performTouchInput(backward)
+        rule.onNodeWithTag("menu-item:${buttons[8].id}").assertIsDisplayed()
+        menu.performTouchInput(backward)
+        rule.onNodeWithTag("menu-item:${buttons[0].id}").assertIsDisplayed()
+        rule.runOnIdle { assertEquals(0, backs); assertEquals(0, taps) }
+    }
+
     private fun shot(name: String) {
         val out = System.getenv("CYIME_RENDER_OUT") ?: return
         rule.waitForIdle()
