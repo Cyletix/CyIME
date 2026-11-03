@@ -388,6 +388,24 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_CLIPBOARD_SENSITIVE_CAPTURE, enabled).apply()
     }
 
+    /** 剪贴板历史最多保存几条（0 = 不限）；没存过时由剪贴板按已有条数定一次，见 ClipboardRetention.initialCount。 */
+    private const val KEY_CLIPBOARD_MAX_COUNT = "clipboard_max_count"
+    /** 剪贴板历史保存几天后自动删除（0 = 不过期，默认）。 */
+    private const val KEY_CLIPBOARD_KEEP_DAYS = "clipboard_keep_days"
+
+    fun getClipboardMaxCount(context: Context): Int? =
+        getPrefs(context).takeIf { it.contains(KEY_CLIPBOARD_MAX_COUNT) }?.getInt(KEY_CLIPBOARD_MAX_COUNT, 0)
+
+    fun setClipboardMaxCount(context: Context, count: Int) {
+        getPrefs(context).edit().putInt(KEY_CLIPBOARD_MAX_COUNT, count).apply()
+    }
+
+    fun getClipboardKeepDays(context: Context): Int = getPrefs(context).getInt(KEY_CLIPBOARD_KEEP_DAYS, 0)
+
+    fun setClipboardKeepDays(context: Context, days: Int) {
+        getPrefs(context).edit().putInt(KEY_CLIPBOARD_KEEP_DAYS, days).apply()
+    }
+
     private const val KEY_SCHEMA_IMPORT_WARNING_DISMISSED = "schema_import_warning_dismissed"
 
     private const val KEY_INSTALLED_MARKET_IDS = "installed_market_ids"

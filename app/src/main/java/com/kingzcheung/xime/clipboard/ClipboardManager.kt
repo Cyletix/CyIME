@@ -17,6 +17,7 @@ import androidx.core.content.FileProvider
 import com.kingzcheung.xime.clipboard.db.ClipboardDatabase
 import com.kingzcheung.xime.clipboard.db.ClipboardEntry
 import com.kingzcheung.xime.clipboard.db.ClipboardImportRow
+import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -292,6 +293,8 @@ class ClipboardManager private constructor(private val context: Context) {
     private val dao = database.clipboardDao()
     private val scope = ClipboardDatabase.scope()
     private val clipboardPinsReady = CompletableDeferred<Unit>()
+    /** Grouped records are marked and the history limits are known; trimming history waits for it. */
+    private val limitsReady = CompletableDeferred<Unit>()
     private val clipboardPinWriter = ClipboardPinWriter(scope, clipboardPinsReady, dao::setClipboardPinned,
         onFailure = { Log.e(TAG, "Could not save clipboard pin state", it) })
 
@@ -316,6 +319,8 @@ class ClipboardManager private constructor(private val context: Context) {
     fun refreshClipboard() {
         images.refresh()
         deleteExpiredSensitive()
+        // 「保留时间」 runs out while nothing is copied too; checked whenever the keyboard opens.
+        if (SettingsPreferences.getClipboardKeepDays(context) != ClipboardRetention.NEVER) scope.launch { trimHistory() }
         readMissedCopy()
     }
 
@@ -431,10 +436,52 @@ class ClipboardManager private constructor(private val context: Context) {
             val id = groups.idForName(name) ?: continue
             // A record already in a group stays where the user put it.
             val members = groups.state.value.members
-            groups.assign(keys.filter { it !in members }, id)
+            val joining = keys.filter { it !in members }
+            groups.assign(joining, id)
+            // Marked at once, so the history limits below leave them alone.
+            joining.mapNotNull { it.removePrefix("text:").toLongOrNull() }.takeIf { it.isNotEmpty() }
+                ?.chunked(500)?.forEach { dao.setGrouped(it, true) }
         }
-        return ClipboardImportResult(added, pinned, existing, notSaved)
+        return ClipboardImportResult(added, pinned, existing, notSaved, trimmed = trimHistory())
     }
+
+    /** 「数量上限」 and 「保留时间」 as saved; the first time, a limit that keeps all history already here. */
+    private suspend fun readHistoryLimits(): ClipboardHistoryLimits {
+        val count = SettingsPreferences.getClipboardMaxCount(context)
+            ?: ClipboardRetention.initialCount(dao.countUnpinned()).also { SettingsPreferences.setClipboardMaxCount(context, it) }
+        return ClipboardHistoryLimits(count, SettingsPreferences.getClipboardKeepDays(context))
+    }
+
+    /** The history limits for the settings page. */
+    internal suspend fun historyLimits(): ClipboardHistoryLimits {
+        limitsReady.await()
+        return readHistoryLimits()
+    }
+
+    /** History records [limits] would delete right now (fixed and grouped ones never count). */
+    internal suspend fun removedBy(limits: ClipboardHistoryLimits): Int {
+        limitsReady.await()
+        return ClipboardRetention.removedBy(dao.countUnpinned(),
+            dao.countHistoryBefore(limits.cutoff(System.currentTimeMillis())), limits.maxCount)
+    }
+
+    /** The user's choice on the settings page, applied at once. */
+    internal fun setHistoryLimits(limits: ClipboardHistoryLimits) {
+        SettingsPreferences.setClipboardMaxCount(context, limits.maxCount)
+        SettingsPreferences.setClipboardKeepDays(context, limits.keepDays)
+        scope.launch { trimHistory() }
+    }
+
+    /** History beyond 「数量上限」 or older than 「保留时间」 goes, oldest first. Returns how many went. */
+    private suspend fun trimHistory(): Int {
+        limitsReady.await()
+        return trimHistoryNow()
+    }
+
+    private suspend fun trimHistoryNow(): Int = runCatching {
+        val limits = readHistoryLimits()
+        dao.trimHistory(limits.maxCount, limits.cutoff(System.currentTimeMillis()))
+    }.onFailure { Log.e(TAG, "Could not trim clipboard history", it) }.getOrDefault(0)
 
     private fun searchKey(text: String) = ClipboardSearch.key(text, AndroidPinyinInitials::initialOf)
 
@@ -489,6 +536,8 @@ class ClipboardManager private constructor(private val context: Context) {
                     .onFailure { Log.e(TAG, "Could not remove duplicate clipboard records", it) }
             }
             deleteExpiredSensitive()
+            trimHistoryNow()
+            limitsReady.complete(Unit)
             scope.launch { dao.observeUnpinnedCount().collect { _unpinnedCount.value = it } }
             scope.launch {
                 dao.observeStoredBytes().collect { stored ->
@@ -665,7 +714,7 @@ class ClipboardManager private constructor(private val context: Context) {
             // A password gets no search key: it is never searched.
             val key = if (sensitive) "" else searchKey(text)
             val now = System.currentTimeMillis()
-            if (fromDevice) {
+            val added = if (fromDevice) {
                 // Received copies keep their own room and never push out or block this phone's own.
                 dao.addReceived(text, now, key, ClipboardCapacity.DEVICE_COUNT, ClipboardCapacity.DEVICE_BYTES)
             } else {
@@ -676,6 +725,8 @@ class ClipboardManager private constructor(private val context: Context) {
                 if (needsRoom && !hasRoomFor(text, key)) return@launch
                 dao.upsert(text, now, key, sensitive = sensitive)
             }
+            // A new record: the oldest history beyond 「数量上限」 makes way (fixed and grouped ones stay).
+            if (added) trimHistory()
             if (sensitive) {
                 // Deleted an hour after the copy; checked again whenever the keyboard opens, in case
                 // the keyboard process was gone when the hour ran out.

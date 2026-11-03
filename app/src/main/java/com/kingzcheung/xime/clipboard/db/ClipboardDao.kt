@@ -137,6 +137,26 @@ interface ClipboardDao {
     @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0 AND id IN (SELECT id FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0 ORDER BY timestamp ASC LIMIT :limit)")
     suspend fun trimUnpinned(limit: Int)
 
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0 AND timestamp < :cutoff")
+    suspend fun countHistoryBefore(cutoff: Long): Int
+
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND grouped = 0 AND isQuickSend = 0 AND timestamp < :cutoff")
+    suspend fun deleteHistoryBefore(cutoff: Long): Int
+
+    /**
+     * The user's history limits: records copied before [cutoff] go, then the oldest beyond [maxCount]
+     * (0 = no cap). Fixed and grouped records are never counted or removed. Returns how many went.
+     */
+    @Transaction
+    suspend fun trimHistory(maxCount: Int, cutoff: Long): Int {
+        var removed = deleteHistoryBefore(cutoff)
+        if (maxCount > 0) {
+            val over = countUnpinned() - maxCount
+            if (over > 0) { trimUnpinned(over); removed += over }
+        }
+        return removed
+    }
+
     // An edit clears the search key; the backfill recomputes it from the new text.
     @Query("UPDATE clipboard_entries SET text = :text, code = COALESCE(:code, code), timestamp = :now, searchKey = '' WHERE id = :id AND isQuickSend = 0")
     suspend fun updateClipboardItem(id: Long, text: String, code: String?, now: Long)

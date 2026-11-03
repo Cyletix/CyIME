@@ -114,12 +114,15 @@ internal object ClipboardImport {
 }
 
 /** What an import did: records added (of them fixed), already there, and not saved for lack of room. */
-internal data class ClipboardImportResult(val added: Int, val pinned: Int, val existing: Int, val notSaved: Int) {
+internal data class ClipboardImportResult(val added: Int, val pinned: Int, val existing: Int, val notSaved: Int,
+    /** History removed afterwards by 「数量上限」 or 「保留时间」. */
+    val trimmed: Int = 0) {
     val message: String get() = buildString {
         if (added == 0 && existing == 0 && notSaved == 0) { append("文件里没有能导入的记录"); return@buildString }
         append("已导入 $added 条")
         if (pinned > 0) append("（其中固定 $pinned 条）")
         if (existing > 0) append("，$existing 条已经有了，没再加")
         if (notSaved > 0) append("，还有 $notSaved 条剪贴板放不下，没有导入")
+        if (trimmed > 0) append("，按数量上限和保留时间删掉了较早的 $trimmed 条")
     }
 }

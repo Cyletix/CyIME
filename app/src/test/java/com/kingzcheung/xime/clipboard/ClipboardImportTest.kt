@@ -79,6 +79,7 @@ class ClipboardImportTest {
         assertEquals("已导入 3 条（其中固定 1 条），2 条已经有了，没再加", ClipboardImportResult(3, 1, 2, 0).message)
         assertEquals("已导入 0 条，还有 4 条剪贴板放不下，没有导入", ClipboardImportResult(0, 0, 0, 4).message)
         assertEquals("文件里没有能导入的记录", ClipboardImportResult(0, 0, 0, 0).message)
+        assertEquals("已导入 5 条，按数量上限和保留时间删掉了较早的 2 条", ClipboardImportResult(5, 0, 0, 0, trimmed = 2).message)
     }
 }
 

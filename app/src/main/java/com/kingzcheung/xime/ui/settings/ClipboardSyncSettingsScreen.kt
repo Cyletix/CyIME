@@ -207,6 +207,7 @@ fun ClipboardSyncSettingsContent(
             VerificationCodeSettings()
             ClipboardSensitiveSetting()
             ClipboardCardLinesSetting(onNavigateToGroups)
+            ClipboardHistoryLimitsSetting()
             ClipboardExportSetting()
             ClipboardImportSetting()
         }
