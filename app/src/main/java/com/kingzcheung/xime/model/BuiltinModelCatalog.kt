@@ -25,8 +25,9 @@ object BuiltinModelCatalog {
                         mirrors = listOf(RELEASE + "ocr-ppocr-v5-det-mobile.onnx", DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-det-mobile.onnx")),
                     ModelFile("ch_PP-OCRv5_rec_mobile.onnx", "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx", "5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5", 16631306L,
                         mirrors = listOf(RELEASE + "ocr-ppocr-v5-rec-mobile.onnx", DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-rec-mobile.onnx")),
-                    ModelFile("ppocrv5-characters.txt", "https://github.com/Cyletix/CyIME/releases/download/models/ocr-ppocr-v5-characters.txt", "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b", 74012L,
-                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-characters.txt")),
+                    // 识别模型自带的字符表，RapidAI 同一版本里有原样的一份 (2026-11-03 核对哈希一致)。
+                    ModelFile("ppocrv5-characters.txt", "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/paddle/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile/ppocrv5_dict.txt", "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b", 74012L,
+                        mirrors = listOf(RELEASE + "ocr-ppocr-v5-characters.txt", DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-characters.txt")),
                 )))),
         // 公式手写（LaTeX）：tools/handwriting_training 训练，只用公开的 MathWriting 2024，不含用户样本；
         // 日语、英文手写的“边写边学”也用它算特征。
