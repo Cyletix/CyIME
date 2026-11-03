@@ -338,10 +338,12 @@ fun HandwritingKeyboardLayout(
                     onPenLifted = { penSounds.stop() })) {
                 renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), inkColor, transparentPaper = expanded, penColor = penInkColor)
             }
-            // 一直显示正在写的语言（用户 10-21：除了公式按钮完全看不出在写什么语言）
-            HandwritingLanguageHint(handwritingLanguageHint(language, useTemplates,
-                    preparing = templateScript != null && importingTemplates,
-                    missingKana = templateScript == HandwritingTemplates.Script.KANA && !useTemplates),
+            // 正在写的语言平时写在空格键上，和其他键盘一样（用户 11-03，#107：胶囊挡住画板和公式预览）。
+            // 画板上只在正在准备、假名模板没读到这种要人知道的时候才浮出提示。
+            val hintPreparing = templateScript != null && importingTemplates
+            val hintMissingKana = templateScript == HandwritingTemplates.Script.KANA && !useTemplates
+            if (hintPreparing || hintMissingKana) HandwritingLanguageHint(handwritingLanguageHint(language, useTemplates,
+                    preparing = hintPreparing, missingKana = hintMissingKana),
                 specialKeyBackgroundColor, specialKeyTextColor, Modifier.align(Alignment.TopStart))
             // 公式开关是浮在画板右上角的实心小按钮，不用对钩：开启时强调色填满、文字在黑白里取反差大的；
             // 关闭时用主题功能键的底色（强制不透明）和文字色，不加描边。
@@ -422,7 +424,7 @@ fun HandwritingKeyboardLayout(
                     HandwritingFunctionKey(action, { press(action) },
                         if (special) specialKeyBackgroundColor else keyBackgroundColor,
                         if (special) specialKeyTextColor else keyTextColor,
-                        Modifier.weight(weight).fillMaxHeight())
+                        Modifier.weight(weight).fillMaxHeight(), spaceLabel = "${recognitionLanguage.displayName}手写")
                 }
             }
             }
@@ -436,7 +438,7 @@ fun HandwritingKeyboardLayout(
 
 @Composable
 private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier,
-    onClear: (() -> Unit)? = null) {
+    onClear: (() -> Unit)? = null, spaceLabel: String = "") {
     val label = when (action) {
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
         "symbol" -> "!@#"; "number" -> "123"; "ime_switch" -> "语言切换"
@@ -461,6 +463,14 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
         contentDescription = label
         onClick { onClick(); true }
     }.testTag("handwriting-key:$action")
+    if (action == "space") {
+        // 与其他键盘同一个空格键：键面上写当前手写的语言（「中文手写」），长按手势也一样。
+        Box(keyModifier) {
+            SpaceKeyButton(onClick = onClick, backgroundColor = keyBackground, textColor = keyForeground,
+                schemaName = spaceLabel, modifier = Modifier.fillMaxSize())
+        }
+        return
+    }
     if (action == "ime_switch") {
         // 与其他键盘同一个语言键：点按切换，长按弹出语言菜单。
         LanguageKeyButton(icon = rememberVectorPainter(Icons.Default.Language), onClick = onClick,

@@ -47,7 +47,8 @@ class HandwritingLanguageBoundaryTest {
             }
         }
         rule.onNodeWithTag("handwriting-canvas").assertExists()
-        rule.onNodeWithTag("handwriting-language").assertTextEquals("中文")
+        rule.onNodeWithTag("handwriting-language").assertDoesNotExist()
+        rule.onNodeWithText("英文手写").assertExists()
         rule.onNodeWithTag("handwriting-unavailable").assertDoesNotExist()
 
         rule.runOnIdle { language = InputLanguage.JAPANESE }
