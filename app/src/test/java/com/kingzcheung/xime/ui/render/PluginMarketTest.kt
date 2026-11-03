@@ -44,6 +44,8 @@ class PluginMarketTest {
         }
         KeyboardThemes.initFromConfig(app)
         PluginManager.initialize(app)
+        // PluginManager 是单例：前面别的测试装过的插件还在列表里，这里先卸干净，「第一次装」才成立。
+        runBlocking { for (plugin in XimeIndexSource.bundledPlugins(app).plugins) PluginManager.installerManager.uninstallPlugin(plugin.id) }
     }
 
     @After fun removeTestInstallations() = runBlocking {
