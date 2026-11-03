@@ -50,7 +50,7 @@ class PerformanceCostsTest {
         val reference = bundled.devices.first()
         PerformanceCosts.Item.entries.forEach { item ->
             assertNotNull(item.id, reference.items[item.id]?.keyMs)
-            assertNotNull(item.id, PerformanceCosts.note(PerformanceCosts.Source(reference, local = false, sameModel = true), item.id))
+            // 11-03 起开销小到不值一提的开关不出这一行（note 为 null），这里只要求表里有数。
         }
     }
 
