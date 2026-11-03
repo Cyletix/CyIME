@@ -93,4 +93,21 @@ class ShiftSlideTargetsTest {
         targets.finish()
         assertFalse(targets.ctrlEnter())
     }
+
+    // 用户 11-03：按住 !@# 长按空格拖动选中文字，和按住 Shift 一样；松开 !@# 后回到普通移动。
+    @Test fun spaceCursorSelectsWhileSymbolKeyHeld() {
+        val targets = targets()
+        SpaceCursorShift.begin()
+        try {
+            assertFalse(SpaceCursorShift.selecting(com.kingzcheung.xime.viewmodel.ShiftMode.OFF))
+            targets.beginCtrl { }
+            assertTrue(SpaceCursorShift.selecting(com.kingzcheung.xime.viewmodel.ShiftMode.OFF))
+            assertTrue("选过字松开 !@# 不再打开符号", targets.ctrlUsed)
+            targets.finish()
+            assertFalse(SpaceCursorShift.selecting(com.kingzcheung.xime.viewmodel.ShiftMode.OFF))
+        } finally {
+            SpaceCursorShift.end()
+            targets.finish()
+        }
+    }
 }
