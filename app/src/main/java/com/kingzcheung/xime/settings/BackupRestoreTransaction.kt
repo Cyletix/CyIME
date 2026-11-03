@@ -68,6 +68,10 @@ internal object BackupRestoreTransaction {
                                 require(BackupManager.isFilesEntry(path, personal = true)) { "备份包包含未知文件: $path" }
                                 target(filesDir, path)
                             }
+                            rel.startsWith("cells/") -> rel.removePrefix("cells/").let { file ->
+                                require(BackupManager.isCellEntry(file)) { "备份包包含未知文件: $file" }
+                                target(File(filesDir, BackupManager.CELLS_DIR), file)
+                            }
                             else -> null
                         }
                         if (destination != null) {

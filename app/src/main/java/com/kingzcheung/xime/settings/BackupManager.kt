@@ -19,6 +19,7 @@ import java.util.zip.ZipOutputStream
  * - `_xime_backup/settings.json`                    设置项（kime_settings，类型保留，剔除设备状态键）
  * - `_xime_backup/prefs/<name>.json`                其他设置文件（[SETTINGS_PREFS]）
  * - `_xime_backup/files/<path>`                     filesDir 下的设置/学习文件（[isFilesEntry]）
+ * - `_xime_backup/cells/<name>`                     导入、下载的分类词库（[isCellEntry]），不论是否勾选个人数据
  * - 包根的 rime 文件：`*.custom.yaml`、自定义布局方案、themes/ 背景图；
  *   勾选个人数据时另含 userdb（自造词与调频）、自定义短语与个人词库
  * - v1 的插件条目（plugin_configs/、plugins.xml、plugins/）仍可恢复，本地备份不再生成
@@ -76,6 +77,18 @@ object BackupManager {
         else -> false
     }
 
+    /** 分类词库目录（[CellDictionaryManager.store]）。 */
+    internal const val CELLS_DIR = "cell-dictionaries"
+
+    /**
+     * 导入、下载的分类词库：词库文件、英文词表、启用状态和词条更新。随 APK 的内置词库不带，装好会自己补上。
+     * 放在 `_xime_backup/cells/` 下：旧版恢复不认识这个目录会跳过，新备份在旧版上其余内容照样能恢复。
+     */
+    internal fun isCellEntry(name: String): Boolean =
+        !name.contains('/') && !name.contains('\\') && !name.startsWith("cell_builtin_") && (name == "state.json" ||
+            (name.startsWith("cell_") && (name.endsWith(".dict.yaml") || name.endsWith(".en.txt"))) ||
+            (name.startsWith("word-updates-") && name.endsWith(".json")))
+
     /** rime 目录中属于设置（总是导出）的文件。 */
     internal fun isRimeSettingsFile(relative: String): Boolean =
         (!relative.contains('/') && relative.endsWith(".custom.yaml")) ||
@@ -114,6 +127,9 @@ object BackupManager {
                 val relative = file.relativeTo(filesDir).path.replace('\\', '/')
                 if (isFilesEntry(relative, includePersonal)) result += (META_PREFIX + "files/" + relative) to file
             }
+        File(filesDir, CELLS_DIR).listFiles().orEmpty()
+            .filter { it.isFile && isCellEntry(it.name) }
+            .forEach { result += (META_PREFIX + "cells/" + it.name) to it }
         return result.sortedBy { it.first }
     }
 

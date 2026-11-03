@@ -338,4 +338,44 @@ class BackupManagerTest {
         assertTrue(!BackupManager.isCyimeBackup(zipOfText(mapOf("default.yaml" to "config:"))))
         assertTrue(!BackupManager.isCyimeBackup("not a zip".toByteArray()))
     }
+
+    @Test
+    fun `local backup always carries imported dictionaries but not built-in ones`() {
+        val files = tempDir.newFolder("files")
+        val cells = File(files, BackupManager.CELLS_DIR).apply { mkdirs() }
+        listOf("state.json", "cell_local_abc.dict.yaml", "cell_local_abc.en.txt", "cell_sogou_1.dict.yaml",
+            "word-updates-3.json", "cell_builtin_arknights.dict.yaml", "cell_builtin_arknights.en.txt", ".cell-1.tmp")
+            .forEach { File(cells, it).writeText(it) }
+
+        val plain = BackupManager.localBackupFiles(files, includePersonal = false).map { it.first }
+        assertEquals(
+            listOf("cell_local_abc.dict.yaml", "cell_local_abc.en.txt", "cell_sogou_1.dict.yaml", "state.json",
+                "word-updates-3.json").map { "${BackupManager.META_PREFIX}cells/$it" },
+            plain
+        )
+    }
+
+    @Test
+    fun `restore puts imported dictionaries back`() {
+        val filesDir = tempDir.newFolder("files")
+        val result = restore(filesDir, zipOfText(mapOf(
+            "${BackupManager.META_PREFIX}settings.json" to "{}",
+            "${BackupManager.META_PREFIX}cells/state.json" to "{\"installed\":[]}",
+            "${BackupManager.META_PREFIX}cells/cell_local_abc.dict.yaml" to "words",
+        )))
+        assertTrue(result.isSuccess)
+        assertEquals("{\"installed\":[]}", File(filesDir, "cell-dictionaries/state.json").readText())
+        assertEquals("words", File(filesDir, "cell-dictionaries/cell_local_abc.dict.yaml").readText())
+    }
+
+    @Test
+    fun `restore rejects unknown files in the dictionary folder`() {
+        val filesDir = tempDir.newFolder("files")
+        val result = restore(filesDir, zipOfText(mapOf(
+            "${BackupManager.META_PREFIX}settings.json" to "{}",
+            "${BackupManager.META_PREFIX}cells/../plugins.xml" to "x",
+        )))
+        assertTrue(result.isFailure)
+        assertTrue(!File(filesDir, "plugins.xml").exists())
+    }
 }
