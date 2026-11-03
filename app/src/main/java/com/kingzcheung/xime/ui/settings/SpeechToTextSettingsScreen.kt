@@ -326,66 +326,69 @@ fun SpeechToTextSettingsContent(
                 }
             }
 
-            OnlineSpeechPluginSection(onNavigateToPluginSettings)
+            OnlineSpeechApiSection()
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
 /**
- * 在线语音是插件（插件市场「在线语音」，和 AI 改写一样默认不装）。这里只选用哪个语音插件、要不要优先用在线；
- * 接口地址、密钥、模型和「测试接口」在插件自己的设置里。旧版在这里填过的接口，装上插件后自动带过去。
+ * 内置在线语音：接口地址、密钥、模型直接填在这里，一个测试按钮和接口状态，不用装插件。
+ * 密钥只存本机、不进备份。打开「优先使用在线语音」后说话先走在线，失败时这段改用本地模型。
  */
 @Composable
-internal fun OnlineSpeechPluginSection(onNavigateToPluginSettings: (String) -> Unit = {}) {
+internal fun OnlineSpeechApiSection() {
     val context = LocalContext.current
-    var tick by remember { mutableStateOf(0) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        com.kingzcheung.xime.speech.OnlineSpeechPlugin.migrateOldApi(context)
-        tick++
-    }
-    val plugins = remember(tick) { ExtensionManager.getEnabledAsrPlugins(context) }
-    val names = remember(tick) { ExtensionManager.getAllInstalledPlugins().associate { it.id to it.name } }
-    val hadOldApi = remember(tick) { com.kingzcheung.xime.speech.OnlineSpeechPlugin.hasOldApiConfig(context) }
-    var selectedId by remember(tick) {
-        mutableStateOf(com.kingzcheung.xime.speech.OnlineSpeechPlugin.selected(context)?.first.orEmpty())
-    }
-    val selected = plugins.firstOrNull { it.first == selectedId }?.second
-    val configured = remember(tick, selectedId) { selected?.let { runCatching { it.isConfigured() }.getOrDefault(false) } == true }
-    val batch = selected?.getCapabilities()?.isBatch == true
-    var preferOnline by remember(tick) { mutableStateOf(!SettingsPreferences.isSttUseLocal(context)) }
-    SettingsSection(title = "在线语音") {
-        if (plugins.isEmpty()) {
-            SettingsJumpText("想用自己的语音接口（OpenAI 兼容，如 OpenAI、Groq、硅基流动），在「扩展 › 插件 › 插件市场」装「在线语音」插件。" +
-                if (hadOldApi) "你以前在这里填的地址和密钥，装上后会自动带过去。" else "",
-                jumps = listOf("扩展 › 插件 › 插件市场"),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp).testTag("speech-plugin-hint"))
-        } else {
-            plugins.forEach { (id, _) ->
-                val isSelected = id == selectedId
-                SettingsItem(icon = Icons.TwoTone.GraphicEq, title = names[id] ?: id,
-                    subtitle = if (isSelected) "点这里填接口地址、密钥和模型" else "点一下改用这个",
-                    status = if (isSelected) "正在用" else null,
-                    onClick = {
-                        if (isSelected) onNavigateToPluginSettings(id)
-                        else {
-                            selectedId = id
-                            SettingsPreferences.setSttOnlinePluginId(context, id)
-                        }
-                    }, showArrow = isSelected)
-            }
-            if (configured) SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "优先使用在线语音",
-                subtitle = if (batch) "说话时先用在线插件识别；失败时这次自动改用本地模型，并在键盘上提示"
-                    else "说话时先用在线插件识别；关掉就用本地模型",
-                checked = preferOnline, onCheckedChange = {
-                    preferOnline = it
-                    if (it) SettingsPreferences.setSttOnlinePluginId(context, selectedId)
-                    SettingsPreferences.setSttUseLocal(context, !it)
-                })
-            else Text("先在插件设置里填好接口密钥，才能打开「优先使用在线语音」。没打开时一律用本地模型。",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp).testTag("speech-plugin-not-configured"))
+    val scope = rememberCoroutineScope()
+    val api = com.kingzcheung.xime.speech.OnlineSpeechApi
+    val saved = remember { api.migrateFromPlugin(context); api.config(context) }
+    var baseUrl by remember { mutableStateOf(saved.baseUrl) }
+    var apiKey by remember { mutableStateOf(saved.apiKey) }
+    var model by remember { mutableStateOf(saved.model) }
+    var status by remember { mutableStateOf(api.status(context)) }
+    var testing by remember { mutableStateOf(false) }
+    var configured by remember { mutableStateOf(api.isConfigured(context)) }
+    var preferOnline by remember { mutableStateOf(api.isActive(context)) }
+    fun save() {
+        api.save(context, com.kingzcheung.xime.speech.OnlineSpeechApi.Config(baseUrl, apiKey, model))
+        status = api.status(context)
+        configured = api.isConfigured(context)
+        if (!configured && preferOnline) {
+            preferOnline = false
+            SettingsPreferences.setSttUseLocal(context, true)
         }
+    }
+    SettingsSection(title = "在线语音") {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it; save() },
+                label = { Text("接口地址") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("speech-api-url"))
+            androidx.compose.material3.OutlinedTextField(value = apiKey, onValueChange = { apiKey = it; save() },
+                label = { Text("API 密钥") }, singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth().testTag("speech-api-key"))
+            androidx.compose.material3.OutlinedTextField(value = model, onValueChange = { model = it; save() },
+                label = { Text("模型") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("speech-api-model"))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("状态：$status", style = MaterialTheme.typography.bodyMedium,
+                    color = if (status.startsWith("可用")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f).testTag("speech-api-status"))
+                androidx.compose.material3.OutlinedButton(enabled = !testing && configured, onClick = {
+                    save(); testing = true; status = "测试中…"
+                    scope.launch {
+                        status = withContext(Dispatchers.IO) { api.test(context) }
+                        testing = false
+                    }
+                }, modifier = Modifier.testTag("speech-api-test")) { Text("测试") }
+            }
+            Text("OpenAI 兼容接口填到 /v1 为止，如 Groq、硅基流动；腾讯 TokenHub 填完整的 sync_transcribe 地址。密钥只存在本机。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (configured) SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "优先使用在线语音",
+            subtitle = "失败时这次改用本地模型，并在键盘上提示",
+            checked = preferOnline, onCheckedChange = {
+                preferOnline = it
+                if (it) SettingsPreferences.setSttOnlinePluginId(context, com.kingzcheung.xime.speech.OnlineSpeechApi.BUILTIN_ID)
+                SettingsPreferences.setSttUseLocal(context, !it)
+            })
     }
 }

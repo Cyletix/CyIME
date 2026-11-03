@@ -30,14 +30,3 @@ plugins:
     downloadUrl:
     - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/ai-rewrite-0.1.0.xipk
       sha256: d8e9959d591dd50551fbde8d758b48f64c5df55ff45c629f6a7019f0c488aa23
-- id: com.kingzcheung.xime.plugin.online_asr
-  name: 在线语音
-  description: 用你自己的语音转写接口识别说话（OpenAI 兼容 /audio/transcriptions，如 OpenAI、Groq、硅基流动）。说完一句整段上传；失败时这次自动改用本地模型。密钥只存在手机里。
-  pluginType: speech
-  appVersion: '>=1.15.40'
-  currentVersion: 0.1.0
-  versions:
-  - version: 0.1.0
-    downloadUrl:
-    - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/online-asr-0.1.0.xipk
-      sha256: a2f85b6794219aacd1a497b1aa340bde2b335ce018d339bc06d4b634a000dff0

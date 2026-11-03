@@ -44,10 +44,10 @@ class PluginSettingsNavigationTest {
         rule.onNodeWithText("从备份恢复").assertIsDisplayed()
         rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
-    @Test fun onlineSpeechPointsToPluginMarketWhenNoVoicePlugin() {
-        rule.setContent { XimeTheme { OnlineSpeechPluginSection() } }
-        rule.onNodeWithTag("speech-plugin-hint").assertIsDisplayed()
-        rule.onNodeWithTag("speech-api-key").assertDoesNotExist()
+    @Test fun onlineSpeechIsBuiltInAndNeedsNoPlugin() {
+        rule.setContent { XimeTheme { OnlineSpeechApiSection() } }
+        rule.onNodeWithTag("speech-api-key").assertIsDisplayed()
+        rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
 
 }

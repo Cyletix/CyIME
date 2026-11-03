@@ -186,6 +186,8 @@ class VoiceRecognitionHandler(
             val localName = AsrBackendFactory.getLocalName()
             if (localName != null) return localName
         }
+        if (com.kingzcheung.xime.speech.OnlineSpeechApi.isSelected(context) &&
+            com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context)) return "在线语音"
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isNotEmpty()) {
             val selectedId = SettingsPreferences.getSttOnlinePluginId(context)

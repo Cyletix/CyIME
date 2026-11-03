@@ -447,14 +447,18 @@ class SpeechRecognitionManager(
         return if (useLocal) {
             AsrBackendFactory.create(context) ?: createOnlineAsrBackend()
         } else {
-            // 优先在线：用选中的语音插件（如「在线语音」）。整段上传的插件失败时，这段录音改用本地模型并提示。
+            // 优先在线：内置在线语音或选中的语音插件。整段上传失败时，这段录音改用本地模型并提示。
             createOnlineAsrBackend() ?: AsrBackendFactory.create(context)
         }
     }
 
     private fun createOnlineAsrBackend(): AsrBackend? {
-        // 旧版内置「在线语音接口」填过的地址和密钥，装上「在线语音」插件后搬过去（只搬一次）。
-        OnlineSpeechPlugin.migrateOldApi(context)
+        // 1.15.40～1.15.50 装过「在线语音」插件的人：设置搬回内置（只搬一次）。
+        OnlineSpeechApi.migrateFromPlugin(context)
+        if (OnlineSpeechApi.isSelected(context) && OnlineSpeechApi.isConfigured(context)) {
+            return OnlineApiAsrBackend(context, localFallback = { AsrBackendFactory.create(context) },
+                onNotice = { message -> mainHandler.post { noticeCallback?.invoke(message) } })
+        }
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isEmpty()) return null
 
