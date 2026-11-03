@@ -85,9 +85,11 @@ fun InfoPanel(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxSize()
-            // 面板里是成段的字：玻璃或键盘调透明时后面的页面会透上来和字叠在一起（11-03「重叠在一起」），
-            // 垫一层几乎不透明的主题底色，和盖在键上的提示同一做法。
-            .keyboardOverlayBackground(backgroundColor)
+            // 面板里是成段的字：玻璃或键盘调透明时后面的页面会透上来和字叠在一起（11-03「重叠在一起」）。
+            // 玻璃下垫一层不透明的主题底色；90% 也不行，渲染图里后面的设置项还看得见。
+            .keyboardPanelBackground(backgroundColor)
+            .then(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled)
+                Modifier.background(backgroundColor.copy(alpha = 1f)) else Modifier)
             .padding(bottom = bottomPaddingDp.dp)
     ) {
         // 导航区：关闭按钮 + 标题
