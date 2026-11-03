@@ -313,6 +313,25 @@ class SchemaYamlParserTest {
     }
 
     @Test
+    fun `getSchemaSwitches keeps the declared default state`() {
+        // 声笔 sbxm：pro_char 默认单字（reset: 1），用户没切过时按它来（GitHub #105）。
+        val f = writeSchema("""
+            schema:
+              schema_id: test_schema
+              name: Test Schema
+            switches:
+              - name: pro_char
+                reset: 1
+                states: [ 词组, 单字 ]
+              - name: pair_hint
+                states: [ 关, 开 ]
+        """.trimIndent())
+        val switches = SchemaManager.parseSchemaSwitches(f)
+        assertEquals(1, switches[0].reset)
+        assertEquals(null, switches[1].reset)
+    }
+
+    @Test
     fun `getSchemaSwitches parses abbrev as list`() {
         val f = writeSchema("""
             schema:

@@ -4,8 +4,9 @@
   cyime_rare.txt 里这个读音的生僻字（构建时从雾凇大字表取 8105 没有的基本区和扩展 A 汉字，见 tasks-chinese.gradle.kts）。
   九键按一个音节的数字（484 = gui、hui）或左栏选定的拼音字母（gui）补；数字可能对应几个音节，按读音带上注释，
   拂动固定字母的筛选（t9_filter）照常按注释比对。
-  双拼（GitHub #72，同一个开关）：方案带 cyime_rare_double_pinyin: true 时，打满两个键（qu）先按这个方案的
-  编码显示规则（translator/preedit_format）换成拼音再查。显示规则为空的方案（自建合并键布局上的双拼）不补。
+  双拼（GitHub #72，同一个开关）：方案带 cyime_rare_double_pinyin: true 时，和下面 14 键一样按这个方案自己的
+  拼写规则算出每个读音的双拼编码再查，打满两个键（qu）补这个读音的字。原来按编码显示规则（preedit_format）换回
+  拼音，显示规则为空的方案（自建布局上的双拼）一个字也不补（2026-11-03）。
   14 键（全拼和双拼，2026-11-02）：方案带 cyime_rare_merged_keys: true 时，按这个方案自己的拼写规则
   （speller/algebra）把每个读音算成精确字母编码，合并键（大写，AU = as 键 + ui 键）逐位换成键上的字母再查，
   对得上几个读音就补几个读音的字（AU 补 ai、si、su，带读音注释）；侧滑选定的字母（小写）只对自己。
@@ -47,25 +48,7 @@ local function load_chars()
   return chars
 end
 
--- 双拼方案：两个键的编码按方案自己的编码显示规则换成拼音；不是双拼时原样返回，换不出时返回 nil。
-local function syllable_of(input, env)
-  if env.rare_double_pinyin == nil then
-    local config = env.engine.schema.config
-    env.rare_double_pinyin = config:get_bool("cyime_rare_double_pinyin") == true
-    if env.rare_double_pinyin then
-      local rules = config:get_list("translator/preedit_format")
-      if rules and rules.size > 0 then
-        env.rare_projection = Projection()
-        env.rare_projection:load(rules)
-      end
-    end
-  end
-  if not env.rare_double_pinyin then return input end
-  if not env.rare_projection or #input ~= 2 then return nil end
-  return env.rare_projection:apply(input, true)
-end
-
--- 14 键：每个方案按自己的拼写规则算一次「精确字母编码 → 读音」，同一个 Lua 环境里按方案缓存。
+-- 14 键和双拼：每个方案按自己的拼写规则算一次「精确字母编码 → 读音」，同一个 Lua 环境里按方案缓存。
 local merged_maps = {}
 
 -- 一条拼写规则拆成 种类、各段；分隔符是种类名后面那个字符（同 Rime）。最后不以分隔符结尾的是带标签的规则。
@@ -117,7 +100,8 @@ local function merged_map(env)
   -- One string per code (syllables separated by spaces), not a table: see load_chars.
   for _, form in ipairs(forms) do
     local code, syllable = form[1], form[2]
-    if code:match("^%l+$") then
+    -- 分号：微软、搜狗双拼把 ing 放在分号键上。
+    if code:match("^[%l;]+$") then
       map.codes[code] = map.codes[code] and (map.codes[code] .. " " .. syllable) or syllable
       if #code > map.longest then map.longest = #code end
     end
@@ -127,7 +111,7 @@ end
 
 -- 输入（合并键大写、侧滑选的字母小写）能对上的读音，按键上字母的顺序。
 local function merged_syllables(map, input)
-  if #input > map.longest or not input:match("^%a+$") then return {} end
+  if #input > map.longest or not input:match("^[%a;]+$") then return {} end
   local found, seen = {}, {}
   local function walk(i, prefix)
     if i > #input then
@@ -159,11 +143,11 @@ end
 local function translator(input, seg, env)
   if not env.engine.context:get_option(OPTION) then return end
   if env.rare_merged_keys == nil then
-    env.rare_merged_keys = env.engine.schema.config:get_bool("cyime_rare_merged_keys") == true
+    local config = env.engine.schema.config
+    env.rare_merged_keys = config:get_bool("cyime_rare_merged_keys") == true or
+      config:get_bool("cyime_rare_double_pinyin") == true
   end
   if env.rare_merged_keys then return merged_translate(input, seg, env) end
-  input = syllable_of(input, env)
-  if not input or input == "" then return end
   local list = load_chars()[input:lower()]
   if list then
     for text in list:gmatch(utf8.charpattern) do

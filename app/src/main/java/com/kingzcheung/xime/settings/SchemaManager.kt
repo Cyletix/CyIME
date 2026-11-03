@@ -56,12 +56,14 @@ data class SchemaMeta(
  * - [name] 非空时表示布尔开关（如 ascii_mode / full_shape / ascii_punct）。
  * - [options] 非空时表示多选一开关（如简繁切换，同一时刻只有一个 option 为 true）。
  * - [abbrev] 自定义缩写（可能每个状态一个），供菜单栏展示用；为空时取 states 首字符。
+ * - [reset] 方案写的默认状态（states 的序号）；没写时为 null。
  */
 data class SchemaSwitch(
     val name: String = "",
     val options: List<String> = emptyList(),
     val states: List<String> = emptyList(),
     val abbrev: List<String> = emptyList(),
+    val reset: Int? = null,
 )
 
 /** 标点宽度/样式相关的方案选项名：full_shape / half_shape / ascii_punct 是同一件事的三种写法。 */
@@ -777,6 +779,21 @@ object SchemaManager {
         }
     }
 
+    @Volatile private var bundledSchemaIds: Set<String>? = null
+
+    /**
+     * APK 自带的方案：assets 下 rime* 目录里的 *.schema.yaml。读不到 assets 时按自带处理，保持原来的行为。
+     */
+    fun isBundledSchema(context: Context, schemaId: String): Boolean {
+        val ids = bundledSchemaIds ?: runCatching {
+            val assets = context.assets
+            assets.list("").orEmpty().filter { it.startsWith("rime") }.flatMap { dir ->
+                assets.list(dir).orEmpty().filter { it.endsWith(".schema.yaml") }.map { it.removeSuffix(".schema.yaml") }
+            }.toSet().takeIf { it.isNotEmpty() }
+        }.getOrNull()?.also { bundledSchemaIds = it } ?: return true
+        return schemaId in ids
+    }
+
     /**
      * 读取方案顶层 `switches:` 中可展示的开关项（name 或 options 存在且有 states）。
      * `switches` 位于 schema 块之外，需单独解析。解析失败或不存在时返回空列表。
@@ -812,9 +829,10 @@ object SchemaManager {
             ?.items?.mapNotNull { (it as? YamlScalar)?.content }
             .orEmpty()
         val abbrev = parseAbbrev(entry["abbrev"])
+        val reset = (entry["reset"] as? YamlScalar)?.content?.trim()?.toIntOrNull()
         return when {
-            name.isNotBlank() -> SchemaSwitch(name = name, options = emptyList(), states = states, abbrev = abbrev)
-            options.isNotEmpty() -> SchemaSwitch(name = "", options = options, states = states, abbrev = abbrev)
+            name.isNotBlank() -> SchemaSwitch(name = name, options = emptyList(), states = states, abbrev = abbrev, reset = reset)
+            options.isNotEmpty() -> SchemaSwitch(name = "", options = options, states = states, abbrev = abbrev, reset = reset)
             else -> null
         }
     }

@@ -176,6 +176,9 @@ fun LanguageKeyButton(
         panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds,
         keyWindowBounds, density.density, menuSchemas.size)
     val rowHeight = menuGeometry.rowHeightPx
+    // 下面的按键手势只在 hasMenu 变化时重建：直接用 rowHeight 会停在菜单还没打开时（0 种语言）算的行高。
+    // 语言多、键上方放不下时菜单把行高压低，手指越往下滑，命中的行就差得越多（GitHub #40：差半行）。
+    val currentRowHeight by rememberUpdatedState(rowHeight)
     val edgeSize = with(density) { 20.dp.toPx() }
     val scrollStep = with(density) { 8.dp.toPx() }
 
@@ -297,7 +300,7 @@ fun LanguageKeyButton(
                             } else if (menuOpen) {
                                 change.consume()
                                 pointer = keyScreenPosition + change.position
-                                selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight, selectedId)
+                                selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, currentRowHeight, selectedId)
                                 if (!change.pressed) {
                                     chosenId = selectedId
                                     // 菜单弹出后还没滑进列表就松手：菜单留着，再点一项选择（用户 10-24 定）。

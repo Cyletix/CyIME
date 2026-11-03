@@ -582,6 +582,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
         val cangjie = com.kingzcheung.xime.settings.InputProfiles.describe(schemaId).scheme ==
             com.kingzcheung.xime.settings.InputScheme.CANGJIE
+        // 方案写的默认值（reset）只给导入的方案用；APK 自带的方案保持原来的行为（没切过就是关），不改内置默认。
+        val useDeclaredDefault = !SchemaManager.isBundledSchema(service, schemaId)
         for (def in defs) {
             // 标点宽度不从 user.yaml 恢复：它的权威来源是用户的「全角／半角」选择，
             // 由 applyPunctuationWidth 统一回写（否则这里会把用户选择覆盖成旧值）。
@@ -589,7 +591,12 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             // 简繁、表情也不从 user.yaml 恢复：权威来源是设置页的开关，由下面的 applyCandidateOptions 写回。
             if (def.name in SETTING_SWITCHES || def.name == "simplification" && cangjie) continue
             if (def.name.isNotEmpty()) {
-                service.rimeEngine.setOption(def.name, service.rimeEngine.getUserConfigBool("var/option/${def.name}"))
+                // 导入的方案用户没切过（user.yaml 里没有这一项）就按方案写的默认值（reset），不能一律当成关：
+                // 导入的声笔 sbxm 写 pro_char reset: 1（单字），原来被改成 0（词组）（GitHub #105）。
+                val key = "var/option/${def.name}"
+                val value = if (service.rimeEngine.getUserConfigString(key) != null) service.rimeEngine.getUserConfigBool(key)
+                    else useDeclaredDefault && def.reset == 1
+                service.rimeEngine.setOption(def.name, value)
             } else if (def.options.isNotEmpty()) {
                 val activeIndex = def.options.indexOfFirst { service.rimeEngine.getUserConfigBool("var/option/$it") }
                 if (activeIndex >= 0) {

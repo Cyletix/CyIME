@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.ui.common.wheelPages
 
 /** 菜单和方案共享受面板高度约束的网格；低高度时分页，卡片不能越界挤压下一行。 */
 @Composable
@@ -41,7 +42,7 @@ internal fun <T> KeyboardPanelGrid(
             maxOf(104.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight)
         val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else minOf(maxWidth, 144.dp * columns + spacing * (columns - 1))
         Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight), horizontalAlignment = Alignment.CenterHorizontally) {
-            HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).testTag(pagerTag)) { page ->
+            HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {
                     repeat(rows) { row ->
                         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(spacing)) {

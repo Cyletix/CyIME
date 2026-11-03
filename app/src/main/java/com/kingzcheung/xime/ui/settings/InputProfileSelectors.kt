@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.kingzcheung.xime.ui.common.wheelScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -101,7 +102,7 @@ internal fun ProfileChoiceRow(
             .coerceAtLeast(minOf(112.dp * fontScale, maxWidth)) else null
         val managementWidth = if (rowHeight != null) (widths.second.value * .75f).roundToInt().dp
             .coerceAtLeast(minOf(88.dp * fontScale, maxWidth)) else null
-        LazyRow(Modifier.fillMaxWidth().testTag("$tag:list"), state = list,
+        LazyRow(Modifier.fillMaxWidth().wheelScroll(list).testTag("$tag:list"), state = list,
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             items(choices, key = { it.first }) { (id, label) ->
                 SchemeTextCard(label, previews[id].orEmpty(), id == selectedId, "$itemTagPrefix$id",
