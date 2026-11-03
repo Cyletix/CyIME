@@ -1,7 +1,9 @@
 package com.kingzcheung.xime.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TxtCellDictionaryTest {
@@ -44,5 +46,32 @@ class TxtCellDictionaryTest {
         assertEquals(listOf("Ame", "Team Spirit"), parsed.english)
         assertEquals(2, parsed.skipped)  // a bare number and one letter are no words
         assertEquals(listOf("Ame"), TxtCellDictionary.parse("Ame\n".toByteArray()).english)
+    }
+
+    @Test
+    fun `tone marks as in wanxiang`() {
+        assertEquals("阿爸|a ba", code("阿爸\tā bà\t716"))
+        assertEquals("绿色|lv se", code("绿色\tlǜ sè\t100"))
+        assertEquals("女儿|nv er", code("女儿\tnǚ ér\t100"))
+        assertEquals("略微|lve wei", code("略微\tlüè wēi\t100"))
+        assertEquals("你好|ni hao", code("你好 nǐhǎo"))
+    }
+
+    @Test
+    fun `duplicates are dropped in file order without a map of all words`() {
+        val text = "---\nname: x\n...\n你好\tnǐ hǎo\t9\n世界\tshì jiè\t8\n你好\tni hao\t1\n你好\tnǐ hāo\t1\n"
+        val words = mutableListOf<String>()
+        val summary = TxtCellDictionary.read({ text.byteInputStream() }) { words += it.word + "|" + it.code }
+        assertEquals(listOf("你好|ni hao", "世界|shi jie"), words)
+        assertEquals(2, summary.count)
+        assertEquals(0, summary.skipped)
+    }
+
+    @Test
+    fun `key set keeps every distinct key across growth`() {
+        val set = TxtCellDictionary.LongSet()
+        for (i in 0L until 100_000L) assertTrue(set.add(i * 0x9E3779B97F4A7C15uL.toLong()))
+        for (i in 0L until 100_000L) assertFalse(set.add(i * 0x9E3779B97F4A7C15uL.toLong()))
+        assertEquals(100_000, set.size)
     }
 }

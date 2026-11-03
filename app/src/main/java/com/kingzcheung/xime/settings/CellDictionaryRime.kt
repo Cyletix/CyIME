@@ -132,10 +132,15 @@ object CellDictionaryRime {
             }
         }
         if (mainTable != null && bindings.isNotEmpty()) writes[File(rimeDir, "${CellWordUpdates.MAIN_TABLE}.dict.yaml")] = mainTable
+        // An imported list can be 40 MB: copied as a file unless online words extend it (only built-ins, which are small).
+        val copies = linkedMapOf<File, File>()
         ids.sorted().forEach { id ->
-            writes[File(rimeDir, "cyime_cells/cell_$id.dict.yaml")] = updates.extend(id, store.dictionaryFile(id).readText())
+            val target = File(rimeDir, "cyime_cells/cell_$id.dict.yaml")
+            if (updates.dictionaries[id].isNullOrEmpty()) copies[target] = store.dictionaryFile(id)
+            else writes[target] = updates.extend(id, store.dictionaryFile(id).readText())
         }
         writes.forEach { (file, text) -> CellDictionaryStore.writeAtomic(file, text) }
+        copies.forEach { (file, source) -> CellDictionaryStore.copyAtomic(source, file) }
         return bindings
     }
 }

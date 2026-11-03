@@ -9,7 +9,6 @@ import com.kingzcheung.xime.settings.CellDictionaryManager
 import com.kingzcheung.xime.settings.CellDictionaryOffer
 import com.kingzcheung.xime.settings.CellDictionaryState
 import com.kingzcheung.xime.settings.CellWordAutoUpdate
-import com.kingzcheung.xime.settings.ScelDictionary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,9 +68,8 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun import(uri: Uri) = work("正在导入词库…") {
-        val bytes = requireNotNull(context.contentResolver.openInputStream(uri)) { "无法打开文件" }
-            .use(ScelDictionary::readBounded)
-        val entry = store.install(bytes)
+        val entry = requireNotNull(context.contentResolver.openInputStream(uri)) { "无法打开文件" }
+            .use(store::installFile)
         store.select(entry.id, true)
         val skipped = if (entry.skipped > 0) "，跳过 ${entry.skipped} 行（单字或没有拼音）" else ""
         "已导入「${entry.name}」${entry.count + entry.english} 个词$skipped，点「应用更改」后生效"

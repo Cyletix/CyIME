@@ -1,8 +1,11 @@
 package com.kingzcheung.xime.settings
 
-import java.nio.ByteBuffer
+import java.io.BufferedReader
+import java.io.InputStream
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
+import java.text.Normalizer
 
 /**
  * Plain-text word lists as other input methods export them, one word per line:
@@ -12,31 +15,50 @@ import java.nio.charset.CodingErrorAction
  * Lines without pinyin are skipped and counted. UTF-8, UTF-16 (with BOM) and GB18030 are read.
  * A line without Chinese characters is an English word (`Ame`, `Team Spirit`, `Ame<TAB>ame<TAB>100`): its text
  * before the first tab, kept as written, goes to the English candidates of every keyboard.
+ * Tone marks are read too (万象 writes `阿爸<TAB>ā bà<TAB>716`). The file is read line by line, never whole: 万象's base
+ * list is 49 MB with 1.49 million words (11-03: the old 16 MB in-memory read refused it).
  */
 object TxtCellDictionary {
     private val word = Regex("[㐀-䶿一-鿿]{2,32}")
     private val letters = Regex("[a-zv' ]+")
 
+    const val MAX_BYTES = 128 * 1024 * 1024
+    const val MAX_ENTRIES = 2_000_000
+
+    data class Summary(val count: Int, val skipped: Int, val english: List<String>)
+
     fun parse(bytes: ByteArray): ScelDictionary.Parsed {
-        require(bytes.size <= ScelDictionary.MAX_BYTES) { "词库超过 16 MB" }
-        var text = decode(bytes)
-        // A Rime .dict.yaml: only the entries after its header.
-        if (text.contains("\n...\n")) text = text.substringAfter("\n...\n")
-        val entries = LinkedHashMap<Pair<String, String>, DictEntry>()
+        require(bytes.size <= MAX_BYTES) { "词库超过 128 MB，请拆分后导入" }
+        val entries = ArrayList<DictEntry>()
+        val summary = read({ bytes.inputStream() }) { entries += it }
+        return ScelDictionary.Parsed("", entries, summary.skipped, summary.english)
+    }
+
+    /**
+     * Streams the file twice (encoding and Rime header check, then the words). [sink] gets each word and pinyin
+     * once, in file order. Duplicates are found by a 64-bit key, so 1.5 million words take 16 MB, not a map of all.
+     */
+    fun read(open: () -> InputStream, sink: (DictEntry) -> Unit): Summary {
+        val (charset, bom) = charset(open)
+        // A Rime .dict.yaml: only the entries after its header, the first "..." line after line one.
+        var header = -1
+        lines(open, charset, bom) { index, line -> if (header < 0 && index > 0 && line == "...") header = index }
+        val seen = LongSet()
         val english = LinkedHashSet<String>()
         var skipped = 0
-        for (raw in text.lineSequence()) {
+        lines(open, charset, bom) { index, raw ->
+            if (index <= header) return@lines
             val line = raw.trim()
-            if (line.isEmpty() || line.startsWith("#")) continue
+            if (line.isEmpty() || line.startsWith("#")) return@lines
             val latin = englishWord(line)
-            if (latin != null) { english += latin; continue }
+            if (latin != null) { english += latin; return@lines }
             val entry = parseLine(line)
-            if (entry == null) { skipped++; continue }
-            entries.putIfAbsent(entry.word to entry.code, entry)
-            require(entries.size + english.size <= ScelDictionary.MAX_ENTRIES) { "词库超过 25 万条词语" }
+            if (entry == null) { skipped++; return@lines }
+            if (seen.add(key(entry.word, entry.code))) sink(entry)
+            require(seen.size + english.size <= MAX_ENTRIES) { "词库超过 200 万条词语，请拆分后导入" }
         }
-        require(entries.isNotEmpty() || english.isNotEmpty()) { "没有读到带拼音的词条（每行“词 拼音”或“拼音 词”）" }
-        return ScelDictionary.Parsed("", entries.values.toList(), skipped, english.toList())
+        require(seen.size > 0 || english.isNotEmpty()) { "没有读到带拼音的词条（每行“词 拼音”或“拼音 词”）" }
+        return Summary(seen.size, skipped, english.toList())
     }
 
     private val latin = Regex("[A-Za-z0-9][A-Za-z0-9 '._&+-]{0,62}")
@@ -52,8 +74,8 @@ object TxtCellDictionary {
     internal fun parseLine(line: String): DictEntry? {
         val fields = line.split('\t', ' ', ',', '，').filter { it.isNotEmpty() }
         val text = fields.firstOrNull { word.matches(it) } ?: return null
-        val pinyin = fields.filter { it != text && it.any(Char::isLetter) }
-            .joinToString(" ").lowercase().replace('ü', 'v').replace("u:", "v")
+        val pinyin = toneless(fields.filter { it != text && it.any(Char::isLetter) }
+            .joinToString(" ").lowercase()).replace('ü', 'v').replace("u:", "v")
         if (pinyin.isEmpty() || !letters.matches(pinyin)) return null
         val code = syllables(pinyin, text.length) ?: return null
         return DictEntry(text, code, 100)
@@ -79,17 +101,87 @@ object TxtCellDictionary {
         return split[count][run.length]?.joinToString(" ")
     }
 
-    private fun decode(bytes: ByteArray): String {
-        fun strict(charset: Charset, offset: Int) = charset.newDecoder()
-            .onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
-            .decode(ByteBuffer.wrap(bytes, offset, bytes.size - offset)).toString()
-        val b = bytes.map { it.toInt() and 255 }
+    private val marks = Regex("\\p{Mn}+")
+
+    /** ā bà → a ba, lǜ/lǚ → lv. Plain pinyin passes through untouched. */
+    internal fun toneless(pinyin: String): String {
+        if (pinyin.all { it.code < 0x80 }) return pinyin
+        return Normalizer.normalize(pinyin, Normalizer.Form.NFD).replace("u\u0308", "v").replace(marks, "")
+    }
+
+    /** UTF-16 and UTF-8 by their BOM; otherwise UTF-8 when the whole file decodes as UTF-8, else GB18030. */
+    private fun charset(open: () -> InputStream): Pair<Charset, Int> {
+        val head = open().use { input -> ByteArray(3).let { it.copyOf(input.readNBytesCompat(it)) } }
+        val b = head.map { it.toInt() and 255 }
         return when {
-            b.size >= 2 && b[0] == 0xFF && b[1] == 0xFE -> strict(Charsets.UTF_16LE, 2)
-            b.size >= 2 && b[0] == 0xFE && b[1] == 0xFF -> strict(Charsets.UTF_16BE, 2)
-            b.size >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF -> strict(Charsets.UTF_8, 3)
-            else -> runCatching { strict(Charsets.UTF_8, 0) }.getOrElse { strict(Charset.forName("GB18030"), 0) }
-        }.replace("\r\n", "\n").replace('\r', '\n')
+            b.size >= 2 && b[0] == 0xFF && b[1] == 0xFE -> Charsets.UTF_16LE to 2
+            b.size >= 2 && b[0] == 0xFE && b[1] == 0xFF -> Charsets.UTF_16BE to 2
+            b.size >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF -> Charsets.UTF_8 to 3
+            else -> try { lines(open, Charsets.UTF_8, 0) { _, _ -> }; Charsets.UTF_8 to 0 }
+                catch (_: CharacterCodingException) { Charset.forName("GB18030") to 0 }
+        }
+    }
+
+    private fun InputStream.readNBytesCompat(buffer: ByteArray): Int {
+        var total = 0
+        while (total < buffer.size) {
+            val count = read(buffer, total, buffer.size - total)
+            if (count < 0) break
+            total += count
+        }
+        return total
+    }
+
+    /** Strict decoding: a byte that does not fit [charset] throws instead of becoming a replacement character. */
+    private inline fun lines(open: () -> InputStream, charset: Charset, skip: Int, action: (Int, String) -> Unit) {
+        open().use { input ->
+            var skipped = 0L
+            while (skipped < skip) { val n = input.skip(skip - skipped); if (n <= 0) break; skipped += n }
+            val decoder = charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+            BufferedReader(java.io.InputStreamReader(input, decoder), 1 shl 16).use { reader ->
+                var index = 0
+                while (true) action(index++, reader.readLine() ?: break)
+            }
+        }
+    }
+
+    /** FNV-1a over word, tab and pinyin. */
+    private fun key(word: String, code: String): Long {
+        var hash = -0x340d631b7bdddcdbL
+        for (c in word) hash = (hash xor c.code.toLong()) * 0x100000001b3L
+        hash = (hash xor '\t'.code.toLong()) * 0x100000001b3L
+        for (c in code) hash = (hash xor c.code.toLong()) * 0x100000001b3L
+        return hash
+    }
+
+    /** Open-addressing set of 64-bit keys (0 is the empty slot, so key 0 is stored as 1). */
+    internal class LongSet {
+        private var slots = LongArray(1 shl 12)
+        var size = 0
+            private set
+
+        fun add(value: Long): Boolean {
+            val key = if (value == 0L) 1L else value
+            if ((size + 1) * 4L > slots.size * 3L) {
+                val old = slots
+                slots = LongArray(old.size * 2)
+                for (slot in old) if (slot != 0L) insert(slots, slot)
+            }
+            return insert(slots, key).also { if (it) size++ }
+        }
+
+        private fun insert(table: LongArray, key: Long): Boolean {
+            val mask = table.size - 1
+            val mixed = key * -0x61c8864680b583ebL
+            var at = (mixed xor (mixed ushr 32)).toInt() and mask
+            while (true) {
+                val slot = table[at]
+                if (slot == 0L) { table[at] = key; return true }
+                if (slot == key) return false
+                at = (at + 1) and mask
+            }
+        }
     }
 
     private val SYLLABLES = ("a ai an ang ao ba bai ban bang bao bei ben beng bi bian biao bie bin bing bo bu ca cai can " +

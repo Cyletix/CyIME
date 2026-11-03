@@ -1,6 +1,8 @@
 package com.kingzcheung.xime.settings
 
+import com.kingzcheung.xime.settings.ScelDictionary.rimeLine
 import java.io.File
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -40,6 +42,27 @@ class CellDictionaryStore(val directory: File) {
         private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
         internal fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
             .digest(bytes).joinToString("") { "%02x".format(it) }
+
+        /** Like [writeAtomic], streamed: a 40 MB imported list is copied, never read into one string. */
+        internal fun copyAtomic(source: File, file: File) {
+            if (file.isFile && file.length() == source.length() && sameBytes(source, file)) return
+            file.parentFile?.mkdirs()
+            val temp = File.createTempFile(".cell-", ".tmp", file.parentFile)
+            try {
+                source.inputStream().use { input -> temp.outputStream().use { input.copyTo(it, 1 shl 16) } }
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE)
+            } finally { temp.delete() }
+        }
+
+        private fun sameBytes(a: File, b: File): Boolean = a.inputStream().buffered(1 shl 16).use { x ->
+            b.inputStream().buffered(1 shl 16).use { y ->
+                var left: Int
+                var right: Int
+                do { left = x.read(); right = y.read() } while (left == right && left >= 0)
+                left == right
+            }
+        }
 
         internal fun writeAtomic(file: File, text: String) {
             if (file.isFile && file.readText() == text) return
@@ -124,6 +147,74 @@ class CellDictionaryStore(val directory: File) {
         else writeAtomic(englishFile(id), parsed.english.joinToString("\n", postfix = "\n"))
         save(old.copy(installed = old.installed.filterNot { it.id == id } + entry))
         entry
+    }
+
+    /**
+     * A file picked by the user, copied to disk first (bounded, hashed on the way) instead of into memory. A plain
+     * or Rime list is converted line by line, up to [TxtCellDictionary.MAX_BYTES] (万象's base list is 49 MB);
+     * SCEL and JSON stay at 16 MB and go through [install].
+     */
+    fun installFile(input: InputStream): InstalledCellDictionary {
+        directory.mkdirs()
+        // Left behind when the app was killed mid-import; only imports use this prefix.
+        directory.listFiles { file -> file.name.startsWith(".import-") }?.forEach { it.delete() }
+        val source = File.createTempFile(".import-", ".tmp", directory)
+        try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            source.outputStream().use { output ->
+                val buffer = ByteArray(1 shl 16)
+                var total = 0L
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    require(total <= TxtCellDictionary.MAX_BYTES) { "词库超过 128 MB，请拆分后导入" }
+                    digest.update(buffer, 0, count)
+                    output.write(buffer, 0, count)
+                }
+            }
+            val (scel, json) = source.inputStream().buffered().use { stream ->
+                val head = ByteArray(4)
+                var read = 0
+                while (read < head.size) { val n = stream.read(head, read, head.size - read); if (n < 0) break; read += n }
+                var first = head.take(read).firstOrNull { it.toInt().toChar() !in " \r\n\t" }?.toInt()
+                if (first == null && read == head.size) {
+                    while (true) { val b = stream.read(); if (b < 0 || b.toChar() !in " \r\n\t") { first = b; break } }
+                }
+                (read == 4 && head[0] == 0x40.toByte() && head[1] == 0x15.toByte() && head[2] == 0.toByte() &&
+                    head[3] == 0.toByte()) to (first == '{'.code)
+            }
+            if (scel || json) {
+                require(source.length() <= ScelDictionary.MAX_BYTES) { "SCEL 和 JSON 词库最大 16 MB" }
+                return install(source.readBytes())
+            }
+            return installText(source, digest.digest().joinToString("") { "%02x".format(it) })
+        } finally { source.delete() }
+    }
+
+    /** Converted outside the lock (a big list takes seconds), then moved in and recorded under it. */
+    private fun installText(source: File, hash: String): InstalledCellDictionary {
+        val id = "local_${hash.take(24)}"
+        read().installed.firstOrNull { it.id == id }?.let { if (dictionaryFile(id).isFile) return it }
+        val converted = File.createTempFile(".import-", ".tmp", directory)
+        try {
+            val summary = converted.bufferedWriter().use { output ->
+                output.write(ScelDictionary.rimeHeader("cell_$id"))
+                TxtCellDictionary.read({ source.inputStream() }) { output.rimeLine(it) }
+            }
+            return synchronized(lock) {
+                val old = read()
+                old.installed.firstOrNull { it.id == id }?.let { if (dictionaryFile(id).isFile) return@synchronized it }
+                val entry = InstalledCellDictionary(id, "本地词库", "本地导入", summary.count, summary.skipped, "", hash,
+                    summary.english.size)
+                Files.move(converted.toPath(), dictionaryFile(id).toPath(), StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE)
+                if (summary.english.isEmpty()) englishFile(id).delete()
+                else writeAtomic(englishFile(id), summary.english.joinToString("\n", postfix = "\n"))
+                save(old.copy(installed = old.installed.filterNot { it.id == id } + entry))
+                entry
+            }
+        } finally { converted.delete() }
     }
 
     /**

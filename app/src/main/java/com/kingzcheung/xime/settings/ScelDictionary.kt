@@ -181,11 +181,17 @@ object ScelDictionary {
         return Parsed(name, entries.values.toList(), skipped)
     }
 
-    fun toRime(name: String, entries: List<DictEntry>): String {
+    fun toRime(name: String, entries: List<DictEntry>): String = buildString {
+        append(rimeHeader(name))
+        entries.forEach { rimeLine(it) }
+    }
+
+    internal fun rimeHeader(name: String): String {
         require(name.matches(Regex("[a-z0-9_]+")))
-        return buildString {
-            append("# Imported SCEL dictionary; managed by CyIME\n---\nname: $name\nversion: \"1\"\nsort: by_weight\nuse_preset_vocabulary: false\n...\n")
-            entries.forEach { append(it.word).append('\t').append(it.code).append("\t100\n") }
-        }
+        return "# Imported SCEL dictionary; managed by CyIME\n---\nname: $name\nversion: \"1\"\nsort: by_weight\nuse_preset_vocabulary: false\n...\n"
+    }
+
+    internal fun Appendable.rimeLine(entry: DictEntry) {
+        append(entry.word).append('\t').append(entry.code).append("\t100\n")
     }
 }

@@ -276,4 +276,54 @@ class CellDictionaryTest {
         }
         assertEquals(listOf("wei shi dai er", "wei shen dai er"), words["维什戴尔"])
     }
+
+    /** 11-03: 万象's 49 MB base list hit the 16 MB in-memory limit. Larger than 16 MB, streamed to disk and copied. */
+    @Test fun `a list over 16 MB imports from a stream and applies as a file copy`() {
+        val store = store()
+        val words = listOf("阿爸\tā bà", "阿坝\tā bà", "三月\tsān yuè", "世界\tshì jiè")
+        val header = "# Rime dictionary\n---\nname: jichu\nversion: \"LTS\"\nsort: by_weight\n...\n"
+        val lines = 900_000  // about 18 MB
+        val size = header.toByteArray().size.toLong() +
+            (0 until lines).sumOf { (words[it % words.size] + "\t$it\n").toByteArray().size.toLong() }
+        assertTrue(size > ScelDictionary.MAX_BYTES)
+        val input = object : java.io.InputStream() {
+            var line = -1
+            var current = header.toByteArray()
+            var at = 0
+            override fun read(): Int {
+                while (at == current.size) {
+                    if (++line >= lines) return -1
+                    current = (words[line % words.size] + "\t$line\n").toByteArray()
+                    at = 0
+                }
+                return current[at++].toInt() and 255
+            }
+        }
+        val entry = store.installFile(input.buffered())
+        assertEquals(4, entry.count)
+        assertEquals(0, entry.skipped)
+        assertTrue(entry.id.startsWith("local_"))
+        val text = store.dictionaryFile(entry.id).readText()
+        assertTrue(text.endsWith("阿爸\ta ba\t100\n阿坝\ta ba\t100\n三月\tsan yue\t100\n世界\tshi jie\t100\n"))
+        assertTrue(directoryHasNoTemp(store.directory))
+        val rime = temp.newFolder()
+        val schemas = listOf(SchemaMeta("rime_ice", "拼音"))
+        File(rime, "rime_ice.schema.yaml").writeText("translator:\n  dictionary: rime_ice\n")
+        CellDictionaryRime.prepare(rime, store, schemas, setOf(entry.id))
+        assertEquals(text, File(rime, "cyime_cells/cell_${entry.id}.dict.yaml").readText())
+    }
+
+    @Test fun `a small file picked by the user still goes through the scel and json readers`() {
+        val store = store()
+        assertEquals(store.install(scelFixture()).id, store.installFile(scelFixture().inputStream()).id)
+        val json = "{\"format\": \"cyime.dictionary.v1\", \"name\": \"我的词库\", \"language\": \"zh\", " +
+            "\"scheme\": \"pinyin\", \"entries\": [{\"word\": \"你好\", \"code\": \"ni hao\"}]}"
+        assertEquals("我的词库", store.installFile(("  \n" + json).byteInputStream()).name)
+        val big = ByteArray(ScelDictionary.MAX_BYTES + 1) { ' '.code.toByte() }.also { it[it.size - 1] = '{'.code.toByte() }
+        val error = assertThrows(IllegalArgumentException::class.java) { store.installFile(big.inputStream()) }
+        assertEquals("SCEL 和 JSON 词库最大 16 MB", error.message)
+        assertTrue(directoryHasNoTemp(store.directory))
+    }
+
+    private fun directoryHasNoTemp(directory: File) = directory.listFiles().orEmpty().none { it.name.endsWith(".tmp") }
 }

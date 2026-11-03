@@ -47,7 +47,7 @@ internal fun CellDictionaryImportGuide(onDismiss: () -> Unit, onImport: () -> Un
             GuideHeading("支持的格式")
             GuideFormat("搜狗细胞词库(.scel)", "搜狗词库网站下载的文件，直接导入。")
             GuideFormat("文本词库(.txt)",
-                "每行一个词。词和拼音用空格、Tab 或逗号隔开，谁在前都行；拼音可以连写，也可以用空格或 ' 隔开。" +
+                "每行一个词。词和拼音用空格、Tab 或逗号隔开，谁在前都行；拼音可以连写，也可以用空格或 ' 隔开，带声调也行。" +
                     "搜狗、QQ 输入法导出的「词 拼音」文本一般可以直接导入。")
             GuideExample("你好 ni hao\nnihao 你好\n'shang'hai 上海\n计算机\tji suan ji\t100\nTeam Spirit")
             GuideText("最后的数字(词频)不读，所有词同一个权重；没有汉字的一行当作英文词，所有键盘的英文候选里都能打出来；" +
@@ -59,7 +59,8 @@ internal fun CellDictionaryImportGuide(onDismiss: () -> Unit, onImport: () -> Un
                 " \"entries\": [{\"word\": \"你好\", \"code\": \"ni hao\"}]}")
 
             GuideHeading("限制")
-            GuideText("一个文件最大 16 MB、25 万个词。中文词要 2 到 32 个字，单字和没有拼音的行会跳过，导入后会说跳过了几行。" +
+            GuideText("文本和 Rime 词典最大 128 MB、200 万个词，搜狗词库和 JSON 最大 16 MB、25 万个词。" +
+                "中文词要 2 到 32 个字，单字和没有拼音的行会跳过，导入后会说跳过了几行。" +
                 "只认全拼拼音，五笔等形码词库不能从这里导入。")
 
             Button(onClick = { onDismiss(); onImport() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
