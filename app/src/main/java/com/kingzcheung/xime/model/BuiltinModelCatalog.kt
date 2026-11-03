@@ -56,8 +56,10 @@ object BuiltinModelCatalog {
                     ModelFile("3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx", "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx", "f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11", 28281138L,
                         mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx")),
                 )))),
+        // 2026-11-03 起不再提供下载：中文边说边出字用 Paraformer，定稿用 SenseVoice / X-ASR（效果更好）。
+        // 已经下载、正在用的照旧能用；条目留着，模型管理里可以删。
         ModelInfo("zipformer-zh-int8", "Zipformer · 中文", "中文流式语音识别，可使用 SenseVoice 二次校正。", ModelCategory.ASR,
-            versions = listOf(ModelVersion(version = "v1.0", size = "132.63MB",
+            versions = listOf(ModelVersion(version = "v1.0", size = "132.63MB", retired = true,
                 archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2", sha256 = "5a2832047ea1f97dd0dc595b816c230c4bafad65cfc0341fa57517cadc50afd0",
                 // 魔搭上的同一归档（2026-10-12 核对哈希一致），国内线路优先用它。
                 archiveMirrors = listOf("https://www.modelscope.cn/models/bikeand/asr/resolve/master/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2"),

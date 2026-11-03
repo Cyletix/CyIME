@@ -72,4 +72,11 @@ class SpeechModelSelectionTest {
         assertEquals(c.PARAFORMER, SpeechModelSelection.pipeline(c.TWO_PASS, true, true, false).preview)
         assertNull(SpeechModelSelection.pipeline(c.SENSEVOICE, true, true, false).preview)
     }
+
+    @Test fun chineseZipformerIsOfferedOnlyToItsCurrentUsers() {
+        val c = SpeechModelCatalog
+        assertFalse(c.ZIPFORMER in SpeechModelSelection.offeredIds(c.SENSEVOICE))
+        assertTrue(c.ZIPFORMER in SpeechModelSelection.offeredIds(c.ZIPFORMER))
+        assertTrue(listOf(c.PARAFORMER, c.SENSEVOICE, c.ZIPFORMER_JA_INT8, c.ZIPFORMER_JA).all { it in SpeechModelSelection.offeredIds(c.SENSEVOICE) })
+    }
 }

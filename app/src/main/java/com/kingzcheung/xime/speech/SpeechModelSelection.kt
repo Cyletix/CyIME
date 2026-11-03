@@ -4,6 +4,13 @@ package com.kingzcheung.xime.speech
 internal object SpeechModelSelection {
     val primaryIds = listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA)
 
+    /**
+     * 语音页里能选的主模型。中文 Zipformer 2026-11-03 起不再提供（效果不如 SenseVoice / X-ASR，边说边出字已有 Paraformer）；
+     * 正在用它的人，选择框里照旧显示它，直到换成别的。
+     */
+    fun offeredIds(currentPrimary: String): List<String> =
+        primaryIds.filter { it != SpeechModelCatalog.ZIPFORMER || it == currentPrimary }
+
     fun supportsCorrection(mode: String) = primary(mode) in setOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.ZIPFORMER)
 
     fun primary(mode: String): String = when (mode) {

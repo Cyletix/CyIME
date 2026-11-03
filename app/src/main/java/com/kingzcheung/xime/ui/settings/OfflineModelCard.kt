@@ -162,7 +162,8 @@ internal fun OfflineModelCard() {
         AlertDialog(onDismissRequest = { editing = null }, title = { Text("${language.displayName}主模型") },
             text = {
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).selectableGroup()) {
-                    SpeechModelSelection.primaryIds.filter { SpeechLanguages.supports(it, language) }.forEach { id ->
+                    SpeechModelSelection.offeredIds(SpeechModelSelection.primary(selected.getValue(language)))
+                        .filter { SpeechLanguages.supports(it, language) }.forEach { id ->
                         val checked = SpeechModelSelection.primary(selected.getValue(language)) == id
                         Row(Modifier.fillMaxWidth().testTag("speech-choice:${language.id}:$id")
                             .selectable(checked, enabled = id in ready, role = Role.RadioButton, onClick = {
