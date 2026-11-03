@@ -46,3 +46,11 @@ internal suspend fun setToolPluginEnabled(context: Context, pluginId: String, en
             PluginManager.unloadPlugin(pluginId)
         }
     }
+
+/** 卸载插件：停掉、删文件，再清掉它的开关、按钮和选用（「已安装」和插件详情页共用）。 */
+internal suspend fun uninstallPluginCompletely(context: Context, pluginId: String) = withContext(Dispatchers.IO) {
+    val buttons = PluginManager.getAllInstallPlugins().find { it.id == pluginId }?.toolbarButtons.orEmpty().map { it.id }
+    PluginManager.unloadPlugin(pluginId)
+    PluginManager.installerManager.uninstallPlugin(pluginId)
+    SettingsPreferences.forgetUninstalledPlugin(context, pluginId, buttons)
+}

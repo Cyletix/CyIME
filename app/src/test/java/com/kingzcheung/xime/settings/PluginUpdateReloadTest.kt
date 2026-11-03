@@ -9,6 +9,7 @@ import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -24,6 +25,7 @@ import java.util.zip.ZipOutputStream
 class PluginUpdateReloadTest {
     private val app get() = ApplicationProvider.getApplicationContext<Application>()
     private val id = "com.example.reload_test"
+    private val button = "$id:open"
 
     @Before fun setup() {
         PluginManager.initialize(app)
@@ -39,7 +41,8 @@ class PluginUpdateReloadTest {
         val file = File(app.cacheDir, "reload-$version.xipk")
         ZipOutputStream(file.outputStream()).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.yaml"))
-            zip.write("id: $id\nname: 测试\nversion: $version\ntype: tool\nentry: main.lua\n".toByteArray())
+            zip.write(("id: $id\nname: 测试\nversion: $version\ntype: tool\nentry: main.lua\n" +
+                "toolbarButtons:\n  - id: $button\n    label: 测试\n    action: open_panel\n").toByteArray())
             zip.putNextEntry(ZipEntry("main.lua"))
             zip.write(
                 ("local plugin = {}\n" +
@@ -70,5 +73,21 @@ class PluginUpdateReloadTest {
         assertTrue(ImportManager.import(app, Uri.fromFile(xipk("1.1.0", "new"))) is ImportManager.ImportResult.Plugin)
         assertEquals(null, PluginManager.getPluginInstance(id))
         assertEquals(false, SettingsPreferences.isPluginEnabled(app, id))
+    }
+
+    @Test fun uninstallForgetsSwitchAndButtonsSoReinstallStartsFresh() = runBlocking {
+        assertTrue(ImportManager.import(app, Uri.fromFile(xipk("1.0.0", "old"))) is ImportManager.ImportResult.Plugin)
+        com.kingzcheung.xime.ui.settings.setToolPluginEnabled(app, id, true)
+        assertTrue(button in SettingsPreferences.getMenuButtons(app) + SettingsPreferences.getToolbarButtons(app))
+
+        com.kingzcheung.xime.ui.settings.uninstallPluginCompletely(app, id)
+        assertFalse(com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.hasChoice(app, id))
+        assertFalse(button in SettingsPreferences.getMenuButtons(app) + SettingsPreferences.getToolbarButtons(app))
+        val placed = SettingsPreferences.getPrefsPublic(app).getString("quick_actions_plugin_buttons_placed", "").orEmpty()
+        assertFalse(button in placed.split(","))
+
+        // 文件重新装回来：按新装处理，不带回旧的「已启用」
+        assertTrue(ImportManager.import(app, Uri.fromFile(xipk("1.0.0", "old"))) is ImportManager.ImportResult.Plugin)
+        assertFalse(com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.hasChoice(app, id))
     }
 }

@@ -321,6 +321,26 @@ object SettingsPreferences {
         return updated != menu
     }
 
+    /**
+     * 卸载插件后把它留下的东西清掉：启用开关、工具栏和菜单里的按钮、「已放过按钮」的记录、语音和剪贴板同步的选用。
+     * 以前只删文件，重新装上时旧的「已启用」又回来了（11-03 平板查到 AI 改写、AI 翻译都是这样）。
+     */
+    fun forgetUninstalledPlugin(context: Context, pluginId: String, buttonIds: Collection<String>) {
+        if (getSttOnlinePluginId(context) == pluginId) setSttOnlinePluginId(context, "")
+        if (getClipboardSyncPluginId(context) == pluginId) setClipboardSyncPluginId(context, "")
+        val prefs = getPrefs(context)
+        val editor = prefs.edit()
+        com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.clear(context, pluginId)
+        val gone = buttonIds.toSet()
+        for (key in listOf(KEY_TOOLBAR_BUTTONS, KEY_MENU_BUTTONS, KEY_PLUGIN_BUTTONS_PLACED)) {
+            val raw = prefs.getString(key, null) ?: continue
+            val ids = raw.split(",").filter { it.isNotEmpty() }
+            val kept = ids.filter { it !in gone }
+            if (kept.size != ids.size) editor.putString(key, kept.joinToString(","))
+        }
+        editor.apply()
+    }
+
     /** 插件按钮现在在哪：设置里「用法」那一行照这个写。 */
     fun pluginButtonPlace(context: Context, id: String): String = when (id) {
         in getToolbarButtons(context) -> "toolbar"

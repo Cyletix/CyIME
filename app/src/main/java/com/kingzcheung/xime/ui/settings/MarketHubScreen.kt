@@ -1690,13 +1690,8 @@ fun PluginDetailContent(
         confirmButton = {
             TextButton(onClick = {
                 confirmUninstall = false
-                if (SettingsPreferences.getSttOnlinePluginId(context) == plugin.id) SettingsPreferences.setSttOnlinePluginId(context, "")
-                if (SettingsPreferences.getClipboardSyncPluginId(context) == plugin.id) SettingsPreferences.setClipboardSyncPluginId(context, "")
                 scope.launch {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        PluginManager.unloadPlugin(plugin.id)
-                        PluginManager.installerManager.uninstallPlugin(plugin.id)
-                    }
+                    uninstallPluginCompletely(context, plugin.id)
                     onBack()
                 }
             }) { Text("卸载", color = MaterialTheme.colorScheme.error) }

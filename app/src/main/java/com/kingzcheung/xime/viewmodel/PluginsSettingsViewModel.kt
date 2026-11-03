@@ -157,18 +157,8 @@ class PluginsSettingsViewModel(application: Application) : AndroidViewModel(appl
     }
     
     fun uninstallPlugin(pluginId: String) {
-        if (SettingsPreferences.getSttOnlinePluginId(context) == pluginId) {
-            SettingsPreferences.setSttOnlinePluginId(context, "")
-        }
-        if (SettingsPreferences.getClipboardSyncPluginId(context) == pluginId) {
-            SettingsPreferences.setClipboardSyncPluginId(context, "")
-        }
-        
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                PluginManager.unloadPlugin(pluginId)
-                PluginManager.installerManager.uninstallPlugin(pluginId)
-            }
+            com.kingzcheung.xime.ui.settings.uninstallPluginCompletely(context, pluginId)
             
             _uiState.update { state ->
                 state.copy(extensions = state.extensions.filter { it.id != pluginId })
