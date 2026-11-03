@@ -185,6 +185,19 @@ private fun systemNavBarHeightPx(context: Context): Int {
 internal fun navBarResourceShowsGestureBar(resourcePx: Int, insetPx: Int, density: Float): Boolean =
     resourcePx > 0 && resourcePx <= (GESTURE_BAR_MAX_DP * density).roundToInt() && insetPx > resourcePx
 
+/** 手势区上限（dp）：系统报的强制手势区比这还高，就不当手势条看。 */
+internal const val GESTURE_ZONE_MAX_DP = 32
+
+/**
+ * 键盘自己从系统给的边衬区量出手势导航，不靠厂商开关（11-03「他能不能自己检测」）：
+ * 三键导航时导航栏整条都是系统按钮，强制手势区和它一样高（平板实测 nav=90 mandatory=90）；
+ * 手势导航时给输入法的是 48dp 按钮框，强制手势区只有底下手势条那一小段（≤[GESTURE_ZONE_MAX_DP] dp），
+ * 而可点区域没占满整条，多出来的那段就是没有按钮的空白。
+ */
+internal fun insetsShowGestureNavigation(navPx: Int, mandatoryPx: Int, tappablePx: Int, density: Float): Boolean =
+    mandatoryPx > 0 && mandatoryPx <= (GESTURE_ZONE_MAX_DP * density).roundToInt() &&
+        navPx - mandatoryPx >= (4 * density).roundToInt() && tappablePx < navPx
+
 /** 系统的手势条高度：手势导航时 navigation_bar_height 是手势条那一小条，限制在 [GESTURE_BAR_MAX_DP] 内。 */
 private fun gestureBarHeightPx(context: Context, hintHidden: Boolean): Int {
     val max = ((if (hintHidden) GESTURE_HINT_HIDDEN_DP else GESTURE_BAR_MAX_DP) *
@@ -269,8 +282,12 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     else @Suppress("DEPRECATION") insets.mandatorySystemGestureInsets.bottom
     // 贴底时再看系统自己的导航栏高度：有的厂商手势导航时 navigation_mode 仍写 0、自家开关也读不到，
     // 但系统的 navigation_bar_height 已换成手势条那一小条（三键时是整条 48dp），这也算手势导航（11-03「调到最低还不行」）。
+    val navInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
+    val density = context.resources.displayMetrics.density
     val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null ||
-        (edge && navBarResourceShowsGestureBar(systemNavBarHeightPx(context), normalPx, context.resources.displayMetrics.density))
+        (edge && (navBarResourceShowsGestureBar(systemNavBarHeightPx(context), normalPx, density) ||
+            insetsShowGestureNavigation(navInset, mandatory, tappable, density)))
     if (!gesture) return safe
     if (edge) return maxOf(cutout, navButtons)
     if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&
@@ -279,6 +296,39 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     ) return safe
     return controls
 }
+
+/**
+ * 固定键盘的底边自检（11-03「他如果自己检测到自己没贴底的话…能不能做到」）：固定卡片的位置每变一次，
+ * 量一次输入法窗口底边离屏幕底边多远。窗口没铺到屏幕底边时，底下那条是系统画的，键盘这边的留白调到 0 也去不掉；
+ * 这时去掉窗口底边的系统栏适配，让窗口铺到屏幕底边，之后照常按导航方式留位。返回量到的缺口（px）。
+ */
+internal fun checkImeWindowReachesScreenBottom(window: Window): Int {
+    val decor = window.decorView
+    if (!decor.isAttachedToWindow || decor.height <= 0) return 0
+    val location = IntArray(2)
+    decor.getLocationOnScreen(location)
+    val gap = imeWindowBottomGapPx(screenBottomPx(window), location[1] + decor.height)
+    if (gap > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val attributes = window.attributes
+        val bottom = WindowInsets.Side.BOTTOM
+        if (attributes.fitInsetsSides and bottom != 0) {
+            attributes.fitInsetsSides = attributes.fitInsetsSides and bottom.inv()
+            window.attributes = attributes
+            Log.w(INSETS_TAG, "bottom-edge: window ends ${gap}px above the screen bottom, stop fitting the bottom bar")
+        }
+    }
+    return gap
+}
+
+/** 窗口底边离屏幕底边的缺口（px）；1 px 以内是取整误差，不算。 */
+internal fun imeWindowBottomGapPx(screenBottomPx: Int, windowBottomPx: Int): Int =
+    (screenBottomPx - windowBottomPx).takeIf { it > 1 } ?: 0
+
+private fun screenBottomPx(window: Window): Int =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) window.windowManager.currentWindowMetrics.bounds.bottom
+    else android.graphics.Point().also {
+        @Suppress("DEPRECATION") window.windowManager.defaultDisplay.getRealSize(it)
+    }.y
 
 /** 默认采用系统建议值，手动下调只消耗建议值中可调的一段。 */
 internal fun fixedKeyboardBottomInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
@@ -356,7 +406,7 @@ internal fun bottomGestureZoneHeightPx(
 /**
  * 厂商自己的全面屏手势开关：开着为 true，关着为 false，不是这些厂商或读不到为 null。
  * 小米 force_fsg_nav_bar（Global）、vivo navigation_gesture_on、OPPO/一加/realme hide_navigationbar_enable、
- * 华为/荣耀 secure_gesture_navigation（Secure）；值非 0 即手势。
+ * 华为/荣耀 secure_gesture_navigation（Secure）、三星 navigation_bar_gesture_while_hidden（Global）；值非 0 即手势。
  */
 internal fun vendorGestureNavigationOn(
     manufacturer: String?,
@@ -367,6 +417,8 @@ internal fun vendorGestureNavigationOn(
         "vivo", "iqoo" -> false to "navigation_gesture_on"
         "oppo", "oneplus", "realme" -> false to "hide_navigationbar_enable"
         "huawei", "honor" -> false to "secure_gesture_navigation"
+        // 三星「滑动手势」：One UI 的 navigation_bar_gesture_while_hidden（Global），三键导航时为 0。
+        "samsung" -> true to "navigation_bar_gesture_while_hidden"
         else -> return null
     }
     return read(global, key)?.let { it != 0 }

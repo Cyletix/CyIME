@@ -72,13 +72,17 @@ class ImeBottomSpaceTest {
             (false to "navigation_gesture_on") to 1,
             (false to "hide_navigationbar_enable") to 0,
             (false to "secure_gesture_navigation") to 1,
+            (true to "navigation_bar_gesture_while_hidden") to 1,
         )
         val read: (Boolean, String) -> Int? = { global, key -> settings[global to key] }
         assertEquals(true, vendorGestureNavigationOn("Xiaomi", read))
         assertEquals(true, vendorGestureNavigationOn("vivo", read))
         assertEquals(false, vendorGestureNavigationOn("OPPO", read))
         assertEquals(true, vendorGestureNavigationOn("HONOR", read))
-        assertEquals(null, vendorGestureNavigationOn("samsung", read))
+        assertEquals(true, vendorGestureNavigationOn("samsung", read))
+        // 平板实测：三键导航时三星这项为 0。
+        assertEquals(false, vendorGestureNavigationOn("samsung") { global, key ->
+            if (global && key == "navigation_bar_gesture_while_hidden") 0 else null })
         assertEquals(null, vendorGestureNavigationOn("Google", read))
         assertEquals(null, vendorGestureNavigationOn(null, read))
         assertEquals(null, vendorGestureNavigationOn("vivo") { _, _ -> null })

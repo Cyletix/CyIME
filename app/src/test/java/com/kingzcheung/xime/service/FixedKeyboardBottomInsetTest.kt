@@ -141,6 +141,43 @@ class FixedKeyboardBottomInsetTest {
         assertEquals(false, navBarResourceShowsGestureBar(resourcePx = 0, insetPx = 126, density = 2.625f))
     }
 
+    @Test fun theKeyboardReadsGestureNavigationFromTheInsetsItself() {
+        // 平板实测（三键导航）：nav、mandatory、tappable 都是 90，不是手势。
+        assertEquals(false, insetsShowGestureNavigation(navPx = 90, mandatoryPx = 90, tappablePx = 90, density = 1.875f))
+        // 手势导航：48dp 按钮框里强制手势区只有手势条那段，可点区域没占满。
+        assertEquals(true, insetsShowGestureNavigation(navPx = 126, mandatoryPx = 63, tappablePx = 0, density = 2.625f))
+        // 可点区域占满整条：那条里有按钮，不算。
+        assertEquals(false, insetsShowGestureNavigation(navPx = 126, mandatoryPx = 63, tappablePx = 126, density = 2.625f))
+        // 没报手势区、或手势区比 32dp 还高，都不猜。
+        assertEquals(false, insetsShowGestureNavigation(navPx = 126, mandatoryPx = 0, tappablePx = 0, density = 2.625f))
+        assertEquals(false, insetsShowGestureNavigation(navPx = 160, mandatoryPx = 100, tappablePx = 0, density = 2.625f))
+    }
+
+    @Test fun edgeDropsTheEmptyFrameWhenOnlyTheInsetsShowGestureNavigation() {
+        // 厂商不认识、navigation_mode 还写 0：贴底时按 inset 自己认出手势导航，底下那条去掉。
+        ShadowBuild.setManufacturer("unknown")
+        mode(0)
+        val reported = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        assertEquals(0, fixedKeyboardBottomInsetPx(reported, activity.window, 48))
+        // 三键导航（手势区和导航栏一样高、按钮占满）照旧整条留着。
+        val buttons = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, 48)).build()
+        assertEquals(48, fixedKeyboardBottomInsetPx(buttons, activity.window, 48))
+        // 贴底关着不猜。
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
+        assertEquals(48, fixedKeyboardBottomInsetPx(reported, activity.window, 48))
+    }
+
+    @Test fun windowGapIgnoresOnePixelRounding() {
+        assertEquals(0, imeWindowBottomGapPx(screenBottomPx = 1752, windowBottomPx = 1752))
+        assertEquals(0, imeWindowBottomGapPx(screenBottomPx = 1752, windowBottomPx = 1751))
+        assertEquals(90, imeWindowBottomGapPx(screenBottomPx = 1752, windowBottomPx = 1662))
+        assertEquals(0, imeWindowBottomGapPx(screenBottomPx = 1752, windowBottomPx = 1800))
+    }
+
     @Test fun samsungHideButtonKeepsRoomUnlessEdgeIsOn() {
         ShadowBuild.setManufacturer("samsung")
         mode(2)

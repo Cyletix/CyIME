@@ -363,6 +363,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /**
+     * 固定卡片的位置变了就自检一次底边：输入法窗口没铺到屏幕底边就让它铺到底（[checkImeWindowReachesScreenBottom]），
+     * 并记下卡片底下实际空出多少、按规则该空多少，手机上一看日志就知道那条是谁留的。
+     */
+    private fun checkFixedKeyboardBottom(cardBottomInWindowPx: Int, expectedGapDp: Int) {
+        val win = window.window ?: return
+        val windowGap = checkImeWindowReachesScreenBottom(win)
+        val cardGap = win.decorView.height - cardBottomInWindowPx
+        val expected = (expectedGapDp * resources.displayMetrics.density).roundToInt()
+        FileLogger.d(TAG, "bottom-edge: windowGap=$windowGap cardGap=$cardGap expected=$expected " +
+            "minimum=${fixedMinimumInsetPxState.value} suggestion=${bottomInsetPxState.value}")
+    }
+
     internal fun keyboardBottomSpaceDp(state: InputUIState): Int = imeBottomSpaceDp(
         if (state.isFloatingMode || state.isCompact || state.voiceCollapsed) bottomInsetPxState.value
         else fixedBottomInsetPxState.value,
@@ -2729,6 +2742,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         if (fixedCardBounds != bounds) {
                                             fixedCardBounds = bounds
                                             keyboardContainer.requestLayout()
+                                            checkFixedKeyboardBottom(bottom, activeBottomDp + contentBottomPaddingDp)
                                         }
                                     }
                                     if (!handwritingExpanded && state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
