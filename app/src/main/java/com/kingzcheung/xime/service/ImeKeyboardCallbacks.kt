@@ -90,8 +90,13 @@ internal fun rememberImeKeyboardCallbacks(
                     val semicolonCode = key == ";" && service.keyRouter.semicolonIsCode()
                     // 第三方方案字母表里的符号（声笔的 ; ' , . /）是编码键：交给按键队列送进 Rime（#87）。
                     val schemeCode = if (numberPanel) null else service.keyRouter.schemeCodeKey(key)
+                    // 日语 26 键的长音键（键面 ー）送 -：和字母一样进罗马字转换（ko-hi- → コーヒー），不当标点直接上屏。
+                    val choonpu = !numberPanel && japaneseChoonpuIsCode(key, service.uiState.value.isAsciiMode,
+                        service.uiState.value.inputProfile)
                     if (schemeCode != null) {
                         service.keyRouter.handleKeyPress(schemeCode, false)
+                    } else if (choonpu) {
+                        service.keyRouter.handleKeyPress(key, false)
                     } else if (!numberPanel && !separator && !semicolonCode && isLiteralPunctuation(key)) {
                         service.textCommit.commitLiteralText(key)
                     } else {

@@ -126,6 +126,12 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings, com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.SHIFT_SYLLABLE_SPLIT, true)
                             ?.takeIf { !settings.shiftSyllableSplit }?.message)
                     ShiftSyllableSplitLegend(settings.shiftSyllableSplit)
+                    HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "长音键代替 Shift",
+                        "日语 26 键：Shift 键换成 ー，长按仍是 Shift；关闭时 ー 在 L 键右侧。",
+                        checked = settings.japaneseChoonpuOnShift, onCheckedChange = {
+                            settings = settings.copy(japaneseChoonpuOnShift = it); settings.save(context)
+                        })
                 })
                 }
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {

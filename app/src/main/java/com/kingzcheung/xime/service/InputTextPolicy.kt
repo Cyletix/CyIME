@@ -25,6 +25,13 @@ internal fun isLiteralPunctuation(key: String): Boolean = key.length == 1 && whe
 internal fun isSentencePunctuation(text: String): Boolean =
     text.isNotEmpty() && text.all { it in ",.?!;:，。？！、；：…" }
 
+/**
+ * 日语罗马字的长音 -（26 键 L 右侧或 Shift 位置的 ー 键送出）：方案字母表里有它，ka- → かー，
+ * 交给按键队列送进转换，不按标点直接上屏。只认屏幕键盘点按送来的 -；角标、符号面板走直接上屏那条路，不经过这里。
+ */
+internal fun japaneseChoonpuIsCode(key: String, ascii: Boolean, profile: com.kingzcheung.xime.settings.InputProfile): Boolean =
+    key == "-" && !ascii && profile.capabilities.japaneseConversion
+
 /** Keyboard punctuation only: never rewrite pasted prose, digits, emoji or speech results. */
 internal fun punctuationWidth(text: String, full: Boolean, japanese: Boolean = false): String {
     if (text.isEmpty() || !text.all { isLiteralPunctuation(it.toString()) }) return text

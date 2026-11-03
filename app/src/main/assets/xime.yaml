@@ -426,7 +426,8 @@ keyboard:
     layout:
       rows:
         - [q, w, e, r, t, y, u, i, o, p]
-        - [a, s, d, f, g, h, j, k, l]
+        # 长音键 ー 在 L 右侧（中排 10 键，和西班牙语的 ñ 一样）；「长音键代替 Shift」开着时拿掉，放到 Shift 键上。
+        - [a, s, d, f, g, h, j, k, l, "ー"]
         - [z, x, c, v, b, n, m]
     keys:
       q: { tap: { label: "q", value: "q" }, swipe_up: { label: "1", value: "1" } }
@@ -455,6 +456,8 @@ keyboard:
       b: { tap: { label: "b", value: "b" }, swipe_up: { label: "？", value: "？" } }
       n: { tap: { label: "n", value: "n" }, swipe_up: { label: "！", value: "！" } }
       m: { tap: { label: "m", value: "m" }, swipe_up: { label: "ー", value: "ー" } }
+      # 送 - 进罗马字转换（ko-hi- → コーヒー），不是直接上屏的符号。
+      "ー": { tap: { label: "ー", value: "-" } }
       "'": { tap: { label: "、", value: "," }, swipe_up: { label: "。", value: "." } }
       earth: { tap: { label: "@language", action: "toggle_ascii" } }
 

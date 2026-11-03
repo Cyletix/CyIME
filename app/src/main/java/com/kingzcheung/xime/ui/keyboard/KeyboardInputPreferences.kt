@@ -108,6 +108,8 @@ data class KeyboardInputPreferences(
     val syllableSplitKey: Boolean = false,
     /** Shift 键分词（默认关）：打拼音时点 Shift 插入 '，键面写「分词」；没在打拼音时照旧大小写。 */
     val shiftSyllableSplit: Boolean = false,
+    /** 日语 26 键长音键：默认在 L 键右侧；打开后左下角 Shift 键换成 ー，长按仍是 Shift，见 [japaneseChoonpuOnShift]。 */
+    val japaneseChoonpuOnShift: Boolean = false,
     /** 各固定栏按位置保存的符号（每行一个位置）；未设置的沿用旧的共用列表。 */
     val sideSymbols: Map<String, String> = emptyMap(),
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
@@ -245,6 +247,7 @@ data class KeyboardInputPreferences(
         const val DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY = "double_pinyin_key_hints_with_corners"
         /** ing 放在 Shift 键上开关；设置在「双拼方案」页的微软双拼一栏。新键，读不到就是关。 */
         const val DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY = "double_pinyin_semicolon_on_shift"
+        const val JAPANESE_CHOONPU_ON_SHIFT_KEY = "japanese_choonpu_on_shift"
         /** 英文选词后自动加空格开关；输入法选词时读它，改了下一次选词就生效。 */
         const val ENGLISH_AUTO_SPACE_KEY = "english_auto_space"
         /** 英文标点后自动加空格开关；输入法打标点时读它，改了下一个标点就生效。新键，读不到就是关。 */
@@ -330,6 +333,7 @@ data class KeyboardInputPreferences(
                 qwertyPeriodKey = prefs.getBoolean("qwerty_period_key_v2", true),
                 syllableSplitKey = prefs.getBoolean("syllable_split_key", false),
                 shiftSyllableSplit = prefs.getBoolean("shift_syllable_split", false),
+                japaneseChoonpuOnShift = prefs.getBoolean(JAPANESE_CHOONPU_ON_SHIFT_KEY, false),
                 sideSymbols = SideSymbolTarget.entries.mapNotNull { target ->
                     prefs.getString(target.prefKey, null)?.let { target.key to it }
                 }.toMap(),
@@ -465,6 +469,7 @@ data class KeyboardInputPreferences(
             .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)
             .putBoolean("syllable_split_key", syllableSplitKey)
             .putBoolean("shift_syllable_split", shiftSyllableSplit)
+            .putBoolean(JAPANESE_CHOONPU_ON_SHIFT_KEY, japaneseChoonpuOnShift)
             .putBoolean("qwerty_period_key", qwertyPeriodKey).apply()
     }
 

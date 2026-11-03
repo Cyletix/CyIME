@@ -123,8 +123,16 @@ fun KeyboardLayout(
     val letterLayout = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) {
         KeysConfigHelper.letterLayout(uiState.currentSchemaId, isAsciiMode)
     }
-    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout) {
-        letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(uiState.currentSchemaId, isAsciiMode)
+    // 日语 26 键长音键：默认在 L 键右侧（xime.yaml qwerty_japanese）；「长音键代替 Shift」开着时从中排拿掉，左下角 Shift 键点按是 ー。
+    // 配置里关掉了 Shift 键（geometry.shift_key）时 ー 仍留在 L 键右侧。
+    val shiftKeyConfigured = remember(cfgVer, uiState.currentSchemaId, isAsciiMode) {
+        KeysConfigHelper.letterGeometryOverride(uiState.currentSchemaId, isAsciiMode)?.shiftKeyEnabled != false
+    }
+    val choonpuOnShift = shiftKeyConfigured && japaneseChoonpuOnShift(
+        LocalKeyboardInputPreferences.current.japaneseChoonpuOnShift, isAsciiMode, uiState.inputProfile)
+    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout, choonpuOnShift) {
+        (letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(uiState.currentSchemaId, isAsciiMode))
+            .let { if (choonpuOnShift) withoutChoonpuKey(it) else it }
     }
     // Typewise honeycomb: a fourth letter row, short rows offset half a key, hexagonal letter caps.
     val honeycomb = letterLayout?.honeycomb == true
@@ -811,6 +819,8 @@ fun KeyboardLayout(
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
                                 composingSplit = shiftComposingSplit,
+                                tapKey = CHOONPU_INPUT.takeIf { choonpuOnShift },
+                                tapLabel = CHOONPU_KEY.takeIf { choonpuOnShift },
                             )
                             }
                             }
@@ -1701,6 +1711,12 @@ internal fun ShiftCapsKeyButton(
     shadowShapeRadius: Dp = 8.dp,
     /** Shift 键分词（默认关）：返回 true 时点按是分词 '，键面写「分词」；null 为普通 Shift。 */
     composingSplit: (() -> Boolean)? = null,
+    /**
+     * 点按送出的键（日语「长音键代替 Shift」：ー）；非 null 时键面写 [tapLabel]，按住满 [SHIFT_TAP_KEY_HOLD_MS] 才是按住 Shift，
+     * 松手前没打别的键就照 Shift 的点按切换大小写（[shiftTapKeyLongPressAction]）。null 为普通 Shift。
+     */
+    tapKey: String? = null,
+    tapLabel: String? = null,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -1711,6 +1727,7 @@ internal fun ShiftCapsKeyButton(
     val suppressCursorMove = LocalSuppressCursorMove.current
     val currentPress by rememberUpdatedState(onKeyPressDown)
     val currentKey by rememberUpdatedState(onKeyPress)
+    val currentTapKey by rememberUpdatedState(tapKey)
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
@@ -1767,14 +1784,25 @@ internal fun ShiftCapsKeyButton(
                     currentPress?.invoke("shift")
                     // Typing consumed the previous one-shot Shift; it cannot start a double tap.
                     if (viewModel.shiftMode.value != ShiftMode.SINGLE) lastTap = Long.MIN_VALUE
-                    viewModel.beginShiftHold()
+                    // 点按另有用途时（长音键）不一按下就亮 Shift：按满时限才算按住，点按时整块键帽不闪大写。
+                    val tapOutput = currentTapKey
+                    var holding = tapOutput == null
+                    if (holding) viewModel.beginShiftHold()
                     var released = false
                     var dragged = false
                     var upTime = down.uptimeMillis
                     try {
                         while (true) {
-                            val event = awaitPointerEvent()
+                            // 拖出去以后不再计时（交给滑到字母上的大写），只等松手。
+                            val event = if (holding || dragged) awaitPointerEvent()
+                                else withTimeoutOrNull((down.uptimeMillis + SHIFT_TAP_KEY_HOLD_MS - upTime).coerceAtLeast(1L)) { awaitPointerEvent() }
+                            if (event == null) {
+                                viewModel.beginShiftHold()
+                                holding = true
+                                continue
+                            }
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!holding) upTime = change.uptimeMillis
                             if (change.isConsumed) break
                             val pointer = bounds.topLeft + change.position
                             dragged = dragged || !bounds.contains(pointer) ||
@@ -1789,11 +1817,19 @@ internal fun ShiftCapsKeyButton(
                             }
                         }
                     } finally {
-                        val used = viewModel.endShiftHold()
+                        val used = holding && viewModel.endShiftHold()
                         targets?.finish()
                         isPressed = false
                         suppressCursorMove.value = false
-                        if (released && !dragged && !used && upTime - down.uptimeMillis < 350L) {
+                        if (tapOutput != null) {
+                            // 长音键：点按送 ー；按住没打别的键松手，照 Shift 点按切换（小写→单次大写→锁定→小写）。
+                            // 计时没赶上（松手事件先到）时按事件时间判断，不把长按当成点按。
+                            if (released && !dragged && !used) {
+                                if (!holding && upTime - down.uptimeMillis < SHIFT_TAP_KEY_HOLD_MS) currentKey(tapOutput)
+                                else currentKey(shiftTapKeyLongPressAction(viewModel.shiftMode.value))
+                            }
+                            lastTap = Long.MIN_VALUE
+                        } else if (released && !dragged && !used && upTime - down.uptimeMillis < 350L) {
                             // 打拼音时点按插入分词；不算进双击，连点两下不会锁成大写。
                             if (currentSplit?.invoke() == true) {
                                 currentKey(SYLLABLE_SEPARATOR)
@@ -1819,6 +1855,17 @@ internal fun ShiftCapsKeyButton(
         // Shift 键分词开着并且在打拼音：键面写「分词」，点了就是它（印什么出什么）。
         if (splitLabel) Text("分词", color = colors.foreground, fontSize = 14.sp, maxLines = 1,
             modifier = Modifier.testTag("shift-key-split"))
+        else if (tapLabel != null) {
+            // 长音键：中间是 ー，右上角小箭头表示长按是 Shift（实心、带横线同普通 Shift 键）。
+            Text(tapLabel, color = colors.foreground, fontSize = 20.sp, maxLines = 1,
+                modifier = Modifier.testTag("shift-key-tap"))
+            Icon(
+                imageVector = ShiftKeyIcons.forMode(shiftMode),
+                contentDescription = ShiftKeyIcons.description(shiftMode),
+                tint = colors.foreground.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 5.dp).size(12.dp)
+            )
+        }
         else Icon(
             imageVector = ShiftKeyIcons.forMode(shiftMode),
             contentDescription = ShiftKeyIcons.description(shiftMode),
