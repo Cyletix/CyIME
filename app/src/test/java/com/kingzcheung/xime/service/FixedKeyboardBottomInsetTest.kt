@@ -85,8 +85,10 @@ class FixedKeyboardBottomInsetTest {
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
         assertEquals(0, measure())
         assertEquals(16, measure(cutout = 16))
-        assertEquals(20, measure(controls = 20))
-        assertEquals(48, measure(controls = 48))
+        // 贴底即忽略系统给的底部边衬区：手势导航时系统报的可点区域（常是整条按钮框）不再留位（11-03）。
+        assertEquals(0, measure(controls = 20))
+        assertEquals(0, measure(controls = 48))
+        assertEquals(16, measure(controls = 48, cutout = 16))
         mode(0)
         assertEquals(48, measure())
         Settings.Secure.putInt(activity.contentResolver, "hide_navigationbar_enable", 1)
@@ -95,13 +97,30 @@ class FixedKeyboardBottomInsetTest {
         assertEquals(48, measure())
     }
 
-    @Test fun samsungHideButtonStillHasRoom() {
+    @Test fun samsungHideButtonKeepsRoomUnlessEdgeIsOn() {
         ShadowBuild.setManufacturer("samsung")
         mode(2)
         Settings.Global.putInt(activity.contentResolver, "navigation_bar_gesture_hint", 1)
         Settings.Global.putInt(activity.contentResolver, "navigation_bar_button_to_hide_keyboard", 1)
-        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -48)
         assertEquals(48, measure())
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        assertEquals(0, measure())
+        mode(0)
+        assertEquals(48, measure(controls = 48))
+    }
+
+    @Test fun floatingKeyboardIgnoresEdgeAndStillAvoidsReportedButtons() {
+        ShadowBuild.setManufacturer("OPPO")
+        mode(2)
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        val insets = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+            .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, 30))
+            .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
+        val normal = extractBottomInset(insets, activity.window)
+        assertEquals(0, fixedKeyboardMinimumInsetPx(insets, activity.window, normal))
+        assertEquals(30, floatingMinimumInsetPx(activity.window, insets,
+            fixedKeyboardMinimumInsetPx(insets, activity.window, normal, edge = false)))
     }
 
     @Test fun visibleAndroidNavigationFrameProtectsItsRealTopOnAGesturePhone() {
@@ -161,7 +180,9 @@ class FixedKeyboardBottomInsetTest {
                 .setTappableElementInsets(Insets.of(0, 0, 0, tappable)).build()
             return fixedKeyboardBottomInsetPx(insets, activity.window, extractBottomInset(insets, activity.window))
         }
-        assertEquals(48, measureQ(48))
+        assertEquals(0, measureQ(48))
         assertEquals(0, measureQ(0))
+        SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
+        assertEquals(48, measureQ(48))
     }
 }

@@ -627,7 +627,7 @@ private fun FixedBottomCalibrationSettings() {
     }
     SettingsSection("固定键盘") {
         SettingsToggleItem(Icons.TwoTone.Keyboard, "手势导航时键盘贴底",
-            "固定键盘从最低安全位置起调，系统按钮和任务栏仍会占位。",
+            "忽略系统给的底部边衬区，固定键盘贴到屏幕底边；三键导航和任务栏照常占位。",
             checked = edge, onCheckedChange = { SettingsPreferences.setEdgeToEdgeKeyboard(context, it) },
             lockMessage = if (android.os.Build.VERSION.SDK_INT < 29) "需要 Android 10 或以上" else null)
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))

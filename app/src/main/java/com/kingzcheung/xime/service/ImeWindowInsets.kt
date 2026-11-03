@@ -218,8 +218,14 @@ internal fun View.observeKeyboardBottomInsets(window: Window?, update: (WindowIn
     }
 }
 
-/** 三键、任务栏、系统绘制的 IME 按钮和底部切口决定下限，不能用手动校准覆盖。 */
-internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, normalPx: Int): Int {
+/**
+ * 三键、任务栏、系统绘制的 IME 按钮和底部切口决定下限，不能用手动校准覆盖。
+ * [edge]（「手势导航时键盘贴底」）打开且识别到手势导航时忽略系统给输入法的底部边衬区（11-03 用户反馈
+ * 「全面屏手势底下有一个高度去不掉」）：系统可能把可点区域（tappableElement）、三星「隐藏键盘」按钮都报成整条按钮框高，
+ * 贴底时不再为它们留位，只留屏幕底部缺口和本窗口里系统真画出来的输入法导航按钮。三键导航和大屏任务栏照旧整条留着。
+ */
+internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
+    edge: Boolean = SettingsPreferences.edgeToEdgeKeyboard(window.context)): Int {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return maxOf(normalPx,
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) insets.displayCutout?.safeInsetBottom ?: 0 else 0)
     val context = window.context
@@ -230,7 +236,7 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     val navButtons = imeNavButtonHeightPx(window)
     val controls = maxOf(cutout, tappable, navButtons)
     val safe = maxOf(normalPx, controls)
-    if (controls >= normalPx) return safe
+    if (controls >= normalPx && !edge) return safe
     if (context.resources.configuration.smallestScreenWidthDp >= 600) {
         // 有些平板只把任务栏报为 navigationBars；大屏本身并不代表底部有任务栏。
         val nav = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
@@ -250,6 +256,7 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     else @Suppress("DEPRECATION") insets.mandatorySystemGestureInsets.bottom
     val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null
     if (!gesture) return safe
+    if (edge) return maxOf(cutout, navButtons)
     if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&
         readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_gesture_hint") } != 0 &&
         readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_button_to_hide_keyboard") } == 1

@@ -335,8 +335,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         bottomInsetPxState.value = normal
         val minimum = if (win != null && insets != null) fixedKeyboardMinimumInsetPx(insets, win, normal) else normal
         fixedMinimumInsetPxState.value = minimum
+        // 贴底只管固定键盘：悬浮键盘的最低位置照旧按系统按钮和手势区算。
         floatingMinimumInsetPxState.value = if (win != null && insets != null)
-            floatingMinimumInsetPx(win, insets, minimum) else minimum
+            floatingMinimumInsetPx(win, insets, fixedKeyboardMinimumInsetPx(insets, win, normal, edge = false)) else minimum
         fixedBottomInsetPxState.value = if (win != null && insets != null)
             fixedKeyboardBottomInsetPx(insets, win, normal, minimum) else normal
         // 设置页的「底部留白校准」看不到输入法窗口，记下这次量到的可调低范围，调低按到下限就停。
