@@ -2,7 +2,6 @@ package com.kingzcheung.xime.service
 
 import android.util.Log
 import android.view.KeyEvent
-import android.view.inputmethod.EditorInfo
 import com.kingzcheung.xime.association.AssociationManager
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.rime.RimeCandidate
@@ -34,6 +33,23 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal val usesDirectFieldInput: Boolean get() = service.editorInputPolicy.directInput &&
         !service.uiState.value.inputTarget.isInternal
 
+    /**
+     * 没在打字时的回车，所有入口同一规则（[EnterKeyAction]）：键面写什么就做什么。
+     * 换行直接上屏 "\n"，不发模拟回车键，聊天软件不会把它当实体键盘的回车发出去（用户 11-03）。
+     */
+    internal fun performIdleEnter(connection: android.view.inputmethod.InputConnection? = service.currentInputConnection) {
+        val ic = connection ?: return
+        val info = service.currentInputEditorInfo
+        val options = info?.imeOptions ?: 0
+        val type = info?.inputType ?: 0
+        val terminal = service.isTerminalEditor()
+        when (val plan = EnterKeyAction.enter(options, type, terminal)) {
+            is EnterKeyAction.EditorAction -> ic.performEditorAction(plan.action)
+            EnterKeyAction.Newline -> ic.commitText("\n", 1)
+            EnterKeyAction.EnterKey -> service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+        }
+    }
+
     /** Literal field input bypasses the decoder, calculator, learning and candidate snapshots. */
     private suspend fun routeDirectFieldKey(key: String, shifted: Boolean, event: KeyEvent?): Boolean {
         val policy = service.editorInputPolicy
@@ -51,15 +67,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     connection.sendKeyEvent(KeyEvent.changeAction(event, KeyEvent.ACTION_UP))
                 }
             }
-            key == "enter" -> withEditor {
-                val options = service.currentInputEditorInfo?.imeOptions ?: 0
-                val action = options and EditorInfo.IME_MASK_ACTION
-                if (options and EditorInfo.IME_FLAG_NO_ENTER_ACTION == 0 && action in setOf(
-                        EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_SEND,
-                        EditorInfo.IME_ACTION_NEXT, EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_PREVIOUS)) {
-                    service.currentInputConnection?.performEditorAction(action)
-                } else service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-            }
+            key == "enter" -> withEditor { performIdleEnter() }
             key == "clear_all" -> withEditor {
                 // Never read or retain a password in the clear/undo buffer.
                 service.lastClearedText = ""
@@ -1167,20 +1175,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     } else {
                         service.rimeEngine.clearComposition()
                         withEditor {
-                            val imeOptions = service.currentInputEditorInfo?.imeOptions ?: 0
-                            val action = imeOptions and EditorInfo.IME_MASK_ACTION
-                            val noEnterAction = imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0
-                            when {
-                                state.showQuickSendForm -> service.submitText("\n")
-                                noEnterAction -> service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                                action == EditorInfo.IME_ACTION_GO ||
-                                action == EditorInfo.IME_ACTION_SEARCH ||
-                                action == EditorInfo.IME_ACTION_SEND ||
-                                action == EditorInfo.IME_ACTION_NEXT ||
-                                action == EditorInfo.IME_ACTION_DONE ->
-                                    service.currentInputConnection?.performEditorAction(action)
-                                else -> service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                            }
+                            if (state.showQuickSendForm) service.submitText("\n") else performIdleEnter()
                         }
                     }
                     withEditor {
