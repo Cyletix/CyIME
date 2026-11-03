@@ -30,11 +30,14 @@ internal class HandwritingInputSession(
     /** 公式模式：识别后笔迹留在板上，接着写会连同前面的笔迹整段重新识别；删除键撤掉最后一笔。 */
     private val keepInk: () -> Boolean = { false },
     /**
-     * 边写边识别（默认关）：每写完一笔就在后台先认当前全部笔迹，停顿一到直接用这次的结果，不用停顿后才开始认；
-     * 接着落笔就作废重来。认的是同一份笔迹，结果和停顿后再认完全一样，只是等待藏进了停顿里。
+     * 边写边识别（默认关）：每写完一笔就在后台先认当前全部笔迹，认完马上经 [onPreview] 放进候选栏，
+     * 停顿一到直接用这次的结果确认，不用停顿后才开始认；接着落笔就作废重来。
+     * 认的是同一份笔迹，结果和停顿后再认完全一样。
      * 只给识别没有副作用的书写方式（中文、日语）；英文分词和公式不提前认。
      */
     private val recognizeEarly: () -> Boolean = { false },
+    /** 边写边识别的预览：写的过程中把当前笔迹的识别结果给候选栏；空列表表示撤掉预览。停顿到了仍走 [onRecognition]。 */
+    private val onPreview: (List<Segment>) -> Unit = {},
 ) {
     var strokes: List<List<StrokePoint>> by mutableStateOf(emptyList())
         private set
@@ -46,7 +49,14 @@ internal class HandwritingInputSession(
     private var job: Job? = null
     private var early: Deferred<List<Segment>>? = null
     private val pendingKeys = mutableListOf<String>()
+    private var previewing = false
     val hasInk get() = strokes.isNotEmpty() || currentStroke.isNotEmpty()
+
+    private fun dropPreview() {
+        if (!previewing) return
+        previewing = false
+        onPreview(emptyList())
+    }
 
     private fun invalidate(): Int {
         job?.cancel()
@@ -86,7 +96,10 @@ internal class HandwritingInputSession(
         if (kept.size == strokes.size) return false
         invalidate()
         strokes = kept
-        if (kept.isNotEmpty()) schedule(pauseMillis()) else phase = HandwritingPhase.IDLE
+        if (kept.isNotEmpty()) schedule(pauseMillis()) else {
+            phase = HandwritingPhase.IDLE
+            dropPreview()
+        }
         return true
     }
 
@@ -102,6 +115,7 @@ internal class HandwritingInputSession(
         strokes = emptyList()
         currentStroke = emptyList()
         phase = HandwritingPhase.IDLE
+        dropPreview()
     }
 
     fun press(action: String) {
@@ -161,7 +175,15 @@ internal class HandwritingInputSession(
         phase = HandwritingPhase.WAITING
         // 提前认的异常在这里吞掉：async 里的异常会连带取消整个键盘协程作用域
         val ahead = if (after == null && waitMs > 0 && recognizeEarly()) scope.async {
-            try { recognize(snapshot) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { emptyList() }
+            val segments = try { recognize(snapshot) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { emptyList() }
+            // 认完马上进候选栏，不等停顿；这时又落笔、删除或切走就作废，不显示
+            if (token == revision) {
+                if (segments.isNotEmpty()) {
+                    previewing = true
+                    onPreview(segments)
+                } else dropPreview()
+            }
+            segments
         }.also { early = it } else null
         job = scope.launch {
             delay(waitMs)
@@ -179,8 +201,13 @@ internal class HandwritingInputSession(
             if (segments.isNotEmpty()) {
                 if (!keepInk()) strokes = emptyList()
                 phase = HandwritingPhase.CANDIDATES
+                // 正式结果替换预览
+                previewing = false
                 onRecognition(segments)
-            } else phase = HandwritingPhase.NO_RESULT
+            } else {
+                phase = HandwritingPhase.NO_RESULT
+                dropPreview()
+            }
             if (pendingKeys.isNotEmpty() && token == revision) {
                 val keys = pendingKeys.toList()
                 pendingKeys.clear()

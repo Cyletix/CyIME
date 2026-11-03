@@ -110,6 +110,8 @@ fun HandwritingKeyboardLayout(
     onKeyPress: (String) -> Unit = {},
     onNewCharacter: (() -> Unit)? = null,
     onRecognition: ((List<OverlappedHandwritingRecognizer.Segment>) -> Unit)? = null,
+    /** 边写边识别：写的过程中当前笔迹的识别结果；空列表表示撤掉（见 HandwritingInputSession）。 */
+    onPreview: ((List<OverlappedHandwritingRecognizer.Segment>) -> Unit)? = null,
     onButtonFeedback: ((String) -> Unit)? = null,
     keyTextColor: Color = Color(0xFF333333),
     keyBackgroundColor: Color = Color(0xFFE0E0E0),
@@ -169,6 +171,7 @@ fun HandwritingKeyboardLayout(
     val keyAction by rememberUpdatedState(onKeyPress)
     val newCharacter by rememberUpdatedState(onNewCharacter)
     val result by rememberUpdatedState(onRecognition)
+    val preview by rememberUpdatedState(onPreview)
     val feedback by rememberUpdatedState(onButtonFeedback)
     // The rows sit on the keyboard's own background (gradient, image or glass); a solid panel colour
     // here showed as a dark band around the bottom row on gradient themes.
@@ -286,7 +289,8 @@ fun HandwritingKeyboardLayout(
             onRecognition = { result?.invoke(it) }, onKey = { wordSpacing.reset(); keyAction(it) }, keepInk = { formulaActive },
             // 边写边识别只给中文、日语：英文要按停顿分词（有状态），公式整段重认，都不能提前认
             recognizeEarly = { recognizeWhileWriting && !formulaActive &&
-                (recognitionLanguage == InputLanguage.CHINESE || recognitionLanguage == InputLanguage.JAPANESE) })
+                (recognitionLanguage == InputLanguage.CHINESE || recognitionLanguage == InputLanguage.JAPANESE) },
+            onPreview = { preview?.invoke(it) })
     }
     val modelDownloaded by remember {
         ModelManager.downloadStates.map { it["ochwpro"] is ModelDownloadState.Complete }.distinctUntilChanged()

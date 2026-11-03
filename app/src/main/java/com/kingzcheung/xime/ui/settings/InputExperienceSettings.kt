@@ -376,7 +376,7 @@ internal fun InputExperienceSettings(
             Row(Modifier.settingsSearchAnchor("手写边写边识别", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("手写边写边识别", style = MaterialTheme.typography.titleSmall)
-                    Text("每写完一笔就在后台先认，停顿一到马上出候选，不用停顿后再等识别。中文、日语手写可用；会多用一点电。",
+                    Text("每写完一笔就先认，候选栏马上显示，可以直接点选，不用等停顿。中文、日语手写可用；会多用一点电。",
                         style = MaterialTheme.typography.bodySmall)
                     PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.HANDWRITING_LIVE)
                 }

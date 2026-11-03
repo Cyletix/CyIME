@@ -43,4 +43,37 @@ class HandwritingCandidateQueueTest {
         assertTrue(queue.candidates.size <= 20)
         assertTrue(queue.candidates.all { it.length == 10 })
     }
+    @Test fun previewShowsWritingInProgressWithoutTouchingConfirmedCharacters() {
+        val queue = HandwritingCandidateQueue()
+        queue.append(listOf(segment("你", "他")))
+        queue.preview(listOf(segment("好", "们")))
+        assertEquals("你好", queue.candidates.first())
+        assertEquals(1, queue.size)
+        // 撤掉预览回到已认好的字；正式结果替换预览
+        queue.preview(emptyList())
+        assertEquals("你", queue.candidates.first())
+        queue.preview(listOf(segment("们")))
+        queue.append(listOf(segment("好")))
+        assertEquals("你好", queue.candidates.first())
+        assertEquals(2, queue.size)
+    }
+    @Test fun pickingAPreviewCommitsItAndDropsTheLateResultOfTheSameInk() {
+        val queue = HandwritingCandidateQueue()
+        queue.preview(listOf(segment("字", "宇")))
+        assertEquals("宇", queue.select(1))
+        // 停顿那次识别抢在清板前回来：不再出现
+        queue.append(listOf(segment("字", "宇")))
+        queue.preview(listOf(segment("字")))
+        assertTrue(queue.candidates.isEmpty())
+        queue.newInk()
+        queue.preview(listOf(segment("好")))
+        assertEquals("好", queue.candidates.first())
+    }
+    @Test fun pickingAConfirmedCandidateDoesNotBlockTheNextResult() {
+        val queue = HandwritingCandidateQueue()
+        queue.append(listOf(segment("你")))
+        assertEquals("你", queue.select(0))
+        queue.append(listOf(segment("好")))
+        assertEquals("好", queue.candidates.first())
+    }
 }

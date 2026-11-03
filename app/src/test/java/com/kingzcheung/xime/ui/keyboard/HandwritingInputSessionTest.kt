@@ -29,23 +29,44 @@ class HandwritingInputSessionTest {
             windows += strokes.size
             if (slow) withContext(NonCancellable) { delay(2000) }
             listOf(Segment(0, strokes.size, listOf(HandwritingCandidate("字", 1f))))
-        }, { events += "begin" }, { events += "result" }, { events += it }, recognizeEarly = { early })
+        }, { events += "begin" }, { events += "result" }, { events += it }, recognizeEarly = { early },
+            onPreview = { events += if (it.isEmpty()) "preview-off" else "preview" })
         fun stroke(): Int = session.begin(StrokePoint(10f, 10f, 0)).also {
             session.move(it, StrokePoint(30f, 10f, 20)); session.end(it)
         }
     }
 
-    @Test fun recognizeWhileWritingStartsAtPenUpAndShowsTheSameResultAtThePause() = runTest {
+    @Test fun recognizeWhileWritingShowsCandidatesAtPenUpAndConfirmsTheSameResultAtThePause() = runTest {
         val f = Fixture(this, early = true)
         f.stroke(); runCurrent()
-        // 笔一抬就开始认，不等停顿；候选仍然等停顿到了才出
+        // 笔一抬就认，认完马上进候选栏，不等停顿
         assertEquals(listOf(1), f.windows)
-        assertEquals(listOf("begin"), f.events)
-        advanceTimeBy(999); runCurrent(); assertEquals(listOf("begin"), f.events)
+        assertEquals(listOf("begin", "preview"), f.events)
+        assertTrue("预览时笔迹还在板上", f.session.hasInk)
+        advanceTimeBy(999); runCurrent(); assertEquals(listOf("begin", "preview"), f.events)
         advanceTimeBy(1); runCurrent()
-        assertEquals(listOf("begin", "result"), f.events)
+        assertEquals(listOf("begin", "preview", "result"), f.events)
         assertEquals("停顿后不再认第二遍", listOf(1), f.windows)
         assertFalse(f.session.hasInk)
+    }
+
+    @Test fun deletingInkWithAPreviewTakesThePreviewBack() = runTest {
+        val f = Fixture(this, early = true)
+        f.stroke(); runCurrent()
+        f.session.press("delete"); advanceUntilIdle()
+        assertEquals(listOf("begin", "preview", "preview-off"), f.events)
+        assertFalse(f.session.hasInk)
+    }
+
+    @Test fun aStrokeStartedWhileRecognizingNeverShowsTheOldPreview() = runTest {
+        val f = Fixture(this, slow = true, early = true)
+        f.stroke(); runCurrent()
+        val token = f.session.begin(StrokePoint(20f, 20f, 100))
+        advanceTimeBy(2500); runCurrent()
+        assertEquals(listOf("begin"), f.events)
+        f.session.end(token); advanceUntilIdle()
+        assertEquals(listOf("begin", "preview", "result"), f.events)
+        assertEquals(listOf(1, 2), f.windows)
     }
 
     @Test fun recognizeWhileWritingRestartsWithEveryNewStrokeAndKeysStillFlushOnce() = runTest {
@@ -56,7 +77,7 @@ class HandwritingInputSessionTest {
         f.session.press("space"); advanceUntilIdle()
         // 按键照旧：先认完整笔迹再执行，按键不提前认
         assertEquals(listOf(1, 2, 2), f.windows)
-        assertEquals(listOf("begin", "result", "space"), f.events)
+        assertEquals(listOf("begin", "preview", "preview", "result", "space"), f.events)
     }
 
     @Test fun recognizeWhileWritingOffKeepsWaitingForThePause() = runTest {

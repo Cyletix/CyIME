@@ -1555,9 +1555,15 @@ fun KeyboardView(
                                     else -> { confirmHandwriting(); callbacks.onCommitText?.invoke(key) }
                                 }
                             },
+                            onNewCharacter = { handwritingPending.newInk() },
                             onRecognition = { segments ->
                                 if (segments.any { it.replacesPending }) handwritingPending.clear()
                                 handwritingPending.append(segments)
+                                refreshHandwritingCandidates()
+                            },
+                            // 边写边识别：每写完一笔候选栏就换成当前笔迹的结果，点它直接上屏并清掉笔迹
+                            onPreview = { segments ->
+                                handwritingPending.preview(segments)
                                 refreshHandwritingCandidates()
                             },
                             onButtonFeedback = { key ->
