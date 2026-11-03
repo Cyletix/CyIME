@@ -211,7 +211,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 }
             }
             SettingsJumpText("分体键盘、按键符号在上一页「键盘布局」；角标、光标与空格在「按键与手势」；字号在「主题与外观 › 按键字号」；" +
-                "模糊音、邻键纠错在「语言与方案 › 中文输入」。",
+                "拼音纠错、模糊音在「语言与方案 › 中文输入」。",
                 jumps = listOf("键盘布局", "按键与手势", "主题与外观 › 按键字号", "语言与方案 › 中文输入"),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -220,32 +220,77 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
 
 
 /**
- * 邻键纠错（11-01 从 26 键页搬到「语言与方案」）：只列当前方案用得上的那一行（全拼或双拼），
- * 另一行改过默认值时也列出来，方便关回去。存的值不变。
+ * 拼音纠错（11-03 统一）：每种纠错一行，全拼、双拼共用，不再各管各的（以前「邻键纠错」只管全拼、双拼另有一行，
+ * 顺序、多键、漏键藏在「邻键纠错」里看不见）。存的值不变：「邻键纠错」「双拼邻键纠错」沿用原来的键；顺序、多键、漏键
+ * 是新键，默认开，同以前的效果。哪种在哪个键盘起作用见 [TypoCorrectionSupport]；用不上的灰掉并写原因。
  */
 @Composable
 internal fun NeighborCorrectionSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings = rememberKeyboardInputPreferences()
-    val usingDoublePinyin = remember { runCatching { SpellingPatches.usingDoublePinyin(context) }.getOrDefault(false) }
+    val support = remember { runCatching { TypoCorrectionSupport.of(context) }.getOrDefault(TypoCorrectionSupport.ALL) }
     val defaults = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences()
-    val showFull = !usingDoublePinyin || settings.neighborCorrection != defaults.neighborCorrection
-    val showDouble = usingDoublePinyin || settings.doublePinyinCorrection != defaults.doublePinyinCorrection
+    // 「双拼邻键纠错」只给用双拼的人，或改过它的人（方便关回去）。
+    val showDouble = support.doublePinyin || settings.doublePinyinCorrection != defaults.doublePinyinCorrection
+    var typos by remember { mutableStateOf(SpellingPatches.Typo.entries.associateWith { SpellingPatches.typo(context, it) }) }
+    val needsNeighbor = if (settings.neighborCorrection) null else "要先打开「邻键纠错」"
+    val fullOnly = if (support.fullPinyin) null else "只用于 26 键全拼"
     SettingsSection(title = "拼音纠错", content = {
-        if (showFull) SettingsToggleItem(Icons.TwoTone.Spellcheck, "邻键纠错",
-            "全拼 26 键按偏到旁边的键时，也给出本来想打的词，原来的候选还在",
+        Text("26 键全拼四种都有，双拼只有邻键纠错，九键、14 键不纠错。", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        SettingsToggleItem(Icons.TwoTone.Spellcheck, "邻键纠错",
+            "按偏到旁边的键时，也给出本来想打的词，原来的候选还在",
             checked = settings.neighborCorrection, onCheckedChange = {
                 settings.copy(neighborCorrection = it).save(context)
-            }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.NEIGHBOR_CORRECTION)
-        if (showFull && showDouble) HorizontalDivider()
-        if (showDouble) SettingsToggleItem(Icons.TwoTone.Spellcheck, "双拼邻键纠错",
-            "双拼 26 键按偏到旁边的键时，也给出本来想打的词(关着时只纠拼不成字的两个键)；改完要几秒重新部署",
-            checked = settings.doublePinyinCorrection, onCheckedChange = {
-                settings.copy(doublePinyinCorrection = it).save(context)
-                scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
-            }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DOUBLE_PINYIN_CORRECTION)
+            }, lockMessage = if (support.fullPinyin || support.doublePinyin) null else "只用于 26 键全拼、双拼",
+            costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.NEIGHBOR_CORRECTION)
+        if (showDouble) {
+            HorizontalDivider()
+            SettingsToggleItem(Icons.TwoTone.Spellcheck, "双拼邻键纠错",
+                "双拼 26 键按偏到旁边的键时，也给出本来想打的词(关着时只纠拼不成字的两个键)；改完要几秒重新部署",
+                checked = settings.doublePinyinCorrection, onCheckedChange = {
+                    settings.copy(doublePinyinCorrection = it).save(context)
+                    scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
+                }, lockMessage = needsNeighbor,
+                costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DOUBLE_PINYIN_CORRECTION)
+        }
+        SpellingPatches.Typo.entries.forEach { typo ->
+            HorizontalDivider()
+            SettingsToggleItem(Icons.TwoTone.Spellcheck, typo.title, typoCaption(typo),
+                checked = typos.getValue(typo), onCheckedChange = { on ->
+                    SpellingPatches.setTypo(context, typo, on)
+                    typos = typos + (typo to on)
+                    scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
+                }, lockMessage = fullOnly ?: if (typo == SpellingPatches.Typo.OMISSION) null else needsNeighbor,
+                costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.typo(typo))
+        }
     })
+}
+
+private fun typoCaption(typo: SpellingPatches.Typo): String = when (typo) {
+    SpellingPatches.Typo.TRANSPOSITION -> "相邻两个字母打反也出想打的词(如 shenem 出“什么”)；改完要几秒重新部署"
+    SpellingPatches.Typo.EXTRA -> "多按一下或多碰到旁边的键也出想打的词(如 woomen 出“我们”)；改完要几秒重新部署"
+    SpellingPatches.Typo.OMISSION -> "漏打一个字母也出想打的词(如 chengong 出“成功”)，有的停一下才出；改完要几秒重新部署"
+}
+
+/** 已启用的中文方案里有没有 26 键全拼、26 键双拼：纠错只在这两种上起作用，都没有时对应的开关灰掉。 */
+internal data class TypoCorrectionSupport(val fullPinyin: Boolean, val doublePinyin: Boolean) {
+    companion object {
+        val ALL = TypoCorrectionSupport(fullPinyin = true, doublePinyin = true)
+
+        fun of(context: android.content.Context): TypoCorrectionSupport =
+            of(com.kingzcheung.xime.settings.SchemaManager.getEnabledSchemas(context) + SettingsPreferences.getCurrentSchema(context))
+
+        fun of(schemas: Collection<String>): TypoCorrectionSupport {
+            val profiles = schemas.distinct().map { com.kingzcheung.xime.settings.InputProfiles.describe(it) }
+                .filter { it.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
+                    it.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC }
+            return TypoCorrectionSupport(
+                fullPinyin = profiles.any { it.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN },
+                doublePinyin = profiles.any { it.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN })
+        }
+    }
 }
 
 /** 模糊音：每组一行开关，默认全关；改了在后台写方案补丁，输入法重新部署后生效（见 [SpellingPatches]）。放在「语言与方案」。 */

@@ -31,6 +31,28 @@ object SpellingPatches {
     const val DOUBLE_PINYIN_ABBREVIATION_KEY = "double_pinyin_abbreviation"
     /** 与 KeyboardInputPreferences.doublePinyinCorrection 同一个键：键盘按它决定是否把键位邻接表交给纠错。 */
     const val DOUBLE_PINYIN_CORRECTION_KEY = "double_pinyin_neighbor_correction"
+    /**
+     * 26 键全拼除邻键以外的三种纠错（11-03 统一纠错设置）：原来都写死在雾凇方案里、跟着「邻键纠错」一起开关，
+     * 设置页看不出有这几种（有人说没有顺序纠错）。默认都开，同以前；关了在方案补丁里关掉对应的键。
+     * 顺序、多键要按键位找相邻字母，「邻键纠错」关着时引擎不拿键位，它们也不起作用（设置页灰掉）。
+     */
+    enum class Typo(val key: String, val title: String) {
+        /** 相邻两个字母打反（lnu → 论）：打字途中只看最后三个字母，停顿后整串再查一遍（cyime_letter_swap）。 */
+        TRANSPOSITION("typo_transposition_correction", "顺序纠错"),
+        /** 多按一下同一个键或多碰旁边的键（zhonng → 中）。 */
+        EXTRA("typo_extra_letter_correction", "多键纠错"),
+        /** 漏打一个字母：停顿后补漏键读法（cyime_omission），以及两字相接处重复字母只打一次（chengong → 成功）。 */
+        OMISSION("typo_omission_correction", "漏键纠错"),
+    }
+
+    fun typo(context: Context, item: Typo): Boolean = SettingsPreferences.getPrefsPublic(context).getBoolean(item.key, true)
+
+    fun setTypo(context: Context, item: Typo, enabled: Boolean) {
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(item.key, enabled).apply()
+    }
+
+    private fun enabledTypos(context: Context): Set<Typo> = Typo.entries.filterTo(linkedSetOf()) { typo(context, it) }
+
     /** 设置页写好补丁后递增；输入法服务据此重新部署并切回当前方案。 */
     const val REVISION = "spelling_patches_revision"
     private const val START = "# BEGIN CYIME SPELLING"
@@ -156,9 +178,14 @@ object SpellingPatches {
         val doublePinyinFuzzy = if (fuzzyDoublePinyin(context)) fuzzy else emptySet()
         val t9Digits = fuzzyT9Digits(context)
         val abbreviation = doublePinyinAbbreviation(context)
+        val typos = enabledTypos(context)
         var changed = false
         for (id in fullPinyinSchemas(context)) {
-            changed = write(rimeDir, id) { schema -> listOf(fuzzyPart(schema, fuzzy) ?: return@write null) } || changed
+            changed = write(rimeDir, id) { schema ->
+                // 三种都开着（默认）时不读方案文件：什么都不写，同以前。
+                listOf(fuzzyPart(schema, fuzzy) ?: return@write null) +
+                    if (typos.size == Typo.entries.size) emptyList<Part>() else typoParts(schema(), typos)
+            } || changed
         }
         // 双拼：拼写规则先按全拼派生模糊音，再换成双拼编码（同雾凇双拼方案注释里的位置），所以两段写在同一个文件里。
         for (id in doublePinyinSchemas(context)) {
@@ -204,11 +231,32 @@ object SpellingPatches {
     internal fun nineKeyRules(algebra: List<String>, groups: Set<Fuzzy>, near: List<String>, digits: Boolean): List<String> =
         (if (digits) groups.flatMap { it.rules } else emptyList()) + algebra + near
 
+    /**
+     * 关掉的纠错写成补丁：只写方案里本来开着的键（雾凇和由它生成的字母排列、自建布局），14 键等没有这些键的方案不写，
+     * 开着的不写（同以前，不触发重新部署）。停顿后的两个补查方案（漏键、打反）写成空名，引擎就不查。
+     */
+    internal fun typoParts(schema: String, enabled: Set<Typo>): List<Part> = listOf(
+        Triple(TRANSPOSITION, Typo.TRANSPOSITION, "false"),
+        Triple(SWAP_SCHEMA, Typo.TRANSPOSITION, "\"\""),
+        Triple(EXTRA, Typo.EXTRA, "false"),
+        Triple(DOUBLED, Typo.OMISSION, "false"),
+        Triple(OMISSION_SCHEMA, Typo.OMISSION, "\"\""),
+    ).map { (key, typo, off) ->
+        val present = Regex("(?m)^\\s*" + Regex.escape(key.substringAfterLast('/')) + ":[ \\t]*\\S").containsMatchIn(schema)
+        Part(key, if (present && typo !in enabled) listOf("\"$key\": $off") else emptyList())
+    }
+
+    private const val TRANSPOSITION = "translator/cyime_transposition_correction"
+    private const val EXTRA = "translator/cyime_extra_letter_correction"
+    private const val DOUBLED = "translator/cyime_doubled_letter_correction"
+    private const val SWAP_SCHEMA = "cyime_edit_schema"
+    private const val OMISSION_SCHEMA = "cyime_omission_schema"
+
     private const val ALGEBRA = "speller/algebra"
     private const val CORRECTION = "translator/enable_correction"
 
     /** 补丁里的一个键：[lines] 为空表示不写这个键。 */
-    private class Part(val key: String, val lines: List<String>)
+    internal class Part(val key: String, val lines: List<String>)
 
     /** 读不出方案的拼写规则时为 null（整个文件保持原样）。 */
     private fun fuzzyPart(schema: () -> String, fuzzy: Set<Fuzzy>): Part? =

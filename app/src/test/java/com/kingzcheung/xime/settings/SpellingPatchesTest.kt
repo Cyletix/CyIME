@@ -172,4 +172,30 @@ class SpellingPatchesTest {
         val expected = SpellingPatches.Fuzzy.IN.penalized + abbreviation.first + algebra + abbreviation.second
         assertEquals(expected.map { "  - \"" + it.replace("\\", "\\\\") + "\"" }, lines.drop(1))
     }
+
+    /** 11-03 统一纠错：顺序、多键、漏键默认开（不写补丁，同以前）；关了只写方案里本来有的键。 */
+    @Test fun typoSwitchesWriteOnlyWhatIsTurnedOffAndPresent() {
+        val iceSchema = schema + "  enable_correction: true\n  cyime_neighbor_correction: true\n" +
+            "  cyime_doubled_letter_correction: true\n  cyime_transposition_correction: true\n" +
+            "  cyime_extra_letter_correction: true\n  cyime_stray_initial_correction: true\n" +
+            "cyime_omission_schema: cyime_omission\ncyime_edit_schema: cyime_letter_swap\n"
+        val all = SpellingPatches.Typo.entries.toSet()
+        assertTrue(SpellingPatches.typoParts(iceSchema, all).all { it.lines.isEmpty() })
+        val lines = SpellingPatches.typoParts(iceSchema, emptySet()).flatMap { it.lines }
+        assertEquals(listOf("\"translator/cyime_transposition_correction\": false", "\"cyime_edit_schema\": \"\"",
+            "\"translator/cyime_extra_letter_correction\": false", "\"translator/cyime_doubled_letter_correction\": false",
+            "\"cyime_omission_schema\": \"\""), lines)
+        // 只关顺序：停顿后的打反补查也关，漏键、多键不动。
+        assertEquals(listOf("\"translator/cyime_transposition_correction\": false", "\"cyime_edit_schema\": \"\""),
+            SpellingPatches.typoParts(iceSchema, all - SpellingPatches.Typo.TRANSPOSITION).flatMap { it.lines })
+        // 14 键等没有这些键的方案什么都不写。
+        assertTrue(SpellingPatches.typoParts(schema, emptySet()).all { it.lines.isEmpty() })
+        // 写出来是合法补丁，Rime 读到的是 false 和空名。
+        val custom = SpellingPatches.patch("", lines)!!
+        val patch = (SchemaManager.yaml.parseToYamlNode(custom) as YamlMap).entries.entries.single { it.key.content == "patch" }.value as YamlMap
+        fun value(key: String) = (patch.entries.entries.single { it.key.content == key }.value as YamlScalar).content
+        assertEquals("false", value("translator/cyime_transposition_correction"))
+        assertEquals("", value("cyime_omission_schema"))
+        assertEquals("", value("cyime_edit_schema"))
+    }
 }

@@ -34,6 +34,16 @@ class LetterNeighborsTest {
         assertEquals("~;$encoded", letterNeighborsForEngine(encoded, correction = false, unreadableOnly = true))
         assertEquals("", letterNeighborsForEngine("", correction = false, unreadableOnly = true))
     }
+    /** 11-03：「邻键纠错」一个开关管全拼和双拼；关了双拼也不再纠拼不成字的两个键。 */
+    @Test fun oneNeighborSwitchForFullAndDoublePinyin() {
+        val encoded = encodeLetterNeighbors(keyboard())
+        assertEquals(encoded, letterNeighborsForEngine(encoded, neighborCorrection = true, doublePinyin = false, doublePinyinCorrection = false))
+        assertEquals("", letterNeighborsForEngine(encoded, neighborCorrection = false, doublePinyin = false, doublePinyinCorrection = true))
+        assertEquals("~;$encoded", letterNeighborsForEngine(encoded, neighborCorrection = true, doublePinyin = true, doublePinyinCorrection = false))
+        assertEquals(encoded, letterNeighborsForEngine(encoded, neighborCorrection = true, doublePinyin = true, doublePinyinCorrection = true))
+        assertEquals("", letterNeighborsForEngine(encoded, neighborCorrection = false, doublePinyin = true, doublePinyinCorrection = false))
+        assertEquals("", letterNeighborsForEngine(encoded, neighborCorrection = false, doublePinyin = true, doublePinyinCorrection = true))
+    }
     @Test fun incompleteMergedOrInvalidGeometryCannotEnableWrongLayoutCorrection() {
         assertEquals("", encodeLetterNeighbors(keyboard() - 'a'))
         assertEquals("", encodeLetterNeighbors(keyboard() + ('a' to LetterKeyRect(0f, 0f, 0f, 60f))))

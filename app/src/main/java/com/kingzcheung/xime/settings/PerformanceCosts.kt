@@ -30,6 +30,12 @@ object PerformanceCosts {
     enum class Item(val id: String, val title: String, val redeploy: Boolean = false) {
         NEIGHBOR_CORRECTION("neighbor_correction", "邻键纠错"),
         DOUBLE_PINYIN_CORRECTION("double_pinyin_correction", "双拼邻键纠错", redeploy = true),
+        // 26 键全拼另外三种纠错（[SpellingPatches.Typo]，11-03 拆出来单独开关）。顺序、多键要用邻键纠错的键位表：
+        // 开着 = 这一项和邻键纠错都开；单开它会连邻键纠错一起开，实测值要减去邻键纠错那一项再写进表。
+        TRANSPOSITION_CORRECTION("transposition_correction", "顺序纠错", redeploy = true),
+        EXTRA_LETTER_CORRECTION("extra_letter_correction", "多键纠错", redeploy = true),
+        // 打字途中只多查重复字母那一处，主要的活在停顿 180 ms 后补查，那次不算进每键耗时。
+        OMISSION_CORRECTION("omission_correction", "漏键纠错", redeploy = true),
         DOUBLE_PINYIN_ABBREVIATION("double_pinyin_abbreviation", "双拼简拼", redeploy = true),
         MIXED_INPUT("mixed_input", "中英混输"),
         CHINESE_GLIDE("chinese_glide", "中文滑行输入"),
@@ -94,6 +100,11 @@ object PerformanceCosts {
             fun byId(id: String): Item? = entries.firstOrNull { it.id == id }
             fun fuzzy(item: SpellingPatches.Fuzzy): Item = checkNotNull(byId("fuzzy_" + item.id))
             fun t9Fuzzy(item: SpellingPatches.Fuzzy): Item = checkNotNull(byId(T9_PREFIX + "fuzzy_" + item.id))
+            fun typo(item: SpellingPatches.Typo): Item = when (item) {
+                SpellingPatches.Typo.TRANSPOSITION -> TRANSPOSITION_CORRECTION
+                SpellingPatches.Typo.EXTRA -> EXTRA_LETTER_CORRECTION
+                SpellingPatches.Typo.OMISSION -> OMISSION_CORRECTION
+            }
         }
     }
 
@@ -113,7 +124,11 @@ object PerformanceCosts {
         val input by lazy { KeyboardInputPreferences.read(context) }
         return when (item) {
             Item.NEIGHBOR_CORRECTION -> input.neighborCorrection
-            Item.DOUBLE_PINYIN_CORRECTION -> SpellingPatches.doublePinyinCorrection(context)
+            // 11-03 起「邻键纠错」双拼也用：它关着时双拼邻键纠错不起作用。
+            Item.DOUBLE_PINYIN_CORRECTION -> input.neighborCorrection && SpellingPatches.doublePinyinCorrection(context)
+            Item.TRANSPOSITION_CORRECTION -> input.neighborCorrection && SpellingPatches.typo(context, SpellingPatches.Typo.TRANSPOSITION)
+            Item.EXTRA_LETTER_CORRECTION -> input.neighborCorrection && SpellingPatches.typo(context, SpellingPatches.Typo.EXTRA)
+            Item.OMISSION_CORRECTION -> SpellingPatches.typo(context, SpellingPatches.Typo.OMISSION)
             Item.DOUBLE_PINYIN_ABBREVIATION -> SpellingPatches.doublePinyinAbbreviation(context)
             Item.MIXED_INPUT -> input.mixedInput
             Item.CHINESE_GLIDE -> input.chineseGlideTyping
@@ -163,10 +178,17 @@ object PerformanceCosts {
         when (item) {
             Item.NEIGHBOR_CORRECTION -> input.copy(neighborCorrection = on).save(context)
             Item.DOUBLE_PINYIN_CORRECTION -> {
-                input.copy(doublePinyinCorrection = on).save(context); SpellingPatches.apply(context)
+                input.copy(doublePinyinCorrection = on, neighborCorrection = on || input.neighborCorrection).save(context)
+                SpellingPatches.apply(context)
             }
             Item.DOUBLE_PINYIN_ABBREVIATION -> {
                 SpellingPatches.setDoublePinyinAbbreviation(context, on); SpellingPatches.apply(context)
+            }
+            // 同液态玻璃：开顺序、多键时邻键纠错没开就一起开；关只关这一项，邻键纠错留给 NEIGHBOR_CORRECTION 那一项管。
+            Item.TRANSPOSITION_CORRECTION, Item.EXTRA_LETTER_CORRECTION, Item.OMISSION_CORRECTION -> {
+                val typo = SpellingPatches.Typo.entries.first { Item.typo(it) == item }
+                if (on && typo != SpellingPatches.Typo.OMISSION) input.copy(neighborCorrection = true).save(context)
+                SpellingPatches.setTypo(context, typo, on); SpellingPatches.apply(context)
             }
             Item.MIXED_INPUT -> input.copy(mixedInput = on).save(context)
             Item.CHINESE_GLIDE -> input.copy(chineseGlideTyping = on).save(context)

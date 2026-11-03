@@ -140,17 +140,15 @@ fun KeyboardLayout(
     val honeycomb = letterLayout?.honeycomb == true
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
-    // 双拼有自己的开关（默认关）：开着时交出键位邻接表，整串都纠错；关着时也交出，但只在两个键拼不成任何音节时纠
-    // （按偏成 wp 原来一个候选都没有），见 [letterNeighborsForEngine]。全拼关掉邻键纠错就不交。
+    // 「邻键纠错」全拼、双拼共用（11-03 统一）：关了两边都不交键位表，引擎不纠。开着时双拼只在两个键拼不成任何音节时纠
+    // （按偏成 wp 原来一个候选都没有，见 [letterNeighborsForEngine]）；「双拼邻键纠错」（默认关）再开才整串都纠。
     val doublePinyin = uiState.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN
-    val correctionEnabled = !isAsciiMode && LocalKeyboardInputPreferences.current.let {
-        if (doublePinyin) it.doublePinyinCorrection else it.neighborCorrection
-    }
-    val unreadableOnly = !isAsciiMode && doublePinyin && !correctionEnabled
-    val geometry = remember(cfgVer, keyRows, correctionEnabled, unreadableOnly, uiState.currentSchemaId, splitKeyboard) {
+    val neighborCorrection = !isAsciiMode && LocalKeyboardInputPreferences.current.neighborCorrection
+    val doublePinyinCorrection = LocalKeyboardInputPreferences.current.doublePinyinCorrection
+    val geometry = remember(cfgVer, keyRows, neighborCorrection, doublePinyin, doublePinyinCorrection, uiState.currentSchemaId, splitKeyboard) {
         LetterGeometry { encoded ->
             callbacks.onLetterNeighbors?.invoke(uiState.currentSchemaId,
-                com.kingzcheung.xime.keyboard.letterNeighborsForEngine(encoded, correctionEnabled, unreadableOnly))
+                com.kingzcheung.xime.keyboard.letterNeighborsForEngine(encoded, neighborCorrection, doublePinyin, doublePinyinCorrection))
         }
     }
     DisposableEffect(geometry) {

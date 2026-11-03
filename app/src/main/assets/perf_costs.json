@@ -14,6 +14,9 @@
       "items": {
         "neighbor_correction": {"keyMs": 1.5, "memoryMb": 3, "estimated": true},
         "double_pinyin_correction": {"keyMs": 1.0, "memoryMb": 2, "estimated": true},
+        "transposition_correction": {"keyMs": 0.1, "memoryMb": 0, "estimated": true},
+        "extra_letter_correction": {"keyMs": 0.2, "memoryMb": 0, "estimated": true},
+        "omission_correction": {"keyMs": 0.1, "memoryMb": 1, "estimated": true},
         "double_pinyin_abbreviation": {"keyMs": 0.6, "memoryMb": 1, "estimated": true},
         "mixed_input": {"keyMs": 1.5, "memoryMb": 2, "estimated": true},
         "chinese_glide": {"keyMs": 0.3, "memoryMb": 6, "estimated": true},

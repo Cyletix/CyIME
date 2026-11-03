@@ -32,3 +32,11 @@ fun letterNeighborsForEngine(encoded: String, correction: Boolean, unreadableOnl
     unreadableOnly -> "~;$encoded"
     else -> ""
 }
+
+/**
+ * 「邻键纠错」全拼、双拼共用（11-03）：关着时什么都不交。开着时全拼整串纠；双拼只纠拼不成字的两个键，
+ * 「双拼邻键纠错」也开才整串纠。
+ */
+fun letterNeighborsForEngine(encoded: String, neighborCorrection: Boolean, doublePinyin: Boolean, doublePinyinCorrection: Boolean): String =
+    letterNeighborsForEngine(encoded, correction = neighborCorrection && (!doublePinyin || doublePinyinCorrection),
+        unreadableOnly = neighborCorrection && doublePinyin && !doublePinyinCorrection)

@@ -46,6 +46,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             profile.layout.kind != com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC ||
             profile.mode != com.kingzcheung.xime.settings.InputMode.KEYBOARD ||
             state.inputText.length !in 4..80 || state.inputText.any { it !in 'a'..'z' }) return
+        // 停顿后只补漏键和打反两种读法：两个都关了就不再算一遍（方案补丁已让引擎不查，这里省掉这次重算）。
+        if (!com.kingzcheung.xime.settings.SpellingPatches.typo(service, com.kingzcheung.xime.settings.SpellingPatches.Typo.OMISSION) &&
+            !com.kingzcheung.xime.settings.SpellingPatches.typo(service, com.kingzcheung.xime.settings.SpellingPatches.Typo.TRANSPOSITION)) return
         omissionJob = service.serviceScope.launch(Dispatchers.Main.immediate) {
             kotlinx.coroutines.delay(180)
             if (service.uiState.value.inputSessionId != ui.inputSessionId ||

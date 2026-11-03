@@ -265,7 +265,7 @@ def main():
     parser.add_argument("--skip", default=None,
                         help="ids that do nothing on this scheme; default: double_pinyin_correction and "
                              "double_pinyin_abbreviation on 全拼, "
-                             "neighbor_correction and mixed_input (全拼 only) on 小鹤. Measure them on their own scheme with --merge")
+                             "mixed_input and the three typo switches (全拼 only) on 小鹤 (neighbor_correction also gates 双拼 since 11-03). Measure them on their own scheme with --merge")
     parser.add_argument("--merge", action="store_true", help="add these items to this device's existing entry")
     parser.add_argument("--no-combos", action="store_true")
     parser.add_argument("--words", default=WORDS, help="comma-separated words of space-separated pinyin syllables")
@@ -289,7 +289,8 @@ def main():
     if args.layout_name is None:
         args.layout_name = "小鹤双拼 26 键" if args.scheme == "flypy" else "中文全拼 26 键"
     if args.skip is None:
-        args.skip = ("neighbor_correction,mixed_input" if args.scheme == "flypy"
+        args.skip = ("mixed_input,transposition_correction,extra_letter_correction,omission_correction"
+                     if args.scheme == "flypy"
                      else "double_pinyin_correction,double_pinyin_abbreviation")
     skip = set(filter(None, args.skip.split(",")))
     nine_key = args.layout == "t9"

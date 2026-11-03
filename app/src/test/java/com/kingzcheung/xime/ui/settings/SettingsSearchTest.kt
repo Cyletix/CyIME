@@ -152,7 +152,9 @@ class SettingsSearchTest {
     /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */
     @Test fun everyAnchorExistsOnItsPage() {
         val dir = java.io.File("src/main/java/com/kingzcheung/xime/ui/settings")
-        val source = dir.listFiles { f -> f.extension == "kt" && f.name != "SettingsSearch.kt" }!!
+        // 「拼音纠错」里每种纠错一行，标题来自 SpellingPatches.Typo，页面上按它循环画出来。
+        val typoTitles = java.io.File("src/main/java/com/kingzcheung/xime/settings/SpellingPatches.kt")
+        val source = (dir.listFiles { f -> f.extension == "kt" && f.name != "SettingsSearch.kt" }!! + typoTitles)
             .joinToString("\n") { it.readText() }
         val missing = SettingsSearchIndex.flatMap { listOfNotNull(it.anchor, it.section) }.distinct()
             .filter { "\"$it\"" !in source }
