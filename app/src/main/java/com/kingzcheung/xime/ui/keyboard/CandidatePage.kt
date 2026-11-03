@@ -190,9 +190,12 @@ fun CandidatePage(
             widenKeys = LocalKeyboardInputPreferences.current.wideKeys && qwerty?.split != true) { body ->
             CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(
                 horizontal = spacing.first?.dp ?: 2.dp, vertical = spacing.second?.dp ?: 2.dp)) {
+                // 底色已由外层这一列画过（或开玻璃时沿用键盘底色），里面不再叠一层：
+                // 叠两层时玻璃中间厚、上面候选栏和两侧薄，像单独一条模糊条（用户 11-03）。
                 CandidatePageContent(state.copy(bottomPaddingDp = 0), callbacks,
                     body.padding(start = (qwerty?.innerInsetDp ?: 0f).dp,
-                        end = (qwerty?.innerInsetDp ?: 0f).dp, bottom = 8.dp), pageScrollEvents, onHapticFeedback)
+                        end = (qwerty?.innerInsetDp ?: 0f).dp, bottom = 8.dp), pageScrollEvents, onHapticFeedback,
+                    paintBackground = false)
             }
         }
         Spacer(Modifier.height(state.bottomPaddingDp.dp))
@@ -206,6 +209,7 @@ private fun CandidatePageContent(
     modifier: Modifier = Modifier,
     pageScrollEvents: Flow<Int>? = null,
     onHapticFeedback: (() -> Unit)? = null,
+    paintBackground: Boolean = true,
 ) {
     val configuration = LocalConfiguration.current
     // 展开页候选字号与候选栏一起随键盘放大。
@@ -242,7 +246,8 @@ private fun CandidatePageContent(
         if (glass.enabled) glassTextHalo(listOf(state.textColor), state.backgroundColor.copy(alpha = 1f),
             glass.normalized().backgroundOpacity) else null
     }
-    Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor).glassTextHalo(halo)) {
+    val surface = modifier.fillMaxSize()
+    Column((if (paintBackground) surface.keyboardPanelBackground(state.backgroundColor) else surface).glassTextHalo(halo)) {
         BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val t9 = state.matchT9Geometry
             val qwerty = state.qwertyGeometry
@@ -402,13 +407,17 @@ private fun CandidatePageContent(
                             // 联想可能先于首批拼音候选到达。它是页脚，不能让列表跟着它移到末尾。
                             item(contentType = "associations") {
                                 Column(modifier = Modifier.fillMaxWidth()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(1.dp)
-                                            .background(dividerColor)
-                                    )
+                                    // 分隔线只隔开上面的打字候选；纯联想（上屏后展开）时上面没东西，不画这条线。
+                                    if (candidateRows.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(1.dp)
+                                                .background(dividerColor)
+                                                .testTag("expanded-association-divider")
+                                        )
+                                    }
                                     FlexRow(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalSpacing = 6.dp,
