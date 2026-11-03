@@ -68,6 +68,8 @@ fun EditKeyboardLayout(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
     modifier: Modifier = Modifier,
+    /** 回车键动作名（换行、发送、搜索等），与主键盘同一来源。 */
+    enterKeyText: String = "回车",
 ) {
     KeyboardKeySpacingScope(modifier, columns = 5f, rows = 3f, horizontalInset = 4.dp, verticalInset = bottomPaddingDp.dp) { bodyModifier ->
     var selecting by remember { mutableStateOf(false) }
@@ -141,7 +143,7 @@ fun EditKeyboardLayout(
                         "left" -> Icons.Default.KeyboardArrowLeft to "向左"
                         "right" -> Icons.Default.KeyboardArrowRight to "向右"
                         "delete" -> Icons.AutoMirrored.Filled.Backspace to "删除"
-                        "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn to "回车"
+                        "enter" -> actionKeyIcon(enterKeyText) to enterKeyText
                         "select_all" -> Icons.Default.SelectAll to "全选"
                         else -> Icons.Default.TextFields to if (selecting) "取消选择" else "选择"
                     }

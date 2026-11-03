@@ -1931,7 +1931,8 @@ fun KeyboardView(
                             shadowEnabled = kbShadow.enabled,
                             shadowElevation = kbShadow.elevation.dp,
                             shadowShapeRadius = kbShadow.shapeRadius.dp,
-                            modifier = panelMaterial.fillMaxWidth().fillMaxHeight()
+                            modifier = panelMaterial.fillMaxWidth().fillMaxHeight(),
+                            enterKeyText = state.enterKeyText,
                         )
                     }
                     is OverlayRoute.Emoji -> EmojiKeyboardLayout(

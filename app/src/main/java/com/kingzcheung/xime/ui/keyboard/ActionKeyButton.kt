@@ -34,18 +34,21 @@ fun ActionKeyButton(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
 ) {
-    val icon = when (text) {
-        "删除" -> Icons.AutoMirrored.Filled.Backspace
-        "搜索" -> Icons.Default.Search
-        "发送" -> Icons.AutoMirrored.Filled.Send
-        "下一步", "下一个" -> Icons.Default.NavigateNext
-        "确定", "完成", "前往" -> Icons.Default.Check
-        else -> Icons.AutoMirrored.Filled.KeyboardReturn
-    }
+    val icon = actionKeyIcon(text)
     val enter = if (text == "删除") LocalFunctionKeyColors.current else LocalEnterKeyColors.current
     IconKeyButton(icon = rememberVectorPainter(icon), onClick = onClick,
         backgroundColor = enter?.background ?: backgroundColor, iconColor = enter?.foreground ?: textColor, modifier = modifier,
         onPress = onPress, onRelease = onRelease, contentDescription = text,
         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius)
+}
+
+/** 回车键（和删除键）按输入框动作名取图标；主键盘、数字、符号和编辑面板共用。 */
+internal fun actionKeyIcon(text: String) = when (text) {
+    "删除" -> Icons.AutoMirrored.Filled.Backspace
+    "搜索" -> Icons.Default.Search
+    "发送" -> Icons.AutoMirrored.Filled.Send
+    "下一步", "下一个" -> Icons.Default.NavigateNext
+    "确定", "完成", "前往" -> Icons.Default.Check
+    else -> Icons.AutoMirrored.Filled.KeyboardReturn
 }
