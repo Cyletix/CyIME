@@ -3055,6 +3055,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         if (keyCode == KeyEvent.KEYCODE_BACK &&
             (keyboardViewModel.page.value is KeyboardPage.Overlay || keyboardCallbacks?.onDismissPreeditEditor != null ||
+                keyboardViewModel.candidatePageExpanded.value ||
                 uiState.value.showKeyboardResize || uiState.value.handwritingExpanded || uiState.value.clipboardSearchVisible ||
                 (hasHardwareKeyboard && hardwareKeyboardDisplay.screenKeyboardRequested))) {
             event?.startTracking()
@@ -3212,6 +3213,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (event?.isCanceled != true) {
                 keyboardViewModel.backFromOverlay()
             }
+            return true
+        }
+        // 候选展开着时返回只收起展开页，编码和键盘都留着（11-03：一下就把展开、键盘和编码全清了）。
+        if (keyCode == KeyEvent.KEYCODE_BACK && keyboardViewModel.candidatePageExpanded.value) {
+            if (event?.isCanceled != true) keyboardViewModel.setCandidatePageExpanded(false)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.handwritingExpanded) {
