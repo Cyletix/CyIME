@@ -25,4 +25,7 @@ object AsrBackendFactory {
     fun releaseModel() = AsrSupport.releaseModel()
 
     fun updateRetention() = AsrSupport.updateRetention()
+
+    /** 键盘收起：系统缺内存时卸掉空闲的语音模型。 */
+    fun keyboardHidden() = AsrSupport.keyboardHidden()
 }

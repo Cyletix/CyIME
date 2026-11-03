@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
+import com.kingzcheung.xime.speech.AsrMemoryPressure
 import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.LocalSpeechSession
 import com.kingzcheung.xime.speech.CaptionDictationArbiter
@@ -259,6 +260,18 @@ class AsrInferenceService : Service() {
         override fun setWholeSentenceFinal(enabled: Boolean) {
             wholeSentenceFinal = enabled
         }
+        override fun onKeyboardHidden() {
+            val memory = android.app.ActivityManager.MemoryInfo()
+            try { getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(memory) ?: return }
+            catch (_: Exception) { return }
+            if (!AsrMemoryPressure.isTight(memory.availMem, memory.threshold, memory.totalMem, memory.lowMemory)) return
+            synchronized(lock) {
+                if (captionOwner != null || !sessions.isIdle) return
+                FileLogger.w("AsrInferenceService", "keyboard hidden, memory tight (avail=${memory.availMem shr 20} MB " +
+                    "threshold=${memory.threshold shr 20} MB total=${memory.totalMem shr 20} MB): releasing voice models")
+                releaseIdleModels()
+            }
+        }
         override fun setKeepModelAlive(keep: Boolean) = synchronized(lock) {
             keepAlive = keep
             cancelIdleRelease()
@@ -382,16 +395,21 @@ class AsrInferenceService : Service() {
         super.onTrimMemory(level)
         synchronized(lock) {
             if (captionOwner != null || !sessions.isIdle) return
-            FileLogger.w("AsrInferenceService", "trim level=$level")
-            if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
-                sessions.releaseRefinementIfIdle()
-            if (level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
-                level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
-                cancelIdleRelease()
-                sessions.release(onlyIfIdle = true)
-                releaseSpeakerModel()
-            }
+            val all = level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+                level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+            val refiner = !all && level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
+            // 写明卸了什么：以前只记级别，看日志分不清模型是不是被这一下卸掉的。
+            FileLogger.w("AsrInferenceService", "trim level=$level release=${if (all) "all" else if (refiner) "second pass" else "none"}")
+            if (refiner) sessions.releaseRefinementIfIdle()
+            if (all) releaseIdleModels()
         }
+    }
+
+    /** 调用方持有 [lock]，且已确认没在说话、字幕没开。 */
+    private fun releaseIdleModels() {
+        cancelIdleRelease()
+        sessions.release(onlyIfIdle = true)
+        releaseSpeakerModel()
     }
 
     override fun onBind(intent: Intent): IBinder = if (intent.action == ACTION_CAPTION) captionBinder else binder

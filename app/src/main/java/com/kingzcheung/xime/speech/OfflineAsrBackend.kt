@@ -200,6 +200,9 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
 
     override fun isAvailable(): Boolean = true
 
+    /** 键盘收起：:asr 在系统缺内存时卸掉空闲模型（见 AsrMemoryPressure）。 */
+    fun keyboardHidden() = client.keyboardHidden()
+
     /**
      * 把"保持引擎常驻"设置同步到 :asr 服务。每次绑定/会话开始都同步一次：
      * 用户中途切换设置后，下一个会话立即按新设置决定是否空闲释放模型。

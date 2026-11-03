@@ -190,6 +190,12 @@ class AsrInferenceClient(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /** 键盘收起时告诉 :asr；没绑定（没用过语音）就不绑，免得为此拉起进程。oneway，不阻塞主线程。 */
+    fun keyboardHidden() {
+        val connected = service ?: return
+        try { connected.onKeyboardHidden() } catch (_: Exception) {}
+    }
+
     /** 同步“保存语音调优录音”设置；服务端只在开启时写入应用自己的目录。 */
     suspend fun setSaveTuningAudio(enabled: Boolean) {
         try {

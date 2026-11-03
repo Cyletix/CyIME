@@ -3930,6 +3930,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         } else {
             // 返回键、焦点离开、锁屏等：本次听写到此结束，麦克风立即释放。
             voiceRecognitionHandler.endInputSession()
+            // 切去别的应用时系统缺内存就卸掉空闲的语音模型；照 AOSP 的 Android 14 起不再发缺内存的回调。
+            com.kingzcheung.xime.speech.AsrBackendFactory.keyboardHidden()
         }
         // 玻璃模糊窗口晚 1 秒再拆：onWindowHidden 时系统的下滑收起动画才开始播，立刻拆掉的话，
         // 下滑那一段键盘后面没有模糊，应用的字清清楚楚透出来，看着就是「闪一下」。模糊窗口是输入法窗口的

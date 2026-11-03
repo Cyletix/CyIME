@@ -29,4 +29,6 @@ interface IInferenceAsrService {
     oneway void setIdleLadder(int refinerIdleSeconds, int engineIdleSeconds);
     /** 整句定稿：SenseVoice 在真停顿或结束时校正一整句，不再每 6 秒切一次。 */
     oneway void setWholeSentenceFinal(boolean enabled);
+    /** 键盘收起：系统缺内存时卸掉空闲的语音模型（常驻设置也卸），见 AsrMemoryPressure。 */
+    oneway void onKeyboardHidden();
 }

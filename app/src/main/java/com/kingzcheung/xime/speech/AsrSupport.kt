@@ -43,6 +43,9 @@ internal object AsrSupport {
 
     fun updateRetention() { warmBackend?.syncKeepAlive() }
 
+    /** 没用过语音时没有后端，什么都不做。 */
+    fun keyboardHidden() { warmBackend?.keyboardHidden() }
+
     /** 卸载常驻模型并解绑 :asr 服务。 */
     fun releaseModel() {
         synchronized(this) {
