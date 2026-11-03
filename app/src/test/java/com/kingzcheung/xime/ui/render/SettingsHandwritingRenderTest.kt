@@ -61,6 +61,7 @@ class SettingsHandwritingRenderTest {
         "gestures" -> com.kingzcheung.xime.ui.settings.LayoutDisplaySettingsContent(onBack = {}, initialPage = "gestures")
         "clipboard" -> com.kingzcheung.xime.ui.settings.ClipboardSyncSettingsContent(onBack = {}, onNavigateToPlugins = {})
         "clipboard-groups" -> com.kingzcheung.xime.ui.settings.ClipboardGroupSettingsContent(onBack = {})
+        "clipboard-panel" -> com.kingzcheung.xime.ui.settings.ClipboardPanelSettingsContent(onBack = {}, onNavigateToGroups = {})
         "plugins" -> com.kingzcheung.xime.ui.settings.PluginsSettingsContent(onBack = {})
         "extension-plugins" -> com.kingzcheung.xime.ui.settings.MarketHubContent(onBack = {}, initialTab = 2)
         "speech" -> com.kingzcheung.xime.ui.settings.SpeechToTextSettingsContent(onBack = {})
@@ -83,7 +84,7 @@ class SettingsHandwritingRenderTest {
         if (pages.any { it in setOf("clipboard", "plugins", "extension-plugins", "speech") })
             com.kingzcheung.xime.plugin.core.runtime.PluginManager.initialize(context as android.app.Application)
         // 剪贴板分组页：先建两个示例分组，并关掉一个自带分类。
-        if ("clipboard-groups" in pages) com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(context).apply {
+        if ("clipboard-groups" in pages || "clipboard-panel" in pages) com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(context).apply {
             add("常用语"); add("工作")
             setHidden(com.kingzcheung.xime.clipboard.ClipboardFilter.EMAIL, true)
         }

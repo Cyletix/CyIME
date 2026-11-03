@@ -100,6 +100,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
     val speech = "$smart › 语音转文本"
     val handwriting = "$smart › 手写"
     val clipboard = "$system › 剪贴板与同步"
+    val clipboardPanel = "$clipboard › 剪贴板面板"
     val other = "$system › 其他设置"
     val backup = "$other › 备份与恢复"
     val performance = "$other › 性能与省电"
@@ -317,15 +318,18 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("让其他手机或平板连接本机", clipboard, SettingsRoutes.ClipboardSync, "手机 平板 互相同步 二维码 允许其他设备连接"),
         SettingsSearchEntry("新短信验证码自动复制", clipboard, SettingsRoutes.ClipboardSync, "验证码 短信 自动复制 code"),
         SettingsSearchEntry("记录密码等敏感内容", clipboard, SettingsRoutes.ClipboardSync, "密码 敏感 银行卡 密码管理器 剪贴板 password"),
-        SettingsSearchEntry("上屏后自动关闭剪贴板", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 关闭 粘贴 连续贴"),
-        SettingsSearchEntry("卡片显示行数", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 卡片 行数 几行 显示 记录 折叠 最多显示 剪贴板卡片最多显示"),
-        SettingsSearchEntry("剪贴板数量上限", clipboard, SettingsRoutes.ClipboardSync,
+        page("剪贴板面板", clipboard, SettingsRoutes.ClipboardPanel, "剪贴板 菜单 更多 设置 面板"),
+        SettingsSearchEntry("上屏后自动关闭剪贴板", clipboardPanel, SettingsRoutes.ClipboardPanel, "剪贴板 关闭 粘贴 连续贴"),
+        SettingsSearchEntry("卡片显示行数", clipboardPanel, SettingsRoutes.ClipboardPanel,
+            "剪贴板 卡片 行数 几行 显示 记录 折叠 最多显示 剪贴板卡片最多显示 卡片最多显示"),
+        SettingsSearchEntry("最近截图", clipboardPanel, SettingsRoutes.ClipboardPanel, "剪贴板 截图 截屏 相册 图片 照片"),
+        SettingsSearchEntry("剪贴板数量上限", clipboardPanel, SettingsRoutes.ClipboardPanel,
             "剪贴板 条数 数量 最多 上限 保存 历史记录 不限 存文档", anchor = "数量上限", section = "历史记录"),
-        SettingsSearchEntry("剪贴板保留时间", clipboard, SettingsRoutes.ClipboardSync,
+        SettingsSearchEntry("剪贴板保留时间", clipboardPanel, SettingsRoutes.ClipboardPanel,
             "剪贴板 定期清理 自动清理 自动删除 过期 天数 保留 历史记录", anchor = "保留时间", section = "历史记录"),
         SettingsSearchEntry("导出剪贴板", clipboard, SettingsRoutes.ClipboardSync, "导出 剪贴板 记录 固定内容 备份"),
         SettingsSearchEntry("导入剪贴板", clipboard, SettingsRoutes.ClipboardSync, "导入 剪贴板 记录 固定内容 分组 恢复 换机"),
-        SettingsSearchEntry("剪贴板分组", clipboard, SettingsRoutes.ClipboardGroups,
+        SettingsSearchEntry("剪贴板分组", clipboardPanel, SettingsRoutes.ClipboardGroups,
             "分组 常用语 自定义分组 新建分组 分类 地址 图片 链接 电话 邮箱 话术 固定内容", anchor = null),
         page("插件市场", "$system › 扩展 › 插件", SettingsRoutes.MarketPlugins, "插件商店 下载 安装 API AI 翻译 帮写 回复 改写 润色 在线语音"),
         page("已安装的插件", "$system › 扩展 › 插件", SettingsRoutes.Plugins, "插件 已安装 插件管理 文件导入 xipk"),

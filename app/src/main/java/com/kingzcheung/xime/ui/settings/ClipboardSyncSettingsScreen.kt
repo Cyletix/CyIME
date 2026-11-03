@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.ContentPaste
 import androidx.compose.material.icons.twotone.Download
-import androidx.compose.material.icons.twotone.Folder
 import androidx.compose.material.icons.twotone.PushPin
 import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material.icons.twotone.Upload
@@ -58,7 +57,7 @@ import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
     onNavigateToPlugins: () -> Unit,
-    onNavigateToGroups: () -> Unit = {},
+    onNavigateToPanel: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -206,8 +205,15 @@ fun ClipboardSyncSettingsContent(
             // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
             VerificationCodeSettings()
             ClipboardSensitiveSetting()
-            ClipboardCardLinesSetting(onNavigateToGroups)
-            ClipboardHistoryLimitsSetting()
+            SettingsSection(title = "剪贴板", content = {
+                SettingsItem(
+                    icon = Icons.TwoTone.ContentPaste,
+                    title = "剪贴板面板",
+                    subtitle = "分组、卡片行数、最近截图、历史记录",
+                    onClick = onNavigateToPanel,
+                    showArrow = true,
+                )
+            })
             ClipboardExportSetting()
             ClipboardImportSetting()
         }
@@ -220,54 +226,6 @@ fun ClipboardSyncSettingsContent(
  */
 internal fun <T> effectiveClipboardSyncPlugin(available: List<Pair<String, T>>, preferredId: String): Pair<String, T>? =
     available.firstOrNull { it.first == preferredId } ?: available.firstOrNull()
-
-/** 剪贴板面板里每张卡片最多显示几行文字（2 / 4 / 8，默认 4）；单选样式和本页「同步服务」一样。 */
-@Composable
-private fun ClipboardCardLinesSetting(onNavigateToGroups: () -> Unit) {
-    val context = LocalContext.current
-    val prefs = remember(context) { context.getSharedPreferences("clipboard_board", android.content.Context.MODE_PRIVATE) }
-    val key = com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_MAX_LINES_KEY
-    var lines by remember { mutableStateOf(prefs.getInt(key, 4)) }
-    // Same switch as the clipboard's own more menu (same preference).
-    var closeAfterPaste by remember { mutableStateOf(com.kingzcheung.xime.ui.menubar.clipboardClosesAfterPaste(prefs)) }
-    val groups by remember(context) { com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(context) }.state.collectAsState()
-    SettingsSection(title = "剪贴板面板", content = {
-        SettingsItem(
-            icon = Icons.TwoTone.Folder,
-            title = "剪贴板分组",
-            subtitle = "自带分类，和自己建的常用语、工作等分组",
-            onClick = onNavigateToGroups,
-            showArrow = true,
-            status = groups.groups.size.takeIf { it > 0 }?.let { "$it 个" },
-        )
-        SettingsToggleItem(
-            icon = Icons.TwoTone.ContentPaste,
-            title = "上屏后自动关闭剪贴板",
-            subtitle = "关掉后留在剪贴板里，可以连续贴多条",
-            checked = closeAfterPaste,
-            onCheckedChange = {
-                closeAfterPaste = it
-                prefs.edit().putBoolean(com.kingzcheung.xime.ui.menubar.CLIPBOARD_CLOSE_AFTER_PASTE_KEY, it).apply()
-            },
-        )
-        Column(Modifier.settingsSearchAnchor("卡片显示行数").fillMaxWidth().padding(16.dp)) {
-            Text("卡片显示行数", style = MaterialTheme.typography.titleSmall)
-            Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            listOf(2, 4, 8).forEach { option ->
-                Row(Modifier.fillMaxWidth().testTag("clipboard-card-lines:$option")
-                    .selectable(lines == option, role = androidx.compose.ui.semantics.Role.RadioButton) {
-                        lines = option
-                        prefs.edit().putInt(key, option).apply()
-                    }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = lines == option, onClick = null)
-                    Spacer(Modifier.width(12.dp))
-                    Text("$option 行", style = MaterialTheme.typography.titleSmall)
-                }
-            }
-        }
-    })
-}
 
 /**
  * 把剪贴板文字记录导出成用户自己保存的文件（TXT / Markdown / JSON），经系统的保存窗口；

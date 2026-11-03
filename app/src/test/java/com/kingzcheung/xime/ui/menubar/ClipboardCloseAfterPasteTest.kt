@@ -85,4 +85,23 @@ class ClipboardCloseAfterPasteTest {
         rule.waitForIdle()
         assertEquals(listOf(false), changes)
     }
+
+    /** 「剪贴板设置」opens Settings › 剪贴板面板, where this menu's switches also are. */
+    @Test fun theMoreMenuOpensTheClipboardSettings() {
+        var opened = 0
+        rule.setContent {
+            MaterialTheme(colorScheme = lightColorScheme()) {
+                ClipboardBoardView(listOf(ClipboardItem(1, "明天下午三点开会", timestamp = 1)), emptyList(), false, false,
+                    emptySet(), false, null,
+                    onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {}, onSplit = { _, _ -> },
+                    onAddQuick = {}, onPinsChange = {}, onRemove = {}, onPhotoAccess = {}, onPick = {},
+                    onSystemPaste = {}, onShare = { _, _ -> }, onPullRemote = null,
+                    onOpenSettings = { opened++ })
+            }
+        }
+        rule.onAllNodesWithTag("clipboard-more")[0].performClick()
+        rule.onAllNodesWithTag("clipboard-settings")[0].performClick()
+        rule.waitForIdle()
+        assertEquals(1, opened)
+    }
 }

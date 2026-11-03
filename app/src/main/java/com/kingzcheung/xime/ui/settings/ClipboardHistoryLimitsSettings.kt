@@ -75,7 +75,7 @@ internal fun ClipboardHistoryLimitsSetting() {
     }
 }
 
-/** 单选样式同本页「剪贴板卡片最多显示」。 */
+/** 单选样式同本页「卡片显示行数」。 */
 @Composable
 private fun HistoryLimitChoices(
     title: String,

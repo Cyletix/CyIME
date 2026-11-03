@@ -195,6 +195,10 @@ internal fun ConnectedClipboardBoard(
             context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
                 com.kingzcheung.xime.ui.settings.SettingsRoutes.ClipboardGroups))
         },
+        onOpenSettings = {
+            context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
+                com.kingzcheung.xime.ui.settings.SettingsRoutes.ClipboardPanel))
+        },
         onFormOpen = { tab, adding ->
             groupStore.setReturnTab(tab.key)
             if (adding) groupStore.setAddTarget((tab as? ClipboardTab.Group)?.group?.id)
@@ -265,6 +269,8 @@ internal fun ClipboardBoardView(
     onAssignGroup: (Set<String>, String?) -> Unit = { _, _ -> },
     /** Opens the group settings (new, rename, delete); null hides those entries. */
     onManageGroups: (() -> Unit)? = null,
+    /** Opens Settings › 剪贴板面板 (the switches of this menu and the board's other settings); null hides it. */
+    onOpenSettings: (() -> Unit)? = null,
     /** The add (true) or edit form is about to open from this tab. */
     onFormOpen: (ClipboardTab, Boolean) -> Unit = { _, _ -> },
 ) {
@@ -693,6 +699,8 @@ internal fun ClipboardBoardView(
                 onPullRemote?.let { action -> add(CompactActionMenuEntry(Icons.Default.Sync, "同步", tag = "clipboard-sync", onClick = action)) }
                 onManageGroups?.let { action -> add(CompactActionMenuEntry(Icons.Default.Folder, "管理分组",
                     tag = "clipboard-manage-groups", onClick = action)) }
+                onOpenSettings?.let { action -> add(CompactActionMenuEntry(Icons.Default.Settings, "剪贴板设置",
+                    tag = "clipboard-settings", onClick = action)) }
                 closeAfterPaste?.let { on -> add(CompactActionMenuEntry(
                     if (on) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "上屏后自动关闭剪贴板",
                     tag = "clipboard-close-after-paste") { onCloseAfterPasteChange(!on) }) }

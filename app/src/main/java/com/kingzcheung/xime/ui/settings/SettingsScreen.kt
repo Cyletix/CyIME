@@ -299,6 +299,12 @@ fun SettingsScreen(
             ClipboardSyncSettingsContent(
                 onBack = { navController.popBackStack() },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                onNavigateToPanel = { navController.navigate(SettingsRoutes.ClipboardPanel) },
+            )
+        }
+        composable(SettingsRoutes.ClipboardPanel) {
+            ClipboardPanelSettingsContent(
+                onBack = { navController.popBackStack() },
                 onNavigateToGroups = { navController.navigate(SettingsRoutes.ClipboardGroups) },
             )
         }
