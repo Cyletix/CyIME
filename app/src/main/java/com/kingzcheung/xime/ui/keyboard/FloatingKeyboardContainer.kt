@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,7 +55,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -127,6 +130,8 @@ internal fun FloatingKeyboardContainer(
     dockTarget: KeyboardDockTarget? = null,
     bottomContentPaddingDp: Int = 0,
     bottomKeyClearance: State<Float>? = null,
+    /** 底排键帽看得见的下沿以下的空白（含键帽内缩），只决定小横条的竖直位置；null 时和拖动区一样。 */
+    bottomKeyVisualClearance: State<Float>? = null,
     /** 悬浮卡片绕自身中心的旋转角（顺时针为正，-90..90）。 */
     rotationDegrees: Float = 0f,
     /** 调节界面里正在调的旋转角；非空时代替 [rotationDegrees]，只在图层里读，转动时不重组键盘。 */
@@ -284,6 +289,10 @@ internal fun FloatingKeyboardContainer(
         val cardTotalHeight = with(density) { cardRect.height.toDp() }
         val dragAreaHeight = floatingDragAreaHeightDp(bottomContentPaddingDp,
             bottomKeyClearance?.value ?: 0f, cardTotalHeight.value).dp
+        // 小横条放在底排键帽下沿到卡片底边的正中；拖动区仍只到键帽触摸区下沿，所以往上挪半个键帽内缩。
+        val dragIndicatorLift = bottomKeyVisualClearance?.let { visual ->
+            (floatingDragAreaHeightDp(bottomContentPaddingDp, visual.value, cardTotalHeight.value).dp - dragAreaHeight) / 2f
+        }?.coerceAtLeast(0.dp) ?: 0.dp
         val horizontalTravel = ((maxWidth.value - normalRect.width / density.density) / 2f).coerceAtLeast(0f)
         val minimumY = minOffsetY.coerceIn(0, maxHeight.value.roundToInt()).toFloat()
         val maxOffsetY = (maxHeight.value - cardTotalHeight.value).coerceAtLeast(minimumY)
@@ -404,6 +413,7 @@ internal fun FloatingKeyboardContainer(
             if (!hideDragBar) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
                 indicatorColor = dragIndicatorColor,
+                indicatorLift = dragIndicatorLift,
                 onDragStart = {
                     dockGesture.cancel()
                     dragX = safeOffsetX
@@ -671,6 +681,7 @@ internal const val UNDOCK_HANDLE_HEIGHT_DP = 14
 private fun DragBar(
     modifier: Modifier,
     indicatorColor: Color,
+    indicatorLift: Dp = 0.dp,
     onDragStart: () -> Unit,
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -707,6 +718,7 @@ private fun DragBar(
         // 40dp×4dp 全圆头；颜色是键盘配色里按键文字色和键盘底色各一半混出来的实色，平时和调节时相同。
         Box(
             modifier = Modifier
+                .offset(y = -indicatorLift)
                 .width(40.dp)
                 .height(4.dp)
                 .clip(RoundedCornerShape(50))

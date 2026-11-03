@@ -229,6 +229,7 @@ class KeyboardBottomEdgeRenderTest {
             val bounds = key.fetchSemanticsNode().boundsInRoot
             val bar = rule.onNodeWithTag("floating-drag-bar", true).fetchSemanticsNode().boundsInRoot
             assertTrue("$id key=$bounds drag=$bar", bounds.bottom <= bar.top + 1f)
+            assertDragIndicatorCentered(id)
             if (tag == "qwerty-enter-key") {
                 pressed.clear()
                 key.performTouchInput { click(Offset(center.x, height - 2f)) }
@@ -242,6 +243,65 @@ class KeyboardBottomEdgeRenderTest {
             }
         }
         save("floating-bottom-hit-areas", "float-host")
+    }
+
+    /** 平板尺寸的悬浮键盘：小横条同样在底排键帽下沿和卡片底边正中（11-03 平板实测低了约 5dp）。 */
+    @Config(qualifiers = "sw800dp-w1280dp-h800dp-mdpi")
+    @Test fun floatingDragIndicatorSitsMidwayBelowTheKeysOnTablet() {
+        val app = rule.activity.application
+        KeysConfigHelper.loadConfig(app)
+        KeyboardThemes.initFromConfig(app)
+        AppFonts.initialize(app)
+        val viewModel = spy(KeyboardViewModel(app))
+        val callbacks = KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {})
+        val t9 = mock<T9InputController> {
+            on { leftPanelState } doReturn T9InputController.LeftPanelState.IDLE
+            on { firstOptions } doReturn emptyList()
+        }
+        doReturn(t9).whenever(viewModel).bindT9Controller(callbacks)
+        val schema = mutableStateOf("rime_ice")
+        rule.setContent {
+            KeyboardView(viewModel, KeyboardUiState(isFloatingMode = true, keyboardWidthDp = 560, keyboardHeightDp = 300,
+                floatingOffsetY = 18, floatingMinOffsetY = 18, currentSchemaId = schema.value, isDarkTheme = true),
+                callbacks, inputSessionManagedByHost = true, modifier = Modifier.size(1280.dp, 800.dp).testTag("float-host"))
+        }
+        for (id in listOf("rime_ice", "t9_pinyin")) {
+            rule.runOnIdle {
+                viewModel.dispatch(KeyboardDispatchAction.InputSessionStarted(false, id))
+                schema.value = id
+            }
+            assertDragIndicatorCentered(id)
+        }
+        save("floating-drag-indicator-tablet", "float-host")
+    }
+
+    /**
+     * 小横条竖直方向在「底排键帽看得见的下沿」和卡片底边的正中，左右在卡片中线上。
+     * 键帽下沿按像素找：在卡片左侧 12% 处（底排最左的键上，避开中间的小横条）从卡片底往上找第一处不是底色的像素。
+     */
+    private fun assertDragIndicatorCentered(id: String) {
+        rule.waitForIdle()
+        val card = rule.onNodeWithTag("floating-keyboard-card", true).fetchSemanticsNode().boundsInWindow
+        val indicator = rule.onNodeWithTag("floating-drag-indicator", true).fetchSemanticsNode().boundsInWindow
+        val root = rule.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
+        val x = (card.left + card.width * 0.12f).roundToInt()
+        val startY = (card.bottom - 3f).roundToInt()
+        val background = bitmap.getPixel(x, startY)
+        fun differs(c: Int): Boolean {
+            val d = kotlin.math.abs(android.graphics.Color.red(c) - android.graphics.Color.red(background)) +
+                kotlin.math.abs(android.graphics.Color.green(c) - android.graphics.Color.green(background)) +
+                kotlin.math.abs(android.graphics.Color.blue(c) - android.graphics.Color.blue(background))
+            return d > 36
+        }
+        var y = startY
+        while (y > card.top.roundToInt() && !differs(bitmap.getPixel(x, y))) y--
+        val capBottom = y + 1f
+        assertTrue("$id no keycap found above the drag bar, card=$card", capBottom > card.top + 1f)
+        val expected = (capBottom + card.bottom) / 2f
+        assertEquals("$id indicator=$indicator capBottom=$capBottom card=$card", expected, indicator.center.y, 1.5f)
+        assertEquals("$id indicator=$indicator card=$card", card.center.x, indicator.center.x, 1f)
     }
 
     private fun save(name: String, tag: String? = null) {

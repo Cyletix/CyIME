@@ -328,6 +328,7 @@ fun KeyboardView(
     val panelMaterial = Modifier.inheritKeyboardBackground(!state.handwritingExpanded)
     var cursorControlActive by remember { mutableStateOf(false) }
     val floatingBottomClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
+    val floatingBottomVisualClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
     // 上拉变悬浮后接着跟手：换模式时这一层不变，由它接着读手指。
     val undockFollow = remember { KeyboardUndockFollow() }
     CompositionLocalProvider(
@@ -337,6 +338,7 @@ fun KeyboardView(
         LocalDpPerMillimeter provides rememberDpPerMillimeter(),
         LocalSplitGapPreview provides splitGapPreview.takeIf { resizeActive },
         LocalFloatingBottomClearance provides if (state.isFloatingMode) floatingBottomClearance else null,
+        LocalFloatingBottomVisualClearance provides if (state.isFloatingMode) floatingBottomVisualClearance else null,
         com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
             com.kingzcheung.xime.ui.theme.MaterialPalette(keyboardBgColor, accentColor),
         LocalKeyboardExplicitWidth provides (state.keyboardWidthDp > 0 || (!state.isFloatingMode && (state.fixedWidthDp > 0 || resizeActive))),
@@ -463,6 +465,7 @@ fun KeyboardView(
             state.clipboardSearchInline),
         bottomContentPaddingDp = renderedBottomPaddingDp,
         bottomKeyClearance = floatingBottomClearance,
+        bottomKeyVisualClearance = floatingBottomVisualClearance,
         fixedWidthDp = state.fixedWidthDp,
         fixedOffsetX = state.fixedOffsetX,
         resolvedWidthDp = state.keyboardWidthDp,

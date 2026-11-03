@@ -24,6 +24,9 @@ internal val LocalKeyboardExplicitWidth = staticCompositionLocalOf { false }
 /** 主键区底排键帽下方的留白；只调整移动条，不参与键区尺寸计算。 */
 internal val LocalFloatingBottomClearance = staticCompositionLocalOf<MutableFloatState?> { null }
 
+/** 底排键帽看得见的下沿到键区底边的距离（含键帽内缩）；只用来把移动条的小横条放在空白正中。 */
+internal val LocalFloatingBottomVisualClearance = staticCompositionLocalOf<MutableFloatState?> { null }
+
 /**
  * 当前键盘体的视觉度量（由布局策略算出）。
  *
@@ -93,9 +96,21 @@ internal fun KeyboardKeySpacingScope(
                 onDispose { bottomClearance.floatValue = 0f }
             }
         }
+        val visualClearance = LocalFloatingBottomVisualClearance.current
+        if (visualClearance != null && growthSpacing != null) {
+            // 小横条按看得见的空白居中（11-03「悬浮窗的调整手柄 又不居中了」）：触摸区收窄后它跟着下移了约 5dp。
+            // 这里沿用收窄前的算法，只决定小横条画在哪，不改拖动区。
+            val visual = verticalInset.value + metrics.bottomSpaceDp + metrics.extraInsetY +
+                resolvedVisualGap(growthSpacing.second, metrics.insetY ?: 0f) / 2f
+            SideEffect { visualClearance.floatValue = visual }
+            DisposableEffect(visualClearance) {
+                onDispose { visualClearance.floatValue = 0f }
+            }
+        }
         CompositionLocalProvider(
             // 符号页等嵌套网格不能覆盖整张键盘的底部留白。
             LocalFloatingBottomClearance provides null,
+            LocalFloatingBottomVisualClearance provides null,
             LocalKeyboardKeyVisualMetrics provides metrics,
             LocalKeyboardKeyContentScale provides KeyboardKeyMetrics.contentScale(metrics.capShortEdge, metrics.capShortEdge),
         ) {
