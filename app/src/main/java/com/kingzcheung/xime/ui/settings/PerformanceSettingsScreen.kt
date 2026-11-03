@@ -224,7 +224,12 @@ private fun IdleLevelSlider(
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
         Slider(value = position, onValueChange = { position = it }, modifier = Modifier.testTag(tag),
-            onValueChangeFinished = { if (shown != minutes) onChoose(shown) },
+            // 松手时按滑块当时的位置取值：点一下滑条时 onValueChange 和这里在同一帧里先后调用，
+            // 组合里算的 shown 还是旧值，原来点选的档位不会保存（GitHub #128）。
+            onValueChangeFinished = {
+                val chosen = idleLevels[position.roundToInt().coerceIn(idleLevels.indices)]
+                if (chosen != minutes) onChoose(chosen)
+            },
             valueRange = 0f..(idleLevels.size - 1).toFloat(), steps = idleLevels.size - 2)
         Row(Modifier.fillMaxWidth()) {
             Text(idleLabel(idleLevels.first()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
