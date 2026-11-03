@@ -97,7 +97,10 @@ internal fun Modifier.ctrlSymbolKeyGesture(
 /** 快捷键键面渐变出来的时长；松手不渐变，立刻换回字母。 */
 internal const val CTRL_FACE_FADE_MS = 250
 
-/** Ctrl 键面：中间写用途，左上角小字母；没有常用用途的字母只淡淡写字母，拖上去照样发 Ctrl+字母。 */
+/**
+ * Ctrl 键面：中间写用途，左上角小字母（九键写数字，[cornerLabel]）；没有常用用途的字母只淡淡写字母，
+ * 拖上去照样发 Ctrl+字母。
+ */
 @Composable
 internal fun BoxScope.CtrlShortcutFace(
     letter: Char,
@@ -108,6 +111,7 @@ internal fun BoxScope.CtrlShortcutFace(
     hintsVisible: Boolean,
     keyWidthDp: Float,
     fontFamily: FontFamily?,
+    cornerLabel: String = letter.uppercase(),
 ) {
     val action = CtrlShortcuts.label(letter)
     val fontScale = LocalDensity.current.fontScale
@@ -120,7 +124,7 @@ internal fun BoxScope.CtrlShortcutFace(
     val actionSp = minOf(labelSp * 0.62f, keyWidthDp * 0.4f / fontScale)
     Text(action, Modifier.align(Alignment.Center), color = textColor, fontSize = actionSp.sp,
         lineHeight = (actionSp * 1.2f).sp, fontWeight = FontWeight.Medium, maxLines = 1, textAlign = TextAlign.Center)
-    if (hintsVisible) Text(letter.uppercase(), Modifier.align(Alignment.TopStart).padding(start = 5.dp, top = 2.dp),
+    if (hintsVisible) Text(cornerLabel, Modifier.align(Alignment.TopStart).padding(start = 5.dp, top = 2.dp),
         color = keyHintColor(textColor, frostedGlass, 0.6f), fontSize = hintSize,
         lineHeight = (hintSize.value * 1.2f).sp, maxLines = 1, fontFamily = fontFamily)
 }

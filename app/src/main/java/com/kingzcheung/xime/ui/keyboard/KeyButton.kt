@@ -344,6 +344,11 @@ fun SwipeableKeyButton(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    /**
+     * 九键数字键按住 !@# 当 Ctrl 时代表的字母（用户 11-03，见 [com.kingzcheung.xime.keyboard.CtrlShortcuts.t9Letter]）：
+     * 拖到这个键上或另一根手指点它发 Ctrl+这个字母，键面换成这个字母的用途。null 时按键自己的字母（26/14 键）。
+     */
+    ctrlShortcutLetter: Char? = null,
 ) {
     val customLayout = LocalCustomLayout.current
     val letterGeometry = LocalLetterGeometry.current
@@ -394,7 +399,8 @@ fun SwipeableKeyButton(
     val fourteenKeyLayout = LocalFourteenKeyLayout.current
     val tapOrCtrl: () -> Unit = {
         val letters = letterGroup ?: text
-        val pick = if (fourteenKeyLayout && letters.length == 2 && ctrlTargets?.ctrl == true)
+        val pick = ctrlShortcutLetter?.toString()
+            ?: if (fourteenKeyLayout && letters.length == 2 && ctrlTargets?.ctrl == true)
             letters[if (ctrlTapFraction[0] < 0.5f) 0 else 1].toString() else letters
         if (ctrlTargets?.ctrlTap(pick) != true) onClick()
     }
@@ -511,15 +517,17 @@ fun SwipeableKeyButton(
         onDispose { shiftTargets?.remove(shiftToken) }
     }
     androidx.compose.runtime.SideEffect {
-        if (shiftLetters != null) shiftTargets?.put(shiftToken, shiftLetters, buttonBounds) { uppercase ->
+        if (ctrlShortcutLetter != null) shiftTargets?.putCtrl(shiftToken, ctrlShortcutLetter, buttonBounds)
+        else if (shiftLetters != null) shiftTargets?.put(shiftToken, shiftLetters, buttonBounds) { uppercase ->
             currentActions.onPress()
             try { currentLetterSelection?.invoke(uppercase) ?: currentActions.onTap() }
             finally { currentActions.onRelease() }
         } else shiftTargets?.remove(shiftToken)
     }
-    val shiftHovered = shiftLetters != null && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
+    val shiftHovered = (shiftLetters != null || ctrlShortcutLetter != null) && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
     // 按住符号键当 Ctrl：单字母键换成快捷键键面（用户 10-24）；按满时限才换，渐变出来，松手立刻换回（用户 10-31）。
-    val ctrlLetter = shiftLetters?.singleOrNull()?.takeIf { shiftTargets?.ctrlFaces == true }
+    // 九键数字键换成它代表的字母的用途，左上角写数字（用户 11-03）。
+    val ctrlLetter = (ctrlShortcutLetter ?: shiftLetters?.singleOrNull())?.takeIf { shiftTargets?.ctrlFaces == true }
     // 从 0 起渐变：14 键这时才拆成单字母键，新键也要渐变出来，不能一出现就是快捷键键面。
     val ctrlFade = remember { androidx.compose.animation.core.Animatable(0f) }
     androidx.compose.runtime.LaunchedEffect(ctrlLetter != null) {
@@ -784,7 +792,8 @@ fun SwipeableKeyButton(
         }
         if (ctrlLetter != null) Box(Modifier.matchParentSize().graphicsLayer { alpha = ctrlFade.value }) {
             CtrlShortcutFace(ctrlLetter, resolvedText, frostedGlass, labelSize,
-                effectiveSwipeFontSize, hintsVisible, keyWidthDp, keyFontFamily)
+                effectiveSwipeFontSize, hintsVisible, keyWidthDp, keyFontFamily,
+                cornerLabel = badgeText?.takeIf { ctrlShortcutLetter != null } ?: ctrlLetter.uppercase())
         }
         else if (showDisc && discLabels != null) {
             KanaDirectionIndicator(discDirection, MaterialTheme.colorScheme.primary.copy(alpha = .6f))

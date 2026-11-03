@@ -27,4 +27,22 @@ class CtrlShortcutsTest {
         assertNull(CtrlShortcuts.letterOf(CtrlShortcuts.ENTER_COMMAND))
         assertEquals("ctrl:c", CtrlShortcuts.command('C'))
     }
+
+    /** 用户 11-03：九键 1 关闭 2 刷新 3 重做 4 全选 5 保存 6 剪切 7 撤销 8 复制 9 粘贴。 */
+    @Test
+    fun t9DigitsMapToTheRequestedShortcuts() {
+        val expected = mapOf('1' to "关闭", '2' to "刷新", '3' to "重做", '4' to "全选", '5' to "保存",
+            '6' to "剪切", '7' to "撤销", '8' to "复制", '9' to "粘贴")
+        for ((digit, label) in expected) {
+            val letter = CtrlShortcuts.t9Letter(digit)!!
+            assertEquals("$digit", label, CtrlShortcuts.label(letter))
+        }
+        // 4/6/8/9 和 26 键一样走编辑面板的全选、剪切、复制、粘贴。
+        assertEquals("select_all", CtrlShortcuts.editingAction(CtrlShortcuts.t9Letter('4')!!))
+        assertEquals("cut", CtrlShortcuts.editingAction(CtrlShortcuts.t9Letter('6')!!))
+        assertEquals("copy", CtrlShortcuts.editingAction(CtrlShortcuts.t9Letter('8')!!))
+        assertEquals("paste", CtrlShortcuts.editingAction(CtrlShortcuts.t9Letter('9')!!))
+        assertNull(CtrlShortcuts.t9Letter('0'))
+        assertNull(CtrlShortcuts.t9Letter('a'))
+    }
 }

@@ -9,6 +9,8 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     data class Target(val key: String, val bounds: Rect, val commit: () -> Unit)
     data class Drag(val origin: Offset, val pointer: Offset)
     private val targets = mutableMapOf<Any, List<Target>>()
+    /** 只在按住符号键当 Ctrl 时才算目标的键（九键数字键）；按住 Shift 拖过去不算。 */
+    private val ctrlOnly = mutableSetOf<Any>()
     var keyboardBounds: Rect = Rect.Zero
     var hovered by mutableStateOf<Target?>(null)
         private set
@@ -71,12 +73,26 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         targets[id] = listOf(Target(ENTER_KEY, bounds) {})
     }
 
+    /**
+     * 九键数字键当 Ctrl 目标（用户 11-03）：按住 !@# 拖到这个键上松手、或另一根手指点它，发 Ctrl+[letter]。
+     * 键名记成这个字母，松手时和 26 键的字母走同一条路。
+     */
+    fun putCtrl(id: Any, letter: Char, bounds: Rect) {
+        if (letter.lowercaseChar() !in 'a'..'z') {
+            remove(id)
+            return
+        }
+        targets[id] = listOf(Target(letter.uppercaseChar().toString(), bounds) {})
+        ctrlOnly += id
+    }
+
     /** 合并字母键按左右半区选单个字母，绝不调用它的长按或符号手势。 */
     fun put(id: Any, letters: String, bounds: Rect, commit: (String) -> Unit) {
         if (letters.length !in 1..2 || letters.any { it.lowercaseChar() !in 'a'..'z' }) {
             remove(id)
             return
         }
+        ctrlOnly -= id
         targets[id] = letters.mapIndexed { index, char ->
             val letter = char.uppercaseChar().toString()
             val cell = Rect(bounds.left + bounds.width * index / letters.length, bounds.top,
@@ -84,9 +100,13 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
             Target(letter, cell) { commit(letter) }
         }
     }
-    fun remove(id: Any) { targets.remove(id) }
+    fun remove(id: Any) {
+        targets.remove(id)
+        ctrlOnly -= id
+    }
     fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) candidateAt(point)?.takeUnless { ctrl }
-        else targets.values.asSequence().flatten().firstOrNull { it.bounds.contains(point) && (ctrl || it.key != ENTER_KEY) }
+        else targets.entries.asSequence().filter { (id, _) -> ctrl || id !in ctrlOnly }.flatMap { (_, cells) -> cells.asSequence() }
+            .firstOrNull { it.bounds.contains(point) && (ctrl || it.key != ENTER_KEY) }
 
     /** 拖出键盘、落在候选上：松手等于按住 Shift 点这个候选（释义模式上屏英文）。 */
     private fun candidateAt(point: Offset): Target? =

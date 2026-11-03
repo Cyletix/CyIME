@@ -5,7 +5,7 @@ import android.view.KeyEvent
 
 /**
  * 按住 26 键的符号键当 Ctrl 用（用户 10-24）：字母键上显示常用快捷键，拖到字母上松手发 Ctrl+字母。
- * 没列出的字母照样能发，只是键面不写用途。
+ * 没列出的字母照样能发，只是键面不写用途。九键的数字键按 [t9Letter] 换成字母，走同一条路。
  */
 object CtrlShortcuts {
     /** 键面写的用途，两个字以内，手机上的窄键也放得下。 */
@@ -16,6 +16,18 @@ object CtrlShortcuts {
     )
 
     fun label(letter: Char): String? = labels[letter.lowercaseChar()]
+
+    /**
+     * 九键按住 !@# 当 Ctrl（用户 11-03）：数字键按这张表发 Ctrl+字母，键面写这个字母的用途。
+     * 1 关闭 2 刷新 3 重做 / 4 全选 5 保存 6 剪切 / 7 撤销 8 复制 9 粘贴；0 键不算。
+     */
+    private val t9Letters = mapOf(
+        '1' to 'w', '2' to 'r', '3' to 'y',
+        '4' to 'a', '5' to 's', '6' to 'x',
+        '7' to 'z', '8' to 'c', '9' to 'v',
+    )
+
+    fun t9Letter(digit: Char): Char? = t9Letters[digit]
 
     /**
      * 全选、复制、剪切、粘贴不发模拟按键，走编辑面板同一条输入框自带动作（返回编辑面板的动作名）。

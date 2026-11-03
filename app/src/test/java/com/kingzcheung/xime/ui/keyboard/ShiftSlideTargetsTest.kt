@@ -94,6 +94,33 @@ class ShiftSlideTargetsTest {
         assertFalse(targets.ctrlEnter())
     }
 
+    // 用户 11-03：九键数字键只在按住 !@# 时是目标，键名是它代表的字母；没按住时拖过去不算。
+    @Test fun t9DigitTargetsOnlyWhileSymbolKeyHeld() {
+        val targets = targets()
+        val seven = Rect(100f, 160f, 160f, 220f)
+        targets.putCtrl("7", 'z', seven)
+        assertNull(targets.move(shift, seven.center))
+        targets.finish()
+        val sent = mutableListOf<Char>()
+        targets.beginCtrl { sent += it }
+        assertEquals("Z", targets.move(shift, seven.center)?.key)
+        assertTrue(targets.ctrlTap("z"))
+        assertEquals(listOf('z'), sent)
+        targets.finish()
+        targets.remove("7")
+        targets.beginCtrl { }
+        assertNull("撤销登记后不再是目标", targets.move(shift, seven.center))
+        targets.finish()
+    }
+
+    @Test fun t9DigitTargetReusedAsLetterBecomesShiftTargetAgain() {
+        val targets = targets()
+        val cell = Rect(100f, 160f, 160f, 220f)
+        targets.putCtrl("cell", 'c', cell)
+        targets.put("cell", "c", cell, commits::add)
+        assertEquals("C", targets.move(shift, cell.center)?.key)
+    }
+
     // 用户 11-03：按住 !@# 长按空格拖动选中文字，和按住 Shift 一样；松开 !@# 后回到普通移动。
     @Test fun spaceCursorSelectsWhileSymbolKeyHeld() {
         val targets = targets()

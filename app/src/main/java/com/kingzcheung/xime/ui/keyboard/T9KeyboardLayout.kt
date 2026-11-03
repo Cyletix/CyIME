@@ -100,6 +100,8 @@ import kotlinx.coroutines.launch
  *   第2行：GHI(4) | JKL(5) | MNO(6) | 重输
  *   第3行：PQRS(7) | TUV(8) | WXYZ(9) | 0
  *   第4行：符 | 123 | 空格(显示方案名) | 中/En(地球图标) | 发送
+ * - 按住左下角 !@# 当 Ctrl（同 26 键，用户 11-03）：1 关闭 2 刷新 3 重做 4 全选 5 保存 6 剪切 7 撤销 8 复制 9 粘贴，
+ *   回车 = Ctrl+回车（发送）。数字键对应的字母见 [com.kingzcheung.xime.keyboard.CtrlShortcuts.t9Letter]。
  */
 @Composable
 fun T9KeyboardLayout(
@@ -250,6 +252,8 @@ private fun T9KeyboardSwipeOverlay(
     }
 
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
+    // 按住 !@# 当 Ctrl：数字键和回车登记成目标，和 26 键同一套（用户 11-03）。九键没有 Shift，只有 Ctrl 用它。
+    val ctrlTargets = remember(controller, uiState.inputProfile) { ShiftSlideTargets() }
 
 
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys) {
@@ -288,6 +292,7 @@ private fun T9KeyboardSwipeOverlay(
             // 横屏：去除原左侧候选大面板（候选已在顶部候选栏展示），
             // 九键布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
             CompositionLocalProvider(
+                LocalShiftSlideTargets provides ctrlTargets,
                 LocalKeyVisualPadding provides PaddingValues(
                     horizontal = keySpacingX ?: 2.dp,
                     vertical = keySpacingY ?: 2.dp,
@@ -317,11 +322,13 @@ private fun T9KeyboardSwipeOverlay(
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
                         dragArea = { keyboardBounds },
+                        ctrlTargets = ctrlTargets,
                     )
                 }
             }
         } else {
             CompositionLocalProvider(
+                LocalShiftSlideTargets provides ctrlTargets,
                 LocalKeyVisualPadding provides PaddingValues(
                     horizontal = keySpacingX ?: 2.dp,
                     vertical = keySpacingY ?: 2.dp,
@@ -352,11 +359,14 @@ private fun T9KeyboardSwipeOverlay(
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
                         dragArea = { keyboardBounds },
+                        ctrlTargets = ctrlTargets,
                     )
                 }
             }
         }
         CandidateDragLine(CandidateDropTargets.shared, { keyboardBounds.topLeft },
+            KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
+        ShiftSlideLine(ctrlTargets, { keyboardBounds.topLeft },
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
         if (glide) GlideTrailOverlay(trail, accentColor, Modifier.matchParentSize())
     }
@@ -387,6 +397,8 @@ private fun T9KeyboardContent(
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
     /** 键盘区在根布局里的位置：0 键拖动超过它宽或高的一半（设置里可调）才算拖动选词。 */
     dragArea: () -> Rect = { Rect.Zero },
+    /** 按住 !@# 当 Ctrl 的目标（数字键、回车）。 */
+    ctrlTargets: ShiftSlideTargets,
 ) {
     val t9DigitFontSize = if (compactMode) 13.sp else 16.sp
     val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
@@ -402,6 +414,10 @@ private fun T9KeyboardContent(
     val hintsActive = !compactMode
     val commitDirect: (String) -> Unit =
         { text -> callbacks.onCommitText?.invoke(text) ?: onKeyPress(text) }
+    // 按住 !@# 当 Ctrl：和 26 键同一条命令（用户 11-03）；没有手势回调时 !@# 照旧只开符号。
+    val onCtrlShortcut: ((Char) -> Unit)? = onGestureAction?.let { action ->
+        { letter: Char -> action(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.command(letter)) }
+    }
 
     fun swipesFor(id: String): T9KeySwipes {
         val gesture = KeysConfigHelper.getT9KeyGesture(id) ?: return T9KeySwipes()
@@ -450,7 +466,9 @@ private fun T9KeyboardContent(
 
     Row(
         modifier = Modifier
-            .fillMaxSize(),
+            .fillMaxSize()
+            // 按住 !@# 拖出这块键区松手不发快捷键。
+            .onGloballyPositioned { ctrlTargets.keyboardBounds = it.boundsInRoot() },
         horizontalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         // ── 第1列：左侧候选区（拼音候选项） ──
@@ -542,6 +560,7 @@ private fun T9KeyboardContent(
                 backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                 modifier = Modifier.fillMaxWidth().weight(1f), onKeyPressDown = onKeyPressDown,
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                ctrlTargets = ctrlTargets, onCtrlShortcut = onCtrlShortcut,
             )
         }
 
@@ -558,6 +577,7 @@ private fun T9KeyboardContent(
                     swipes = swipesFor("1"),
 
                     digit = "1", letters = "分词", flickDigitLongPress = true,
+                    ctrlShortcutLetter = com.kingzcheung.xime.keyboard.CtrlShortcuts.t9Letter('1'),
                     onSwipeStateChange = onSwipeStateChange,
                     onClick = { if (callbacks.onPreeditKeyInput?.invoke("1") != true) controller.onDigitPressed("1") },
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
@@ -677,6 +697,7 @@ private fun T9KeyboardContent(
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                     modifier = Modifier.weight(0.8f), onKeyPressDown = onKeyPressDown,
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                    ctrlTargets = ctrlTargets, onCtrlShortcut = onCtrlShortcut,
                 )
                 T9SpaceKey(
                     schemaName = "拼音", isSttEnabled = uiState.isSttEnabled,
@@ -788,12 +809,25 @@ private fun T9KeyboardContent(
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
             )
+            // 按住 !@# 点回车、或从 !@# 拖到回车上松手：Ctrl+回车，发送（同 26 键，用户 11-03）。
+            // 位置一定下来就登记（这一列布局后不一定重组，只靠重组会漏登记，拖到回车上没反应）；
+            // 目标换了一份时重组再按记下的位置登记一次。id 每个回车键各一个。
+            val enterTargetId = remember { Any() }
+            var enterBounds by remember { mutableStateOf(Rect.Zero) }
+            androidx.compose.runtime.DisposableEffect(ctrlTargets) { onDispose { ctrlTargets.remove(enterTargetId) } }
+            androidx.compose.runtime.SideEffect {
+                if (enterBounds != Rect.Zero) ctrlTargets.putEnter(enterTargetId, enterBounds)
+            }
             ActionKeyButton(
                 text = uiState.enterKeyText,
-                onClick = { onKeyPress("enter") },
+                onClick = { if (!ctrlTargets.ctrlEnter()) onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("t9-enter-key")
+                    .onGloballyPositioned {
+                        enterBounds = it.boundsInRoot()
+                        ctrlTargets.putEnter(enterTargetId, enterBounds)
+                    },
                 onPress = { onKeyPressDown?.invoke("enter") },
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
@@ -887,6 +921,7 @@ private fun T9DigitKey(
         shadowEnabled = shadowEnabled,
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
+        ctrlShortcutLetter = digit.singleOrNull()?.let(com.kingzcheung.xime.keyboard.CtrlShortcuts::t9Letter),
     )
 }
 
@@ -989,6 +1024,8 @@ internal fun NineKeyButton(
     onSwipeRight: (() -> Unit)? = null,
     /** 九键拂动模式下与 2~9 一致：长按弹出本键数字，松手输入。 */
     flickDigitLongPress: Boolean = false,
+    /** 按住 !@# 当 Ctrl 时这个键代表的字母（1 键 = W 关闭）。 */
+    ctrlShortcutLetter: Char? = null,
 ) {
     val digitLongPress = swipes.onSwipeUp.takeIf {
         flickDigitLongPress && digit.isNotEmpty() && LocalKeyboardInputPreferences.current.t9FlickLetters
@@ -1028,6 +1065,7 @@ internal fun NineKeyButton(
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
         fontSize = fontSize,
+        ctrlShortcutLetter = ctrlShortcutLetter,
     )
 }
 

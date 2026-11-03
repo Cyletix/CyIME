@@ -46,7 +46,7 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
             KeyTip("从 Shift 拖到候选上松手", "这条候选有英文就上屏英文。"),
             KeyTip("长按空格移光标时按住 Shift", "选中文字，和电脑上 Shift 加方向键一样。"),
         )),
-        KeyTipGroup("Ctrl(26 键左下角 !@# 键)", buildList {
+        KeyTipGroup("Ctrl(左下角 !@# 键)", buildList {
             add(KeyTip("按住 !@#", "按满 $hold 秒，字母键渐变成显示快捷键：全选、复制、粘贴、剪切、撤销、重做、保存、查找等；点一下开符号时键面不变。"))
             add(KeyTip("按住 !@# 拖到字母上松手", "发送 Ctrl 加这个字母，和实体键盘一样；也可以另一根手指直接点字母。不用等快捷键显示出来。"))
             add(KeyTip("按住 !@# 点回车", "发送消息，同 Ctrl+回车；也可以拖到回车上松手。还在打字时只上屏编码。"))
@@ -55,6 +55,7 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
                 listOf("按键与手势 › 符号键松手打开符号的时限")))
         }),
         KeyTipGroup("九键", listOf(
+            KeyTip("按住 !@# 拖到数字键上松手", "1 关闭、2 刷新、3 重做、4 全选、5 保存、6 剪切、7 撤销、8 复制、9 粘贴；也可以另一根手指直接点数字键。回车、空格同 26 键。"),
             KeyTip("长按「下一项」", "等于按住 Shift：候选中英对调，松手恢复。"),
             KeyTip("从「下一项」拖到候选上松手", "这条候选有英文就上屏英文。"),
         )),
