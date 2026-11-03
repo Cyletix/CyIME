@@ -523,6 +523,7 @@ fun KeyboardLayout(
 
     CompositionLocalProvider(
         LocalFourteenKeyLayout provides fourteenKey,
+        LocalLongVowelOnL provides (longVowelKey == JapaneseLongVowelKey.L_KEY),
         LocalLetterGeometry provides geometry,
         LocalCustomLayout provides letterLayout,
         LocalEvenMergedKeys provides evenMergedKeys,
@@ -885,7 +886,7 @@ fun KeyboardLayout(
                                     val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
                 key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
                                     val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode,
-                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels).let { semicolonKeyLabel(key, isAsciiMode, it) }
+                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels).let { semicolonKeyLabel(key, isAsciiMode, it) }.let { longVowelKeyLabel(key, it, LocalLongVowelOnL.current) }
 
                                     val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
                                     val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
@@ -1613,7 +1614,7 @@ fun KeyboardRowWithConfig(
             val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
                 key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
             val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode,
-                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels).let { semicolonKeyLabel(key, isAsciiMode, it) }
+                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels).let { semicolonKeyLabel(key, isAsciiMode, it) }.let { longVowelKeyLabel(key, it, LocalLongVowelOnL.current) }
 
             val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
@@ -1977,7 +1978,7 @@ fun CompactKeyboardRowWithConfig(
             val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
                 key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
             val compactDisplayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode,
-                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels).let { semicolonKeyLabel(key, isAsciiMode, it) }
+                isShifted || LocalKeyboardInputPreferences.current.uppercaseKeyLabels).let { semicolonKeyLabel(key, isAsciiMode, it) }.let { longVowelKeyLabel(key, it, LocalLongVowelOnL.current) }
             val compactOnClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val compactOnPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
             val compactOnRelease: (() -> Unit)? = remember(key, onKeyRelease) { { onKeyRelease?.invoke(key); Unit } }

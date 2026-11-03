@@ -86,6 +86,15 @@ class JapaneseChoonpuKeyTest {
         assertFalse(japaneseChoonpuIsCode("ー", false, japanese))
     }
 
+    /** 默认 L 键就是长音：键面写 ー（Shift 时也是），其他键和另外两种放法不变（11-03 Mei：长音键显示成了 L）。 */
+    @Test fun lKeyShowsTheLongVowelWhenItIsTheLongVowel() {
+        assertEquals("ー", longVowelKeyLabel("l", "l", true))
+        assertEquals("ー", longVowelKeyLabel("l", "L", true))
+        assertEquals("ー", longVowelKeyLabel("L", "L", true))
+        assertEquals("k", longVowelKeyLabel("k", "k", true))
+        assertEquals("l", longVowelKeyLabel("l", "l", false))
+    }
+
     @Test fun longPressAloneTogglesLikeShiftTaps() {
         assertEquals("shift_single", shiftTapKeyLongPressAction(ShiftMode.OFF))
         assertEquals("shift_caps", shiftTapKeyLongPressAction(ShiftMode.SINGLE))

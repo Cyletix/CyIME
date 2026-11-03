@@ -652,7 +652,8 @@ internal fun JapaneseLongVowelIllustration(mode: com.kingzcheung.xime.ui.keyboar
         modifier = Modifier.testTag("long-vowel-illustration:${mode.name}")) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             when (mode) {
-                com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.L_KEY -> { Key("k"); Key("l", below = "ー", accent = true) }
+                // L 键就是长音：键面写 ー，角上小 l 表示是原来 L 的位置（和键盘上一致）。
+                com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.L_KEY -> { Key("k"); Key("ー", corner = "l", accent = true) }
                 com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.SEPARATE -> { Key("l"); Key("ー", accent = true) }
                 com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.SHIFT -> { Key("k"); Key("l") }
             }

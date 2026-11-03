@@ -44,6 +44,13 @@ internal fun withChoonpuKey(rows: List<List<String>>): List<List<String>> {
     }
 }
 
+/** 长音键选「L 键」（默认）时为 true：L 键键面写 ー（它打的就是 ー），不写 l（11-03 Mei 以为长音键没了）。 */
+internal val LocalLongVowelOnL = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** L 键当长音时键面写 ー；其他键、其他放法原样。Shift 时也一样（大写 L 同样是 ー）。 */
+internal fun longVowelKeyLabel(key: String, label: String, lIsLongVowel: Boolean): String =
+    if (lIsLongVowel && key.equals("l", ignoreCase = true)) CHOONPU_KEY else label
+
 /** 长按没打别的键就松手：照 Shift 点按切换，小写→单次大写→锁定→小写（shift_caps 在锁定时是解锁）。 */
 internal fun shiftTapKeyLongPressAction(mode: ShiftMode): String =
     if (mode == ShiftMode.OFF) "shift_single" else "shift_caps"
