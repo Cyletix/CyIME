@@ -64,38 +64,38 @@ private fun ChineseOutputSection() {
     val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
     SettingsSection(title = "中文输出") {
         SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
-            "候选和上屏改用台湾正体（台灣、計畫、了解）；关着时仓颉也出简体，注音始终出正体。词库和学习记录不变，开启时不给中文联想。",
+            "候选和上屏改用台湾正体(台灣、計畫、了解)；关着时仓颉也出简体，注音始终出正体。词库和学习记录不变，开启时不给中文联想。",
             checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.TRADITIONAL)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.FontDownload, "生僻字",
-            "全拼、双拼（26 键和 14 键）和九键打一个完整拼音（chan、gui；双拼打满两个键）时，在常用字后面补上约 1.8 万个生僻字（瀺、槻）。",
+            "全拼、双拼(26 键和 14 键)和九键打一个完整拼音(chan、gui；双拼打满两个键)时，在常用字后面补上约 1.8 万个生僻字(瀺、槻)。",
             checked = input.rareCharacters, onCheckedChange = { input.copy(rareCharacters = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.RARE_CHARACTERS)
         CandidateExtraLegend("rare-characters-legend", "gui", listOf("鬼", "贵", "归"), "槻", input.rareCharacters,
             skipped = true)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.Schedule, "时间日期候选",
-            "打“时间”“日期”“星期”时显示本机时间或日期。输入 ts（九键 87）还可选当前 Unix 时间戳。",
+            "打“时间”“日期”“星期”时显示本机时间或日期。输入 ts(九键 87)还可选当前 Unix 时间戳。",
             checked = input.datetimeCandidates, onCheckedChange = { input.copy(datetimeCandidates = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DATETIME)
         val now = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.ROOT).format(java.util.Date()) }
         CandidateExtraLegend("datetime-candidates-legend", "shijian", listOf("时间"), now, input.datetimeCandidates)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.EmojiEmotions, "候选里显示表情",
-            "打「开心」「爱心」这类词时，在词后面多出对应的表情（😄、❤️）。",
+            "打「开心」「爱心」这类词时，在词后面多出对应的表情(😄、❤️)。",
             checked = input.candidateEmoji, onCheckedChange = { input.copy(candidateEmoji = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.EMOJI)
         CandidateExtraLegend("candidate-emoji-legend", "kaixin", listOf("开心"), "😄", input.candidateEmoji)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.Functions, "打符号名出符号",
-            "打「加号」「问号」「括号」这类符号名时，在词后面多出对应的符号（+、？、（）），词本身的位置不变。",
+            "打「加号」「问号」「括号」这类符号名时，在词后面多出对应的符号(+、？、（）)，词本身的位置不变。",
             checked = input.symbolNames, onCheckedChange = { input.copy(symbolNames = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.SYMBOL_NAMES)
         CandidateExtraLegend("symbol-names-legend", "jiahao", listOf("加号"), "+", input.symbolNames)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.Functions, "希腊字母",
-            "打 xita、pi、alpha 这类字母名时，第 3 个候选给出希腊字母（θ、π、α），前两个词不变。",
+            "打 xita、pi、alpha 这类字母名时，第 3 个候选给出希腊字母(θ、π、α)，前两个词不变。",
             checked = input.greekLetters, onCheckedChange = { input.copy(greekLetters = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.GREEK_LETTERS)
         CandidateExtraLegend("greek-letters-legend", "pi", listOf("批", "皮"), "π", input.greekLetters)
@@ -112,13 +112,13 @@ private fun EnglishInputSection() {
             checked = input.addressFieldsEnglish, onCheckedChange = { input.copy(addressFieldsEnglish = it).save(context) })
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.SpaceBar, "选词后自动加空格",
-            "英文（含西班牙语）点候选栏的词后自动补一个空格，接着打下一个词不用再按空格。紧接着按空格不会多出一个；" +
+            "英文(含西班牙语)点候选栏的词后自动补一个空格，接着打下一个词不用再按空格。紧接着按空格不会多出一个；" +
                 "打 , . ? ! : ; 时标点挪到空格前面；退格删掉这个空格。",
             checked = input.englishAutoSpace, onCheckedChange = { input.copy(englishAutoSpace = it).save(context) })
         AutoSpaceLegend("english-auto-space-legend", "点 world", "hello world", "|", input.englishAutoSpace)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.SpaceBar, "标点后自动加空格",
-            "英文（含西班牙语）键盘在字母后面打 , . ? ! : ; 时自动跟一个空格（Hello, world）。紧接着按空格不会多出一个，" +
+            "英文(含西班牙语)键盘在字母后面打 , . ? ! : ; 时自动跟一个空格(Hello, world)。紧接着按空格不会多出一个，" +
                 "连打 ... ?! 空格留在最后；3.14、1,000、10:30 和网址、邮箱、密码框不加；退格删掉这个空格。",
             checked = input.englishPunctuationSpace, onCheckedChange = { input.copy(englishPunctuationSpace = it).save(context) })
         AutoSpaceLegend("english-punctuation-space-legend", "打 ,", "Hello,", "|", input.englishPunctuationSpace)

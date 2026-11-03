@@ -333,8 +333,8 @@ fun KeyEffectSettingsContent(
                         }
 
                         Text(
-                            text = if (uiState.hapticPrimitives) "为 0（「系统默认」）时用内置的轻触强度。「长按振动振幅」管按住删除键连删时的每一下，为 0 时和按键振动一样。"
-                                else "都为 0（「系统默认」）时用系统默认振动。「长按」两项管按住删除键连删时的每一下，为 0 时和按键振动一样。",
+                            text = if (uiState.hapticPrimitives) "为 0(「系统默认」)时用内置的轻触强度。「长按振动振幅」管按住删除键连删时的每一下，为 0 时和按键振动一样。"
+                                else "都为 0(「系统默认」)时用系统默认振动。「长按」两项管按住删除键连删时的每一下，为 0 时和按键振动一样。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)

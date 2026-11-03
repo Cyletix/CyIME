@@ -221,7 +221,7 @@ fun SmartPredictionSettingsContent(
                     SettingsToggleItem(
                         icon = Icons.AutoMirrored.TwoTone.Backspace,
                         title = "删掉刚打的词不学习",
-                        subtitle = "词一上屏就整个删掉（退格删完或上滑清空），这一次不记进词库，误触打出的怪词不会排到前面",
+                        subtitle = "词一上屏就整个删掉(退格删完或上滑清空)，这一次不记进词库，误触打出的怪词不会排到前面",
                         checked = unlearnRejected,
                         onCheckedChange = {
                             unlearnRejected = it

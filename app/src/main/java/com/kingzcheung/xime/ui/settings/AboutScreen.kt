@@ -89,7 +89,7 @@ object AppInfo {
     
     val dependencies = listOf(
         LicenseItem(
-            name = "CyIME（由 Cyletix 维护开发）",
+            name = "CyIME(由 Cyletix 维护开发)",
             license = "GPL-3.0",
             url = "https://github.com/Cyletix/CyIME/blob/main/LICENSE"
         ),
@@ -144,7 +144,7 @@ object AppInfo {
             url = "https://github.com/KaTeX/KaTeX"
         ),
         LicenseItem(
-            name = "Xime（CyIME 基于它开发）",
+            name = "Xime(CyIME 基于它开发)",
             license = "GPL-3.0",
             url = "https://github.com/ximeiorg/Xime"
         )

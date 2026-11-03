@@ -477,7 +477,7 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
                 }.joinToString("，")
                 _events.emit(
                     TrainingEvent.Message(
-                        "已导入 ${result.prompts.size} 道公式题" + (if (extra.isEmpty()) "" else "（$extra）") +
+                        "已导入 ${result.prompts.size} 道公式题" + (if (extra.isEmpty()) "" else "($extra)") +
                             "，导入题库共 ${formulaBank.size} 道"
                     )
                 )
@@ -543,11 +543,11 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
             }
             val total = added.values.sum()
             val text = buildString {
-                if (total == 0) append("没有新样本（文件不是样本备份，或这些样本已经在了）")
+                if (total == 0) append("没有新样本(文件不是样本备份，或这些样本已经在了)")
                 else {
                     append("已导入 $total 条样本")
                     val parts = listOfNotNull(added["kana"]?.let { "假名 $it" }, added["latin"]?.let { "字母 $it" })
-                    if (parts.isNotEmpty()) append("（${parts.joinToString("、")}）")
+                    if (parts.isNotEmpty()) append("(${parts.joinToString("、")})")
                 }
                 if (total > 0 && !com.kingzcheung.xime.handwriting.FormulaRecognizer.isAvailable(app))
                     append("；英文、日语手写还要在 模型管理 下载「公式手写模型」")
@@ -766,7 +766,7 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                     if (contribute) CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                         val pending = (state.totalSamples - state.uploaded).coerceAtLeast(0)
                         if (HandwritingContribution.uploadAvailable()) CompactMenuRow(
-                            label = if (state.uploading) "正在上传…" else "上传（$pending 条未传）", icon = Icons.Filled.CloudUpload,
+                            label = if (state.uploading) "正在上传…" else "上传($pending 条未传)", icon = Icons.Filled.CloudUpload,
                             onClick = { moreMenu = false; withConsent { viewModel.upload() } },
                         )
                         CompactMenuRow(
@@ -784,15 +784,15 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                         )
                     } else CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                         CompactMenuRow(
-                            label = "导入公式题库（CSV）", icon = Icons.Filled.FileOpen,
+                            label = "导入公式题库(CSV)", icon = Icons.Filled.FileOpen,
                             onClick = { moreMenu = false; importLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*")) },
                         )
                         CompactMenuRow(
-                            label = "导入题库文件（.tsv）", icon = Icons.Filled.FileOpen,
+                            label = "导入题库文件(.tsv)", icon = Icons.Filled.FileOpen,
                             onClick = { moreMenu = false; bankLauncher.launch(arrayOf("*/*")) },
                         )
                         CompactMenuRow(
-                            label = "导入样本备份（.jsonl）", icon = Icons.Filled.FileOpen,
+                            label = "导入样本备份(.jsonl)", icon = Icons.Filled.FileOpen,
                             onClick = { moreMenu = false; sampleBackupLauncher.launch(arrayOf("*/*")) },
                         )
                         CompactMenuRow(
@@ -836,7 +836,7 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                         Spacer(Modifier.height(6.dp))
                         OutlinedButton(onClick = {
                             importLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
-                        }) { Text("导入 CSV（file_name,LaTeX）") }
+                        }) { Text("导入 CSV(file_name,LaTeX)") }
                     }
                     prompt == null && state.bank.isExternal() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("这个分类的题库文件还没放到平板上", fontSize = 16.sp)
@@ -846,7 +846,7 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(6.dp))
-                        OutlinedButton(onClick = { bankLauncher.launch(arrayOf("*/*")) }) { Text("导入题库文件（.tsv）") }
+                        OutlinedButton(onClick = { bankLauncher.launch(arrayOf("*/*")) }) { Text("导入题库文件(.tsv)") }
                     }
                     prompt == null && state.bank == TrainingBank.Missed -> Text(
                         "还没有认错的字。写汉字时会自动识别，认错又跳过的字会放到这里",
@@ -920,7 +920,7 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
             }
             state.check?.takeIf { it.promptId == prompt?.id }?.let { check ->
                 val text = if (check.retries == 0) "认成了「${check.wrong}」，再写一遍，写到认对为止"
-                else "又认成了「${check.last}」，再写一遍（已重写 ${check.retries} 遍）"
+                else "又认成了「${check.last}」，再写一遍(已重写 ${check.retries} 遍)"
                 Text(
                     text = text,
                     fontSize = 13.sp,

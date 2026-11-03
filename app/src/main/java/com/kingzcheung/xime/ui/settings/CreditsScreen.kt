@@ -40,7 +40,7 @@ object Credits {
 
     val groups: List<Pair<String, List<CreditItem>>> = listOf(
         "输入引擎" to listOf(
-            CreditItem("Rime（librime）", "佛振及 Rime 社区", "输入引擎", "BSD-3-Clause", "https://github.com/rime/librime"),
+            CreditItem("Rime(librime)", "佛振及 Rime 社区", "输入引擎", "BSD-3-Clause", "https://github.com/rime/librime"),
             CreditItem("OpenCC", "BYVoid", "简繁转换", "Apache-2.0", "https://github.com/BYVoid/OpenCC"),
             CreditItem("sherpa-onnx", "k2-fsa", "本地语音识别", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx"),
             CreditItem("ONNX Runtime", "Microsoft", "手写、识字的模型推理", "MIT",
@@ -73,7 +73,7 @@ object Credits {
             CreditItem("3D-Speaker CAM++", "阿里巴巴 3D-Speaker", "字幕区分说话人", "Apache-2.0",
                 "https://github.com/modelscope/3D-Speaker"),
             CreditItem("PP-OCRv5", "PaddlePaddle；RapidAI", "拍照识字", "Apache-2.0", "https://github.com/PaddlePaddle/PaddleOCR"),
-            CreditItem("ochwpro", "bikeand（ModelScope）", "中文手写识别",
+            CreditItem("ochwpro", "bikeand(ModelScope)", "中文手写识别",
                 "MIT", "https://www.modelscope.cn/models/bikeand/ochwpro"),
         ),
         "设计参考" to listOf(

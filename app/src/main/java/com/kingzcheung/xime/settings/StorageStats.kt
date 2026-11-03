@@ -124,7 +124,7 @@ object StorageStats {
             Category(
                 id = ID_MODELS,
                 title = "离线模型",
-                description = "联想 / 手写 / 语音识别模型（含旧版本目录），清除后需重新下载",
+                description = "联想 / 手写 / 语音识别模型(含旧版本目录)，清除后需重新下载",
                 sizeBytes = modelsSize,
                 clearable = true,
             ),
@@ -153,21 +153,21 @@ object StorageStats {
             Category(
                 id = ID_MARKET_PACKAGES,
                 title = "已下载方案包",
-                description = "方案市场的安装包（内置方案除外）；已安装的方案不受影响，重装时需重新下载",
+                description = "方案市场的安装包(内置方案除外)；已安装的方案不受影响，重装时需重新下载",
                 sizeBytes = marketSize,
                 clearable = true,
             ),
             Category(
                 id = ID_CLIPBOARD,
                 title = "剪贴板历史",
-                description = "本地剪贴板记录（不含固定内容）",
+                description = "本地剪贴板记录(不含固定内容)",
                 sizeBytes = clipboardSize,
                 clearable = true,
             ),
             Category(
                 id = ID_LOGS,
                 title = "日志",
-                description = "运行日志文件（保留当日日志）",
+                description = "运行日志文件(保留当日日志)",
                 sizeBytes = logsSize,
                 clearable = true,
             ),

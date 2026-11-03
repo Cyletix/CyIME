@@ -368,7 +368,7 @@ object PerformanceCosts {
         cost ?: return null
         val parts = mutableListOf<String>()
         cost.keyMs?.let { ms ->
-            if (ms >= device.noiseMs) parts += "每键 +${oneDecimal(ms)} ms（慢 ${percent(ms, cost.baselineKeyMs ?: device.baseline.keyMs)}%）"
+            if (ms >= device.noiseMs) parts += "每键 +${oneDecimal(ms)} ms(慢 ${percent(ms, cost.baselineKeyMs ?: device.baseline.keyMs)}%)"
         }
         cost.memoryMb?.let { mb -> if (mb >= 1) parts += "内存 +${mb.roundToInt()} MB" }
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
@@ -394,8 +394,8 @@ object PerformanceCosts {
 
     private fun reference(source: Source) = when {
         source.sameModel -> ""
-        source.scaled -> "（${deviceName(source.device)} 实测按本机档位折算，仅供参考）"
-        else -> "（${deviceName(source.device)} 实测，仅供参考）"
+        source.scaled -> "(${deviceName(source.device)} 实测按本机档位折算，仅供参考)"
+        else -> "(${deviceName(source.device)} 实测，仅供参考)"
     }
 
     fun deviceName(device: Device) = device.name.ifBlank { device.model }

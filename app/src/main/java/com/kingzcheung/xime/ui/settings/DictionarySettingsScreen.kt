@@ -229,7 +229,7 @@ private fun PhraseEditDialog(
             OutlinedTextField(value = code, onValueChange = onCodeChange,
                 label = { Text("编码，例如 dz") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = weight, onValueChange = onWeightChange,
-                label = { Text("排序（可不填，数字大的在前）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                label = { Text("排序(可不填，数字大的在前)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text("取消") }
                 Spacer(Modifier.width(8.dp))

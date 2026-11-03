@@ -71,7 +71,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 // 邻键纠错、模糊音 11-01 搬到「语言与方案」（跟着方案走，九键和 26 键页不再各放一份）。
                 SettingsSection(title = "混输", content = {
                     SettingsToggleItem(Icons.TwoTone.Abc, "中英混输",
-                        "仅用于中文全拼 26 键；拼音里夹着英文词（nihaohello）时首选“你好hello”。本身像拼音的英文词（game、nice）认不出。",
+                        "仅用于中文全拼 26 键；拼音里夹着英文词(nihaohello)时首选“你好hello”。本身像拼音的英文词(game、nice)认不出。",
                         checked = settings.mixedInput, onCheckedChange = {
                             settings = settings.copy(mixedInput = it); settings.save(context)
                         }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.MIXED_INPUT)
@@ -130,8 +130,8 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     HorizontalDivider()
                     // 逗号键分词（默认关）：下角标的方向跟「反转上下滑方向」走，说明照实际方向写。
                     SettingsToggleItem(Icons.TwoTone.ContentCut, "逗号键分词",
-                        "中文全拼、双拼的 26 键和 14 键：逗号键左下角加 '（只开句号键时在句号键上），" +
-                            "打拼音时${if (settings.reverseSymbolSwipe) "下滑" else "上滑"}插入分词（xi'an），F 键角标的 ' 也一样；" +
+                        "中文全拼、双拼的 26 键和 14 键：逗号键左下角加 '(只开句号键时在句号键上)，" +
+                            "打拼音时${if (settings.reverseSymbolSwipe) "下滑" else "上滑"}插入分词(xi'an)，F 键角标的 ' 也一样；" +
                             "没在打拼音时输入 '。九键照旧用 1 键分词。",
                         checked = settings.syllableSplitKey, onCheckedChange = {
                             settings = settings.copy(syllableSplitKey = it); settings.save(context)
@@ -140,7 +140,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         settings.reverseSymbolSwipe)
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.ContentCut, "Shift 键分词",
-                        "中文全拼、双拼的 26 键和 14 键：打拼音时 Shift 键写「分词」，点一下插入分词（xi'an）；" +
+                        "中文全拼、双拼的 26 键和 14 键：打拼音时 Shift 键写「分词」，点一下插入分词(xi'an)；" +
                             "没在打拼音时照旧切换大小写，按住 Shift 打大写也不变。",
                         checked = settings.shiftSyllableSplit, onCheckedChange = {
                             settings = settings.copy(shiftSyllableSplit = it); settings.save(context)
@@ -166,7 +166,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.T9_GLIDE)
                         HorizontalDivider()
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
-                            "左、上、右、下依次输入键上的第 1～4 个字母（7、9 用到下），点按仍是九键输入；" +
+                            "左、上、右、下依次输入键上的第 1～4 个字母(7、9 用到下)，点按仍是九键输入；" +
                                 "开启后长按输入数字、不再弹出字母菜单。",
                             checked = settings.t9FlickLetters, onCheckedChange = {
                                 settings = settings.copy(t9FlickLetters = it); settings.save(context)
@@ -190,7 +190,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     SettingsSection(title = "双字母键", content = {
                         SettingsToggleItem(Icons.TwoTone.SwapHoriz, "左右滑动选字母",
                             "例如 qw：左滑输入 q，右滑输入 w，松手确认；点按仍使用合并键。" +
-                                "适用于拼音和小鹤双拼 14 键，以及自己合并成一格的两个字母（如自建 18 键的 as）。",
+                                "适用于拼音和小鹤双拼 14 键，以及自己合并成一格的两个字母(如自建 18 键的 as)。",
                             checked = settings.fourteenLetterSwipe, onCheckedChange = {
                                 settings = settings.copy(fourteenLetterSwipe = it); settings.save(context)
                             })
@@ -240,7 +240,7 @@ internal fun NeighborCorrectionSection() {
             }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.NEIGHBOR_CORRECTION)
         if (showFull && showDouble) HorizontalDivider()
         if (showDouble) SettingsToggleItem(Icons.TwoTone.Spellcheck, "双拼邻键纠错",
-            "双拼 26 键按偏到旁边的键时，也给出本来想打的词（关着时只纠拼不成字的两个键）；改完要几秒重新部署",
+            "双拼 26 键按偏到旁边的键时，也给出本来想打的词(关着时只纠拼不成字的两个键)；改完要几秒重新部署",
             checked = settings.doublePinyinCorrection, onCheckedChange = {
                 settings.copy(doublePinyinCorrection = it).save(context)
                 scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
@@ -268,7 +268,7 @@ internal fun FuzzyPinyinSection() {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             // 用户 11-02：九键按数字也模糊很耗性能，做成开关、默认关，开关和每组下面写实测代价，卡了自己关。
             SettingsToggleItem(Icons.TwoTone.Hearing, "九键按数字也模糊",
-                "九键直接按数字也出下面所开各组的相近读音（如 74 也出“是”），不用再点左侧读音。" +
+                "九键直接按数字也出下面所开各组的相近读音(如 74 也出“是”)，不用再点左侧读音。" +
                     "候选变多、每键变慢，首选也更容易不是想要的字；开的组越多越明显，打字卡了就关掉。改完要几秒重新部署。",
                 checked = t9Digits, onCheckedChange = { on ->
                     SpellingPatches.setFuzzyT9Digits(context, on)
@@ -277,12 +277,12 @@ internal fun FuzzyPinyinSection() {
                 },
                 extraCost = {
                     PerformanceCostTotalNote(enabled.mapTo(linkedSetOf()) { com.kingzcheung.xime.settings.PerformanceCosts.Item.t9Fuzzy(it) },
-                        label = "性能开销（已开的 ${enabled.size} 组合计）", tag = "t9-fuzzy-digits")
+                        label = "性能开销(已开的 ${enabled.size} 组合计)", tag = "t9-fuzzy-digits")
                 })
             if (showDoublePinyinSwitch) {
                 HorizontalDivider()
                 SettingsToggleItem(Icons.TwoTone.Hearing, "模糊音也用于双拼",
-                    "关着时下面各组只对全拼起作用；打开后双拼也按读音模糊（in 和 ing 互通）",
+                    "关着时下面各组只对全拼起作用；打开后双拼也按读音模糊(in 和 ing 互通)",
                     checked = doublePinyin, onCheckedChange = { on ->
                         SpellingPatches.setFuzzyDoublePinyin(context, on)
                         doublePinyin = on

@@ -84,7 +84,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
             if (current == null) {
                 SettingsJumpText("在「语言与方案」的方案一栏切换双拼。内置方案可以复制后修改键位，保存为自己的方案；" +
                     "符号和词库与中文26键相同。在「语言与方案」点 QWJRTK、Colemak 或自己的字母布局，双拼也按那个排列打；" +
-                    "启用了中文14键或自己合并过按键的布局（如自己排的20键）时，在方案栏显示的双拼方案在那个布局上也能用：点合并键打键上第一个字母，长按选另一个字母。",
+                    "启用了中文14键或自己合并过按键的布局(如自己排的20键)时，在方案栏显示的双拼方案在那个布局上也能用：点合并键打键上第一个字母，长按选另一个字母。",
                     jumps = listOf("语言与方案"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -211,7 +211,7 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                 if (problems.isNotEmpty() || collisions.isNotEmpty()) SettingsSection(title = "检查") {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         problems.forEach { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
-                        if (collisions.isNotEmpty()) Text("同码音节（由词库区分候选）：" + collisions.entries.joinToString("；") { (code, syllables) ->
+                        if (collisions.isNotEmpty()) Text("同码音节(由词库区分候选)：" + collisions.entries.joinToString("；") { (code, syllables) ->
                             "${code.uppercase()} = ${syllables.joinToString(" / ")}" }, style = MaterialTheme.typography.bodySmall)
                     }
                 }

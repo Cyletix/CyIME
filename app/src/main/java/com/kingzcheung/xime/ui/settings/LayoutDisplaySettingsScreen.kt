@@ -135,14 +135,14 @@ private fun LayoutDisplayPage(
                     }
                     SettingsToggleItem(Icons.TwoTone.Spellcheck, "标点上屏首选",
                         "打字中点逗号、句号、问号等断句标点时，先上屏首选候选再接标点，nihao 点逗号得到「你好，」。" +
-                            "关闭时先上屏打的字母（nihao，）。实体键盘不变。",
+                            "关闭时先上屏打的字母(nihao，)。实体键盘不变。",
                         checked = punctuationCandidate, onCheckedChange = {
                             punctuationCandidate = it; SettingsPreferences.setPunctuationCommitsCandidateEnabled(context, it)
                         })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     var pairedSymbols by remember { mutableStateOf(SettingsPreferences.isPairedSymbolsEnabled(context)) }
                     SettingsToggleItem(Icons.TwoTone.DataObject, "输入成对符号",
-                        "点 “ （ 《 【 等开头的一半时连结尾一起输入，光标停在中间；接着点结尾会跳过已有的那个，" +
+                        "点 “ ( 《 【 等开头的一半时连结尾一起输入，光标停在中间；接着点结尾会跳过已有的那个，" +
                             "退格删掉空的一对。实体键盘不变。",
                         checked = pairedSymbols, onCheckedChange = {
                             pairedSymbols = it; SettingsPreferences.setPairedSymbolsEnabled(context, it)
@@ -175,7 +175,7 @@ private fun LayoutDisplayPage(
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val evenMerged = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().evenMergedKeys
                     SettingsToggleItem(Icons.TwoTone.ViewWeek, "合并键均匀排布",
-                        "14 键和自己排的合并键布局（如 17、18、20 键）里，合并键只比单字母键宽三分之一，单字母键跟着变宽，" +
+                        "14 键和自己排的合并键布局(如 17、18、20 键)里，合并键只比单字母键宽三分之一，单字母键跟着变宽，" +
                             "每排更匀，小屏上好按。关闭时合并键严格占两个 26 键的位置。分体键盘不变。",
                         checked = evenMerged, onCheckedChange = { SettingsPreferences.setEvenMergedKeysEnabled(context, it) },
                         // 分体按 26 键中线拆左右，均匀排布在分体时不起作用：置灰并说明，不让它看着开着却没用。
@@ -587,7 +587,7 @@ private fun LayoutDisplayPage(
             if (page == "gestures") item {
                 SettingsSection(title = "说明", searchKey = "按键技巧入口", content = {
                     SettingsItem(Icons.TwoTone.Lightbulb, "按键技巧",
-                        "Shift、Ctrl（!@#）、空格、删除键的隐藏操作", showArrow = true,
+                        "Shift、Ctrl(!@#)、空格、删除键的隐藏操作", showArrow = true,
                         onClick = { onOpenLayout("${SettingsRoutes.LayoutDisplay}?page=key_tips") })
                 })
             }
@@ -650,10 +650,10 @@ private fun FixedBottomCalibrationSettings() {
 /** 「键盘布局」之外直接从首页进入的两页：route, title, one-line description. */
 internal val LayoutDisplayPages = listOf(
     Triple("bottom_gap", "底部留白校准", "查看键盘底部，调低、抬高或恢复系统建议"),
-    Triple("candidates", "候选词", "字号、候选注释（拼音或中英释义）、取消按钮、输入框或候选栏显示"),
+    Triple("candidates", "候选词", "字号、候选注释(拼音或中英释义)、取消按钮、输入框或候选栏显示"),
     Triple("gestures", "按键与手势", "角标输入方式、删除键、长按空格、光标、长按语言键"),
     // 不在首页列出，从「按键与手势」最下面进入。
-    Triple("key_tips", "按键技巧", "Shift、Ctrl（!@#）、空格、删除键的隐藏操作"),
+    Triple("key_tips", "按键技巧", "Shift、Ctrl(!@#)、空格、删除键的隐藏操作"),
 )
 
 /** 按键显示：字号、键帽大小写、角标与双拼键位提示、点按气泡、顶部样式和底部圆角；放在「主题与外观」。 */
@@ -785,7 +785,7 @@ internal fun KeyboardAppearanceSettings() {
                         )
                         // 图例：上面三个开关和这里的不透明度一起实时变化；怎么输入角标在「按键与手势」。
                         KeyFaceHintsLegend(swipeUpEnabled, swipeDownEnabled, keyPrefs.doublePinyinKeyHints, cornerOpacity)
-                        SettingsNote("角标怎么输入（滑动还是长按）在「按键与手势 › 按键角标的符号和数字」",
+                        SettingsNote("角标怎么输入(滑动还是长按)在「按键与手势 › 按键角标的符号和数字」",
                             jumps = listOf("按键与手势 › 按键角标的符号和数字"))
                     }
                     HorizontalDivider(

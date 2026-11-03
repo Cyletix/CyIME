@@ -73,7 +73,7 @@ fun BackupSettingsContent(onBack: () -> Unit) {
             val result = withContext(Dispatchers.IO) { BackupManager.exportTo(context, uri, includePersonal) }
             busyOp = null
             message = result.fold(
-                onSuccess = { "备份已导出" + if (includePersonal) "（含个人词库与学习数据）" else "" },
+                onSuccess = { "备份已导出" + if (includePersonal) "(含个人词库与学习数据)" else "" },
                 onFailure = { "导出失败：${it.message ?: "未知错误"}" }
             )
         }

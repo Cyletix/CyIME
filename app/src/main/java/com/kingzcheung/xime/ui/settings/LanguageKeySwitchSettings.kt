@@ -59,7 +59,7 @@ internal fun LanguageKeySwitchSettings(
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.selectableGroup()) {
                 for ((mode, title) in listOf(
-                    LanguageSwitchMode.CURRENT_ENGLISH to "当前语言与英文切换（默认）",
+                    LanguageSwitchMode.CURRENT_ENGLISH to "当前语言与英文切换(默认)",
                     LanguageSwitchMode.CYCLE to "按已启用语言顺序循环切换",
                     LanguageSwitchMode.SPECIFIC_ENGLISH to "指定语言与英文切换",
                 )) {
@@ -76,7 +76,7 @@ internal fun LanguageKeySwitchSettings(
                 }
             }
             if (options.mode == LanguageSwitchMode.SPECIFIC_ENGLISH) {
-                if (nativeLanguages.isEmpty()) Text("先在上面打开一种语言（中文、日语、西班牙语等），等它的输入方案准备好后再选。",
+                if (nativeLanguages.isEmpty()) Text("先在上面打开一种语言(中文、日语、西班牙语等)，等它的输入方案准备好后再选。",
                     style = MaterialTheme.typography.bodyMedium)
                 Column(Modifier.selectableGroup()) {
                     for (language in choices) {

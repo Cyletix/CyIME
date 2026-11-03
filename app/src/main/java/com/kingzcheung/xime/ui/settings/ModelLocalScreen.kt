@@ -140,7 +140,7 @@ fun ModelLocalContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "models") {
-                SettingsSection(title = "已安装模型（${localModels.size + if (builtinOcr) 1 else 0}）") {
+                SettingsSection(title = "已安装模型(${localModels.size + if (builtinOcr) 1 else 0})") {
                     if (builtinOcr) BuiltinOcrModelRow()
                     localModels.forEachIndexed { index, item ->
                         if (builtinOcr || index > 0) ModelRowDivider()
@@ -190,7 +190,7 @@ private fun DownloadRegionSection(
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(if (option == DownloadRegion.AUTO)
-                            "${option.label}（当前判断：${if (detectedChina) "中国大陆" else "海外"}）" else option.label,
+                            "${option.label}(当前判断：${if (detectedChina) "中国大陆" else "海外"})" else option.label,
                             style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         Text(option.description, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -220,7 +220,7 @@ private fun ModelImportSection(
     }
     SettingsSection(title = "从本机导入") {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("可选模型文件、官方压缩包、整合包（.zip），或一个存放模型的文件夹；按文件内容自动认出是哪个模型，认不出的不会安装。",
+            Text("可选模型文件、官方压缩包、整合包(.zip)，或一个存放模型的文件夹；按文件内容自动认出是哪个模型，认不出的不会安装。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically) {

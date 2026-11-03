@@ -318,7 +318,7 @@ internal fun ClipboardExportSetting() {
                     .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = format == option, onClick = null)
                     Spacer(Modifier.width(12.dp))
-                    Text("${option.label}（.${option.extension}）", style = MaterialTheme.typography.titleSmall)
+                    Text("${option.label}(.${option.extension})", style = MaterialTheme.typography.titleSmall)
                 }
             }
         }

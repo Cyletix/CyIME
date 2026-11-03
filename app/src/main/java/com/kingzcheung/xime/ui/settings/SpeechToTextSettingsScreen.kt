@@ -125,7 +125,7 @@ fun SpeechToTextSettingsContent(
                     val computers = com.kingzcheung.xime.clipboard.sync.WindowsDevices.saved.value
                     SettingsToggleItem(icon = Icons.TwoTone.Computer, title = "隔空输入",
                         subtitle = if (computers.isEmpty()) "说的话发到电脑光标处；先在「剪贴板同步」连上电脑"
-                            else "说的话发到电脑光标处（电脑要用 CyIME），手机上不上屏",
+                            else "说的话发到电脑光标处(电脑要用 CyIME)，手机上不上屏",
                         checked = remoteTyping, onCheckedChange = { remoteTyping = it; SettingsPreferences.setSttRemoteTyping(context, it) })
                 }
             }
@@ -318,7 +318,7 @@ fun SpeechToTextSettingsContent(
                         )
                     }
                     Text(
-                        text = "离开字幕页（回桌面或切到别的应用）后，字幕继续在屏幕底部显示，点一下回到字幕页；按“退出”才停止。打电话时只显示通话字幕，挂断后接着显示。" +
+                        text = "离开字幕页(回桌面或切到别的应用)后，字幕继续在屏幕底部显示，点一下回到字幕页；按“退出”才停止。打电话时只显示通话字幕，挂断后接着显示。" +
                             if (callCaptionOn) "" else "需要先在系统无障碍里打开“通话字幕”。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -381,7 +381,7 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
     ), answers.typing, "setup-typing") { onAnswers(answers.copy(typing = it)) }
     if (answers.typing == TypingWay.DOUBLE_PINYIN && facts.doublePinyinChoices.isNotEmpty()) {
         GuideQuestion("用哪一种双拼？", facts.doublePinyinChoices.map { choice ->
-            Triple(choice.id, choice.name, "“双拼”两个字打 ${choice.example}" + if (choice.builtin) "" else "（你自己建的）")
+            Triple(choice.id, choice.name, "“双拼”两个字打 ${choice.example}" + if (choice.builtin) "" else "(你自己建的)")
         }, answers.doublePinyin, "setup-double-pinyin") { onAnswers(answers.copy(doublePinyin = it)) }
     }
     val keyboards = SetupGuidePlanner.keyboards(facts, answers)
@@ -397,7 +397,7 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
             })
         }, keyboard, "setup-keyboard",
             note = "以后随时可以在键盘上的「输入方式」里换。".takeIf { keyboards.size > 1 }
-                ?: "${facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }?.name ?: "这种双拼"}只有 26 键（ing 在分号键上，14 键、九键没有分号键）。") {
+                ?: "${facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }?.name ?: "这种双拼"}只有 26 键(ing 在分号键上，14 键、九键没有分号键)。") {
             onAnswers(answers.copy(keyboard = it))
         }
     }
@@ -425,17 +425,17 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
     GuideQuestion("语音输入打算怎么用？", listOf(
         Triple(VoiceUse.OFTEN, "经常用，想边说边看到字", "说话时字就跟着出来，停下后再自动改错、加标点"),
         Triple(VoiceUse.SOMETIMES, "偶尔用，说完出字就行", "说完一句再出字，错字少、带标点，占的空间少一半"),
-        Triple(VoiceUse.NEVER, "不用语音", "关掉语音输入，不留语音模型（字幕要用的除外）"),
+        Triple(VoiceUse.NEVER, "不用语音", "关掉语音输入，不留语音模型(字幕要用的除外)"),
     ), answers.voice, "setup-voice") { onAnswers(answers.copy(voice = it)) }
-    val speaker = facts.sizes[BuiltinModelCatalog.SPEAKER_MODEL]?.takeIf { it > 0 }?.let { "（${SetupGuidePlanner.mbText(it)}）" }.orEmpty()
+    val speaker = facts.sizes[BuiltinModelCatalog.SPEAKER_MODEL]?.takeIf { it > 0 }?.let { "(${SetupGuidePlanner.mbText(it)})" }.orEmpty()
     val icon = when {
         !facts.captionIconChangeable -> "桌面上的「字幕」图标保留"
         facts.usesCaption -> "桌面上已有「字幕」图标，点一下就打开"
-        else -> "桌面上加一个「字幕」图标（系统会问一次要不要添加），点一下就打开"
+        else -> "桌面上加一个「字幕」图标(系统会问一次要不要添加)，点一下就打开"
     }
     GuideQuestion("要用「字幕」吗？", listOf(
         Triple(true, "用字幕", "$icon；键盘菜单里也能进。会留下分清谁在说话的模型$speaker"),
-        Triple(false, "不用字幕", (if (facts.captionIconChangeable) "桌面上不放「字幕」图标（已有的会变灰，可长按移除），" else "") +
+        Triple(false, "不用字幕", (if (facts.captionIconChangeable) "桌面上不放「字幕」图标(已有的会变灰，可长按移除)，" else "") +
             "删掉分清谁在说话的模型。以后想用，在 设置 → 语音转文本 → 字幕 打开"),
     ), answers.caption, "setup-caption",
         note = "「字幕」是 CyIME 里单独的一个页面：把身边的人说的话实时变成大字显示在屏幕上，还能分清是谁在说。" +
@@ -552,7 +552,7 @@ private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit, onOpenM
                 // 写明是哪些模型在下载（语音、联想…），不只写多少 MB。
                 if (result.downloading > 0) add(if (result.waitingForWifi)
                     "${SetupGuidePlanner.kindsText(result.downloadingIds)}还要下载 ${SetupGuidePlanner.mbText(result.downloading)}，连上 Wi-Fi 后自动下载。"
-                    else "${SetupGuidePlanner.kindsText(result.downloadingIds)}正在后台下载（${SetupGuidePlanner.mbText(result.downloading)}），下好就能用。")
+                    else "${SetupGuidePlanner.kindsText(result.downloadingIds)}正在后台下载(${SetupGuidePlanner.mbText(result.downloading)})，下好就能用。")
                 if (result.unpackingIds.isNotEmpty())
                     add("${SetupGuidePlanner.kindsText(result.unpackingIds)}正在从安装包取出，取好就能用。")
                 if (result.failed.isNotEmpty()) add("这些没删成：${result.failed.joinToString("、")}，可以在 扩展 → 已安装的模型 里再删。")

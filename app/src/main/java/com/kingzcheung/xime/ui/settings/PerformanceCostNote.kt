@@ -73,7 +73,7 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
     SettingsSection(title = "性能开销") {
         Column(Modifier.fillMaxWidth().padding(16.dp).testTag("perf-cost-total"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (source == null) {
-                Text("读不到开销表（安装包里的 perf_costs.json），暂时算不出总开销。",
+                Text("读不到开销表(安装包里的 perf_costs.json)，暂时算不出总开销。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 return@Column
             }
@@ -112,9 +112,9 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                     source.scaled -> "${PerformanceCosts.deviceName(device)} 实测按本机档位折算，仅供参考"
                     else -> "${PerformanceCosts.deviceName(device)} 实测，仅供参考"
                 })
-                if (device.measuredAt.isNotBlank()) append("（${device.measuredAt}")
-                if (device.layout.isNotBlank()) append(if (device.measuredAt.isNotBlank()) "，${device.layout}" else "（${device.layout}")
-                if (device.measuredAt.isNotBlank() || device.layout.isNotBlank()) append("）")
+                if (device.measuredAt.isNotBlank()) append("(${device.measuredAt}")
+                if (device.layout.isNotBlank()) append(if (device.measuredAt.isNotBlank()) "，${device.layout}" else "(${device.layout}")
+                if (device.measuredAt.isNotBlank() || device.layout.isNotBlank()) append(")")
                 append("。全关时每键 ${PerformanceCosts.oneDecimal(device.baseline.keyMs)} ms")
                 device.baseline.memoryMb?.let { append("，内存 ${Math.round(it)} MB") }
                 append("。")
@@ -135,7 +135,7 @@ internal fun PerformanceCostTotalSection(on: Set<String>) {
                 }
                 dictionaries?.let { cost ->
                     Row(Modifier.fillMaxWidth().testTag("perf-cost-dictionaries")) {
-                        Text("导入的词库（$dictionaryWords 词）", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text("导入的词库($dictionaryWords 词)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         Text(PerformanceCosts.describe(cost, device) ?: "测不出差别", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

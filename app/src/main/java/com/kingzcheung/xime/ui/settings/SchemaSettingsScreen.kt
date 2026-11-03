@@ -151,8 +151,8 @@ fun SchemaSettingsContent(
                 Column {
                     Text("可以导入：", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "· Rime 方案压缩包（.zip、.tar.gz），比如从 GitHub 下载的方案仓库\n" +
-                            "· 单个方案或词库文件（.schema.yaml、.dict.yaml）",
+                        "· Rime 方案压缩包(.zip、.tar.gz)，比如从 GitHub 下载的方案仓库\n" +
+                            "· 单个方案或词库文件(.schema.yaml、.dict.yaml)",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -378,7 +378,7 @@ fun SchemaSettingsContent(
                             .padding(horizontal = 8.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）",
+                        Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案(高级)",
                             modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary)
                         Text("${extraOff.size} 个", style = MaterialTheme.typography.bodySmall,
@@ -432,7 +432,7 @@ fun SchemaSettingsContent(
                 // 直接看、改 Rime 文件只用来排错，放在高级方案后面。
                 item {
                     TextButton(onClick = onNavigateToRimeFileBrowser) {
-                        Text("Rime 配置文件（高级）")
+                        Text("Rime 配置文件(高级)")
                     }
                 }
                 item { Spacer(Modifier.height(8.dp)) }

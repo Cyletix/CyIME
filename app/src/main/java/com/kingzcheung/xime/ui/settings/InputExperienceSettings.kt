@@ -331,7 +331,7 @@ internal fun InputExperienceSettings(
                         onValueChangeFinished = { settings.save(context) }, valueRange = 0.5f..3f, steps = 9)
                 }
                 Column(Modifier.settingsSearchAnchor("光标每移动一字所需距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档（约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米）")
+                    Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档(约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米)")
                     Text("只在读不到一行几个字的输入框里用；越小越灵敏", style = MaterialTheme.typography.bodySmall)
                     Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
                         onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
@@ -358,7 +358,7 @@ internal fun InputExperienceSettings(
             }
             Column(Modifier.settingsSearchAnchor("符号键松手打开符号的时限", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("符号键松手打开符号的时限：${"%.1f".format(settings.symbolKeyHoldSeconds)} 秒")
-                Text("默认 1 秒。26 键按住 !@# 是 Ctrl，拖到字母上松手发快捷键（如 C 复制）；超过时限或拖出去再松手不打开符号。按满时限字母键才显示快捷键。", style = MaterialTheme.typography.bodySmall)
+                Text("默认 1 秒。26 键按住 !@# 是 Ctrl，拖到字母上松手发快捷键(如 C 复制)；超过时限或拖出去再松手不打开符号。按满时限字母键才显示快捷键。", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.symbolKeyHoldSeconds, modifier = Modifier.testTag("symbol-key-hold-slider"),
                     onValueChange = { settings = settings.copy(symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.3f..2f, steps = 16)

@@ -192,13 +192,13 @@ object SetupGuidePlanner {
     fun title(id: String): String = when (id) {
         SpeechModelCatalog.SENSEVOICE -> "语音识别：说完一句出字"
         SpeechModelCatalog.PARAFORMER -> "语音识别：边说边出字"
-        SpeechModelCatalog.XASR -> "整句精修（中文）"
+        SpeechModelCatalog.XASR -> "整句精修(中文)"
         SpeechModelCatalog.ZIPFORMER -> "另一个边说边出字的中文模型"
         SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA -> "日语专用语音模型"
         BuiltinModelCatalog.SPEAKER_MODEL -> "字幕：分清谁在说话"
-        CandidateModelCatalog.NGRAM -> "九键整句组词（完整）"
-        CandidateModelCatalog.NGRAM_SMALL -> "九键整句组词（精简）"
-        CandidateModelCatalog.GRAMMAR -> "九键语法增强（旧）"
+        CandidateModelCatalog.NGRAM -> "九键整句组词(完整)"
+        CandidateModelCatalog.NGRAM_SMALL -> "九键整句组词(精简)"
+        CandidateModelCatalog.GRAMMAR -> "九键语法增强(旧)"
         HANDWRITING -> "手写识别"
         else -> id
     }
@@ -279,7 +279,7 @@ object SetupGuidePlanner {
         // 已经在用五笔（86、98 或五笔拼音）就不动；从别的方式改成五笔才装、才打开五笔86。
         val useWubi = typing == TypingWay.WUBI && facts.typing != TypingWay.WUBI
         val downloadWubi = useWubi && !facts.wubiInstalled
-        if (downloadWubi) lines += "下载五笔86方案（约 2 MB，要联网），装好后在方案栏里打开。"
+        if (downloadWubi) lines += "下载五笔86方案(约 2 MB，要联网)，装好后在方案栏里打开。"
         // 五笔只有 26 键：在 26 键上才替人切过去，九键、14 键、手写不动。全拼、双拼按回答的键盘切。
         val switchTo = if (!changed) null
             else if (typing == TypingWay.WUBI) WUBI.takeIf { facts.keyboard == KeyboardWay.QWERTY }
@@ -323,8 +323,8 @@ object SetupGuidePlanner {
 
         val captionIcon = answers.caption.takeIf { facts.captionIconChangeable && it != facts.usesCaption }
         when (captionIcon) {
-            true -> lines += "桌面上加一个「字幕」图标（系统会问一次要不要添加）。"
-            false -> lines += "桌面上的「字幕」图标关掉（变灰后可长按移除）。"
+            true -> lines += "桌面上加一个「字幕」图标(系统会问一次要不要添加)。"
+            false -> lines += "桌面上的「字幕」图标关掉(变灰后可长按移除)。"
             null -> {}
         }
         return InputPlan(switchTo, enable, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
@@ -480,8 +480,8 @@ object SetupGuidePlanner {
         SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "Zipformer · 日语轻量"
         SpeechModelCatalog.ZIPFORMER_JA -> "Zipformer · 日语原版"
         BuiltinModelCatalog.SPEAKER_MODEL -> "声纹模型"
-        CandidateModelCatalog.NGRAM -> "九键词组模型（完整）"
-        CandidateModelCatalog.NGRAM_SMALL -> "九键词组模型（精简）"
+        CandidateModelCatalog.NGRAM -> "九键词组模型(完整)"
+        CandidateModelCatalog.NGRAM_SMALL -> "九键词组模型(精简)"
         CandidateModelCatalog.GRAMMAR -> "九键语法增强"
         HANDWRITING -> "手写模型"
         else -> ""

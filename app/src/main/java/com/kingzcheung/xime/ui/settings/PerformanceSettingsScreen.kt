@@ -105,7 +105,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                     PerformanceScale(settings)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    TierRow("自动（推荐）", "按本机配置选：${tierNames.getValue(detected)}", auto) {
+                    TierRow("自动(推荐)", "按本机配置选：${tierNames.getValue(detected)}", auto) {
                         PerformanceProfile.applyAuto(context); refresh()
                     }
                     listOf(PerformanceTier.HIGH, PerformanceTier.MEDIUM, PerformanceTier.LOW).forEach { tier ->

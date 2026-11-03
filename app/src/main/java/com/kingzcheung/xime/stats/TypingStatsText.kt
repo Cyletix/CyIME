@@ -76,7 +76,7 @@ object TypingStatsText {
      * [device] 是「手机」或「平板」，[version] 是 App 版本。
      */
     fun shareText(stats: TypingStatsData, device: String, version: String): String = buildString {
-        append("我的 CyIME 打字速度（").append(device).append("）\n")
+        append("我的 CyIME 打字速度(").append(device).append(")\n")
         for (c in shareRows(stats)) {
             append(c.label).append("：")
             speedText(c)?.let { append(it).append("，") }

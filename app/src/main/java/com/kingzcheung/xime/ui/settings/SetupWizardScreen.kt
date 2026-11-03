@@ -48,9 +48,9 @@ internal data class SetupStatus(
  */
 internal fun imePickerFallbackHint(manufacturer: String, brand: String): String? {
     val vivo = listOf(manufacturer, brand).any { it.equals("vivo", true) || it.equals("iqoo", true) }
-    return if (vivo) "vivo / iQOO（OriginOS）的输入法选择框可能是空的。请点下面按钮打开系统输入法设置，" +
-        "在「默认输入法」（或「当前输入法」）里选 CyIME；如果打开的页面里没有，就进" +
-        "「设置 → 系统管理（或更多设置）→ 语言与输入法 → 默认输入法」，也可以在设置顶部搜索「默认输入法」。"
+    return if (vivo) "vivo / iQOO(OriginOS)的输入法选择框可能是空的。请点下面按钮打开系统输入法设置，" +
+        "在「默认输入法」(或「当前输入法」)里选 CyIME；如果打开的页面里没有，就进" +
+        "「设置 → 系统管理(或更多设置)→ 语言与输入法 → 默认输入法」，也可以在设置顶部搜索「默认输入法」。"
     else null
 }
 
@@ -188,7 +188,7 @@ internal fun SetupWizardContent(
                 // 老人包不出下一页（按设备推荐配置）。
                 if (!com.kingzcheung.xime.BuildConfig.ELDER) Text("用全拼、双拼还是五笔，26 键、14 键还是九键，完成后下一页会问你。",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = onSchemas, enabled = !status.preparing) { Text("选择其他方案（可选）") }
+                TextButton(onClick = onSchemas, enabled = !status.preparing) { Text("选择其他方案(可选)") }
             }
             SetupCard(3, "切换到 CyIME", status.imeEnabled && status.imeSelected,
                 if (status.imeEnabled && status.imeSelected) "已切换" else "待切换") {

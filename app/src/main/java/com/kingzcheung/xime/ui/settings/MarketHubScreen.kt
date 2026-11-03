@@ -336,9 +336,9 @@ private fun SchemesMarketTab(
                             val updatedAt = uiState.updatedAt.takeIf { it.isNotBlank() }
                             val sourceLabel = if (uiState.source.isNotBlank()) "来源：${uiState.source}" else "来自 CyIME 官方源"
                             val footerText = buildString {
-                                append("共 ${uiState.filteredSchemes.size} 个方案（$sourceLabel")
+                                append("共 ${uiState.filteredSchemes.size} 个方案($sourceLabel")
                                 if (updatedAt != null) append(" · 更新于 $updatedAt")
-                                append("）")
+                                append(")")
                             }
                             Text(
                                 footerText,

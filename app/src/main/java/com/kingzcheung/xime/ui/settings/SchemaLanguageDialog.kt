@@ -42,7 +42,7 @@ internal fun SchemaLanguageDialog(schema: SchemaMeta, onChosen: (InputLanguage?)
                         verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = language == current, onClick = choose)
                         Spacer(Modifier.width(8.dp))
-                        Text(language?.displayName ?: "不指定（${InputLanguage.UNSPECIFIED.displayName}）",
+                        Text(language?.displayName ?: "不指定(${InputLanguage.UNSPECIFIED.displayName})",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (language == current) FontWeight.Medium else FontWeight.Normal)
                     }

@@ -31,7 +31,7 @@ object ModelImporter {
             }
             if (unmatched.isNotEmpty()) {
                 if (isNotEmpty()) append("；")
-                append("${unmatched.size} 个文件不属于任何已知模型（${unmatched.take(3).joinToString("、")}${if (unmatched.size > 3) " 等" else ""}）")
+                append("${unmatched.size} 个文件不属于任何已知模型(${unmatched.take(3).joinToString("、")}${if (unmatched.size > 3) " 等" else ""})")
             }
             if (isEmpty()) append("没有找到可导入的文件")
         }

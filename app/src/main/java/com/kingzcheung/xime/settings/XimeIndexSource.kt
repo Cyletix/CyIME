@@ -90,7 +90,7 @@ object XimeIndexSource {
                 // 全部镜像都失败
                 Result.success(SchemesFetch(
                     CuratedRimeSchemes.merge(emptyList()).map { XimeIndexParser.toItem(it, appVersion) },
-                    "CyIME 内置目录（远程索引暂不可用）",
+                    "CyIME 内置目录(远程索引暂不可用)",
                 ))
             } catch (e: Exception) {
                 Log.e(TAG, "fetchSchemes failed", e)
@@ -110,7 +110,7 @@ object XimeIndexSource {
             val direct = XimeIndexParser.parseDirectIndex(text)
             val schemes = CuratedRimeSchemes.merge(direct.schemas)
                 .map { XimeIndexParser.toItem(it, appVersion) }
-            Log.i(TAG, "tryFetchFromBase $host: 获取到 ${schemes.size} 个方案（扁平索引）")
+            Log.i(TAG, "tryFetchFromBase $host: 获取到 ${schemes.size} 个方案(扁平索引)")
 
             if (schemes.isEmpty()) {
                 Log.w(TAG, "tryFetchFromBase $host: 0 个方案，尝试下一个镜像")
@@ -191,7 +191,7 @@ object XimeIndexSource {
                                     val request = Request.Builder().url(url).build()
                                     require(request.url.isHttps) { "插件包需要 HTTPS 下载地址" }
                                     client.newCall(request).execute().use { response ->
-                                        check(response.isSuccessful) { "下载失败（HTTP ${response.code}）" }
+                                        check(response.isSuccessful) { "下载失败(HTTP ${response.code})" }
                                         val body = response.body ?: throw IOException("下载内容为空")
                                         body.byteStream().use { copyPlugin(it, tmp, hash) }
                                     }
@@ -294,7 +294,7 @@ object XimeIndexSource {
                 val schemeDir = SchemaManager.getMarketDir(context, scheme.id)
                 if (schemeDir.exists()) schemeDir.deleteRecursively()
                 val reason = if (result.sha256Verified == false)
-                    "文件校验失败（sha256 不匹配），文件可能不完整" else "下载失败"
+                    "文件校验失败(sha256 不匹配)，文件可能不完整" else "下载失败"
                 return@withContext InstallResult(
                     false, failureReason = reason, sha256Status = result.sha256Verified
                 )
@@ -330,7 +330,7 @@ object XimeIndexSource {
         )
         if (!result.success) {
             val reason = result.failureReason ?: result.conflicts.joinToString("、") { c ->
-                "${c.fileName}（已被 ${c.claimedBy.joinToString("、")} 使用）"
+                "${c.fileName}(已被 ${c.claimedBy.joinToString("、")} 使用)"
             }
             return@withContext InstallResult(false, failureReason = reason)
         }

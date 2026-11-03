@@ -81,7 +81,7 @@ class PerformanceCostsTest {
         assertEquals(3.0 * 2.8, low.device.items.getValue("neighbor_correction").keyMs!!, 1e-9)
         assertEquals(30.0 * 2.8, low.device.baseline.keyMs, 1e-9)
         assertEquals(2.0, low.device.items.getValue("neighbor_correction").memoryMb!!, 1e-9)
-        assertTrue(PerformanceCosts.note(low, "neighbor_correction")!!.endsWith("（Galaxy Tab S8+ 实测按本机档位折算，仅供参考）"))
+        assertTrue(PerformanceCosts.note(low, "neighbor_correction")!!.endsWith("(Galaxy Tab S8+ 实测按本机档位折算，仅供参考)"))
         assertNull(PerformanceCosts.pick(null, null, "SM-X800", "HIGH"))
     }
 
@@ -92,7 +92,7 @@ class PerformanceCostsTest {
         assertFalse(source.device.items.getValue("glass").estimated)
         assertEquals(0.8, source.device.items.getValue("glass").keyMs!!, 1e-9)
         assertTrue(source.device.items.getValue("neighbor_correction").estimated)
-        assertEquals("性能开销：每键 +3.0 ms（慢 10%） · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
+        assertEquals("性能开销：每键 +3.0 ms(慢 10%) · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
         assertEquals(listOf("neighbor_correction"), PerformanceCosts.total(source.device, setOf("glass", "neighbor_correction")).estimated)
     }
 
@@ -110,12 +110,12 @@ class PerformanceCostsTest {
 
     @Test fun noteShowsMeasuredCostAndHidesUnmeasured() {
         val source = PerformanceCosts.Source(device, local = true, sameModel = true)
-        assertEquals("性能开销：每键 +3.0 ms（慢 10%） · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
+        assertEquals("性能开销：每键 +3.0 ms(慢 10%) · 内存 +2 MB", PerformanceCosts.note(source, "neighbor_correction"))
         // 低于测量误差不说“慢 1%”，内存不到 1 MB 不写。
         assertNull(PerformanceCosts.note(source, "glass"))
         assertNull(PerformanceCosts.note(source, "mixed_input"))
         val reference = source.copy(local = false, sameModel = false)
-        assertTrue(PerformanceCosts.note(reference, "fuzzy_z_zh")!!.endsWith("（Galaxy Tab S8+ 实测，仅供参考）"))
+        assertTrue(PerformanceCosts.note(reference, "fuzzy_z_zh")!!.endsWith("(Galaxy Tab S8+ 实测，仅供参考)"))
     }
 
     @Test fun totalUsesMeasuredComboWhenExact() {
@@ -137,9 +137,9 @@ class PerformanceCostsTest {
     @Test fun nineKeyItemsUseTheirOwnBaselineForThePercentage() {
         val source = PerformanceCosts.Source(device, local = true, sameModel = true)
         // 九键那次全关基线 20 ms：+2.0 ms 是慢 10%，不按 26 键的 30 ms 算成 7%。
-        assertEquals("九键性能开销：每键 +2.0 ms（慢 10%） · 内存 +4 MB", PerformanceCosts.note(source, "t9_fuzzy_s_sh", "九键性能开销"))
-        assertEquals("性能开销（已开的 2 组合计）：每键 +5.0 ms（慢 25%） · 内存 +9 MB",
-            PerformanceCosts.totalNote(source, setOf("t9_fuzzy_s_sh", "t9_fuzzy_an_ang"), "性能开销（已开的 2 组合计）"))
+        assertEquals("九键性能开销：每键 +2.0 ms(慢 10%) · 内存 +4 MB", PerformanceCosts.note(source, "t9_fuzzy_s_sh", "九键性能开销"))
+        assertEquals("性能开销(已开的 2 组合计)：每键 +5.0 ms(慢 25%) · 内存 +9 MB",
+            PerformanceCosts.totalNote(source, setOf("t9_fuzzy_s_sh", "t9_fuzzy_an_ang"), "性能开销(已开的 2 组合计)"))
         // 一组都没测过（或一组都没开）不显示。
         assertNull(PerformanceCosts.totalNote(source, setOf("t9_fuzzy_z_zh"), "合计"))
         assertNull(PerformanceCosts.totalNote(source, emptySet(), "合计"))

@@ -141,8 +141,8 @@ internal fun OfflineModelCard() {
                     Column(Modifier.weight(1f)) {
                         Text("整句定稿", style = MaterialTheme.typography.bodyLarge)
                         Text(when {
-                            chineseCorrection -> "中文说完一整句（停顿约 1 秒或点结束）再统一校正一次，更准，说完要多等一会儿；关闭时每 6 秒校正一次。只对中文生效。"
-                            senseVoiceChinese -> "中文用 SenseVoice 时，说完（点结束）把整段再识别一次，更准，说完要多等一会儿。只对中文生效。"
+                            chineseCorrection -> "中文说完一整句(停顿约 1 秒或点结束)再统一校正一次，更准，说完要多等一会儿；关闭时每 6 秒校正一次。只对中文生效。"
+                            senseVoiceChinese -> "中文用 SenseVoice 时，说完(点结束)把整段再识别一次，更准，说完要多等一会儿。只对中文生效。"
                             else -> "只对中文生效：先为中文开启上面的 SenseVoice 二次校正。"
                         },
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

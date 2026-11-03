@@ -491,7 +491,7 @@ private fun ExtensionItem(
                 if (!hostCompatible) {
                     Text(
                         text = "该插件不支持当前主应用版本，已跳过加载" +
-                            if (hostRange.isNotEmpty()) "（要求 $hostRange）" else "。请更新主应用后重试。",
+                            if (hostRange.isNotEmpty()) "(要求 $hostRange)" else "。请更新主应用后重试。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                     )
@@ -642,7 +642,7 @@ private fun ExtensionItem(
             title = { Text("启用非官方插件") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("插件「${extension.name}」未被标记为官方（${badge?.first ?: "未知来源"}）。")
+                    Text("插件「${extension.name}」未被标记为官方(${badge?.first ?: "未知来源"})。")
                     Text("非官方插件可能访问您输入的内容或网络，请确认来源可信后再启用。")
                     if (extension.description.isNotEmpty()) {
                         Text(

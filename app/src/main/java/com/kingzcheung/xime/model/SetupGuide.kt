@@ -281,7 +281,7 @@ object SetupGuide {
                     redeploy = true
                 } else failed += when {
                     !online -> "五笔86方案没下载：现在没联网。可以连上网后再来这页，或在 扩展 → 方案 里获取。"
-                    else -> "五笔86方案没装上（${install?.failureReason ?: download?.failureReason ?: "下载失败"}），可以在 扩展 → 方案 里再获取。"
+                    else -> "五笔86方案没装上(${install?.failureReason ?: download?.failureReason ?: "下载失败"})，可以在 扩展 → 方案 里再获取。"
                 }
             } else wubiReady = true
             // 装过但从方案栏关掉了：打开它。

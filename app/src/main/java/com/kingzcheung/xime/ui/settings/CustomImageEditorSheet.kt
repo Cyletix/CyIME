@@ -182,7 +182,7 @@ internal fun CustomImageEditorSheet(
 }
 
 private fun placementLabel(placement: ThemeImagePlacement): String = when (placement.fit) {
-    "cover" -> if (placement.zoom > 1.001f) "铺满（已放大）" else "铺满"
+    "cover" -> if (placement.zoom > 1.001f) "铺满(已放大)" else "铺满"
     "fit_height" -> "上下对齐，两边留白"
     "fit_width" -> "左右对齐，上下留白"
     else -> "自由大小，四周留白"
