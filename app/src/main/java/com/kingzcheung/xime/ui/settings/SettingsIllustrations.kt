@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
@@ -48,6 +49,42 @@ import com.kingzcheung.xime.settings.CandidateCommentMode
  * 不再切掉最后一行（11-02：角标三张卡的「长按 → …」被切掉一半）。别用固定 height 包选项卡片。
  */
 internal fun Modifier.choiceCardRowHeight(min: Dp): Modifier = heightIn(min = min).height(IntrinsicSize.Min)
+
+/**
+ * 图例里的「键盘」配色：底色、键色、字色都取当前主题的真键盘（[com.kingzcheung.xime.ui.theme.LocalKeyboardPalette]），
+ * 不用设置页 Material 的 surface／surfaceVariant——黑白浅色等主题两者几乎一样，图例里的键白底白键看不见（11-03 截图）。
+ * 图例内部照旧读 surface（键）、surfaceVariant（底）、onSurface（字），所以只在图例外框套一层即可。
+ * 键与底色太接近（导入主题）时把键往字色拉一点，保证看得出键。
+ */
+@Composable
+internal fun LegendKeyboardColors(content: @Composable () -> Unit) {
+    val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
+    if (palette == null) { content(); return }
+    val scheme = MaterialTheme.colorScheme
+    val board = palette.background.copy(alpha = 1f)
+    val text = palette.text.copy(alpha = 1f)
+    val key = legendKeyColor(board, palette.key.copy(alpha = 1f), text)
+    MaterialTheme(colorScheme = scheme.copy(surface = key, surfaceVariant = board, onSurface = text,
+        outlineVariant = androidx.compose.ui.graphics.lerp(board, text, .18f)), content = content)
+}
+
+/** 键和底色亮度差太小时（对比不到 [LEGEND_MIN_KEY_CONTRAST]）把键往字色拉，直到看得出。 */
+internal fun legendKeyColor(board: Color, key: Color, text: Color): Color {
+    fun contrast(a: Color, b: Color): Float {
+        val hi = maxOf(a.luminance(), b.luminance())
+        val lo = minOf(a.luminance(), b.luminance())
+        return (hi + .05f) / (lo + .05f)
+    }
+    if (contrast(key, board) >= LEGEND_MIN_KEY_CONTRAST) return key
+    for (step in 1..10) {
+        val candidate = androidx.compose.ui.graphics.lerp(key, text, step * .03f)
+        if (contrast(candidate, board) >= LEGEND_MIN_KEY_CONTRAST) return candidate
+    }
+    return androidx.compose.ui.graphics.lerp(key, text, .3f)
+}
+
+/** 黑白浅色真键盘白键对 #E8E8EA 底是 1.24；比这再淡就看不出键了。 */
+internal const val LEGEND_MIN_KEY_CONTRAST = 1.15f
 
 /**
  * 带示意图的单选卡片（与「编码显示」同一外观）：上方是这个选项在键盘上的样子，下方是名称。
@@ -78,13 +115,15 @@ internal fun IllustratedChoiceCard(
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
         ) {
-            Column(
-                Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-                content = illustration,
-            )
+            LegendKeyboardColors {
+                Column(
+                    Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    content = illustration,
+                )
+            }
         }
         Spacer(Modifier.height(6.dp))
         Text(title, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
@@ -159,7 +198,10 @@ internal fun CandidateCommentIllustration(mode: CandidateCommentMode) {
  * 两端圆底按钮和真实候选栏一样（左取消、右展开），随开关实时变化。
  */
 @Composable
-internal fun CandidateCancelIllustration(show: Boolean) {
+internal fun CandidateCancelIllustration(show: Boolean) = LegendKeyboardColors { CandidateCancelContent(show) }
+
+@Composable
+private fun CandidateCancelContent(show: Boolean) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     val primary = MaterialTheme.colorScheme.primary
     val muted = onSurface.copy(alpha = 0.6f)
@@ -256,7 +298,12 @@ internal fun QwertyStaggerIllustration(stagger: Float) {
 
 /** 底排预览：模式键、空格两侧标点、语言键与回车，按设置实时变化。 */
 @Composable
-internal fun SpacePunctuationIllustration(comma: Boolean, period: Boolean) {
+internal fun SpacePunctuationIllustration(comma: Boolean, period: Boolean) = LegendKeyboardColors {
+    SpacePunctuationContent(comma, period)
+}
+
+@Composable
+private fun SpacePunctuationContent(comma: Boolean, period: Boolean) {
     val (left, right) = com.kingzcheung.xime.ui.keyboard.spacePunctuationKeys(comma, period, fullWidth = true)
     val onSurface = MaterialTheme.colorScheme.onSurface
     @Composable
@@ -270,7 +317,9 @@ internal fun SpacePunctuationIllustration(comma: Boolean, period: Boolean) {
             }
         }
     }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // 和真键盘底排一样：键画在键盘底色上（原来直接画在设置卡片上，浅色主题键和卡片分不开）。
+    Row(Modifier.widthIn(max = SETTINGS_LEGEND_MAX_WIDTH).fillMaxWidth().clip(RoundedCornerShape(6.dp))
+        .background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
         RowScopeKey("!@#", null, 1.2f, this)
         RowScopeKey("123", null, 1.2f, this)
         if (comma) RowScopeKey(left?.primary ?: "，", left?.alternate ?: "。", 1f, this, accent = true)
@@ -286,11 +335,12 @@ internal fun SpacePunctuationIllustration(comma: Boolean, period: Boolean) {
  * 放在没有图标的设置行下面，左右和文字对齐。最宽 [SETTINGS_LEGEND_MAX_WIDTH]：平板上是一张限宽卡片，不撑满整行（11-02）。
  */
 @Composable
-internal fun SettingsLegend(tag: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.widthIn(max = SETTINGS_LEGEND_MAX_WIDTH).fillMaxWidth().testTag(tag).clip(RoundedCornerShape(6.dp))
-        .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
-}
+internal fun SettingsLegend(tag: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) =
+    LegendKeyboardColors {
+        Column(modifier.widthIn(max = SETTINGS_LEGEND_MAX_WIDTH).fillMaxWidth().testTag(tag).clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
+    }
 
 /** 图例卡片最宽多少：手机上撑满，平板上所有图例都是这一个宽度。 */
 internal val SETTINGS_LEGEND_MAX_WIDTH = 420.dp
@@ -332,7 +382,7 @@ private fun SettingsStepLegend(
     action: String,
     before: @Composable ColumnScope.() -> Unit,
     after: @Composable ColumnScope.() -> Unit,
-) {
+) = LegendKeyboardColors {
     val primary = MaterialTheme.colorScheme.primary
     Row(Modifier.widthIn(max = SETTINGS_LEGEND_MAX_WIDTH).fillMaxWidth().testTag(tag).clip(RoundedCornerShape(6.dp))
         .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
