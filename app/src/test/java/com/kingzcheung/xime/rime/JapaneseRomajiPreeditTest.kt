@@ -51,6 +51,39 @@ class JapaneseRomajiPreeditTest {
     }
 
 
+    /** L 和 - 一样是长音 ー：显示引擎读音，不显示成字母 l（11-03：ko+L 显示「こl」，用户以为长音键丢了）。 */
+    @Test fun lIsTheLongVowelNotAPendingConsonant() {
+        // 引擎读音来自电脑上经 Rime 插件的 azooKey（rime_drv）：kol → こー，kolh → こーh。
+        assertEquals("こー", japanesePreedit("kol", "こー"))
+        assertEquals("こーh", japanesePreedit("kolh", "こーh"))
+        assertEquals("コーヒー", japanesePreedit("kolhil", "コーヒー"))
+        assertEquals("コー", japanesePreedit("KOL", "コー"))
+        assertNull(pendingRomajiTail("kol"))
+        assertNull(pendingRomajiTail("KOL"))
+        assertEquals("h", pendingRomajiTail("kolh"))
+        assertEquals("k", pendingRomajiTail("kolk"))
+        // 退格：L 和 - 一样一次删一个长音。
+        assertEquals(2, romajiDeleteStart("kol"))
+        assertEquals("ko", deleteJapaneseRomaji("kol"))
+        assertEquals("kol", deleteJapaneseRomaji("kolh"))
+        assertEquals(romajiDeleteStart("ka-"), romajiDeleteStart("kal"))
+    }
+
+    /** 选了单独的 ー 键（L 右侧或 Shift）时 L 是字母 l：和别的辅音一样等元音（la → ぁ）。 */
+    @Test fun lIsAConsonantWhenTheKeyboardHasItsOwnLongVowelKey() {
+        japaneseLIsLongVowel = false
+        try {
+            assertEquals("l", pendingRomajiTail("kil"))
+            assertEquals("lt", pendingRomajiTail("kilt"))
+            assertEquals("きl", japanesePreedit("kil", "きl"))
+            assertNull(pendingRomajiTail("kila"))
+            assertEquals("ki", deleteJapaneseRomaji("kil"))
+            assertEquals(2, romajiDeleteStart("kila"))
+        } finally {
+            japaneseLIsLongVowel = true
+        }
+    }
+
     @Test
     fun `以元音结尾的输入已经拼完`() {
         listOf("a", "ka", "kya", "xtsu", "kakina", "KATA", "ka-").forEach {

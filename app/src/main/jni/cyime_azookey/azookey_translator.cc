@@ -203,14 +203,16 @@ class AzooKeyTranslator : public Translator {
     // Rime passes this segment's own input (not the whole composition).
     const string& code = input;
     if (code.empty()) return nullptr;
-    // Uppercase romaji asks for katakana (jaroomaji convention); "l" is the long-vowel key like "-".
+    // Uppercase romaji asks for katakana (jaroomaji convention); "l" is the long-vowel key like "-",
+    // unless the keyboard has its own long-vowel key (option _cyime_l_letter): then l is a letter (la -> ぁ).
     bool katakana = false;
+    const bool l_long_vowel = !engine_->context()->get_option("_cyime_l_letter");
     string romaji;
     for (char c : code) {
       if (isupper(static_cast<unsigned char>(c))) katakana = true;
       char lower = static_cast<char>(tolower(static_cast<unsigned char>(c)));
       // azooKey's romaji table has no hyphen: send the long-vowel mark itself (one character either way).
-      if (lower == 'l' || lower == '-') romaji += "\u30fc"; else romaji += lower;
+      if ((lower == 'l' && l_long_vowel) || lower == '-') romaji += "\u30fc"; else romaji += lower;
     }
     AzooKeyApi& api = Api();
     if (!api.ready) return nullptr;

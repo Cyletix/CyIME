@@ -6,22 +6,43 @@ import com.kingzcheung.xime.settings.LayoutKind
 import com.kingzcheung.xime.viewmodel.ShiftMode
 
 /**
- * 日语 26 键的长音键。键面 ー，送出 "-" 进罗马字转换（ko-hi- → コーヒー），和字母一样接在读音里；
- * 不是直接上屏的符号（m 键角标的 ー 照旧直接上屏）。默认放在 L 键右侧（xime.yaml qwerty_japanese 中排）。
+ * 日语 26 键的长音 ー 放在哪（「26 键 › 长音键」三选一，默认 L 键）：
+ * - [L_KEY]：L 键就是长音（原来 jaroomaji、现在 azooKey 翻译器都把 l 当 ー），不多加键；
+ * - [SEPARATE]：L 右侧单独一个 ー 键，L 打回字母 l（la → ぁ）；
+ * - [SHIFT]：Shift 键点按是 ー、按住满 [SHIFT_TAP_KEY_HOLD_MS] 是 Shift，L 打回字母 l。
+ * ー 键送 "-" 进罗马字转换（ko-hi- → コーヒー），和字母一样接在读音里；m 键角标的 ー 照旧直接上屏。
  */
+enum class JapaneseLongVowelKey(val label: String) {
+    L_KEY("L 键"), SEPARATE("L 右侧单独键"), SHIFT("代替 Shift");
+
+    /** L 键是不是长音；不是时 L 是字母 l（翻译器选项 `_cyime_l_letter`，显示规则见 JapaneseRomajiPreedit）。 */
+    val lIsLongVowel: Boolean get() = this == L_KEY
+
+    companion object {
+        fun fromName(name: String?): JapaneseLongVowelKey = entries.firstOrNull { it.name == name } ?: L_KEY
+    }
+}
+
 internal const val CHOONPU_KEY = "ー"
 internal const val CHOONPU_INPUT = "-"
 
 /** 按住长音键满这么久才算按住 Shift；比这短松手是 ー。 */
 internal const val SHIFT_TAP_KEY_HOLD_MS = 300L
 
-/** 「长音键代替 Shift」只管罗马字日语 26 键（不在英数模式）；日语九宫格、其他语言不变。 */
-internal fun japaneseChoonpuOnShift(setting: Boolean, ascii: Boolean, profile: InputProfile): Boolean =
-    setting && !ascii && profile.language == InputLanguage.JAPANESE && profile.layout.kind == LayoutKind.ALPHABETIC
+/** 只管罗马字日语 26 键（不在英数模式）；日语九宫格、其他语言返回 null，键盘不变。 */
+internal fun japaneseLongVowelKey(setting: JapaneseLongVowelKey, ascii: Boolean, profile: InputProfile): JapaneseLongVowelKey? =
+    setting.takeIf { !ascii && profile.language == InputLanguage.JAPANESE && profile.layout.kind == LayoutKind.ALPHABETIC }
 
-/** 代替 Shift 时中排拿掉 L 右侧的 ー，恢复 9 键。 */
-internal fun withoutChoonpuKey(rows: List<List<String>>): List<List<String>> =
-    rows.map { row -> row.filter { it != CHOONPU_KEY } }
+/** 「L 右侧单独键」：有 l 的那一行在 l 后面插一个 ー（自选的字母排列也一样）；没有 l 时加在第二行末尾。 */
+internal fun withChoonpuKey(rows: List<List<String>>): List<List<String>> {
+    if (rows.any { CHOONPU_KEY in it }) return rows
+    val row = rows.indexOfFirst { "l" in it }.takeIf { it >= 0 } ?: 1.coerceAtMost(rows.lastIndex)
+    if (row < 0) return rows
+    return rows.mapIndexed { index, keys ->
+        if (index != row) keys
+        else keys.indexOf("l").let { at -> if (at < 0) keys + CHOONPU_KEY else keys.take(at + 1) + CHOONPU_KEY + keys.drop(at + 1) }
+    }
+}
 
 /** 长按没打别的键就松手：照 Shift 点按切换，小写→单次大写→锁定→小写（shift_caps 在锁定时是解锁）。 */
 internal fun shiftTapKeyLongPressAction(mode: ShiftMode): String =

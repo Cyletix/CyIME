@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.render
 
 import android.app.Application
 import android.graphics.Bitmap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -23,6 +25,7 @@ import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayout
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardExplicitWidth
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
@@ -41,8 +44,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 日语 26 键长音键的两种放法：A 在 L 键右侧（默认），B 代替 Shift（点按 ー，按住是 Shift）。
- * 点按都送 -（进罗马字转换）；B 按住没打别的键松手是 Shift 点按。设了 CYIME_RENDER_OUT 时另出手机、平板两种宽度的图。
+ * 日语 26 键长音键三选一：L 键（默认，不加键）、L 右侧单独键、代替 Shift（点按 ー，按住是 Shift）。
+ * ー 键点按送 -（进罗马字转换）；代替 Shift 时按住没打别的键松手是 Shift 点按。设置页三张卡片带图例。
+ * 设了 CYIME_RENDER_OUT 时出手机、平板和设置页的图。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1000dp-h900dp-xhdpi")
@@ -50,7 +54,7 @@ import java.io.File
 class JapaneseChoonpuKeyRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
 
-    @Test fun choonpuKeyBesideLOrOnShift() {
+    @Test fun longVowelKeyThreeWays() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         KeysConfigHelper.loadConfig(app)
         KeyboardThemes.initFromConfig(app)
@@ -58,17 +62,21 @@ class JapaneseChoonpuKeyRenderTest {
         KeysConfigHelper.setActiveKeyboardSchema("japanese")
         val vm = KeyboardViewModel(app)
         val pressed = mutableListOf<String>()
-        var onShift by mutableStateOf(false)
+        var mode by mutableStateOf(JapaneseLongVowelKey.L_KEY)
         var tablet by mutableStateOf(false)
+        var settingsPage by mutableStateOf(false)
         rule.setContent {
             val palette = resolveKeyboardPalette("soft_blue", false)
             val config = FrostedGlassConfig.defaults(false, enabled = false)
-            val width = if (tablet) 900.dp else 400.dp
-            val height = if (tablet) 340.dp else 280.dp
-            CompositionLocalProvider(LocalKeyboardExplicitWidth provides true,
-                LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config, japaneseChoonpuOnShift = onShift)) {
+            val width = if (settingsPage) 360.dp else if (tablet) 900.dp else 400.dp
+            val height = if (settingsPage) 230.dp else if (tablet) 340.dp else 280.dp
+            val prefs = KeyboardInputPreferences(frostedGlass = config, japaneseLongVowelKey = mode)
+            CompositionLocalProvider(LocalKeyboardExplicitWidth provides true, LocalKeyboardInputPreferences provides prefs) {
                 MaterialTheme {
-                    Box(Modifier.requiredSize(width, height).testTag("layout-body")
+                    if (settingsPage) Box(Modifier.requiredSize(width, height).testTag("layout-body")
+                        .background(MaterialTheme.colorScheme.background)) {
+                        com.kingzcheung.xime.ui.settings.JapaneseLongVowelKeySettings(prefs) { mode = it.japaneseLongVowelKey }
+                    } else Box(Modifier.requiredSize(width, height).testTag("layout-body")
                         .keyboardBackground(KeyboardThemes.getRenderingScheme("soft_blue").keyboardBackground, false,
                             palette.background, config)) {
                         KeyboardLayout({ pressed += it }, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
@@ -80,7 +88,18 @@ class JapaneseChoonpuKeyRenderTest {
         }
         rule.waitForIdle()
 
-        // A：ー 在 L 右侧，Shift 照旧。
+        // 默认：L 键就是长音，没有多的键，Shift 照旧。
+        rule.onAllNodesWithTag("qwerty-key:ー", true).assertCountEquals(0)
+        rule.onAllNodesWithTag("shift-key-tap", true).assertCountEquals(0)
+        rule.onNodeWithTag("qwerty-key:l", true).performTouchInput { down(center); up() }
+        rule.waitForIdle()
+        assertEquals(listOf("l"), pressed)
+        shot("long-vowel-1-l-key-phone")
+
+        // L 右侧单独键：ー 紧接 L 右边，点按送 -。
+        pressed.clear()
+        rule.runOnIdle { mode = JapaneseLongVowelKey.SEPARATE }
+        rule.waitForIdle()
         rule.onAllNodesWithTag("qwerty-key:ー", true).assertCountEquals(1)
         rule.onAllNodesWithTag("shift-key-tap", true).assertCountEquals(0)
         rule.onNodeWithTag("qwerty-key:ー", true).performTouchInput { down(center); up() }
@@ -89,14 +108,13 @@ class JapaneseChoonpuKeyRenderTest {
         val l = rule.onNodeWithTag("qwerty-key:l", true).fetchSemanticsNode().boundsInRoot
         val choonpu = rule.onNodeWithTag("qwerty-key:ー", true).fetchSemanticsNode().boundsInRoot
         val p = rule.onNodeWithTag("qwerty-key:p", true).fetchSemanticsNode().boundsInRoot
-        // ー 紧接 L 右边，不超出上排 P 的右边。
         assertEquals(l.right, choonpu.left, 1.5f)
         assertTrue(choonpu.right <= p.right + 1.5f)
-        shot("choonpu-A-l-right-phone")
+        shot("long-vowel-2-separate-phone")
 
-        // B：中排回到 9 键，Shift 键点按送 -，按住满时限松手是 Shift 点按。
+        // 代替 Shift：中排 9 键，Shift 键点按送 -，按住满时限松手是 Shift 点按。
         pressed.clear()
-        rule.runOnIdle { onShift = true }
+        rule.runOnIdle { mode = JapaneseLongVowelKey.SHIFT }
         rule.waitForIdle()
         rule.onAllNodesWithTag("qwerty-key:ー", true).assertCountEquals(0)
         rule.onAllNodesWithTag("shift-key-tap", true).assertCountEquals(1)
@@ -107,14 +125,24 @@ class JapaneseChoonpuKeyRenderTest {
         rule.onNodeWithTag("shift-key", true).performTouchInput { down(center); advanceEventTime(600); up() }
         rule.waitForIdle()
         assertEquals(listOf("shift_single"), pressed)
-        shot("choonpu-B-on-shift-phone")
+        shot("long-vowel-3-shift-phone")
 
-        rule.runOnIdle { tablet = true; onShift = false }
+        rule.runOnIdle { tablet = true }
+        for (m in JapaneseLongVowelKey.entries) {
+            rule.runOnIdle { mode = m }
+            rule.waitForIdle()
+            shot("long-vowel-${m.ordinal + 1}-${m.name.lowercase().replace('_', '-')}-tablet")
+        }
+
+        // 设置页的三选一图例：点卡片就换。
+        rule.runOnIdle { settingsPage = true; mode = JapaneseLongVowelKey.L_KEY }
         rule.waitForIdle()
-        shot("choonpu-A-l-right-tablet")
-        rule.runOnIdle { onShift = true }
+        for (m in JapaneseLongVowelKey.entries)
+            rule.onAllNodesWithTag("long-vowel-illustration:${m.name}", true).assertCountEquals(1)
+        shot("long-vowel-settings")
+        rule.onNodeWithTag("long-vowel-key:SHIFT", true).performClick()
         rule.waitForIdle()
-        shot("choonpu-B-on-shift-tablet")
+        assertEquals(JapaneseLongVowelKey.SHIFT, mode)
     }
 
     private fun shot(name: String) {

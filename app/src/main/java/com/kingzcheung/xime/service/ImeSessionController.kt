@@ -542,6 +542,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (!RimeEngine.isInitialized()) return false
         val prefs = SettingsPreferences.getPrefsPublic(service)
         val traditional = prefs.getBoolean(KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
+        // 日语长音键：默认 L 键就是 ー；选了单独的 ー 键时 L 是字母 l。翻译器读选项，显示与退格读同一个值。
+        val lLetter = !com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.fromName(
+            prefs.getString(KeyboardInputPreferences.JAPANESE_LONG_VOWEL_KEY, null)).lIsLongVowel
+        com.kingzcheung.xime.rime.japaneseLIsLongVowel = !lLetter
         val options = buildList {
             add("cyime_mixed_input" to prefs.getBoolean(KeyboardInputPreferences.MIXED_INPUT_KEY, false))
             add("traditionalization" to traditional)
@@ -551,6 +555,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             add("cyime_symbol_names" to prefs.getBoolean(KeyboardInputPreferences.SYMBOL_NAMES_KEY, false))
             add("cyime_greek_letters" to prefs.getBoolean(KeyboardInputPreferences.GREEK_LETTERS_KEY, false))
             add("cyime_rare_chars" to prefs.getBoolean(KeyboardInputPreferences.RARE_CHARACTERS_KEY, false))
+            add("_cyime_l_letter" to lLetter)
         }
         var changed = false
         for ((name, value) in options) {

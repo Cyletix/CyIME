@@ -4,6 +4,22 @@ package com.kingzcheung.xime.rime
 private const val ROMAJI_VOWELS = "aiueo"
 
 /**
+ * L 键是不是长音 ー（「26 键 › 长音键」选 L 键时，默认）：翻译器 cyime_azookey_translator、原 jaroomaji 都把 l 当 ー。
+ * 选了单独的 ー 键时 L 是字母 l（la → ぁ），和别的辅音一样要等元音。由 ImeSessionController.applyCandidateOptions
+ * 和引擎选项 `_cyime_l_letter` 一起写。
+ */
+@Volatile internal var japaneseLIsLongVowel: Boolean = true
+
+private fun isLongVowelL(c: Char): Boolean = japaneseLIsLongVowel && c.lowercaseChar() == 'l'
+
+/**
+ * 这个字符本身就是完整的一个单位、不用等后面的元音：元音、非字母（长音 -、分隔符），以及当长音用的 L。
+ * 把长音 L 当辅音时 ko+L 会显示成「こl」（11-03 用户以为长音键丢了）。
+ */
+private fun completesKana(c: Char): Boolean =
+    !c.isLetter() || c.lowercaseChar() in ROMAJI_VOWELS || isLongVowelL(c)
+
+/**
  * 末尾尚未成音的罗马音（需要按按下的原字母显示的部分）；null 表示末段已经拼完。
  *
  * 依据方案 `japanese.schema.yaml` / `jaroomaji.schema.yaml` 的 preedit_format 判定，
@@ -21,12 +37,12 @@ private const val ROMAJI_VOWELS = "aiueo"
  */
 internal fun pendingRomajiTail(input: String): String? {
     val last = input.lastOrNull() ?: return null
-    if (!last.isLetter() || last.lowercaseChar() in ROMAJI_VOWELS) return null
+    if (completesKana(last)) return null
     // 末尾是辅音（含 n）：回溯出「末尾整段辅音」再判其中哪些已经成音。
     var start = input.length
     while (start > 0) {
         val previous = input[start - 1]
-        if (!previous.isLetter() || previous.lowercaseChar() in ROMAJI_VOWELS) break
+        if (completesKana(previous)) break
         start--
     }
     return pendingTailInConsonants(input.substring(start))
@@ -68,8 +84,8 @@ internal fun romajiDeleteStart(input: String): Int {
     if (input.isEmpty()) return 0
     if (pendingRomajiTail(input) != null) return input.length - 1
     val last = input.last()
-    // 长音符 / 分隔符 / 标点：单个字符即一个删除单位。
-    if (!last.isLetter()) return input.length - 1
+    // 长音符（- 或 L）/ 分隔符 / 标点：单个字符即一个删除单位。
+    if (!last.isLetter() || isLongVowelL(last)) return input.length - 1
     // 末尾 nn → 撥音 ん 一个假名。
     if (last.lowercaseChar() == 'n' && input.length >= 2 &&
         input[input.length - 2].lowercaseChar() == 'n'
@@ -78,7 +94,7 @@ internal fun romajiDeleteStart(input: String): Int {
     var start = input.length - 1
     while (start > 0) {
         val previous = input[start - 1]
-        if (!previous.isLetter() || previous.lowercaseChar() in ROMAJI_VOWELS) break
+        if (completesKana(previous)) break
         start--
     }
     // 双写促音（kka）：第一个辅音属于上一个假名 っ，留给下一次删除。

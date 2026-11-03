@@ -123,16 +123,18 @@ fun KeyboardLayout(
     val letterLayout = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) {
         KeysConfigHelper.letterLayout(uiState.currentSchemaId, isAsciiMode)
     }
-    // 日语 26 键长音键：默认在 L 键右侧（xime.yaml qwerty_japanese）；「长音键代替 Shift」开着时从中排拿掉，左下角 Shift 键点按是 ー。
-    // 配置里关掉了 Shift 键（geometry.shift_key）时 ー 仍留在 L 键右侧。
+    // 日语 26 键长音 ー（「26 键 › 长音键」）：默认 L 键就是长音，键盘不变；「L 右侧单独键」在 l 后面加一个 ー 键；
+    // 「代替 Shift」左下角 Shift 键点按是 ー。配置里关掉了 Shift 键（geometry.shift_key）时改放 L 右侧。
     val shiftKeyConfigured = remember(cfgVer, uiState.currentSchemaId, isAsciiMode) {
         KeysConfigHelper.letterGeometryOverride(uiState.currentSchemaId, isAsciiMode)?.shiftKeyEnabled != false
     }
-    val choonpuOnShift = shiftKeyConfigured && japaneseChoonpuOnShift(
-        LocalKeyboardInputPreferences.current.japaneseChoonpuOnShift, isAsciiMode, uiState.inputProfile)
-    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout, choonpuOnShift) {
+    val longVowelKey = japaneseLongVowelKey(LocalKeyboardInputPreferences.current.japaneseLongVowelKey, isAsciiMode, uiState.inputProfile)
+    val choonpuOnShift = longVowelKey == JapaneseLongVowelKey.SHIFT && shiftKeyConfigured
+    val choonpuBesideL = longVowelKey == JapaneseLongVowelKey.SEPARATE ||
+        longVowelKey == JapaneseLongVowelKey.SHIFT && !shiftKeyConfigured
+    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout, choonpuBesideL) {
         (letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(uiState.currentSchemaId, isAsciiMode))
-            .let { if (choonpuOnShift) withoutChoonpuKey(it) else it }
+            .let { if (choonpuBesideL) withChoonpuKey(it) else it }
     }
     // Typewise honeycomb: a fourth letter row, short rows offset half a key, hexagonal letter caps.
     val honeycomb = letterLayout?.honeycomb == true
@@ -1712,7 +1714,7 @@ internal fun ShiftCapsKeyButton(
     /** Shift 键分词（默认关）：返回 true 时点按是分词 '，键面写「分词」；null 为普通 Shift。 */
     composingSplit: (() -> Boolean)? = null,
     /**
-     * 点按送出的键（日语「长音键代替 Shift」：ー）；非 null 时键面写 [tapLabel]，按住满 [SHIFT_TAP_KEY_HOLD_MS] 才是按住 Shift，
+     * 点按送出的键（日语长音键「代替 Shift」：ー）；非 null 时键面写 [tapLabel]，按住满 [SHIFT_TAP_KEY_HOLD_MS] 才是按住 Shift，
      * 松手前没打别的键就照 Shift 的点按切换大小写（[shiftTapKeyLongPressAction]）。null 为普通 Shift。
      */
     tapKey: String? = null,

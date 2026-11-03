@@ -31,6 +31,29 @@ internal enum class LayoutInputCategory(val route: String, val title: String, va
     Nine("layout_input_nine", "九键与 14 键", "九键滑行、拂动选字母、14 键双字母键、触发距离、方向圆盘与假名提示"),
 }
 
+/** 日语 26 键的长音 ー 放在哪：三张带图例的卡片，默认 L 键（见 JapaneseLongVowelKey）。 */
+@Composable
+internal fun JapaneseLongVowelKeySettings(
+    settings: com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences,
+    onChange: (com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences) -> Unit,
+) {
+    Column(Modifier.settingsSearchAnchor("长音键").padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("长音键", style = MaterialTheme.typography.titleSmall)
+        Text("日语 26 键打 ー 的键。选单独键或 Shift 时 L 是字母 l，代替 Shift 时按住仍是 Shift。",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth().choiceCardRowHeight(108.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.entries.forEach { mode ->
+                IllustratedChoiceCard(mode.label, settings.japaneseLongVowelKey == mode,
+                    onClick = { onChange(settings.copy(japaneseLongVowelKey = mode)) },
+                    modifier = Modifier.weight(1f), tag = "long-vowel-key:${mode.name}") {
+                    JapaneseLongVowelIllustration(mode)
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: () -> Unit) {
@@ -127,11 +150,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             ?.takeIf { !settings.shiftSyllableSplit }?.message)
                     ShiftSyllableSplitLegend(settings.shiftSyllableSplit)
                     HorizontalDivider()
-                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "长音键代替 Shift",
-                        "日语 26 键：Shift 键换成 ー，长按仍是 Shift；关闭时 ー 在 L 键右侧。",
-                        checked = settings.japaneseChoonpuOnShift, onCheckedChange = {
-                            settings = settings.copy(japaneseChoonpuOnShift = it); settings.save(context)
-                        })
+                    JapaneseLongVowelKeySettings(settings) { settings = it; it.save(context) }
                 })
                 }
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {

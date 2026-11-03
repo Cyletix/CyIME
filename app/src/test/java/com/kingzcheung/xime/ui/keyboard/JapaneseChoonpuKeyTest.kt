@@ -7,6 +7,7 @@ import com.kingzcheung.xime.viewmodel.ShiftMode
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -15,7 +16,7 @@ import org.junit.rules.TemporaryFolder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
-/** 日语 26 键长音键：ー 送 - 进罗马字转换（ko-hi- → コーヒー），默认在 L 右侧，可换到 Shift 键上。 */
+/** 日语 26 键长音键：默认 L 键就是长音；可选 L 右侧单独 ー 键或代替 Shift，ー 键送 - 进罗马字转换（ko-hi- → コーヒー）。 */
 class JapaneseChoonpuKeyTest {
     @get:Rule val temp = TemporaryFolder()
     private val defaults get() = requireNotNull(javaClass.classLoader?.getResource("xime.yaml")).readText()
@@ -33,13 +34,19 @@ class JapaneseChoonpuKeyTest {
     }
     @After fun reset() { KeysConfigHelper.setActiveKeyboardSchema("") }
 
-    @Test fun choonpuKeySitsRightOfLAndTypesHyphenIntoTheReading() {
+    @Test fun defaultKeyboardHasNoExtraKeyAndTheChoonpuKeyTypesHyphen() {
         KeysConfigHelper.setActiveKeyboardSchema("japanese")
         val rows = KeysConfigHelper.getKeyRows("japanese", false)
-        assertEquals(listOf("a", "s", "d", "f", "g", "h", "j", "k", "l", CHOONPU_KEY), rows[1])
+        // 默认 L 键就是长音，键盘和原来一样。
         assertEquals(listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p"), rows[0])
+        assertEquals(listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"), rows[1])
         assertEquals(listOf("z", "x", "c", "v", "b", "n", "m"), rows[2])
-        // 键面 ー，送出 -（方案字母表里的长音），不是直接上屏的 ー。
+        assertEquals(JapaneseLongVowelKey.L_KEY, JapaneseLongVowelKey.fromName(null))
+        assertEquals(JapaneseLongVowelKey.L_KEY, JapaneseLongVowelKey.fromName("坏值"))
+        assertTrue(JapaneseLongVowelKey.L_KEY.lIsLongVowel)
+        assertFalse(JapaneseLongVowelKey.SEPARATE.lIsLongVowel)
+        assertFalse(JapaneseLongVowelKey.SHIFT.lIsLongVowel)
+        // 单独的 ー 键：键面 ー，送出 -（方案字母表里的长音），不是直接上屏的 ー。
         assertEquals("ー", KeysConfigHelper.getKeyDisplayLabel(CHOONPU_KEY, false, false))
         assertEquals(CHOONPU_INPUT, KeysConfigHelper.getKeyCommitValue(CHOONPU_KEY, false))
         // m 键角标的 ー 照旧直接上屏，L 键角标的 - 也不变。
@@ -47,31 +54,26 @@ class JapaneseChoonpuKeyTest {
         assertEquals("-", KeysConfigHelper.getSwipeUpCommitValue("l", false))
     }
 
-    @Test fun otherKeyboardsDoNotGetTheChoonpuKey() {
-        for (schema in listOf("rime_ice", "japanese_kana")) {
-            KeysConfigHelper.setActiveKeyboardSchema(schema)
-            assertFalse(schema, KeysConfigHelper.getKeyRows(schema, false).flatten().contains(CHOONPU_KEY))
-        }
-        KeysConfigHelper.setActiveKeyboardSchema("japanese")
-        // 英数模式是英文键盘。
-        assertFalse(KeysConfigHelper.getKeyRows("japanese", true).flatten().contains(CHOONPU_KEY))
-    }
-
-    @Test fun onShiftTheMiddleRowGoesBackToNineKeys() {
+    @Test fun separateKeyGoesRightAfterL() {
         val rows = KeysConfigHelper.getKeyRows("japanese", false)
-        val moved = withoutChoonpuKey(rows)
-        assertEquals(listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"), moved[1])
-        assertEquals(rows[0], moved[0])
-        assertEquals(rows[2], moved[2])
+        val separate = withChoonpuKey(rows)
+        assertEquals(listOf("a", "s", "d", "f", "g", "h", "j", "k", "l", CHOONPU_KEY), separate[1])
+        assertEquals(rows[0], separate[0])
+        assertEquals(rows[2], separate[2])
+        assertEquals("只加一次", separate, withChoonpuKey(separate))
+        // 自选排列里 l 在别处（Colemak 第一排）：跟在 l 后面。
+        val colemak = listOf(listOf("q", "w", "f", "p", "g", "j", "l", "u", "y"), listOf("a", "r", "s", "t"), listOf("z"))
+        assertEquals(listOf("q", "w", "f", "p", "g", "j", "l", CHOONPU_KEY, "u", "y"), withChoonpuKey(colemak)[0])
     }
 
-    @Test fun onShiftOnlyForJapaneseRomaji() {
+    @Test fun choiceOnlyForJapaneseRomaji() {
         val japanese = InputProfiles.describe("japanese")
-        assertTrue(japaneseChoonpuOnShift(true, false, japanese))
-        assertFalse(japaneseChoonpuOnShift(false, false, japanese))
-        assertFalse(japaneseChoonpuOnShift(true, true, japanese))
-        assertFalse(japaneseChoonpuOnShift(true, false, InputProfiles.describe("japanese_kana")))
-        assertFalse(japaneseChoonpuOnShift(true, false, InputProfiles.describe("rime_ice")))
+        for (mode in JapaneseLongVowelKey.entries) {
+            assertEquals(mode, japaneseLongVowelKey(mode, false, japanese))
+            assertNull(japaneseLongVowelKey(mode, true, japanese))
+            assertNull(japaneseLongVowelKey(mode, false, InputProfiles.describe("japanese_kana")))
+            assertNull(japaneseLongVowelKey(mode, false, InputProfiles.describe("rime_ice")))
+        }
     }
 
     @Test fun hyphenIsReadingOnlyInJapaneseRomaji() {

@@ -578,3 +578,39 @@ internal fun KeyboardTopStyleIllustration(style: com.kingzcheung.xime.ui.keyboar
         }
     }
 }
+
+/** 「长音键」三选一的图例：L 右下两排各取一端，强调色画 ー 在哪个键上。 */
+@Composable
+internal fun JapaneseLongVowelIllustration(mode: com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey) {
+    val primary = MaterialTheme.colorScheme.primary
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    @Composable
+    fun Key(main: String, below: String? = null, corner: String? = null, accent: Boolean = false) {
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(6.dp))
+            .background(if (accent) primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface)
+            .border(if (accent) 1.dp else 0.5.dp, if (accent) primary else MaterialTheme.colorScheme.outlineVariant,
+                RoundedCornerShape(6.dp))) {
+            Text(main, Modifier.align(Alignment.Center).padding(bottom = if (below != null) 9.dp else 0.dp),
+                fontSize = if (below != null) 14.sp else 16.sp, color = if (accent) primary else onSurface, maxLines = 1)
+            if (below != null) Text(below, Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp),
+                fontSize = 11.sp, color = primary, fontWeight = FontWeight.Bold, maxLines = 1)
+            if (corner != null) Text(corner, Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 3.dp),
+                fontSize = 9.sp, color = onSurface.copy(alpha = 0.6f), maxLines = 1)
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.testTag("long-vowel-illustration:${mode.name}")) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            when (mode) {
+                com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.L_KEY -> { Key("k"); Key("l", below = "ー", accent = true) }
+                com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.SEPARATE -> { Key("l"); Key("ー", accent = true) }
+                com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.SHIFT -> { Key("k"); Key("l") }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (mode == com.kingzcheung.xime.ui.keyboard.JapaneseLongVowelKey.SHIFT) Key("ー", corner = "⇧", accent = true)
+            else Key("⇧")
+            Key("z")
+        }
+    }
+}
