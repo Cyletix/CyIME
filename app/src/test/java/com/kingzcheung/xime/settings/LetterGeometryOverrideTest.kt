@@ -1,12 +1,19 @@
 package com.kingzcheung.xime.settings
 
 import com.kingzcheung.xime.ui.keyboard.firstRowCellDp
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** xime.custom.yaml keyboard.<section>.geometry：自己写的预设的第二行缩进和删除键份数。 */
+/** xime.custom.yaml keyboard.<section>.geometry：第二行缩进、删除键份数、Shift 开关和份数。 */
 class LetterGeometryOverrideTest {
+    @After fun clear() {
+        KeysConfigHelper.setSectionGeometryForTest(emptyMap())
+        LetterLayouts.setForTest(InputLanguage.CHINESE, null)
+        LetterLayouts.setForTest(InputLanguage.ENGLISH, null)
+    }
 
     private val lxsq17 = """
         keyboard:
@@ -87,5 +94,64 @@ class LetterGeometryOverrideTest {
         // 14 键按字母数占格：一格是一个字母宽。
         assertEquals(30f, firstRowCellDp(30f, 10f, listOf("qw", "er", "ty", "ui", "op"), true), 1e-4f)
         assertEquals(30f, firstRowCellDp(30f, 10f, emptyList(), false), 0f)
+    }
+
+    @Test fun `Shift 可以关掉或调窄`() {
+        val yaml = """
+            keyboard:
+              my17:
+                geometry:
+                  shift_key:
+                    enabled: false
+                    weight: 0.8
+        """.trimIndent()
+        assertEquals(LetterGeometryOverride(shiftKeyEnabled = false, shiftKeyWeight = 0.8f),
+            KeysConfigHelper.parseLetterGeometryYamlText(yaml, "my17"))
+        val short = """
+            keyboard:
+              my17:
+                geometry:
+                  shift_key: false
+        """.trimIndent()
+        assertEquals(LetterGeometryOverride(shiftKeyEnabled = false),
+            KeysConfigHelper.parseLetterGeometryYamlText(short, "my17"))
+        val narrow = """
+            keyboard:
+              my17:
+                geometry:
+                  shift_key: { weight: 0 }
+        """.trimIndent()
+        assertEquals(LetterGeometryOverride(shiftKeyWeight = LetterGeometryOverride.MIN_DELETE_KEY_WEIGHT),
+            KeysConfigHelper.parseLetterGeometryYamlText(narrow, "my17"))
+        val wrong = """
+            keyboard:
+              my17:
+                geometry:
+                  shift_key: { enabled: maybe }
+        """.trimIndent()
+        assertNull(KeysConfigHelper.parseLetterGeometryYamlText(wrong, "my17"))
+    }
+
+    @Test fun `Shift 两项也按字段合并`() {
+        assertEquals(LetterGeometryOverride(0f, null, false, 1f), KeysConfigHelper.mergeLetterGeometry(
+            LetterGeometryOverride(shiftKeyEnabled = false), LetterGeometryOverride(middleRowInset = 0f, shiftKeyWeight = 1f)))
+    }
+
+    @Test fun `用了应用内字母排列也保留参数`() {
+        val zh = LetterGeometryOverride(middleRowInset = 0f, shiftKeyEnabled = false)
+        val en = LetterGeometryOverride(deleteKeyWeight = 1.5f)
+        KeysConfigHelper.setSectionGeometryForTest(mapOf("qwerty" to zh, "qwerty_en" to en))
+        LetterLayouts.setForTest(InputLanguage.CHINESE, ColemakLayout.ID)
+        assertNotNull(KeysConfigHelper.letterLayout("double_pinyin_flypy", false))
+        assertEquals(zh, KeysConfigHelper.letterGeometryOverride("double_pinyin_flypy", false))
+        LetterLayouts.setForTest(InputLanguage.ENGLISH, Cyletix10Layout.ID)
+        assertNotNull(KeysConfigHelper.letterLayout("rime_ice", true))
+        assertEquals(en, KeysConfigHelper.letterGeometryOverride("rime_ice", true))
+    }
+
+    @Test fun `没写参数时一律为空`() {
+        KeysConfigHelper.setSectionGeometryForTest(emptyMap())
+        assertNull(KeysConfigHelper.letterGeometryOverride("rime_ice", false))
+        assertNull(KeysConfigHelper.letterGeometryOverride("rime_ice", true))
     }
 }

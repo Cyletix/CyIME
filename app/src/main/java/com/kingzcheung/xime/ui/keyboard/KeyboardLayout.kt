@@ -231,18 +231,21 @@ fun KeyboardLayout(
             resolvedQwertyStagger(it.qwertyStagger, it.qwertyStaggerCustom, splitCellDp, physicalTargetCellDp)
         },
     )
-    // xime.custom.yaml keyboard.<section>.geometry（自己写的预设才有）：第二行缩进、删除键份数，写了哪项换哪项。
-    // 应用内自建/选定的字母排列有自己的行，不套 YAML 的参数（letterGeometryOverride 里同样判断）。
-    val geometryOverride = remember(cfgVer, uiState.currentSchemaId, isAsciiMode, letterLayout) {
-        if (letterLayout != null) null else KeysConfigHelper.letterGeometryOverride(uiState.currentSchemaId, isAsciiMode)
+    // xime.custom.yaml keyboard.<section>.geometry：第二行缩进、删除键份数、Shift 开关和份数，写了哪项换哪项。
+    // 方案换用应用内自定义布局时同样生效。
+    val geometryOverride = remember(cfgVer, uiState.currentSchemaId, isAsciiMode) {
+        KeysConfigHelper.letterGeometryOverride(uiState.currentSchemaId, isAsciiMode)
     }
     val overrideRowInset = geometryOverride?.middleRowInset?.let { cells ->
         (cells * firstRowCellDp(splitCellDp, letterKeyboardColumns(keyRows, fourteenKey),
-            keyRows.firstOrNull().orEmpty(), weighted = fourteenKey)).dp
+            keyRows.firstOrNull().orEmpty(), weighted = fourteenKey || letterLayout != null)).dp
     }
     val standardRowInset = overrideRowInset ?: letterRowGeometry?.middleRowInsetDp?.dp
     val standardRowEndInset = overrideRowInset ?: letterRowGeometry?.middleRowEndInsetDp?.dp
-    val letterSideKeyWeight = letterRowGeometry?.outerKeyWeight ?: 1.4f
+    // geometry.shift_key：关掉时第三行不放 Shift（份数按 0 算），写了 weight 按它；默认照旧。
+    val shiftKeyShown = geometryOverride?.shiftKeyEnabled != false
+    val frameSideKeyWeight = letterRowGeometry?.outerKeyWeight ?: 1.4f
+    val letterSideKeyWeight = if (!shiftKeyShown) 0f else geometryOverride?.shiftKeyWeight ?: frameSideKeyWeight
     val letterDeleteKeyWeight = geometryOverride?.deleteKeyWeight ?: letterRowGeometry?.deleteKeyWeight ?: 1.4f
     val letterBottomWeight = letterRowGeometry?.bottomLetterWeight ?: 7f
     val splitWeighted = letterLayout != null || fourteenKey
@@ -739,7 +742,8 @@ fun KeyboardLayout(
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
                                 specialKeyBackgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
                                 keyboardBackgroundColor = keyboardBackgroundColor,
-                                sideKeyWeight = if (letterRowGeometry != null) letterSideKeyWeight else 1.2f,
+                                sideKeyWeight = if (!shiftKeyShown) 0f else geometryOverride?.shiftKeyWeight
+                                    ?: if (letterRowGeometry != null) letterSideKeyWeight else 1.2f,
                                 endKeyWeight = geometryOverride?.deleteKeyWeight
                                     ?: if (letterRowGeometry != null) letterDeleteKeyWeight else 1.2f,
                                 letterWeight = letterBottomWeight,
@@ -780,7 +784,7 @@ fun KeyboardLayout(
                                 .weight(1f)
                                 .fillMaxHeight(),
                         ) {
-                            CompositionLocalProvider(LocalHoneycombEdge provides if (honeycomb) HoneycombEdge.START else null) {
+                            if (shiftKeyShown) CompositionLocalProvider(LocalHoneycombEdge provides if (honeycomb) HoneycombEdge.START else null) {
                             val shiftSlot = Modifier.weight(letterSideKeyWeight)
                             SemicolonShiftKey(
                                 ingActive = ingOnShift,
@@ -822,7 +826,7 @@ fun KeyboardLayout(
                                 // 14 键的 m 与 26 键的 m 同位同宽；删除键保持与 Shift 对称的宽度。
                                 // 宽屏错位让删除键比 Shift 宽时，m 只借这部分富余的一半，最多一个键宽。
                                 val fourteenMExtra = if (fourteenKey && splitAt2 < 0 && bottomKeys.lastOrNull()?.length == 1)
-                                    fourteenMBorrowedWeight(letterSideKeyWeight, letterDeleteKeyWeight) else 0f
+                                    fourteenMBorrowedWeight(frameSideKeyWeight, letterDeleteKeyWeight) else 0f
                                 val bottomSegments = if (splitAt2 < 0) listOf(bottomKeys)
                                     else listOf(bottomKeys.take(splitAt2), bottomKeys.drop(splitAt2))
                                 bottomSegments.forEachIndexed { segment, segmentKeys ->
@@ -1463,7 +1467,8 @@ private fun DummyBottomRow(
         modifier = Modifier
             .fillMaxWidth(),
     ) {
-        DummyKeyButton(
+        // geometry.shift_key 关掉时没有 Shift（份数 0），占位行也不画。
+        if (sideKeyWeight > 0f) DummyKeyButton(
             backgroundColor = specialKeyBackgroundColor,
             modifier = Modifier.weight(sideKeyWeight)
         )

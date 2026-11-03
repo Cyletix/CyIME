@@ -470,14 +470,22 @@ data class KeyboardT9Config(
 
 /**
  * 字母键盘的对齐参数，从 xime.yaml / xime.custom.yaml keyboard.<section>.geometry 读（字段级 custom → 内置）。
- * 两项都不写时为 null，键盘照旧：标准排列按字母格自动算，其余第二行缩进 16dp、删除键 1.4 份。
+ * 都不写时为 null，键盘照旧：标准排列按字母格自动算，其余第二行缩进 16dp、Shift 和删除键各 1.4 份。
+ * 这个方案用应用内自定义布局时同样生效。
  */
 data class LetterGeometryOverride(
     /** 第二行左右各缩进几格；一格 = 第一行一个格子宽（合并键按字母数占格时是一个字母宽，否则是一个键宽）。 */
     val middleRowInset: Float? = null,
     /** 删除键在第三行占的份数，和 Shift、底排字母区按份数分这一行。 */
     val deleteKeyWeight: Float? = null,
+    /** shift_key.enabled：false 时第三行不放 Shift，字母区和删除键分这一行。 */
+    val shiftKeyEnabled: Boolean? = null,
+    /** shift_key.weight：Shift 占的份数，范围同删除键。 */
+    val shiftKeyWeight: Float? = null,
 ) {
+    val isEmpty: Boolean get() =
+        middleRowInset == null && deleteKeyWeight == null && shiftKeyEnabled == null && shiftKeyWeight == null
+
     companion object {
         const val MAX_MIDDLE_ROW_INSET = 3f
         const val MIN_DELETE_KEY_WEIGHT = 0.2f
@@ -825,15 +833,12 @@ object KeysConfigHelper {
         if (isAsciiMode) _enRows else _zhRows
 
     /**
-     * 当前字母键盘按 YAML 哪个 section 的行排：写了 geometry 才返回它的对齐参数。
-     * 应用内自建/选定的字母排列（[letterLayout]、[CustomKeyboardLayouts.forSchema]）有自己的行，不套 YAML 的参数。
+     * 当前方案对应 YAML section 的对齐参数，没写 geometry 时为 null。
+     * 方案换用应用内自建/选定的字母排列时照样生效：参数跟着方案的 section 走，不跟行从哪来。
      */
-    fun letterGeometryOverride(schemaId: String, isAsciiMode: Boolean): LetterGeometryOverride? {
-        if (letterLayout(schemaId, isAsciiMode) != null) return null
-        if (isAsciiMode) return _sectionGeometry["qwerty_en"]
-        if (CustomKeyboardLayouts.forSchema(schemaId) != null) return null
-        return _sectionGeometry[mergedSectionForSchema(schemaId) ?: "qwerty"]
-    }
+    fun letterGeometryOverride(schemaId: String, isAsciiMode: Boolean): LetterGeometryOverride? =
+        if (isAsciiMode) _sectionGeometry["qwerty_en"]
+        else _sectionGeometry[mergedSectionForSchema(schemaId) ?: "qwerty"]
 
     /** A rendered frame can arrive before the active gesture cache has switched schemes. */
     fun getKeyRows(schemaId: String, isAsciiMode: Boolean): List<List<String>> {
@@ -1429,6 +1434,11 @@ object KeysConfigHelper {
         return custom ?: default
     }
 
+    /** 仅供单测：直接放入各 section 的对齐参数（正常由 [loadConfig] 从 YAML 读）。 */
+    internal fun setSectionGeometryForTest(geometry: Map<String, LetterGeometryOverride>) {
+        _sectionGeometry = geometry
+    }
+
     /** 各 section 的对齐参数：custom 写了的字段覆盖内置，两边都没写的 section 不进表。 */
     private fun parseSectionGeometries(context: Context, sections: Collection<String>): Map<String, LetterGeometryOverride> {
         val defaultText = readAssetText(context, XIME_CONFIG_FILE)
@@ -1444,25 +1454,34 @@ object KeysConfigHelper {
         val merged = LetterGeometryOverride(
             middleRowInset = custom?.middleRowInset ?: builtIn?.middleRowInset,
             deleteKeyWeight = custom?.deleteKeyWeight ?: builtIn?.deleteKeyWeight,
+            shiftKeyEnabled = custom?.shiftKeyEnabled ?: builtIn?.shiftKeyEnabled,
+            shiftKeyWeight = custom?.shiftKeyWeight ?: builtIn?.shiftKeyWeight,
         )
-        return merged.takeIf { it.middleRowInset != null || it.deleteKeyWeight != null }
+        return merged.takeUnless { it.isEmpty }
     }
 
     /**
      * 从 YAML 文本提取 keyboard.<section>.geometry：
-     * middle_row_inset（格，0～3）、delete_key_weight（份，0.2～5）。超范围的夹到范围内，写错的项当没写。
+     * middle_row_inset（格，0～3）、delete_key_weight（份，0.2～5）、
+     * shift_key: { enabled: true/false, weight: 份，0.2～5 }（也可直接写 shift_key: false）。
+     * 超范围的夹到范围内，写错的项当没写。
      */
     internal fun parseLetterGeometryYamlText(yamlText: String, section: String): LetterGeometryOverride? {
         return try {
             val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val sectionNode = root.opt<YamlMap>("keyboard")?.opt<YamlMap>(section) ?: return null
             val node = sectionNode.opt<YamlMap>("geometry") ?: return null
-            fun number(key: String): Float? =
-                node.opt<YamlScalar>(key)?.content?.trim()?.toFloatOrNull()?.takeIf { it.isFinite() }
-            val inset = number("middle_row_inset")?.coerceIn(0f, LetterGeometryOverride.MAX_MIDDLE_ROW_INSET)
-            val delete = number("delete_key_weight")?.coerceIn(
+            fun number(map: YamlMap, key: String): Float? =
+                map.opt<YamlScalar>(key)?.content?.trim()?.toFloatOrNull()?.takeIf { it.isFinite() }
+            fun weight(map: YamlMap, key: String): Float? = number(map, key)?.coerceIn(
                 LetterGeometryOverride.MIN_DELETE_KEY_WEIGHT, LetterGeometryOverride.MAX_DELETE_KEY_WEIGHT)
-            LetterGeometryOverride(inset, delete).takeIf { inset != null || delete != null }
+            fun flag(scalar: YamlScalar?): Boolean? = scalar?.content?.trim()?.lowercase()?.toBooleanStrictOrNull()
+            val inset = number(node, "middle_row_inset")?.coerceIn(0f, LetterGeometryOverride.MAX_MIDDLE_ROW_INSET)
+            val delete = weight(node, "delete_key_weight")
+            val shiftNode = node.opt<YamlMap>("shift_key")
+            val shiftEnabled = shiftNode?.let { flag(it.opt<YamlScalar>("enabled")) } ?: flag(node.opt<YamlScalar>("shift_key"))
+            val shiftWeight = shiftNode?.let { weight(it, "weight") }
+            LetterGeometryOverride(inset, delete, shiftEnabled, shiftWeight).takeUnless { it.isEmpty }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse keyboard geometry config", e)
             null

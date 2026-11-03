@@ -1,10 +1,12 @@
-# 自己写的字母键盘预设：对齐用的两个参数（可选）。
-# 只对 xime.custom.yaml 里自己的 section 生效；应用内「自定义布局」编辑的布局不读这里。
-# 两项都不写时和以前一样：标准排列（整套 26 字母，每排 10/9/7 左右）按字母格自动对齐，
-# 其余排列第二行左右各缩进 16dp、删除键 1.4 份。
+# 字母键盘的对齐参数（可选），写在方案对应的 section 下（自己的预设，或 qwerty / qwerty_en）。
+# 这个方案换用应用内「自定义布局」时同样生效。
+# 都不写时和以前一样：标准排列（整套 26 字母，每排 10/9/7 左右）按字母格自动对齐，
+# 其余排列第二行左右各缩进 16dp、Shift 和删除键各 1.4 份。
 #
-#   middle_row_inset   第二行左右各缩进几格，0～3。一格 = 第一行一个键宽（14 键按字母数占格时是一个字母宽）。
+#   middle_row_inset   第二行左右各缩进几格，0～3。一格 = 第一行一个键宽（按字母数占格时是一个字母宽）。
 #   delete_key_weight  删除键在第三行占几份，0.2～5。和 Shift（约 1.4 份）、底排字母区（7 份）按比例分这一行。
+#   shift_key          enabled: false 去掉 Shift（大写和「ing 放在 Shift 键上」也跟着没有）；
+#                      weight: Shift 占几份，0.2～5。也可以直接写 shift_key: false。
 keyboard:
   qwerty_lxsq17:
     schemas: [double_pinyin_lxsq17]   # 换成你自己的方案 id
@@ -20,3 +22,6 @@ keyboard:
     geometry:
       middle_row_inset: 0
       delete_key_weight: 1.4
+      shift_key:
+        enabled: true
+        weight: 1.4
