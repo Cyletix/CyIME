@@ -42,7 +42,7 @@ internal fun FrostedThemeControls(config: FrostedGlassConfig, isDark: Boolean,
         GlassSlider("按键不透明度", "${(config.keyOpacity * 100).roundToInt()}%", config.keyOpacity) {
             onChange(config.copy(keyOpacity = (it * 100).roundToInt() / 100f))
         }
-        if (!compact) Text("背景与按键独立调整，切换深浅时互换；取消不保存。文字和图标不随这两个透明度淡化。" +
+        if (!compact) Text("浅色、深色各自保存；取消不保存。文字和图标不随这两个透明度淡化。" +
             "调得过透时，键盘会自动加深到在白色和黑色页面上都能看清按键文字。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

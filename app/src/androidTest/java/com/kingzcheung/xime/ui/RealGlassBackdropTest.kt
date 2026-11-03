@@ -192,6 +192,7 @@ class RealGlassBackdropTest {
                 instrumentation.waitForIdleSync()
             }
             setMaterial(FrostedGlassConfig(false, 14f, .35f, .15f), isDark = true)
+            setMaterial(FrostedGlassConfig(false, 14f, .15f, .35f), isDark = false)
             if (runs("backdrop")) for (isDark in listOf(true, false)) for (theme in listOf("pure_black", "soft_blue", "lavender_purple")) {
                 val appearance = if (isDark) "dark" else "light"
                 val label = "$theme-$appearance"
@@ -209,9 +210,9 @@ class RealGlassBackdropTest {
                     change(mapOf(FrostedGlassPreferences.KEY_ENABLED to true))
                     waitUntil(10_000) { FrostedGlassPreferences.read(context).enabled }
                     assertEquals("glass must retain selected colors", theme, SettingsPreferences.getKeyboardTheme(context))
-                    assertEquals("real keyboard must read the swapped $appearance profile", if (isDark) .35f else .15f,
+                    assertEquals("real keyboard must read the saved $appearance profile", if (isDark) .35f else .15f,
                         FrostedGlassPreferences.read(context).backgroundOpacity)
-                    assertEquals("real keyboard must read the swapped $appearance key opacity", if (isDark) .15f else .35f,
+                    assertEquals("real keyboard must read the saved $appearance key opacity", if (isDark) .15f else .35f,
                         FrostedGlassPreferences.read(context).keyOpacity)
                     val glassRed = colorFrame(RED, "$label-fixed-glass-red")
                     val glassBlue = colorFrame(BLUE, "$label-fixed-glass-blue")

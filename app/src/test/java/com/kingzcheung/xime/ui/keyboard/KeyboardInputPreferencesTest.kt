@@ -287,18 +287,18 @@ class KeyboardInputPreferencesTest {
 
     @Test fun `rendered appearance chooses its own glass controls despite saved display mode`() {
         values["dark_mode"] = 0
-        val dark = FrostedGlassConfig(true, 15f, 0.77f, 0.21f)
-        val light = FrostedGlassConfig(true, 11f, 0.24f, 0.84f)
+        // 浅色、深色各存各的：后存的浅色不改深色。
+        val dark = FrostedGlassConfig(true, 15f, 0.84f, 0.24f)
+        val light = FrostedGlassConfig(true, 11f, 0.30f, 0.84f)
         FrostedGlassPreferences.save(context, dark, true)
         FrostedGlassPreferences.save(context, light, false)
-        val swappedDark = dark.copy(backgroundOpacity = light.keyOpacity, keyOpacity = light.backgroundOpacity)
         // 白色玻璃显示时底色补到 WHITE_GLASS_PANEL_OPACITY（保存的值不变）。
         val shownLight = light.copy(backgroundOpacity = WHITE_GLASS_PANEL_OPACITY)
-        assertEquals(swappedDark, KeyboardInputPreferences.read(context, true).frostedGlass)
+        assertEquals(dark, KeyboardInputPreferences.read(context, true).frostedGlass)
         assertEquals(shownLight, KeyboardInputPreferences.read(context, false).frostedGlass)
         values["dark_mode"] = 1
         assertEquals(shownLight, KeyboardInputPreferences.read(context, false).frostedGlass)
-        assertEquals(swappedDark, KeyboardInputPreferences.read(context).frostedGlass)
+        assertEquals(dark, KeyboardInputPreferences.read(context).frostedGlass)
     }
 
     @Test

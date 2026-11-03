@@ -169,7 +169,7 @@ private fun ThemeSettingsPage(
                         }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.LIQUID_GLASS)
                     if (glass.dark.enabled) {
                         SettingsItem(icon = Icons.TwoTone.Opacity, title = "透明度与模糊",
-                            subtitle = "切换深浅时，背景与按键透明度互换", showArrow = true,
+                            subtitle = "浅色、深色分开设置", showArrow = true,
                             onClick = { showGlassSettings = true })
                         // 「柔化顶部边缘」11-01 并进本页下面的「键盘顶部样式」（圆角／直角／柔化三选一）。
                     }

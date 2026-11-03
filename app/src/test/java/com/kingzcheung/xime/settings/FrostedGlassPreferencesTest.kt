@@ -58,23 +58,37 @@ class FrostedGlassPreferencesTest {
         assertTrue(values.isEmpty())
     }
 
-    @Test fun `opacity controls remain independent and appearance changes swap them both ways`() {
+    @Test fun `light and dark opacities are kept separately`() {
+        // 用户反馈 11-03：白天黑夜两个设置不能同时保留。调一套不能改另一套。
         val dark = FrostedGlassConfig(true, 12f, 0.61f, 0.29f)
         SettingsPreferences.setDarkMode(context, 1)
         FrostedGlassPreferences.save(context, dark)
         FrostedGlassPreferences.save(context, dark.copy(backgroundOpacity = 0.47f))
         assertEquals(0.29f, FrostedGlassPreferences.read(context).keyOpacity)
         SettingsPreferences.setDarkMode(context, 0)
-        assertEquals(0.29f, FrostedGlassPreferences.read(context).backgroundOpacity)
-        assertEquals(0.47f, FrostedGlassPreferences.read(context).keyOpacity)
+        assertEquals(FrostedGlassConfig.defaults(false, enabled = true), FrostedGlassPreferences.read(context))
         val light = FrostedGlassPreferences.read(context)
         FrostedGlassPreferences.save(context, light.copy(keyOpacity = 0.76f))
-        assertEquals(0.29f, FrostedGlassPreferences.read(context).backgroundOpacity)
+        assertEquals(light.copy(keyOpacity = 0.76f), FrostedGlassPreferences.read(context))
         SettingsPreferences.setDarkMode(context, 1)
-        assertEquals(dark.copy(backgroundOpacity = 0.76f), FrostedGlassPreferences.read(context))
+        assertEquals(dark.copy(backgroundOpacity = 0.47f), FrostedGlassPreferences.read(context))
+        SettingsPreferences.setDarkMode(context, 0)
+        assertEquals(light.copy(keyOpacity = 0.76f), FrostedGlassPreferences.read(context))
     }
 
-    @Test fun `conflicting old appearance pairs migrate from active appearance without deleting either record`() {
+    @Test fun `old shared opacity pair splits into the two appearances it rendered`() {
+        values["frosted_glass_paired_dark_background_opacity"] = 0.66f
+        values["frosted_glass_paired_dark_key_opacity"] = 0.27f
+        assertEquals(FrostedGlassConfig(false, 10f, 0.66f, 0.27f), FrostedGlassPreferences.read(context, true))
+        assertEquals(FrostedGlassConfig(false, 10f, 0.27f, 0.66f), FrostedGlassPreferences.read(context, false))
+        assertEquals(true, values[FrostedGlassPreferences.KEY_OPACITY_SPLIT])
+        assertEquals(0.66f, values["frosted_glass_paired_dark_background_opacity"])
+        FrostedGlassPreferences.save(context, FrostedGlassConfig(false, 10f, 0.4f, 0.9f), false)
+        assertEquals(FrostedGlassConfig(false, 10f, 0.66f, 0.27f), FrostedGlassPreferences.read(context, true))
+        assertEquals(FrostedGlassConfig(false, 10f, 0.4f, 0.9f), FrostedGlassPreferences.read(context, false))
+    }
+
+    @Test fun `conflicting old appearance pairs migrate from active appearance`() {
         for (activeDark in listOf(false, true)) {
             values.clear()
             SettingsPreferences.setDarkMode(context, if (activeDark) 1 else 0)
@@ -88,7 +102,11 @@ class FrostedGlassPreferencesTest {
             val expected = if (activeDark) 0.67f to 0.23f else 0.81f to 0.34f
             assertEquals(expected.first, FrostedGlassPreferences.read(context, true).backgroundOpacity)
             assertEquals(expected.second, FrostedGlassPreferences.read(context, true).keyOpacity)
-            old.forEach { (key, value) -> assertEquals(value, values[key]) }
+            // 正在显示的两套写进各自的键（浅色是深色那对互换），之后各存各的。
+            assertEquals(expected.first, values[FrostedGlassPreferences.KEY_BACKGROUND_OPACITY + "_dark"])
+            assertEquals(expected.second, values[FrostedGlassPreferences.KEY_BACKGROUND_OPACITY + "_light"])
+            assertEquals(expected.second, FrostedGlassPreferences.read(context, false).backgroundOpacity)
+            assertEquals(expected.first, FrostedGlassPreferences.read(context, false).keyOpacity)
             SettingsPreferences.setDarkMode(context, if (activeDark) 0 else 1)
             assertEquals(expected.first, FrostedGlassPreferences.read(context, true).backgroundOpacity)
             assertEquals(expected.second, FrostedGlassPreferences.read(context, true).keyOpacity)
@@ -103,16 +121,14 @@ class FrostedGlassPreferencesTest {
         assertEquals(FrostedGlassConfig.defaults(false), FrostedGlassPreferences.read(context, false))
     }
 
-    @Test fun `saving either appearance swaps opacity roles and preserves each blur`() {
+    @Test fun `saving either appearance keeps the other and shares only the switch`() {
         val dark = FrostedGlassConfig(true, 17f, 0.36f, 0.72f)
         val light = FrostedGlassConfig(true, 13f, 0.27f, 0.83f)
         FrostedGlassPreferences.save(context, dark, true)
         FrostedGlassPreferences.save(context, light, false)
-        assertEquals(FrostedGlassProfiles(light, dark.copy(backgroundOpacity = 0.83f, keyOpacity = 0.27f)),
-            FrostedGlassPreferences.readProfiles(context))
+        assertEquals(FrostedGlassProfiles(light, dark), FrostedGlassPreferences.readProfiles(context))
         FrostedGlassPreferences.save(context, dark.copy(enabled = false), true)
-        assertEquals(FrostedGlassProfiles(light.copy(enabled = false, backgroundOpacity = 0.72f, keyOpacity = 0.36f),
-            dark.copy(enabled = false)),
+        assertEquals(FrostedGlassProfiles(light.copy(enabled = false), dark.copy(enabled = false)),
             FrostedGlassPreferences.readProfiles(context))
     }
 
@@ -164,7 +180,7 @@ class FrostedGlassPreferencesTest {
             light = FrostedGlassConfig(true, Float.NaN, Float.POSITIVE_INFINITY, -2f),
             dark = FrostedGlassConfig(true, 50f, Float.NaN, 8f),
         ))
-        assertEquals(FrostedGlassConfig(true, 10f, 1f, 0.8f), FrostedGlassPreferences.read(context, false))
+        assertEquals(FrostedGlassConfig(true, 10f, 0.2f, 0f), FrostedGlassPreferences.read(context, false))
         assertEquals(FrostedGlassConfig(true, 40f, 0.8f, 1f), FrostedGlassPreferences.read(context, true))
         assertEquals(true, values["key_glow_enabled"])
         assertEquals(0.8f, values["keyboard_alpha"])
@@ -243,6 +259,7 @@ class FrostedGlassPreferencesTest {
             assertTrue(FrostedGlassPreferences.keys.contains(FrostedGlassPreferences.KEY_BACKGROUND_OPACITY + suffix))
             assertTrue(FrostedGlassPreferences.keys.contains(FrostedGlassPreferences.KEY_KEY_OPACITY + suffix))
         }
+        assertTrue(FrostedGlassPreferences.keys.contains(FrostedGlassPreferences.KEY_OPACITY_SPLIT))
         assertTrue(FrostedGlassPreferences.keys.contains("dark_mode"))
     }
 
