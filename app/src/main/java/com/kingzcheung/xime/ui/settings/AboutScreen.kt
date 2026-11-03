@@ -506,7 +506,7 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "数据收集",
-                            content = "CyIME 默认使用本地输入与识别。主动启用在线语音或其他联网服务时，相应音频或文本会发送给您选择的服务商。"
+                            content = "CyIME 默认使用本地输入与识别。主动启用在线语音或其他联网服务时，相应音频或文本会发送给您选择的服务商。在「贡献手写样本」页点上传时，只上传该页按题写的笔迹、题目、App 版本和手机型号，用于训练 CyIME 手写模型；平时手写和打字的内容不会上传。"
                         )
                         
                         PrivacySection(

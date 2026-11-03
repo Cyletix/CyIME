@@ -34,6 +34,8 @@ enum class TrainingBank(val id: String, val title: String, val inMenu: Boolean =
     ImportedFormula("formula", "导入公式", inMenu = false),
     /** 随机生成的公式，暂不在菜单里出现，代码保留以后可再开。 */
     RandomFormula("formula_random", "随机公式", inMenu = false),
+    /** 公开版「贡献手写样本」的固定题目（见 HandwritingContribution），不在训练模式菜单里。 */
+    Contribute("contribute", "贡献手写样本", inMenu = false),
 }
 
 /**

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.twotone.Inventory
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Edit
+import androidx.compose.material.icons.twotone.VolunteerActivism
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -27,7 +28,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 手写的设置都放在这一页（用户 10-21 要求和语音分开）：停顿识别、公式标记、手写模型；
- * 手写训练和数据采集只在「装到我的设备」和调试包里出现。
+ * 手写训练和数据采集只在「装到我的设备」和调试包里出现；「贡献手写样本」各个包都有。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +37,7 @@ fun HandwritingSettingsContent(
     onOpenModels: () -> Unit = {},
     onOpenTraining: () -> Unit = {},
     onOpenCapture: () -> Unit = {},
+    onOpenContribute: () -> Unit = {},
     devTools: Boolean = com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG,
 ) {
     Scaffold(modifier = Modifier.testTag("handwriting-settings"), containerColor = MaterialTheme.colorScheme.surface,
@@ -50,6 +52,10 @@ fun HandwritingSettingsContent(
             SettingsSection(title = "手写模型", content = {
                 SettingsItem(Icons.TwoTone.Inventory, "已安装的手写模型",
                     "内置手写、公式手写模型和个人手写模型；下载、切换和删除", onClick = onOpenModels, showArrow = true)
+            })
+            SettingsSection(title = "改进手写", content = {
+                SettingsItem(Icons.TwoTone.VolunteerActivism, "贡献手写样本",
+                    "按题写字，分享或上传给作者训练手写模型", onClick = onOpenContribute, showArrow = true)
             })
             if (devTools) SettingsSection(title = "训练与采集", content = {
                 SettingsItem(Icons.TwoTone.ModelTraining, "手写训练模式",

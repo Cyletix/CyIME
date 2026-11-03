@@ -301,6 +301,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("手写公式两边的标记", handwriting, SettingsRoutes.Handwriting, "公式 latex 美元 数学"),
         SettingsSearchEntry("手写训练模式", handwriting, SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式", anchor = null),
         SettingsSearchEntry("手写数据采集", handwriting, SettingsRoutes.HandwritingCapture, "手写 采集 样本 笔迹 标注", anchor = null),
+        SettingsSearchEntry("贡献手写样本", handwriting, SettingsRoutes.HandwritingContribute, "手写 贡献 样本 上传 分享 训练 改进 认不出", anchor = null),
         // 系统 › 剪贴板与同步
         SettingsSearchEntry("连接状态", clipboard, SettingsRoutes.ClipboardSync, "扫码连接电脑 连接电脑 Windows 配对 连接码 二维码 互联"),
         SettingsSearchEntry("同步剪贴板", clipboard, SettingsRoutes.ClipboardSync, "同步 剪贴板 电脑 Windows 我的设备", section = "连接状态"),

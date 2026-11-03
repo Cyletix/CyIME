@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SaveAlt
@@ -93,11 +94,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.handwriting.training.BuiltinTrainingPrompts
 import com.kingzcheung.xime.handwriting.training.FormulaGenerator
+import com.kingzcheung.xime.handwriting.training.HandwritingContribution
 import com.kingzcheung.xime.handwriting.training.PromptBankFile
 import com.kingzcheung.xime.handwriting.training.TrainingBank
 import com.kingzcheung.xime.handwriting.training.FormulaCsvParser
@@ -154,6 +158,9 @@ data class TrainingUiState(
     val checking: Boolean = false,
     /** 个人手写模型：null 没有，true 在用，false 已停用。 */
     val personalModel: Boolean? = null,
+    /** 贡献样本：已上传的条数（样本文件前这么多行），正在上传时不能再点。 */
+    val uploaded: Int = 0,
+    val uploading: Boolean = false,
 ) {
     val current: TrainingPrompt? get() = custom ?: prompts.getOrNull(index)
     val totalSamples: Int get() = counts.values.sum()
@@ -170,10 +177,20 @@ sealed class TrainingEvent {
     data class Share(val uri: Uri) : TrainingEvent()
 }
 
-/** 训练模式：只做数据收集，按题库顺序出题，样本逐条写入 app 私有目录。 */
-class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewModel(app) {
+/**
+ * 训练模式：只做数据收集，按题库顺序出题，样本逐条写入 app 私有目录。
+ * [contribute] 为 true 时是公开版的「贡献手写样本」：只出固定题目，样本另存一处，可分享或上传。
+ */
+class HandwritingTrainingViewModel @JvmOverloads constructor(
+    app: android.app.Application,
+    val contribute: Boolean = false,
+) : AndroidViewModel(app) {
 
-    private val store = TrainingSampleStore(app)
+    private val store = if (contribute) TrainingSampleStore(app, HandwritingContribution.STORE_NAME) else TrainingSampleStore(app)
+    private val contributePrompts by lazy {
+        runCatching { HandwritingContribution.prompts(app) }
+            .getOrElse { e -> Log.w(TRAINING_TAG, "load contribute prompts failed", e); emptyList() }
+    }
     private var formulaBank: List<TrainingPrompt> = emptyList()
     private val assetBanks = java.util.concurrent.ConcurrentHashMap<PromptBankFile, List<TrainingPrompt>>()
 
@@ -202,8 +219,16 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
                 store.loadFormulaBank() to store.countsByPrompt()
             }
             formulaBank = bank
-            _state.update { it.copy(counts = counts, personalModel = personalModelState()) }
-            selectBank(store.currentBank)
+            _state.update {
+                it.copy(counts = counts, personalModel = personalModelState(),
+                    uploaded = if (contribute) HandwritingContribution.uploadedLines(app) else 0)
+            }
+            if (contribute) {
+                withContext(Dispatchers.IO) { contributePrompts }
+                selectBank(TrainingBank.Contribute)
+            } else {
+                selectBank(store.currentBank)
+            }
         }
     }
 
@@ -226,6 +251,7 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
         TrainingBank.Missed -> misses.map { it.prompt.copy(hint = "认错 ${it.misses} 次，上次认成「${it.lastWrong}」") }
         TrainingBank.RandomFormula -> randomFormulas
         TrainingBank.ImportedFormula -> formulaBank
+        TrainingBank.Contribute -> contributePrompts
     }
 
     private val randomFormulas by lazy { FormulaGenerator.prompts() }
@@ -269,7 +295,7 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
     /** 能做识别检查时返回内置模型的前 5 个候选；不是单个字、模型不认识这个字或模型不可用时返回 null。 */
     /** 只有汉字（内置模型真正认得的）才“认错就重写到认对”。 */
     private fun enforcesCheck(prompt: TrainingPrompt): Boolean =
-        isHanzi(prompt.label) && (prompt.type == TrainingPromptType.Chinese || prompt.type == TrainingPromptType.Custom)
+        !contribute && isHanzi(prompt.label) && (prompt.type == TrainingPromptType.Chinese || prompt.type == TrainingPromptType.Custom)
 
     private fun isHanzi(label: String): Boolean =
         label.codePointCount(0, label.length) == 1 &&
@@ -315,6 +341,12 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
                     recognized = recognized,
                 )
                 withContext(Dispatchers.IO) {
+                    if (contribute) {
+                        // 贡献的样本只存不学：不改本机的手写模板
+                        store.append(sample, BuildConfig.VERSION_NAME, AppInfo.deviceModel,
+                            HandwritingContribution.writerId(getApplication()))
+                        return@withContext
+                    }
                     store.append(sample, BuildConfig.VERSION_NAME, AppInfo.deviceModel)
                     // 假名、英文字母同时加成输入法手写的模板（边用边学，见 HandwritingTemplates）
                     runCatching {
@@ -418,7 +450,8 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
         val index = if (wrapped) 0 else next
         store.setPosition(s.bank, index)
         _state.update { it.copy(index = index) }
-        if (wrapped) _events.tryEmit(TrainingEvent.Message("这一组写完一轮了，从头再来"))
+        if (wrapped) _events.tryEmit(TrainingEvent.Message(
+            if (contribute) "全部写完了，可以在右上角分享或上传" else "这一组写完一轮了，从头再来"))
     }
 
     fun importFormulaCsv(uri: Uri) {
@@ -556,11 +589,37 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
         }
     }
 
+    /** 贡献样本：把还没上传的样本传给作者（只传新写的）。 */
+    fun upload() {
+        if (_state.value.uploading) return
+        _state.update { it.copy(uploading = true) }
+        viewModelScope.launch {
+            val app = getApplication<android.app.Application>()
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    HandwritingContribution.upload(app, store.samples(), BuildConfig.VERSION_NAME)
+                }
+                _state.update { it.copy(uploaded = HandwritingContribution.uploadedLines(app)) }
+                _events.emit(TrainingEvent.Message(
+                    if (result.count == 0) "没有新写的样本" else "已上传 ${result.count} 条，谢谢"))
+            } catch (e: Exception) {
+                Log.w(TRAINING_TAG, "upload failed", e)
+                FileLogger.e(TRAINING_TAG, "upload failed", e)
+                _events.emit(TrainingEvent.Message("上传失败：${e.message}，可以改用分享"))
+            } finally {
+                _state.update { it.copy(uploading = false) }
+            }
+        }
+    }
+
     fun clearSamples() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { store.clearSamples() }
+            withContext(Dispatchers.IO) {
+                store.clearSamples()
+                if (contribute) HandwritingContribution.resetUploaded(getApplication())
+            }
             misses = emptyList()
-            _state.update { it.copy(counts = emptyMap(), check = null) }
+            _state.update { it.copy(counts = emptyMap(), check = null, uploaded = 0) }
             if (_state.value.bank == TrainingBank.Missed) selectBank(TrainingBank.Missed)
             _events.emit(TrainingEvent.Message("已清空样本"))
         }
@@ -571,14 +630,23 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
  * 手写训练模式（数据收集）：顶部出题，下方全屏画板，按“下一题”保存当前笔迹。
  */
 @Composable
-fun HandwritingTrainingScreen(onBack: () -> Unit) {
+fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
     val context = LocalContext.current
-    val viewModel: HandwritingTrainingViewModel = viewModel()
+    val app = context.applicationContext as android.app.Application
+    val viewModel: HandwritingTrainingViewModel = viewModel(
+        key = if (contribute) "contribute" else "training",
+        factory = viewModelFactory { initializer { HandwritingTrainingViewModel(app, contribute) } },
+    )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var bankMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    // 贡献样本：第一次分享或上传前先同意用途；同意后接着做刚才点的那件事
+    var consentFor by remember { mutableStateOf<(() -> Unit)?>(null) }
+    fun withConsent(action: () -> Unit) {
+        if (!contribute || HandwritingContribution.consented(context)) action() else consentFor = action
+    }
 
     val strokes = remember { mutableStateListOf<TrainingStroke>() }
     var currentStroke by remember { mutableStateOf<List<TrainingPoint>>(emptyList()) }
@@ -645,7 +713,7 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         clipData = android.content.ClipData.newRawUri(null, event.uri)
                     }
-                    context.startActivity(Intent.createChooser(intent, "分享训练样本"))
+                    context.startActivity(Intent.createChooser(intent, if (contribute) "分享手写样本" else "分享训练样本"))
                 }
             }
         }
@@ -668,7 +736,8 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出")
                 }
-                Box {
+                if (contribute) Text(TrainingBank.Contribute.title, fontSize = 16.sp)
+                else Box {
                     TextButton(onClick = { bankMenu = true }) {
                         Text(state.bank.title, fontSize = 16.sp)
                         Icon(Icons.Filled.ArrowDropDown, contentDescription = "切换题库")
@@ -694,7 +763,26 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
                     IconButton(onClick = { moreMenu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "更多")
                     }
-                    CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    if (contribute) CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                        val pending = (state.totalSamples - state.uploaded).coerceAtLeast(0)
+                        if (HandwritingContribution.uploadAvailable()) CompactMenuRow(
+                            label = if (state.uploading) "正在上传…" else "上传（$pending 条未传）", icon = Icons.Filled.CloudUpload,
+                            onClick = { moreMenu = false; withConsent { viewModel.upload() } },
+                        )
+                        CompactMenuRow(
+                            label = "分享样本文件", icon = Icons.Filled.IosShare,
+                            onClick = { moreMenu = false; withConsent { viewModel.export(share = true) } },
+                        )
+                        CompactMenuRow(
+                            label = "导出到下载目录", icon = Icons.Filled.SaveAlt,
+                            onClick = { moreMenu = false; viewModel.export(share = false) },
+                        )
+                        CompactMenuRow(
+                            label = "清空全部样本", icon = Icons.Filled.Delete,
+                            tint = MaterialTheme.colorScheme.error,
+                            onClick = { moreMenu = false; confirmClear = true },
+                        )
+                    } else CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                         CompactMenuRow(
                             label = "导入公式题库（CSV）", icon = Icons.Filled.FileOpen,
                             onClick = { moreMenu = false; importLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*")) },
@@ -1066,7 +1154,7 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
                     modifier = noKeyFocus,
                 ) { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "撤销") }
                 TextButton(onClick = { resetBoard() }, enabled = strokes.isNotEmpty(), modifier = noKeyFocus) { Text("重写") }
-                TextButton(modifier = noKeyFocus, onClick = {
+                if (!contribute) TextButton(modifier = noKeyFocus, onClick = {
                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager
                     val clip = clipboard.primaryClip
                     val text = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(context)?.toString() else null
@@ -1074,6 +1162,22 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
                 }) { Text("粘贴") }
             }
         }
+    }
+
+    consentFor?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { consentFor = null },
+            title = { Text("样本用途") },
+            text = { Text(HandwritingContribution.CONSENT_TEXT) },
+            confirmButton = {
+                TextButton(onClick = {
+                    HandwritingContribution.setConsented(context)
+                    consentFor = null
+                    pending()
+                }) { Text("同意") }
+            },
+            dismissButton = { TextButton(onClick = { consentFor = null }) { Text("取消") } },
+        )
     }
 
     if (confirmClear) {

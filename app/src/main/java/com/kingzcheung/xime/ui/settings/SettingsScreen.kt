@@ -340,7 +340,14 @@ fun SettingsScreen(
             HandwritingSettingsContent(onBack = { navController.popBackStack() },
                 onOpenModels = { navController.navigate(SettingsRoutes.ModelLocal) },
                 onOpenTraining = { navController.navigate(SettingsRoutes.HandwritingTraining) },
-                onOpenCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) })
+                onOpenCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) },
+                onOpenContribute = { navController.navigate(SettingsRoutes.HandwritingContribute) })
+        }
+        composable(SettingsRoutes.HandwritingContribute) {
+            HandwritingTrainingScreen(
+                onBack = { navController.popBackStack() },
+                contribute = true,
+            )
         }
         composable(SettingsRoutes.HandwritingTraining) {
             HandwritingTrainingScreen(

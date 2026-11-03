@@ -52,7 +52,7 @@ object TrainingSampleCodec {
     const val FORMAT = "cyime-handwriting-training"
     const val VERSION = 1
 
-    fun encode(sample: TrainingSample, appVersion: String, device: String): String {
+    fun encode(sample: TrainingSample, appVersion: String, device: String, writer: String? = null): String {
         val p = sample.prompt
         val obj = JSONObject()
             .put("format", FORMAT)
@@ -91,6 +91,7 @@ object TrainingSampleCodec {
         obj.put("created_at_ms", sample.createdAtMs)
         obj.put("app_version", appVersion)
         obj.put("device", device)
+        writer?.let { obj.put("writer", it) }
         // JSONL 要求单行；org.json 默认不换行
         return obj.toString()
     }
@@ -104,13 +105,13 @@ object TrainingSampleCodec {
  * - formula_bank.jsonl：用户导入的公式题库（私人数据，不随安装包分发）；
  * 进度（每个题库下一题位置）存在 SharedPreferences。
  */
-class TrainingSampleStore(private val context: Context) {
+class TrainingSampleStore(private val context: Context, private val name: String = "handwriting_training") {
 
-    private val dir = File(context.filesDir, "handwriting_training").apply { mkdirs() }
+    private val dir = File(context.filesDir, name).apply { mkdirs() }
     private val samplesFile = File(dir, "samples.jsonl")
     private val formulaFile = File(dir, "formula_bank.jsonl")
     private val missFile = File(dir, "misses.jsonl")
-    private val prefs = context.getSharedPreferences("handwriting_training", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
     companion object {
         /** 认对一次就说明能认出来，移出认错列表。 */
@@ -181,9 +182,12 @@ class TrainingSampleStore(private val context: Context) {
         if (!tmp.renameTo(missFile)) { tmp.copyTo(missFile, overwrite = true); tmp.delete() }
     }
 
-    fun append(sample: TrainingSample, appVersion: String, device: String) {
-        samplesFile.appendText(TrainingSampleCodec.encode(sample, appVersion, device) + "\n", Charsets.UTF_8)
+    fun append(sample: TrainingSample, appVersion: String, device: String, writer: String? = null) {
+        samplesFile.appendText(TrainingSampleCodec.encode(sample, appVersion, device, writer) + "\n", Charsets.UTF_8)
     }
+
+    /** 样本文件本身（上传时按行读取）。 */
+    fun samples(): File = samplesFile
 
     /**
      * 合并导入一份样本备份（训练模式导出的 .jsonl）：只收本格式的行，按样本 id 去重后追加。
@@ -291,7 +295,8 @@ class TrainingSampleStore(private val context: Context) {
         if (!samplesFile.exists() || samplesFile.length() == 0L) return null
         val exportDir = File(context.filesDir, "exports").apply { mkdirs() }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        return File(exportDir, "cyime_handwriting_training_$stamp.jsonl").also { samplesFile.copyTo(it, overwrite = true) }
+        val prefix = if (name == "handwriting_training") "cyime_handwriting_training" else "cyime_$name"
+        return File(exportDir, "${prefix}_$stamp.jsonl").also { samplesFile.copyTo(it, overwrite = true) }
     }
 
     /** 保存到公共“下载”目录，返回显示路径。 */
