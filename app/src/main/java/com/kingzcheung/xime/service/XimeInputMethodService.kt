@@ -3809,21 +3809,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun editorEnterKeyText(): String = currentInputEditorInfo?.let(::enterKeyTextFor) ?: "发送"
 
-    private fun enterKeyTextFor(editorInfo: EditorInfo): String {
-        val imeOptions = editorInfo.imeOptions
-        val action = imeOptions and EditorInfo.IME_MASK_ACTION
-        val noEnterAction = imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0
-        val enterText = when {
-            noEnterAction -> "换行"
-            action == EditorInfo.IME_ACTION_GO -> "前往"
-            action == EditorInfo.IME_ACTION_SEARCH -> "搜索"
-            action == EditorInfo.IME_ACTION_SEND -> "发送"
-            action == EditorInfo.IME_ACTION_NEXT -> "下一项"
-            action == EditorInfo.IME_ACTION_DONE -> "完成"
-            else -> "换行"
-        }
-        return enterText
-    }
+    /** 键面和回车实际做的事同一判断（[EnterKeyAction]）：写换行就换行，写发送才发送。 */
+    private fun enterKeyTextFor(editorInfo: EditorInfo): String = EnterKeyAction.label(editorInfo.imeOptions)
 
     override fun onFinishInput() {
         // 离开后的最后一帧仍不可输入，下一次 onStartInput 按新编辑器恢复正常行为。
