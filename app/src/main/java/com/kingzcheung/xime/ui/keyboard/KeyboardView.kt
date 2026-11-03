@@ -120,6 +120,9 @@ val LocalStretchFactor = compositionLocalOf { 1f }
 val LocalSuppressCursorMove = compositionLocalOf { mutableStateOf(false) }
 internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> (Int) -> Unit)?> { null }
 
+/** How long startup may take before the loading panel shows "正在加载词库" and its progress bar. */
+internal const val DEPLOY_NOTICE_DELAY_MS = 600L
+
 @Composable
 fun KeyboardView(
     viewModel: KeyboardViewModel,
@@ -1729,6 +1732,18 @@ fun KeyboardView(
             }
         }
 
+        // A short startup (the IME service recreated, the engine still resident) must not flash
+        // "正在加载词库" and a progress bar on every keyboard open. The plain panel still covers the
+        // keys at once (input stays gated by InputReadiness); the words and bar follow only when
+        // loading really takes a while, or right away for an error.
+        var deployNoticeVisible by remember { mutableStateOf(false) }
+        LaunchedEffect(state.isDeploying) {
+            deployNoticeVisible = false
+            if (state.isDeploying) {
+                kotlinx.coroutines.delay(DEPLOY_NOTICE_DELAY_MS)
+                deployNoticeVisible = true
+            }
+        }
         if (state.isDeploying) {
             val isError = state.deploymentMessage.contains("超时") || state.deploymentMessage.contains("失败")
             Box(
@@ -1741,7 +1756,7 @@ fun KeyboardView(
                     .clickable {},
                 contentAlignment = Alignment.Center
             ) {
-                Column(
+                if (deployNoticeVisible || isError) Column(
                     modifier = Modifier.padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {

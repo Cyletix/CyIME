@@ -1009,7 +1009,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         
         
         FileLogger.init(this)
-        FileLogger.i(TAG, "XimeInputMethodService created")
+        // processAgeMs near 0: the process was started for this keyboard (killed while hidden, a cold load).
+        // A large value: only the service was recreated, and the resident engine needs no reload.
+        FileLogger.i(TAG, "XimeInputMethodService created processAgeMs=" +
+            (android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis()) +
+            " engineResident=${RimeEngine.isInitialized()}")
         hardwareInputManager.registerInputDeviceListener(hardwareInputListener, mainHandler)
         FileLogger.i(
             TAG,
@@ -1071,6 +1075,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun initRimeEngine(languagesOnly: Boolean = false) {
         if (rimeInitializationJob?.isActive == true) return
         val quiet = languagesOnly && RimeEngine.isInitialized() && SettingsPreferences.isDeploymentDone(this)
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        val engineResident = RimeEngine.isInitialized()
         inputReadiness.deployment(true)
         Log.d(TAG, "initRimeEngine: Starting initialization...")
         
@@ -1186,7 +1192,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         EditorInputPreparation(this@XimeInputMethodService).schedule(false,
                             EditorInfoClassifier.isNumberEditor(it))
                     }
-                    Log.d(TAG, "initRimeEngine: Rime engine initialized successfully")
+                    FileLogger.i(TAG, "initRimeEngine: ready in ${android.os.SystemClock.elapsedRealtime() - startedAt} ms " +
+                        "engineResident=$engineResident")
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -4246,7 +4253,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         _viewModelStore.clear()
         feedbackManager.release()
-        rimeEngine.destroy()
+        // The Rime engine is process-wide (the Application prepares it too). Keep it resident: the system
+        // recreates this service when another keyboard was used in between, and destroying the engine here
+        // made the next keyboard open reload every dictionary behind "正在加载词库".
         AssociationManager.release()
         voiceRecognitionHandler.release()
         com.kingzcheung.xime.handwriting.HandwritingEngine.release()

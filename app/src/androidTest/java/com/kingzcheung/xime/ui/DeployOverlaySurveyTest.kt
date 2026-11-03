@@ -118,7 +118,8 @@ class DeployOverlaySurveyTest {
                     isDeploying = true, deploymentMessage = "正在准备词库，首次使用需要稍候...")
             }
             rule.waitForIdle()
-            rule.mainClock.advanceTimeBy(300)
+            // The words and progress bar appear only after the startup grace period.
+            rule.mainClock.advanceTimeBy(com.kingzcheung.xime.ui.keyboard.DEPLOY_NOTICE_DELAY_MS + 300)
             rule.waitForIdle()
             rule.onNodeWithTag("deploy-overlay").assertExists()
             save("$themeId-${if (dark) "dark" else "light"}-${if (g) "glass" else "plain"}")
