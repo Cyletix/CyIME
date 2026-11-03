@@ -3112,7 +3112,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (settingsPreviewEditor) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (event?.isCanceled != true) requestHideSelf(0)
+                // 设置页里调节键盘时按返回 = 取消：切过的悬浮、分体、尺寸都不留下，只有「确认」才算数。
+                if (event?.isCanceled != true) {
+                    if (uiState.value.showKeyboardResize) cancelKeyboardResize()
+                    requestHideSelf(0)
+                }
                 return true
             }
             return if (event?.isSystem == true) super.onKeyUp(keyCode, event) else true
