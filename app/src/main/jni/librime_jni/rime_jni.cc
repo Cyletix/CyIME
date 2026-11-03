@@ -35,6 +35,7 @@
 #include <ctime>     // for time
 #include <signal.h>  // native crash 捕获
 #include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unwind.h>  // 信号安全的 native 调用栈采集
 
@@ -1459,6 +1460,98 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetVerboseLogging(
     (void)thiz;
     (void)enabled;
 #endif
+}
+
+// 预读词库和词组模型：引擎按页读这些映射文件，冷页要等存储读入（平板九键慢键多在等这个）。
+// 只把还不在内存里的页交给内核异步读入；已在内存的页不再读，所以热的时候几乎不花时间。
+// 返回交给内核去读的 KB 数，打不开返回 -1。
+JNIEXPORT jlong JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativePrefetchFile(
+    JNIEnv* env,
+    jobject thiz,
+    jstring path
+) {
+    (void)thiz;
+    const char* p = env->GetStringUTFChars(path, nullptr);
+    if (!p) return -1;
+    const int fd = open(p, O_RDONLY | O_CLOEXEC);
+    env->ReleaseStringUTFChars(path, p);
+    if (fd < 0) return -1;
+    struct stat st;
+    if (fstat(fd, &st) != 0) { close(fd); return -1; }
+    if (st.st_size <= 0) { close(fd); return 0; }
+    const size_t size = static_cast<size_t>(st.st_size);
+    const size_t page = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+    const size_t pages = (size + page - 1) / page;
+    void* map = mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0);
+    std::vector<unsigned char> resident(pages, 0);
+    const bool known = map != MAP_FAILED && mincore(map, size, resident.data()) == 0;
+    if (map != MAP_FAILED) munmap(map, size);
+    // The kernel caps one WILLNEED request at its readahead window, so a long range goes in pieces.
+    static constexpr size_t kChunk = 2 << 20;
+    auto willneed = [fd](size_t offset, size_t length) {
+        for (size_t at = offset; at < offset + length; at += kChunk)
+            posix_fadvise(fd, static_cast<off_t>(at), static_cast<off_t>(std::min(kChunk, offset + length - at)),
+                          POSIX_FADV_WILLNEED);
+    };
+    if (!known) {
+        // Residency unknown: ask for the whole file, the kernel skips what is cached.
+        willneed(0, size);
+        close(fd);
+        return static_cast<jlong>(size / 1024);
+    }
+    // Runs of missing pages, joined across short resident gaps to keep the calls few.
+    constexpr size_t kJoinGap = 32;
+    size_t requested = 0;
+    size_t i = 0;
+    while (i < pages) {
+        if (resident[i] & 1) { ++i; continue; }
+        size_t end = i + 1, gap = 0;
+        for (size_t j = end; j < pages && gap <= kJoinGap; ++j) {
+            if (resident[j] & 1) { ++gap; continue; }
+            end = j + 1;
+            gap = 0;
+        }
+        willneed(i * page, (end - i) * page);
+        requested += end - i;
+        i = end;
+    }
+    close(fd);
+    return static_cast<jlong>(requested * page / 1024);
+}
+
+// 抽查文件有多少页在内存里：每 stride 页查一页，返回 0~1，打不开返回 -1。
+JNIEXPORT jfloat JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeResidentFraction(
+    JNIEnv* env,
+    jobject thiz,
+    jstring path,
+    jint stride
+) {
+    (void)thiz;
+    const char* p = env->GetStringUTFChars(path, nullptr);
+    if (!p) return -1;
+    const int fd = open(p, O_RDONLY | O_CLOEXEC);
+    env->ReleaseStringUTFChars(path, p);
+    if (fd < 0) return -1;
+    struct stat st;
+    if (fstat(fd, &st) != 0 || st.st_size <= 0) { close(fd); return -1; }
+    const size_t size = static_cast<size_t>(st.st_size);
+    const size_t page = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+    void* map = mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) return -1;
+    const size_t step = static_cast<size_t>(std::max(1, static_cast<int>(stride)));
+    size_t sampled = 0, resident = 0;
+    bool ok = true;
+    for (size_t at = 0; at < size; at += step * page) {
+        unsigned char v = 0;
+        if (mincore(static_cast<char*>(map) + at, 1, &v) != 0) { ok = false; break; }
+        ++sampled;
+        resident += v & 1;
+    }
+    munmap(map, size);
+    return ok && sampled ? static_cast<jfloat>(resident) / static_cast<jfloat>(sampled) : -1;
 }
 
 // 初始化 Rime 引擎

@@ -3561,6 +3561,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
         KeyLatencyProbe.refresh(window.window)
         startRuntimeObservation()
+        DictionaryPrefetch.onShow(this, serviceScope, rimeEngine)
         info?.let { updateEnterKeyText(it) }
         updateHardwareKeyboardConnection()
         applyCompactMode()
@@ -3971,10 +3972,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onTrimMemory(level)
         // 内存回收会让词库与语法文件的缓存页失效，之后的按键变慢；记下级别供对照。
         FileLogger.w("InputMemory", "trim level=$level")
+        DictionaryPrefetch.onTrimMemory(level)
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         KeyboardPanelLaunch.previewVisible = false
+        DictionaryPrefetch.onHide()
         discardInlinePinyinBeforeFrameworkFinish()
         // The search bar belongs to this keyboard session; leaving restores learning.
         closeClipboardSearch(openBoard = false)

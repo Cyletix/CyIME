@@ -995,6 +995,35 @@ class RimeEngine {
     fun getSchemaPacks(schemaId: String): List<String> =
         getSchemaList(schemaId, "translator/packs")
 
+    /**
+     * 当前方案打字时按页读取的文件：主词库、个人词库包、音节表和词组模型。
+     * 只列出存在的文件；先找用户目录的部署结果，没有再找共享目录。
+     */
+    fun prefetchCandidates(schemaId: String): List<String> {
+        if (!isInitialized || schemaId.isEmpty()) return emptyList()
+        // Skipped while the engine is busy (typing, deploying): the next keyboard show tries again.
+        val names = tryLocked(emptyList<String>()) {
+            val dicts = listOfNotNull(getSchemaDictionary(schemaId)) + getSchemaPacks(schemaId)
+            val prism = getSchemaString(schemaId, "translator/prism") ?: schemaId
+            // Most valuable first: every key reads the syllable prism and the main table.
+            listOf("$prism.prism.bin") + dicts.map { "$it.table.bin" }
+        }
+        val files = names.mapNotNull { name ->
+            listOf(userDataDir, sharedDataDir).filter { it.isNotEmpty() }
+                .map { java.io.File(it, "build/$name") }.firstOrNull { it.isFile }?.path
+        }
+        val model = java.io.File(userDataDir, "t9_ngram.lm").takeIf { userDataDir.isNotEmpty() && it.isFile }
+        return (files + listOfNotNull(model?.path)).distinct()
+    }
+
+    /** 抽查文件在内存里的比例（每 [stride] 页查一页），0~1；打不开为 -1。在 IO 线程调用。 */
+    @androidx.annotation.WorkerThread
+    fun residentFraction(path: String, stride: Int = 64): Float = nativeResidentFraction(path, stride)
+
+    /** 把文件中还不在内存的页交给内核异步读入；返回请求读入的 KB 数，打不开为 -1。在 IO 线程调用。 */
+    @androidx.annotation.WorkerThread
+    fun prefetchFile(path: String): Long = nativePrefetchFile(path)
+
     /** 读取方案 translator.dictionary 主词典名。 */
     fun getSchemaDictionary(schemaId: String): String? =
         getSchemaString(schemaId, "translator/dictionary")
@@ -1123,6 +1152,8 @@ class RimeEngine {
     private external fun nativeCreateSession(): Boolean
     private external fun nativeHasSession(): Boolean
     private external fun nativeIsMaintaining(): Boolean
+    private external fun nativePrefetchFile(path: String): Long
+    private external fun nativeResidentFraction(path: String, stride: Int): Float
     private external fun nativeGetCurrentSchema(): String?
     private external fun nativeProcessKey(keycode: Int, mask: Int): Boolean
     private external fun nativeProcessKeyAndGetResult(keycode: Int, mask: Int): RimeProcessResult
