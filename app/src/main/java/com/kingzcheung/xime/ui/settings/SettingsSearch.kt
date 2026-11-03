@@ -239,7 +239,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("上方角标提示", theme, SettingsRoutes.Theme, "角标 提示 符号 显示 上方 干净 干净模式 简洁 隐藏"),
         SettingsSearchEntry("下方角标提示", theme, SettingsRoutes.Theme, "角标 提示 符号 显示 下方 干净 干净模式 简洁 隐藏"),
         SettingsSearchEntry("角标不透明度", theme, SettingsRoutes.Theme, "角标 透明度 不透明度 淡 变淡 减淡 颜色 灰 玻璃 层次 突出 主字"),
-        SettingsSearchEntry("功能键不显示提示字", theme, SettingsRoutes.Theme, "空格 方案名 方案名称 隐藏 不显示 删除键 清空 提示 小字 功能键 干净"),
+        SettingsSearchEntry("功能键不显示提示字", theme, SettingsRoutes.Theme, "空格 方案名 方案名称 隐藏 不显示 删除键 清空 重输 提示 小字 功能键 干净"),
         SettingsSearchEntry("点按弹出气泡", theme, SettingsRoutes.Theme, "气泡 预览 弹出 按键放大"),
         SettingsSearchEntry("键盘顶部样式", theme, SettingsRoutes.Theme, "圆角 顶部 顶部圆角 上圆角 直角 方角 关圆角 关闭圆角 柔化 柔化顶部边缘 羽化 渐变 边缘 上沿 割裂 衔接 玻璃 毛玻璃"),
         SettingsSearchEntry("底部圆角与透明导航栏", theme, SettingsRoutes.Theme, "圆角 导航栏 底部 直角 键盘底部样式"),

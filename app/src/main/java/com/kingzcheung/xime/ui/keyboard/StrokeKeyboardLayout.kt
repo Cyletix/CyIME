@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -781,85 +780,6 @@ private fun StrokeSymbolButton(
         shadowShapeRadius = shadowShapeRadius,
         fontSize = fontSize,
     )
-}
-
-@Composable
-private fun ResetKey(
-    onClick: () -> Unit,
-    onPress: (() -> Unit)?,
-    backgroundColor: Color,
-    textColor: Color,
-    modifier: Modifier = Modifier,
-    shadowEnabled: Boolean = true,
-    shadowElevation: Dp = 1.dp,
-    shadowShapeRadius: Dp = 8.dp,
-    compactMode: Boolean = false,
-) {
-    var isPressed by remember { mutableStateOf(false) }
-    val currentOnClick by rememberUpdatedState(onClick)
-    val currentOnPress by rememberUpdatedState(onPress)
-    val density = LocalDensity.current
-    val shape = RoundedCornerShape(KeyShapes.current.radius(shadowShapeRadius))
-    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
-        if (shadowEnabled && !frostedGlass.enabled) {
-            val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
-            val color = crispShadowColor(backgroundColor)
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(0f, offsetPx),
-                    size = size,
-                    cornerRadius = CornerRadius(cornerPx)
-                )
-            }
-        } else Modifier
-    }
-
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(onPress = {
-                    isPressed = true
-                    currentOnPress?.invoke()
-                    tryAwaitRelease()
-                    isPressed = false
-                }, onTap = { currentOnClick() })
-            }
-            .padding(scaledKeyVisualPadding())
-            .keyGlow(Modifier.then(shadowModifier)
-            .clip(shape)
-            .background(frostedKeyColor(
-                backgroundColor, textColor, frostedGlass,
-                legacyStateColor = if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
-                pressed = isPressed,
-            ))),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = "重输",
-            tint = textColor,
-            modifier = Modifier.size(if (compactMode) 16.dp else 20.dp)
-        )
-        // 文字贴顶：中心在键中心上方「半高 - 上边距 - 半行高」，放不下时只留图标。
-        if (!compactMode && KeyboardKeyMetrics.hintClearsIcon(maxHeight.value / 2f - 2f - 11f * density.fontScale / 2f,
-                9f, density.fontScale, 20f)) {
-Text(
-            text = "重输",
-            color = keyHintColor(textColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
-            fontSize = 9.sp,
-            lineHeight = 11.sp,
-            fontWeight = FontWeight.Normal,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
-            fontFamily = AppFonts.keyFontFamily
-        )
-        }
-    }
 }
 
 @Composable

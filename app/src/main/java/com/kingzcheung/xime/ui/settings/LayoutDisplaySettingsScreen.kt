@@ -795,7 +795,7 @@ internal fun KeyboardAppearanceSettings() {
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
-                    // 功能键不显示提示字（GitHub #11 #60，别人的需求，默认关）：空格的方案名、删除键的「清空」。
+                    // 功能键不显示提示字（GitHub #11 #60，别人的需求，默认关）：空格的方案名、删除键的「清空」、重输键的「重输」。
                     Row(
                         modifier = Modifier.settingsSearchAnchor("功能键不显示提示字")
                             .fillMaxWidth()
@@ -813,7 +813,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "空格不显示方案名，删除键不显示「清空」",
+                                text = "空格不显示方案名，删除键不显示「清空」，重输键不显示「重输」",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

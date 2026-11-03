@@ -64,7 +64,7 @@ data class KeyboardInputPreferences(
      * 调低更淡。开不开玻璃都起作用（GitHub #7 #60）。
      */
     val cornerHintOpacity: Float = 1f,
-    /** 功能键不显示提示字：空格不写方案名，删除键等功能键不写上滑的「清空」；只改显示，滑动照旧（GitHub #11 #60，默认关）。 */
+    /** 功能键不显示提示字：空格不写方案名，删除键不写上滑的「清空」，重输键不写「重输」；只改显示，滑动照旧（GitHub #11 #60，默认关）。 */
     val hideFunctionKeyHints: Boolean = false,
     /** 字母键帽一律显示大写（只改显示，输入照旧跟 Shift）；默认关，保持小写。 */
     val uppercaseKeyLabels: Boolean = false,

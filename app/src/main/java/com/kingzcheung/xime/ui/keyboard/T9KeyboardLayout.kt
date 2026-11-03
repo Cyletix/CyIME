@@ -1069,9 +1069,18 @@ internal fun NineKeyButton(
     )
 }
 
-/** 重输键 —— 文本在上、图标在下，参考功能键风格 */
+/**
+ * 重输键刷新图标相对退格图标的放大倍数：Material 刷新字形高 16/24，退格字形高 18/24，
+ * 按 18/16 放大后两个图标字形一样高（用户 11-03：两个图标不一样大）。
+ */
+internal const val ResetIconGlyphScale = 18f / 16f
+
+/**
+ * 重输键（九键、笔画共用）—— 文本在上、图标在下，尺寸规则与旁边的退格键（[SwipeableIconKeyButton]）一致：
+ * 同一基准、同一缩放、同样大小的提示字；「功能键不显示提示字」开着时和退格的「清空」一起藏（用户 11-03）。
+ */
 @Composable
-private fun ResetKey(
+internal fun ResetKey(
     onClick: () -> Unit,
     onPress: (() -> Unit)?,
     backgroundColor: Color,
@@ -1125,18 +1134,20 @@ private fun ResetKey(
             ))), contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
-        val hintSize = 9f * adaptiveHintScale(contentScale)
-        val iconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, if (compactMode) 16f else 20f)
+        // 与退格键同一套：提示字 10 号、图标基准 FunctionIconSize（紧凑模式也不另缩小）。
+        val hintSize = 10f * adaptiveHintScale(contentScale)
+        val backspaceIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value)
         val hintOffset = KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale)
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = "重输",
             tint = textColor,
-            modifier = Modifier.size(iconSize.dp)
+            modifier = Modifier.size((backspaceIconSize * ResetIconGlyphScale).dp)
         )
 
-        // 键太矮放不下时只留图标，文字不能压在图标上。
-        if (!compactMode && KeyboardKeyMetrics.hintClearsIcon(hintOffset, hintSize, density.fontScale, iconSize)) {
+        // 键太矮放不下时只留图标，文字不能压在图标上。字形与退格同高，按退格的图标框判断，两键同时藏或同时显示。
+        if (!compactMode && !LocalKeyboardInputPreferences.current.hideFunctionKeyHints &&
+            KeyboardKeyMetrics.hintClearsIcon(hintOffset, hintSize, density.fontScale, backspaceIconSize)) {
             Text(
                 text = "重输",
                 color = keyHintColor(textColor, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
@@ -1145,7 +1156,8 @@ private fun ResetKey(
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.offset(y = -hintOffset.dp)
+                modifier = Modifier.offset(y = -hintOffset.dp),
+                fontFamily = AppFonts.keyLabelFontFamily
             )
         }
     }
