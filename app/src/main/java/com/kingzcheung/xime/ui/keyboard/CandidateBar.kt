@@ -706,14 +706,8 @@ fun CandidateBar(
                     }
                 }
             }
-            if (state !is CandidateBarState.Idle) {
-                // 打字时右边亮着的开关（繁体、全角等）和两端按钮同一格宽；不给宽度时它按剩下的整行宽量，
-                // 胶囊撑到 112dp，挤掉候选（GitHub #75）。
-                toolbarActions.filter { it.active }.forEach { action ->
-                    ToolbarActionButton(action, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState,
-                        modifier = Modifier.width(edgeSlot ?: 44.dp))
-                }
-            }
+            // 打字时候选栏只放候选：亮着的开关（悬浮、繁体、全角等）只在空闲工具栏里显示，
+            // 不再挤到候选右边（11-03：悬浮键盘里一直多一个蓝色悬浮按钮，候选只剩一个）。
             if (associationCancelRight && !candidatePageExpanded) {
                 Spacer(Modifier.width(4.dp))
                 KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
