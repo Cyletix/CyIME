@@ -75,6 +75,11 @@ public:
     // 字母约束；候选过滤时只保留该位置拼音字母一致的候选。数字串为空时返回 false，
     // 由上层按普通字母输入处理。
     bool FixLetter(char letter);
+    // 整句都用拂动时，字母按普通字母进 RIME input，数字串一直为空（见 FixLetter）。
+    // 右选只占前一段时去掉这一段的字母、留下后面的继续选，返回 false（partial）；
+    // 选到末尾返回 true；不是这种纯字母输入时返回 nullopt，按原逻辑处理。
+    std::optional<bool> SelectLetterCandidate(const std::string& candidate_pinyin,
+                                              const std::string& candidate_text);
     bool HasLetterConstraints() const { return !letter_constraints_.empty(); }
     // candidate 从 RIME input 的 rime_start 开始、拼音注释为 comment 时，是否满足全部字母约束。
     bool MatchesLetterConstraints(size_t rime_start, const std::string& comment) const;
@@ -202,13 +207,17 @@ private:
         const std::optional<std::string>& candidate_pinyin,
         const std::string& candidate_text,
         T9CommitCapture* capture = nullptr,
-        bool* out_is_t9_user = nullptr) const;
+        bool* out_is_t9_user = nullptr,
+        size_t* out_end = nullptr) const;
+    // 纯字母输入里选掉的前一段，剩下的字母删光后退格把它整段还回来（同数字串撤销右选）。
+    bool UndoLetterCommit();
 
     // ════════════════════════════════════════
     // 状态成员（对应 Kotlin T9InputController 的私有字段）
     // ════════════════════════════════════════
     T9Buffer input_buffer_;                              // §2.2 结构化输入模型
     std::map<int, char> letter_constraints_;             // 拂动固定的字母：digit_sequence 位置 → 字母
+    std::vector<std::string> letter_commits_;            // 纯字母输入里已选掉的各段字母（撤销用，按选择顺序）
     T9StateMachine state_machine_;                       // §3.2 三态状态机
     // 段模型（2026-08-06 起为回退唯一真相源）：输入操作双写
     // （Digit/LeftChoice/Separator/SyncRightCommit），backspace 全部走 T9UndoModel::Backspace。

@@ -34,6 +34,7 @@ public final class RimeEngine {
     public native boolean nativeSelectCandidateByGlobalIndex(int index);
     public native String nativeCommit();
     public native String nativeT9GetRemainingDigits();
+    public native int nativeT9GetAndConsumeUndoneRightCommitCount();
     public native String[][] nativeInspectCandidates(int limit);
     public native void nativeDestroy();
     // Host replay only (tools/ime_lab/host_replay/host_replay_jni.cc); absent from the Android library.

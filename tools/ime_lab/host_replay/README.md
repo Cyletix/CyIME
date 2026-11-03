@@ -80,6 +80,11 @@ root's `user` directory) checks that ending a T9 composition after a partial cho
 code fresh: 9447426926, choose 至少, clear, then 64 must read `64`. It also prints what a Rime-only
 clear leaves, which is the 2026-10-23 report (old digits came back after Enter).
 
+`T9FlickSentenceProbe.java` (same arguments) types a whole sentence as flicked letters (`womenquchifan`, the
+letters go to Rime because the T9 digit buffer is empty), chooses 我们 and expects `quchifan` to remain, then
+deletes the rest and checks that one more backspace brings back `women`. 2026-11-03 report: choosing the first
+word committed only that word and the rest of the sentence vanished.
+
 `CustomPhraseReloadProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists
 `rime_ice`) adds a phrase to `custom_phrase.txt` while a session is open and reports which step makes
 it appear. 2026-10-23: nothing until the schema is selected again; maintenance is not needed.

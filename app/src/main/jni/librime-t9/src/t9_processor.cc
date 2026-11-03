@@ -315,6 +315,11 @@ ProcessResult T9Processor::HandleBackspace() {
     // 旧 P0（末尾分隔符清除）移除：段模型位置删除天然覆盖（"5'" 删 '，
     // "5'4" 删 '4' 保留 '，位置逻辑决定）。
     bool handled = undo_model_.Backspace();
+    // 纯字母输入（整句拂动）选掉的一段：剩下的删光后再退格，把这段的字母还回来。
+    if (!handled && UndoLetterCommit()) {
+        LogPreeditState();
+        return kAccepted;
+    }
     if (handled) {
         // 撤销 commit 操作计数累加，供 Kotlin 同步 t9PartialCommitTexts
         const int undone = undo_model_.ConsumeUndoneCommitCount();
@@ -487,6 +492,8 @@ bool T9Processor::SelectCandidate(const std::string& candidate_pinyin,
           last_choice_consumed_digits_.has_value() ? last_choice_consumed_digits_->c_str() : "(null)");
 
     if (input_buffer_.is_empty()) {
+        // 整句拂动：字母直接在 RIME input 里，选第一段不能当整句上屏（用户 11-03）。
+        if (auto letters = SelectLetterCandidate(candidate_pinyin, candidate_text)) return *letters;
         T9LOG(">> SelectCandidate: buffer empty → return true");
         return true;
     }
@@ -762,6 +769,59 @@ bool T9Processor::FixLetter(char letter) {
     return true;
 }
 
+std::optional<bool> T9Processor::SelectLetterCandidate(const std::string& candidate_pinyin,
+                                                       const std::string& candidate_text) {
+    Context* ctx = engine_->context();
+    const std::string input = ctx ? ctx->input() : std::string();
+    if (input.empty()) return std::nullopt;
+    // 只管全是字母（和分隔符）的输入；数字串由右选三层算法处理。
+    for (char c : input) {
+        if (c >= '0' && c <= '9') return std::nullopt;
+    }
+    T9CommitCapture captured;
+    size_t end = 0;
+    if (QueryRimeConsumedDigits(candidate_pinyin, candidate_text, &captured, nullptr, &end) < 0)
+        return std::nullopt;
+    size_t rest = std::min(end, input.size());
+    size_t code_end = rest;
+    while (rest < input.size() && (input[rest] == manual_delimiter_ || input[rest] == ' ' || input[rest] == '\''))
+        ++rest;
+    // 每段一条调频捕获，整句选完后和数字串一样整句记忆（MemorizeEntry）。
+    undo_model_.PushCommitCapture(captured.text, captured.code, captured.table_code);
+    pending_fullcommit_capture_.reset();
+    if (rest >= input.size()) {
+        bool complete = true;
+        for (const auto& capture : undo_model_.commit_captures()) {
+            if (!capture.valid()) complete = false;
+        }
+        if (complete) pending_fullcommit_capture_ = undo_model_.commit_captures();
+        T9LOG(">> SelectLetterCandidate: '%s' covers the rest of '%s' → full", candidate_text.c_str(), input.c_str());
+        return true;
+    }
+    letter_commits_.push_back(input.substr(0, code_end));
+    last_rime_input_.clear();
+    pending_input_ = input.substr(rest);
+    pending_action_ = RimePendingAction::kSetInput;
+    T9LOG(">> SelectLetterCandidate: '%s' takes '%s', remaining '%s'",
+          candidate_text.c_str(), letter_commits_.back().c_str(), pending_input_.c_str());
+    return false;
+}
+
+bool T9Processor::UndoLetterCommit() {
+    if (letter_commits_.empty() || !input_buffer_.is_empty()) return false;
+    Context* ctx = engine_->context();
+    if (!ctx || !ctx->input().empty() || pending_action_ != RimePendingAction::kNone) return false;
+    pending_input_ = std::move(letter_commits_.back());
+    letter_commits_.pop_back();
+    undo_model_.PopLastCommitCapture();
+    pending_fullcommit_capture_.reset();
+    ++undone_right_commit_count_;
+    last_rime_input_.clear();
+    pending_action_ = RimePendingAction::kSetInput;
+    T9LOG(">> UndoLetterCommit: restore '%s'", pending_input_.c_str());
+    return true;
+}
+
 bool T9Processor::MatchesLetterConstraints(size_t rime_start, const std::string& comment) const {
     if (letter_constraints_.empty() || comment.empty()) return true;
     // 候选覆盖的是 RIME input 里的未分配数字段；其前面的字符（已选拼音字母、分隔符）不算。
@@ -860,7 +920,8 @@ int T9Processor::QueryRimeConsumedDigits(
     const std::optional<std::string>& candidate_pinyin,
     const std::string& candidate_text,
     T9CommitCapture* capture,
-    bool* out_is_t9_user) const {
+    bool* out_is_t9_user,
+    size_t* out_end) const {
     // 方案 A：右选消费优先采用 RIME 候选的实际匹配范围。
     // RIME 已通过 schema 的 speller/algebra（含 derive/abbrev 派生规则）
     // 精确计算出候选在输入中的匹配结束位置（Candidate::end()），
@@ -929,6 +990,7 @@ int T9Processor::QueryRimeConsumedDigits(
                 }
             }
             size_t end = genuine->end();
+            if (out_end) *out_end = end;
             int digits = 0;
             size_t limit = std::min(end, rime_input.size());
             for (size_t k = 0; k < limit; ++k) {
@@ -1168,6 +1230,7 @@ void T9Processor::EnterIdle() {
     // stale buffer 会导致后续 backspace 等操作在残留数据上处理。
     input_buffer_ = T9Buffer();
     letter_constraints_.clear();
+    letter_commits_.clear();
     T9LOG(">> EnterIdle: clearing original_digit_sequence_='%s', last_commit='%s'",
           original_digit_sequence_.c_str(),
           last_commit_digit_sequence_.c_str());
