@@ -76,11 +76,12 @@ class MainActivity : ComponentActivity() {
         /** 插件面板「设置」：直接进插件设置页，不经过详情页（11-03 要点两次设置）。 */
         const val EXTRA_OPEN_PLUGIN_SETTINGS = "open_plugin_settings"
 
-        /** 打开插件时落到哪一页：要设置页进设置页，否则进详情页（网络授权在详情页）。 */
+        /** 打开插件时落到哪一页：一个插件一页，联网授权也在设置页；只有已下架的进详情页。[settings] 留着兼容旧调用。 */
+        @Suppress("UNUSED_PARAMETER")
         fun pluginLaunchRoute(pluginId: String, settings: Boolean): String =
-            if (settings) "plugin_settings/$pluginId" else "plugin_detail/$pluginId"
+            com.kingzcheung.xime.ui.settings.pluginPageRoute(pluginId)
 
-        /** 构造跳转到指定插件网络授权页的 Intent（IME 等后台场景调用）。 */
+        /** 构造跳转到指定插件那一页的 Intent（联网被拦时，IME 等后台场景调用）。 */
         fun buildPluginAuthIntent(context: android.content.Context, pluginId: String): Intent {
             return Intent(context, MainActivity::class.java).apply {
                 putExtra("open_fragment", "plugins")

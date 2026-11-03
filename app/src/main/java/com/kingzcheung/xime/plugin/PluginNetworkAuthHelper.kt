@@ -15,7 +15,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
  * 插件联网授权引导：
  * - [ensureAuthorized]：使用前检测——插件声明/配置了网络域名但未授权时，引导用户先授权；
  * - [onNetworkDenied]：运行时兜底——被拒时记录待授权域名、Toast 提示原因，
- *   首次被拒自动拉起该插件的网络授权页，让用户当场授权。
+ *   首次被拒自动打开这个插件的设置页（「联网」在那页），让用户当场授权。
  */
 object PluginNetworkAuthHelper {
 
@@ -57,7 +57,7 @@ object PluginNetworkAuthHelper {
         mainHandler.post {
             Toast.makeText(
                 context,
-                "插件「${info.name}」需要授权后才能联网访问 $host\n已为您打开授权页面，请授权后重试",
+                "插件「${info.name}」还不能连 $host\n已打开它的设置页，在「联网」里授权后再试",
                 Toast.LENGTH_LONG
             ).show()
             if (firstTime) {
@@ -82,7 +82,7 @@ object PluginNetworkAuthHelper {
             val name = pluginName ?: pluginId
             Toast.makeText(
                 context,
-                "插件「$name」联网被拒绝：$reason\n请在插件设置中授权后重试",
+                "插件「$name」联网被拒绝：$reason\n在它设置页的「联网」里授权后再试",
                 Toast.LENGTH_LONG
             ).show()
             if (firstTime) {

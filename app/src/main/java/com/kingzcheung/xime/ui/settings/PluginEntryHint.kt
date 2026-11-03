@@ -54,3 +54,11 @@ internal suspend fun uninstallPluginCompletely(context: Context, pluginId: Strin
     PluginManager.installerManager.uninstallPlugin(pluginId)
     SettingsPreferences.forgetUninstalledPlugin(context, pluginId, buttons)
 }
+
+/**
+ * 一个插件只有一页：能用的进它的设置页（接口、测试、联网、卸载都在那里）；已下架的进详情页，
+ * 那里写着功能去了哪里、可以卸载。插件管理、键盘里长按、面板「设置」、联网被拦都走这里（11-03「界面跳转极其混乱」）。
+ */
+internal fun pluginPageRoute(pluginId: String): String =
+    if (pluginId in com.kingzcheung.xime.settings.XimeIndexSource.RETIRED_PLUGIN_IDS) "plugin_detail/$pluginId"
+    else "${SettingsRoutes.PluginSettings}/$pluginId"

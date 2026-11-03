@@ -71,33 +71,16 @@ fun PluginSettingsContent(
         return
     }
 
+    // 没加载上也进同一页：说明、联网、卸载照样在，只是没有设置项。
     if (pluginInstance == null) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(pluginInfo.name) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            }
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("插件加载失败，到「已安装」点这个插件看错误")
-            }
-        }
+        PluginConfigFormScreen(
+            pluginId = pluginId,
+            plugin = NoSettings,
+            pluginName = pluginInfo.name,
+            onBack = onBack,
+            note = com.kingzcheung.xime.plugin.core.security.PluginErrorLog.getLastError(pluginId)
+                ?.let { "插件加载失败：${it.message}" } ?: "插件加载失败",
+        )
         return
     }
 
@@ -155,32 +138,16 @@ fun PluginSettingsContent(
         }
 
         else -> {
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text(pluginInfo.name) },
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "返回"
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            titleContentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                }
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("该插件没有设置界面")
-                }
-            }
+            PluginConfigFormScreen(
+                pluginId = pluginId,
+                plugin = (pluginInstance as? IPluginConfigurable) ?: NoSettings,
+                pluginName = pluginInfo.name,
+                onBack = onBack,
+                note = "这个插件没有设置项",
+            )
         }
     }
 }
+
+/** 没有设置项的插件也用同一页（说明、启用、联网、卸载）。 */
+private object NoSettings : IPluginConfigurable

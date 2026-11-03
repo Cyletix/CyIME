@@ -381,9 +381,5 @@ fun SettingsScreen(
  * 那里写着功能去了哪里、可以卸载（11-03「装完了点开啥都没有，空页面」）。
  */
 private fun openInstalledPlugin(navController: androidx.navigation.NavController, pluginId: String) {
-    if (pluginId in com.kingzcheung.xime.settings.XimeIndexSource.RETIRED_PLUGIN_IDS) {
-        navController.navigate("plugin_detail/$pluginId")
-    } else {
-        navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
-    }
+    navController.navigate(pluginPageRoute(pluginId))
 }

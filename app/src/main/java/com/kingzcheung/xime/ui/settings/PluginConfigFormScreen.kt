@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import com.kingzcheung.xime.ui.common.CompactMenuStyle
@@ -36,10 +37,13 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -56,7 +60,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.PluginConfigStoreImpl
+import com.kingzcheung.xime.plugin.PluginNetworkAuthHelper
+import com.kingzcheung.xime.plugin.core.model.PluginSource
 import com.kingzcheung.xime.plugin.core.config.IPluginConfigurable
 import com.kingzcheung.xime.plugin.core.config.PluginConfigStore
 import com.kingzcheung.xime.plugin.core.config.UiNode
@@ -76,7 +83,9 @@ fun PluginConfigFormScreen(
     pluginName: String,
     schema: List<UiNode> = emptyList(),
     onBack: () -> Unit,
-    embedded: Boolean = false
+    embedded: Boolean = false,
+    /** 页面顶上的一句提示（插件没加载上、没有设置项时）。 */
+    note: String? = null
 ) {
     val context = LocalContext.current
     val configStore = remember(pluginId) {
@@ -181,6 +190,29 @@ fun PluginConfigFormScreen(
     }
     val toggleScope = rememberCoroutineScope()
 
+    // 没有「保存」：字段边打边存，离开这页时把填的地址授权（文件导入的插件用；市场装的和内置的本来就放行）。
+    var uninstalled by remember(pluginId) { mutableStateOf(false) }
+    if (!embedded) DisposableEffect(pluginId) {
+        onDispose { if (!uninstalled) autoAuthorizeConfiguredHosts() }
+    }
+    var confirmUninstall by remember { mutableStateOf(false) }
+    if (confirmUninstall && installedInfo != null) AlertDialog(
+        onDismissRequest = { confirmUninstall = false },
+        title = { Text("卸载插件") },
+        text = { Text("确定要卸载「${installedInfo.name.ifEmpty { installedInfo.id }}」吗？插件文件和配置会删掉。") },
+        confirmButton = {
+            TextButton(onClick = {
+                confirmUninstall = false
+                uninstalled = true
+                toggleScope.launch {
+                    uninstallPluginCompletely(context, pluginId)
+                    onBack()
+                }
+            }) { Text("卸载", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton(onClick = { confirmUninstall = false }) { Text("取消") } },
+    )
+
     if (embedded) {
         Column(
             modifier = Modifier
@@ -224,6 +256,14 @@ fun PluginConfigFormScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
             ) {
+                if (installedInfo != null) item {
+                    val about = listOfNotNull(
+                        installedInfo.description.takeIf { it.isNotBlank() },
+                        installedInfo.versionName.takeIf { it.isNotBlank() }?.let { "版本 $it" },
+                    ).joinToString("\n")
+                    if (about.isNotEmpty()) SettingsNote(about)
+                }
+                if (note != null) item { SettingsNote(note) }
                 if (installedInfo != null && canEnableFromSettings(installedInfo)) item {
                     SettingsSection(title = "插件") {
                         SettingsToggleItem(
@@ -247,8 +287,33 @@ fun PluginConfigFormScreen(
                     }
                 }
 
-                item {
-                    saveButton()
+                if (installedInfo != null) {
+                    val trusted = PluginNetworkAuthHelper.trustsConfiguredHosts(installedInfo)
+                    // 市场装的和内置的插件：填的地址直接放行，这里只说一句；要授权的域名照旧列出来。
+                    val hosts = if (trusted) installedInfo.declaredHosts.distinct() else (installedInfo.declaredHosts +
+                        ExtensionManager.getConfiguredNetworkHosts(context, pluginId) +
+                        SettingsPreferences.getPluginPendingHosts(context, pluginId)).distinct()
+                    if (trusted || hosts.isNotEmpty()) item {
+                        SettingsSection(title = "联网") {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (trusted) Text("只连你在上面填的接口地址",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (hosts.isNotEmpty()) NetworkAccessSection(
+                                    pluginId = pluginId,
+                                    pluginName = installedInfo.name.ifEmpty { pluginId },
+                                    hosts = hosts,
+                                    showTitle = false,
+                                )
+                            }
+                        }
+                    }
+                    if (installedInfo.source != PluginSource.SYSTEM) item {
+                        OutlinedButton(
+                            onClick = { confirmUninstall = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("卸载", color = MaterialTheme.colorScheme.error) }
+                    }
                 }
             }
         }

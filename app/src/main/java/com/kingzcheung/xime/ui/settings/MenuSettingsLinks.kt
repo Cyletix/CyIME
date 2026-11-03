@@ -29,8 +29,8 @@ internal val MenuSettingsTitles: Map<ToolbarButton, String> = mapOf(
     ToolbarButton.FLICK_DISC to "拂动时显示方向圆盘",
 )
 
-/** [item] 长按要去的设置；插件按钮去该插件的详情页。没有对应设置时为 null。 */
+/** [item] 长按要去的设置；插件按钮去这个插件的那一页（[pluginPageRoute]）。没有对应设置时为 null。 */
 internal fun menuSettingsEntry(item: ToolbarButtonItem): SettingsSearchEntry? = when (item) {
     is ToolbarButtonItem.Builtin -> MenuSettingsTitles[item.button]?.let { title -> SettingsSearchIndex.firstOrNull { it.title == title } }
-    is ToolbarButtonItem.Plugin -> SettingsSearchEntry(item.label, "", "plugin_detail/${item.pluginId}", anchor = null)
+    is ToolbarButtonItem.Plugin -> SettingsSearchEntry(item.label, "", pluginPageRoute(item.pluginId), anchor = null)
 }

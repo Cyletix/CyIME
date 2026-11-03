@@ -30,7 +30,7 @@ object NetworkPolicy {
             return "插件未声明访问域名 $host，已阻止联网"
         }
         if (host !in authorizedHosts) {
-            return "访问 $host 未获用户授权，请在插件中心授权"
+            return "访问 $host 没授权"
         }
         return null
     }

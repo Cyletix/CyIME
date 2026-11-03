@@ -683,7 +683,9 @@ fun NetworkAccessSection(
     pluginId: String,
     pluginName: String,
     hosts: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 外面已有「联网」标题时不再写「网络访问」。 */
+    showTitle: Boolean = true
 ) {
     val context = LocalContext.current
     var authorized by remember(pluginId) {
@@ -701,7 +703,7 @@ fun NetworkAccessSection(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
+            if (showTitle) Text(
                 text = "网络访问",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold
@@ -710,7 +712,7 @@ fun NetworkAccessSection(
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.padding(start = if (showTitle) 8.dp else 0.dp)
                 ) {
                     Text(
                         text = "${unauthorized.size} 个域名待授权",
