@@ -20,7 +20,13 @@ import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.twotone.DirectionsCar
 import androidx.compose.material.icons.twotone.Computer
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.twotone.VolumeOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.heightIn
+import com.kingzcheung.xime.speech.VoiceOtherAudio
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +66,38 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** 「屏蔽外放音」一行：右边写当前选的，点开单选框（样式同首页「界面语言」）。 */
+@Composable
+private fun VoiceOtherAudioItem() {
+    val context = LocalContext.current
+    var current by remember { mutableStateOf(SettingsPreferences.getSttOtherAudio(context)) }
+    var picking by remember { mutableStateOf(false) }
+    SettingsItem(icon = Icons.AutoMirrored.TwoTone.VolumeOff, title = "屏蔽外放音",
+        subtitle = "说话时压低或暂停正在放的音乐、视频", status = current.label, onClick = { picking = true })
+    if (picking) AlertDialog(
+        onDismissRequest = { picking = false },
+        title = { Text("屏蔽外放音") },
+        text = {
+            Column {
+                VoiceOtherAudio.entries.forEach { mode ->
+                    val choose = {
+                        picking = false
+                        if (mode != current) { current = mode; SettingsPreferences.setSttOtherAudio(context, mode) }
+                    }
+                    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(onClick = choose)
+                        .testTag("voice-other-audio:${mode.id}"), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = mode == current, onClick = choose)
+                        Spacer(Modifier.width(8.dp))
+                        Text(mode.label, style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (mode == current) FontWeight.Medium else FontWeight.Normal)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { picking = false }) { Text("关闭") } },
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +154,8 @@ fun SpeechToTextSettingsContent(
                     checked = sttEnabled, onCheckedChange = { sttEnabled = it; SettingsPreferences.setSttEnabled(context, it) })
                 // 开车连续语音：别人提的需求，默认关（VoicePillResume）。只在语音打开时生效，关着语音就不显示。
                 if (sttEnabled) {
+                    // 屏蔽外放音：用户 11-04 要的，选项照他的截图，默认不屏蔽（VoiceAudioFocus）。
+                    VoiceOtherAudioItem()
                     var pillResume by remember { mutableStateOf(SettingsPreferences.isSttPillResume(context)) }
                     SettingsToggleItem(icon = Icons.TwoTone.DirectionsCar, title = "开车连续语音",
                         subtitle = "语音收起成悬浮条后，发送完回到输入框自动接着听",

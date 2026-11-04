@@ -111,6 +111,9 @@ object SettingsPreferences {
     const val KEY_STT_ARABIC_NUMBERS = "stt_arabic_numbers"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     const val KEY_STT_REMOTE_TYPING = "stt_remote_typing"
+    const val KEY_STT_OTHER_AUDIO = "stt_other_audio"
+    private const val KEY_STT_MUSIC_MUTED_BY_VOICE = "stt_music_muted_by_voice"
+    private const val KEY_STT_MUSIC_VOLUME_BEFORE_VOICE = "stt_music_volume_before_voice"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
@@ -1019,6 +1022,36 @@ object SettingsPreferences {
 
     fun setSttRemoteTyping(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STT_REMOTE_TYPING, enabled).apply()
+    }
+
+    /**
+     * 屏蔽外放音（用户 2026-11-04 要的，参照他截图的「压低音量 / 暂停播放 / 不屏蔽」，默认压低音量）：
+     * 语音开麦时把正在放的音乐、视频压低或暂停，关麦恢复。开关麦各一次系统调用，没有可测的性能开销，不登记；见 VoiceAudioFocus。
+     */
+    fun getSttOtherAudio(context: Context): com.kingzcheung.xime.speech.VoiceOtherAudio =
+        com.kingzcheung.xime.speech.VoiceOtherAudio.fromId(getPrefs(context).getString(KEY_STT_OTHER_AUDIO, null))
+
+    fun setSttOtherAudio(context: Context, mode: com.kingzcheung.xime.speech.VoiceOtherAudio) {
+        getPrefs(context).edit().putString(KEY_STT_OTHER_AUDIO, mode.id).apply()
+    }
+
+    /** VoiceAudioFocus 退回静音媒体音量时记下，进程中途结束也能在下次补回声音。 */
+    internal fun isSttMusicMutedByVoice(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_STT_MUSIC_MUTED_BY_VOICE, false)
+
+    internal fun setSttMusicMutedByVoice(context: Context, muted: Boolean) {
+        // 记“静了”要立刻落盘，进程随后被杀也能补回；清除可以慢一点，残留只会多解一次静音。
+        val editor = getPrefs(context).edit().putBoolean(KEY_STT_MUSIC_MUTED_BY_VOICE, muted)
+        if (muted) editor.commit() else editor.apply()
+    }
+
+    /** VoiceAudioFocus 退回手动压低媒体音量时记下原音量（-1 表示没压），用途同上。 */
+    internal fun getSttMusicVolumeBeforeVoice(context: Context): Int =
+        getPrefs(context).getInt(KEY_STT_MUSIC_VOLUME_BEFORE_VOICE, -1)
+
+    internal fun setSttMusicVolumeBeforeVoice(context: Context, volume: Int) {
+        val editor = getPrefs(context).edit().putInt(KEY_STT_MUSIC_VOLUME_BEFORE_VOICE, volume)
+        if (volume >= 0) editor.commit() else editor.apply()
     }
 
     // ---- 插件网络授权（per plugin per host） ----

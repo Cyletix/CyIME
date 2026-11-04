@@ -57,6 +57,8 @@ class SpeechRecognitionManager(
         if (SettingsPreferences.isSttUseLocal(context)) "local:${AsrSupport.generation}"
         else "online:${SettingsPreferences.getSttOnlinePluginId(context)}"
     @Volatile private var recordingThread: RecordingThread? = null
+    // 屏蔽外放音：开麦时压低或暂停别的应用的声音，关麦恢复（本地和在线语音都从这里的录音线程取音）
+    private val audioFocus by lazy { VoiceAudioFocus(context) }
     @Volatile private var released = false
     @Volatile private var recognitionLanguage = InputLanguage.CHINESE
 
@@ -683,6 +685,8 @@ class SpeechRecognitionManager(
                 // 麦克风启动失败不能悄无声息地结束：报给用户（键盘上会显示）。
                 if (!microphone.start()) error("麦克风没能开始录音：可能被其他应用占用，或没有录音权限")
                 FileLogger.i(TAG, "Microphone ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
+                // 加载中已松手的收尾段不再开麦说话，不去动别人的声音
+                if (drainBytes < 0 && !stopRequested) audioFocus.acquire(this)
                 deliveryThread = Thread(::deliverAudio, "AsrAudioDelivery").also { it.start() }
                 deliveryStarted = true
                 val draining = drainBytes >= 0
@@ -756,6 +760,7 @@ class SpeechRecognitionManager(
             } finally {
                 stopRequested = true
                 microphone.close()
+                audioFocus.release(this)
                 captureEnded = true
                 watchShutdown()
                 if (deliveryStarted) {
@@ -774,6 +779,7 @@ class SpeechRecognitionManager(
         fun forceStopAudio() {
             stopRequested = true
             microphone.close()
+            audioFocus.release(this)
             watchShutdown()
         }
 

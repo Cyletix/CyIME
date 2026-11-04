@@ -293,6 +293,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("用户学习数据", prediction, SettingsRoutes.SmartPrediction, "学习 记忆 个人语料 导出 导入 保存 统计 学习文件"),
         // 智能 › 语音转文本
         SettingsSearchEntry("本地识别", speech, SettingsRoutes.SpeechToText, "本地 离线 模型 识别方式 在线 无需网络"),
+        SettingsSearchEntry("屏蔽外放音", speech, SettingsRoutes.SpeechToText, "屏蔽 外放 压低音量 暂停播放 不屏蔽 静音 音乐 视频 媒体 声音 其他声音 音频焦点 录音 语音", section = "语音输入"),
         SettingsSearchEntry("开车连续语音", speech, SettingsRoutes.SpeechToText, "开车 驾驶 免手 连续 自动 接着听 悬浮条 浮窗 发送 语音", section = "语音输入"),
         SettingsSearchEntry("隔空输入", speech, SettingsRoutes.SpeechToText, "隔空输入 电脑 Windows 发到电脑 手机说话 电脑打字 远程 光标 微信", section = "语音输入"),
         SettingsSearchEntry("保存语音调优录音", speech, SettingsRoutes.SpeechToText, "录音 保存 调优 回放 分析", section = "本地识别"),
