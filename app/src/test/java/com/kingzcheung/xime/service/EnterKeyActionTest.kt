@@ -27,8 +27,6 @@ class EnterKeyActionTest {
     }
 
     @Test fun declaredActionRunsAndMatchesTheKeyFace() {
-        assertEquals(EditorAction(send), EnterKeyAction.enter(send, multiLine, terminal = false))
-        assertEquals("发送", EnterKeyAction.label(send))
         assertEquals(EditorAction(EditorInfo.IME_ACTION_SEARCH), EnterKeyAction.enter(EditorInfo.IME_ACTION_SEARCH, text, false))
         assertEquals("搜索", EnterKeyAction.label(EditorInfo.IME_ACTION_SEARCH))
         assertEquals("前往", EnterKeyAction.label(EditorInfo.IME_ACTION_GO))
@@ -58,5 +56,19 @@ class EnterKeyActionTest {
         assertEquals(EditorAction(EditorInfo.IME_ACTION_SEARCH), EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_SEARCH, text, false))
         // 终端：Ctrl+回车交给终端。
         assertEquals(CtrlEnterKey, EnterKeyAction.ctrlEnter(send, multiLine, terminal = true))
+    }
+
+    /** 用户 11-04：微信开了「回车键发送消息」，普通回车照样换行、键面写换行；只有 Ctrl+回车发送。 */
+    @Test fun appCannotTurnPlainEnterIntoSend() {
+        assertEquals(Newline, EnterKeyAction.enter(send, multiLine, terminal = false))
+        assertEquals(Newline, EnterKeyAction.enter(send, text, terminal = false))
+        assertEquals("换行", EnterKeyAction.label(send))
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(send, text, terminal = false))
+        // 终端里回车还是回车键；不收文字的发送框发回车键。
+        assertEquals(EnterKey, EnterKeyAction.enter(send, multiLine, terminal = true))
+        assertEquals(EnterKey, EnterKeyAction.enter(send, InputType.TYPE_CLASS_NUMBER, terminal = false))
+        // 搜索、前往、下一项、完成仍由普通回车执行。
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_GO), EnterKeyAction.enter(EditorInfo.IME_ACTION_GO, text, false))
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_DONE), EnterKeyAction.enter(EditorInfo.IME_ACTION_DONE, text, false))
     }
 }
