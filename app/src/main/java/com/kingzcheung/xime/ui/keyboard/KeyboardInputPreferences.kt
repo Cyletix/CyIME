@@ -162,6 +162,8 @@ data class KeyboardInputPreferences(
     val clearBeforeCursorOnly: Boolean = false,
     /** 删除键左右滑动删字：左滑删光标前、右滑删光标后，滑得越远删得越多，默认开（11-01 用户要求可关）。 */
     val swipeDistanceDelete: Boolean = true,
+    /** 按住删除键连删的快慢，振动间隔跟着换档；默认「标准」即原来的手感（11-03 别人提的需求）。 */
+    val deleteRepeatSpeed: com.kingzcheung.xime.keyboard.DeleteRepeatSpeed = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.DEFAULT,
     val cursorHoldSeconds: Float = 0.2f,
     /** 移动光标时每走一字轻震一下；原来一直有，默认开保持手感（2026-10-22 起可关）。 */
     val cursorStepHaptic: Boolean = true,
@@ -284,7 +286,7 @@ data class KeyboardInputPreferences(
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
+                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
@@ -382,6 +384,8 @@ data class KeyboardInputPreferences(
                 clearAllWhileComposing = prefs.getBoolean(CLEAR_ALL_WHILE_COMPOSING_KEY, false),
                 clearBeforeCursorOnly = prefs.getBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, false),
                 swipeDistanceDelete = prefs.getBoolean(SWIPE_DISTANCE_DELETE_KEY, true),
+                deleteRepeatSpeed = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.fromName(
+                    prefs.getString(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, null)),
                 kanaDirectionHints = prefs.getBoolean("kana_direction_hints", false),
                 // 10.11 的默认关已写进旧键；v2 一次性恢复为开，之后用户手动关闭的保留。
                 flickDirectionDisc = prefs.getBoolean("flick_direction_disc_v2", true),
@@ -441,6 +445,7 @@ data class KeyboardInputPreferences(
             .putBoolean(CLEAR_ALL_WHILE_COMPOSING_KEY, clearAllWhileComposing)
             .putBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, clearBeforeCursorOnly)
             .putBoolean(SWIPE_DISTANCE_DELETE_KEY, swipeDistanceDelete)
+            .putString(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, deleteRepeatSpeed.name)
             .putBoolean("kana_direction_hints", kanaDirectionHints)
             .putBoolean("flick_direction_disc_v2", flickDirectionDisc)
             .putBoolean("flick_direction_disc", flickDirectionDisc)

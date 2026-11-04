@@ -118,6 +118,18 @@ internal fun InputExperienceSettings(
                     })
             }
             divider()
+            // 长按删除速度（11-03 别人提的需求）：连删间隔和振动间隔一起换档，默认标准即原来的手感。
+            Column(Modifier.settingsSearchAnchor("长按删除速度", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("长按删除速度：${settings.deleteRepeatSpeed.label}")
+                Slider(value = settings.deleteRepeatSpeed.ordinal.toFloat(), modifier = Modifier.testTag("delete-repeat-speed"),
+                    onValueChange = { settings = settings.copy(deleteRepeatSpeed =
+                        com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.fromIndex(kotlin.math.round(it).toInt())) },
+                    onValueChangeFinished = { settings.save(context) },
+                    valueRange = 0f..com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.entries.lastIndex.toFloat(),
+                    steps = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.entries.size - 2)
+                Text("按住删除键连删的快慢，振动跟着变密或变疏。默认标准。", style = MaterialTheme.typography.bodySmall)
+            }
+            divider()
             Column(Modifier.settingsSearchAnchor("打字中清空整个输入框", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

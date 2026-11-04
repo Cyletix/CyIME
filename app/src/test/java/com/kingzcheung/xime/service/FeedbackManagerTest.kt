@@ -173,6 +173,30 @@ class FeedbackManagerTest {
         org.junit.Assert.assertTrue(FeedbackManager.deleteRepeatHapticDue(600L, 500L))
     }
 
+    @Test fun `delete repeat speed keeps the old feel by default and haptics follow the repeat rate`() {
+        val standard = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.DEFAULT
+        org.junit.Assert.assertEquals(30L, standard.intervalMs)
+        org.junit.Assert.assertEquals(FeedbackManager.DELETE_REPEAT_GAP_MS, standard.repeatGapMs)
+        org.junit.Assert.assertEquals(FeedbackManager.DELETE_REPEAT_HAPTIC_MS, FeedbackManager.deleteRepeatHapticGapMs(standard, 0L))
+        val speeds = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.entries
+        speeds.zipWithNext().forEach { (slower, faster) ->
+            org.junit.Assert.assertTrue(faster.intervalMs < slower.intervalMs)
+            org.junit.Assert.assertTrue(faster.hapticGapMs < slower.hapticGapMs)
+        }
+        speeds.forEach { speed ->
+            // 每档都是连删两到四下振一下；最快一档也留出停顿，转子马达 45 ms 一下不会首尾相接。
+            org.junit.Assert.assertTrue(speed.name, speed.hapticGapMs in speed.intervalMs * 2..speed.intervalMs * 4)
+            org.junit.Assert.assertTrue(speed.name, speed.hapticGapMs >= 45L)
+            // 连删的下一下仍算连删，手指连点（>= 100 ms）不算。
+            org.junit.Assert.assertTrue(FeedbackManager.isDeleteRepeat(1000L + speed.intervalMs + 15L, 1000L, speed.repeatGapMs))
+            org.junit.Assert.assertFalse(FeedbackManager.isDeleteRepeat(1120L, 1000L, speed.repeatGapMs))
+        }
+        // 「长按振动时长」调长时间隔让出一下振动的长度。
+        val fast = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.FAST
+        org.junit.Assert.assertEquals(120L, FeedbackManager.deleteRepeatHapticGapMs(fast, 100L))
+        org.junit.Assert.assertEquals(fast.hapticGapMs, FeedbackManager.deleteRepeatHapticGapMs(fast, 20L))
+    }
+
     @Test fun `only repeated delete sounds cut off the previous one`() {
         org.junit.Assert.assertTrue(FeedbackManager.chokesPrevious("delete"))
         listOf("standard", "space", "enter", "voice_start").forEach {

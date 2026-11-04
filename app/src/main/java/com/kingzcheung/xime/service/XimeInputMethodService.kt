@@ -2353,7 +2353,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 voicePillOnScreen = true
                                 onDispose { voicePillOnScreen = false }
                             }
-                            val glass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).frostedGlass
+                            val pillPrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark)
+                            val glass = pillPrefs.frostedGlass
                             val pillEnglish = state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
                             com.kingzcheung.xime.ui.keyboard.VoiceCollapsedPill(
                                 listening = state.isVoiceMode,
@@ -2376,6 +2377,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onBackspace = { keyboardCallbacks?.onKeyPress("delete", false) },
                                 onBackspacePress = { keyboardCallbacks?.onKeyPressDown?.invoke("delete") },
                                 onBackspaceRelease = { keyboardCallbacks?.onKeyRelease?.invoke("delete") },
+                                backspaceRepeatMs = pillPrefs.deleteRepeatSpeed.intervalMs,
                                 onMic = {
                                     // 在悬浮条上点麦克风停下：用户自己停的，之后不再自动续听。
                                     // 收尾期间焦点离开也不能再记成“被打断”。

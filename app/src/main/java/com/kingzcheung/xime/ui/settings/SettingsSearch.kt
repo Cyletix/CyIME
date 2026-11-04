@@ -202,6 +202,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长按弹出字母气泡", gestures, gesturePage, "长按 字母 大写 小写 音调 气泡 弹出 拼音声调 九键 字母键长按弹出大小写 字母菜单 滑动＋字母气泡", section = "按键角标的符号和数字"),
         SettingsSearchEntry("反转上下滑方向", gestures, gesturePage, "反转 方向 上滑 下滑 上拉 下拉 删除键 清空 撤销"),
         SettingsSearchEntry("左右滑动删除", gestures, gesturePage, "删除键 左滑 右滑 滑动删除 按距离 向后删 Delete 光标后 连删 长按 误触", section = "删除键"),
+        SettingsSearchEntry("长按删除速度", gestures, gesturePage, "删除键 长按 按住 连删 连续删除 速度 快慢 振动 震动 退格 回删", section = "删除键"),
         SettingsSearchEntry("打字中清空整个输入框", gestures, gesturePage, "清空 删除键 上滑 拼音 候选 输入框 全部 一次 跳过候选", section = "删除键"),
         SettingsSearchEntry("只清空光标前的内容", gestures, gesturePage, "清空 删除键 上滑 下滑 光标前 光标后 保留 部分 一半", section = "删除键"),
         SettingsSearchEntry("长按语言键切换输入法", gestures, gesturePage, "语言键 地球键 长按 切换输入法 选择输入法 其他输入法 系统输入法 KeePassDX 密码键盘", section = "时长与距离"),

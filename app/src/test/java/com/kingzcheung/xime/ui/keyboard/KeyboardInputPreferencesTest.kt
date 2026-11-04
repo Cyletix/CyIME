@@ -198,6 +198,18 @@ class KeyboardInputPreferencesTest {
         assertTrue(KeyboardInputPreferences.BOTTOM_LIFT_CURSOR_KEY in KeyboardInputPreferences.watchedKeys)
     }
 
+    @Test fun `delete repeat speed defaults to the old feel and persists every step`() {
+        val before = KeyboardInputPreferences.read(context)
+        assertEquals(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.STANDARD, before.deleteRepeatSpeed)
+        for (speed in com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.entries) {
+            before.copy(deleteRepeatSpeed = speed).save(context)
+            val after = KeyboardInputPreferences.read(context)
+            assertEquals(speed, after.deleteRepeatSpeed)
+            assertEquals(before, after.copy(deleteRepeatSpeed = before.deleteRepeatSpeed))
+        }
+        assertTrue(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY in KeyboardInputPreferences.watchedKeys)
+    }
+
     @Test fun `every saved setting refreshes the keyboard already on screen`() {
         // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
         KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)

@@ -982,6 +982,8 @@ fun SwipeableIconKeyButton(
     downFeedback: KeyFlickFeedback = KeyFlickFeedback.NORMAL,
     followSymbolSwipeDirection: Boolean = false,
     distanceDelete: Boolean = false,
+    /** 删除键：按住连删按「长按删除速度」。会左右滑动删除的键都是删除键；手写的删除键不接滑动，单独标。 */
+    deleteKey: Boolean = distanceDelete,
 ) {
     // Gesture coroutines survive recomposition; route to the current editor/input callbacks.
     val currentOnClick by rememberUpdatedState(onClick)
@@ -993,6 +995,7 @@ fun SwipeableIconKeyButton(
     val currentOnSwipeDown by rememberUpdatedState(onSwipeDown)
     val currentOnSwipeLeft by rememberUpdatedState(onSwipeLeft)
     val startDeleteDrag by rememberUpdatedState(LocalDeleteDrag.current.takeIf { distanceDelete })
+    val repeatIntervalMs by rememberUpdatedState(if (deleteKey) LocalKeyboardInputPreferences.current.deleteRepeatSpeed.intervalMs else 30L)
     val currentOnSwipeStateChange by rememberUpdatedState(onSwipeStateChange)
     val currentSwipeText by rememberUpdatedState(swipeText)
     val currentSwipeUpLabel by rememberUpdatedState(swipeUpLabel)
@@ -1069,6 +1072,7 @@ fun SwipeableIconKeyButton(
                         upLabel = currentSwipeUpLabel ?: currentSwipeText,
                         downLabel = currentSwipeDownLabel,
                         startDeleteDrag = startDeleteDrag,
+                        repeatIntervalMs = repeatIntervalMs,
                         onPreview = { state ->
                             flickPreview = state.keyFlick
                             currentOnSwipeStateChange?.invoke(state, buttonBounds)

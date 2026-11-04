@@ -71,6 +71,8 @@ internal fun VoiceCollapsedPill(
     /** 按下/抬起删除键：与键盘删除键同一套按键反馈（音效、震动）。 */
     onBackspacePress: () -> Unit = {},
     onBackspaceRelease: () -> Unit = {},
+    /** 按住退格连删的间隔，跟键盘删除键同一个「长按删除速度」。 */
+    backspaceRepeatMs: Long = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.DEFAULT.intervalMs,
     onMic: () -> Unit,
     backgroundColor: Color,
     contentColor: Color,
@@ -120,7 +122,7 @@ internal fun VoiceCollapsedPill(
                 }
                 // 麦克风在右数第二个，与展开后工具栏里麦克风的位置一致。
                 VoicePillMic(listening, amplitude, color, accentColor, onMic)
-                VoicePillBackspace(color, onBackspace, onBackspacePress, onBackspaceRelease)
+                VoicePillBackspace(color, onBackspace, onBackspacePress, onBackspaceRelease, backspaceRepeatMs)
             }
         }
         }
@@ -148,26 +150,29 @@ private fun VoicePillMic(listening: Boolean, amplitude: () -> Float, color: Colo
 /** 删除键的手势：点按删一个，长按后按键盘删除键的节奏连续删除（复用同一个手势检测）。 */
 internal fun voicePillBackspaceActions(
     onDelete: () -> Unit, onPress: () -> Unit, onRelease: () -> Unit, onPressedChange: (Boolean) -> Unit,
+    repeatIntervalMs: Long = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.DEFAULT.intervalMs,
 ) = RepeatingKeyActions(
     onTap = onDelete,
     onPress = { onPressedChange(true); onPress() },
     onRelease = { onPressedChange(false); onRelease() },
     onPreview = {},
     onRepeat = onDelete,
+    repeatIntervalMs = repeatIntervalMs,
 )
 
 @Composable
-private fun VoicePillBackspace(color: Color, onDelete: () -> Unit, onPress: () -> Unit, onRelease: () -> Unit) {
+private fun VoicePillBackspace(color: Color, onDelete: () -> Unit, onPress: () -> Unit, onRelease: () -> Unit, repeatMs: Long) {
     var pressed by remember { mutableStateOf(false) }
     val currentDelete by rememberUpdatedState(onDelete)
     val currentPress by rememberUpdatedState(onPress)
     val currentRelease by rememberUpdatedState(onRelease)
+    val currentRepeatMs by rememberUpdatedState(repeatMs)
     Box(
         Modifier.size(48.dp)
             .semantics { contentDescription = "删除"; role = Role.Button; onClick { currentDelete(); true } }
             .pointerInput(Unit) {
                 detectRepeatingKeyGestures {
-                    voicePillBackspaceActions({ currentDelete() }, { currentPress() }, { currentRelease() }) { pressed = it }
+                    voicePillBackspaceActions({ currentDelete() }, { currentPress() }, { currentRelease() }, { pressed = it }, currentRepeatMs)
                 }
             }
             .testTag("voice-pill-backspace"),

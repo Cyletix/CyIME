@@ -61,6 +61,7 @@ class FeedbackManager(private val context: Context) {
     private var longPressAmplitude = 0
     private var cursorStepHaptic = true
     private var cursorStepSound = false
+    private var deleteRepeatSpeed = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.DEFAULT
 
     companion object {
         /** 设置页「按键音色」写入的偏好键。 */
@@ -112,7 +113,7 @@ class FeedbackManager(private val context: Context) {
         /** 删除音连发时只保留最新一层；其他按键音照常可以重叠。 */
         fun chokesPrevious(keyType: String): Boolean = keyType == "delete"
 
-        /** 按住删除键时每 30 ms 连删一下；离上一下这么近的只能是连删，手指连点到不了。 */
+        /** 按住删除键时每 30 ms 连删一下（「长按删除速度」标准档）；离上一下这么近的只能是连删，手指连点到不了。 */
         const val DELETE_REPEAT_GAP_MS = 80L
 
         /**
@@ -121,11 +122,18 @@ class FeedbackManager(private val context: Context) {
          */
         const val DELETE_REPEAT_HAPTIC_MS = 100L
 
-        fun isDeleteRepeat(nowUptime: Long, lastPressUptime: Long): Boolean =
-            lastPressUptime > 0L && nowUptime - lastPressUptime < DELETE_REPEAT_GAP_MS
+        fun isDeleteRepeat(nowUptime: Long, lastPressUptime: Long, gapMs: Long = DELETE_REPEAT_GAP_MS): Boolean =
+            lastPressUptime > 0L && nowUptime - lastPressUptime < gapMs
 
-        fun deleteRepeatHapticDue(nowUptime: Long, lastHapticUptime: Long): Boolean =
-            nowUptime - lastHapticUptime >= DELETE_REPEAT_HAPTIC_MS
+        fun deleteRepeatHapticDue(nowUptime: Long, lastHapticUptime: Long, gapMs: Long = DELETE_REPEAT_HAPTIC_MS): Boolean =
+            nowUptime - lastHapticUptime >= gapMs
+
+        /**
+         * 连删振动间隔跟着「长按删除速度」换档。「启用」里把「长按振动时长」调长了（连删用它），间隔至少比一下振动
+         * 长 20 ms，免得一下没振完下一下又来，连成一长串嗡；没调（0）时就是档位本身的间隔。
+         */
+        fun deleteRepeatHapticGapMs(speed: com.kingzcheung.xime.keyboard.DeleteRepeatSpeed, customLongPressMs: Long): Long =
+            if (customLongPressMs > 0L) maxOf(speed.hapticGapMs, customLongPressMs + 20L) else speed.hapticGapMs
 
         /** 设置页「录屏时包含按键音」写入的偏好键，默认关。 */
         const val KEY_SOUND_CAPTURABLE = "key_sound_capturable"
@@ -238,6 +246,12 @@ class FeedbackManager(private val context: Context) {
         pressAmplitude = SettingsPreferences.getVibrationPressAmplitude(context)
         longPressAmplitude = SettingsPreferences.getVibrationLongPressAmplitude(context)
         readCursorStepSettings()
+        readDeleteRepeatSpeed()
+    }
+
+    private fun readDeleteRepeatSpeed() {
+        deleteRepeatSpeed = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.fromName(
+            SettingsPreferences.getPrefsPublic(context).getString(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, null))
     }
 
     /** 「移动光标时振动 / 播放按键音」两个开关，键名与 KeyboardInputPreferences 一致。 */
@@ -266,6 +280,7 @@ class FeedbackManager(private val context: Context) {
                 }
                 "haptic_mode" -> hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
                 KEY_CURSOR_STEP_HAPTIC, KEY_CURSOR_STEP_SOUND -> readCursorStepSettings()
+                com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY -> readDeleteRepeatSpeed()
                 "haptic_on_keyup" -> hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
                 "vibration_press_duration" -> pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
                 "vibration_long_press_duration" -> longPressDuration = SettingsPreferences.getVibrationLongPressDuration(context).toLong()
@@ -414,10 +429,12 @@ class FeedbackManager(private val context: Context) {
             hapticFeedback(view, type = type)
             return
         }
-        // 连删：声音照旧每下都有，振动按 DELETE_REPEAT_HAPTIC_MS 隔开；单点删除照常每下都震。
-        val repeat = isDeleteRepeat(nowUptime, lastDeletePressUptime)
+        // 连删：声音照旧每下都有，振动按「长按删除速度」的间隔隔开（标准档 100 ms）；单点删除照常每下都震。
+        val speed = deleteRepeatSpeed
+        val repeat = isDeleteRepeat(nowUptime, lastDeletePressUptime, speed.repeatGapMs)
         lastDeletePressUptime = nowUptime
-        if (repeat && !deleteRepeatHapticDue(nowUptime, lastDeleteHapticUptime)) return
+        val customLong = if (hapticMode == HapticMode.Enabled) longPressDuration else 0L
+        if (repeat && !deleteRepeatHapticDue(nowUptime, lastDeleteHapticUptime, deleteRepeatHapticGapMs(speed, customLong))) return
         lastDeleteHapticUptime = nowUptime
         hapticFeedback(view, type = type, deleteRepeat = repeat)
     }

@@ -24,6 +24,8 @@ internal data class RepeatingKeyActions(
     // 上下动作对调后，预览仍从原提示所在一侧出现（“清空”标在上方，下拉时也从上方移入）。
     val swappedVertical: Boolean = false,
     val startDeleteDrag: (() -> (Int) -> Unit)? = null,
+    /** 按住后每隔多久再来一下；删除键按「长按删除速度」，其他键 30 ms。 */
+    val repeatIntervalMs: Long = 30L,
 )
 
 /** A single owner for hold and swipe: touch slop must not cancel repeated deletion. */
@@ -59,7 +61,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
             while (repeat.isActive) {
                 actions.onPress()
                 repeat.dispatch(onRepeat)
-                delay(30)
+                delay(actions.repeatIntervalMs)
             }
         } }
         try {

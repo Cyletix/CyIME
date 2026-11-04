@@ -455,7 +455,7 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
         SwipeableIconKeyButton(
             icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
             onClick = onClick, onLongClick = onClick, onSwipeUp = onClear,
-            followSymbolSwipeDirection = true,
+            followSymbolSwipeDirection = true, deleteKey = true,
             upFeedback = KeyFlickFeedback.DELETE,
             swipeText = "清空", swipeUpLabel = "清空",
             backgroundColor = keyBackground, iconColor = keyForeground,
