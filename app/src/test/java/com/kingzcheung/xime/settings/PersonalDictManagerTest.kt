@@ -622,6 +622,26 @@ c	d
     }
 
     @Test
+    fun `a multi line phrase stays one table row and reaches the nine key copy whole`() {
+        val context = mockContext()
+        val invoice = "名称：某某公司\n税号：91110000XXXX"
+        val entries = listOf(DictEntry(invoice, "fpxx"), DictEntry("B站", "bzhan", 1))
+        PersonalDictManager.saveCustomPhrases(context, entries = entries)
+        val dir = File(context.filesDir, "rime")
+        val rows = File(dir, "custom_phrase.txt").readLines().filterNot { it.isBlank() || it.startsWith('#') }
+        assertEquals(listOf("名称：某某公司\u2028税号：91110000XXXX\tfpxx", "B站\tbzhan\t1"), rows)
+        val loaded = PersonalDictManager.loadCustomPhrases(context)
+        assertEquals(invoice, PhraseLineBreaks.typed(loaded.first().word))
+        // Saving what was loaded does not change the file.
+        val before = File(dir, "custom_phrase.txt").readText()
+        PersonalDictManager.saveCustomPhrases(context, entries = loaded)
+        assertEquals(before, File(dir, "custom_phrase.txt").readText())
+        PersonalDictManager.writeKeyedPhrases(dir, PersonalDictManager.PhraseKeys.T9)
+        val t9 = PersonalDictManager.parseStableDbEntries(File(dir, "custom_phrase_t9.txt").readText())
+        assertEquals(DictEntry("名称：某某公司\u2028税号：91110000XXXX", "3799"), t9.first())
+    }
+
+    @Test
     fun `loadCustomPhrases when file missing returns empty`() {
         val context = mockContext()
         assertTrue(PersonalDictManager.loadCustomPhrases(context).isEmpty())

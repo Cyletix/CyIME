@@ -219,7 +219,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             service.currentInputConnection?.getTextBeforeCursor(DigitPhrases.CONTEXT_LENGTH, 0)?.toString()
         }.getOrNull()
         val replaced = DigitPhrases.typedDigits(before) == state.digitPhraseText &&
-            service.replaceBeforeCursor(state.digitPhraseText, word)
+            service.replaceBeforeCursor(state.digitPhraseText, com.kingzcheung.xime.settings.PhraseLineBreaks.typed(word))
         service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList(),
             digitPhrases = emptyList(), digitPhraseText = "")
         // 换掉的数字也是计算器正在记的那串，别让下一个运算符接到已经不在的数字上。

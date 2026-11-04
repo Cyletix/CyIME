@@ -163,10 +163,11 @@ private fun CustomPhraseTabContent(
                 // filteredEntries is a view of entries; edit and delete act on the entry's own position.
                 val index = uiState.entries.indexOf(entry)
                 SettingsGroupRow(row, uiState.filteredEntries.size) {
-                    SettingsListRow(entry.word, entry.code,
+                    val shownWord = com.kingzcheung.xime.settings.PhraseLineBreaks.shown(entry.word)
+                    SettingsListRow(shownWord, entry.code,
                         Modifier.clickable { viewModel.setEditing(index, entry); viewModel.showEditDialog() }) {
                         IconButton(onClick = { viewModel.deleteEntry(index) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "删除${entry.word}",
+                            Icon(Icons.Default.Delete, contentDescription = "删除$shownWord",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -224,8 +225,9 @@ private fun PhraseEditDialog(
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            // 短语可以多行（发票抬头、地址）：回车换行，粘贴多行原样保留。
             OutlinedTextField(value = word, onValueChange = onWordChange,
-                label = { Text("短语") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                label = { Text("短语") }, maxLines = 6, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = code, onValueChange = onCodeChange,
                 label = { Text("编码，例如 dz") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = weight, onValueChange = onWeightChange,

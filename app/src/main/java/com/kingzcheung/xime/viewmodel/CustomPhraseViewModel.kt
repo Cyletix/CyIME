@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kingzcheung.xime.settings.DictEntry
 import com.kingzcheung.xime.settings.PersonalDictManager
+import com.kingzcheung.xime.settings.PhraseLineBreaks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +70,7 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
         if (trimmedWord.isEmpty() || trimmedCode.isEmpty()) return
         viewModelScope.launch {
             val current = _uiState.value.entries
-            val updated = current + DictEntry(trimmedWord, trimmedCode, weight)
+            val updated = current + DictEntry(PhraseLineBreaks.stored(trimmedWord), trimmedCode, weight)
             withContext(Dispatchers.IO) { PersonalDictManager.saveCustomPhrases(context, schemaId, updated) }
             _uiState.update {
                 val query = it.searchQuery
@@ -86,7 +87,7 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val current = _uiState.value.entries.toMutableList()
             if (index < 0 || index >= current.size) return@launch
-            current[index] = DictEntry(trimmedWord, trimmedCode, weight)
+            current[index] = DictEntry(PhraseLineBreaks.stored(trimmedWord), trimmedCode, weight)
             withContext(Dispatchers.IO) { PersonalDictManager.saveCustomPhrases(context, schemaId, current) }
             _uiState.update {
                 val query = it.searchQuery
@@ -142,7 +143,8 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
     fun setEditing(index: Int, entry: DictEntry) {
         _uiState.update { it.copy(
             editIndex = index,
-            editWord = entry.word,
+            // 编辑框里是真的换行，存的时候再换成 U+2028。
+            editWord = PhraseLineBreaks.typed(entry.word),
             editCode = entry.code,
             editWeight = entry.weight?.toString() ?: ""
         ) }

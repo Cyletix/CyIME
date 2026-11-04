@@ -12,4 +12,9 @@ class CandidateNumberLabelTest {
         assertEquals("hello", candidateNumberedText("hello", 0, false))
         assertEquals("剪贴板", candidateNumberedText("剪贴板", -1, true))
     }
+
+    @Test fun multiLinePhraseShowsItsBreakAsAMark() {
+        assertEquals("1 抬头↵税号", candidateNumberedText("抬头\u2028税号", 0, true))
+        assertEquals("抬头↵税号", candidateNumberedText("抬头\u2028税号", 0, false))
+    }
 }

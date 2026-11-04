@@ -614,7 +614,8 @@ object PersonalDictManager {
         val sb = StringBuilder()
         sb.append(header.trimEnd('\n', '\r')).append('\n')
         for (e in entries) {
-            sb.append(e.word).append('\t').append(e.code)
+            // 短语里的换行存成 U+2028，表里仍是一行（见 PhraseLineBreaks）。
+            sb.append(PhraseLineBreaks.stored(e.word)).append('\t').append(e.code)
             if (e.weight != null) sb.append('\t').append(e.weight)
             sb.append('\n')
         }

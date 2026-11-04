@@ -544,7 +544,7 @@ private fun CandidatePageItem(
                     fontFamily = AppFonts.candidateFontFamily
                 )
             ) {
-                append(entry.text)
+                append(com.kingzcheung.xime.settings.PhraseLineBreaks.shown(entry.text))
             }
             if (displayComment.isNotEmpty()) {
                 withStyle(

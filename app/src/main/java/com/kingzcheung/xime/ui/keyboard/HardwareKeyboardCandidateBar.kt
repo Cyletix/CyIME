@@ -156,7 +156,7 @@ fun HardwareKeyboardCandidateBar(
             avoidBounds = toolbarExclusion,
         )
         val textWidth = candidates.take(MAX_VISIBLE_CANDIDATES).mapIndexed { index, text ->
-            measurer.measure(AnnotatedString("${(index + 1) % 10} $text"),
+            measurer.measure(AnnotatedString(candidateNumberedText(text, index, true)),
                 candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == highlightIndex), softWrap = false).size.width
         }.sum()
         val contentWidth = (with(density) { textWidth.toDp() } + (12 * candidates.size + 104).dp)
@@ -245,7 +245,7 @@ private fun HardwareCandidateGrid(
                         .background(if (selected) visuals.accentColor.copy(alpha = .18f) else Color.Transparent)
                         .clickable { onCandidateSelect?.invoke(index) }.testTag("hardware-grid-candidate:$index"),
                         contentAlignment = Alignment.Center) {
-                        Text("${(index + 1) % 10} $word", color = if (selected) visuals.selectedTextColor else visuals.textColor,
+                        Text(candidateNumberedText(word, index, true), color = if (selected) visuals.selectedTextColor else visuals.textColor,
                             fontSize = fontSize, maxLines = 1, softWrap = false)
                     }
                 }

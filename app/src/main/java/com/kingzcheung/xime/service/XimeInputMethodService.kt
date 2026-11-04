@@ -5015,6 +5015,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return owner.runInline { commitTextSilently(text, isPaste, isSensitive, caret) }
         }
         InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
+        // 「我的短语」的换行在短语表里是 U+2028，上屏换回换行；粘贴的原文不动。
+        val delivered = if (isPaste) text else com.kingzcheung.xime.settings.PhraseLineBreaks.typed(text)
         val target = uiState.value.inputTarget
         if (target.isInternal) {
             val editor = target.editText() ?: return TextCommitResult.NO_CONNECTION
@@ -5023,25 +5025,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             var end = editor.selectionEnd.coerceIn(start, editable.length)
             val overtype = caret.overtype
             if (overtype != null && start == end && editable.startsWith(overtype, end)) end += overtype.length
-            editable.replace(start, end, text)
-            editor.setSelection(start + text.length - caret.caretBack.coerceIn(0, text.length))
+            editable.replace(start, end, delivered)
+            editor.setSelection(start + delivered.length - caret.caretBack.coerceIn(0, delivered.length))
             return TextCommitResult.ACCEPTED_INTERNAL
         }
         val connection = currentInputConnection ?: return TextCommitResult.NO_CONNECTION
-        val committed = if (caret == CommitCaret.NONE) connection.commitText(text, 1)
-            else connection.commitTextWithCaret(text, caret)
+        val committed = if (caret == CommitCaret.NONE) connection.commitText(delivered, 1)
+            else connection.commitTextWithCaret(delivered, caret)
         if (!committed) return TextCommitResult.REJECTED
         if (isSensitive || isSecretEditor()) return TextCommitResult.ACCEPTED_HOST
-        pluginEvents.onTextCommitted(text, isPaste)
+        pluginEvents.onTextCommitted(delivered, isPaste)
         typingStatsSource().let { source ->
-            com.kingzcheung.xime.stats.TypingStats.onCommit(text, isPaste, source, softKeyboard = !hasHardwareKeyboard,
+            com.kingzcheung.xime.stats.TypingStats.onCommit(delivered, isPaste, source, softKeyboard = !hasHardwareKeyboard,
                 combo = typingStatsCombo(source, !hasHardwareKeyboard))
         }
         if (isChineseMode) {
             val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull()
             if (before != null) predictionManager.replaceCommittedText(before)
-            else predictionManager.appendCommittedText(text)
-            if (!isPaste) predictionManager.recordInput(text)
+            else predictionManager.appendCommittedText(delivered)
+            if (!isPaste) predictionManager.recordInput(delivered)
         }
         return TextCommitResult.ACCEPTED_HOST
     }
