@@ -7,4 +7,6 @@ internal data class PendingCandidateCommit(
     val t9: Boolean,
     val learnSelection: Boolean = true,
     val caret: CommitCaret = CommitCaret.NONE,
+    /** 通讯录的人名、号码：上屏不学习（见 [CandidateAction.isPrivate]）。 */
+    val isPrivate: Boolean = false,
 )

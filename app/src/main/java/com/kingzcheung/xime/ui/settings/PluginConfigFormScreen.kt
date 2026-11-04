@@ -189,6 +189,7 @@ fun PluginConfigFormScreen(
         installedInfo?.let { pluginEntryHint(context, it, pluginEnabled) }
     }
     val toggleScope = rememberCoroutineScope()
+    val contactsGate = rememberContactsPermissionGate(pluginId)
 
     // 没有「保存」：字段边打边存，离开这页时把填的地址授权（文件导入的插件用；市场装的和内置的本来就放行）。
     var uninstalled by remember(pluginId) { mutableStateOf(false) }
@@ -272,10 +273,12 @@ fun PluginConfigFormScreen(
                             subtitle = entryHint.orEmpty(),
                             checked = pluginEnabled,
                             onCheckedChange = { on ->
-                                pluginEnabled = on
-                                toggleScope.launch {
-                                    setToolPluginEnabled(context, pluginId, on)
-                                    placeTick++
+                                contactsGate(on) {
+                                    pluginEnabled = on
+                                    toggleScope.launch {
+                                        setToolPluginEnabled(context, pluginId, on)
+                                        placeTick++
+                                    }
                                 }
                             },
                         )

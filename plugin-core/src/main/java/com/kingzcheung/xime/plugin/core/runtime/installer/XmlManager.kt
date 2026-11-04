@@ -169,6 +169,9 @@ class XmlManager(private val context: Application) {
             if (cap.clipboardRead) {
                 root["clipboardRead"] = true
             }
+            if (cap.contacts) {
+                root["contacts"] = true
+            }
             return com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson.encode(root) ?: ""
         }
 
@@ -220,7 +223,8 @@ class XmlManager(private val context: Application) {
                     events = (root["events"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
                     candidateTransform = (root["candidateTransform"] as? Boolean) ?: false,
                     quickSendRead = (root["quickSendRead"] as? Boolean) ?: false,
-                    clipboardRead = (root["clipboardRead"] as? Boolean) ?: false
+                    clipboardRead = (root["clipboardRead"] as? Boolean) ?: false,
+                    contacts = (root["contacts"] as? Boolean) ?: false
                 )
             }.getOrNull()
         }

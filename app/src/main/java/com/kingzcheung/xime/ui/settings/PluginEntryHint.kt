@@ -53,6 +53,11 @@ internal suspend fun uninstallPluginCompletely(context: Context, pluginId: Strin
     PluginManager.unloadPlugin(pluginId)
     PluginManager.installerManager.uninstallPlugin(pluginId)
     SettingsPreferences.forgetUninstalledPlugin(context, pluginId, buttons)
+    // 卸掉的是通讯录插件：内存里的通讯录跟着丢掉。投递到主线程不等它：调用方可能正占着主线程等卸载做完。
+    if (com.kingzcheung.xime.contacts.ContactSuggestions.isContactsPlugin(pluginId)) {
+        val app = context.applicationContext
+        android.os.Handler(android.os.Looper.getMainLooper()).post { com.kingzcheung.xime.contacts.ContactSuggestions.sync(app) }
+    }
 }
 
 /**

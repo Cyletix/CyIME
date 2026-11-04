@@ -1565,7 +1565,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // key-processing 线程同步调用；ascii 场景不变换（调用点语义与 transformFor 一致）
                     val transformed = if (capturedInputText.isNotEmpty() && !capturedIsAscii) {
                         service.candidateTransform.transform(
-                            capturedInputText, "", capturedCandidates.toList(), capturedIsAscii
+                            capturedInputText, "", capturedCandidates.toList(), capturedIsAscii, firstPage = !capturedHasPrev
                         )
                     } else {
                         null
@@ -1646,7 +1646,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (composition != null &&
             service.candidateState.value.engineRevision != composition.engineRevision) {
             val transformed = service.candidateTransform.transform(composition.input, composition.preedit,
-                composition.candidates.toList(), composition.isAsciiMode)
+                composition.candidates.toList(), composition.isAsciiMode, firstPage = !composition.hasPrevPage)
             val injections = if (isT9Schema(service.uiState.value.currentSchemaId)) {
                 service.candidateTransform.transformForT9(com.kingzcheung.xime.rime.RimeProcessResult(
                     true, "", composition.input, composition.preedit, composition.candidates,
@@ -2244,7 +2244,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val engineHasComposition = service.rimeEngine.getInput().isNotEmpty() ||
                 service.rimeEngine.getCandidates().isNotEmpty()
             if (engineHasComposition) {
-                commitSelectedText(pendingAction.commitText)
+                if (pendingAction.isPrivate) commitPrivateText(pendingAction.commitText, isT9Schema(service.uiState.value.currentSchemaId))
+                else commitSelectedText(pendingAction.commitText)
                 return
             }
         }
@@ -2366,14 +2367,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         ))
     }
 
-    /** A rejected commit retains its original owner and text. Retry is an explicit user action. */
-    internal suspend fun commitPreparedText(text: String, t9: Boolean, caret: CommitCaret = CommitCaret.NONE): TextCommitResult =
+    /**
+     * 通讯录的人名、号码上屏：不进 Rime 词库（不经引擎选词）、不记联想（不记上下文，下一次上屏也不和它配对）、
+     * 不进打字统计、不发插件事件，上屏后不出联想。
+     */
+    internal suspend fun commitPrivateText(text: String, t9: Boolean) {
         deliverCandidateCommit(PendingCandidateCommit(InputCommandOwner.requireOwner(), text, t9, learnSelection = false,
-            caret = caret))
+            isPrivate = true))
+    }
+
+    /** A rejected commit retains its original owner and text. Retry is an explicit user action. */
+    internal suspend fun commitPreparedText(text: String, t9: Boolean, caret: CommitCaret = CommitCaret.NONE,
+        isPrivate: Boolean = false): TextCommitResult =
+        deliverCandidateCommit(PendingCandidateCommit(InputCommandOwner.requireOwner(), text, t9, learnSelection = false,
+            caret = caret, isPrivate = isPrivate))
 
     private suspend fun deliverCandidateCommit(pending: PendingCandidateCommit): TextCommitResult =
         pending.deliver(
             submit = { text -> withEditor {
+                if (pending.isPrivate) return@withEditor service.submitPrivateText(text, pending.caret)
                 val previousText = service.predictionManager.lastCommittedText
                 val outcome = service.submitText(text, pending.caret)
                 if (outcome.accepted) {

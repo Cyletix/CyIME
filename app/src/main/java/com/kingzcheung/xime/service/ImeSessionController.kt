@@ -125,7 +125,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             // 不实际消费 engineIndex，仅用于插件候选分流）
             val baseCands = display.displayCandidates
             val baseComments = display.displayComments
-            val byAnchor = t9PluginInjections.groupBy { it.anchorEngineIndex }
+            val byAnchor = t9PluginInjections.filter { it.contactName == null }.groupBy { it.anchorEngineIndex }
             val mergedCands = ArrayList<String>(baseCands.size + t9PluginInjections.size)
             val mergedComments = ArrayList<String>(mergedCands.size)
             val mergedActions = ArrayList<CandidateAction>(mergedCands.size)
@@ -144,10 +144,17 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 mergedComments.add(inj.snapshot.comment)
                 mergedActions.add(CandidateAction.plugin(inj.snapshot.text))
             }
-            displayCandidates = mergedCands
-            displayComments = mergedComments
+            // 通讯录的人名、号码（不学习）：已经分段上屏了一部分时不给，免得只上屏名字丢了前面的字。
+            val contacts = if (service.t9PartialSegments.isNotEmpty()) emptyList() else t9PluginInjections.mapNotNull { inj ->
+                inj.contactName?.let { com.kingzcheung.xime.contacts.ContactItem(inj.snapshot.text, inj.snapshot.comment, it) }
+            }
+            val rows = com.kingzcheung.xime.contacts.ContactCandidates.merge(
+                com.kingzcheung.xime.contacts.CandidateRows(mergedCands, mergedComments, mergedActions), contacts,
+            )
+            displayCandidates = rows.texts
+            displayComments = rows.comments
             isComposing = display.isComposing
-            t9CandidateActions = mergedActions
+            t9CandidateActions = rows.actions
         } else {
             // 非 T9 方案：preeditText 用引擎回显（带音节分隔符，如全拼 ni'hao）供候选栏展示；
             // inputText 保留原始键入串（无分隔）——空格/切模式等提交路径会把它直接上屏，

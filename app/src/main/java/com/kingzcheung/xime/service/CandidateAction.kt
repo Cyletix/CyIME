@@ -7,15 +7,19 @@ package com.kingzcheung.xime.service
  * - [engineIndex] < 0：插件自有候选，点击直接上屏 [commitText]（绕过引擎，所见即所得）
  *
  * 空列表 = 纯引擎语义（显示 index 即引擎 index），所有既有路径零影响。
+ *
+ * [isPrivate]：通讯录插件的人名、号码。上屏不学习：不进词库、联想、打字统计和插件事件。
  */
 data class CandidateAction(
     val engineIndex: Int,
     val commitText: String,
+    val isPrivate: Boolean = false,
 ) {
     val isPluginCandidate: Boolean get() = engineIndex < 0
 
     companion object {
         fun engine(index: Int) = CandidateAction(engineIndex = index, commitText = "")
         fun plugin(text: String) = CandidateAction(engineIndex = -1, commitText = text)
+        fun contact(text: String) = CandidateAction(engineIndex = -1, commitText = text, isPrivate = true)
     }
 }

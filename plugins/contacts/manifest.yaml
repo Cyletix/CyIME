@@ -1,0 +1,25 @@
+# =============================================
+# CyIME Lua 插件元数据（宿主用 YAML 解析）
+# =============================================
+
+id: com.kingzcheung.xime.plugin.contacts
+
+name: 通讯录
+icon: "人"
+description: 打联系人名字的拼音，候选里出名字和手机号。打开时要通讯录权限；通讯录只放在手机内存里，不学习、不备份、不同步、不联网，关掉插件就清掉。
+
+version: 0.1.0
+
+# tool：没有键盘按钮，只有设置页
+type: tool
+activation: multi
+
+entry: main.lua
+
+minHostVersion: 1.15.58
+
+# 不联网：不声明任何域名
+
+capabilities:
+  # 宿主自己读通讯录、给候选，内容不交给本脚本
+  contacts: true

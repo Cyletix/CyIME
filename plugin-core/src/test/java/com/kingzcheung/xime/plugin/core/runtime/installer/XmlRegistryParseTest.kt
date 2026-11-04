@@ -85,6 +85,14 @@ class XmlRegistryParseTest {
     }
 
     @Test
+    fun `contacts capability survives registry reload`() {
+        val caps = XmlManager.parsePluginsXmlContent(registryXml("""{&quot;contacts&quot;:true}""")).single().capabilities!!
+        assertTrue(caps.contacts)
+        val old = XmlManager.parsePluginsXmlContent(registryXml("""{&quot;candidateTransform&quot;:true}""")).single().capabilities!!
+        assertTrue(!old.contacts)
+    }
+
+    @Test
     fun `旧注册表无 capabilities 节点时为 null`() {
         val plugin = XmlManager.parsePluginsXmlContent(registryXml(null)).single()
         assertNull(plugin.capabilities)

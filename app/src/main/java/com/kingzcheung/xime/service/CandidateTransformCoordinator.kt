@@ -1,6 +1,11 @@
 package com.kingzcheung.xime.service
 
 import android.util.Log
+import com.kingzcheung.xime.contacts.CandidateRows
+import com.kingzcheung.xime.contacts.ContactCandidates
+import com.kingzcheung.xime.contacts.ContactIndex
+import com.kingzcheung.xime.contacts.ContactItem
+import com.kingzcheung.xime.contacts.ContactSuggestions
 import com.kingzcheung.xime.plugin.core.lua.CandidateTransformCandidate
 import com.kingzcheung.xime.plugin.core.lua.CandidateTransformItem
 import com.kingzcheung.xime.plugin.core.lua.CandidateTransformOutcome
@@ -34,6 +39,8 @@ data class PluginCandidateSnapshot(
 data class T9CandidateInjection(
     val anchorEngineIndex: Int?,
     val snapshot: PluginCandidateSnapshot,
+    /** 通讯录插件的人名/号码：不按锚点插，交给 [com.kingzcheung.xime.contacts.ContactCandidates.merge]。 */
+    val contactName: Boolean? = null,
 )
 
 /**
@@ -97,6 +104,7 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
             preedit = result.preeditText,
             engineCandidates = result.candidates.toList(),
             asciiMode = result.isAsciiMode,
+            firstPage = !result.hasPrevPage,
         )
     }
 
@@ -109,9 +117,63 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         preedit: String,
         engineCandidates: List<RimeCandidate>,
         asciiMode: Boolean,
+        firstPage: Boolean = true,
     ): CandidateTransformResult? {
         if (asciiMode) return null
         if (isT9Schema(service.uiState.value.currentSchemaId)) return null
+        val transformed = transformByPlugin(inputText, preedit, engineCandidates, asciiMode)
+        return withContacts(transformed, inputText, preedit, engineCandidates, firstPage)
+    }
+
+    /**
+     * 通讯录插件（宿主内置查找，不经插件脚本）：编码正好是某个联系人名字的拼音时，
+     * 把名字和号码放进候选（见 [ContactCandidates.merge]），点了走不学习的上屏。
+     * 只在首页、中文键盘、非密码框里给；没启用时只读一个 volatile 就返回。
+     */
+    private fun withContacts(
+        transformed: CandidateTransformResult?,
+        inputText: String,
+        preedit: String,
+        engineCandidates: List<RimeCandidate>,
+        firstPage: Boolean,
+    ): CandidateTransformResult? {
+        val items = contactItems(inputText, preedit, firstPage, t9 = false)
+        if (items.isEmpty()) return transformed
+        val base = transformed?.candidates ?: engineCandidates
+        val merged = ContactCandidates.merge(
+            CandidateRows(base.map { it.text }, base.map { it.comment }, transformed?.actions.orEmpty()), items,
+        )
+        val candidates = merged.texts.indices.map { i ->
+            val from = merged.origin[i]
+            val original = base.getOrNull(from)
+            when {
+                original == null -> RimeCandidate(merged.texts[i], merged.comments[i])
+                original.comment == merged.comments[i] -> original
+                else -> original.copy(comment = merged.comments[i])
+            }
+        }
+        return CandidateTransformResult(candidates, merged.actions)
+    }
+
+    private fun contactItems(inputText: String, preedit: String, firstPage: Boolean, t9: Boolean): List<ContactItem> {
+        if (!firstPage || !ContactSuggestions.isActive || inputText.isEmpty()) return emptyList()
+        // 密码框（含终端）不给；手动无痕照样给：通讯录候选本来就不学习。
+        if (service.isSecretEditor()) return emptyList()
+        val profile = service.uiState.value.inputProfile
+        if (profile.language != com.kingzcheung.xime.settings.InputLanguage.CHINESE ||
+            profile.mode != com.kingzcheung.xime.settings.InputMode.KEYBOARD) return emptyList()
+        val letters = ContactIndex.lettersOf(preedit) ?: ContactIndex.lettersOf(inputText)
+        val digits = if (t9) ContactIndex.digitsOf(inputText) else null
+        return ContactSuggestions.itemsFor(letters, digits)
+    }
+
+    /** 插件脚本（candidate_transform）那一份变换；没有声明的插件返回 null。 */
+    private fun transformByPlugin(
+        inputText: String,
+        preedit: String,
+        engineCandidates: List<RimeCandidate>,
+        asciiMode: Boolean,
+    ): CandidateTransformResult? {
         if (service.pluginEvents.isCurrentEditorSensitive) return null
         val (pluginId, runtime) = findRuntime() ?: return null
         if (!failureCircuit.permits(runtime)) return null
@@ -159,6 +221,15 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
     fun transformForT9(result: RimeProcessResult): List<T9CandidateInjection>? {
         if (result.isAsciiMode) return null
         if (result.inputText.isEmpty() && result.candidates.isEmpty()) return null
+        val contacts = contactItems(result.inputText, result.preeditText, !result.hasPrevPage, t9 = true).map {
+            T9CandidateInjection(null, PluginCandidateSnapshot(it.text, it.comment), contactName = it.isName)
+        }
+        val plugin = transformForT9ByPlugin(result)
+        if (contacts.isEmpty()) return plugin
+        return plugin.orEmpty() + contacts
+    }
+
+    private fun transformForT9ByPlugin(result: RimeProcessResult): List<T9CandidateInjection>? {
         if (service.pluginEvents.isCurrentEditorSensitive) return null
         val (pluginId, runtime) = findRuntime() ?: return null
         if (!failureCircuit.permits(runtime)) return null

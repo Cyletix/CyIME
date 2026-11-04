@@ -285,6 +285,12 @@ private fun ExtensionItem(
     var resumeTick by remember { mutableStateOf(0) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { resumeTick++ }
     var isEnabled by remember(extension.id, resumeTick) { mutableStateOf(viewModel.isPluginEnabled(extension.id)) }
+    val contactsGate = rememberContactsPermissionGate(extension.id)
+    // 从文件装的插件默认是开的：通讯录插件没授权时开关显示关着，拨一下就要权限。
+    val contactsUnauthorized = remember(extension.id, resumeTick, isEnabled) {
+        isEnabled && extension.capabilities?.contacts == true &&
+            !com.kingzcheung.xime.contacts.ContactSuggestions.hasPermission(context)
+    }
     var showErrorDialog by remember { mutableStateOf(false) }
     var showTrustConfirm by remember { mutableStateOf(false) }
     var trustConfirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -501,7 +507,7 @@ private fun ExtensionItem(
                         Text(
                             text = when {
                                 !hostCompatible -> "不兼容"
-                                isEnabled -> "已启用"
+                                isEnabled && !contactsUnauthorized -> "已启用"
                                 else -> "未启用"
                             },
                             style = MaterialTheme.typography.bodyMedium,
@@ -514,9 +520,11 @@ private fun ExtensionItem(
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
-                        Switch(checked = isEnabled, enabled = hostCompatible, colors = settingsSwitchColors(), onCheckedChange = {
-                            isEnabled = it
-                            viewModel.setPluginEnabled(extension.id, it)
+                        Switch(checked = isEnabled && !contactsUnauthorized, enabled = hostCompatible, colors = settingsSwitchColors(), onCheckedChange = { on ->
+                            contactsGate(on) {
+                                isEnabled = on
+                                viewModel.setPluginEnabled(extension.id, on)
+                            }
                         })
                     }
 

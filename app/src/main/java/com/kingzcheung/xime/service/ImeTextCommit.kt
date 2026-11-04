@@ -285,8 +285,10 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         }
         val text = prefix + literal
         if (text.isEmpty()) return true
+        // 首选是通讯录的人名/号码（不学习）：带着它上屏的这一段同样不学习。
+        val private = !asTyped && input.isNotEmpty() && action?.isPrivate == true
         // Rejection retains the complete text and the original command owner for retry/cancel.
-        val result = service.keyRouter.commitPreparedText(text, t9, caret)
+        val result = service.keyRouter.commitPreparedText(text, t9, caret, isPrivate = private)
         withContext(Dispatchers.Main) {
             InputCommandOwner.requireOwner().validate()
             if (result.accepted) {

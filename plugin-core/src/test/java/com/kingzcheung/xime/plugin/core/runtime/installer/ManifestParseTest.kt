@@ -19,6 +19,20 @@ class ManifestParseTest {
     }
 
     @Test
+    fun `contacts plugin declares the host contacts capability and no network`() {
+        val content = java.io.File("../plugins/contacts/manifest.yaml").readText()
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("tool", config.type)
+        assertTrue(config.capabilities?.contacts == true)
+        assertTrue(config.declaredHosts.isEmpty())
+        assertTrue(!config.allowCustomHosts)
+        assertTrue(config.toolbarButtons.isEmpty())
+        // 其他插件不声明就没有。
+        val other = (InstallerManager.parseManifestContent("id: x\ntype: tool") as PluginParseResult.Success).config
+        assertTrue(other.capabilities?.contacts != true)
+    }
+
+    @Test
     fun `正常 manifest 解析成功且字段正确`() {
         val content = """
             id: kaomoji

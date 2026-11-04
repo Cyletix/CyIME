@@ -778,6 +778,11 @@ object SettingsPreferences {
 
     fun setPluginEnabled(context: Context, pluginId: String, enabled: Boolean) {
         com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.setEnabled(context, pluginId, enabled)
+        // 通讯录插件：关掉立刻丢掉内存里的通讯录，打开（已授权）就后台读入。
+        if (com.kingzcheung.xime.contacts.ContactSuggestions.isContactsPlugin(pluginId)) {
+            val app = context.applicationContext
+            android.os.Handler(android.os.Looper.getMainLooper()).post { com.kingzcheung.xime.contacts.ContactSuggestions.sync(app) }
+        }
     }
     
     fun isSmartPredictionEnabled(context: Context): Boolean {

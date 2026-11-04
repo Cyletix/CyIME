@@ -3628,6 +3628,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         openPendingKeyboardPanel()
         // 释义词典随设置与下载状态后台加载/释放；选拼音时不占内存。
         com.kingzcheung.xime.gloss.CandidateGlossary.prepare(this)
+        // 通讯录插件：启用且授权时后台读入（只在内存），关了就丢掉。
+        com.kingzcheung.xime.contacts.ContactSuggestions.sync(this)
     }
 
     private fun requestHardwareCursorUpdates() {
@@ -4678,6 +4680,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val transformed = if (composition.input.isNotEmpty()) candidateTransform.transform(
                     inputText = composition.input, preedit = composition.preedit,
                     engineCandidates = composition.candidates.toList(), asciiMode = composition.isAsciiMode,
+                    firstPage = !composition.hasPrevPage,
                 ) else null
                 withContext(Dispatchers.Main) {
                     if (!inputReadiness.accepts(admission) || uiState.value.inputSessionId != session ||
@@ -4912,6 +4915,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun submitText(text: String, caret: CommitCaret = CommitCaret.NONE): TextCommitResult {
         InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
         return commitTextAndPredict(text, false, caret = caret)
+    }
+
+    /**
+     * 通讯录的人名、号码：按敏感文字上屏（不发 text_committed、不进打字统计、不记联想），
+     * 清掉联想上下文，这次和下一次上屏之间不配对学习，上屏后也不出联想。
+     */
+    internal fun submitPrivateText(text: String, caret: CommitCaret = CommitCaret.NONE): TextCommitResult {
+        InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
+        val result = commitTextSilently(text, isSensitive = true, caret = caret)
+        if (result.accepted) {
+            predictionManager.invalidatePendingPredictions()
+            predictionManager.clearCommittedText()
+            candidateState.value = candidateState.value.copy(associationCandidates = emptyList())
+        }
+        return result
     }
 
     internal fun commitTextAndPredict(text: String, isPaste: Boolean, allowPrediction: Boolean = true,

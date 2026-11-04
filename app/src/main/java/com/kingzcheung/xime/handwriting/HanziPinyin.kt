@@ -30,10 +30,10 @@ object HanziPinyin {
 
     fun load(context: Context) {
         if (table != null || !loading.compareAndSet(false, true)) return
-        val assets = context.applicationContext.assets
+        val app = context.applicationContext
         thread(name = "hanzi-pinyin", isDaemon = true) {
             try {
-                table = assets.open(ASSET).bufferedReader(Charsets.UTF_8).useLines(::parse)
+                table = readTable(app)
                 revisionState.intValue++
             } catch (error: Exception) {
                 FileLogger.w(TAG, "手写读音表加载失败：${error.message}")
@@ -41,6 +41,10 @@ object HanziPinyin {
             }
         }
     }
+
+    /** 读一份读音表（后台线程调用）；通讯录插件给联系人名字注拼音也用它。 */
+    internal fun readTable(context: Context): Table =
+        table ?: context.applicationContext.assets.open(ASSET).bufferedReader(Charsets.UTF_8).useLines(::parse)
 
     internal fun parse(lines: Sequence<String>): Table {
         val shared = HashMap<String, String>()
