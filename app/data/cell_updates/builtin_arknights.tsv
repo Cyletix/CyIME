@@ -1,0 +1,4 @@
+# 明日方舟词库的在线补词：每行 词<TAB>拼音（拼音小写，每个字一个音节，空格分开）。
+# 加完运行 py -3 -B scripts\dict\publish_word_updates.py；手机键盘收起后一天内自动更新。
+# 下次打包时可以把这些词并进 tools/dictionaries/arknights/ 的词表，并进后这里留着也不会重复。
+精一队	jing yi dui
