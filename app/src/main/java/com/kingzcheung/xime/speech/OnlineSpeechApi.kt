@@ -228,6 +228,16 @@ object OnlineSpeechApi {
         throw if (error is java.io.IOException) IllegalStateException("连不上服务器", error) else error
     }
 
+    /**
+     * 火山引擎(豆包)双向流式地址：这次录音边说边发、边出字（[VolcengineSpeechApi.LiveSession]）。
+     * 其他接口、没填密钥或密钥有多余文字时为 null：照旧录完整段上传，错误由 [transcribe] 报。
+     */
+    internal fun liveSession(context: Context, onPartial: (String) -> Unit): VolcengineSpeechApi.LiveSession? {
+        val config = config(context)
+        if (config.apiKey.isBlank() || !config.apiKey.all { it in '!'..'~' } || !VolcengineSpeechApi.isLive(config.baseUrl)) return null
+        return VolcengineSpeechApi.LiveSession(client, config.baseUrl, config.appId, config.apiKey, config.model, ::httpError, onPartial)
+    }
+
     /** 发一次识别请求，返回文字。HTTP 失败抛 [HttpFailure]。 */
     private fun post(url: String, config: Config, wav: ByteArray, language: InputLanguage): String {
         val chat = url.endsWith("/chat/completions")
@@ -330,7 +340,8 @@ object OnlineSpeechApi {
 }
 
 /**
- * 录完一段再整段上传；说话中不出预览。上传失败时这段录音改用本地模型识别（[localFallback]），
+ * 录完一段再整段上传，说话中不出预览；火山引擎(豆包)双向流式地址边说边发、边出字。
+ * 识别失败时这段录音改用本地模型识别（[localFallback]），
  * 并用 [onNotice] 在键盘上说明，不会无声无息地结束。中文、英文、日语都交给接口。
  */
 class OnlineApiAsrBackend(
@@ -346,6 +357,9 @@ class OnlineApiAsrBackend(
     override val resultKeepsPunctuation: Boolean get() = keepsPunctuation
 
     private var onResult: ((String) -> Unit)? = null
+    private var onPartial: ((String) -> Unit)? = null
+    /** 这次录音的豆包双向流式连接；为 null 时录完整段上传。 */
+    @Volatile private var live: VolcengineSpeechApi.LiveSession? = null
     private var onState: ((RecognitionState) -> Unit)? = null
     private var onError: ((String) -> Unit)? = null
     private val audio = ByteArrayOutputStream()
@@ -357,7 +371,7 @@ class OnlineApiAsrBackend(
         onStateChange: (RecognitionState) -> Unit,
         onError: (String) -> Unit
     ) {
-        this.onResult = onResult; onState = onStateChange; this.onError = onError
+        this.onResult = onResult; onPartial = onPartialResult; onState = onStateChange; this.onError = onError
     }
 
     override fun initialize(): Boolean = OnlineSpeechApi.isConfigured(context)
@@ -366,6 +380,8 @@ class OnlineApiAsrBackend(
     override fun start(language: InputLanguage): Boolean {
         this.language = language
         synchronized(audio) { audio.reset() }
+        live?.cancel()
+        live = OnlineSpeechApi.liveSession(context) { text -> onPartial?.invoke(text) }
         onState?.invoke(RecognitionState.LISTENING)
         return true
     }
@@ -373,14 +389,17 @@ class OnlineApiAsrBackend(
     override fun canContinueIn(language: InputLanguage): Boolean = language != InputLanguage.UNSPECIFIED
 
     override fun processAudioChunk(buffer: ByteArray) {
+        // 整段留一份：流式出错时这段录音还能交给本地模型。
         synchronized(audio) { audio.write(buffer) }
+        live?.feed(buffer)
     }
 
     override fun stop() {
         val pcm = synchronized(audio) { audio.toByteArray().also { audio.reset() } }
-        if (pcm.isEmpty()) { onState?.invoke(RecognitionState.IDLE); return }
+        val session = live.also { live = null }
+        if (pcm.isEmpty()) { session?.cancel(); onState?.invoke(RecognitionState.IDLE); return }
         onState?.invoke(RecognitionState.PROCESSING)
-        OnlineSpeechApi.transcribe(context, pcm, language)
+        (session?.let { runCatching { it.finish() } } ?: OnlineSpeechApi.transcribe(context, pcm, language))
             .onSuccess { keepsPunctuation = true; onResult?.invoke(it); onState?.invoke(RecognitionState.IDLE) }
             .onFailure { error ->
                 if (recognizeLocally(pcm)) onNotice("在线语音没识别出来（${error.message}），这次已改用本地模型")
@@ -409,6 +428,8 @@ class OnlineApiAsrBackend(
     }
 
     override fun cancel() {
+        live?.cancel()
+        live = null
         synchronized(audio) { audio.reset() }
         onState?.invoke(RecognitionState.IDLE)
     }

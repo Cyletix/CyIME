@@ -24,7 +24,8 @@ import java.util.zip.GZIPOutputStream
 /**
  * 火山引擎(豆包)语音识别：接口地址是 openspeech.bytedance.com 或以 wss:// 开头时走这里，不走 OpenAI 格式。
  * - 流式识别 `/api/v3/sauc/bigmodel`、`bigmodel_async`、`bigmodel_nostream`：WebSocket 二进制协议。
- *   录音整段已在手里：发请求参数，再按 200 ms 一包把音频发完，最后一包带结束标记，等服务器带结束标记的那条结果。
+ *   双向流式(`bigmodel`、`bigmodel_async`)边说边发、边出字（[LiveSession]）；流式输入(`bigmodel_nostream`)
+ *   录完整段再发：发请求参数，再按 200 ms 一包把音频发完，最后一包带结束标记，等服务器带结束标记的那条结果。
  * - 录音文件极速版 `/api/v3/auc/bigmodel/recognize/flash`：HTTPS 上传 JSON，音频是 Base64 WAV。
  * 鉴权：只填密钥时按新版控制台的 API Key 发 `X-Api-Key`；填了 App ID 按旧版发 `X-Api-App-Key` + `X-Api-Access-Key`。
  * 「模型」一栏填资源 ID(`X-Api-Resource-Id`)，没填 volc. 开头的值时按地址用默认资源。
@@ -64,6 +65,16 @@ internal object VolcengineSpeechApi {
     }
 
     fun isFlash(url: String): Boolean = "/recognize/flash" in url.lowercase()
+
+    /**
+     * 双向流式 `/sauc/bigmodel`、`/sauc/bigmodel_async`：说话时就发音频，服务器边认边回字。
+     * 只填域名(补成流式输入 nostream)、流式输入、极速版和其他 ws 地址还是录完整段再发。
+     */
+    fun isLive(url: String): Boolean {
+        if (!isVolcengine(url) || isFlash(url)) return false
+        val path = endpoint(url).substringAfter("://").substringAfter('/', "").substringBefore('?').trimEnd('/').lowercase()
+        return path.endsWith("sauc/bigmodel") || path.endsWith("sauc/bigmodel_async")
+    }
 
     /** 用户填的地址 → 实际地址：极速版没写 http(s):// 时用 https；流式把 https:// 换成 wss://，只填域名时补上流式输入接口。 */
     fun endpoint(baseUrl: String): String {
@@ -269,17 +280,7 @@ internal object VolcengineSpeechApi {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (response != null && response.code != 101) {
-                    val body = runCatching { response.body?.string() }.getOrNull().orEmpty()
-                    val detail = response.header("X-Api-Message")
-                        ?: runCatching { JSONObject(body) }.getOrNull()?.let { j ->
-                            listOf("error", "message", "msg").map { j.optString(it) }.firstOrNull { it.isNotBlank() }
-                        }
-                        ?: body.trim().takeIf { it.isNotEmpty() && '<' !in it }
-                    finish(null, httpError(response.code, detail?.let(::shorten)))
-                } else {
-                    finish(null, "连不上服务器")
-                }
+                finish(null, connectError(response, httpError))
             }
         }
         val request = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
@@ -290,6 +291,146 @@ internal object VolcengineSpeechApi {
         }
         failure?.let { error(it) }
         return text.orEmpty().trim()
+    }
+
+    /** 握手失败(401、403、404…)带上接口给的原因；没有回包就是连不上。 */
+    private fun connectError(response: Response?, httpError: (Int, String?) -> String): String {
+        if (response == null || response.code == 101) return "连不上服务器"
+        val body = runCatching { response.body?.string() }.getOrNull().orEmpty()
+        val detail = response.header("X-Api-Message")
+            ?: runCatching { JSONObject(body) }.getOrNull()?.let { j ->
+                listOf("error", "message", "msg").map { j.optString(it) }.firstOrNull { it.isNotBlank() }
+            }
+            ?: body.trim().takeIf { it.isNotEmpty() && '<' !in it }
+        return httpError(response.code, detail?.let(::shorten))
+    }
+
+    /**
+     * 双向流式的一次录音：说话时 [feed] 把音频按 200 ms 一包发出去，服务器每回一条就把目前认出的整段文字交给
+     * [onPartial]，键盘上边说边出字；松手时 [finish] 发带结束标记的最后一包，等带结束标记的那条结果。
+     * 第一次 [feed] 才连服务器，没开口不占连接。手里总留一点音频(不到一包或正好一包)，最后一包不会是空的。
+     * [feed]、[finish]、[cancel] 在同一个后台线程调用；[onPartial] 在 OkHttp 的读线程回调，结束或取消后不再回调。
+     */
+    class LiveSession(
+        private val client: OkHttpClient,
+        baseUrl: String,
+        appId: String,
+        apiKey: String,
+        model: String,
+        private val httpError: (Int, String?) -> String,
+        private val onPartial: (String) -> Unit,
+    ) {
+        private val url = endpoint(baseUrl)
+        private val headers = headers(appId, apiKey, resourceId(model, url), UUID.randomUUID().toString())
+        private val lock = Any()
+        private val pending = ByteArrayOutputStream()
+        /** 连上之前排着的音频帧；连上时先发请求参数，再按顺序发这些。 */
+        private val queued = ArrayList<ByteArray>()
+        private var socket: WebSocket? = null
+        private var opened = false
+        private var lastSent = false
+        private val ended = java.util.concurrent.atomic.AtomicBoolean()
+        private val done = CountDownLatch(1)
+        @Volatile private var text: String? = null
+        @Volatile private var failure: String? = null
+        @Volatile private var latest = ""
+
+        private fun end(result: String?, error: String?) {
+            if (!ended.compareAndSet(false, true)) return
+            text = result; failure = error; done.countDown()
+        }
+
+        /** 在 [lock] 里调用。 */
+        private fun send(frame: ByteArray) {
+            val ws = socket ?: return
+            if (!opened) { queued += frame; return }
+            if (!ws.send(frame.toByteString())) { end(null, "录音太长，发不出去"); ws.cancel() }
+        }
+
+        /** 在 [lock] 里调用。 */
+        private fun connect() {
+            if (socket != null) return
+            val request = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
+            socket = client.newWebSocket(request, listener)
+        }
+
+        fun feed(pcm: ByteArray) {
+            if (pcm.isEmpty() || ended.get()) return
+            synchronized(lock) {
+                if (lastSent) return
+                connect()
+                pending.write(pcm)
+                if (pending.size() <= PACKET_BYTES) return
+                val bytes = pending.toByteArray()
+                pending.reset()
+                var from = 0
+                while (bytes.size - from > PACKET_BYTES) {
+                    send(encodeAudio(bytes.copyOfRange(from, from + PACKET_BYTES), last = false))
+                    from += PACKET_BYTES
+                }
+                pending.write(bytes, from, bytes.size - from)
+            }
+        }
+
+        /** 发最后一包并等结果，最多 [timeoutMs]（比键盘收尾的 30 秒短，超时能显示这里的原因）。 */
+        fun finish(timeoutMs: Long = 25_000L): String {
+            val ws = synchronized(lock) {
+                if (!lastSent) {
+                    connect()
+                    lastSent = true
+                    send(encodeAudio(pending.toByteArray(), last = true))
+                    pending.reset()
+                }
+                socket
+            }
+            if (!done.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+                ws?.cancel()
+                error("等识别结果超时")
+            }
+            failure?.let { error(it) }
+            return text.orEmpty().trim()
+        }
+
+        fun cancel() {
+            end(null, "已取消")
+            synchronized(lock) { lastSent = true; socket }?.cancel()
+        }
+
+        private val listener = object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                synchronized(lock) {
+                    if (!webSocket.send(encodeFullClientRequest(requestJson()).toByteString())) return
+                    opened = true
+                    queued.forEach(::send)
+                    queued.clear()
+                }
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                if (ended.get()) return
+                val frame = runCatching { parse(bytes.toByteArray()) }.getOrElse {
+                    end(null, "接口返回的格式看不懂"); webSocket.cancel(); return
+                }
+                if (frame.type == SERVER_ERROR) {
+                    if (frame.code == CODE_SILENCE) end("", null) else end(null, frameError(frame))
+                    webSocket.close(1000, null); return
+                }
+                if (frame.type != FULL_SERVER_RESPONSE) return
+                // 中间结果只在有字时更新，最后一条万一是空的也不丢前面认出的字。
+                val changed = resultText(frame.json)?.takeIf { it.isNotEmpty() && it != latest }?.also { latest = it } != null
+                if (frame.last) { end(latest, null); webSocket.close(1000, null) }
+                else if (changed) onPartial(latest)
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                end(null, "服务器断开了连接" + reason.takeIf { it.isNotBlank() }?.let { "：${shorten(it)}" }.orEmpty())
+                webSocket.close(1000, null)
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                end(null, connectError(response, httpError))
+            }
+        }
     }
 
     fun gzip(data: ByteArray): ByteArray =
