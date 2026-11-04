@@ -37,7 +37,7 @@ Features marked "off by default" have to be turned on in the settings.
 
 - Full Pinyin on 26 keys, 9 keys and 14 keys, with the rime-ice dictionary. The 9-key keyboard can download a phrase model and a grammar model and picks words key by key in long sentences.
 - Shuangpin: built-in Xiaohe, Shoudao, Ziranma, Zhineng ABC, Pinyin Jiajia and Microsoft layouts. Copy and edit them or build your own. Every Shuangpin scheme has a 14-key version; Xiaohe, Shoudao and your own schemes also have a 9-key version (off by default).
-- Wubi 86 (bundled), Wubi 98 (download), stroke, Cangjie 5 and Zhuyin (Dachen keyboard), enabled in "Languages and schemes".
+- Stroke, Cangjie 5, Quick (Sucheng) and Zhuyin (Dachen keyboard) are bundled; Wubi 86 and Wubi 98 download from "Extensions › Schemes" (about 2 MB). Turn them on in "Languages and schemes".
 - Traditional Chinese output (Taiwan forms), fuzzy Pinyin, rare characters, mixed Chinese-English input and Chinese glide typing, all off by default.
 - Candidates can show Pinyin or a Chinese/English gloss. The 26-key keyboard corrects extra or missing letters without putting the correction first.
 - Dictionary page: your own phrases, import TXT / Sogou / QQ / Rime dictionaries, removed candidates, word lookup. Topic dictionaries for anime, games, programming, math and more (off by default).
