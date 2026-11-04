@@ -73,6 +73,33 @@ class BackupManagerTest {
         assertEquals("new:", File(filesDir, "rime/default.yaml").readText())
     }
 
+    /** 11-04 平板：备份之后学的词写在新的 .log 里，恢复只覆盖备份里的文件，leveldb 打开时把它重放回来。 */
+    @Test
+    fun `restore replaces a whole userdb dir so later logs are not replayed`() {
+        val filesDir = tempDir.newFolder("files")
+        val db = File(filesDir, "rime/rime_ice.userdb").apply { mkdirs() }
+        File(db, "CURRENT").writeText("MANIFEST-000525\n")
+        File(db, "MANIFEST-000525").writeText("after")
+        File(db, "000526.log").writeText("learned after backup")
+        File(db, "000509.ldb").writeText("old table")
+        File(db, "LOCK").writeText("")
+        val other = File(filesDir, "rime/t9_digit.userdb").apply { mkdirs() }
+        File(other, "000100.log").writeText("not in backup")
+
+        val result = restore(filesDir, zipOfText(linkedMapOf(
+            "rime_ice.userdb/CURRENT" to "MANIFEST-000517\n",
+            "rime_ice.userdb/MANIFEST-000517" to "before",
+            "rime_ice.userdb/000518.log" to "",
+            "rime_ice.userdb/000509.ldb" to "table",
+        )))
+
+        assertTrue(result.isSuccess)
+        assertEquals(setOf("CURRENT", "MANIFEST-000517", "000518.log", "000509.ldb", "LOCK"), db.list()!!.toSet())
+        assertEquals("table", File(db, "000509.ldb").readText())
+        // 备份里没带的词库目录不动。
+        assertEquals("not in backup", File(other, "000100.log").readText())
+    }
+
     @Test
     fun `restore rejects path traversal entries`() {
         val filesDir = tempDir.newFolder("files")

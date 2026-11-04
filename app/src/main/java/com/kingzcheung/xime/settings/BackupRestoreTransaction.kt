@@ -93,11 +93,21 @@ internal object BackupRestoreTransaction {
                     destination.copyTo(it)
                 } else null
             }
+            // 备份里带了的用户词库（leveldb 目录）整个换成备份里的：本机多出来的 .log/.ldb/MANIFEST 不删的话，
+            // leveldb 打开时会把多出来的 .log 重放回去，恢复后的词库又带上备份之后学的词（11-04 平板实测）。
+            val rimeDir = File(filesDir, "rime").canonicalFile
+            val restored = changes.map { it.first }.toSet()
+            val strays = changes.map { it.first.parentFile }
+                .filter { it.name.endsWith(".userdb") && it.parentFile?.canonicalFile == rimeDir }
+                .distinct()
+                .flatMap { dir -> dir.listFiles().orEmpty().filter { it.isFile && it !in restored && it.name !in LEVELDB_RUNTIME } }
+            val removed = strays.mapIndexed { index, file -> file to File(staging, "stray-$index").also { file.copyTo(it) } }
             try {
                 changes.forEach { (destination, staged) ->
                     check(destination.parentFile.isDirectory || destination.parentFile.mkdirs()) { "无法创建恢复目录" }
                     staged.copyTo(destination, overwrite = true)
                 }
+                strays.forEach { check(!it.exists() || it.delete()) { "无法清理旧词库文件: ${it.name}" } }
                 settings.forEach { (name, data) -> preferences.restore(name, data) }
             } catch (failure: Exception) {
                 oldFiles.entries.toList().asReversed().forEach { (destination, old) ->
@@ -105,6 +115,10 @@ internal object BackupRestoreTransaction {
                         if (old == null) { if (destination.isFile) check(destination.delete()) }
                         else old.copyTo(destination, overwrite = true)
                     } catch (rollback: Exception) { failure.addSuppressed(rollback); preserveRecovery = true }
+                }
+                removed.forEach { (file, copy) ->
+                    try { if (!file.exists()) copy.copyTo(file) }
+                    catch (rollback: Exception) { failure.addSuppressed(rollback); preserveRecovery = true }
                 }
                 oldSettings.forEach { (name, data) ->
                     try { preferences.restore(name, data, replace = true) }
@@ -120,4 +134,7 @@ internal object BackupRestoreTransaction {
             if (!preserveRecovery) staging.deleteRecursively()
         }
     }
+
+    /** leveldb 的锁和运行日志不是数据，备份里也不带（见 [BackupManager.isRimePersonalFile]），留着不动。 */
+    private val LEVELDB_RUNTIME = setOf("LOCK", "LOG", "LOG.old")
 }
