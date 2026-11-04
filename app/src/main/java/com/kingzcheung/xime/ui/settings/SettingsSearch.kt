@@ -114,7 +114,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry(title, path, target, keywords, anchor = null)
     listOf(
         // 首页入口（整页）
-        page("语言与方案", input, "languages", "语言 输入方案 键盘布局 切换方式 双拼 日语 英语 九键 26键 14键 语言管理 中文 日文 英文 拼音 导入方案的语言 未标注语言 方案语言"),
+        page("语言与方案", input, "languages", "语言 输入方案 键盘布局 切换方式 双拼 五笔 形码 笔画 仓颉 速成 注音 大千 日语 英语 九键 26键 14键 语言管理 中文 日文 英文 拼音 导入方案的语言 未标注语言 方案语言"),
         page("键盘布局", input, layoutIndex, "布局 26键 九键 14键 布局与显示 自定义布局 按键符号 分体"),
         page("按键与手势", input, gesturePage, "手势 角标 光标 空格 长按 上滑 下滑 滑动"),
         page("按键技巧", gestures, layoutPage("key_tips"), "技巧 说明 教程 帮助 Shift Ctrl 大写 锁定 快捷键 复制 粘贴 隐藏 功能 拖动 九键 数字键"),
