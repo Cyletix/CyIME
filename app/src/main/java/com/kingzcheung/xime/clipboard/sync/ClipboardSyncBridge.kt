@@ -71,7 +71,9 @@ class ClipboardSyncBridge(
                 description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
                     description?.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
                     com.kingzcheung.xime.settings.IncognitoState.active ||
-                    com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(appContext)).also { lastRead = it }
+                    com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(appContext) ||
+                    // 通讯录插件开着时，联系人的名字、号码不发到别的设备。
+                    com.kingzcheung.xime.contacts.ContactSuggestions.isContactText(text)).also { lastRead = it }
         }
         override fun writeIfUnchanged(expected: SyncClipboardSnapshot, text: String): Boolean {
             if (read() != expected) return false

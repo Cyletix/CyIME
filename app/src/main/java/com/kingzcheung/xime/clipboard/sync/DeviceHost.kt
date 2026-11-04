@@ -465,6 +465,7 @@ object DeviceHost {
                 description?.label == VerificationCodeSmsReceiver.CLIP_LABEL) return@profile null
             val text = clip.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
             if (text.isNullOrBlank() || text.contains('\u0000')) return@profile null
+            if (com.kingzcheung.xime.contacts.ContactSuggestions.isContactText(text)) return@profile null
             ClipboardProfile.fromText(text).takeIf { it.size <= MAX_TEXT }
         }
         lastServed = (description?.timestamp ?: 0L) to profile

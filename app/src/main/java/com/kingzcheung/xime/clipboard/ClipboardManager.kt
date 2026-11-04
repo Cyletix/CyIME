@@ -253,7 +253,9 @@ class ClipboardManager private constructor(private val context: Context) {
                         return
                     }
                     _verificationCode.value = null
-                    if (!private) addItem(text, fromDevice = clipData.description.label == RECEIVED_CLIP_LABEL, sensitive = secret)
+                    // 通讯录插件开着时，复制的正好是联系人名字或号码：不记进键盘剪贴板。
+                    if (!private && !com.kingzcheung.xime.contacts.ContactSuggestions.isContactText(text))
+                        addItem(text, fromDevice = clipData.description.label == RECEIVED_CLIP_LABEL, sensitive = secret)
                     return
                 }
             }
