@@ -1051,6 +1051,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEV_TOOLS) EnterProbe.service = java.lang.ref.WeakReference(this)
         com.kingzcheung.xime.stats.TypingStats.init(this)
         com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter = handwritingGlassRegionReporter
         com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.requester = cursorLineRequester
@@ -4448,6 +4449,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onDestroy() {
+        if (EnterProbe.service?.get() === this) EnterProbe.service = null
         KeyboardPanelLaunch.previewVisible = false
         com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = false
         if (com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter === handwritingGlassRegionReporter)

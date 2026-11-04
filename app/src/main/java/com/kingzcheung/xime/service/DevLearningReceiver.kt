@@ -38,6 +38,10 @@ import kotlin.concurrent.thread
  * - `op=cell_set --es ids a,b --ez english false`：把开着的导入词库设成正好这几个（目录里的搜狗词库没下载的先下载），
  *   再像点「应用更改」一样应用。应用要几分钟，所以立刻回 `cell_set: started`，脚本用 cell_state 等 applying=false。
  * - `op=cell_remove --es ids a,b`：删掉这几个没在用的下载词库（脚本测完删掉它为测量下载的，原来就有的不动）。
+ * - `op=enter_info`：当前输入框的 EditorInfo（包名、回车动作、「回车不做动作」标记、类型、actionId），不含文字。
+ * - `op=enter_probe --es method <做法> --es marker t01`：清空当前输入框，上屏标记，用这一种做法回车，
+ *   回 `result=sent|newline|nothing|other`（只报长度）。做法见 [EnterProbe.methods]；给 QQ、微信试哪种回车发送、哪种换行。
+ *   会真的发出消息，只在文件传输助手、我的电脑这类发给自己的聊天里用。
  * 输入法正在部署时回 busy，稍后重试。每个 op 的结果写进广播结果（am broadcast 会打印 data=...）和 logcat 标签 DevLearning。
  * 用法：adb shell am broadcast -n com.cyletix.cyime/com.kingzcheung.xime.service.DevLearningReceiver -a com.cyletix.cyime.DEV_LEARNING --es op unlearn
  * 只有 adb（持有 DUMP 权限）能发，普通应用发不进来。
@@ -184,6 +188,14 @@ class DevLearningReceiver : BroadcastReceiver() {
                 val ids = intent.getStringExtra("ids").orEmpty().split(",").filter { it.isNotBlank() }
                 report("cell_remove: " + ids.joinToString(" ") { id -> "$id=" + runCatching { store.remove(id); "removed" }
                     .getOrElse { "kept(${it.message})" }.replace(' ', '_') })
+            }
+            "enter_info" -> report(EnterProbe.describe(EnterProbe.service?.get()?.currentInputEditorInfo))
+            "enter_probe" -> {
+                val pending = goAsync()
+                val method = intent.getStringExtra("method").orEmpty()
+                val marker = intent.getStringExtra("marker")?.takeIf { it.isNotBlank() } ?: "t00"
+                EnterProbe.service?.get()?.mainHandler?.post { EnterProbe.run(method, marker, pending) }
+                    ?: run { pending.resultData = "enter_probe: keyboard not running"; pending.finish() }
             }
             else -> report("unknown op")
         }
