@@ -199,4 +199,49 @@ class OnlineSpeechApiTest {
             assertNull(server.apiKeyHeaders.single())
         }
     }
+    @Test fun `地址栏连着说明文字粘进来：只取网址；密钥、模型去掉换行空格`() {
+        assertEquals("https://api.groq.com/openai/v1",
+            OnlineSpeechApi.cleanUrl("https://api.groq.com/openai/v1\n• API 密钥: 粘贴刚复制的 key\n• 模型: whisper-large-v3"))
+        assertEquals("https://api.siliconflow.cn/v1", OnlineSpeechApi.cleanUrl("  地址：https://api.siliconflow.cn/v1，模型 FunAudioLLM/SenseVoiceSmall"))
+        assertEquals("wss://openspeech.bytedance.com/api/v3/sauc/bigmodel", OnlineSpeechApi.cleanUrl("wss://openspeech.bytedance.com/api/v3/sauc/bigmodel "))
+        assertEquals("https://api.xiaomimimo.com/v1", OnlineSpeechApi.cleanUrl("https://api.xiaomimimo.com/v1"))
+        assertEquals("abc", OnlineSpeechApi.cleanUrl(" abc "))
+        assertEquals("gsk_abc", OnlineSpeechApi.cleanToken(" gsk_a\u200Bb c\n"))
+    }
+
+    @Test fun `Groq：地址带着说明文字、密钥和模型带换行也能请求到 audio transcriptions`() {
+        FakeServer { path -> if (path == "/v1/audio/transcriptions") 200 to """{"text":"你好"}""" else 404 to "{}" }.use { server ->
+            app.getSharedPreferences("online_speech_api", 0).edit().clear().commit()
+            OnlineSpeechApi.save(app, OnlineSpeechApi.Config("${server.base}\n• API 密钥: 粘贴刚复制的 key\n• 模型: …",
+                "sk-\ntest", "whisper-large-v3\n"))
+            assertEquals("你好", OnlineSpeechApi.transcribe(app, ByteArray(3200), com.kingzcheung.xime.settings.InputLanguage.CHINESE).getOrThrow())
+            assertEquals(listOf("/v1/audio/transcriptions"), server.paths)
+            val body = server.bodies.single()
+            assertTrue(body, body.contains("whisper-large-v3\r\n") && body.contains("name=\"language\"") && body.contains("name=\"response_format\""))
+        }
+    }
+
+    @Test fun `模型名不对（Groq 404 model_not_found）：不换接口，直接说模型名`() {
+        FakeServer {
+            404 to """{"error":{"message":"The model `whisper-lerga-v3` does not exist or you do not have access to it.","type":"invalid_request_error","code":"model_not_found"}}"""
+        }.use { server ->
+            configure(server.base, "whisper-lerga-v3")
+            val message = OnlineSpeechApi.transcribe(app, ByteArray(3200), com.kingzcheung.xime.settings.InputLanguage.CHINESE)
+                .exceptionOrNull()!!.message!!
+            assertEquals(listOf("/v1/audio/transcriptions"), server.paths)
+            assertTrue(message, message.startsWith("模型名不对（404）：whisper-lerga-v3"))
+        }
+    }
+
+    @Test fun `密钥里混进中文：不发请求，报错里不带密钥`() {
+        FakeServer { 200 to """{"text":"x"}""" }.use { server ->
+            app.getSharedPreferences("online_speech_api", 0).edit().clear().commit()
+            OnlineSpeechApi.save(app, OnlineSpeechApi.Config(server.base, "sk-secret粘贴", "whisper-1"))
+            val message = OnlineSpeechApi.transcribe(app, ByteArray(3200), com.kingzcheung.xime.settings.InputLanguage.CHINESE)
+                .exceptionOrNull()!!.message!!
+            assertEquals("密钥里有多余的文字，请重新粘贴密钥", message)
+            assertFalse(message.contains("secret"))
+            assertTrue(server.paths.isEmpty())
+        }
+    }
 }

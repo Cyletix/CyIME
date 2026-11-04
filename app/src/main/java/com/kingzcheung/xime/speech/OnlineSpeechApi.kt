@@ -58,11 +58,22 @@ object OnlineSpeechApi {
         (context.applicationContext ?: context).getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun config(context: Context): Config = prefs(context).let {
-        Config(it?.getString(KEY_BASE_URL, null)?.takeIf { url -> url.isNotBlank() } ?: DEFAULT_BASE_URL,
-            it?.getString(KEY_API_KEY, "").orEmpty(),
-            it?.getString(KEY_MODEL, null)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL,
-            it?.getString(KEY_APP_ID, "").orEmpty())
+        Config(it?.getString(KEY_BASE_URL, null)?.let(::cleanUrl)?.takeIf { url -> url.isNotBlank() } ?: DEFAULT_BASE_URL,
+            cleanToken(it?.getString(KEY_API_KEY, "").orEmpty()),
+            it?.getString(KEY_MODEL, null)?.let(::cleanToken)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL,
+            cleanToken(it?.getString(KEY_APP_ID, "").orEmpty()))
     }
+
+    private val URL_IN_TEXT = Regex("(?i)(?:https?|wss?)://[^\\s•·，。、；;,\"'<>()（）]+")
+
+    /**
+     * 地址栏只取第一个网址：连着说明文字一起粘进来（11-04 Groq 截图：地址后面跟着「• API 密钥: …• 模型: …」），
+     * 请求地址就成了 /openai/v1• API 密钥…，服务商回 404。没有网址时原样去掉首尾空白。
+     */
+    internal fun cleanUrl(raw: String): String = URL_IN_TEXT.find(raw)?.value ?: raw.trim()
+
+    /** 密钥、模型、App ID 里不会有空白：粘贴带进来的换行、空格、零宽字符去掉。 */
+    internal fun cleanToken(raw: String): String = raw.filterNot { it.isWhitespace() || it in "\u200B\u200C\u200D\uFEFF" }
 
     /** 改了配置就清掉旧的测试结果，状态不会停在“可用”误导人。 */
     fun save(context: Context, config: Config) {
@@ -176,12 +187,22 @@ object OnlineSpeechApi {
     }
 
     /** HTTP 失败：带上请求地址，404 时能说出试的是哪个地址。 */
-    private class HttpFailure(val code: Int, val url: String, message: String) : IllegalStateException(message)
+    private class HttpFailure(val code: Int, val url: String, message: String, val detail: String? = null,
+        val modelMissing: Boolean = false) : IllegalStateException(message)
+
+    /** 404 回包说的是模型不存在（OpenAI/Groq：error.code = model_not_found，或 message 提到 model）。 */
+    internal fun isModelMissing(json: JSONObject?): Boolean {
+        val error = json?.optJSONObject("error") ?: return false
+        return error.optString("code") == "model_not_found" ||
+            Regex("(?i)\\bmodel\\b.*(not exist|not found|does not)").containsMatchIn(error.optString("message"))
+    }
 
     /** [pcm] 为 16 kHz 单声道 16 位小端 PCM。在后台线程调用。 */
     fun transcribe(context: Context, pcm: ByteArray, language: InputLanguage): Result<String> = runCatching {
         val config = config(context)
         require(config.apiKey.isNotBlank()) { "未填写密钥" }
+        // 请求头只能是英文字符；密钥里混进中文或符号时 OkHttp 会把整个密钥写进报错，这里先拦下。
+        require(config.apiKey.all { it in '!'..'~' }) { "密钥里有多余的文字，请重新粘贴密钥" }
         if (VolcengineSpeechApi.isVolcengine(config.baseUrl)) {
             return@runCatching VolcengineSpeechApi.transcribe(client, config.baseUrl, config.appId, config.apiKey,
                 config.model, pcm, ::httpError)
@@ -192,13 +213,15 @@ object OnlineSpeechApi {
             post(url, config, wav, language)
         } catch (e: HttpFailure) {
             // 不认识的服务商：OpenAI 式地址 404，换成对话接口再试一次；还不行就把两个地址都写出来。
+            // 服务商明说是模型名不对（Groq：The model `x` does not exist）时不换接口，直接说模型名。
+            if (e.modelMissing) error("模型名不对（404）：${config.model}" + (e.detail?.let { "（$it）" } ?: ""))
             val fallback = if (e.code == 404 && !isChatAudio(config.baseUrl, config.model)) chatFallback(config.baseUrl) else null
             if (fallback == null) throw e
             try {
                 post(fallback, config, wav, language)
             } catch (second: HttpFailure) {
                 if (second.code != 404) throw second
-                error("接口地址或模型名不对（404）：试过 ${e.url} 和 ${second.url}")
+                error("接口地址或模型名不对（404）：试过 ${e.url} 和 ${second.url}" + (e.detail?.let { "（$it）" } ?: ""))
             }
         }
     }.recoverCatching { error ->
@@ -232,7 +255,7 @@ object OnlineSpeechApi {
                 // 404 时写出试的完整地址，一眼看出是地址错了还是模型名错了。
                 val message = if (response.code == 404) "接口地址或模型名不对（404）：$url" + (detail?.let { "（$it）" } ?: "")
                     else httpError(response.code, detail)
-                throw HttpFailure(response.code, url, message)
+                throw HttpFailure(response.code, url, message, detail, response.code == 404 && isModelMissing(json))
             }
             checkNotNull(json) { "接口返回的格式看不懂" }
             businessError(json)?.let { error(it) }
