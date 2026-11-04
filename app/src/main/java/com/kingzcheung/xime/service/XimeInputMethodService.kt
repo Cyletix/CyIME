@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -3851,7 +3852,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         win.isNavigationBarContrastEnforced = SettingsPreferences.roundedKeyboardBottom(this)
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        // Android 15 起（targetSdk 35）这个颜色系统不再画，导航区照旧由 Compose 画；只是把键盘底色报出去，
+                        // 小米「输入法全面屏优化」（含 LSP 模块开的）用它给键盘下面那条系统栏上色，不报就是系统默认色（#144）。
+                        // 图片背景没有一个能对上的颜色，照旧不报。
+                        win.setNavigationBarColor(if (theme.keyboardBackground?.type == "image") android.graphics.Color.TRANSPARENT
+                            else bgColor.copy(alpha = 1f).toArgb())
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }
                 }
