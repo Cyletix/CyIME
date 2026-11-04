@@ -492,10 +492,14 @@ fun KeyboardView(
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
-        // 平板固定键盘顶边的把手：往上拉变悬浮，和工具栏「悬浮」同一个切换。
+        // 固定键盘顶边的把手：往上拉变悬浮，和工具栏「悬浮」同一个切换。平板都有；手机上卡片比屏幕窄时也有
+        // （横屏收窄居中、两边露出应用，看着就像悬浮，用户往上拽就该真的变悬浮，GitHub #155 等好几人当成悬浮）。
         onUndock = callbacks.onFloatingModeChange?.takeIf {
+            val configuration = LocalConfiguration.current
+            val cardWidthDp = state.keyboardWidthDp.takeIf { w -> w > 0 }
+                ?: resolvedFixedKeyboardWidth(configuration.screenWidthDp, state.fixedWidthDp)
             !state.isFloatingMode && !resizeActive && !state.isHandwritingMode &&
-                LocalConfiguration.current.smallestScreenWidthDp >= 600
+                (configuration.smallestScreenWidthDp >= 600 || cardWidthDp < configuration.screenWidthDp - 1)
         }?.let { change -> { change(true) } },
         rotationDegrees = state.floatingRotation,
         previewRotationState = if (resizeActive && state.isFloatingMode) resizeRotation else null,
