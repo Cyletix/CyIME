@@ -447,7 +447,7 @@ private fun PerformanceScale(
 
 /**
  * 一行文字，每个按 [points]（0～100）对准刻度条上的位置居中，靠边时收在行内。
- * [avoidOverlap]：按位置从左到右排，和左边那个重叠就往右挪，挪出行尾再整体往左收。
+ * [avoidOverlap]：挤在一起的文字错开到第二行，仍各自对准自己的刻度（[staggerLabels]）。
  */
 @Composable
 private fun ScaleLabels(points: List<Int>, inset: Dp = scaleInset, avoidOverlap: Boolean = false, content: @Composable () -> Unit) {
@@ -460,21 +460,34 @@ private fun ScaleLabels(points: List<Int>, inset: Dp = scaleInset, avoidOverlap:
             val center = start + track * points[index] / 100f
             (center - placeables[index].width / 2f).roundToInt().coerceIn(0, maxOf(0, width - placeables[index].width))
         }
-        if (avoidOverlap && placeables.size > 1) {
-            val gap = 4.dp.roundToPx()
-            val order = lefts.indices.sortedBy { lefts[it] }
-            for (k in 1 until order.size) {
-                val prev = order[k - 1]
-                lefts[order[k]] = maxOf(lefts[order[k]], lefts[prev] + placeables[prev].width + gap)
-            }
-            for (k in order.indices.reversed()) {
-                val limit = if (k == order.lastIndex) width - placeables[order[k]].width
-                    else lefts[order[k + 1]] - gap - placeables[order[k]].width
-                lefts[order[k]] = minOf(lefts[order[k]], limit).coerceAtLeast(0)
-            }
-        }
-        layout(width, placeables.maxOfOrNull { it.height } ?: 0) {
-            placeables.forEachIndexed { index, placeable -> placeable.placeRelative(lefts[index], 0) }
+        val rows = if (avoidOverlap) staggerLabels(lefts, IntArray(placeables.size) { placeables[it].width }, width, 8.dp.roundToPx())
+            else IntArray(placeables.size)
+        val rowHeight = placeables.maxOfOrNull { it.height } ?: 0
+        layout(width, rowHeight * ((rows.maxOrNull() ?: 0) + 1)) {
+            placeables.forEachIndexed { index, placeable -> placeable.placeRelative(lefts[index], rows[index] * rowHeight) }
         }
     }
+}
+
+/**
+ * 刻度文字挤在一起时的排法，返回每个文字放第几行（0 或 1），必要时改 [lefts]。
+ * 原来挤在一起时往右推，低配、中配两档刻度挨着时两个字并排挤在第一个刻度下，看不出哪个对哪个（11-04 渲染）。
+ * 现在从左到右排：放得下就放第一行；和第一行左边那个重叠就放第二行，仍对准自己的刻度；两行都放不下才在空得早的那行往右推。
+ */
+internal fun staggerLabels(lefts: IntArray, widths: IntArray, width: Int, gap: Int): IntArray {
+    val rows = IntArray(lefts.size)
+    val rowEnds = mutableListOf<Int>()
+    for (index in lefts.indices.sortedBy { lefts[it] }) {
+        var row = rowEnds.indexOfFirst { lefts[index] >= it + gap }
+        if (row < 0 && rowEnds.size < 2) {
+            row = rowEnds.size
+            rowEnds += 0
+        } else if (row < 0) {
+            row = rowEnds.indices.minBy { rowEnds[it] }
+            lefts[index] = minOf(rowEnds[row] + gap, width - widths[index]).coerceAtLeast(0)
+        }
+        rows[index] = row
+        rowEnds[row] = lefts[index] + widths[index]
+    }
+    return rows
 }
