@@ -300,7 +300,13 @@ fun KeyboardView(
     val resizeActive = resizeOverlay != null
     val opacityEditingState = remember(resizeActive) { mutableStateOf(false) }
     val resizeControlDensity = LocalDensity.current
-    val inputPreferences = rememberKeyboardInputPreferences(state.isDarkTheme)
+    val storedInputPreferences = rememberKeyboardInputPreferences(state.isDarkTheme)
+    // 「只在横屏分体」：竖屏时整个键盘（字母区、中缝、调节框）都按不分体排；存着的「分体键盘」不改。
+    val splitLandscape = LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
+    val inputPreferences = remember(storedInputPreferences, splitLandscape) {
+        if (storedInputPreferences.splitKeyboardEnabled && !storedInputPreferences.splitShownIn(splitLandscape))
+            storedInputPreferences.copy(splitKeyboardEnabled = false) else storedInputPreferences
+    }
     // 「ing 放在 Shift 键上」决定 26 键第二排补不补分号键；只由输入法自己的键盘交给 KeysConfigHelper（设置页的预览不改它）。
     LaunchedEffect(inputPreferences.doublePinyinSemicolonOnShift) {
         com.kingzcheung.xime.settings.KeysConfigHelper.setSemicolonOnShift(inputPreferences.doublePinyinSemicolonOnShift)
@@ -2085,7 +2091,6 @@ fun KeyboardView(
     resizeOverlay?.let { controls ->
         val splitActive = inputPreferences.splitKeyboardEnabled &&
             supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode)
-        val splitLandscape = LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
         val splitContext = LocalContext.current
         val splitPitchDp = rememberCalibratedKeyPitchDp()
         val splitGapSetting = splitGapPreview.value

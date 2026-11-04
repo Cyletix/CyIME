@@ -26,6 +26,7 @@ import androidx.compose.material.icons.twotone.ViewWeek
 import androidx.compose.material.icons.twotone.Reorder
 import androidx.compose.material.icons.twotone.VerticalAlignBottom
 import androidx.compose.material.icons.twotone.Keyboard
+import androidx.compose.material.icons.twotone.ScreenRotation
 import androidx.compose.material.icons.twotone.Lightbulb
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -155,6 +156,12 @@ private fun LayoutDisplayPage(
                     SettingsToggleItem(SplitKeyboardIcon, "分体键盘",
                         "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
                         checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    val landscapeOnly = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitLandscapeOnly
+                    SettingsToggleItem(Icons.TwoTone.ScreenRotation, "只在横屏分体",
+                        "竖屏用完整键盘，横屏才分体。",
+                        checked = landscapeOnly, onCheckedChange = { SettingsPreferences.setSplitLandscapeOnly(context, it) },
+                        lockMessage = if (split) null else "打开上面的「分体键盘」后可用")
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val rightG = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitRightG
                     SettingsToggleItem(Icons.TwoTone.Keyboard, "右半边也放 G 键",

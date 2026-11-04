@@ -434,6 +434,32 @@ class KeyboardInputPreferencesTest {
         assertEquals(false, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
     }
 
+    /** 「只在横屏分体」（别人提的需求，默认关）：关着时横竖屏照旧分体；打开后只有竖屏不分，存着的「分体键盘」不变。 */
+    @Test fun `split landscape only is opt in and only drops the split in portrait`() {
+        assertEquals(false, KeyboardInputPreferences.read(context).splitLandscapeOnly)
+        assertTrue(SettingsPreferences.KEY_SPLIT_LANDSCAPE_ONLY in KeyboardInputPreferences.watchedKeys)
+        SettingsPreferences.setSplitKeyboardEnabled(context, true)
+        for (landscape in listOf(false, true)) {
+            assertEquals(true, KeyboardInputPreferences.read(context).splitShownIn(landscape))
+            assertEquals(true, SettingsPreferences.isSplitKeyboardShown(context, landscape))
+        }
+        SettingsPreferences.setSplitLandscapeOnly(context, true)
+        val read = KeyboardInputPreferences.read(context)
+        assertEquals(true, read.splitKeyboardEnabled)
+        assertEquals(false, read.splitShownIn(false))
+        assertEquals(true, read.splitShownIn(true))
+        assertEquals(false, SettingsPreferences.isSplitKeyboardShown(context, false))
+        assertEquals(true, SettingsPreferences.isSplitKeyboardShown(context, true))
+        KeyboardInputPreferences().save(context)
+        assertEquals(true, SettingsPreferences.isSplitLandscapeOnly(context))
+        SettingsPreferences.setSplitKeyboardEnabled(context, false)
+        for (landscape in listOf(false, true)) {
+            assertEquals(false, KeyboardInputPreferences.read(context).splitShownIn(landscape))
+            assertEquals(false, SettingsPreferences.isSplitKeyboardShown(context, landscape))
+        }
+        SettingsPreferences.setSplitLandscapeOnly(context, false)
+    }
+
     @Test fun `legacy combined preference preserves both effects until edited independently`() {
         for (old in listOf(false, true)) {
             values.clear()
