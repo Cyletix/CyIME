@@ -419,6 +419,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private val backgroundMotionGame = mutableStateOf(false)
     /** 动态背景的钟只在键盘窗口显示时走。 */
     private val backgroundMotionWindowShown = mutableStateOf(false)
+    /** Between onWindowShown and onWindowHidden; the stall watchdog runs only then. */
+    private var imeWindowShown = false
     /** 游戏直通生效中：键盘不显示，实体按键不经过 CyIME（见 [HardwareGamePassthrough]）。 */
     private val hardwareGamePassthrough: Boolean get() = HardwareGamePassthrough.active(
         uiState.value.hardwareOptions.gamePassthrough, hasHardwareKeyboard,
@@ -3466,7 +3468,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (detachedComposition == null) inlineComposition.selectionReported(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1, -1, -1)
         englishEditorReadCapability.clear()
         if (inputStallWatchdog == null) inputStallWatchdog = InputStallWatchdog(serviceScope, mainHandler) { keyProcessingThread }
-        inputStallWatchdog?.start()
+        // 卡顿记录只在键盘显示时跑：输入框有焦点但键盘收着（聊天页翻消息）时不再每 0.25 秒唤醒两条线程。
+        if (imeWindowShown) inputStallWatchdog?.start()
         hardwareLanguageShortcuts.reset()
         clipboardKeyboard.reset()
         clipboardNavigationKeys.clear()
@@ -4060,6 +4063,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onWindowHidden()
         com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = false
         backgroundMotionWindowShown.value = false
+        imeWindowShown = false
+        inputStallWatchdog?.stop()
         KeyboardPanelLaunch.previewVisible = false
         val keepVoice = voiceKeptAlive
         voiceKeptAlive = false
@@ -4098,6 +4103,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 键盘一出来 CPU 测速就停（设置页里测到一半也停），不和打字抢 CPU。
         com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = true
         backgroundMotionWindowShown.value = true
+        imeWindowShown = true
+        inputStallWatchdog?.start()
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
         mainHandler.removeCallbacks(hideGlassBlurWindows)
         glassWindowVisible = true
