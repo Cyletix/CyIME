@@ -4087,6 +4087,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         com.kingzcheung.xime.ocr.DocumentOcrActivity.finishHiddenHost()
         clearHardwareSurfaceBounds()
         if (::clipboardManager.isInitialized) clipboardManager.images.dismissPresentedPreview()
+        if (::clipboardManager.isInitialized) clipboardManager.images.setKeyboardVisible(false)
         runtimeObserver?.stop()
         clipboardSyncBridge?.setKeyboardVisible(false)
         cancelKeyboardResize()
@@ -4119,6 +4120,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         clipboardSyncBridge?.setKeyboardVisible(true)
         // 短信弹窗里点「复制」时键盘被盖住，回来时输入框没变、不走 onStartInput，键盘重新显示时补读那一条。
         if (::clipboardManager.isInitialized) runCatching { clipboardManager.readMissedCopy() }
+        if (::clipboardManager.isInitialized) clipboardManager.images.setKeyboardVisible(true)
     }
 
     /**

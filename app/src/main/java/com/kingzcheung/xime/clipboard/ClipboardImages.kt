@@ -38,6 +38,7 @@ class ClipboardImages private constructor(private val context: Context) {
     companion object {
         private const val MAX_BYTES = 32L * 1024 * 1024
         @Volatile private var instance: ClipboardImages? = null
+        private const val MEDIA_SETTLE_MS = 1_000L
         fun getInstance(context: Context): ClipboardImages = instance ?: synchronized(this) {
             instance ?: ClipboardImages(context.applicationContext).also { instance = it }
         }
@@ -72,8 +73,33 @@ class ClipboardImages private constructor(private val context: Context) {
     private var observing = false
     private var expiry: Job? = null
     private val cachedSources = mutableMapOf<String, ClipboardImage>()
-    private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(selfChange: Boolean) { refresh() }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val settledRefresh = Runnable { refresh() }
+    /** 相册监听只在键盘显示时注册；收着时截的图，弹出键盘那一次查询就能看到（提示看截图时间，1 分钟内照样出）。 */
+    @Volatile private var keyboardShown = false
+    private val observer = object : ContentObserver(mainHandler) {
+        // 别的应用存图、系统扫描相册会连着发几十次变更，每次都查一遍相册；停 1 秒没有新变更再查一次。
+        override fun onChange(selfChange: Boolean) {
+            mainHandler.removeCallbacks(settledRefresh)
+            mainHandler.postDelayed(settledRefresh, MEDIA_SETTLE_MS)
+        }
+    }
+
+    /** Keyboard window shown/hidden: query once on show; watch the photo library only while shown. */
+    fun setKeyboardVisible(shown: Boolean) {
+        if (keyboardShown == shown) return
+        keyboardShown = shown
+        if (shown) { refresh(); return }
+        mainHandler.removeCallbacks(settledRefresh)
+        // 收起后马上又弹出时，弹出那次刷新会重新注册；这里不能把它拆掉。
+        scope.launch { mutex.withLock { if (!keyboardShown) stopObserving() } }
+    }
+
+    /** Callers hold [mutex]. */
+    private fun stopObserving() {
+        if (!observing) return
+        runCatching { context.contentResolver.unregisterContentObserver(observer) }
+        observing = false
     }
 
     init {
@@ -294,12 +320,10 @@ class ClipboardImages private constructor(private val context: Context) {
             // It is read locally only; it enters clipboard history only if the user pastes it.
             if (includeRecent) media.filter { it.uri !in hidden }.maxByOrNull { it.timestamp }
                 ?.let { previewState.offerScreenshot(it, System.currentTimeMillis()) }
-            if (recentScreenshotsEnabled() && !observing) {
+            val watch = recentScreenshotsEnabled() && keyboardShown
+            if (watch && !observing) {
                 runCatching { context.contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer) }.onSuccess { observing = true }
-            } else if (!recentScreenshotsEnabled() && observing) {
-                runCatching { context.contentResolver.unregisterContentObserver(observer) }
-                observing = false
-            }
+            } else if (!watch) stopObserving()
             publish()
         }
     }

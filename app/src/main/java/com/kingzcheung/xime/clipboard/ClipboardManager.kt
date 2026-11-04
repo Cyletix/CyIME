@@ -319,7 +319,7 @@ class ClipboardManager private constructor(private val context: Context) {
      * 以前每次弹出键盘都整条读一次，系统一直提示读了剪贴板（用户 11-01：「哪怕我没用剪贴板」）。
      */
     fun refreshClipboard() {
-        images.refresh()
+        // 最近截图不在这里查：换输入框、应用重启输入框都会走到这，以前每次都查一遍相册；改为键盘弹出时查一次（setKeyboardVisible）。
         deleteExpiredSensitive()
         // 「保留时间」 runs out while nothing is copied too; checked whenever the keyboard opens.
         if (SettingsPreferences.getClipboardKeepDays(context) != ClipboardRetention.NEVER) scope.launch { trimHistory() }
