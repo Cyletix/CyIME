@@ -94,4 +94,28 @@ class GlideChineseLexiconTest {
         println("glide flypy: ${decoder.size} templates, misses=$missed")
         assertTrue("misses: $missed", missed.size <= 3)
     }
+
+    /**
+     * 牛逼、卧槽这类口语雾凇词频低，排不进前 30000 个编码，原来一笔划不出来（用户 11-04：双拼划牛逼总落到 nabi）。
+     * glide_pinyin_extra.txt 把它们补进词表：全拼和每个内置双拼方案划牛逼都排第一，其他补充词进前三。
+     */
+    @Test fun colloquialWordsMissingFromTheTopCodesCanBeGlided() {
+        val colloquial = listOf("niu bi", "wo cao", "sha bi", "kao pu", "dian zan", "shuang pin", "hua xing")
+        val missing = colloquial.filter { it.split(' ') !in entries }
+        assertTrue("词表缺：$missing", missing.isEmpty())
+        val keyboard = GlideLexicon.keyboard(keys)
+        fun check(name: String, scheme: DoublePinyinScheme?) {
+            val decoder = GlideDecoder(keyboard, pinyinCodes(entries, scheme))
+            colloquial.forEachIndexed { index, word ->
+                val code = word.split(' ').joinToString("") { scheme?.code(it) ?: it }
+                if (!code.all { it in keys }) return@forEachIndexed
+                val (xs, ys) = trace(code, index)
+                val result = decoder.decode(xs, ys).map { it.word }
+                if (word == "niu bi") assertEquals("$name $code→${result.take(3)}", code, result.firstOrNull())
+                else assertTrue("$name $code→${result.take(3)}", code in result.take(3))
+            }
+        }
+        check("全拼", null)
+        DoublePinyinScheme.BUILTINS.forEach { check(it.name, it) }
+    }
 }
