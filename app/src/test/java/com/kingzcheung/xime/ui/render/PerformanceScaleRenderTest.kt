@@ -45,6 +45,12 @@ class PerformanceScaleRenderTest {
             "high" to { PerformanceProfile.applyPreset(context, PerformanceTier.HIGH) },
             "custom-73" to { PerformanceProfile.applyCustom(context, high.copy(keyGlow = false)) },
             "custom-15" to { PerformanceProfile.applyCustom(context, high.copy(keyAnimation = false, speechRefinerIdleMinutes = 1, speechEngineIdleMinutes = 1)) },
+            // 「CPU 实测」一行测过的样子（假数，只看排版）；前几张是 Robolectric 里读不进原生库的「未测：本机不支持」。
+            "auto-cpu-measured" to {
+                com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.save(context,
+                    com.kingzcheung.xime.runtime.adaptation.CpuMeasurement(14_500_000, 15_000_000), "4-7")
+                PerformanceProfile.applyAuto(context)
+            },
         )
         val themes = listOf("light" to (false to false), "dark" to (true to false), "glass" to (true to true))
         val theme = mutableIntStateOf(0)

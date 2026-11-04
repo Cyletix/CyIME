@@ -280,6 +280,8 @@ private fun DeviceSection(facts: SetupFacts, onOpenPerformance: (() -> Unit)?) {
                 facts.maxCpuKHz?.let { add("最高 ${"%.1f".format(it / 1_000_000.0)} GHz") }
             }
             if (hardware.isNotEmpty()) FactLine(hardware.joinToString("，"))
+            // 档位按这个定，主频、核数只是显示（和「性能与省电」的「CPU 实测」同一句）。
+            FactLine("CPU 实测 " + cpuLine(facts.cpu, null, running = false))
             facts.soc?.let { FactLine("处理器 $it") }
             facts.freeBytes?.let { FactLine("剩余空间 ${SetupGuidePlanner.gbText(it)}") }
             FactLine("网络 " + when { !facts.online -> "未联网"; facts.metered -> "移动数据"; else -> "Wi-Fi" })

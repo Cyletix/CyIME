@@ -18,6 +18,7 @@ internal object DeviceCapabilityProbe {
             safe { manager?.isLowRamDevice }, memory,
             safe { Runtime.getRuntime().availableProcessors().takeIf { it > 0 } },
             readMaxCpuKHz(File("/sys/devices/system/cpu")),
+            safe { CpuBenchmarkRunner.cached(context) },
         )
     }
 

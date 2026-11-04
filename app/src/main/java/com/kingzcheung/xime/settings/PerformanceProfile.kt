@@ -33,6 +33,11 @@ data class PerformanceSettings(
  */
 object PerformanceProfile {
     private const val KEY_AUTO = "performance_profile_auto"
+    /**
+     * 「自动」套用的是哪一档。以 device_ 开头，备份不带走（[BackupManager.stripDeviceState]），换机器后按新机器重新判断。
+     * 旧版本没有这一项：当时套的那档就是现在的值对上的那档。
+     */
+    private const val KEY_AUTO_TIER = "device_performance_auto_tier"
 
     val presets: Map<PerformanceTier, PerformanceSettings> = mapOf(
         PerformanceTier.LOW to PerformanceSettings(keyAnimation = false, keyGlow = false,
@@ -114,24 +119,48 @@ object PerformanceProfile {
         }?.key
 
     /**
-     * “自动”只在当前值仍是本机档位那一组时成立：在「按键效果」里单独改了动效、炫光，或别处改了语音释放，
+     * “自动”只在当前值仍是自动套上的那一档时成立：在「按键效果」里单独改了动效、炫光，或别处改了语音释放，
      * 页面就显示“自定义”，不会一边勾着自动一边用着另一组值。
      */
-    fun isAuto(context: Context): Boolean = isAuto(
-        SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_AUTO, false), read(context), detectedTier(context))
+    fun isAuto(context: Context): Boolean {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        return isAuto(prefs.getBoolean(KEY_AUTO, false), read(context), autoTier(context))
+    }
 
-    fun isAuto(chosenAuto: Boolean, settings: PerformanceSettings, detected: PerformanceTier): Boolean =
-        chosenAuto && matching(settings) == detected
+    /** [applied] 是自动套上的那档；null = 旧版本没记，值对得上任一档就算。 */
+    fun isAuto(chosenAuto: Boolean, settings: PerformanceSettings, applied: PerformanceTier?): Boolean {
+        val tier = matching(settings) ?: return false
+        return chosenAuto && (applied == null || tier == applied)
+    }
+
+    /** 自动套上的那档；没选自动或旧版本没记返回 null。 */
+    fun autoTier(context: Context): PerformanceTier? {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        if (!prefs.getBoolean(KEY_AUTO, false)) return null
+        return prefs.getString(KEY_AUTO_TIER, null)?.let { name -> PerformanceTier.entries.firstOrNull { it.name == name } }
+            ?: matching(read(context))
+    }
 
     fun detectedTier(context: Context): PerformanceTier = PerformanceTiers.classify(DeviceCapabilityProbe.read(context))
 
-    /** 选“自动”：按本机配置套用对应档，并记住是自动选的。 */
+    /** 选“自动”：按本机配置套用对应档，并记住是自动选的、选的哪档。 */
     fun applyAuto(context: Context): PerformanceTier {
         val tier = detectedTier(context)
         write(context, checkNotNull(presets[tier]))
         turnOff(context, turnsOff.getValue(tier))
-        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(KEY_AUTO, true).apply()
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(KEY_AUTO, true).putString(KEY_AUTO_TIER, tier.name).apply()
         return tier
+    }
+
+    /**
+     * CPU 刚测完：还在「自动」、实测定出了档、和自动套上的那档不一样，就改套新的一档。
+     * 没选自动、改过任何一项（已经是自定义）、或分档线还没定，都不动。返回改成的档，没改返回 null。
+     */
+    fun onCpuMeasured(context: Context): PerformanceTier? {
+        if (!isAuto(context)) return null
+        val verdict = PerformanceTiers.explain(DeviceCapabilityProbe.read(context))
+        if (verdict.cpuTier == null) return null
+        return if (verdict.tier != autoTier(context)) applyAuto(context) else null
     }
 
     fun applyPreset(context: Context, tier: PerformanceTier) {
@@ -157,6 +186,7 @@ object PerformanceProfile {
             .putInt(SettingsPreferences.KEY_STT_ENGINE_IDLE_MINUTES, settings.speechEngineIdleMinutes)
             .putBoolean(SettingsPreferences.KEY_STT_KEEP_ENGINE_ALIVE, settings.speechEngineIdleMinutes == 0)
             .putBoolean(KEY_AUTO, true)
+            .putString(KEY_AUTO_TIER, tier.name)
     }
 
     /** 只关不开：和各自设置页写同样的值（[PerformanceCosts.set]）。新装时这几项本来就关着，自动档首次写入不用碰它们。 */

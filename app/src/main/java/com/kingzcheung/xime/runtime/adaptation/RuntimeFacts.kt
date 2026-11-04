@@ -10,6 +10,8 @@ data class DeviceCapabilities(
     val processors: Int?,
     /** Hardware maximum, not the current/governor-limited frequency. Unknown when unreadable. */
     val maxCpuKHz: Long? = null,
+    /** 本机 CPU 实测（[CpuBenchmarkRunner]）；没测过为 null。档位靠它，不靠主频（[PerformanceTiers]）。 */
+    val cpu: CpuMeasurement? = null,
 ) {
     val memoryEstimate: MemoryEstimate get() = when {
         lowRam == true || totalMemoryBytes?.let { it in 1 until 4 * GIB } == true -> MemoryEstimate.CONSERVATIVE

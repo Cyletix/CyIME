@@ -236,3 +236,10 @@ target_link_libraries(cylm onnxruntime)
 target_compile_features(cylm PRIVATE cxx_std_17)
 target_compile_options(cylm PRIVATE -O2 -Wno-unused-result)
 target_link_options(cylm PRIVATE "-Wl,-z,max-page-size=16384")
+
+# CPU 测速（CpuBenchmark.kt）：一段固定计算，给性能档位用。Debug 也固定 -O2，和正式包量出同样的数。
+add_library(cyime_cpubench SHARED
+    cpu_bench.cc
+)
+target_compile_options(cyime_cpubench PRIVATE -O2)
+target_link_options(cyime_cpubench PRIVATE "-Wl,-z,max-page-size=16384")

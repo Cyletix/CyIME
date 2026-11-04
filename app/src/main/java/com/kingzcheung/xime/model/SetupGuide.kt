@@ -41,6 +41,11 @@ object SetupGuide {
 
     /** 在 IO 线程调用：会查模型文件。 */
     fun readFacts(context: Context): SetupFacts {
+        // 没测过 CPU 就先测一次（约 0.3～2 秒，键盘开着、省电、发热时跳过），档位按实测算；还在「自动」时跟着改套新档。
+        if (com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.ensure(context) is
+                com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.Outcome.Measured) {
+            com.kingzcheung.xime.settings.PerformanceProfile.onCpuMeasured(context)
+        }
         val hardware = DeviceCapabilityProbe.read(context)
         ModelManager.initialize()
         val models = SetupGuidePlanner.managedIds.mapNotNull { ModelManager.getModel(it) }
@@ -90,6 +95,7 @@ object SetupGuide {
             memoryBytes = hardware.totalMemoryBytes,
             cores = hardware.processors,
             maxCpuKHz = hardware.maxCpuKHz,
+            cpu = hardware.cpu,
             soc = socName(),
             language = Locale.getDefault().let { it.getDisplayLanguage(it) }.takeIf { it.isNotBlank() },
             freeBytes = runCatching { StatFs(context.filesDir.path).availableBytes }.getOrNull(),

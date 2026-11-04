@@ -90,6 +90,24 @@ class DeviceModelDefaultsTest {
         }
     }
 
+    @Test fun aMeasuredCpuReplacesTheClockForModelTiers() {
+        // 测试用的分档线，不是实测值。
+        val lines = com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.CpuThresholds(
+            20_000_000, 25_000_000, 60_000_000, 70_000_000)
+        fun cpu(single: Long, dual: Long) = com.kingzcheung.xime.runtime.adaptation.CpuMeasurement(single, dual)
+        // 2.4 GHz、8 GB 但实测慢：不再推荐边说边出字那一套。
+        assertEquals(DeviceModelTier.LIGHT, DeviceModelProfiles.choose(device().copy(cpu = cpu(80_000_000, 90_000_000)),
+            thresholds = lines).tier)
+        assertEquals(DeviceModelTier.STANDARD, DeviceModelProfiles.choose(device().copy(cpu = cpu(40_000_000, 45_000_000)),
+            thresholds = lines).tier)
+        // 主频读数低但实测快。
+        assertEquals(DeviceModelTier.ENHANCED, DeviceModelProfiles.choose(device(frequency = 1_500_000)
+            .copy(cpu = cpu(15_000_000, 18_000_000)), thresholds = lines).tier)
+        // 分档线没定时测了也按原来的主频估计。
+        assertEquals(DeviceModelTier.ENHANCED, DeviceModelProfiles.choose(device().copy(cpu = cpu(80_000_000, 90_000_000)),
+            thresholds = null).tier)
+    }
+
     @Test fun onlyEditionsThatBundleParaformerStartOnIt() {
         val voice = { bundled: Set<String> -> DeviceModelProfiles.choose(device(), bundled).voiceModel }
         assertEquals(SpeechModelCatalog.SENSEVOICE, voice(emptySet()))

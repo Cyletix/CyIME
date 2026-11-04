@@ -11,10 +11,15 @@ class PerformanceProfileTest {
     private val device = DeviceCapabilities(0, 35, listOf("arm64-v8a"), false, 8 * gib, 8, 3_360_000)
 
     @Test fun `tiers come from one shared threshold set`() {
-        assertEquals(PerformanceTier.HIGH, PerformanceTiers.classify(device))
-        assertEquals(PerformanceTier.MEDIUM, PerformanceTiers.classify(device.copy(totalMemoryBytes = 6 * gib)))
-        assertEquals(PerformanceTier.LOW, PerformanceTiers.classify(device.copy(totalMemoryBytes = 3 * gib)))
-        assertEquals(PerformanceTier.LOW, PerformanceTiers.classify(device.copy(lowRam = null)))
+        // 测试用的分档线，不是实测值。
+        val lines = PerformanceTiers.CpuThresholds(20_000_000, 25_000_000, 60_000_000, 70_000_000)
+        val fast = device.copy(cpu = com.kingzcheung.xime.runtime.adaptation.CpuMeasurement(15_000_000, 18_000_000))
+        assertEquals(PerformanceTier.HIGH, PerformanceTiers.classify(fast, lines))
+        // 没实测：8 GB、3.36 GHz 也只到中配（11-04）。
+        assertEquals(PerformanceTier.MEDIUM, PerformanceTiers.classify(device, lines))
+        assertEquals(PerformanceTier.MEDIUM, PerformanceTiers.classify(fast.copy(totalMemoryBytes = 6 * gib), lines))
+        assertEquals(PerformanceTier.LOW, PerformanceTiers.classify(fast.copy(totalMemoryBytes = 3 * gib), lines))
+        assertEquals(PerformanceTier.LOW, PerformanceTiers.classify(fast.copy(lowRam = null), lines))
     }
 
     @Test fun `a preset is shown only when every value matches, otherwise custom`() {
@@ -38,6 +43,16 @@ class PerformanceProfileTest {
         assertFalse(PerformanceProfile.isAuto(true, high.copy(keyGlow = false), PerformanceTier.HIGH))
         assertFalse(PerformanceProfile.isAuto(true, PerformanceProfile.presets.getValue(PerformanceTier.LOW), PerformanceTier.HIGH))
         assertFalse(PerformanceProfile.isAuto(false, high, PerformanceTier.HIGH))
+    }
+
+    @Test fun autoKeepsTheTierItAppliedUntilAMeasurementChangesIt() {
+        val high = PerformanceProfile.presets.getValue(PerformanceTier.HIGH)
+        val medium = PerformanceProfile.presets.getValue(PerformanceTier.MEDIUM)
+        // 旧版本没记套的哪档：值对得上任一档就还是自动，升级后不会先变成「自定义」。
+        assertTrue(PerformanceProfile.isAuto(true, high, null))
+        assertTrue(PerformanceProfile.isAuto(true, medium, null))
+        assertFalse(PerformanceProfile.isAuto(true, high.copy(keyGlow = false), null))
+        assertFalse(PerformanceProfile.isAuto(true, medium, PerformanceTier.HIGH))
     }
 
     @Test fun firstRunKeyEffectsAreTheSameTierPreset() {

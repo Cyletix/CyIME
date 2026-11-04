@@ -39,3 +39,9 @@
 # OCR native bindings construct these classes and access their members by name.
 -keep class ai.onnxruntime.** { *; }
 -keep class org.opencv.** { *; }
+
+# CPU 测速：电脑上的校准脚本用 app_process 直接跑 main（tools/ime_lab/cpu_bench_calibrate.py），正式包也要留着。
+-keep class com.kingzcheung.xime.runtime.adaptation.CpuBenchmark {
+    public static void main(java.lang.String[]);
+    native <methods>;
+}

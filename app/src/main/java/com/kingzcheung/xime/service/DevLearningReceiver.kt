@@ -27,6 +27,8 @@ import kotlin.concurrent.thread
  * - `op=restore`：打完后把上面这些原样放回（用户词库按快照逐条复原，期间新学的词删掉），再核对一遍。
  *   之后脚本要重启输入法进程，让内存里的设置和 CyLM 学习层重新读取，再发 `op=verify`。
  * - `op=verify`：只核对现状和快照是否完全一样，结果第一个词是 OK 或 DIFFERENT，后面列出哪里不一样。
+ * - `op=cpu_bench_state`：本机 CPU 实测结果（存着的单线程、双线程中位纳秒，测过的核）和按它定的档位、卡在哪、「自动」套的档，
+ *   给 tools/ime_lab/cpu_bench_calibrate.py 对照电脑上量的数。只读，不测。
  * - `op=perf_state`：列出登记了性能代价的开关（[com.kingzcheung.xime.settings.PerformanceCosts.Item]）现在开没开，
  *   一行 `id=true|false`，给 tools/ime_lab/perf_cost_bench.py 记下原状。
  * - `op=perf_switch --es id <id> --ez on true|false`：和设置页拨这个开关写同样的值；模糊音、双拼纠错写完补丁，
@@ -111,6 +113,16 @@ class DevLearningReceiver : BroadcastReceiver() {
                     "restart=${if (putBack.isEmpty()) "no" else "yes"}; " + verify(app, dir)
             }
             "verify" -> background { verify(app, snapshotDir(app)) }
+            "cpu_bench_state" -> {
+                val cpu = com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.cached(app)
+                val device = com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe.read(app)
+                val verdict = com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.explain(device)
+                report("cpu_bench version=${com.kingzcheung.xime.runtime.adaptation.CpuBenchmark.VERSION} " +
+                    "single_ns=${cpu?.singleNs ?: -1} dual_ns=${cpu?.dualNs ?: -1} " +
+                    "cpus=${com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.cachedCpus(app).orEmpty()} " +
+                    "tier=${verdict.tier} limit=${verdict.limit} cpu_tier=${verdict.cpuTier ?: "none"} " +
+                    "auto=${com.kingzcheung.xime.settings.PerformanceProfile.autoTier(app) ?: "off"}")
+            }
             "perf_state" -> report(com.kingzcheung.xime.settings.PerformanceCosts.Item.entries.joinToString(" ") {
                 "${it.id}=${runCatching { com.kingzcheung.xime.settings.PerformanceCosts.isOn(app, it) }.getOrDefault(false)}"
             })

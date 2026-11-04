@@ -46,6 +46,8 @@ data class SetupFacts(
     val memoryBytes: Long? = null,
     val cores: Int? = null,
     val maxCpuKHz: Long? = null,
+    /** CPU 实测；没测过为 null。 */
+    val cpu: com.kingzcheung.xime.runtime.adaptation.CpuMeasurement? = null,
     val soc: String? = null,
     /** 系统语言的名字，只用来显示。 */
     val language: String? = null,

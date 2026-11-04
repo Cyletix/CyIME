@@ -4054,6 +4054,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = false
         backgroundMotionWindowShown.value = false
         KeyboardPanelLaunch.previewVisible = false
         val keepVoice = voiceKeptAlive
@@ -4090,6 +4091,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
+        // 键盘一出来 CPU 测速就停（设置页里测到一半也停），不和打字抢 CPU。
+        com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = true
         backgroundMotionWindowShown.value = true
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
         mainHandler.removeCallbacks(hideGlassBlurWindows)
@@ -4433,6 +4436,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onDestroy() {
         KeyboardPanelLaunch.previewVisible = false
+        com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = false
         if (com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter === handwritingGlassRegionReporter)
             com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter = null
         if (com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.requester === cursorLineRequester)

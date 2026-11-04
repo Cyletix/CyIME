@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.Speed
 import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -29,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,9 +49,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner
+import com.kingzcheung.xime.runtime.adaptation.CpuMeasurement
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilities
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
+import com.kingzcheung.xime.runtime.adaptation.PerformanceTiers
 import com.kingzcheung.xime.settings.PerformanceCosts
 import com.kingzcheung.xime.settings.PerformanceProfile
 import com.kingzcheung.xime.settings.PerformanceSettings
@@ -85,6 +90,41 @@ private fun readCostFacts(context: android.content.Context): CostFacts {
 }
 private fun idleLabel(minutes: Int) = if (minutes == 0) "永不" else "$minutes 分钟"
 
+/** 「自动」那一行：选哪档，卡在内存或还没测时括号里写一句。 */
+internal fun autoLine(verdict: PerformanceTiers.Verdict, memoryBytes: Long?): String {
+    val reason = when (verdict.limit) {
+        PerformanceTiers.Limit.UNMEASURED -> "CPU 未测"
+        PerformanceTiers.Limit.MEMORY -> memoryBytes?.let {
+            if (it < PerformanceTiers.LOW_MEMORY_BYTES) "内存不到 4 GB" else "内存不到 8 GB"
+        }
+        PerformanceTiers.Limit.CPU, PerformanceTiers.Limit.UNKNOWN -> null
+    }
+    return "按本机配置选：" + tierNames.getValue(verdict.tier) + (reason?.let { " ($it)" } ?: "")
+}
+
+private fun msText(ns: Long) = "%.1f ms".format(ns / 1_000_000.0)
+
+/**
+ * 「CPU 实测」那一行的说明：测出来的耗时，分档线定了时前面写算力够哪一档。
+ * 没测成写原因；以前测过、这次重测没测成，保留上次的数，后面写这次为什么没测。
+ */
+internal fun cpuLine(measurement: CpuMeasurement?, skipped: CpuBenchmarkRunner.Skip?, running: Boolean): String {
+    val why = when (skipped) {
+        CpuBenchmarkRunner.Skip.KEYBOARD -> "键盘开着"
+        CpuBenchmarkRunner.Skip.POWER_SAVE -> "省电模式开着"
+        CpuBenchmarkRunner.Skip.THERMAL -> "设备发热"
+        CpuBenchmarkRunner.Skip.UNSUPPORTED -> "本机不支持"
+        null -> null
+    }
+    return when {
+        running -> "测试中…"
+        measurement != null -> listOfNotNull(PerformanceTiers.cpuTier(measurement)?.let { tierNames.getValue(it) },
+            "单线程 ${msText(measurement.singleNs)}", "双线程 ${msText(measurement.dualNs)}",
+            why?.let { "没重测：$it" }).joinToString(" · ")
+        else -> "未测" + (why?.let { "：$it" } ?: "")
+    }
+}
+
 private val ladder = listOf(PerformanceTier.LOW, PerformanceTier.MEDIUM, PerformanceTier.HIGH)
 
 /**
@@ -103,8 +143,11 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
     var version by remember { mutableIntStateOf(0) }
     // 本页列表里关掉的项留在列表里，方便开回来。
     var shownOff by remember { mutableStateOf(emptySet<String>()) }
-    val device = remember { DeviceCapabilityProbe.read(context) }
-    val detected = remember { PerformanceProfile.detectedTier(context) }
+    var device by remember { mutableStateOf(DeviceCapabilityProbe.read(context)) }
+    val verdict = PerformanceTiers.explain(device)
+    // CPU 实测：没测过就在打开这页时测一次（后台线程，约 0.3～2 秒；键盘开着、省电、发热时不测）。
+    var cpuRunning by remember { mutableStateOf(device.cpu == null) }
+    var cpuSkipped by remember { mutableStateOf<CpuBenchmarkRunner.Skip?>(null) }
     // 语音关着时不开麦，模型不加载：两个语音滑条不显示，常驻的语音模型也不算开销（存的值不变）。
     val speech = remember { SettingsPreferences.isSttEnabled(context) }
     val current = PerformanceProfile.matching(settings)
@@ -113,6 +156,23 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
         value = withContext(Dispatchers.IO) { runCatching { readCostFacts(context) }.getOrNull() }
     }
     fun refresh() { settings = PerformanceProfile.read(context); auto = PerformanceProfile.isAuto(context); version++ }
+    fun measureCpu(force: Boolean) {
+        cpuRunning = true
+        scope.launch {
+            val outcome = withContext(Dispatchers.Default) {
+                val result = if (force) CpuBenchmarkRunner.run(context) else CpuBenchmarkRunner.ensure(context)
+                // 还在「自动」且实测定出了新档就改套那档；手动选的档、自定义不动。
+                if (result is CpuBenchmarkRunner.Outcome.Measured) PerformanceProfile.onCpuMeasured(context)
+                result
+            }
+            cpuSkipped = (outcome as? CpuBenchmarkRunner.Outcome.Skipped)?.reason
+            device = DeviceCapabilityProbe.read(context)
+            cpuRunning = false
+            refresh()
+        }
+    }
+    // 等页面先画完再测，免得和打开页面的绘制抢核、把数测高。
+    LaunchedEffect(Unit) { if (device.cpu == null) { kotlinx.coroutines.delay(600); measureCpu(force = false) } }
     fun custom(next: PerformanceSettings) { PerformanceProfile.applyCustom(context, next); refresh() }
     fun voiceResident(s: PerformanceSettings) = speech && s.speechEngineIdleMinutes == 0
     // 某组档位值下的总开销：档位管的几项换成这组值，别的开关、词库、九键模型照现在的算。
@@ -180,7 +240,10 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                         ladder.associateWith { loadFor(PerformanceProfile.applied(settings, it)) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    TierRow("自动(推荐)", "按本机配置选：${tierNames.getValue(detected)}", auto) {
+                    // 还没测时「自动」保留原来套上的那档（老用户升级不会先被降一档），测完再按实测改。
+                    val autoShown = if (auto && verdict.limit == PerformanceTiers.Limit.UNMEASURED)
+                        PerformanceProfile.matching(settings)?.let { verdict.copy(tier = it) } ?: verdict else verdict
+                    TierRow("自动(推荐)", autoLine(autoShown, device.totalMemoryBytes), auto) {
                         PerformanceProfile.applyAuto(context); refresh()
                     }
                     listOf(PerformanceTier.HIGH, PerformanceTier.MEDIUM, PerformanceTier.LOW).forEach { tier ->
@@ -193,6 +256,13 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                     val isCustom = !auto && current == null
                     RowDivider()
                     TierRow("自定义", "单独改过档位管的任一项后自动选中", isCustom, enabled = false) {}
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    // 「自动」按这个定算力档；主频、核数只在顶上显示，不算分。点一下重测（刚玩完游戏发热时测低了可以再测）。
+                    SettingsItem(icon = Icons.TwoTone.Speed, title = "CPU 实测",
+                        subtitle = cpuLine(device.cpu, cpuSkipped, cpuRunning),
+                        status = if (cpuRunning) null else "重测",
+                        onClick = { if (!cpuRunning) measureCpu(force = true) })
                 }
             }
             if (speech) item {
