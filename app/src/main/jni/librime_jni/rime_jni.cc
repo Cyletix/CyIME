@@ -15,6 +15,7 @@
 #include <rime/menu.h>
 #include <rime/gear/translator_commons.h>
 #include "candidate_policy.h"
+#include "candidate_pins.h"
 #include "jni_text.h"
 #include "pinyin_syllable_selection.h"
 #include "t9_processor.h"
@@ -806,6 +807,23 @@ public:
             if (!context->DeleteCandidate(nativeIndex)) return 0;
         }
         return stillOffered(context, text) ? 1 : 3;
+    }
+
+    // 长按「固定」：这个编码下排第一，固定多个按先后排（candidate_pins.cc，Windows 版同一份）。
+    // 返回 -1 不能固定（没有在组词）、0 没固定、1 已固定。
+    int candidatePinState(const std::string& text) {
+        if (!rime || !session_id_ || text.empty()) return -1;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session) return -1;
+        const auto code = cyime::pins::ActiveCode(session->context());
+        if (code.empty()) return -1;
+        return cyime::pins::IsPinned(code, text) ? 1 : 0;
+    }
+
+    bool setCandidatePinned(const std::string& text, bool pinned) {
+        if (!rime || !session_id_ || text.empty()) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        return session && cyime::pins::SetPinned(session->context(), text, pinned);
     }
 
     // Erases the user dictionary records of the words `candidate` is made of (its own entry, or a
@@ -2086,6 +2104,19 @@ JNIEXPORT jint JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeForgetCandidate(
     JNIEnv*, jobject, jint index, jboolean global) {
     return Rime::Instance().forgetCandidate(index, global);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeCandidatePinState(JNIEnv* env, jobject, jstring text) {
+    if (!text) return -1;
+    return Rime::Instance().candidatePinState(CandidateUtf8(env, text));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetCandidatePinned(
+    JNIEnv* env, jobject, jstring text, jboolean pinned) {
+    if (!text) return JNI_FALSE;
+    return Rime::Instance().setCandidatePinned(CandidateUtf8(env, text), pinned == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
 }
 
 // 旧版本 26 键长按“屏蔽”的候选（cyime-hidden-candidates.txt），只供设置页恢复。

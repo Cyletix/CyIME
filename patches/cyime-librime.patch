@@ -1742,6 +1742,19 @@ index 4a54f64c..4a3188bb 100644
    Segment& seg(ctx->composition().back());
    seg.Close();
    if (seg.end == ctx->input().length()) {
+@@ -355,6 +358,12 @@ void ConcreteEngine::InitializeComponents() {
+                                        "translator", translators_);
+   CreateComponentsFromList<Filter>(this, config, "engine/filters", "filter",
+                                    filters_);
++  // CyIME: the words the user pinned for a code come first, after the
++  // schema's own filters, in every schema (candidate_pins.cc).
++  if (auto c_pins = Filter::Require("cyime_pins")) {
++    an<Filter> pins(c_pins->Create(Ticket(this, "cyime_pins")));
++    filters_.push_back(pins);
++  }
+   // create formatters
+   auto c_formatter = Formatter::Require("shape_formatter");
+   if (c_formatter) {
 diff --git a/src/rime/gear/memory.cc b/src/rime/gear/memory.cc
 index 9da80fa9..d6443783 100644
 --- a/src/rime/gear/memory.cc

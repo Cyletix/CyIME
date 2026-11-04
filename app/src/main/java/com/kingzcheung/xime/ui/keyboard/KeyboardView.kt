@@ -1099,7 +1099,7 @@ fun KeyboardView(
                                 com.kingzcheung.xime.handwriting.HandwritingTemplates.forget(handwritingContext, handwritingWord)
                             }
                         } else if (!word.isNullOrEmpty()) {
-                            deletePending = DeletePendingWord(word) {
+                            deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word)) {
                                 if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                 if (railEntry != null) {
                                     callbacks.onGlobalCandidateDelete?.invoke(railEntry.first)
@@ -1283,7 +1283,7 @@ fun KeyboardView(
                                 .getOrNull(entry.globalIndex)?.text
                             if (!word.isNullOrEmpty()) {
                                 onHapticFeedback?.invoke()
-                                deletePending = DeletePendingWord(word) {
+                                deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word)) {
                                     if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                     callbacks.onGlobalCandidateDelete?.invoke(entry.globalIndex)
                                 }
@@ -1838,7 +1838,9 @@ fun KeyboardView(
         deletePending?.let { pending ->
             ForgetLearningConfirm(pending.word, pending.message, Modifier.matchParentSize(),
                 onCancel = { onHapticFeedback?.invoke(); deletePending = null },
-                onConfirm = { onHapticFeedback?.invoke(); deletePending = null; pending.onConfirm() })
+                onConfirm = { onHapticFeedback?.invoke(); deletePending = null; pending.onConfirm() },
+                pinned = pending.pin?.pinned,
+                onPin = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.apply?.invoke() })
         }
 
         // A route change replaces only the panel content, never restarts the reveal host.
@@ -2170,17 +2172,26 @@ private fun KeyboardResizeControlsHost(
     }
 }
 
-/** 忘掉学习记录的确认卡。 */
+/**
+ * 长按候选的卡片：忘掉学习记录；引擎候选还能固定（[pinned] 非空：false 显示「固定」，true 显示「取消固定」）。
+ */
 @Composable
 internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Modifier,
-    onCancel: () -> Unit, onConfirm: () -> Unit) {
+    onCancel: () -> Unit, onConfirm: () -> Unit, pinned: Boolean? = null, onPin: () -> Unit = {}) {
+    val forget = "忘掉「$word」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。"
     KeyboardConfirmCard(
-        title = "忘掉学习",
-        message = message ?: "忘掉「$word」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。",
+        title = if (pinned == null) "忘掉学习" else "「$word」",
+        message = message ?: when (pinned) {
+            null -> forget
+            false -> "固定：这个编码下排第一，固定多个按先后排。\n忘掉：删掉学习记录，词库里本来有的词回到原来的位置，自己打出来的新词会消失。"
+            true -> "取消固定：回到原来的位置。\n忘掉：删掉学习记录，词库里本来有的词回到原来的位置，自己打出来的新词会消失。"
+        },
         confirmLabel = "忘掉",
         destructive = true,
         tag = "forget-learning-confirm",
-        modifier = modifier, onCancel = onCancel, onConfirm = onConfirm)
+        modifier = modifier, onCancel = onCancel, onConfirm = onConfirm,
+        extraLabel = when (pinned) { null -> null; false -> "固定"; true -> "取消固定" },
+        onExtra = onPin)
 }
 
 /**
@@ -2189,7 +2200,8 @@ internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Mod
  */
 @Composable
 internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: String, destructive: Boolean,
-    tag: String, modifier: Modifier, onCancel: () -> Unit, onConfirm: () -> Unit) {
+    tag: String, modifier: Modifier, onCancel: () -> Unit, onConfirm: () -> Unit,
+    extraLabel: String? = null, onExtra: () -> Unit = {}) {
     val cardColors = keyboardCardColors()
     Box(
         modifier = modifier
@@ -2227,6 +2239,12 @@ internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: S
                     TextButton(onClick = onCancel) {
                         Text("取消", color = cardColors.text.copy(alpha = .7f))
                     }
+                    if (extraLabel != null) {
+                        Spacer(Modifier.width(4.dp))
+                        TextButton(onClick = onExtra, modifier = Modifier.testTag("$tag-extra")) {
+                            Text(extraLabel, color = cardColors.text)
+                        }
+                    }
                     Spacer(Modifier.width(4.dp))
                     TextButton(onClick = onConfirm) {
                         Text(confirmLabel, color = if (destructive) MaterialTheme.colorScheme.error else cardColors.text)
@@ -2242,8 +2260,23 @@ private data class DeletePendingWord(
     val word: String,
     /** 弹窗说明；为空时用词库学习的说明。 */
     val message: String? = null,
+    /** 引擎候选的固定按钮；null＝不显示（手写候选、没在组词）。 */
+    val pin: PinChoice? = null,
     val onConfirm: () -> Unit,
 )
+
+/** 长按卡片的固定按钮：现在是否已固定，以及按下后切换。 */
+private class PinChoice(val pinned: Boolean, val apply: () -> Unit)
+
+/** 引擎候选长按时查一次固定状态；拿不到（没在组词、引擎正忙）就不显示固定按钮。 */
+private fun pinChoice(callbacks: KeyboardCallbacks, cs: com.kingzcheung.xime.service.CandidateState, word: String): PinChoice? {
+    val onPin = callbacks.onCandidatePin ?: return null
+    if (!cs.isComposing) return null
+    val pinned = callbacks.candidatePinState(word) ?: return null
+    return PinChoice(pinned) {
+        if (callbacks.isCandidateSnapshotCurrent(cs)) onPin(word, !pinned)
+    }
+}
 
 /**
  * The clipboard above the search field, showing what the field matches as it is typed: committed

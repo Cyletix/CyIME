@@ -2760,6 +2760,26 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /**
+     * 长按「固定」：这个词在当前编码下排第一，固定多个按先后排；「取消固定」回到原位。
+     * 按文字固定，存 cyime_pins.txt（与 Windows 版同一格式）；不在引擎候选里的词（插件注入）固定不了，只提示。
+     */
+    internal fun pinCandidate(text: String, pinned: Boolean) {
+        val snapshot = service.candidateState.value
+        postRimeJob {
+            if (!snapshot.hasSameSelectionSource(service.candidateState.value)) return@postRimeJob
+            val done = service.rimeEngine.setCandidatePinnedAtRevision(text, pinned, snapshot.engineRevision)
+            FileLogger.i(XimeInputMethodService.TAG, "PinCandidate: text='$text' pinned=$pinned result=$done")
+            if (done) {
+                withEditor { service.updateUI() }
+            } else if (pinned) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(service, "「$text」不能固定", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     /** A remembered hand-typed English word (lua/cyime_en_memory.lua) has no Rime record: forget it from its file. */
     private suspend fun forgetEnglishWord(text: String): Boolean {
         if (!isRimeIceCapitalSchema(service.uiState.value.currentSchemaId)) return false

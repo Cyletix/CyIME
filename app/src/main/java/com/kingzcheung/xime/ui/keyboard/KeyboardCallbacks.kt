@@ -49,6 +49,10 @@ data class KeyboardCallbacks(
     val onGlobalCandidateSelect: ((Int) -> Unit)? = null,
     /** 候选展开页长按删除自造词：globalIndex 为跨页全量候选列表中的索引。 */
     val onGlobalCandidateDelete: ((Int) -> Unit)? = null,
+    /** 长按卡片的「固定」：这个词在当前编码下是否已固定；null＝不能固定（不显示按钮）。 */
+    val candidatePinState: (String) -> Boolean? = { null },
+    /** 固定（true）或取消固定（false）当前编码下的这个词。 */
+    val onCandidatePin: ((String, Boolean) -> Unit)? = null,
     /** 用户展开候选页时请求服务层拉取跨页全量候选（本地分页数据源）。 */
     val onRequestExpandedCandidates: (() -> Unit)? = null,
     /** 收起的候选栏滑到最后几个：服务层把展开列表接到候选栏后面。 */

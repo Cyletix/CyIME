@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.18.0)
 add_library(rime_jni SHARED
     rime_jni.cc
     candidate_policy.cc
+    candidate_pins.cc
     basic_particle_choices.cc
 )
 

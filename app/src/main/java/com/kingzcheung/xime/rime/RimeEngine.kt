@@ -1168,6 +1168,8 @@ class RimeEngine {
     private external fun nativeDeleteCandidateOnCurrentPage(index: Int): Boolean
     private external fun nativeDeleteCandidateByGlobalIndex(index: Int): Boolean
     private external fun nativeForgetCandidate(index: Int, global: Boolean): Int
+    private external fun nativeCandidatePinState(text: String): Int
+    private external fun nativeSetCandidatePinned(text: String, pinned: Boolean): Boolean
     private external fun nativeRestoreSuppressedCandidate(text: String): Boolean
     private external fun nativeGetSuppressedCandidates(): Array<String>
     private external fun nativeGetHiddenCandidates(): Array<String>
@@ -1456,6 +1458,23 @@ class RimeEngine {
         if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked 0
         candidateRevision.incrementAndGet()
         nativeForgetCandidate(index, global)
+    }
+
+    /**
+     * 长按卡片用：[text] 在当前编码下是否已固定；null＝不能固定（没在组词，或引擎正忙）。
+     * 主线程调用，拿不到锁不等待。
+     */
+    internal fun candidatePinState(text: String): Boolean? = tryLocked(null) {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@tryLocked null
+        when (nativeCandidatePinState(text)) { 1 -> true; 0 -> false; else -> null }
+    }
+
+    /** 固定：当前编码下排第一，固定多个按先后排；取消固定回到原位。候选过期时不做。 */
+    @androidx.annotation.WorkerThread
+    internal fun setCandidatePinnedAtRevision(text: String, pinned: Boolean, revision: Long): Boolean = locked {
+        if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked false
+        candidateRevision.incrementAndGet()
+        nativeSetCandidatePinned(text, pinned)
     }
 
     @androidx.annotation.WorkerThread

@@ -1,4 +1,5 @@
 #include "candidate_policy.h"
+#include "candidate_pins.h"
 #include "basic_particle_choices.h"
 #include <algorithm>
 #include <cstdio>
@@ -482,6 +483,7 @@ void InitializeCandidatePolicy(const std::string& user_dir) {
   std::ifstream preferences(hidden_path);
   while (std::getline(preferences, line)) if (!line.empty()) hidden.insert(line);
   Registry::instance().Register("cyime_candidate_policy", new Component<CandidatePolicy>());
+  pins::Initialize(user_dir);
 }
 
 bool HideCandidate(const std::string& text) {
