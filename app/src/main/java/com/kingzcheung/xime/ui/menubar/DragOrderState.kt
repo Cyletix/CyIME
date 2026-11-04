@@ -101,9 +101,14 @@ internal fun LazyItemScope.dragOrderItem(state: DragOrderState, id: String, enab
     val active = state.dragging == id
     val offset by animateFloatAsState(if (active) state.translation else 0f,
         animationSpec = if (active) snap() else spring(), label = "cardDrop")
+    // 拖着的卡片在绘制时现算位移：换位那一帧卡片已排到新位置，组合时算的位移还是旧位置的，
+    // 会差一张卡片高，看着一闪一抽（#130）。松手后照旧用 offset 弹回。
     return Modifier.animateItem(placementSpec = if (active) null else spring())
         .zIndex(if (active) 1f else 0f)
-        .graphicsLayer { translationY = offset; shadowElevation = if (active) 8.dp.toPx() else 0f }
+        .graphicsLayer {
+            translationY = if (state.dragging == id) state.translation else offset
+            shadowElevation = if (active) 8.dp.toPx() else 0f
+        }
         .then(if (enabled) Modifier.reorderOnLongPress(
             onStart = { state.start(id, it.y) }, onDrag = state::drag,
             onEnd = { if (state.dragging == id) state.finish() },
