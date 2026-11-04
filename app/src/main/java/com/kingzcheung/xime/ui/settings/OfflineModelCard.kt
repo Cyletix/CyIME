@@ -257,3 +257,22 @@ internal fun SpeechPunctuationSettings() {
         }
     }
 }
+
+/** 数字转阿拉伯数字：别人提的需求，默认关(VoiceNumbers)。 */
+@Composable
+internal fun SpeechNumberSettings() {
+    val context = LocalContext.current
+    var arabic by remember { mutableStateOf(SettingsPreferences.isSttArabicNumbers(context)) }
+    Row(Modifier.fillMaxWidth().settingsSearchAnchor("数字转阿拉伯数字").testTag("speech-arabic-numbers")
+        .toggleable(value = arabic, role = Role.Switch,
+            onValueChange = { arabic = it; SettingsPreferences.setSttArabicNumbers(context, it) })
+        .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("数字转阿拉伯数字", style = MaterialTheme.typography.bodyLarge)
+            Text("中文说的数字写成 325、3.5、50%；一个、第一、一心一意这类不变。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = arabic, onCheckedChange = null, colors = settingsSwitchColors())
+    }
+}

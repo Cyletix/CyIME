@@ -151,6 +151,8 @@ class SettingsSearchTest {
         assertTrue("按键音色" in titles("案件音色"))
         assertTrue("浅色遮罩" in titles("变暗"))
         assertTrue("深色遮罩" in titles("背景暗度"))
+        assertTrue("数字转阿拉伯数字" in titles("阿拉伯数字"))
+        assertTrue("数字转阿拉伯数字" in titles("中文数字"))
     }
 
     /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */

@@ -543,9 +543,12 @@ class VoiceRecognitionHandler(
         val automatic = SettingsPreferences.isSttAutoPunctuation(context)
         val localSentences = SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context)
         val marks = voiceMarks()
+        // 预览和定稿走同一条转换，说到一半出的 300 和说完的 325 是同一种写法，不会中文、数字来回跳。
+        val arabicNumbers = SettingsPreferences.isSttArabicNumbers(context)
         return segments.mapIndexed { index, part ->
             val keep = automatic && (part.serverPunctuation || (localSentences && part.language == InputLanguage.CHINESE))
-            normalizeVoiceText(part.text, language, keep, if (index == segments.lastIndex) marks else marks.copy(trailing = true))
+            normalizeVoiceText(part.text, language, keep, if (index == segments.lastIndex) marks else marks.copy(trailing = true),
+                arabicNumbers)
         }.filter(String::isNotEmpty).joinToString(" ")
     }
 

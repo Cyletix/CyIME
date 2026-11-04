@@ -108,6 +108,7 @@ object SettingsPreferences {
     const val KEY_STT_PUNCTUATION_PERIOD = "stt_punctuation_period"
     const val KEY_STT_PUNCTUATION_QUESTION = "stt_punctuation_question"
     const val KEY_STT_PUNCTUATION_TRAILING = "stt_punctuation_trailing"
+    const val KEY_STT_ARABIC_NUMBERS = "stt_arabic_numbers"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     const val KEY_STT_REMOTE_TYPING = "stt_remote_typing"
     
@@ -974,6 +975,14 @@ object SettingsPreferences {
     fun isSttPunctuationTrailing(context: Context) = getPrefs(context).getBoolean(KEY_STT_PUNCTUATION_TRAILING, true)
     fun setSttPunctuationTrailing(context: Context, enabled: Boolean) =
         getPrefs(context).edit().putBoolean(KEY_STT_PUNCTUATION_TRAILING, enabled).apply()
+
+    /**
+     * 数字转阿拉伯数字：中文语音结果里读出来的数字写成 325、3.5、50%(VoiceNumbers)。
+     * 别人提的需求(2026-11-04)，默认关；只是一次文字扫描，没有可测的性能开销，不登记。
+     */
+    fun isSttArabicNumbers(context: Context) = getPrefs(context).getBoolean(KEY_STT_ARABIC_NUMBERS, false)
+    fun setSttArabicNumbers(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_STT_ARABIC_NUMBERS, enabled).apply()
 
     /**
      * 开车连续语音：语音悬浮条听写时发出消息或离开输入框，回到同一应用的输入框自动接着听。

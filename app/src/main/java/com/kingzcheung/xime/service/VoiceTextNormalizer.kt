@@ -45,13 +45,13 @@ private fun dropKinds(text: String, marks: VoiceMarks): String {
 /**
  * Call once on incoming ASR text, never on already rendered partial text.
  * [keepMarks]: 整句定稿 keeps the model's sentence/clause marks instead of turning them into spaces;
- * [marks] picks which kinds stay (自动加标点 → 逐项).
+ * [marks] picks which kinds stay (自动加标点 → 逐项); [arabicNumbers]: 数字转阿拉伯数字 (Chinese only).
  */
 internal fun normalizeVoiceText(text: String, language: InputLanguage = InputLanguage.CHINESE, keepMarks: Boolean = false,
-    marks: VoiceMarks = VoiceMarks()): String {
+    marks: VoiceMarks = VoiceMarks(), arabicNumbers: Boolean = false): String {
     val clean = cleanSpeechText(text, keepMarks).let { if (keepMarks) dropMarks(it, marks) else it }
     if (language != InputLanguage.CHINESE) return clean
-    return (if (keepMarks) dictatedWithMarks else dictatedPunctuation).replace(clean) {
+    val punctuated = (if (keepMarks) dictatedWithMarks else dictatedPunctuation).replace(clean) {
         when (it.groupValues[1]) {
             "逗号" -> "，"
             "句号" -> "。"
@@ -59,4 +59,5 @@ internal fun normalizeVoiceText(text: String, language: InputLanguage = InputLan
             else -> "！"
         }
     }
+    return if (arabicNumbers) spokenNumbersToDigits(punctuated) else punctuated
 }

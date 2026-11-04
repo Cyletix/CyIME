@@ -139,6 +139,8 @@ fun SpeechToTextSettingsContent(
 
             SettingsSection(title = "语音标点") { SpeechPunctuationSettings() }
 
+            SettingsSection(title = "数字") { SpeechNumberSettings() }
+
             val scope = rememberCoroutineScope()
 
             if (OfflineAsrSettings.isSupported()) {

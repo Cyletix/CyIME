@@ -587,6 +587,16 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals("0.05。", editor.toString())
     }
 
+    @Test fun `arabic numbers switch converts preview and final the same way and is off by default`() {
+        startToolbar(); onPartial("三百二十五块")
+        assertEquals("三百二十五块", editor.toString())
+        whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_ARABIC_NUMBERS), any<Boolean>())).thenReturn(true)
+        onPartial("三百二十五块零点五")
+        assertEquals("325块0.5", editor.toString())
+        handler.finishRecognition(); onResult("三百二十五块零点五句号")
+        assertEquals("325块0.5。", editor.toString())
+    }
+
     @Test fun `release and timeout never normalize already converted punctuation twice`() {
         startToolbar(); onPartial("结果逗号0.05句号")
         handler.commitPendingOnRelease()
