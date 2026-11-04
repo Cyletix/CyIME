@@ -20,6 +20,9 @@ class UserNgramCache(context: Context) {
     private val fileMutex = Mutex()
     private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pendingSave: Job? = null
+    /** Learned since the last save started; guarded by [stateLock]. */
+    private var dirty = false
+    internal var saveDelayMs = SAVE_DELAY_MS
     private var loaded = false
     private var storedProfileRows: List<PersonalContinuation>? = null
     private var storedProfileReference: String? = null
@@ -59,14 +62,30 @@ class UserNgramCache(context: Context) {
             if (recentInputs.size > 100) recentInputs.subList(0, recentInputs.size - 100).clear()
             tokens.windowed(2).forEach { bigramTrie.insert(it) }
             tokens.windowed(3).forEach { trigramTrie.insert(it) }
-            pendingSave?.cancel()
-            pendingSave = saveScope.launch {
-                delay(500)
-                try { save() }
-                catch (cancelled: CancellationException) { throw cancelled }
-                catch (error: Exception) { Log.e("UserNgramCache", "Automatic learning save failed", error) }
-            }
+            dirty = true
+            // 每次保存都要把全部学习条目（上限 10 万＋10 万条）重新编码、整份写盘，原来每次上屏停顿 0.5 秒就写一次，
+            // 打字时 CPU 和存储一直在忙。打字中最多每 [saveDelayMs] 写一次，键盘收起时 [flush] 立刻写。
+            if (pendingSave?.isActive != true) scheduleSave(saveDelayMs)
         }
+    }
+
+    /** Keyboard hidden: write what was learned since the last save now instead of waiting. */
+    fun flush() = synchronized(stateLock) {
+        if (!dirty) return@synchronized
+        pendingSave?.cancel()
+        scheduleSave(0L)
+    }
+
+    /** Callers hold [stateLock]; the job is assigned before it can run, so [save] sees itself as the pending one. */
+    private fun scheduleSave(delayMs: Long) {
+        val job = saveScope.launch(start = CoroutineStart.LAZY) {
+            if (delayMs > 0) delay(delayMs)
+            try { save() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { Log.e("UserNgramCache", "Automatic learning save failed", error) }
+        }
+        pendingSave = job
+        job.start()
     }
 
     private fun tokenize(text: String): List<String> = text.filter {
@@ -121,12 +140,12 @@ class UserNgramCache(context: Context) {
             }
             storedProfileRows = data.continuations
         }
-        val root = org.json.JSONObject(data.copy(profileName = "", continuations = emptyList()).encode())
-        storedProfileReference?.let { root.put("profileReference", it) }
+        // 引用直接写进同一次编码，不再把几 MB 的文本解析回 JSONObject 再输出一遍。
+        val text = data.copy(profileName = "", continuations = emptyList()).encode(storedProfileReference)
         val atomic = AtomicFile(cacheFile)
         val stream = atomic.startWrite()
         try {
-            stream.write(root.toString().toByteArray(Charsets.UTF_8))
+            stream.write(text.toByteArray(Charsets.UTF_8))
             atomic.finishWrite(stream)
         } catch (error: Exception) {
             atomic.failWrite(stream)
@@ -149,11 +168,16 @@ class UserNgramCache(context: Context) {
         }
         withContext(Dispatchers.IO) { fileMutex.withLock {
             check(loaded) { "学习数据尚未成功读取，不能覆盖保存" }
-            val data = snapshot()
-            val bounded = data.boundedForStorage()
-            // 越过上限时内存里也换成裁剪后的数据，否则下次保存又要整份排序一次。
-            if (bounded !== data) replaceInMemory(bounded)
-            write(bounded)
+            val data = synchronized(stateLock) { dirty = false; snapshot() }
+            try {
+                val bounded = data.boundedForStorage()
+                // 越过上限时内存里也换成裁剪后的数据，否则下次保存又要整份排序一次。
+                if (bounded !== data) replaceInMemory(bounded)
+                write(bounded)
+            } catch (error: Throwable) {
+                synchronized(stateLock) { dirty = true }
+                throw error
+            }
         } }
     }
     suspend fun importData(data: PersonalLearningData) = withContext(Dispatchers.IO) {
@@ -170,4 +194,9 @@ class UserNgramCache(context: Context) {
         pendingSave = saveScope.launch { save() }
     }
     fun getCacheSize(): Int = synchronized(stateLock) { bigramTrie.size() + trigramTrie.size() }
+
+    companion object {
+        /** Longest a typed observation waits for its save while the keyboard stays open. */
+        const val SAVE_DELAY_MS = 30_000L
+    }
 }

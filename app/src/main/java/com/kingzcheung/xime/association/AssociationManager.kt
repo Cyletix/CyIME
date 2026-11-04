@@ -110,6 +110,11 @@ object AssociationManager {
         fusionEngine.recordUserInput(text)
     }
     
+    /** Keyboard hidden: save typed observations now (typing saves at most every 30 s). */
+    fun flushLearning() {
+        synchronized(this) { learningCache }?.flush()
+    }
+
     suspend fun saveUserData() {
         checkNotNull(learningCache) { "学习数据尚未加载" }.save()
     }

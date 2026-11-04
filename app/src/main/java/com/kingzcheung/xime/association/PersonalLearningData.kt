@@ -17,7 +17,8 @@ data class PersonalLearningData(
     val uniqueSequences get() = bigrams.size + trigrams.size
     val observations get() = (bigrams + trigrams).sumOf { it.count.toLong() }
 
-    fun encode(): String {
+    /** [profileReference]: the observation file names its immutable corpus file instead of embedding it. */
+    fun encode(profileReference: String? = null): String {
         fun sequences(rows: List<LearnedSequence>) = JSONArray().apply {
             rows.forEach { put(JSONObject().put("tokens", JSONArray(it.tokens)).put("count", it.count)) }
         }
@@ -26,7 +27,7 @@ data class PersonalLearningData(
             .put("recentInputs", JSONArray(recentInputs))
             .put("profile", JSONObject().put("name", profileName).put("entries", JSONArray().apply {
                 continuations.forEach { put(JSONObject().put("context", it.context).put("text", it.text).put("count", it.count)) }
-            })).toString()
+            })).apply { if (profileReference != null) put("profileReference", profileReference) }.toString()
     }
 
     /**

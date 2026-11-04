@@ -4036,6 +4036,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onFinishInputView(finishingInput)
         runtimeObserver?.stop()
         com.kingzcheung.xime.stats.TypingStats.flush()
+        com.kingzcheung.xime.association.AssociationManager.flushLearning()
         // App 收起键盘（点了别处）：听写结束，不再自己弹悬浮条；只有收起按钮才出悬浮条（voiceKeepsListeningAfter）。
         voiceKeptAlive = !finishingInput && voiceKeepsAliveOnHide()
         if (!voiceKeptAlive) noteVoicePillInterrupted(VoiceSessionEnd.FOCUS_LEAVES)
@@ -4451,6 +4452,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         glassSurfaceOrigins.clear()
         hardwareInputManager.unregisterInputDeviceListener(hardwareInputListener)
         inputStallWatchdog?.stop()
+        com.kingzcheung.xime.association.AssociationManager.flushLearning()
         runtimeObserver?.stop()
         stopVoicePillResume()
         inputReadiness.close()
