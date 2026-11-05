@@ -70,6 +70,8 @@ internal class LocalSpeechSession(
     wholeSentence: Boolean = false,
     /** 结束时整段重识别的时间预算，超出就保留按停顿定稿的文字。 */
     private val wholeSessionBudgetMs: Long = WHOLE_SESSION_BUDGET_MS,
+    /** 二次校正把关：中文有流式预览时，第二遍改动的字要过九键词组模型，否则留第一遍的字（见 [SecondPassGate]）。 */
+    private val gate: SecondPassGate? = null,
 ) : ResidentSession {
     // SenseVoice alone (no streaming or rolling preview, e.g. the 完整版 without Paraformer) keeps punctuation and gets
     // the same end-of-input re-read; its segments stay at the engine's 6 s so text still appears while speaking.
@@ -77,6 +79,8 @@ internal class LocalSpeechSession(
         (engine.hasRefinement && engine.isStreaming || !engine.isStreaming && !engine.hasRollingPreview)
     /** 整句定稿时保留模型标点（整句的句末不再是切点硬塞的句号）。 */
     private val transcript = SpeechTranscript(keepMarks = wholeSentenceActive)
+    /** 流式预览的定稿前文字，整段重识别时作为把关的第一遍。 */
+    private val previews = SpeechTranscript()
     private val decodeTimeoutMs = if (wholeSentenceActive) maxOf(engine.decodeTimeoutMs, WHOLE_SENTENCE_DECODE_TIMEOUT_MS)
         else engine.decodeTimeoutMs
     private fun worker(name: String, capacity: Int) = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
@@ -192,6 +196,7 @@ internal class LocalSpeechSession(
         onRegion(id, samples.size, boundary)
         previewAudio.clear()
         val preview = if (engine.isStreaming) engine.finishStream() else ""
+        if (engine.isStreaming) synchronized(outputLock) { previews.update(id, preview, boundary) }
         if (engine.isStreaming) publish(id, preview, boundary, confirmed = !engine.hasRefinement)
         // 整句定稿: the end-of-input re-read covers the last sentence, so the stop region is not decoded twice
         // (saves up to one 30 s decode of waiting). If the re-read is cancelled or over budget, its preview stays.
@@ -205,7 +210,7 @@ internal class LocalSpeechSession(
                     if (abandoned.get()) return@execute
                     try {
                         check(System.nanoTime() < deadline) { "离线识别积压" }
-                        val text = keepChinese(preview, if (wholeSentenceActive) engine.refinePunctuated(samples) else engine.refine(samples), engine.lockedChinese)
+                        val text = guarded(preview, keepChinese(preview, if (wholeSentenceActive) engine.refinePunctuated(samples) else engine.refine(samples), engine.lockedChinese))
                         check(System.nanoTime() < deadline) { "离线识别超时" }
                         synchronized(outputLock) { pending.remove(id); publish(id, text, boundary, confirmed = true) }
                     } catch (e: Exception) {
@@ -218,6 +223,12 @@ internal class LocalSpeechSession(
                 fail(if (engine.hasRefinement) "第二遍识别队列已满，请关闭 SenseVoice 二次校正后重试" else "离线识别跟不上录音，请缩短录音后重试")
             }
         }
+    }
+
+    /** 第二遍文字过把关；没有流式预览、不是中文或把关出错时原样采用第二遍。 */
+    private fun guarded(first: String, second: String): String {
+        if (gate == null || !engine.isStreaming || !engine.lockedChinese) return second
+        return try { gate.merge(first, second) } catch (_: Exception) { second }
     }
 
     private fun publish(id: Long, text: String, boundary: SpeechBoundary? = null, confirmed: Boolean = false) = synchronized(outputLock) {
@@ -257,7 +268,8 @@ internal class LocalSpeechSession(
             whole.update(++id, part, SpeechBoundary.PAUSE)
         }
         if (abandoned.get() || System.nanoTime() > budgetEnd) return null
-        return whole.text().ifEmpty { null }
+        val first = synchronized(outputLock) { previews.text() }
+        return guarded(first, whole.text()).ifEmpty { null }
     }
 
     /** Drains actual audio, then waits only for outstanding work; no artificial stop delay. */

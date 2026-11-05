@@ -197,7 +197,10 @@ class AsrInferenceService : Service() {
                             if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { }
                         },
                         onRegion = { id, samples, boundary -> recorder?.region(id, samples, boundary) },
-                        wholeSentence = wholeSentence) },
+                        wholeSentence = wholeSentence,
+                        // 中文流式 + 二次校正：第二遍改的字要过九键词组模型（没装模型时照旧整句采用第二遍）。
+                        gate = if (selection.first != null && selection.secondDir != null && selection.recognitionLanguage == "zh")
+                            com.kingzcheung.xime.speech.SecondPassGate.forFiles(filesDir) else null) },
                     owner = callback.asBinder(), isActive = { generation.get() == token })
                 val readyAt = SystemClock.elapsedRealtime()
                 val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
