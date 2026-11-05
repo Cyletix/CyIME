@@ -121,6 +121,16 @@ git submodule update --init --recursive
 
 见 [CONTRIBUTING.md](CONTRIBUTING.md)：先提 Issue，再提最小修改的 PR。
 
+## 支持作者
+
+CyIME 输入法是我空闲时间制作的一款输入法, 遵循GPL协议, 所以此项目永久免费开源, 并且此项目的任何fork项目也同样必须开源.
+
+如果它帮到了你, 愿意的话可以请我喝杯咖啡, 用来支付agent开销 模型训练和个人测试的时间开销, 感谢支持, 不打赏也完全没关系, 欢迎反馈问题, 同样是很大的支持
+
+[爱发电：afdian.com/a/cyletix](https://afdian.com/a/cyletix)
+
+<img src="docs/images/afdian.png" alt="爱发电 · Cyletix" width="240">
+
 ## 鸣谢
 
 CyIME 用到了下面这些项目、数据和模型，感谢作者们的工作。安装包里的许可证全文和版权声明见 `app/src/main/assets/NOTICE.txt`、`app/src/main/assets/licenses/` 和各方案目录下的 NOTICE 文件；应用里在「设置 › 关于 › 鸣谢」和「开源许可证」。
