@@ -52,4 +52,4 @@ plugins:
   - version: 0.1.0
     downloadUrl:
     - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/translate-0.1.0.xipk
-      sha256: 1dae8c7261012fdd31b6c0028fcebb30a4f0ed88a81a18e48f51f041ba9bb784
+      sha256: fe4f1877a396a79162d90dbb1a4f2a640df378ee1f4aafa3a6a825e75b19befc
