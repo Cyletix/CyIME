@@ -1060,7 +1060,9 @@ internal fun KeyboardResizeOverlay(
                             rectBeforeSplit = current
                             currentOnPreviewRectChange(current.copy(left = bounds.left, right = bounds.right))
                         } else if (!splitMode) {
-                            rectBeforeSplit?.let { currentOnPreviewRectChange(it.copy(top = current.top, bottom = current.bottom)) }
+                            // 本次调节里开过分体就退回开之前的样子；一进来就是分体的，退回存着的非分体宽度和位置。
+                            (rectBeforeSplit ?: previewState.nonSplitRect)
+                                ?.let { currentOnPreviewRectChange(it.copy(top = current.top, bottom = current.bottom)) }
                             rectBeforeSplit = null
                         }
                     }
@@ -1394,6 +1396,8 @@ internal data class KeyboardResizePreviewState(
     val onSplitGapCommit: () -> Unit = {},
     /** 悬浮键盘本次调节中的旋转角；只在悬浮调节时有。 */
     val rotation: MutableFloatState? = null,
+    /** 存着的非分体位置（宿主 px）：本次调节开始时已是分体、关掉分体时退回这里；null 时不动。 */
+    val nonSplitRect: ResizeRect? = null,
 )
 
 internal val LocalKeyboardResizePreviewState = compositionLocalOf { KeyboardResizePreviewState() }

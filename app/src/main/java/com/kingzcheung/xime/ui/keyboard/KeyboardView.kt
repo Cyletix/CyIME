@@ -452,6 +452,29 @@ fun KeyboardView(
             horizontalOffsetPx = state.fixedOffsetX * resizeControlDensity.density,
             density = resizeControlDensity.density,
         )
+        // 调节里关掉分体时退回的非分体位置：分体期间服务不改存着的宽度和水平位置（见 onGeometryChange），
+        // 所以一进调节就是分体的也能退回原来的窄键盘。悬浮没存过宽度时为 null，保持原样。
+        val nonSplitPreviewRect = if (state.isFloatingMode)
+            (state.resizePreviewWidthDp.takeIf { it > 0 } ?: state.floatingWidthDp.takeIf { it > 0 })?.let { widthDp ->
+                floatingCardRect(
+                    hostWidthPx = hostWidthPx,
+                    hostHeightPx = hostHeightPx,
+                    widthPx = widthDp * resizeControlDensity.density,
+                    totalHeightPx = state.keyboardHeightDp * resizeControlDensity.density + dragBarPx,
+                    horizontalOffsetPx = state.floatingOffsetX * resizeControlDensity.density,
+                    bottomOffsetPx = state.floatingOffsetY * resizeControlDensity.density,
+                    minBottomInsetPx = minBottomPx,
+                )
+            }
+        else fixedKeyboardRect(
+            hostWidthPx, hostHeightPx,
+            state.keyboardHeightDp * resizeControlDensity.density,
+            state.keyboardBottomPaddingDp.coerceAtLeast(0) * resizeControlDensity.density,
+            fixedBottomInsetDp.coerceAtLeast(0) * resizeControlDensity.density,
+            widthPx = resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), state.fixedWidthDp) * resizeControlDensity.density,
+            horizontalOffsetPx = state.fixedOffsetX * resizeControlDensity.density,
+            density = resizeControlDensity.density,
+        )
         // 只在进入调节、切模式或视口变化时创建事务。主题/透明度/偏好监听不能重置它。
         val sessionKey = listOf(resizeActive, state.isFloatingMode, maxWidth, maxHeight, fixedBottomInsetDp,
             state.keyboardBottomPaddingDp)
@@ -2147,6 +2170,7 @@ fun KeyboardView(
                 splitGapPreview.value?.let { SettingsPreferences.setSplitGapFraction(splitContext, splitLandscape, it) }
             },
             rotation = if (state.isFloatingMode) resizeRotation else null,
+            nonSplitRect = nonSplitPreviewRect,
             controls = controls,
         )
     }
@@ -2172,6 +2196,7 @@ private fun KeyboardResizeControlsHost(
     onSplitGapChange: (Float) -> Unit,
     onSplitGapCommit: () -> Unit,
     rotation: androidx.compose.runtime.MutableFloatState?,
+    nonSplitRect: ResizeRect?,
     controls: @Composable () -> Unit,
 ) {
     // The controls and measured keyboard share one live rectangle.
@@ -2193,6 +2218,7 @@ private fun KeyboardResizeControlsHost(
         onSplitGapChange = onSplitGapChange,
         onSplitGapCommit = onSplitGapCommit,
         rotation = rotation,
+        nonSplitRect = nonSplitRect,
     )
     CompositionLocalProvider(
         LocalDensity provides density,

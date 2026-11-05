@@ -330,6 +330,51 @@ class ResizeOpacityPanelRenderTest {
         }
     }
 
+    /**
+     * 一进调节就是分体（两半贴边占满宽）：关掉分体退回存着的窄键盘宽度和位置，不把整屏宽留下（11-05 平板）；
+     * 本次调节里先开再关，退回开之前的样子。
+     */
+    @Test fun turningSplitOffRestoresTheSavedNarrowKeyboard() = checkSplitOff(startSplit = true)
+
+    @Test fun turningSplitOnThenOffRestoresTheKeyboardBeforeSplit() = checkSplitOff(startSplit = false)
+
+    private fun checkSplitOff(startSplit: Boolean) {
+        val bounds = ResizeRect(0f, 0f, 900f, 600f)
+        val narrow = ResizeRect(250f, 300f, 650f, 600f)
+        run {
+            val rect = mutableStateOf(if (startSplit) bounds.copy(top = 300f) else narrow)
+            val splitChanges = mutableListOf<Boolean>()
+            rule.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(Modifier.size(900.dp, 600.dp)) {
+                        val preview = KeyboardResizePreviewState(rect = rect.value, initialRect = rect.value, bounds = bounds,
+                            onRectChange = { rect.value = it },
+                            // 本次调节里开过分体时，开之前的样子优先于存着的非分体位置。
+                            nonSplitRect = if (startSplit) narrow.copy(top = 0f, bottom = 1f) else ResizeRect(100f, 0f, 500f, 1f))
+                        CompositionLocalProvider(LocalKeyboardResizePreviewState provides preview) {
+                            KeyboardResizeOverlay(300, 300, 0, false, onHeightChange = {}, onBottomPaddingChange = {},
+                                onOpacityChange = {}, onReset = {}, onConfirm = { _, _, _, _ -> }, onCancel = {},
+                                isSplitKeyboard = startSplit, onSplitKeyboardChange = { splitChanges += it })
+                        }
+                    }
+                }
+            }
+            val button = rule.onNodeWithTag("keyboard-resize-split-button", useUnmergedTree = true)
+            if (!startSplit) {
+                button.performClick()
+                rule.runOnIdle { assertEquals(listOf(true), splitChanges); assertEquals(0f, rect.value.left, 0.5f)
+                    assertEquals(900f, rect.value.right, 0.5f) }
+            }
+            button.performClick()
+            rule.runOnIdle {
+                assertEquals("startSplit=$startSplit", false, splitChanges.last())
+                assertEquals("startSplit=$startSplit left", narrow.left, rect.value.left, 0.5f)
+                assertEquals("startSplit=$startSplit right", narrow.right, rect.value.right, 0.5f)
+                assertEquals("startSplit=$startSplit keeps the height", 300f, rect.value.top, 0.5f)
+            }
+        }
+    }
+
     @Test fun draggingThePaddingHintUsesTheBottomHandleGesture() {
         val padding = mutableIntStateOf(36)
         var confirmedHeight = 0

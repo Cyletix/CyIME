@@ -245,11 +245,14 @@ internal fun rememberImeKeyboardCallbacks(
                 // incorporates automatic defaults; raw height preferences do not describe it.
                 val currentHeight = currentSize.height
                 val currentWidth = currentSize.width
+                // 分体时显示的是贴边占满的宽度，不是存着的非分体宽度：进调节时不拿它当起点，
+                // 否则确认（或在调节里关掉分体）会把窄键盘存成整屏宽（11-05 平板）。
+                val splitShown = service.splitKeyboardActive(s)
                 service.uiState.value = service.uiState.value.copy(
                     showKeyboardResize = true,
                     resizePreviewHeightDp = currentHeight,
-                    resizePreviewWidthDp = currentWidth,
-                    fixedWidthDp = if (s.isFloatingMode) s.fixedWidthDp else currentWidth,
+                    resizePreviewWidthDp = if (splitShown && s.isFloatingMode) s.floatingWidthDp else currentWidth,
+                    fixedWidthDp = if (s.isFloatingMode || splitShown) s.fixedWidthDp else currentWidth,
                     resizeInitialFloating = service.uiState.value.isFloatingMode,
                     resizeInitialSplit = SettingsPreferences.isSplitKeyboardEnabled(service),
                     resizeInitialX = service.uiState.value.floatingOffsetX,
