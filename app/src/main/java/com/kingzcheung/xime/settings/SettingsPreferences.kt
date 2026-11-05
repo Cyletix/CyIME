@@ -114,6 +114,8 @@ object SettingsPreferences {
     const val KEY_STT_PUNCTUATION_QUESTION = "stt_punctuation_question"
     const val KEY_STT_PUNCTUATION_TRAILING = "stt_punctuation_trailing"
     const val KEY_STT_ARABIC_NUMBERS = "stt_arabic_numbers"
+    const val KEY_STT_CORRECTIONS = "stt_corrections"
+    const val KEY_STT_CORRECTIONS_TEXT = "stt_corrections_text"
     const val KEY_STT_PILL_RESUME = "stt_pill_resume"
     const val KEY_STT_REMOTE_TYPING = "stt_remote_typing"
     const val KEY_STT_OTHER_AUDIO = "stt_other_audio"
@@ -995,6 +997,17 @@ object SettingsPreferences {
     fun isSttArabicNumbers(context: Context) = getPrefs(context).getBoolean(KEY_STT_ARABIC_NUMBERS, false)
     fun setSttArabicNumbers(context: Context, enabled: Boolean) =
         getPrefs(context).edit().putBoolean(KEY_STT_ARABIC_NUMBERS, enabled).apply()
+
+    /**
+     * 语音纠错：语音结果上屏前把用户列的错词换成正词(VoiceCorrections)。
+     * 别人提的需求(2026-11-04)，默认关；只是一次文字扫描，没有可测的性能开销，不登记。词表随设置一起备份。
+     */
+    fun isSttCorrections(context: Context) = getPrefs(context).getBoolean(KEY_STT_CORRECTIONS, false)
+    fun setSttCorrections(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_STT_CORRECTIONS, enabled).apply()
+    fun getSttCorrectionsText(context: Context): String = getPrefs(context).getString(KEY_STT_CORRECTIONS_TEXT, "").orEmpty()
+    fun setSttCorrectionsText(context: Context, text: String) =
+        getPrefs(context).edit().putString(KEY_STT_CORRECTIONS_TEXT, text).apply()
 
     /**
      * 开车连续语音：语音悬浮条听写时发出消息或离开输入框，回到同一应用的输入框自动接着听。

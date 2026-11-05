@@ -181,6 +181,8 @@ fun SpeechToTextSettingsContent(
 
             SettingsSection(title = "数字") { SpeechNumberSettings() }
 
+            SettingsSection(title = "纠错") { SpeechCorrectionSettings() }
+
             val scope = rememberCoroutineScope()
 
             if (OfflineAsrSettings.isSupported()) {
