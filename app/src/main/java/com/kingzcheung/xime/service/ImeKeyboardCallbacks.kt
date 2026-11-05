@@ -265,7 +265,10 @@ internal fun rememberImeKeyboardCallbacks(
             onSettings = { service.schemaController.openSettings() },
             onSettingsPage = { service.schemaController.openSettings(it) },
             onSwitchSchema = { schemaId -> if (service.inputReadiness.ticket() != null) service.schemaController.switchSchema(schemaId) },
-            onHandwritingExpand = { expanded -> service.uiState.value = service.uiState.value.copy(handwritingExpanded = expanded) },
+            onHandwritingExpand = { expanded ->
+                com.kingzcheung.xime.ui.keyboard.HandwritingFullscreenMemory.write(service, expanded)
+                service.uiState.value = service.uiState.value.copy(handwritingExpanded = expanded)
+            },
             onHandwritingToggle = { service.schemaController.toggleHandwriting() },
             onToggleSchemaSwitch = { sw -> service.sessionController.toggleSchemaSwitch(sw) },
             onHideKeyboard = { service.hideKeyboard() },

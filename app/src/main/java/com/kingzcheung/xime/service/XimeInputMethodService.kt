@@ -2063,9 +2063,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val handwritingExpanded = handwritingExpansion.active
                 val clipboardPanelOpen = clipboardPanelCanExpand(page, state.showKeyboardResize, state.isCompact)
                 val imagePanelExpanded = clipboardPanelOpen && state.clipboardImagesExpanded
-                androidx.compose.runtime.LaunchedEffect(isHandwritingMode) {
+                androidx.compose.runtime.LaunchedEffect(isHandwritingMode, state.isCompact, state.voiceCollapsed) {
                     if (!isHandwritingMode && uiState.value.handwritingExpanded)
                         uiState.value = uiState.value.copy(handwritingExpanded = false)
+                    // 切回手写、从工具栏或语音悬浮条回到键盘时按上次的全屏/半屏打开；收起状态下不动。
+                    else if (isInputViewShown) restoreHandwritingFullscreen()
                 }
                 val isDarkTheme = isDarkTheme()
                 val roundedKeyboardBottom = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardBottom()
@@ -3416,7 +3418,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.handwritingExpanded) {
-            if (event?.isCanceled != true) uiState.value = uiState.value.copy(handwritingExpanded = false)
+            if (event?.isCanceled != true) {
+                com.kingzcheung.xime.ui.keyboard.HandwritingFullscreenMemory.write(this, false)
+                uiState.value = uiState.value.copy(handwritingExpanded = false)
+            }
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_BACK && keyboardCallbacks?.onDismissPreeditEditor != null) {
@@ -3731,6 +3736,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 scheduleVoicePillResume()
             }
         }
+        restoreHandwritingFullscreen()
         applyWindowBackground()
         requestHardwareCursorUpdates()
         openPendingOcrPanel()
@@ -3739,6 +3745,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         com.kingzcheung.xime.gloss.CandidateGlossary.prepare(this)
         // 通讯录插件：启用且授权时后台读入（只在内存），关了就丢掉。
         com.kingzcheung.xime.contacts.ContactSuggestions.sync(this)
+    }
+
+    /** 手写上次是全屏就直接全屏打开（11-05）；首次和上次半屏都照旧半屏。 */
+    private fun restoreHandwritingFullscreen() {
+        val state = uiState.value
+        val handwritingPage = (keyboardViewModel.page.value.underlyingPage() as? KeyboardPage.Main)?.type ==
+            com.kingzcheung.xime.keyboard.MainType.HANDWRITING
+        if (!com.kingzcheung.xime.ui.keyboard.HandwritingFullscreenMemory.shouldRestore(
+                remembered = com.kingzcheung.xime.ui.keyboard.HandwritingFullscreenMemory.read(this),
+                handwritingPage = handwritingPage,
+                alreadyExpanded = state.handwritingExpanded,
+                compact = state.isCompact,
+                voiceCollapsed = state.voiceCollapsed,
+                resizing = state.showKeyboardResize,
+                settingsPreview = settingsPreviewEditor,
+            )) return
+        uiState.value = state.copy(handwritingExpanded = true)
     }
 
     private fun requestHardwareCursorUpdates() {
