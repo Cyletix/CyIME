@@ -3924,6 +3924,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }
                 }
+                // 状态栏底色也要透明（11-05 微信打开键盘时点图片预览，键盘收起前屏幕顶上有条黑线）：
+                // 系统给输入法窗口开了 FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS，状态栏底色默认是系统主题的不透明深色。
+                // 平时输入法窗口在状态栏下面，用不上；应用切到全屏（图片预览、视频）隐藏状态栏那一下，
+                // 输入法窗口先长到屏幕顶上、状态栏还没退完，系统就在窗口顶上画一条状态栏高的深色底，直到键盘收起。
+                win.statusBarColor = android.graphics.Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) win.isStatusBarContrastEnforced = false
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     win.decorView?.let { decor ->
                         val controller = androidx.core.view.WindowInsetsControllerCompat(win, decor)
