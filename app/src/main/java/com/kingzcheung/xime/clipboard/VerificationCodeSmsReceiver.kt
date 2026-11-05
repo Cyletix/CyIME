@@ -29,6 +29,8 @@ class VerificationCodeSmsReceiver : BroadcastReceiver() {
         }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         clipboard.setPrimaryClip(clip)
+        // 「验证码发到其他设备」开着才发，只发给已配对的设备，见 VerificationCodeRelay。
+        com.kingzcheung.xime.clipboard.sync.VerificationCodeRelay.send(context, code, System.currentTimeMillis())
     }
 
     companion object { const val CLIP_LABEL = "cyime_verification_code" }

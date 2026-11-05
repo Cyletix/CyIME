@@ -66,6 +66,12 @@ class ClipboardManager private constructor(private val context: Context) {
         internal const val SMS_CODE_LIFETIME_MS = 10 * 60_000L
         /** 候选栏只在短信到达后的 3 分钟内提示验证码；之后仍可从系统剪贴板粘贴，直到 10 分钟清掉。 */
         internal const val SMS_CODE_SUGGESTION_MS = 3 * 60_000L
+        /** 别的设备发来的验证码：剪贴板描述里记着几点清掉（System.currentTimeMillis），见 VerificationCodeRelay。 */
+        internal const val CODE_EXPIRES_EXTRA = "cyime.code_expires_at"
+
+        /** 验证码几点从剪贴板清掉：本机短信 10 分钟；别的设备发来的按它带的时间，最多也是 10 分钟。 */
+        internal fun smsCodeExpiresAt(timestamp: Long, expiresAt: Long): Long =
+            if (expiresAt > 0) minOf(expiresAt, timestamp + SMS_CODE_LIFETIME_MS) else timestamp + SMS_CODE_LIFETIME_MS
 
         /** 开着无痕时第一次复制的提示（剪贴板面板顶上另有一行同样意思的说明）。 */
         internal const val INCOGNITO_COPY_NOTICE =
@@ -235,7 +241,9 @@ class ClipboardManager private constructor(private val context: Context) {
                     if (clipData.description.label == VerificationCodeSmsReceiver.CLIP_LABEL && VerificationCodeExtractor.isCode(text)) {
                         // Automatic SMS codes stay in memory and never enter history or sync.
                         val timestamp = clipData.description.timestamp
-                        val remaining = timestamp + SMS_CODE_LIFETIME_MS - System.currentTimeMillis()
+                        val expiresAt = smsCodeExpiresAt(timestamp,
+                            clipData.description.extras?.getLong(CODE_EXPIRES_EXTRA, 0L) ?: 0L)
+                        val remaining = expiresAt - System.currentTimeMillis()
                         if (remaining <= 0) {
                             // 键盘进程中途被回收时定时器没跑，下次读到就补删。
                             expireSmsCode(timestamp)
@@ -246,7 +254,7 @@ class ClipboardManager private constructor(private val context: Context) {
                             if (smsCodeSuggested(timestamp, now)) {
                                 _verificationCode.value = ClipboardItem(text = text, timestamp = timestamp)
                                 handler.postDelayed({ dismissVerificationCode(timestamp) },
-                                    timestamp + SMS_CODE_SUGGESTION_MS - now)
+                                    minOf(timestamp + SMS_CODE_SUGGESTION_MS, expiresAt) - now)
                             }
                             handler.postDelayed({ expireSmsCode(timestamp) }, remaining)
                         }
@@ -873,6 +881,22 @@ class ClipboardManager private constructor(private val context: Context) {
     /** Text arriving from a paired device: the same as a copy, but filed as received in history. */
     fun copyReceivedToSystemClipboard(text: String) {
         androidClipboardManager.setPrimaryClip(ClipData.newPlainText(RECEIVED_CLIP_LABEL, text))
+    }
+
+    /**
+     * 已配对设备发来的验证码（「验证码发到其他设备」）：和本机短信验证码一样标成验证码、系统敏感内容，
+     * 所以不进历史、不再同步转发、候选栏提示；到 [ttlMs] 后还没换掉就清掉。
+     */
+    fun copyReceivedCodeToSystemClipboard(code: String, ttlMs: Long) {
+        val clip = ClipData.newPlainText(VerificationCodeSmsReceiver.CLIP_LABEL, code)
+        clip.description.extras = android.os.PersistableBundle().apply {
+            putBoolean("android.content.extra.IS_SENSITIVE", true)
+            putLong(CODE_EXPIRES_EXTRA, System.currentTimeMillis() + ttlMs)
+        }
+        androidClipboardManager.setPrimaryClip(clip)
+        // 键盘没在监听（不是当前输入法）时也要按时清掉。
+        val timestamp = runCatching { androidClipboardManager.primaryClipDescription?.timestamp }.getOrNull() ?: return
+        Handler(Looper.getMainLooper()).postDelayed({ expireSmsCode(timestamp) }, ttlMs)
     }
 
     fun copyImageUriToSystemClipboard(image: ClipboardImage) {

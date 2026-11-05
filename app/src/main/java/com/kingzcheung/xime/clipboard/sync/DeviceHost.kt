@@ -434,6 +434,12 @@ object DeviceHost {
                 }
                 Response(200, json(incoming, ClipboardClock.stampOf(incoming.hash) ?: stamp), incoming.hash)
             }
+            // 已配对设备发来的短信验证码：写进剪贴板标成验证码（不进历史、不转发），到时清掉。
+            method == "POST" && path == VerificationCodeRelay.PATH -> {
+                val (code, ttl) = VerificationCodeRelay.parse(JSONObject(body.toString(Charsets.UTF_8))) ?: return Response(400)
+                runBlocking(Dispatchers.Main) { ClipboardManager.getInstance(context).copyReceivedCodeToSystemClipboard(code, ttl) }
+                Response(200, JSONObject().put("v", 2))
+            }
             else -> Response(404)
         }
     }

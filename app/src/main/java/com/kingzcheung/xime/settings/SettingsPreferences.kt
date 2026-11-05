@@ -9,6 +9,11 @@ object SettingsPreferences {
     fun setSmsCodeEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean("sms_code_enabled", enabled).apply()
     }
+    /** 验证码发到已配对的电脑、手机、平板（默认关）。 */
+    fun isSmsCodeSyncEnabled(context: Context): Boolean = getPrefs(context).getBoolean("sms_code_sync_enabled", false)
+    fun setSmsCodeSyncEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean("sms_code_sync_enabled", enabled).apply()
+    }
     private const val PREFS_NAME = "kime_settings"
     const val KEY_ROUNDED_KEYBOARD_BOTTOM = "rounded_keyboard_bottom"
     fun roundedKeyboardBottom(context: Context): Boolean =

@@ -33,7 +33,8 @@ class VerificationCodePermissionTest {
         val scenario = rule.activityRule.scenario
         shadowOf(app).denyPermissions(RECEIVE_SMS)
         rule.setContent { MaterialTheme { VerificationCodeSettings() } }
-        val toggle = rule.onNode(isToggleable())
+        // 第一个开关是「新短信验证码自动复制」；下面还有「验证码发到其他设备」。
+        val toggle = rule.onAllNodes(isToggleable())[0]
         val warning = rule.onNodeWithText("未获得短信权限", substring = true)
         toggle.assertIsOff().performClick()
         rule.runOnIdle {
