@@ -43,7 +43,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("datetimeHints", 2)
     inputs.property("symbolNames", 1)
     inputs.property("greekLetters", 1)
-    inputs.property("unicodeCodes", 1)
+    inputs.property("unicodeCodes", 2)
     inputs.property("doublePinyinSentences", 1)
     inputs.property("shortcutOrder", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
@@ -223,7 +223,8 @@ val prepareChineseDictionaries by tasks.registering {
             yield(stamp)
         """.trimIndent().replace("\n", "\n        ")))
         // Unicode 码（雾凇 26 键大写 U 加十六进制，U2603 → ☃）：至少 4 位才出字符，U2、U23 这类不会被空格换成控制符、#；
-        // 「再打一位」的 16 个字只列到 3FFFF（U1f60 → 😀…），4 位码往后多是未分配码位，手机上显示成方框（U62fc 后面）。
+        // 「再打一位」的 16 个字只列手机字体有的：基本平面（U260 → ☀☁☂☃…）和表情（U1f60 → 😀😁😂…）；
+        // 别的 5 位码（U2603 后面的扩展 B 汉字、U62fc 后面的未分配码位）手机上是方框，不列。
         val unicodeLua = File(root, "lua/unicode.lua")
         val unicodeSource = unicodeLua.readText()
         val unicodeMinimum = "if ucodestr and #ucodestr > 1 then"
@@ -232,7 +233,7 @@ val prepareChineseDictionaries by tasks.registering {
             "Upstream unicode translator changed"
         }
         unicodeLua.writeText(unicodeSource.replace(unicodeMinimum, "if ucodestr and #ucodestr >= 4 then")
-            .replace(unicodeNext, "if code < 0x4000 then"))
+            .replace(unicodeNext, "if code < 0x1000 or (code >= 0x1f00 and code <= 0x1faf) then"))
         val corrector = File(root, "lua/corrector.lua")
         val source = corrector.readText()
         val commentGate = "if env.keep_comment then"
