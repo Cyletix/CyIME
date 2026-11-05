@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -402,18 +403,23 @@ internal fun ThemeKeyboardPreview(
                         )
                     }
 
-                    // Row 4: ?123 , 空格 中/En 确定
+                    // Row 4: 和真键盘默认底排一样（符号、数字是两个键）：!@# 123 ， 空格 。 地球 确定
+                    val bottom = com.kingzcheung.xime.ui.keyboard.QwertyBottomRowWeights.Standard
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        PreviewKey("?123", specialKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("，", keyColor, textColor, 0.8f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("空格", keyColor, textColor, 3f, fontSize = 9.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("中/En", specialKeyColor, specialTextColor, 0.8f, fontSize = 8.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("确定", enterKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        val keyPad = Modifier.padding(0.5.dp, 2.dp)
+                        PreviewKey("!@#", specialKeyColor, specialTextColor, bottom.mode, extraModifier = keyPad)
+                        PreviewKey("123", specialKeyColor, specialTextColor, bottom.mode, extraModifier = keyPad)
+                        PreviewKey("，", keyColor, textColor, bottom.punctuation, extraModifier = keyPad)
+                        PreviewKey("空格", keyColor, textColor, bottom.space - bottom.punctuation, fontSize = 9.sp, extraModifier = keyPad)
+                        PreviewKey("。", keyColor, textColor, bottom.punctuation, extraModifier = keyPad)
+                        PreviewKey("", specialKeyColor, specialTextColor, bottom.language,
+                            icon = rememberVectorPainter(Icons.Default.Language), extraModifier = keyPad)
+                        PreviewKey("确定", enterKeyColor, specialTextColor, bottom.enter, extraModifier = keyPad)
                     }
                 }
             }
