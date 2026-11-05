@@ -29,7 +29,8 @@ internal data class EditorFieldPolicy(
         }
         val accepted: (Char) -> Boolean = when (kind) {
             Kind.NUMBER_PASSWORD -> { c -> c in '0'..'9' }
-            Kind.NUMBER -> { c -> c in '0'..'9' || signed && c in "+-" || decimal && c in ".," }
+            // 小数点、逗号交给输入框自己判断：不少应用声明纯数字框，却自己接受小数（#92 Weex 价格框）。
+            Kind.NUMBER -> { c -> c in '0'..'9' || c in ".," || signed && c in "+-" }
             Kind.PHONE -> { c -> c in '0'..'9' || c in "+*#,; ()-.N" }
             Kind.DATE -> { c -> c in '0'..'9' || c in "/-. " }
             Kind.TIME -> { c -> c in '0'..'9' || c in ":. aApPmM" }

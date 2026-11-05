@@ -127,7 +127,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             // only handle key events. sendKeyChar sends digits as KEYCODE_0..9, as stock IMEs do,
             // and still commits any other character as text.
             if (service.currentInputConnection == null) return@withEditor false
-            literal.forEach(service::sendKeyChar)
+            // 数字框的小数点也按键发（KEYCODE_PERIOD）：只认按键的价格框收不到 commitText 的「.」（#92）。
+            val numberField = service.editorInputPolicy.field.kind == EditorFieldPolicy.Kind.NUMBER
+            literal.forEach { c ->
+                if (numberField && c == '.') service.sendDownUpKeyEvents(KeyEvent.KEYCODE_PERIOD)
+                else service.sendKeyChar(c)
+            }
             return@withEditor true
         }
         val committed = service.currentInputConnection?.commitText(literal, 1) == true

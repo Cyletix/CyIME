@@ -56,7 +56,9 @@ class EditorSessionInputPolicyTest {
             assertTrue(policy.locksNativeInput)
             assertEquals("7", policy.typedLiteral("7"))
             assertEquals(signed, policy.typedLiteral("-").isNotEmpty())
-            assertEquals(decimal, policy.typedLiteral(".").isNotEmpty())
+            // 小数点不看 decimal 标记：纯数字框是否收小数由输入框自己决定（#92）。
+            assertEquals(".", policy.typedLiteral("."))
+            assertEquals(",", policy.typedLiteral("，"))
             assertTrue(policy.typedLiteral("*").isEmpty())
             assertTrue(policy.typedLiteral("中").isEmpty())
         }
