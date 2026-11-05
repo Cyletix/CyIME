@@ -11,7 +11,13 @@ object BuiltinModelCatalog {
 
     val models = com.kingzcheung.xime.speech.SpeechModelCatalog.models + CandidateModelCatalog.models + listOf(
         ModelInfo("ochwpro", "手写模型", "本地手写识别模型。", ModelCategory.HANDWRITING,
-            versions = listOf(ModelVersion(version = "v1.0", size = "6.7 MB",
+            // v1.1：在 v1.0 上用用户贡献的手写样本微调（只改 100 个常用字的输出层），字表不变。最新的放第一个。
+            versions = listOf(ModelVersion(version = "v1.1", size = "6.7 MB",
+                files = listOf(
+                    ModelFile("ochwpro.onnx", "https://www.modelscope.cn/models/Cyletix/cyime-model/resolve/master/ochwpro-v1.1-ochwpro.onnx", "d625e6b6fa0dc39499bc15a8ac960249fcea9e71e34334522d32524557d1136d", 7001270L, mirrors = listOf(RELEASE + "ochwpro-v1.1-ochwpro.onnx")),
+                    ModelFile("char_index.json", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/char_index.json", "171cf2ac23731428ac9dd28f64be82dece5f66a0ca3d674ffb3b567b51532176", 51317L, mirrors = listOf(RELEASE + "ochwpro-v1.0-char_index.json")),
+                )),
+                ModelVersion(version = "v1.0", size = "6.7 MB",
                 files = listOf(
                     ModelFile("ochwpro.onnx", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/ochwpro.onnx", "eb04d62a314c7d7bac4e34d6ce0c24137474d30ff94b929115a621385420ce13", 7001270L, mirrors = listOf(RELEASE + "ochwpro-v1.0-ochwpro.onnx")),
                     ModelFile("char_index.json", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/char_index.json", "171cf2ac23731428ac9dd28f64be82dece5f66a0ca3d674ffb3b567b51532176", 51317L, mirrors = listOf(RELEASE + "ochwpro-v1.0-char_index.json")),

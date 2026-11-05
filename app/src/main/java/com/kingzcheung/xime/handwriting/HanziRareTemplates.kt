@@ -61,10 +61,20 @@ internal class HanziRareTemplates private constructor(
         /** 只比首位类落在查询前这么多类里的模板。 */
         const val BUCKET_TOP = 32
 
-        /** [meta] 的 model_sha256 与 [modelSha] 不一致（模型换了）或文件长度不对时返回 null；[modelSha] 为 null 时不核对。 */
+        /**
+         * 模板是不是按 [modelSha] 这个模型算的：model_sha256 相同，或写在 compatible_model_sha256 里
+         * （同一模型微调的旧版本，实测换用模板准确率不变，例如 ochwpro v1.0 与 v1.1）。
+         */
+        internal fun modelMatches(meta: JSONObject, modelSha: String): Boolean {
+            if (meta.optString("model_sha256").equals(modelSha, ignoreCase = true)) return true
+            val compatible = meta.optJSONArray("compatible_model_sha256") ?: return false
+            return (0 until compatible.length()).any { compatible.optString(it).equals(modelSha, ignoreCase = true) }
+        }
+
+        /** [meta] 与 [modelSha] 对不上（模型换了，见 [modelMatches]）或文件长度不对时返回 null；[modelSha] 为 null 时不核对。 */
         fun decode(meta: String, bin: ByteArray, modelSha: String?): HanziRareTemplates? {
             val o = JSONObject(meta)
-            if (modelSha != null && !o.optString("model_sha256").equals(modelSha, ignoreCase = true)) return null
+            if (modelSha != null && !modelMatches(o, modelSha)) return null
             val n = o.getInt("n")
             val count = o.getInt("count")
             val labels = o.getString("labels")

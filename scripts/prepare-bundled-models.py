@@ -25,6 +25,7 @@ def catalog():
             literal = re.match(r'"([^"]+)"', block)
             model_id = literal[1] if literal else constants.get(re.match(r'(\w+)', block)[1], '')
             version = re.search(r'ModelVersion\(version = "([^"]+)"', block)[1]
+            block = 'ModelVersion('.join(block.split('ModelVersion(')[:2])  # files of the first (newest) version only
             title = re.match(r'(?:"[^"]+"|\w+),\s*"([^"]+)"', block)
             files = [dict(name=n, url=u, sha256=s, size=int(z)) for n,u,s,z in
                      re.findall(r'ModelFile\("([^"]+)", "([^"]*)", "([^"]*)", (\d+)L[,)]', block)]  # files may list download mirrors after the size

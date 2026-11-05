@@ -195,7 +195,7 @@ object HandwritingTemplates {
      */
     internal fun decodePrecomputed(meta: String, bin: ByteArray, modelSha: String): List<Pair<String, Feature>>? {
         val o = JSONObject(meta)
-        if (!o.optString("model_sha256").equals(modelSha, ignoreCase = true)) return null
+        if (!HanziRareTemplates.modelMatches(o, modelSha)) return null
         val n = o.getInt("n")
         val labels = o.getJSONArray("labels")
         if (n <= 0 || bin.size != labels.length() * n * 4) return null

@@ -62,6 +62,10 @@ class HanziRareTemplatesTest {
         assertNull(HanziRareTemplates.decode(meta, bin, "def"))
         assertNull(HanziRareTemplates.decode(meta, bin.copyOf(bin.size - 1), "abc"))
         assertNotNull(HanziRareTemplates.decode(meta, bin, "ABC"))
+        // 声明兼容的旧模型（同一模型微调前的版本）照用，别的仍然拒绝
+        val compatible = org.json.JSONObject(meta).put("compatible_model_sha256", org.json.JSONArray().put("old")).toString()
+        assertNotNull(HanziRareTemplates.decode(compatible, bin, "OLD"))
+        assertNull(HanziRareTemplates.decode(compatible, bin, "def"))
     }
 
     @Test fun bundledTemplatesCoverStandardCharactersMissingFromTheModel() {
