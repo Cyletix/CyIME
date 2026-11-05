@@ -5,7 +5,7 @@ import com.kingzcheung.xime.plugin.core.config.IPluginConfigurable
 /**
  * 工具面板结果显示方式：宿主按插件元数据（manifest.capabilities.tool.display）决策
  * 结果交互（直接上屏 or 纯展示面板），插件侧不再返回。
- * manifest 取值小写：`direct` | `passive`（与 inputMode 风格一致）。
+ * manifest 取值小写：`direct` | `passive` | `live`（与 inputMode 风格一致）。
  */
 enum class ToolResult {
     /** 结果生成结束直接上屏（如 AI 翻译）。 */
@@ -19,6 +19,14 @@ enum class ToolResult {
      * （替代原 SELECT 全屏结果页，如 AI 智能回复）。
      */
     PASSIVE,
+
+    /**
+     * 键盘上方一行输入栏（翻译栏）：打的字进这一行，停手后宿主自动 `generate`，
+     * 生成中和生成完都把 items[0] 当作未确认的字（composing）写进应用输入框，再打字整段换掉；
+     * 回车或关栏时定下来。[ToolPanelState.ui] 的第一个 BUTTON 画成栏左边的圆钮（点了转给插件，
+     * 宿主随后重新生成），第一个 TEXT 当输入栏的提示。旧宿主不认，按未声明处理。
+     */
+    LIVE,
 }
 
 /**

@@ -382,6 +382,7 @@ internal fun rememberImeKeyboardCallbacks(
             onToolPanelClose = { service.closeToolPanel() },
             onToolPanelItemClick = { item -> service.commitToolPanelItem(item.text) },
             onToolPanelAction = { actionId -> service.dispatchToolPanelAction(actionId) },
+            onToolPanelTextChange = { text -> service.liveToolBar.onTextChanged(text) },
             onClipboardSearchOpen = { service.openClipboardSearch() },
             onClipboardTranslate = { text -> service.translateClipboardText(text) },
             clipboardTranslateAvailable = { service.clipboardTranslatePluginId() != null },

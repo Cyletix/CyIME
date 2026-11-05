@@ -156,6 +156,7 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
                 display = when (it.display?.lowercase()) {
                     "direct" -> com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT
                     "passive" -> com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
+                    "live" -> com.kingzcheung.xime.plugin.core.api.ToolResult.LIVE
                     // 旧契约 "select"（全屏结果页）已并入 passive（InfoPanel 内 items 点选上屏）
                     "select" -> com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
                     else -> null

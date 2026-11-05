@@ -1455,6 +1455,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 面板生成轮询任务（流式生成期间持续刷新候选）。 */
     private var toolPanelPollJob: Job? = null
 
+    /** 翻译栏这类 live 面板（manifest `display: live`）：停手后生成，结果写进输入框。 */
+    internal val liveToolBar by lazy { LiveToolBar(this) }
+
+    /** 打开面板时的输入框还在：面板结果才能写进去。 */
+    internal fun toolPanelEditorStillCurrent(): Boolean =
+        toolPanelAdmission?.let { inputReadiness.accepts(it) } == true
+
     /**
      * 插件工具栏按钮 action=open_panel 的宿主入口：打开该插件的通用面板。
      * 记录选区、按优先级收集上下文预填、向插件取初始面板状态并渲染。
@@ -1468,6 +1475,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return
         }
         closeQuickSend()
+        // 翻译栏开着又点了插件按钮：已经写进输入框的译文先定下来
+        if (uiState.value.toolPanelDisplay == ToolResult.LIVE.name) liveToolBar.close()
         // 打开面板前清理宿主输入框残留输入态（未上屏的拼音/英文），
         // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
         val pending = candidateState.value
@@ -1490,10 +1499,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         toolPanelSelection = if (sourceText != null) null else readCurrentSelection()
         toolPanelAdmission = inputReadiness.ticket()
+        val display = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == pluginId }?.capabilities?.tool?.display
+        val live = display == ToolResult.LIVE
         // AI 改写这类插件（manifest `context: field`）：没选字就改整个输入框，点结果时替换整框，不拿剪贴板。
         val wholeField = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.capabilities?.tool?.wholeField == true
+        // 翻译栏从空栏开始，译文写在光标处，不拿选区、剪贴板
+        if (live) toolPanelSelection = null
         val contextText = when {
+            live -> ""
             sourceText != null -> sourceText
             wholeField && toolPanelSelection == null ->
                 readWholeField()?.let { (text, range) -> toolPanelSelection = range; text } ?: ""
@@ -1501,8 +1516,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         val pluginName = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.name ?: pluginId
-        val display = ExtensionManager.getAllInstalledPlugins()
-            .firstOrNull { it.id == pluginId }?.capabilities?.tool?.display
+        if (live) liveToolBar.reset()
         val epoch = uiState.value.toolPanelRequestEpoch + 1
         uiState.value = uiState.value.copy(
             toolPanelVisible = true,
@@ -1514,7 +1528,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             toolPanelDisplay = display?.name,
             toolPanelUiNodes = null,
             toolPanelRequestEpoch = epoch,
-            enterKeyText = if (display == ToolResult.PASSIVE) "发送" else "生成",
+            enterKeyText = when (display) {
+                ToolResult.PASSIVE -> "发送"
+                ToolResult.LIVE -> "完成"
+                else -> "生成"
+            },
         )
         if (display == ToolResult.PASSIVE) {
             // 纯展示面板与表情/符号同级：Overlay 全屏覆盖键盘，不撑高候选栏上方区域
@@ -1619,6 +1637,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         toolPanelItems = state?.items ?: uiState.value.toolPanelItems,
                         toolPanelLoading = state?.loading ?: false,
                     )
+                    // 翻译栏换了目标语言：栏里的字按新设置重新生成
+                    if (uiState.value.toolPanelDisplay == ToolResult.LIVE.name) liveToolBar.retranslate()
                 }
             }
         }
@@ -1737,7 +1757,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         textCommit.selectClipboardItem(text)
     }
 
-    internal fun closeToolPanel() {        toolPanelSelection = null
+    internal fun closeToolPanel() {
+        // 翻译栏：写进输入框的译文留下（定下来），没译完的不再写
+        if (uiState.value.toolPanelDisplay == ToolResult.LIVE.name) liveToolBar.close()
+        toolPanelSelection = null
         toolPanelAdmission = null
         stopToolPanelPoll()
         // 面板相关 Overlay 页面（ToolPanel 纯展示页）开着时联动关闭
@@ -1804,6 +1827,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         if (uiState.value.toolPanelDisplay == TOOL_PANEL_EDITING_DISPLAY) {
             finishToolPanelEdit()
+            return
+        }
+        if (uiState.value.toolPanelDisplay == ToolResult.LIVE.name) {
+            // 翻译栏回车：等这句译完定下来，清空栏接着打下一句
+            liveToolBar.finish()
             return
         }
         // 使用前授权检测：插件有未授权网络域名时先引导授权，不发起请求
@@ -2143,12 +2171,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 不参与计算，否则 Overlay 页面会带上表单/工具面板的额外高度（容器整体被撑高）。
                 val isOverlayPage = page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay
                 // Clipboard editing uses a separate popup and does not resize the keyboard.
-                // 需与 ToolPanel.TOOL_PANEL_HEIGHT(170) 保持一致，否则容器比面板多/少一截，键盘被拉高。
+                // 与面板实际高度同一来源（toolPanelExtraHeight），否则容器比面板多/少一截，键盘被拉高。
                 // PASSIVE 纯展示面板走 Overlay 全屏覆盖（键盘窗口内容区），不撑高。
-                val toolPanelExtra = if (state.toolPanelVisible &&
-                    state.toolPanelDisplay != "PASSIVE" &&
-                    !isOverlayPage
-                ) 170 else 0
+                val toolPanelExtra = if (!isOverlayPage) com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
+                    state.toolPanelVisible, state.toolPanelDisplay) else 0
                 // Clipboard search adds its results and search panel above the keyboard like the tool panel.
                 val overlayPanelExtra = toolPanelExtra + com.kingzcheung.xime.ui.keyboard.clipboardSearchExtraHeight(
                     state.clipboardSearchVisible, isOverlayPage, clipboardSearchResultsHeight, clipboardSearchInline)
@@ -2969,8 +2995,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val contentHeight = if (clipboardPanelCanExpand(page, false, fixed.isCompact) && fixed.clipboardImagesExpanded)
             clipboardPanelBounds(normal.height, resources.configuration.screenHeightDp, clipboardBottom).expanded
             else normal.height
-        val toolExtra = if (fixed.toolPanelVisible && fixed.toolPanelDisplay != "PASSIVE" &&
-            page !is KeyboardPage.Overlay) 170 else 0
+        val toolExtra = if (page !is KeyboardPage.Overlay) com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
+            fixed.toolPanelVisible, fixed.toolPanelDisplay) else 0
         return KeyboardDockTarget(normal.width, contentHeight + toolExtra, normal.offsetX,
             fixed.keyboardBottomPaddingDp, bottom)
     }

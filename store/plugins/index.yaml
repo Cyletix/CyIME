@@ -42,3 +42,14 @@ plugins:
     downloadUrl:
     - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/ai-rewrite-0.1.0.xipk
       sha256: d8e9959d591dd50551fbde8d758b48f64c5df55ff45c629f6a7019f0c488aa23
+- id: com.kingzcheung.xime.plugin.translate
+  name: 翻译
+  description: 点键盘菜单里的「翻译」，键盘上方多一行输入栏：在栏里打中文，停一下，译文就写进聊天框，点应用的发送就行。左边圆钮换目标语言（英文、日文、韩文、中文）。用你自己的 OpenAI 兼容接口，密钥只存在手机里。
+  pluginType: tool
+  appVersion: '>=1.15.59'
+  currentVersion: 0.1.0
+  versions:
+  - version: 0.1.0
+    downloadUrl:
+    - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/translate-0.1.0.xipk
+      sha256: 1dae8c7261012fdd31b6c0028fcebb30a4f0ed88a81a18e48f51f041ba9bb784

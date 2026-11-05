@@ -361,7 +361,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             }
         }
 
-        if (updateInputBoxComposition &&
+        // 在键盘自己的输入栏里打字（翻译栏等）：编码在栏里，不去动应用输入框（翻译栏写在那里的译文是组合区，
+        // 这里收尾会把它定下来，下一次译文就接在后面了）。
+        if (updateInputBoxComposition && !service.uiState.value.toolPanelInputFocused &&
             TerminalEditor.inputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {

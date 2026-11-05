@@ -33,6 +33,15 @@ class ManifestParseTest {
     }
 
     @Test
+    fun `翻译插件的 manifest 声明 live 翻译栏`() {
+        val content = java.io.File("../plugins/translate/manifest.yaml").readText()
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("tool", config.type)
+        assertEquals(com.kingzcheung.xime.plugin.core.api.ToolResult.LIVE, config.capabilities?.tool?.display)
+        assertEquals("翻译", config.toolbarButtons.single().label)
+    }
+
+    @Test
     fun `正常 manifest 解析成功且字段正确`() {
         val content = """
             id: kaomoji

@@ -93,6 +93,13 @@ class XmlRegistryParseTest {
     }
 
     @Test
+    fun `live 翻译栏的能力声明重启后还在`() {
+        val xml = registryXml("{&quot;tool&quot;:{&quot;display&quot;:&quot;LIVE&quot;}}")
+
+        assertEquals(ToolResult.LIVE, XmlManager.parsePluginsXmlContent(xml).single().capabilities?.tool?.display)
+    }
+
+    @Test
     fun `旧注册表无 capabilities 节点时为 null`() {
         val plugin = XmlManager.parsePluginsXmlContent(registryXml(null)).single()
         assertNull(plugin.capabilities)

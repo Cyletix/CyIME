@@ -1,0 +1,33 @@
+# =============================================
+# CyIME Lua 插件元数据（宿主用 YAML 解析）
+# =============================================
+
+id: com.kingzcheung.xime.plugin.translate
+
+name: 翻译
+icon: "译"
+description: 点键盘菜单里的「翻译」，键盘上方多一行输入栏：在栏里打中文，停一下，译文就写进聊天框，点应用的发送就行。左边圆钮换目标语言（英文、日文、韩文、中文）。用你自己的 OpenAI 兼容接口，密钥只存在手机里。
+
+version: 0.1.0
+
+type: tool
+activation: multi
+
+entry: main.lua
+
+# 翻译栏（display: live）从这一版宿主起才有
+minHostVersion: 1.15.59
+
+toolbarButtons:
+  - id: com.kingzcheung.xime.plugin.translate:open
+    label: 翻译
+    action: open_panel
+
+# 接口地址由用户填写，域名在第一次使用时授权
+network:
+  allowCustomHosts: true
+
+capabilities:
+  tool:
+    # live：键盘上方一行输入栏，停手后自动翻译，译文写进输入框（未确认，再打字整段换掉）
+    display: live

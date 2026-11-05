@@ -123,6 +123,8 @@ data class KeyboardCallbacks(
      * 通用工具面板输入框焦点变化。
      */
     val onToolPanelFocusChange: ((Boolean) -> Unit)? = null,
+    /** 翻译栏（display: live）里的字变了。 */
+    val onToolPanelTextChange: ((String) -> Unit)? = null,
     /** Clipboard search bar: open (from the clipboard board), close, submit to the board, paste a result. */
     val onClipboardSearchOpen: (() -> Unit)? = null,
     val onClipboardSearchClose: (() -> Unit)? = null,

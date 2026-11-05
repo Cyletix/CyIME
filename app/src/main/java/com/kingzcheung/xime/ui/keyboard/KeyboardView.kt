@@ -867,7 +867,25 @@ fun KeyboardView(
 
             // ACTIVE 输入面板在候选栏上方（需要 EditText 输入，保留候选栏可见）；
             // PASSIVE 纯展示面板走 Overlay 全屏（KeyboardView 底部 Overlay 分支渲染 InfoPanel）
-            if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE") {
+            if (state.toolPanelVisible && state.toolPanelDisplay == "LIVE") {
+                // 翻译栏：一行，圆钮和提示由插件给（第一个按钮、第一段文字）
+                val nodes = state.toolPanelUiNodes.orEmpty()
+                val chip = nodes.firstOrNull { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.BUTTON }
+                val hintNode = nodes.firstOrNull { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.TEXT }
+                ToolPanelBar(
+                    chipLabel = chip?.label,
+                    hint = hintNode?.value ?: state.toolPanelTitle,
+                    isFocused = state.toolPanelInputFocused,
+                    isLoading = state.toolPanelLoading,
+                    textColor = keyTextColor,
+                    accentColor = accentColor,
+                    cardBgColor = keyBgColor,
+                    onChipClick = { chip?.key?.let { callbacks.onToolPanelAction?.invoke(it) } },
+                    onClose = { callbacks.onToolPanelClose?.invoke() },
+                    onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                    onTextChange = { text -> callbacks.onToolPanelTextChange?.invoke(text) },
+                )
+            } else if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE") {
                 ToolPanel(
                     title = state.toolPanelTitle,
                     isFocused = state.toolPanelInputFocused,
