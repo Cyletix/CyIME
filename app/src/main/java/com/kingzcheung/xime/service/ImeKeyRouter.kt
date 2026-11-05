@@ -89,6 +89,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 // Never read or retain a password in the clear/undo buffer.
                 service.lastClearedText = ""
                 service.lastClearedDocument = null
+                service.lastSwipeDelete = null
                 service.currentInputConnection?.let { connection ->
                     if (com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service).getBoolean(
                             com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)) {
@@ -1120,6 +1121,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val scope = ClearAllScope.of(hasInputState(candState), wholeField)
                     // 清的是焦点所在的框：键盘自己的输入框（新增固定等）有焦点时清它，不清后面应用的框。
                     service.lastClearedTarget = service.uiState.value.inputTarget
+                    // 清空比之前的左右滑删字新，撤回放回的是这次清空。
+                    service.lastSwipeDelete = null
                     if (!scope.field) {
                         service.lastClearedDocument = null
                         // 输入态：只清输入态（等价于 clear_composition），并记录 lastClearedText 供下滑撤回。
@@ -1186,7 +1189,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 下滑撤回 = 撤销"上滑清空"，仅空闲态有效（输入态恢复会插入错误位置），
                     // 判定与 clear_all 共用 hasInputState()。
                     // 只放回清掉它的那个框（应用的框 / 新增固定等键盘自己的框）。
-                    if (!hasInputState(candState) && service.lastClearedTarget == service.uiState.value.inputTarget) {
+                    // 左右滑删字之后也能撤回（别人 11-05 的需求）：它比清空新，先放回它；滑完改过输入框就不放。
+                    val swiped = service.lastSwipeDelete.takeUnless { hasInputState(candState) }
+                    if (swiped != null && withEditor { swiped.undo() }) {
+                        service.lastSwipeDelete = null
+                    } else if (!hasInputState(candState) && service.lastClearedTarget == service.uiState.value.inputTarget) {
                         val text = service.lastClearedText
                         val document = service.lastClearedDocument
                         if (document != null) withEditor {

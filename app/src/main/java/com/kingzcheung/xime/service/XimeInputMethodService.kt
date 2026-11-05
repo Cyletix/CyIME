@@ -634,6 +634,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     @Volatile internal var lastClearedDocument: ClearedDocument? = null
     /** 上面两样是从哪个输入框清掉的：下滑撤回只放回同一个框（应用的框清掉的字不能撤回到「新增固定」里）。 */
     internal var lastClearedTarget: InputTarget = InputTarget.Host
+    /** 最近一次删除键左右滑删了字的那次触摸；比 [lastClearedDocument] 新，撤回手势先放回它。 */
+    @Volatile internal var lastSwipeDelete: ImeDistanceBackspace? = null
     /** 累积的 partial commit 段列表（多段选词场景下逐段追加，文本+拼音同源，供调频/回滚） */
     internal val t9PartialSegments = mutableListOf<T9PartialSegment>()
     /** 键盘回调引用，用于在 RIME selectCandidate 前同步通知 T9 控制器 */
@@ -3608,6 +3610,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             voicePillResumeFieldAllowed()
         lastClearedText = ""
         lastClearedDocument = null
+        lastSwipeDelete = null
 
         // 旧组合区已在 onStartInput 开头脱离（重启输入时框架也会定格它），此处不再保留标记，
         // 避免 endComposingInputBox 对新连接执行 setComposingText("")（选中文字时等于删除选区）。

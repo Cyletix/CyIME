@@ -37,6 +37,8 @@ internal class DistanceDeleteScene {
     var clear = 0
     var undo = 0
     var pixelsPerDp = 1f
+    /** The last touch's edit, kept after release like XimeInputMethodService.lastSwipeDelete. */
+    var last: DistanceBackspace? = null
     fun reset() { field.setText(original); field.setSelection(original.length - 1) }
     @Composable fun Content() {
         pixelsPerDp = LocalDensity.current.density
@@ -48,7 +50,7 @@ internal class DistanceDeleteScene {
                 val ic = checkNotNull(field.onCreateInputConnection(EditorInfo()))
                 var edit: DistanceBackspace? = null
                 val apply: (Int) -> Unit = { signed ->
-                    if (edit == null) edit = DistanceBackspace.open(ic, forward = signed < 0)
+                    if (edit == null) edit = DistanceBackspace.open(ic, forward = signed < 0).also { last = it }
                     check(edit?.move(kotlin.math.abs(signed)) == true)
                 }
                 apply
@@ -135,6 +137,43 @@ class DistanceDeleteGestureTest {
             scene.field.setSelection(0)
             assertFalse(drag.move(0))
             assertEquals("甲e\u0301乙尾", scene.value)
+        }
+        rule.runOnIdle { assertEquals(0, scene.taps + scene.clear + scene.undo) }
+    }
+
+    @Test fun undoAfterReleasePutsTheSwipedTextBackWhereItWas() {
+        // 别人 11-05：左滑删字松手后，撤回手势（同清空后的撤回）放回删掉的字。
+        open()
+        key.performTouchInput { down(center) }; drag(-64); key.performTouchInput { up() }; text("甲尾")
+        rule.runOnIdle {
+            val edit = checkNotNull(scene.last)
+            assertTrue(edit.hasRemoved)
+            assertTrue(edit.move(0))
+            assertFalse(edit.hasRemoved)
+            assertEquals(scene.original, scene.value)
+            assertEquals(scene.original.length - 1, scene.field.selectionStart)
+            assertEquals(scene.original.length - 1, scene.field.selectionEnd)
+        }
+        // Right swipe: the text comes back after the caret and the caret does not move.
+        rule.runOnIdle { scene.field.setSelection(1) }
+        key.performTouchInput { down(center) }; drag(64); key.performTouchInput { up() }; text("甲尾")
+        rule.runOnIdle {
+            val edit = checkNotNull(scene.last)
+            assertTrue(edit.hasRemoved && edit.forward)
+            assertTrue(edit.move(0))
+            assertEquals(scene.original, scene.value)
+            assertEquals(1, scene.field.selectionStart); assertEquals(1, scene.field.selectionEnd)
+        }
+        // Swiping back to the start leaves nothing to undo.
+        rule.runOnIdle { scene.reset() }
+        key.performTouchInput { down(center) }; drag(-64); drag(-10); key.performTouchInput { up() }; text(scene.original)
+        rule.runOnIdle { assertFalse(checkNotNull(scene.last).hasRemoved) }
+        // Typing after the swipe refuses the undo instead of inserting somewhere else.
+        key.performTouchInput { down(center) }; drag(-64); key.performTouchInput { up() }; text("甲尾")
+        rule.runOnIdle {
+            scene.field.text.insert(scene.field.selectionStart, "新")
+            assertFalse(checkNotNull(scene.last).move(0))
+            assertEquals("甲新尾", scene.value)
         }
         rule.runOnIdle { assertEquals(0, scene.taps + scene.clear + scene.undo) }
     }

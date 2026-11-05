@@ -43,6 +43,8 @@ internal class DistanceBackspace private constructor(
     private var cut = if (forward) 0 else original.before.length
     val remainingContext get() = if (forward) original.before.toString() else original.before.subSequence(0, cut).toString()
     val removedUnits get() = if (forward) 0 else original.before.length - cut
+    /** 这次触摸现在还删着字（没滑回原处）：松手后可以用撤回手势放回。 */
+    val hasRemoved get() = cut != (if (forward) 0 else original.before.length)
 
     /** False permanently retires this gesture if the editor moved, changed or refused an edit. */
     fun move(count: Int): Boolean {

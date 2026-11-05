@@ -105,11 +105,12 @@ internal fun InputExperienceSettings(
             if (InputExperiencePart.DELETE in parts) {
             // 删除键的几种行为放一组（11-01，B站评论找「删除跳过候选」找不到）：原来分在「角标与长按」和「智能联想」两页。
             val clearSwipe = if (settings.reverseSymbolSwipe) "上滑" else "下滑"
+            val undoSwipe = if (settings.reverseSymbolSwipe) "下滑" else "上滑"
             divider()
             Row(Modifier.settingsSearchAnchor("左右滑动删除", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("左右滑动删除", style = MaterialTheme.typography.titleSmall)
-                    Text("按住删除键左滑删光标前的字、右滑删光标后的字，滑得越远删得越多，往回滑补回。",
+                    Text("按住删除键左滑删光标前的字、右滑删光标后的字，滑得越远删得越多，往回滑补回；松手后${undoSwipe}删除键撤回。",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.swipeDistanceDelete, colors = settingsSwitchColors(),

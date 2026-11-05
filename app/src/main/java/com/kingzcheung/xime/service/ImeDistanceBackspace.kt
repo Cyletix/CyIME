@@ -76,6 +76,9 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
                     val cs = service.candidateState.value
                     if (!current() || cs.isComposing || cs.inputText.isNotEmpty() || cs.preeditText.isNotEmpty() ||
                         service.editorConnection() !== ic || !text.move(count)) { invalid = true; return@withContext }
+                    // 松手后用撤回手势（同上滑清空后的下滑撤回）放回这次滑掉的字；滑回原处就没有可撤回的。
+                    if (text.hasRemoved) service.lastSwipeDelete = this@ImeDistanceBackspace
+                    else if (service.lastSwipeDelete === this@ImeDistanceBackspace) service.lastSwipeDelete = null
                     // Text before the caret is untouched: keep prediction, association and English state.
                     // 键盘自己的输入框不进联想上下文（和在里面上屏一样）。
                     if (text.forward || internal) return@withContext
@@ -88,6 +91,22 @@ internal class ImeDistanceBackspace(private val service: XimeInputMethodService,
                 }
             }
         }
+    }
+
+    /**
+     * 撤回这次左右滑删掉的字，放回原位、光标回到滑之前的位置（别人 11-05 的需求）。
+     * 只在同一个输入框、滑完后没再改过时放回（[DistanceBackspace.move] 自己核对光标和两边的字）。
+     * 在主线程、输入队列里调用，滑动的删字任务都已做完。
+     */
+    fun undo(): Boolean {
+        val text = document ?: return false
+        if (!text.hasRemoved || ic == null || !current() || service.editorConnection() !== ic || !text.move(0)) return false
+        invalid = true
+        if (!text.forward && !internal) {
+            service.predictionManager.invalidatePendingPredictions()
+            service.predictionManager.replaceCommittedText(text.remainingContext)
+        }
+        return true
     }
 }
 
