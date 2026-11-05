@@ -38,7 +38,8 @@ class KeyboardDefaultGeometryTest {
     }
 
     @Test fun wideOrShortWindowsNarrowAndCenterInsteadOfStretching() {
-        for ((width, height) in listOf(1493 to 934, 2200 to 700, 960 to 600, 800 to 393)) {
+        // Phone landscape (about 393dp tall) now fills the width: see phoneLandscapeFillsWidthWithWideCaps.
+        for ((width, height) in listOf(1493 to 934, 2200 to 700, 960 to 600, 960 to 552)) {
             val defaults = LetterKeyboardDefaults(height)
             val size = defaultLetterKeyboardSize(width, width, defaults)
             val cap = caps(size, defaults)
@@ -196,7 +197,9 @@ class KeyboardDefaultGeometryTest {
             maximumHeightDp = 393)
         val left = defaultLetterKeyboardSize(832, 832, defaults)
         val right = defaultLetterKeyboardSize(833, 833, defaults)
-        assertEquals(left, right)
+        // Was a 4dp jump at this width; phone landscape now fills it, so one dp more is one dp wider.
+        assertTrue("$left -> $right", right.width - left.width in 0..1)
+        assertEquals(left.height, right.height)
         assertTrue(right.height <= 228) // Existing narrow-window minimum is the only 50% exception.
     }
 
@@ -211,6 +214,58 @@ class KeyboardDefaultGeometryTest {
                 assertTrue("$density/$xDpi $width x $height -> $size", size.height <= height / 2)
                 assertTrue(size.width in 1..width)
                 assertEquals(size, defaultLetterKeyboardSize(width, size.width, defaults))
+            }
+        }
+    }
+
+    /** 11-05: phone landscape fills the width at the same 228dp height (his screenshot about 760x228);
+     * caps get wider than tall instead of the keyboard narrowing to about 459dp and centering. */
+    @Test fun phoneLandscapeFillsWidthWithWideCaps() {
+        for (height in listOf(320, 340, 360, 384, 393, 412, 430))
+            for (width in listOf(640, 700, 760, 780, 823, 860, 915))
+                for (pitch in listOf(null, calibratedPitch, KeyboardPhysicalMetrics.from(2.8125f, 500f)!!
+                    .dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM))) {
+                    val defaults = LetterKeyboardDefaults(height, calibratedMaxCellWidthDp = pitch,
+                        maximumHeightDp = pitch?.let { keyboardHeightBounds(height, true).last.coerceAtMost(height) })
+                    val size = defaultLetterKeyboardSize(width, width, defaults)
+                    assertEquals("$width x $height / $pitch", ProtectedKeyboardSize(width, 228, 0), size)
+                    val cap = caps(size, defaults)
+                    assertTrue("$width x $height: $cap", cap.first > cap.second)
+                    assertTrue("$width x $height: $cap", cap.first / cap.second <= DEFAULT_WIDE_CAP_ASPECT + 0.05f)
+                    assertEquals(size, defaultLetterKeyboardSize(width, size.width, defaults))
+                }
+    }
+
+    /** Tablets, phone portrait and 8-inch tablet landscape keep the square rule exactly. */
+    @Test fun squareRuleIsExactFromTheUpperAnchorUp() {
+        for (height in DEFAULT_SQUARE_CAP_HEIGHT_DP.toInt()..2400) assertEquals(1f, defaultLetterCapAspect(height))
+        for (height in 0..DEFAULT_WIDE_CAP_FULL_HEIGHT_DP.toInt())
+            assertEquals(DEFAULT_WIDE_CAP_ASPECT, defaultLetterCapAspect(height))
+        var previous = defaultLetterCapAspect(0)
+        for (height in 1..2400) {
+            val next = defaultLetterCapAspect(height)
+            assertTrue(next <= previous)
+            assertTrue("$height", previous - next <= 0.025f)
+            previous = next
+        }
+        val tablet = LetterKeyboardDefaults(862, calibratedMaxCellWidthDp = calibratedPitch,
+            maximumHeightDp = keyboardHeightBounds(862, true).last)
+        assertEquals(ProtectedKeyboardSize(1000, 431, 0), defaultLetterKeyboardSize(1493, 1493, tablet))
+        assertEquals(ProtectedKeyboardSize(934, 404, 0),
+            defaultLetterKeyboardSize(934, 934, LetterKeyboardDefaults(1421)))
+    }
+
+    /** Growing only the available height (phone landscape -> tablet) narrows the default smoothly. */
+    @Test fun availableHeightSweepHasNoPhoneTabletStep() {
+        for (width in listOf(800, 960, 1200)) for (pitch in listOf(null, calibratedPitch)) {
+            fun at(height: Int) = defaultLetterKeyboardSize(width, width, LetterKeyboardDefaults(height,
+                calibratedMaxCellWidthDp = pitch, maximumHeightDp = pitch?.let { height }))
+            var previous = at(300)
+            for (height in 301..1600) {
+                val next = at(height)
+                assertTrue("$width/$pitch $height: $previous -> $next", kotlin.math.abs(next.width - previous.width) <= 12)
+                assertTrue("$width/$pitch $height: $previous -> $next", kotlin.math.abs(next.height - previous.height) <= 1)
+                previous = next
             }
         }
     }

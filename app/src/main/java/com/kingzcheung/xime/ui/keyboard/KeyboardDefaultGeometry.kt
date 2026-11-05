@@ -34,6 +34,22 @@ internal fun letterKeyboardDefaults(
     return LetterKeyboardDefaults(availableHeightDp, x, y, floating, pitch, maximumHeightDp)
 }
 
+/** 默认字母键帽最多能比方形宽几倍, 按可用高度连续变化 (用户 11-05: 手机横屏铺满, 平板不变)。
+ * 可用高度 ≤ [DEFAULT_WIDE_CAP_FULL_HEIGHT_DP] (手机横屏) 允许 [DEFAULT_WIDE_CAP_ASPECT] 倍,
+ * ≥ [DEFAULT_SQUARE_CAP_HEIGHT_DP] (平板横竖屏、手机竖屏、8 寸平板横屏) 恰好 1 倍, 与原来的方形规则逐位相同;
+ * 中间用 smoothstep 过渡, 没有台阶。只影响自动默认尺寸, 手动尺寸不经过这里。 */
+internal fun defaultLetterCapAspect(availableHeightDp: Int): Float {
+    val t = ((availableHeightDp - DEFAULT_WIDE_CAP_FULL_HEIGHT_DP) /
+        (DEFAULT_SQUARE_CAP_HEIGHT_DP - DEFAULT_WIDE_CAP_FULL_HEIGHT_DP)).coerceIn(0f, 1f)
+    if (t >= 1f) return 1f
+    val square = t * t * (3f - 2f * t)
+    return DEFAULT_WIDE_CAP_ASPECT + (1f - DEFAULT_WIDE_CAP_ASPECT) * square
+}
+
+internal const val DEFAULT_WIDE_CAP_ASPECT = 2.2f
+internal const val DEFAULT_WIDE_CAP_FULL_HEIGHT_DP = 440f
+internal const val DEFAULT_SQUARE_CAP_HEIGHT_DP = 520f
+
 /** A 56dp minimum row keeps a narrow keyboard usable. Once width permits, letter caps
  * become square. A measured physical pitch bounds calibrated QWERTY defaults; unknown
  * displays keep the original 88dp cap and 45% default-height budget. A calibrated target
@@ -58,6 +74,7 @@ internal fun defaultLetterKeyboardSize(
     if (heightBudget < 56f) return ProtectedKeyboardSize(preferred, heightBudget.toInt(), 0)
     val minRow = ((heightBudget - 52f) / 4f).coerceIn(1f, 56f)
     val policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE)
+    val capAspect = defaultLetterCapAspect(availableHeight)
 
     fun geometry(width: Float): Pair<Float, Float> {
         val cellWidth = ((width - 16f) / 10f).coerceAtLeast(1f)
@@ -72,7 +89,7 @@ internal fun defaultLetterKeyboardSize(
             val gapY = defaults.spacingY?.takeUnless { it == KeyVisualPolicy.DeclaredDefaultGap }
                 ?: ((metrics.insetY ?: 0f) * 2f)
             capWidth = (cellWidth - gapX).coerceAtLeast(1f)
-            rowHeight = maxOf(minRow, capWidth + gapY)
+            rowHeight = maxOf(minRow, capWidth / capAspect + gapY)
         }
         return capWidth to (52f + rowHeight * 4f)
     }
