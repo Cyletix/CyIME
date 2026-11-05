@@ -280,6 +280,10 @@ public final class ChatReplay {
         }
         engine.nativeT9ClearComposition(1);
         engine.nativeT9FlushRimeInput();
+        // "left_context": text committed before the composition, as the app passes it from the editor (2026-11-05:
+        // 58333 after 精防肩撞就 gave 觉的). Cases without it leave the engine's context untouched.
+        String leftContext = item.optString("left_context", null);
+        if (leftContext != null) engine.nativeSetT9LeftContext(leftContext);
         if (variant.startsWith("letters")) engine.nativeSetInput("");  // 26-key schemas have no T9 processor
         StringBuilder typed = new StringBuilder();
         StringBuilder sentKeys = new StringBuilder();
@@ -330,6 +334,7 @@ public final class ChatReplay {
         // "select": [4, 0] picks those candidates in turn (a phrase made of several picks is learned as one).
         org.json.JSONArray picks = item.optJSONArray("select");
         if (picks != null) for (int k = 0; k < picks.length(); k++) engine.nativeSelectCandidateByGlobalIndex(picks.getInt(k));
+        if (leftContext != null) engine.nativeSetT9LeftContext(null);
     }
 
     private JSONObject settle() throws Exception {
