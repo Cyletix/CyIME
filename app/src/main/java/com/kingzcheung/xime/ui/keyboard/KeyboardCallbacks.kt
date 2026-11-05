@@ -129,6 +129,9 @@ data class KeyboardCallbacks(
     val onClipboardSearchSubmit: (() -> Unit)? = null,
     val onClipboardSearchSelect: ((String) -> Unit)? = null,
     val onClipboardSearchImageSelect: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
+    /** 剪贴板长按「翻译」：用 AI 改写翻这条记录；[clipboardTranslateAvailable] 为 false 时菜单里没有这一项。 */
+    val onClipboardTranslate: ((String) -> Unit)? = null,
+    val clipboardTranslateAvailable: () -> Boolean = { false },
     val onKeyboardModeChange: ((Boolean) -> Unit)? = null,
     val onDismissDeploying: (() -> Unit)? = null,
     val onFloatingModeChange: ((Boolean) -> Unit)? = null,

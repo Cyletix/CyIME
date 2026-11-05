@@ -71,6 +71,8 @@ internal fun ConnectedClipboardBoard(
     onAddPinned: (() -> Unit)? = null, onEditText: ((Long, String, String) -> Unit)? = null,
     onRecognizeDocument: (() -> Unit)? = null,
     onOpenSearch: (() -> Unit)? = null,
+    /** 长按菜单的「翻译」：交给 AI 改写的翻译；null（没装或没开 AI 改写）不显示这一项。 */
+    onTranslateText: ((String) -> Unit)? = null,
     /** The search view above the keyboard hands its query on to the board when Enter is pressed. */
     keepQueryOnDispose: Boolean = false,
     /** The keyboard search field, typed live (composition included); null when the board is not searching from it. */
@@ -170,7 +172,7 @@ internal fun ConnectedClipboardBoard(
             .putExtra("pick_image", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
         onSystemPaste = onSystemPaste, onShare = onImageShare, onPullRemote = onPullRemote, modifier = modifier,
         onAddPinned = onAddPinned, onEditText = onEditText, onDismissFailure = store::clearPasteFailure,
-        onRecognizeDocument = onRecognizeDocument,
+        onRecognizeDocument = onRecognizeDocument, onTranslateText = onTranslateText,
         unpinnedTextTotal = unpinnedTotal, onLoadMore = { if (searchResults == null) manager.loadMoreHistory() },
         onClearUnpinned = { images ->
             // Clearing means all unfixed history in the database, not only the pages read so far.
@@ -235,6 +237,8 @@ internal fun ClipboardBoardView(
     onAddPinned: (() -> Unit)? = null, onEditText: ((Long, String, String) -> Unit)? = null,
     onDismissFailure: () -> Unit = {},
     onRecognizeDocument: (() -> Unit)? = null,
+    /** 长按菜单的「翻译」；null 不显示。密码记录没有这一项。 */
+    onTranslateText: ((String) -> Unit)? = null,
     /** Unfixed text records in the whole history; -1 when only [textItems] is known. */
     unpinnedTextTotal: Int = -1,
     onLoadMore: () -> Unit = {},
@@ -650,6 +654,8 @@ internal fun ClipboardBoardView(
                     editText?.let { edit -> add(LongPressMenuEntry(Icons.Default.Edit, "编辑") {
                         edit(card.item.id, card.item.text, card.item.code)
                     }) }
+                    onTranslateText?.let { translate -> add(LongPressMenuEntry(Icons.Default.Translate, "翻译",
+                        tag = "clipboard-item-translate") { translate(card.item.text) }) }
                 }
                 add(LongPressMenuEntry(Icons.Default.DoneAll, "多选") {
                     selecting = true; selected = setOf(card.key)

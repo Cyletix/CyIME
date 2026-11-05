@@ -211,6 +211,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         private const val DARK_MODE_SYSTEM = 2
         private const val HARDWARE_CANDIDATE_BAR_HEIGHT = 72
         internal const val SAFE_TEXT_LIMIT = 262144
+        /** 剪贴板长按「翻译」交给的插件（AI 改写，它有「翻译」动作 `mode:translate`）。 */
+        internal const val CLIPBOARD_TRANSLATE_PLUGIN_ID = "com.kingzcheung.xime.plugin.ai_rewrite"
 
     }
 
@@ -1456,11 +1458,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /**
      * 插件工具栏按钮 action=open_panel 的宿主入口：打开该插件的通用面板。
      * 记录选区、按优先级收集上下文预填、向插件取初始面板状态并渲染。
+     *
+     * [sourceText]：面板的原文用这段字（剪贴板长按「翻译」），不取选区、输入框和剪贴板；点结果插到光标处，
+     * 不替换输入框里原有的字。[startAction]：面板打开后自动点这个动作（如 `mode:translate`）。
      */
-    internal fun openToolPanel(pluginId: String) {
-        if (uiState.value.isFloatingMode ||
-            resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
-        ) {
+    internal fun openToolPanel(pluginId: String, sourceText: String? = null, startAction: String? = null) {
+        if (toolPanelBlocked()) {
             Toast.makeText(this, "工具面板不支持在悬浮/横屏模式下使用", Toast.LENGTH_SHORT).show()
             return
         }
@@ -1485,14 +1488,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 hasPrevPage = false
             )
         }
-        toolPanelSelection = readCurrentSelection()
+        toolPanelSelection = if (sourceText != null) null else readCurrentSelection()
         toolPanelAdmission = inputReadiness.ticket()
         // AI 改写这类插件（manifest `context: field`）：没选字就改整个输入框，点结果时替换整框，不拿剪贴板。
         val wholeField = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.capabilities?.tool?.wholeField == true
-        val contextText = if (wholeField && toolPanelSelection == null) {
-            readWholeField()?.let { (text, range) -> toolPanelSelection = range; text } ?: ""
-        } else collectToolPanelContext()
+        val contextText = when {
+            sourceText != null -> sourceText
+            wholeField && toolPanelSelection == null ->
+                readWholeField()?.let { (text, range) -> toolPanelSelection = range; text } ?: ""
+            else -> collectToolPanelContext()
+        }
         val pluginName = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.name ?: pluginId
         val display = ExtensionManager.getAllInstalledPlugins()
@@ -1539,8 +1545,29 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     editor.setText(prefill)
                     editor.setSelection(prefill.length)
                 }
+                startAction?.let { dispatchToolPanelAction(it) }
             }
         }
+    }
+
+    /** 悬浮键盘、横屏下工具面板不开（面板高度按竖屏固定键盘算）。 */
+    private fun toolPanelBlocked(): Boolean = uiState.value.isFloatingMode ||
+        resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
+
+    /**
+     * 剪贴板长按「翻译」用的插件：装着并开着的 AI 改写（它的「翻译」动作，用户自己的接口）。
+     * 没有，或者现在开不了工具面板（悬浮、横屏），就返回 null，长按菜单里不显示「翻译」。
+     */
+    internal fun clipboardTranslatePluginId(): String? = CLIPBOARD_TRANSLATE_PLUGIN_ID.takeIf { id ->
+        !toolPanelBlocked() && SettingsPreferences.isPluginEnabled(this, id) &&
+            ExtensionManager.getAllInstalledPlugins().any { it.id == id }
+    }
+
+    /** 剪贴板长按「翻译」：打开 AI 改写，原文是这条记录，自动翻译；点译文插到光标处。 */
+    internal fun translateClipboardText(text: String) {
+        val pluginId = clipboardTranslatePluginId() ?: return
+        if (text.isBlank()) return
+        openToolPanel(pluginId, sourceText = text, startAction = "mode:translate")
     }
 
     /**

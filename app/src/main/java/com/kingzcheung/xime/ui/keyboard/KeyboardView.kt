@@ -1944,6 +1944,7 @@ fun KeyboardView(
                         onCollapseImages = callbacks.onCollapseClipboardImages,
                         onRecognizeDocument = { viewModel.showOverlay(OverlayRoute.Ocr) },
                         onOpenSearch = callbacks.onClipboardSearchOpen,
+                        onTranslateText = callbacks.onClipboardTranslate?.takeIf { callbacks.clipboardTranslateAvailable() },
                     )
                     is OverlayRoute.ToolbarCustomize -> ToolbarCustomizeView(
                         toolbarButtons = state.toolbarButtons,

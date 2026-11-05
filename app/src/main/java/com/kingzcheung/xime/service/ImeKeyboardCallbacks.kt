@@ -383,6 +383,8 @@ internal fun rememberImeKeyboardCallbacks(
             onToolPanelItemClick = { item -> service.commitToolPanelItem(item.text) },
             onToolPanelAction = { actionId -> service.dispatchToolPanelAction(actionId) },
             onClipboardSearchOpen = { service.openClipboardSearch() },
+            onClipboardTranslate = { text -> service.translateClipboardText(text) },
+            clipboardTranslateAvailable = { service.clipboardTranslatePluginId() != null },
             onClipboardSearchClose = { service.closeClipboardSearch(openBoard = true) },
             onClipboardSearchSubmit = { service.submitClipboardSearch() },
             onClipboardSearchSelect = { text -> service.selectClipboardSearchResult(text) },
