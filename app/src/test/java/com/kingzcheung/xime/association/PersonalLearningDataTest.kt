@@ -25,6 +25,66 @@ class PersonalLearningDataTest {
         assertEquals(.1f, trie.getFrequency(listOf("你", "们")), .00001f)
         assertTrue(trie.next(listOf("我")).isEmpty())
     }
+    @Test fun editableExportRoundTripsAndDeletingALineRemovesThatEntry() {
+        val data = PersonalLearningData(
+            bigrams = listOf(LearnedSequence(listOf("你", "好"), 3), LearnedSequence(listOf("我", "们"), 5),
+                LearnedSequence(listOf("\n", "\""), 1)),
+            trigrams = listOf(LearnedSequence(listOf("我", "们", "的"), 2)),
+            recentInputs = listOf("我", "们"), profileName = "自用 \"方案\"",
+            continuations = listOf(PersonalContinuation("我想", "看看", 12), PersonalContinuation("想", "问问", 2)))
+        val text = data.encodeForEditing()
+        assertEquals(data, PersonalLearningData.decode(text))
+        assertEquals(PersonalLearningData(), PersonalLearningData.decode(PersonalLearningData().encodeForEditing()))
+        // 每条一行：在电脑上删掉一行 (不是最后一行) 就删掉这一条，其余不变。
+        val lines = text.lines()
+        val target = lines.single { "tokens" in it && "[\"我\",\"们\"]" in it }
+        val edited = PersonalLearningData.decode(lines.filterNot { it == target }.joinToString("\n"))
+        assertEquals(data.copy(bigrams = data.bigrams.filterNot { it.tokens == listOf("我", "们") }), edited)
+        val profileLine = lines.single { "看看" in it }
+        assertEquals(data.continuations.drop(1),
+            PersonalLearningData.decode(lines.filterNot { it == profileLine }.joinToString("\n")).continuations)
+    }
+    @Test fun addImportKeepsLocalLearningAndIsIdempotent() {
+        val local = PersonalLearningData(
+            bigrams = listOf(LearnedSequence(listOf("你", "好"), 5), LearnedSequence(listOf("我", "们"), 2)),
+            trigrams = listOf(LearnedSequence(listOf("我", "们", "的"), 2)),
+            recentInputs = listOf("好"), profileName = "",
+            continuations = listOf(PersonalContinuation("我想", "看看", 3)))
+        val imported = PersonalLearningData(
+            bigrams = listOf(LearnedSequence(listOf("你", "好"), 2), LearnedSequence(listOf("我", "们"), 9), LearnedSequence(listOf("大", "家"), 4)),
+            recentInputs = listOf("家"), profileName = "自用",
+            continuations = listOf(PersonalContinuation("我想", "看看", 1), PersonalContinuation("想", "问问", 6)))
+        val merged = local.mergedWith(imported)
+        assertEquals(listOf(LearnedSequence(listOf("你", "好"), 5), LearnedSequence(listOf("我", "们"), 9),
+            LearnedSequence(listOf("大", "家"), 4)), merged.bigrams)
+        assertEquals(local.trigrams, merged.trigrams)
+        assertEquals(local.recentInputs, merged.recentInputs)
+        assertEquals("自用", merged.profileName)
+        assertEquals(listOf(PersonalContinuation("我想", "看看", 3), PersonalContinuation("想", "问问", 6)), merged.continuations)
+        assertEquals(merged, merged.mergedWith(imported))
+        assertEquals(merged, PersonalLearningData.decode(merged.encodeForEditing()))
+        // 没有语料方案的文件不换掉本机语料方案的同一份列表，保存时不必重写语料文件。
+        assertSame(local.continuations, local.mergedWith(imported.copy(continuations = emptyList())).continuations)
+    }
+    @Test fun addImportStaysWithinStoredLimits() {
+        val many = (0 until PersonalLearningData.MAX_PROFILE_ENTRIES).map { PersonalContinuation("词$it", "接", 1) }
+        val merged = PersonalLearningData(continuations = many)
+            .mergedWith(PersonalLearningData(continuations = listOf(PersonalContinuation("我想", "看看", 9))))
+        assertEquals(PersonalLearningData.MAX_PROFILE_ENTRIES, merged.continuations.size)
+        assertEquals("看看", merged.continuations.first().text)
+        PersonalLearningData.decode(merged.encodeForEditing())
+    }
+    @Test fun otherCyimeFilesAreReportedAsNotLearningFiles() {
+        for (text in listOf(
+            """{"items":[{"text":"你好","time":1}]}""",
+            """{"format":"cyime.dictionary.v1","entries":[]}""",
+            """{"format":"cyime-personal-learning","version":1,"trigrams":[]}"""
+        )) {
+            try { PersonalLearningData.decode(text); fail(text) } catch (_: NotLearningFileException) { }
+        }
+        try { PersonalLearningData.decode("""{"format":"cyime-personal-learning","version":2,"bigrams":[],"trigrams":[]}"""); fail() }
+        catch (error: IllegalArgumentException) { assertFalse(error is NotLearningFileException) }
+    }
     @Test fun malformedOrDuplicateImportsAreRejectedBeforeReplacement() {
         for (row in listOf(
             """{"tokens":["你","好"],"count":0}""",

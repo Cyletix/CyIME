@@ -93,7 +93,7 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
     
     fun getCacheSize(): Int = userNgramCache.getCacheSize()
     fun learningData(): PersonalLearningData = userNgramCache.snapshot()
-    suspend fun importLearningData(data: PersonalLearningData) = userNgramCache.importData(data)
+    suspend fun importLearningData(data: PersonalLearningData, merge: Boolean = false) = userNgramCache.importData(data, merge)
     
     fun isInitialized(): Boolean = isInitialized
 }

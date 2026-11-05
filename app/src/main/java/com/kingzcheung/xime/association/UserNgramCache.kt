@@ -180,12 +180,15 @@ class UserNgramCache(context: Context) {
             }
         } }
     }
-    suspend fun importData(data: PersonalLearningData) = withContext(Dispatchers.IO) {
+    /** [merge] 为 true 时按 [PersonalLearningData.mergedWith] 新增，否则整份替换。 */
+    suspend fun importData(data: PersonalLearningData, merge: Boolean = false) = withContext(Dispatchers.IO) {
         fileMutex.withLock {
             // Keep an exact recoverable pre-import snapshot. Validation happens before this method.
-            File(cacheFile.parentFile, "user_learning_before_import.json").writeText(snapshot().encode())
-            write(data)
-            replaceInMemory(data)
+            val before = snapshot()
+            File(cacheFile.parentFile, "user_learning_before_import.json").writeText(before.encode())
+            val result = if (merge) before.mergedWith(data) else data
+            write(result)
+            replaceInMemory(result)
         }
     }
     fun clear() = synchronized(stateLock) {

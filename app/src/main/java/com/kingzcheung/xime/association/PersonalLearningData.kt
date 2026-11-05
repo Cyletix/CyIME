@@ -6,6 +6,9 @@ import org.json.JSONObject
 data class LearnedSequence(val tokens: List<String>, val count: Int)
 data class PersonalContinuation(val context: String, val text: String, val count: Int)
 
+/** 选进来的文件根本不是学习文件 (词库、剪贴板备份等)，和学习文件内容有错分开报。 */
+class NotLearningFileException : IllegalArgumentException("不是学习文件")
+
 /** Portable personal data. A corpus prior is distinct from actual keyboard observations. */
 data class PersonalLearningData(
     val bigrams: List<LearnedSequence> = emptyList(),
@@ -31,6 +34,52 @@ data class PersonalLearningData(
     }
 
     /**
+     * 导出给人在电脑上看、删改的版本：内容与 [encode] 相同，但每个条目单独一行。
+     * 读回仍用 [decode]；改坏的文件整份拒绝，不会只导入一半。
+     */
+    fun encodeForEditing(): String {
+        fun lines(rows: List<String>, indent: String) =
+            if (rows.isEmpty()) "[]" else rows.joinToString(",\n$indent  ", "[\n$indent  ", "\n$indent]")
+        fun sequences(rows: List<LearnedSequence>) = lines(rows.map {
+            JSONObject().put("tokens", JSONArray(it.tokens)).put("count", it.count).toString()
+        }, "  ")
+        val entries = lines(continuations.map {
+            JSONObject().put("context", it.context).put("text", it.text).put("count", it.count).toString()
+        }, "    ")
+        return buildString {
+            append("{\n  \"format\": \"cyime-personal-learning\",\n  \"version\": 1,\n")
+            append("  \"bigrams\": ").append(sequences(bigrams)).append(",\n")
+            append("  \"trigrams\": ").append(sequences(trigrams)).append(",\n")
+            append("  \"recentInputs\": ").append(JSONArray(recentInputs).toString()).append(",\n")
+            append("  \"profile\": {\n    \"name\": ").append(JSONObject.quote(profileName)).append(",\n")
+            append("    \"entries\": ").append(entries).append("\n  }\n}\n")
+        }
+    }
+
+    /**
+     * 「新增」导入：保留本机已学的，加入 [imported] 里没有的条目；同一条取两边较大的次数，
+     * 所以同一个文件重复导入不会把次数越叠越大。最近输入保留本机的。结果按存储上限裁剪。
+     */
+    fun mergedWith(imported: PersonalLearningData): PersonalLearningData {
+        fun merge(local: List<LearnedSequence>, other: List<LearnedSequence>): List<LearnedSequence> {
+            if (other.isEmpty()) return local
+            val counts = LinkedHashMap<List<String>, Int>()
+            local.forEach { counts[it.tokens] = it.count }
+            other.forEach { counts.merge(it.tokens, it.count, ::maxOf) }
+            return counts.map { LearnedSequence(it.key, it.value) }
+        }
+        val profile = if (imported.continuations.isEmpty()) continuations else {
+            val counts = LinkedHashMap<Pair<String, String>, Int>()
+            continuations.forEach { counts[it.context to it.text] = it.count }
+            imported.continuations.forEach { counts.merge(it.context to it.text, it.count, ::maxOf) }
+            val rows = counts.map { PersonalContinuation(it.key.first, it.key.second, it.value) }
+            if (rows.size > MAX_PROFILE_ENTRIES) rows.sortedByDescending { it.count }.take(MAX_PROFILE_ENTRIES) else rows
+        }
+        return copy(bigrams = merge(bigrams, imported.bigrams), trigrams = merge(trigrams, imported.trigrams),
+            profileName = profileName.ifEmpty { imported.profileName }, continuations = profile).boundedForStorage()
+    }
+
+    /**
      * 本机学习数据的存储上限：超过 [STORED_HIGH_WATER] 条时只留次数最多的 [STORED_KEPT] 条，
      * 任一次数超过 [MAX_COUNT] 时全部减半。这样保存的文件永远能被 [decode] 读回，
      * 不会因长期使用越界而让学习静默停止。没有越界时原样返回同一对象。
@@ -53,6 +102,7 @@ data class PersonalLearningData(
         const val MAX_SEQUENCES = 100_000
         const val MAX_COUNT = 1_000_000
         const val MAX_RECENT = 100
+        const val MAX_PROFILE_ENTRIES = 100_000
         const val STORED_HIGH_WATER = MAX_SEQUENCES
         const val STORED_KEPT = 90_000
 
@@ -69,9 +119,10 @@ data class PersonalLearningData(
             require(lenient || text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "学习文件超过 32 MB" }
             val root = JSONObject(text)
             if (root.has("format")) {
-                require(root.getString("format") == "cyime-personal-learning" && root.getInt("version") == 1) { "不支持的学习文件格式" }
+                if (root.optString("format") != "cyime-personal-learning") throw NotLearningFileException()
+                require(root.getInt("version") == 1) { "不支持的学习文件格式" }
             }
-            require(root.has("bigrams") && root.has("trigrams")) { "缺少手机学习数据" }
+            if (!root.has("bigrams") || !root.has("trigrams")) throw NotLearningFileException()
             fun count(row: JSONObject): Int {
                 val value = row.getLong("count")
                 require(value >= 1 && (lenient || value <= MAX_COUNT)) { "次数必须在 1～1000000 之间" }
@@ -93,7 +144,7 @@ data class PersonalLearningData(
             }
             val profile = root.optJSONObject("profile")
             val entries = profile?.getJSONArray("entries") ?: JSONArray()
-            require(entries.length() <= 100_000) { "个人方案超过 100000 条" }
+            require(entries.length() <= MAX_PROFILE_ENTRIES) { "个人方案超过 100000 条" }
             val seen = hashSetOf<Pair<String, String>>()
             val continuations = List(entries.length()) { index ->
                 val row = entries.getJSONObject(index)

@@ -76,13 +76,14 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     }
 
     fun exportLearningData(uri: android.net.Uri) = learningOperation("已导出学习文件") {
-        val data = AssociationManager.learningData(context)
+        // 按存储上限裁剪后再导出，保证导出的文件一定能原样导入回来。
+        val data = AssociationManager.learningData(context).boundedForStorage()
         AssociationManager.saveUserData()
         val output = checkNotNull(context.contentResolver.openOutputStream(uri)) { "无法写入所选位置" }
-        output.bufferedWriter().use { it.write(data.encode()) }
+        output.bufferedWriter().use { it.write(data.encodeForEditing()) }
     }
 
-    fun importLearningData(uri: android.net.Uri) = learningOperation("已导入；导入前数据已备份") {
+    fun importLearningData(uri: android.net.Uri, merge: Boolean) = learningOperation(if (merge) "已新增导入" else "已导入并替换") {
         val input = checkNotNull(context.contentResolver.openInputStream(uri)) { "无法读取所选文件" }
         val bytes = input.use { stream ->
             val output = java.io.ByteArrayOutputStream()
@@ -96,8 +97,15 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
             output.toByteArray()
         }
         require(bytes.size <= com.kingzcheung.xime.association.PersonalLearningData.MAX_BYTES) { "学习文件超过 32 MB" }
-        val data = com.kingzcheung.xime.association.PersonalLearningData.decode(bytes.toString(Charsets.UTF_8))
-        AssociationManager.importLearningData(context, data)
+        // 常有人把讯飞、搜狗等词库或别的备份选到这里：不是学习文件时指到真正的词库导入入口，不显示报错原文。
+        val data = try {
+            com.kingzcheung.xime.association.PersonalLearningData.decode(bytes.toString(Charsets.UTF_8))
+        } catch (_: org.json.JSONException) {
+            throw IllegalArgumentException("这不是学习文件。词库请在「词库」页的「导入词库」导入")
+        } catch (_: com.kingzcheung.xime.association.NotLearningFileException) {
+            throw IllegalArgumentException("这不是学习文件。词库请在「词库」页的「导入词库」导入")
+        }
+        AssociationManager.importLearningData(context, data, merge)
     }
     
     fun setEnabled(enabled: Boolean) {

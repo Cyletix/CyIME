@@ -85,9 +85,14 @@ fun SmartPredictionSettingsContent(
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pendingImport = null },
             title = { Text("导入学习文件") },
-            text = { Text("将替换本机学习记录和个人语料方案。导入前会保留一份本机备份；不会修改 Rime 用户词库或模型。") },
-            confirmButton = { Button(onClick = { pendingImport = null; viewModel.importLearningData(uri) }) { Text("导入替换") } },
-            dismissButton = { OutlinedButton(onClick = { pendingImport = null }) { Text("取消") } }
+            text = { Text("新增：保留已学的，加入文件里的条目，同一条取较大次数。\n替换：本机学习和个人语料方案整份换成文件内容，电脑上删掉的条目只有替换才生效。\n不会修改 Rime 用户词库或模型。") },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { pendingImport = null; viewModel.importLearningData(uri, merge = false) }) { Text("替换") }
+                    Button(onClick = { pendingImport = null; viewModel.importLearningData(uri, merge = true) }) { Text("新增") }
+                }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { pendingImport = null }) { Text("取消") } }
         )
     }
 
@@ -287,7 +292,7 @@ internal fun LearningDataControls(
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("本机学习：$unique 种组合 · 累计 $observations 次")
             Text("个人语料方案：$profileSize 条联想", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("输入后自动保存。语料方案与实际输入记录分开统计；可导出到电脑查看、删改后再导入。",
+            Text("输入后自动保存。导出不改动本机数据；导入可选新增或替换，电脑上删改过的文件用替换导入。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // Stack actions so large fonts and narrow keyboards cannot clip labels.
             Button(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("导出文件") }

@@ -125,10 +125,10 @@ object AssociationManager {
         return cache.snapshot()
     }
 
-    suspend fun importLearningData(ctx: Context, data: PersonalLearningData) {
+    suspend fun importLearningData(ctx: Context, data: PersonalLearningData, merge: Boolean) {
         val cache = learningCache(ctx)
         cache.initialize()
-        cache.importData(data)
+        cache.importData(data, merge)
     }
     
     fun getCacheSize(): Int {
