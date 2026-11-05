@@ -50,6 +50,12 @@ COST_COUNTERS = (
     "grammar_queries", "gram_lookups", "whole_text_priors", "ngram_lookups",
 )
 WORK_GATED = ("total", "p50", "p95", "p99", "max")
+# --model-swap (user 2026-11-05): when only the word model changes, beam_insertions may drift a little because
+# scores change by a hair. Allowed: total +0.01% (settle work too) and +2 per key event or per statistic.
+# Every other counter, repeat reproducibility and latency stay exactly as strict.
+MODEL_SWAP_COUNTER = "beam_insertions"
+MODEL_SWAP_TOTAL_FRACTION = 0.0001
+MODEL_SWAP_KEY_SLACK = 2
 LATENCY_GATED = ("mean", "p50", "p95")
 LATENCY_RELATIVE_FLOOR = 0.01
 LATENCY_EPSILON_MS = 0.005
@@ -115,19 +121,30 @@ def exceeds(candidate, baseline, tolerance_percent):
     return candidate > baseline * (1 + tolerance_percent / 100.0)
 
 
+def swap_exceeds(candidate, baseline, stat, tolerance_percent):
+    """--model-swap allowance for MODEL_SWAP_COUNTER: totals +0.01%, per key / per statistic +2."""
+    if stat in ("total", "settle"):
+        return candidate > baseline + max(baseline * MODEL_SWAP_TOTAL_FRACTION, baseline * tolerance_percent / 100.0)
+    return candidate > max(baseline + MODEL_SWAP_KEY_SLACK, baseline * (1 + tolerance_percent / 100.0))
+
+
 def work_signature(run, pass_name):
     return [(row["id"], row["keys"], row["stage"], row.get("work"), row.get("inspect_work"))
             for row in run["snapshots"] if row["pass"] == pass_name]
 
 
-def increased_keys(baseline, candidate, pass_name, names, tolerance_percent):
+def increased_keys(baseline, candidate, pass_name, names, tolerance_percent, model_swap=False):
     """Every key whose cost counter grew, grouped by case; never averaged."""
     before = {(row["id"], row["keys"]): row for row in key_rows(baseline, pass_name)}
     cases = {}
     for row in key_rows(candidate, pass_name):
         old = before[(row["id"], row["keys"])]
         for name in names:
-            if name in COST_COUNTERS and exceeds(cost(row, name), cost(old, name), tolerance_percent):
+            if name not in COST_COUNTERS:
+                continue
+            if (swap_exceeds(cost(row, name), cost(old, name), "key", tolerance_percent)
+                    if model_swap and name == MODEL_SWAP_COUNTER else
+                    exceeds(cost(row, name), cost(old, name), tolerance_percent)):
                 cases.setdefault(row["id"], {}).setdefault(name, []).append(
                     {"keys": row["keys"], "baseline": cost(old, name), "candidate": cost(row, name)})
     grouped = {}
@@ -146,10 +163,11 @@ def increased_keys(baseline, candidate, pass_name, names, tolerance_percent):
     return result
 
 
-def work_section(baselines, candidates, pass_name, tolerance_percent):
+def work_section(baselines, candidates, pass_name, tolerance_percent, model_swap=False):
     baseline, candidate = baselines[0], candidates[0]
     names = counter_names(candidate) or counter_names(baseline) or []
     result = {"counters": {}, "tolerance_percent": tolerance_percent, "gated_statistics": list(WORK_GATED),
+              "model_swap": model_swap,
               "scope": "per key_immediate event: work (processKey + flush) + inspect_work (candidate reading), "
                        "replay thread; settle = waits after syllables/clauses"}
     increased = []
@@ -165,9 +183,11 @@ def work_section(baselines, candidates, pass_name, tolerance_percent):
         entry["delta"] = cand_total - base_total
         entry["delta_percent"] = round(100.0 * entry["delta"] / base_total, 3) if base_total else (
             0.0 if not cand_total else None)
-        grown = [stat for stat in WORK_GATED
-                 if exceeds(entry["candidate"][stat], entry["baseline"][stat], tolerance_percent)]
-        if exceeds(entry["settle"]["candidate"], entry["settle"]["baseline"], tolerance_percent):
+        swap = model_swap and name == MODEL_SWAP_COUNTER
+        grow = (lambda c, b, stat: swap_exceeds(c, b, stat, tolerance_percent)) if swap else (
+            lambda c, b, stat: exceeds(c, b, tolerance_percent))
+        grown = [stat for stat in WORK_GATED if grow(entry["candidate"][stat], entry["baseline"][stat], stat)]
+        if grow(entry["settle"]["candidate"], entry["settle"]["baseline"], "settle"):
             grown.append("settle")
         entry["grown_statistics"] = grown
         if entry["cost"] and grown:
@@ -177,7 +197,7 @@ def work_section(baselines, candidates, pass_name, tolerance_percent):
             entry["verdict"] = "within_tolerance" if entry["cost"] else "informational"
         result["counters"][name] = entry
     result["increased"] = increased
-    result["increased_keys"] = increased_keys(baseline, candidate, pass_name, names, tolerance_percent)
+    result["increased_keys"] = increased_keys(baseline, candidate, pass_name, names, tolerance_percent, model_swap)
     result["increased_key_count"] = sum(len(case["keys"]) for case in result["increased_keys"])
     reference = {"baseline": work_signature(baseline, pass_name), "candidate": work_signature(candidate, pass_name)}
     result["not_reproducible"] = [run["directory"] for label, runs in (("baseline", baselines), ("candidate", candidates))
@@ -330,7 +350,7 @@ def latency_section(baselines, candidates, pass_name, session):
     return result
 
 
-def speed_report(baselines, candidates, passes, tolerance_percent=0.0):
+def speed_report(baselines, candidates, passes, tolerance_percent=0.0, model_swap=False):
     """Compare validated runs (t9_replay_compare.load_run results); the first of each list is the primary run."""
     report = {"format_version": 2, "passes": {},
               "runs": {"baseline": [run["directory"] for run in baselines],
@@ -341,6 +361,9 @@ def speed_report(baselines, candidates, passes, tolerance_percent=0.0):
                       "baseline's by more than a one-sided 1% t bound on the pooled run-to-run spread plus "
                       "max(1%, 0.005 ms), judged only in an interleaved timing session (>= 3 baseline-engine runs "
                       "bracketing the candidate runs); it detects only slowdowns larger than run-level noise. Quality gains never offset a speed regression."}
+    if model_swap:
+        report["rule"] += (" Model swap: beam_insertions may grow by up to 0.01% in total/settle and by up to 2 "
+                           "per key event or statistic; every other rule unchanged.")
     session = timing_session(baselines, candidates)
     report["timing_session"] = session
     if not all(has_work(run, name) for run in baselines + candidates for name in passes):
@@ -351,7 +374,7 @@ def speed_report(baselines, candidates, passes, tolerance_percent=0.0):
         return report
     failures, unassessed, warnings, assessed = [], [], [], 0
     for name in passes:
-        work = work_section(baselines, candidates, name, tolerance_percent)
+        work = work_section(baselines, candidates, name, tolerance_percent, model_swap)
         latency = latency_section(baselines, candidates, name, session)
         report["passes"][name] = {"work": work, "latency": latency}
         failures.extend(f"{name}: work {counter} increased ({', '.join(work['counters'][counter]['grown_statistics'])})"

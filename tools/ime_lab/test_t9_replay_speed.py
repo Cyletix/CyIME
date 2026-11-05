@@ -251,6 +251,31 @@ class SpeedGateTest(unittest.TestCase):
         self.assertEqual(case["counters"]["beam_evaluations"]["case_total"], {"baseline": 150, "candidate": 150})
         self.assertIn("c001：beam_evaluations 150→150（1 键）", "\n".join(speed.markdown(result["speed"])))
 
+    def test_model_swap_allows_small_beam_insertion_drift_only(self):
+        # The fixture's counter set has no beam_insertions; point the model-swap counter at beam_evaluations.
+        original = speed.MODEL_SWAP_COUNTER
+        speed.MODEL_SWAP_COUNTER = "beam_evaluations"
+        self.addCleanup(setattr, speed, "MODEL_SWAP_COUNTER", original)
+
+        def drift(row, values):  # balanced +-2, as a model swap moves a few keys each way
+            values["beam_evaluations"] += {"6": 2, "644": -2}.get(row["keys"], 0)
+        result = compare.compare_runs(self.run_dir("base"), self.run_dir("cand", work=drift))
+        self.assertEqual(result["speed_gate"], "failed")
+        swap = compare.compare_runs(self.root / "base", self.root / "cand", model_swap=True)
+        self.assertEqual(swap["speed"]["passes"]["digits:continuous"]["work"]["increased"], [])
+        self.assertEqual(swap["speed"]["passes"]["digits:continuous"]["work"]["increased_key_count"], 0)
+
+        def too_much(row, values):
+            values["beam_evaluations"] += {"6": 3, "644": -3}.get(row["keys"], 0)
+        over = compare.compare_runs(self.root / "base", self.run_dir("cand3", work=too_much), model_swap=True)
+        self.assertEqual(over["speed_gate"], "failed")
+        self.assertEqual(over["speed"]["passes"]["digits:continuous"]["work"]["increased_key_count"], 1)
+
+        def other(row, values):
+            values["dict_table_queries"] += 1
+        strict = compare.compare_runs(self.root / "base", self.run_dir("cand-other", work=other), model_swap=True)
+        self.assertEqual(strict["speed_gate"], "failed")
+
     def test_any_key_whose_work_grows_fails_even_when_every_statistic_is_unchanged(self):
         # The same per-key values moved to another key: total, p50, p95, p99 and max are unchanged.
         def heavy_first(row, values):

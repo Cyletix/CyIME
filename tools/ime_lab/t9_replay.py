@@ -457,6 +457,9 @@ def main(argv=None):
                          help="Repeated run of the candidate engine in the same timing session")
     compare.add_argument("--work-tolerance-percent", type=float, default=0.0,
                          help="Allowed growth of cost work counters (default 0)")
+    compare.add_argument("--model-swap", action="store_true",
+                         help="Only the word model differs: beam_insertions may grow by up to 0.01%% in total "
+                              "and by up to 2 per key; every other rule unchanged")
     prepare = sub.add_parser("prepare", help="Prepare a new text/pinyin fixture; see t9_fixture.py prepare --help")
     prepare.add_argument("arguments", nargs=argparse.REMAINDER)
     args, extra = parser.parse_known_args(argv)
@@ -477,6 +480,8 @@ def main(argv=None):
                 for path in paths:
                     forwarded.extend([flag, str(path)])
             forwarded.extend(["--work-tolerance-percent", str(args.work_tolerance_percent)])
+            if args.model_swap:
+                forwarded.append("--model-swap")
             return compare_main(forwarded)
         if args.command == "run":
             return run_host(args)

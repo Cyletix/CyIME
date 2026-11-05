@@ -342,7 +342,7 @@ def combine_exit_codes(*codes):
 
 
 def compare_runs(baseline_dir, candidate_dir, assertions_path=None, noise_dir=None, work_tolerance_percent=0.0,
-                 candidate_repeats=None):
+                 candidate_repeats=None, model_swap=False):
     """noise_dir: repeated runs of the baseline engine; candidate_repeats: repeated runs of the candidate engine.
     Latency is judged only when all of them form one interleaved timing session (see t9_replay_speed)."""
     baseline, candidate = load_run(baseline_dir), load_run(candidate_dir)
@@ -377,7 +377,7 @@ def compare_runs(baseline_dir, candidate_dir, assertions_path=None, noise_dir=No
     result["counts"]["known_bad_violations"] = len(known_bad["violations"])
     result["execution_issues"]["repeats"] = [{"run": run["directory"], "issues": run["execution_issues"]}
                                              for run in baselines[1:] + candidates[1:] if run["execution_issues"]]
-    result["speed"] = speed.speed_report(baselines, candidates, REQUIRED_PASSES, work_tolerance_percent)
+    result["speed"] = speed.speed_report(baselines, candidates, REQUIRED_PASSES, work_tolerance_percent, model_swap)
     result["speed_gate"] = result["speed"]["gate"]
     failed = bool(result["regressions"] or known_bad["violations"] or baseline["execution_issues"] or
                   candidate["execution_issues"] or result["execution_issues"]["repeats"] or
@@ -420,10 +420,13 @@ def main(argv=None):
                         help="Repeated run of the candidate engine in the same timing session")
     parser.add_argument("--work-tolerance-percent", type=float, default=0.0,
                         help="Allowed growth of cost work counters (default 0: counts are deterministic)")
+    parser.add_argument("--model-swap", action="store_true",
+                        help="Only the word model differs: beam_insertions may grow by up to 0.01%% in total and "
+                             "by up to 2 per key; every other rule unchanged")
     args = parser.parse_args(argv)
     try:
         result = compare_runs(args.baseline, args.candidate, args.assertions, args.noise_baseline,
-                              args.work_tolerance_percent, args.candidate_repeat)
+                              args.work_tolerance_percent, args.candidate_repeat, args.model_swap)
     except (audit.EvidenceError, OSError, KeyError, TypeError, ValueError) as error:
         result = {"status": "invalid", "exit_code": 2, "error": str(error)}
     write_comparison(args.output_dir, result)
