@@ -247,6 +247,15 @@ private fun LayoutDisplayPage(
                             com.kingzcheung.xime.service.DigitPhrases.setEnabled(context, it)
                         },
                         costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DIGIT_PHRASES)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    // 联想常用数字（用户 11-04 要求，默认开）：见 service/NumberHistory.kt。关掉即清空记下的数字。
+                    var numberHistory by remember { mutableStateOf(com.kingzcheung.xime.service.NumberHistory.isEnabled(context)) }
+                    SettingsToggleItem(Icons.TwoTone.Dialpad, "联想常用数字",
+                        "打过两次的 4 位以上数字，再打开头两位时给出 (只存本机，密码框、无痕和 16 位以上不记，关掉即清空)",
+                        checked = numberHistory, onCheckedChange = {
+                            numberHistory = it
+                            com.kingzcheung.xime.service.NumberHistory.setEnabled(context, it)
+                        })
                 })
             }
             if (page == "candidates") item {

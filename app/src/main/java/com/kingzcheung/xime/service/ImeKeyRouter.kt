@@ -166,14 +166,27 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal suspend fun offerEmailSuffixesAfterAt() = withEditor { offerEmailSuffixes() }
 
     /**
-     * 数字上屏之后（数字键盘、数字行、角标）：光标前那串数字对得上「我的短语」的编码开头时把短语放到候选栏（默认关，见 [DigitPhrases]）。
-     * 开关关着时不读短语表也不读输入框。短语表在按键队列里读（文件没变不重读），输入框在主线程读。
+     * 数字上屏之后（数字键盘、数字行、角标）：光标前那串数字对得上「我的短语」的编码开头时把短语放到候选栏（默认关，见 [DigitPhrases]），
+     * 打过两次以上的常用数字也放进这一组（默认开，见 [NumberHistory]）。
+     * 两个开关都关着时不读短语表也不读输入框。短语表、记下的数字在按键队列里读（只读一次），输入框在主线程读。
      */
     internal suspend fun offerDigitPhrases() {
-        if (!DigitPhrases.isEnabled(service)) return
-        val phrases = DigitPhrases.phrases(service)
-        if (phrases.isEmpty()) return
-        withEditor { showDigitPhrases(phrases) }
+        val numbers = if (NumberHistory.isEnabled(service)) NumberHistory.load(service) else null
+        val phrases = if (DigitPhrases.isEnabled(service)) DigitPhrases.phrases(service) else emptyList()
+        if (phrases.isEmpty() && numbers == null) return
+        val finished = withEditor { showDigitPhrases(phrases, numbers) }
+        // 上一串打完了的数字：记一次（文件在后台写）。
+        finished?.let { NumberHistory.record(service, it) }
+    }
+
+    /** 跟着光标前正在打的那串数字，打完才记（见 [NumberHistory]）。主线程用。 */
+    private val numberRun = NumberRunTracker()
+
+    /** 打数字给的那一组：先是「我的短语」，再是记下的常用数字。 */
+    private fun digitWords(typed: String, phrases: List<com.kingzcheung.xime.settings.DictEntry>, numbers: NumberMemory?): List<String> {
+        val code = DigitPhrases.code(typed)
+        val learned = numbers?.suggestions(code).orEmpty()
+        return (DigitPhrases.matching(code, phrases) + learned).distinct().take(DigitPhrases.LIMIT)
     }
 
     /** 光标前读一段给打数字出短语用；有选区、密码框、键盘里的面板输入框、实体键盘、终端、打着字或在算式里时返回 null。主线程调用。 */
@@ -190,27 +203,37 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         return before.takeIf { EmailSuffixes.typedDomain(it) == null }
     }
 
-    private fun showDigitPhrases(phrases: List<com.kingzcheung.xime.settings.DictEntry>) {
+    /** 返回上一串已经打完、该记下的常用数字（没开「联想常用数字」或没有时为 null）。 */
+    private fun showDigitPhrases(phrases: List<com.kingzcheung.xime.settings.DictEntry>, numbers: NumberMemory?): String? {
         val before = digitPhraseContext()
+        // 算式里的数字、无痕时打的数字不记；这一串也丢掉，不接着算。
+        val finished = when {
+            numbers == null -> null
+            service.calculatorEngine.isActive() || com.kingzcheung.xime.settings.IncognitoState.active -> { numberRun.reset(); null }
+            else -> numberRun.onDigit(before)
+        }
         val typed = before?.let(DigitPhrases::typedDigits)
-        val words = typed?.let { DigitPhrases.matching(DigitPhrases.code(it), phrases) }.orEmpty()
+        val words = typed?.let { digitWords(it, phrases, numbers) }.orEmpty()
         if (before == null || typed == null || words.isEmpty()) {
             // 接着打的数字对不上了：收起上一位给的那一组，别留着换错数字。
             if (service.candidateState.value.isDigitPhraseList) service.candidateState.value = service.candidateState.value.copy(
                 associationCandidates = emptyList(), digitPhrases = emptyList(), digitPhraseText = "")
-            return
+            return finished
         }
         service.predictionManager.invalidatePendingPredictions()
         // 联想上下文对上光标前的文字：光标更新时才不会当成上下文变了，把短语清掉。
         service.predictionManager.replaceCommittedText(before)
         service.candidateState.value = service.candidateState.value.copy(associationCandidates = words,
             digitPhrases = words, digitPhraseText = typed, pendingEnglishText = "", isShowingRecentClipboard = false)
+        return finished
     }
 
     /** 退格删掉一位后按剩下的数字重新给短语（[remaining] 是删后光标前的文字）；对不上就收起这一组。主线程调用。 */
     private fun refreshDigitPhrasesAfterDelete(remaining: String) {
         val typed = DigitPhrases.typedDigits(remaining)
-        val words = typed?.let { DigitPhrases.matching(DigitPhrases.code(it), DigitPhrases.cachedPhrases()) }.orEmpty()
+        val numbers = if (NumberHistory.isEnabled(service)) NumberHistory.loaded() else null
+        val phrases = if (DigitPhrases.isEnabled(service)) DigitPhrases.cachedPhrases() else emptyList()
+        val words = typed?.let { digitWords(it, phrases, numbers) }.orEmpty()
         service.predictionManager.replaceCommittedText(remaining)
         service.candidateState.value = service.candidateState.value.copy(associationCandidates = words,
             digitPhrases = words, digitPhraseText = if (words.isEmpty()) "" else typed.orEmpty())
@@ -229,6 +252,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             service.replaceBeforeCursor(state.digitPhraseText, com.kingzcheung.xime.settings.PhraseLineBreaks.typed(word))
         service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList(),
             digitPhrases = emptyList(), digitPhraseText = "")
+        // 选了的就是整串，不再按打的那几位记；选的是记下的常用数字时多记一次。
+        numberRun.reset()
+        if (replaced && NumberHistory.isEnabled(service) && NumberHistory.loaded()?.contains(word) == true &&
+            !com.kingzcheung.xime.settings.IncognitoState.active) NumberHistory.record(service, word)
         // 换掉的数字也是计算器正在记的那串，别让下一个运算符接到已经不在的数字上。
         if (replaced) service.calculatorEngine.clear()
         hardwareNavigation.clear()
@@ -291,6 +318,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val replaced = EmailSuffixes.completion(before, domain)?.let { (typed, full) ->
             service.replaceBeforeCursor(typed, full)
         } == true
+        // 数字键盘在 @ 后打的数字、点也进了计算器：换成后缀后别让下一个运算符接到它们上。
+        if (replaced) service.calculatorEngine.clear()
         service.candidateState.value = service.candidateState.value.copy(pendingEnglishText = "", associationCandidates = emptyList())
         hardwareNavigation.clear()
         publishHardwareCandidateSelection()
@@ -1013,6 +1042,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             // 给着邮箱后缀时接着打的数字（中文键盘下还有字母）：对得上某个后缀就原样上屏、筛后缀，不进拼音。
             if (hardwareEvent == null && schemeCode == null && !mergedKey && typesEmailDomainKey(key) &&
                 withEditor { commitEmailDomainKey(if (isShifted) key.uppercase() else key) }) return@command
+            // 下面会先清掉联想（含邮箱后缀）；数字键盘走计算器那条路时要知道按键前是不是正给着后缀。
+            val emailSuffixesShown = EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)
             // Most composing keys have nothing to clear. Do not make every key wait
             // for a Main round trip before it can even reach the decoder.
             if (key.length == 1) {
@@ -1390,8 +1421,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         calculatorEngine = service.calculatorEngine,
                     )
                     if (routeResult is com.kingzcheung.xime.calculator.CalculatorRouteResult.Handled) {
-                        withEditor { service.commitText(service.textCommit.keyboardLiteral(routeResult.commitText, numberPanel = isNumberKeyboard)) }
+                        // 给着邮箱后缀时接着打的数字、点、减号是后缀的一部分（数字键盘以前不给后缀：@ 走这里直接上屏）。
+                        // 这时候选栏已经在上面清掉了，按按键前记下的算。
+                        val emailDomain = emailSuffixesShown
+                        val literal = withEditor {
+                            service.textCommit.keyboardLiteral(routeResult.commitText, numberPanel = isNumberKeyboard)
+                                .also { service.commitText(it) }
+                        }
                         if (isNumberKeyboard) updateCalculatorCandidates()
+                        // 数字键盘、常用符号面板打的 @：和主键盘一样给邮箱后缀（默认开），接着打的数字、点重新筛。
+                        if (literal == "@" || literal == "＠" ||
+                            emailDomain && literal.isNotEmpty() && literal.all { it == '.' || it == '-' || it in '0'..'9' })
+                            offerEmailSuffixesAfterAt()
                         // 数字键盘打的数字：对得上「我的短语」编码的短语放到候选栏（默认关）。
                         if (isNumberKeyboard && key.length == 1 && key[0] in '0'..'9') offerDigitPhrases()
                         needsUIUpdate = true
@@ -2079,6 +2120,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             withEditor {
                 if (owner != service.uiState.value.inputSessionId) return@withEditor
                 val digitsBefore = if (candState.isDigitPhraseList) digitPhraseContext() else null
+                // 删过的那串数字不按打的记（接着打时从输入框里重新读整串）。
+                numberRun.reset()
                 service.sendDeleteKey()
                 // 打数字给的短语：按删后剩下的数字重新给。
                 if (digitsBefore != null) refreshDigitPhrasesAfterDelete(digitsBefore.dropLastCharacter())
@@ -2189,6 +2232,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val word = rejectedCommitBefore(clearing = false)
                     deletedBefore = characterAboutToBeDeleted()
                     if (candState.isDigitPhraseList) digitsBefore = digitPhraseContext()
+                    numberRun.reset()
                     service.sendDeleteKey()
                     word
                 }
