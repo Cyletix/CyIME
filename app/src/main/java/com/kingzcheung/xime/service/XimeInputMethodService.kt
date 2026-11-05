@@ -3200,7 +3200,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         keyRouter.handleKeyPress("ime_switch", uiState.value.isAsciiMode, languageSwitchMode = mode)
     }
 
+    /**
+     * 实体键盘 Shift 是否按住，以每个按键事件自带的修饰键为准（11-04 平板：候选一直 south 在前，空格和点「南 south」
+     * 都上屏英文）。只在 Shift 按下、抬起时记一次的话，抬起没送到这里（游戏直通、设置预览、焦点切走）就一直算按住。
+     * Shift 按下只在有实体键盘时算；其余按键（含另一个 Shift 抬起）照事件里的 isShiftPressed 改正。
+     */
+    private fun syncPhysicalShift(keyCode: Int, event: KeyEvent?, down: Boolean) {
+        val e = event ?: return
+        val shiftKey = keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT
+        val held = hasHardwareKeyboard && (if (shiftKey && down) true else e.isShiftPressed)
+        if (com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value != held) {
+            com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = held
+        }
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        syncPhysicalShift(keyCode, event, down = true)
         if (settingsPreviewEditor) {
             if (keyCode == KeyEvent.KEYCODE_BACK) return true
             return if (event?.isSystem == true) super.onKeyDown(keyCode, event) else true
@@ -3227,9 +3242,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val e = event ?: return super.onKeyDown(keyCode, event)
         if (hasHardwareKeyboard) {
             // Shift 单击切语言时这个键会被下面的快捷键吞掉，按住状态要先记下。
-            if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
-                com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = true
-            }
             val shortcut = hardwareLanguageShortcuts.down(keyCode, e.eventTime, e.repeatCount,
                 e.isCtrlPressed, e.isAltPressed, e.isMetaPressed, e.isShiftPressed, uiState.value.hardwareOptions)
             shortcut.switchMode?.let { switchHardwareLanguage(it) }
@@ -3341,6 +3353,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        syncPhysicalShift(keyCode, event, down = false)
         if (settingsPreviewEditor) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 // 设置页里调节键盘时按返回 = 取消：切过的悬浮、分体、尺寸都不留下，只有「确认」才算数。
@@ -3358,9 +3371,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)) {
             if (event?.isCanceled != true) keyboardCallbacks?.onHideQuickSendForm?.invoke()
             return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
-            com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = event?.isShiftPressed == true
         }
         if (glossShiftKeys.remove(keyCode)) return true
         if (ctrlEnterKeys.remove(keyCode)) return true
@@ -4162,6 +4172,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
+        // 键盘重新弹出：上次收起时没收到的 Shift 抬起不再算按住（否则候选一直中英对调，空格上屏英文）。
+        com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = false
         // 键盘一出来 CPU 测速就停（设置页里测到一半也停），不和打字抢 CPU。
         com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = true
         backgroundMotionWindowShown.value = true
