@@ -68,9 +68,12 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         return true
     }
 
-    /** 回车键的位置：按住符号键拖到回车上松手发 Ctrl+回车；按住 Shift 拖过去不算目标。 */
-    fun putEnter(id: Any, bounds: Rect) {
-        targets[id] = listOf(Target(ENTER_KEY, bounds) {})
+    /**
+     * 回车键的位置：按住符号键拖到回车上松手发 Ctrl+回车（按键名走 Ctrl 那条路）；
+     * 从 Shift 拖到回车上松手是 Shift+回车，换行（[shiftEnter]，用户 11-04）。
+     */
+    fun putEnter(id: Any, bounds: Rect, shiftEnter: () -> Unit = {}) {
+        targets[id] = listOf(Target(ENTER_KEY, bounds, shiftEnter))
     }
 
     /**
@@ -106,7 +109,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     }
     fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) candidateAt(point)?.takeUnless { ctrl }
         else targets.entries.asSequence().filter { (id, _) -> ctrl || id !in ctrlOnly }.flatMap { (_, cells) -> cells.asSequence() }
-            .firstOrNull { it.bounds.contains(point) && (ctrl || it.key != ENTER_KEY) }
+            .firstOrNull { it.bounds.contains(point) }
 
     /** 拖出键盘、落在候选上：松手等于按住 Shift 点这个候选（释义模式上屏英文）。 */
     private fun candidateAt(point: Offset): Target? =

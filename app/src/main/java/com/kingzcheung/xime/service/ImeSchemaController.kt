@@ -512,6 +512,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "undo", "redo" -> editCursor { service.sendUndoShortcut(it, redo = action == "redo") }
             // Ctrl+回车：发送（见 EnterKeyAction.ctrlEnter）。
             "send" -> editCursor { service.keyRouter.performIdleEnter(it, ctrl = true) }
+            // Shift+回车：换行，不管应用把回车设成什么（见 EnterKeyAction.shiftEnter）。
+            "newline" -> editCursor { service.keyRouter.performIdleEnter(it, shift = true) }
             "select_all" -> editCursor { selectAllGuard.selectAll(it) }
             "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
             "cut" -> editCursor { it.performContextMenuAction(android.R.id.cut) }

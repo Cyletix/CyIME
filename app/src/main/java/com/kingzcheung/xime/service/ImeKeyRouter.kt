@@ -41,21 +41,28 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         !service.uiState.value.inputTarget.isInternal
 
     /**
-     * 没在打字时的回车、Ctrl+回车，所有入口同一规则（[EnterKeyAction]）：键面写什么就做什么，Ctrl+回车发送。
-     * 换行直接上屏 "\n"，不发模拟回车键，聊天软件不会把它当实体键盘的回车发出去（用户 11-03）。
+     * 没在打字时的回车、Shift+回车、Ctrl+回车，所有入口同一规则（[EnterKeyAction]）：键面写什么就做什么，
+     * Shift+回车换行，Ctrl+回车发送。换行直接上屏 "\n"，不发模拟回车键，聊天软件不会把它当实体键盘的回车发出去（用户 11-03）。
      */
     internal fun performIdleEnter(connection: android.view.inputmethod.InputConnection? = service.currentInputConnection,
-        ctrl: Boolean = false) {
+        ctrl: Boolean = false, shift: Boolean = false) {
         val ic = connection ?: return
         val info = service.currentInputEditorInfo
         val options = info?.imeOptions ?: 0
         val type = info?.inputType ?: 0
         val terminal = service.isTerminalEditor()
-        when (val plan = if (ctrl) EnterKeyAction.ctrlEnter(options, type, terminal) else EnterKeyAction.enter(options, type, terminal)) {
+        val plan = when {
+            ctrl -> EnterKeyAction.ctrlEnter(options, type, terminal)
+            shift -> EnterKeyAction.shiftEnter(options, type, terminal)
+            else -> EnterKeyAction.enter(options, type, terminal)
+        }
+        when (plan) {
             is EnterKeyAction.EditorAction -> ic.performEditorAction(plan.action)
             EnterKeyAction.Newline -> ic.commitText("\n", 1)
             EnterKeyAction.EnterKey -> service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
             EnterKeyAction.CtrlEnterKey -> com.kingzcheung.xime.keyboard.CtrlShortcuts.enterKeyEvents(
+                android.os.SystemClock.uptimeMillis()).forEach(ic::sendKeyEvent)
+            EnterKeyAction.ShiftEnterKey -> com.kingzcheung.xime.keyboard.CtrlShortcuts.shiftEnterKeyEvents(
                 android.os.SystemClock.uptimeMillis()).forEach(ic::sendKeyEvent)
         }
     }

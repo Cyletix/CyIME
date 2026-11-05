@@ -6,10 +6,11 @@ import com.kingzcheung.xime.service.EnterKeyAction.CtrlEnterKey
 import com.kingzcheung.xime.service.EnterKeyAction.EditorAction
 import com.kingzcheung.xime.service.EnterKeyAction.EnterKey
 import com.kingzcheung.xime.service.EnterKeyAction.Newline
+import com.kingzcheung.xime.service.EnterKeyAction.ShiftEnterKey
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 回车键面写什么就做什么，Ctrl+回车发送（用户 11-03：键上写换行，聊天软件里回车却发了出去）。 */
+/** 回车键面写什么就做什么，Shift+回车换行，Ctrl+回车发送（用户 11-03：键上写换行，聊天软件里回车却发了出去）。 */
 class EnterKeyActionTest {
     private val text = InputType.TYPE_CLASS_TEXT
     private val multiLine = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -70,5 +71,25 @@ class EnterKeyActionTest {
         // 搜索、前往、下一项、完成仍由普通回车执行。
         assertEquals(EditorAction(EditorInfo.IME_ACTION_GO), EnterKeyAction.enter(EditorInfo.IME_ACTION_GO, text, false))
         assertEquals(EditorAction(EditorInfo.IME_ACTION_DONE), EnterKeyAction.enter(EditorInfo.IME_ACTION_DONE, text, false))
+    }
+
+    /** 用户 11-04：Shift+回车无条件换行，不管输入框声明了什么动作。 */
+    @Test fun shiftEnterAlwaysBreaksTheLine() {
+        // 回车设成发送的聊天框（多行、单行）、回车发送关的聊天框（DONE / SEND + 回车不做动作）、普通多行框：上屏 "\n"。
+        assertEquals(Newline, EnterKeyAction.shiftEnter(send, multiLine, terminal = false))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(send, text, terminal = false))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(EditorInfo.IME_ACTION_DONE or noEnter, multiLine, false))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(send or noEnter, multiLine, false))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(EditorInfo.IME_ACTION_UNSPECIFIED, multiLine, false))
+        // 多行框声明了完成、搜索：普通回车执行动作，Shift+回车换行。
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_DONE), EnterKeyAction.enter(EditorInfo.IME_ACTION_DONE, multiLine, false))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(EditorInfo.IME_ACTION_DONE, multiLine, false))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(EditorInfo.IME_ACTION_SEARCH, multiLine, false))
+        // 没有换行的单行框、数字框：照普通回车。
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_SEARCH), EnterKeyAction.shiftEnter(EditorInfo.IME_ACTION_SEARCH, text, false))
+        assertEquals(EnterKey, EnterKeyAction.shiftEnter(send, InputType.TYPE_CLASS_NUMBER, false))
+        assertEquals(EnterKey, EnterKeyAction.shiftEnter(EditorInfo.IME_ACTION_UNSPECIFIED, InputType.TYPE_NULL, false))
+        // 终端：Shift+回车交给终端。
+        assertEquals(ShiftEnterKey, EnterKeyAction.shiftEnter(send, multiLine, terminal = true))
     }
 }

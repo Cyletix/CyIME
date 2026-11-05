@@ -3151,7 +3151,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private val hardwareCandidateNavigationKeys = mutableSetOf<Int>()
     /** Shift 加数字或空格已用来选候选（上屏英文）的键，松开时一并吞掉。 */
     private val glossShiftKeys = mutableSetOf<Int>()
-    /** 实体键盘 Ctrl+回车按下时已发送，抬起也不再交给应用。 */
+    /** 实体键盘 Ctrl+回车、Shift+回车按下时已处理，抬起也不再交给应用。 */
     private val ctrlEnterKeys = mutableSetOf<Int>()
     private val clipboardKeyboard = com.kingzcheung.xime.clipboard.ClipboardKeyboardNavigation {
         keyboardViewModel.leaveClipboard()
@@ -3255,6 +3255,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if ((keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) && e.isCtrlPressed &&
                 !e.isAltPressed && !e.isMetaPressed && !e.isShiftPressed && !isTerminalEditor()) {
                 if (e.repeatCount == 0) ctrlEnter()
+                ctrlEnterKeys += keyCode
+                return true
+            }
+            // 实体键盘 Shift+回车：和屏幕上按住 Shift 点回车同一条规则，换行。终端、打字中（回车上屏编码、选中的候选）照旧。
+            if ((keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) && e.isShiftPressed &&
+                !e.isAltPressed && !e.isMetaPressed && !e.isCtrlPressed && !isTerminalEditor() && !enterStaysPlain()) {
+                shiftEnter()
                 ctrlEnterKeys += keyCode
                 return true
             }
@@ -3454,6 +3461,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 imm.showInputMethodPicker()
             }
             com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER_COMMAND -> ctrlEnter()
+            com.kingzcheung.xime.keyboard.CtrlShortcuts.SHIFT_ENTER_COMMAND -> shiftEnter()
             else -> com.kingzcheung.xime.keyboard.CtrlShortcuts.letterOf(name)?.let { letter ->
                 // Ctrl+A/C/X/V 和编辑面板的全选、复制、剪切、粘贴同一路；终端里 Ctrl+C 等是终端自己的键，照旧发按键。
                 val editing = com.kingzcheung.xime.keyboard.CtrlShortcuts.editingAction(letter)
@@ -3487,6 +3495,29 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             else -> schemaController.handleToolbarEditingAction("send")
         }
+    }
+
+    /**
+     * Shift+回车 = 换行（屏幕上按住 Shift 点回车、从 Shift 拖到回车、实体键盘 Shift+回车），不管应用把回车设成什么
+     * （用户 11-04）。还在打字、或在键盘自己的输入框里时和回车一样只上屏编码；终端发 Shift+回车键；
+     * 其他按 [EnterKeyAction.shiftEnter]，和 Ctrl+回车同一条编辑队列。
+     */
+    private fun shiftEnter() {
+        when {
+            enterStaysPlain() -> keyRouter.handleKeyPress("enter", false)
+            isTerminalEditor() -> currentInputConnection?.let { ic ->
+                com.kingzcheung.xime.keyboard.CtrlShortcuts.shiftEnterKeyEvents(SystemClock.uptimeMillis()).forEach(ic::sendKeyEvent)
+            }
+            else -> schemaController.handleToolbarEditingAction("newline")
+        }
+    }
+
+    /** 还在打字、或焦点在键盘自己的输入框（快捷发送、工具面板）：Shift+回车和回车一样。 */
+    private fun enterStaysPlain(): Boolean {
+        val composing = candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() || it.preeditText.isNotEmpty() } ||
+            t9PartialSegments.isNotEmpty()
+        val state = uiState.value
+        return composing || state.inputTarget.isInternal || state.toolPanelInputFocused || state.showQuickSendForm
     }
 
     override fun repeatLastInput() {

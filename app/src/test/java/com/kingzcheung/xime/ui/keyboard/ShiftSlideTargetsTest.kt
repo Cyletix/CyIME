@@ -76,12 +76,15 @@ class ShiftSlideTargetsTest {
         assertEquals(listOf("Q", "W"), commits)
     }
 
-    // 用户 11-03：按住 !@# 点回车或拖到回车上是 Ctrl+回车；按住 Shift 拖过去不算。
+    // 用户 11-03：按住 !@# 点回车或拖到回车上是 Ctrl+回车。11-04：从 Shift 拖到回车上松手是 Shift+回车（换行），不是 Ctrl+回车。
     @Test fun ctrlEnterOnlyWhileSymbolKeyHeld() {
         val targets = targets()
         val enter = Rect(330f, 220f, 400f, 280f)
-        targets.putEnter("enter", enter)
-        assertNull(targets.move(shift, enter.center))
+        var newlines = 0
+        targets.putEnter("enter", enter) { newlines++ }
+        targets.move(shift, enter.center)!!.commit()
+        assertEquals(1, newlines)
+        assertFalse(targets.ctrlEnter())
         targets.finish()
         assertFalse(targets.ctrlEnter())
         val sent = mutableListOf<Char>()
