@@ -88,8 +88,8 @@ class CandidateModelInstallationTest {
 
     @Test fun retiredVersionsStayRecognizableButAreNotOfferedForDownload() {
         val full = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.NGRAM }
-        assertEquals(listOf("v3-ls-tri-c3"), full.downloadableVersions.map { it.version })
-        assertEquals("v3-ls-tri-c3", full.resolvedVersion()?.version)
+        assertEquals(listOf("v3-ls-tri-jue1105-c3"), full.downloadableVersions.map { it.version })
+        assertEquals("v3-ls-tri-jue1105-c3", full.resolvedVersion()?.version)
         assertTrue(full.versions.any { it.retired && it.files.single().sizeBytes == 367598664L })
         val sentence = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.SENTENCE }
         assertTrue(sentence.downloadableVersions.isEmpty())
