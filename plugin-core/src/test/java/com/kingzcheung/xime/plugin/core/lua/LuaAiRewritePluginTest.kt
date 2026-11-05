@@ -44,6 +44,40 @@ class LuaAiRewritePluginTest {
         override fun lastError(): String? = null
     }
 
+    /** 像 Kimi K2.5 以后的模型：带了 temperature 就回 400；其他情况按 [status]/[errorBody] 回。 */
+    private class FixedTemperatureApi : HttpHostApi {
+        val bodies = mutableListOf<String>()
+        var status: Int = 200
+        var errorBody: String = ""
+        override fun request(
+            method: String,
+            url: String,
+            headers: Map<String, String>,
+            body: ByteArray?,
+            timeoutMillis: Int?
+        ): HttpResponse? {
+            val text = body?.toString(Charsets.UTF_8).orEmpty()
+            bodies += text
+            if (text.contains("\"temperature\"")) {
+                return HttpResponse(status = 400, body = """{"error":{"message":"invalid temperature: only 1 is allowed for this model","type":"invalid_request_error"}}""".toByteArray())
+            }
+            if (status != 200) return HttpResponse(status = status, body = errorBody.toByteArray())
+            return HttpResponse(status = 200,
+                body = """{"choices":[{"message":{"content":"我明天早上八点到公司，你们先开会吧。"}}]}""".toByteArray())
+        }
+        override fun lastError(): String? = null
+    }
+
+    private fun runtimeWith(api: HttpHostApi, model: String): LuaScriptRuntime {
+        val store = InMemoryConfigStore()
+        store.set("apiKey", "test-key-000000")
+        store.set("baseUrl", "https://api.example.com/v1")
+        store.set("model", model)
+        val runtime = LuaScriptRuntime("com.kingzcheung.xime.plugin.ai_rewrite", File("../plugins/ai-rewrite"), "main.lua", store, httpHostApi = api)
+        assertTrue("main.lua 应能加载", runtime.load())
+        return runtime
+    }
+
     private val source = "这个方案我觉得还行吧，不过预算那块可能得再看看，别超了。"
 
     private fun setup(): Triple<LuaScriptRuntime, LuaToolPluginAdapter, FakeApi> {
@@ -148,5 +182,45 @@ class LuaAiRewritePluginTest {
         api.content = "预算部分可能还要再看看"
         adapter.onPanelAction("mode:polish")
         assertTrue("请求带的是改好的字", api.lastBody?.contains(edited) == true)
+    }
+
+    @Test
+    fun `只接受固定 temperature 的模型：去掉 temperature 重发一次，之后不再带`() {
+        val api = FixedTemperatureApi()
+        val runtime = runtimeWith(api, "kimi-k3")
+        assertTrue("测试接口应通过", runtime.call("testConnection").isnil())
+        assertEquals(2, api.bodies.size)
+        assertTrue(api.bodies[0].contains("\"temperature\""))
+        assertTrue(!api.bodies[1].contains("\"temperature\""))
+        assertTrue(runtime.call("testConnection").isnil())
+        assertEquals("记住了，第二次直接不带", 3, api.bodies.size)
+    }
+
+    @Test
+    fun `接口报错时带上服务器原话，密钥遮掉`() {
+        val api = FixedTemperatureApi()
+        val runtime = runtimeWith(api, "kimi-k3")
+        api.status = 400
+        api.errorBody = """{"error":{"message":"Invalid request: test-key-000000 is wrong\nmore","type":"invalid_request_error"}}"""
+        assertEquals("400: Invalid request: *** is wrong", runtime.call("testConnection").tojstring())
+        api.status = 404
+        api.errorBody = """{"error":{"message":"Not found the model kimi-k9 or Permission denied"}}"""
+        assertEquals("接口地址或模型名不对（404）：Not found the model kimi-k9 or Permission denied",
+            runtime.call("testConnection").tojstring())
+        api.status = 400
+        api.errorBody = """{"code":20012,"message":"Model does not exist. Please check it carefully.","data":null}"""
+        assertEquals("400: Model does not exist. Please check it carefully.", runtime.call("testConnection").tojstring())
+        api.status = 502
+        api.errorBody = "<html><body>Bad Gateway</body></html>"
+        assertEquals("接口返回 502", runtime.call("testConnection").tojstring())
+    }
+
+    @Test
+    fun `普通接口照旧带 temperature`() {
+        val (_, adapter, api) = setup()
+        adapter.getPanelState(source)
+        api.content = "这个方案我觉得还不错，不过预算部分可能需要再看看，别超支了。"
+        adapter.onPanelAction("mode:polish")
+        assertTrue(api.lastBody?.contains("\"temperature\"") == true)
     }
 }

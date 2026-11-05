@@ -405,11 +405,71 @@ local function buildUserMessage(instruction, text)
   return instruction .. "\n\n<原文>\n" .. text .. "\n</原文>"
 end
 
-local function httpErrorText(status)
-  if status == 401 or status == 403 then return "密钥不对或没有权限（" .. status .. "）" end
-  if status == 404 then return "接口地址或模型名不对（404）" end
-  if status == 429 then return "请求太多或余额不足（429）" end
-  return "接口返回 " .. tostring(status)
+-- 服务器在错误回复里说的原因（OpenAI 格式 {"error":{"message":…}}，也认 {"message":…}、{"error":"…"}、
+-- {"detail":"…"}，不是 JSON 就取第一行）。只取一行、最多 80 字；回复里万一带了密钥就换成 ***。
+local MAX_SERVER_MESSAGE = 80
+
+local function serverMessage(text, apiKey)
+  text = text or ""
+  local msg = nil
+  local ok, data = pcall(host.json.decode, text)
+  if ok and type(data) == "table" then
+    local e = data.error
+    if type(e) == "table" and type(e.message) == "string" then msg = e.message
+    elseif type(e) == "string" then msg = e
+    elseif type(data.message) == "string" then msg = data.message
+    elseif type(data.detail) == "string" then msg = data.detail
+    elseif type(data.msg) == "string" then msg = data.msg
+    end
+  elseif not trim(text):match("^[{%[<]") then
+    msg = text  -- 纯文字回复；HTML 错误页不显示
+  end
+  if msg == nil then return "" end
+  msg = trim(msg:match("^[^\r\n]*") or "")
+  if apiKey ~= nil and #apiKey >= 6 then
+    local s, e = msg:find(apiKey, 1, true)
+    while s ~= nil do
+      msg = msg:sub(1, s - 1) .. "***" .. msg:sub(e + 1)
+      s, e = msg:find(apiKey, s + 3, true)
+    end
+  end
+  -- 别家的 sk- 密钥也遮掉（task-1 这类不算）
+  msg = msg:gsub("()(sk%-[A-Za-z0-9_%-]+)", function(pos, key)
+    if pos > 1 and msg:sub(pos - 1, pos - 1):match("^[A-Za-z0-9_]$") then return key end
+    return "sk-***"
+  end)
+  if charCount(msg) > MAX_SERVER_MESSAGE then
+    local out, n = {}, 0
+    for ch in msg:gmatch(UTF8_CHAR) do
+      n = n + 1
+      if n > MAX_SERVER_MESSAGE then break end
+      out[#out + 1] = ch
+    end
+    msg = table.concat(out) .. "…"
+  end
+  return msg
+end
+
+local function httpErrorText(status, detail)
+  local head
+  if status == 401 or status == 403 then head = "密钥不对或没有权限（" .. status .. "）"
+  elseif status == 404 then head = "接口地址或模型名不对（404）"
+  elseif status == 429 then head = "请求太多或余额不足（429）"
+  else
+    -- 其他状态直接给服务器原话，例：400: invalid temperature: only 1 is allowed for this model
+    if detail ~= nil and detail ~= "" then return tostring(status) .. ": " .. detail end
+    return "接口返回 " .. tostring(status)
+  end
+  if detail ~= nil and detail ~= "" then return head .. "：" .. detail end
+  return head
+end
+
+-- 有的模型只接受固定的 temperature（Kimi K2.5 以后的模型、OpenAI 推理模型等），带了就回 400。
+-- 遇到这种 400 就不带 temperature 重发一次，并记住这个接口地址 + 模型，之后都不带。
+local noTemperature = {}
+
+local function rejectsTemperature(resp)
+  return resp.status == 400 and contains((resp.text or ""):lower(), "temperature")
 end
 
 -- 返回 content, err
@@ -418,26 +478,41 @@ local function callApi(instruction, text, systemPrompt)
   if apiKey == "" then return nil, "还没填 API 密钥：点下面的「设置」" end
   local baseUrl = trim(configOr(KEY_BASE_URL, DEFAULT_BASE_URL)):gsub("/+$", "")
   local model = trim(configOr(KEY_MODEL, DEFAULT_MODEL))
-  local body = host.json.encode({
-    model = model,
-    messages = {
-      { role = "system", content = systemPrompt or SYSTEM_PROMPT },
-      { role = "user", content = buildUserMessage(instruction, text) },
-    },
-    temperature = 0.3,
-    stream = false,
-  })
-  local headers = {
-    ["Content-Type"] = "application/json",
-    ["Authorization"] = "Bearer " .. apiKey,
-  }
-  local resp = host.http.request("POST", baseUrl .. "/chat/completions", headers, body, TIMEOUT_MS)
+  local endpoint = baseUrl .. "|" .. model
+  local function send(withTemperature)
+    local req = {
+      model = model,
+      messages = {
+        { role = "system", content = systemPrompt or SYSTEM_PROMPT },
+        { role = "user", content = buildUserMessage(instruction, text) },
+      },
+      stream = false,
+    }
+    if withTemperature then req.temperature = 0.3 end
+    local headers = {
+      ["Content-Type"] = "application/json",
+      ["Authorization"] = "Bearer " .. apiKey,
+    }
+    return host.http.request("POST", baseUrl .. "/chat/completions", headers, host.json.encode(req), TIMEOUT_MS)
+  end
+  local withTemperature = not noTemperature[endpoint]
+  local resp = send(withTemperature)
   if resp == nil then
     return nil, "连不上接口：" .. (host.http.lastError() or "未知错误")
   end
+  local detail = resp.status ~= 200 and serverMessage(resp.text, apiKey) or ""
+  if withTemperature and rejectsTemperature(resp) then
+    noTemperature[endpoint] = true
+    resp = send(false)
+    if resp == nil then
+      return nil, "连不上接口：" .. (host.http.lastError() or "未知错误")
+    end
+    detail = resp.status ~= 200 and serverMessage(resp.text, apiKey) or ""
+  end
   if resp.status ~= 200 then
-    host.logError("AI 改写 " .. httpErrorText(resp.status) .. ": " .. tostring(resp.text))
-    return nil, httpErrorText(resp.status)
+    local err = httpErrorText(resp.status, detail)
+    host.logError("AI 改写 " .. err)
+    return nil, err
   end
   local data = host.json.decode(resp.text or "")
   local content = nil
