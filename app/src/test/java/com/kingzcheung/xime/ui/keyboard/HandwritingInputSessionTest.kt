@@ -22,6 +22,46 @@ class HandwritingInputSessionTest {
         assertTrue(f.windows.isEmpty())
     }
 
+    @Test fun undoGestureTakesBackTheLastStrokeWhileWriting() = runTest {
+        val f = Fixture(this)
+        f.stroke(); f.stroke()
+        f.session.press("undo_clear")
+        assertEquals(1, f.session.strokes.size)
+        f.session.press("undo_clear"); advanceUntilIdle()
+        assertFalse(f.session.hasInk)
+        assertEquals(HandwritingPhase.IDLE, f.session.phase)
+        // 撤笔不交给输入法，也不识别
+        assertEquals(listOf("begin"), f.events)
+        assertTrue(f.windows.isEmpty())
+    }
+
+    @Test fun undoGestureRestoresInkTheDeleteKeyJustCleared() = runTest {
+        val f = Fixture(this)
+        f.stroke(); f.stroke()
+        f.session.press("clear_all")
+        assertFalse(f.session.hasInk)
+        f.session.press("undo_clear")
+        assertEquals(2, f.session.strokes.size)
+        advanceUntilIdle()
+        // 放回后照常停顿识别，识别的是放回的两笔
+        assertEquals(listOf(2), f.windows)
+        assertEquals(listOf("begin", "result"), f.events)
+    }
+
+    @Test fun clearedInkIsForgottenOnceTheUserMovesOn() = runTest {
+        val f = Fixture(this)
+        f.stroke()
+        f.session.press("delete")
+        f.stroke(); f.session.press("clear_all")
+        f.session.press("undo_clear")
+        assertEquals("只放回最近一次清掉的", 1, f.session.strokes.size)
+        f.session.clear()
+        f.session.press("clear_all")
+        f.session.press("undo_clear"); advanceUntilIdle()
+        // 板上空着又没有刚清掉的笔迹：交给输入法撤回上次清空的文字
+        assertEquals("undo_clear", f.events.last())
+    }
+
     private class Fixture(scope: TestScope, slow: Boolean = false, early: Boolean = false) {
         val events = mutableListOf<String>()
         val windows = mutableListOf<Int>()

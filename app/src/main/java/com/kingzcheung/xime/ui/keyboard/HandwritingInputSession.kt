@@ -50,6 +50,8 @@ internal class HandwritingInputSession(
     private var early: Deferred<List<Segment>>? = null
     private val pendingKeys = mutableListOf<String>()
     private var previewing = false
+    /** 删除键清掉的笔迹，删除键撤回手势放回；再落笔、擦除或按别的键就作废。 */
+    private var clearedInk: List<List<StrokePoint>>? = null
     val hasInk get() = strokes.isNotEmpty() || currentStroke.isNotEmpty()
 
     private fun dropPreview() {
@@ -69,6 +71,7 @@ internal class HandwritingInputSession(
 
     fun begin(point: StrokePoint): Int {
         val token = invalidate()
+        clearedInk = null
         if (strokes.isEmpty()) onNewCharacter()
         currentStroke = listOf(point)
         phase = HandwritingPhase.WRITING
@@ -95,6 +98,7 @@ internal class HandwritingInputSession(
         val kept = strokes.filterNot { stroke -> stroke.touchedBy(path, radius) }
         if (kept.size == strokes.size) return false
         invalidate()
+        clearedInk = null
         strokes = kept
         if (kept.isNotEmpty()) schedule(pauseMillis()) else {
             phase = HandwritingPhase.IDLE
@@ -112,26 +116,44 @@ internal class HandwritingInputSession(
 
     fun clear() {
         invalidate()
+        clearedInk = null
         strokes = emptyList()
         currentStroke = emptyList()
         phase = HandwritingPhase.IDLE
         dropPreview()
     }
 
+    /** 撤掉最后一笔；撤光了回到空白（公式模式连同公式预览一起清）。 */
+    private fun dropLastStroke() {
+        invalidate()
+        strokes = strokes.dropLast(1)
+        currentStroke = emptyList()
+        if (strokes.isNotEmpty()) schedule(pauseMillis()) else {
+            phase = HandwritingPhase.IDLE
+            dropPreview()
+            if (keepInk()) onKey("clear_composition")
+        }
+    }
+
     fun press(action: String) {
         when {
-            action == "delete" && keepInk() && strokes.isNotEmpty() -> {
+            action == "delete" && keepInk() && strokes.isNotEmpty() -> dropLastStroke()
+            // 删除键的撤回手势（11-05 别人的评论「手写时无法撤销」）：板上有笔迹撤最后一笔；
+            // 刚用删除键清掉笔迹就整份放回；都没有才交给输入法撤回上次清空的文字。
+            action == "undo_clear" && strokes.isNotEmpty() -> dropLastStroke()
+            action == "undo_clear" && !hasInk && clearedInk != null -> {
+                val restored = clearedInk.orEmpty()
+                clearedInk = null
                 invalidate()
-                strokes = strokes.dropLast(1)
-                currentStroke = emptyList()
-                if (strokes.isNotEmpty()) schedule(pauseMillis()) else {
-                    phase = HandwritingPhase.IDLE
-                    onKey("clear_composition")
-                }
+                strokes = restored
+                schedule(pauseMillis())
             }
+            action == "undo_clear" && hasInk -> Unit
             action in setOf("delete", "clear_all", "clear_composition") && hasInk -> {
                 val wasKept = keepInk()
+                val ink = strokes + listOfNotNull(currentStroke.takeIf { it.isNotEmpty() })
                 clear()
+                clearedInk = ink
                 if (wasKept) onKey("clear_composition")
             }
             action in setOf("symbol", "number", "ime_switch") -> {
@@ -150,6 +172,7 @@ internal class HandwritingInputSession(
             }
             else -> {
                 invalidate()
+                clearedInk = null
                 phase = HandwritingPhase.IDLE
                 onKey(action)
             }

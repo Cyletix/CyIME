@@ -1609,6 +1609,8 @@ fun KeyboardView(
                                         if (handwritingPending.size > 0) clearHandwriting()
                                         else callbacks.onKeyPress(key, false)
                                     }
+                                    // 板上没笔迹时的删除键撤回：放回上次清空的文字；还有没选的手写候选时不动，免得插到候选前面。
+                                    "undo_clear" -> if (handwritingPending.size == 0) callbacks.onKeyPress("undo_clear", false)
                                     "symbol" -> { clearHandwriting(); viewModel.showOverlay(OverlayRoute.Symbol) }
                                     "number" -> { clearHandwriting(); viewModel.enterPanel(PanelType.NUMBER) }
                                     "ime_switch" -> {

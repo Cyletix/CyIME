@@ -382,7 +382,7 @@ fun HandwritingKeyboardLayout(
                         HandwritingFunctionKey(action, { press(action) },
                             if (action == "delete") specialKeyBackgroundColor else keyBackgroundColor,
                             if (action == "delete") specialKeyTextColor else keyTextColor,
-                            Modifier.weight(1f).fillMaxWidth(), onClear = { press("clear_all") })
+                            Modifier.weight(1f).fillMaxWidth(), onClear = { press("clear_all") }, onUndo = { press("undo_clear") })
                     }
                 }
             }
@@ -413,7 +413,8 @@ fun HandwritingKeyboardLayout(
                             Modifier.weight(1f).fillMaxHeight())
                     }
                     HandwritingFunctionKey("delete", { press("delete") }, specialKeyBackgroundColor,
-                        specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight(), onClear = { press("clear_all") })
+                        specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight(), onClear = { press("clear_all") },
+                        onUndo = { press("undo_clear") })
                 }
             }
             Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
@@ -442,7 +443,7 @@ fun HandwritingKeyboardLayout(
 
 @Composable
 private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier,
-    onClear: (() -> Unit)? = null, spaceLabel: String = "") {
+    onClear: (() -> Unit)? = null, onUndo: (() -> Unit)? = null, spaceLabel: String = "") {
     val label = when (action) {
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
         "symbol" -> "!@#"; "number" -> "123"; "ime_switch" -> "语言切换"
@@ -455,9 +456,12 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
         SwipeableIconKeyButton(
             icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
             onClick = onClick, onLongClick = onClick, onSwipeUp = onClear,
+            // 和其他键盘的删除键一样有撤回（11-05 别人的评论「手写时无法撤销」）：有笔迹撤最后一笔，刚清掉的放回。
+            onSwipeDown = onUndo,
             followSymbolSwipeDirection = true, deleteKey = true,
             upFeedback = KeyFlickFeedback.DELETE,
-            swipeText = "清空", swipeUpLabel = "清空",
+            downFeedback = KeyFlickFeedback.UNDO,
+            swipeText = "清空", swipeUpLabel = "清空", swipeDownLabel = "撤回",
             backgroundColor = keyBackground, iconColor = keyForeground,
             modifier = modifier.semantics { contentDescription = label }.testTag("handwriting-key:delete"),
         )
