@@ -249,6 +249,28 @@ internal fun KeyboardResizeOverlay(
                 ?.let { it - overlayOrigin.y }
         }
         val bottomHandleClearancePx = BOTTOM_HANDLE_GESTURE_CLEARANCE_DP * density.density
+        // 左右边把手常贴着屏幕边，从边上往里拖会被系统当成返回手势，直接退出调节（11-05 平板）。
+        // 把两条边中间一段（系统每边最多认 200dp）从系统手势里排除；分体时外侧边不可拖，不排除。
+        val edgeExclusionHitPx = RESIZE_EDGE_HIT_DP * density.density
+        val edgeExclusionHalfPx = minOf(frame.height, RESIZE_EDGE_GESTURE_EXCLUSION_DP * density.density) / 2f
+        androidx.compose.runtime.DisposableEffect(hostView, frame, overlayOrigin, splitActive, editingOpacity) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val viewInWindow = IntArray(2).also { hostView.getLocationInWindow(it) }
+                val dx = overlayOrigin.x - viewInWindow[0]
+                val dy = overlayOrigin.y - viewInWindow[1]
+                hostView.systemGestureExclusionRects = if (splitActive || editingOpacity) emptyList() else
+                    listOf(frame.left, frame.right).map { x ->
+                        android.graphics.Rect((x - edgeExclusionHitPx + dx).roundToInt(),
+                            (frame.centerY - edgeExclusionHalfPx + dy).roundToInt(),
+                            (x + edgeExclusionHitPx + dx).roundToInt(),
+                            (frame.centerY + edgeExclusionHalfPx + dy).roundToInt())
+                    }
+            }
+            onDispose {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+                    hostView.systemGestureExclusionRects = emptyList()
+            }
+        }
         val bottomHandleY = if (floatingMode) frame.bottom
             else fixedBottomHandleY(frame, gestureZoneTopPx, bottomHandleClearancePx)
         // 从两条实际可拖边往里排：提示到边框等距，工具面板在两个提示之间居中。

@@ -181,6 +181,8 @@ internal enum class ResizeHandle {
 }
 
 internal const val RESIZE_EDGE_HIT_DP = 26f
+/** 左右边把手从系统返回手势里排除的竖向长度；系统每条边最多认 200dp。 */
+internal const val RESIZE_EDGE_GESTURE_EXCLUSION_DP = 200f
 internal const val RESIZE_CORNER_HIT_DP = 36f
 
 /** 固定键盘底边把手离系统底部手势区上沿至少留这么高（dp）。 */
