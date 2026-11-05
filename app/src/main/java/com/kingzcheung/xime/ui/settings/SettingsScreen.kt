@@ -342,7 +342,9 @@ fun SettingsScreen(
         composable(SettingsRoutes.StorageSpace) {
             StorageSpaceScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
+                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                onNavigateToModels = { navController.navigate(SettingsRoutes.ModelLocal) },
+                onNavigateToPerformance = { navController.navigate(SettingsRoutes.Performance) }
             )
         }
         composable(SettingsRoutes.LogViewer) {

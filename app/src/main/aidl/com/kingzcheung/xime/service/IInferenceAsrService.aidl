@@ -31,4 +31,8 @@ interface IInferenceAsrService {
     oneway void setWholeSentenceFinal(boolean enabled);
     /** 键盘收起：系统缺内存时卸掉空闲的语音模型（常驻设置也卸），见 AsrMemoryPressure。 */
     oneway void onKeyboardHidden();
+    /** 设置 › 存储空间 点「释放」：没在说话、字幕没开时立刻卸掉全部语音模型；卸了返回 true。 */
+    boolean releaseIdleModelsNow();
+    /** 语音进程自己的 PSS（kB）：正式包里别的进程读不到它的 /proc，存储空间页靠这个显示；读不到返回 0。 */
+    long memoryKb();
 }

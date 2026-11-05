@@ -96,6 +96,10 @@ data class SetupFacts(
     val fuzzy: Set<String> = emptySet(),
     /** 能不能替人加、去桌面「字幕」图标；老人包固定有图标。 */
     val captionIconChangeable: Boolean = true,
+    /** 系统现在可用的内存，只用来显示。 */
+    val availMemoryBytes: Long? = null,
+    /** 上次在引导里答了“有内存焦虑”；没答过为 false，所以默认推荐不变。 */
+    val memorySaver: Boolean = false,
 )
 
 data class SetupAnswers(
@@ -109,6 +113,8 @@ data class SetupAnswers(
     val fuzzy: Set<FuzzyHabit> = emptySet(),
     /** 打中文用哪种键盘。 */
     val keyboard: KeyboardWay = KeyboardWay.QWERTY,
+    /** 有内存焦虑（用户 11-04）：只留必需的模型、九键用精简版、语音空闲很快卸掉。 */
+    val memorySaver: Boolean = false,
 ) {
     companion object { const val FLYPY = "double_pinyin_flypy" }
 }
@@ -163,6 +169,8 @@ data class SetupPlan(
     val remove: List<SetupItem>,
     val notes: List<String>,
     val input: InputPlan = InputPlan(),
+    /** 语音模型空闲多少分钟后全部卸掉（二次校正同时）；null 不改。 */
+    val voiceIdleMinutes: Int? = null,
 ) {
     val downloadBytes: Long get() = keep.filter { it.source == SetupSource.DOWNLOAD }.sumOf { it.bytes }
     val freedBytes: Long get() = remove.filter { it.source == SetupSource.ON_PHONE }.sumOf { it.bytes }
@@ -217,7 +225,11 @@ object SetupGuidePlanner {
         keyboard = facts.keyboard,
         doublePinyin = facts.doublePinyin ?: facts.doublePinyinChoices.firstOrNull()?.id ?: SetupAnswers.FLYPY,
         fuzzy = FuzzyHabit.entries.filterTo(linkedSetOf()) { habit -> habit.fuzzyIds.any { it in facts.fuzzy } },
+        memorySaver = facts.memorySaver,
     )
+
+    /** 有内存焦虑时语音模型空闲多久卸掉：和低配档一样 1 分钟。 */
+    const val SAVER_VOICE_IDLE_MINUTES = 1
 
     /** 五笔86 的方案 id（「扩展 › 方案」里审过的那份，约 2 MB）。 */
     const val WUBI = "wubi86"
@@ -338,6 +350,7 @@ object SetupGuidePlanner {
         val tight = free != null && free < TIGHT_FREE
         val veryTight = free != null && free < VERY_TIGHT_FREE
         val light = facts.tier == DeviceModelTier.LIGHT
+        val saver = answers.memorySaver
         val notes = mutableListOf<String>()
         fun available(id: String) = id in facts.installed || id in facts.inPackage
 
@@ -345,21 +358,26 @@ object SetupGuidePlanner {
         // 边说边出字要再加 226 MB，并且说话时两个模型一起跑，入门机型和空间紧张时不推荐。
         val voiceNeeded = answers.voice != VoiceUse.NEVER || answers.caption
         // 字幕只用说完出字时一整句一下子冒出来，看的人跟不上，所以用字幕也配边说边出字。
-        var streaming = voiceNeeded && !light && !tight && (answers.voice == VoiceUse.OFTEN || answers.caption)
+        var streaming = voiceNeeded && !light && !tight && !saver && (answers.voice == VoiceUse.OFTEN || answers.caption)
         // 整句精修（X-ASR，136 MB）：用语音就推荐。同一批录音错字 8.5% → 5.5%，比 SenseVoice 定稿还快，
         // 只用 SenseVoice 时也由它定稿、不再加载 SenseVoice（2026-11-01 复测，用户「就按你说的」）。
         // 空间紧张时不新下；已经下好的留着，空间极紧才删。
-        var xasr = answers.voice != VoiceUse.NEVER &&
+        // 有内存焦虑：已经下好的也删，以后在语音设置里还能下。
+        var xasr = answers.voice != VoiceUse.NEVER && !saver &&
             (!tight || SpeechModelCatalog.XASR in facts.installed && !veryTight)
         if (answers.voice == VoiceUse.OFTEN && !streaming) notes += when {
             light -> "这台${facts.device}${memoryText(facts.memoryBytes)}，边说边出字要同时跑两个语音模型，容易卡，先用「说完一句出字」。"
+            saver && !tight -> "选了能省就省，先用「说完一句出字」，少占 226 MB。"
             else -> "${facts.device}剩余空间不到 3 GB，先用「说完一句出字」，少占 226 MB。"
         }
 
         // 九键词组：完整 203 MB，精简 105 MB（首选约低 3 个百分点）。已经有哪一档就留哪一档。
         // 全拼选了九键就是用九键，“用九键打字吗”那题不再问。
         val usesT9 = answers.t9 || answers.typing == TypingWay.FULL_PINYIN && keyboardOf(facts, answers) == KeyboardWay.T9
+        // 有内存焦虑用精简版（小一半）；只有完整版在、又没联网下不了精简版时先留完整版，不让九键没模型可用。
+        val smallReachable = available(CandidateModelCatalog.NGRAM_SMALL) || facts.online
         var t9Model = if (!usesT9) null else when {
+            saver && (smallReachable || !available(CandidateModelCatalog.NGRAM)) -> CandidateModelCatalog.NGRAM_SMALL
             CandidateModelCatalog.NGRAM in facts.installed && !veryTight -> CandidateModelCatalog.NGRAM
             CandidateModelCatalog.NGRAM_SMALL in facts.installed -> CandidateModelCatalog.NGRAM_SMALL
             CandidateModelCatalog.NGRAM in facts.inPackage && !veryTight -> CandidateModelCatalog.NGRAM
@@ -410,7 +428,7 @@ object SetupGuidePlanner {
         }
         val remove = managedIds.filter { it !in keepIds && available(it) }.map { id ->
             val onPhone = id in facts.installed
-            SetupItem(id, title(id), removeReason(id, facts, answers, streaming, t9Model),
+            SetupItem(id, title(id), saverReason(id, answers, voiceNeeded, t9Model) ?: removeReason(id, facts, answers, streaming, t9Model),
                 if (onPhone) facts.installed.getValue(id) else facts.sizes[id] ?: 0L,
                 if (onPhone) SetupSource.ON_PHONE else SetupSource.IN_PACKAGE, modelName(id))
         }
@@ -428,8 +446,11 @@ object SetupGuidePlanner {
             streaming -> SpeechModelCatalog.TWO_PASS
             else -> SpeechModelCatalog.SENSEVOICE
         }
+        // 有内存焦虑：语音空闲 1 分钟就从内存卸掉（性能与省电里同一项）。不用语音、也不用字幕时没有模型可卸，不改。
+        val voiceIdle = SAVER_VOICE_IDLE_MINUTES.takeIf { saver && voiceNeeded }
+        if (voiceIdle != null) notes += "语音空闲 $voiceIdle 分钟后从内存卸掉，之后第一次说话要多等一两秒。在 性能与省电 里可以改。"
         return SetupPlan(answers, answers.voice != VoiceUse.NEVER, voiceMode, t9Model, keep, remove, notes,
-            inputPlan(facts, answers))
+            inputPlan(facts, answers), voiceIdle)
     }
 
     private fun keepReason(id: String, facts: SetupFacts, answers: SetupAnswers, streaming: Boolean): String = when (id) {
@@ -447,6 +468,18 @@ object SetupGuidePlanner {
         CandidateModelCatalog.NGRAM_SMALL -> "九键按整句组词；比完整版小一半，首选略差一点。"
         HANDWRITING -> "手写输入要用，只有 7 MB。"
         else -> ""
+    }
+
+    /** 是因为选了“能省就省”才删的，说这个原因；不是就 null，用原来的说法。 */
+    private fun saverReason(id: String, answers: SetupAnswers, voiceNeeded: Boolean, t9Model: String?): String? {
+        if (!answers.memorySaver) return null
+        return when (id) {
+            SpeechModelCatalog.PARAFORMER -> "能省就省：先用「说完一句出字」。以后在语音设置里可以再下。".takeIf { voiceNeeded }
+            SpeechModelCatalog.XASR -> "能省就省：先不留整句精修(136 MB)。以后在语音设置里可以再下。"
+                .takeIf { answers.voice != VoiceUse.NEVER }
+            CandidateModelCatalog.NGRAM -> "能省就省：九键改用精简版，小一半。".takeIf { t9Model == CandidateModelCatalog.NGRAM_SMALL }
+            else -> null
+        }
     }
 
     private fun removeReason(id: String, facts: SetupFacts, answers: SetupAnswers, streaming: Boolean,

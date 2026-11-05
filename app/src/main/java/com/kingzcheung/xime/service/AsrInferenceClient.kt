@@ -196,6 +196,18 @@ class AsrInferenceClient(context: Context) {
         try { connected.onKeyboardHidden() } catch (_: Exception) {}
     }
 
+    /** 立刻卸掉空闲的语音模型（设置 › 存储空间 的「释放」）；正在说话、字幕开着或连不上时返回 false。 */
+    suspend fun releaseIdleModelsNow(): Boolean = withContext(Dispatchers.IO) {
+        if (!ensureBound()) return@withContext false
+        try { requireService().releaseIdleModelsNow() } catch (_: Exception) { false }
+    }
+
+    /** 语音进程现在占多少内存（PSS，kB）；连不上或读不到为 null。 */
+    suspend fun memoryKb(): Long? = withContext(Dispatchers.IO) {
+        if (!ensureBound()) return@withContext null
+        try { requireService().memoryKb().takeIf { it > 0 } } catch (_: Exception) { null }
+    }
+
     /** 同步“保存语音调优录音”设置；服务端只在开启时写入应用自己的目录。 */
     suspend fun setSaveTuningAudio(enabled: Boolean) {
         try {

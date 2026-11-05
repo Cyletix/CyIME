@@ -127,6 +127,8 @@ object StorageStats {
                 description = "联想 / 手写 / 语音识别模型(含旧版本目录)，清除后需重新下载",
                 sizeBytes = modelsSize,
                 clearable = true,
+                // 点进模型管理逐个删（11-04「更多对内存的控制」）；「清理」仍是一次全删。
+                navigable = true,
             ),
             Category(
                 id = ID_SCHEMA_CACHE,

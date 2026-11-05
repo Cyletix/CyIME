@@ -158,8 +158,19 @@ class SetupGuideRenderTest {
         rule.onNodeWithTag("setup-fuzzy:FH").assertIsOff()
         rule.onNodeWithTag("setup-fuzzy:none").assertIsNotSelected()
         rule.onNodeWithTag("setup-hide-double-pinyin").assertIsOff()
+        // 有内存焦虑吗（11-04）：没答过是“没有”；选“有”后不留的模型写明是为了省。
+        rule.onNodeWithTag("setup-memory-saver:false").performScrollTo().assertIsSelected()
+        rule.onNodeWithTag("setup-memory-saver:true").assertIsNotSelected()
+        val saverBounds = rule.onNodeWithTag("setup-memory-saver:true").getBoundsInRoot()
+        assertTrue("内存焦虑卡只有 ${saverBounds.bottom - saverBounds.top} 高", saverBounds.bottom - saverBounds.top >= 76.dp)
+        rule.onNodeWithTag("setup-memory-saver:true").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("setup-memory-saver:true").assertIsSelected()
         val out = System.getenv("CYIME_RENDER_OUT")
-        if (!out.isNullOrEmpty()) { File(out).mkdirs(); shot(out, "full-pinyin-fuzzy") }
+        if (!out.isNullOrEmpty()) { File(out).mkdirs(); shot(out, "memory-saver") }
+        rule.onNodeWithTag("setup-memory-saver:false").performScrollTo().performClick()
+        rule.waitForIdle()
+        if (!out.isNullOrEmpty()) shot(out, "full-pinyin-fuzzy")
         // 选双拼：出“用哪一种”，模糊音那题收起。
         rule.onNodeWithTag("setup-typing:DOUBLE_PINYIN").performScrollTo().performClick()
         rule.waitForIdle()

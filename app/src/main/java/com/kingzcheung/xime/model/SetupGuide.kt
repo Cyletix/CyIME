@@ -18,6 +18,7 @@ import com.kingzcheung.xime.settings.InputScheme
 import com.kingzcheung.xime.settings.InputProfiles
 import com.kingzcheung.xime.settings.LanguagePreferences
 import com.kingzcheung.xime.settings.LayoutKind
+import com.kingzcheung.xime.settings.PerformanceProfile
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.SpellingPatches
@@ -34,6 +35,8 @@ object SetupGuide {
     private fun canEnableKeyHints(keys: KeyboardInputPreferences): Boolean =
         InputGestureLocks.lockFor(keys, InputGestureLock.Option.DOUBLE_PINYIN_KEY_HINTS, true) == null
     private const val KEY_SHOWN = "setup_guide_shown"
+    /** 引导里「有内存焦虑吗？」上次的回答，下次打开照它预选。 */
+    private const val KEY_MEMORY_SAVER = "setup_guide_memory_saver"
 
     /** 首次设置向导之后是否已经出现过（看过、设置过或点了“以后再说”）。 */
     fun isShown(context: Context): Boolean = SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_SHOWN, false)
@@ -124,6 +127,10 @@ object SetupGuide {
             canEnableDoublePinyinKeyHints = canEnableKeyHints(keys),
             fuzzy = SpellingPatches.fuzzy(context).mapTo(linkedSetOf()) { it.id },
             captionIconChangeable = !com.kingzcheung.xime.BuildConfig.ELDER,
+            availMemoryBytes = runCatching {
+                android.app.ActivityManager.MemoryInfo().also { context.getSystemService(android.app.ActivityManager::class.java)!!.getMemoryInfo(it) }.availMem
+            }.getOrNull()?.takeIf { it > 0 },
+            memorySaver = SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_MEMORY_SAVER, false),
         )
     }
 
@@ -194,13 +201,21 @@ object SetupGuide {
                 ModelManager.getModel(item.id)?.let { ModelManager.downloadModelInBackground(app, it, onlyIfDefaultPending = true) }
             }
         }
+        SettingsPreferences.getPrefsPublic(app).edit().putBoolean(KEY_MEMORY_SAVER, plan.answers.memorySaver).apply()
+        // 有内存焦虑：语音空闲很快卸掉。和「性能与省电」改滑条写同一处；已经一样就不写，不把“自动”改成“自定义”。
+        plan.voiceIdleMinutes?.let { minutes ->
+            val now = PerformanceProfile.read(app)
+            if (now.speechEngineIdleMinutes != minutes || now.speechRefinerIdleMinutes != minutes)
+                PerformanceProfile.applyCustom(app, now.copy(speechRefinerIdleMinutes = minutes, speechEngineIdleMinutes = minutes))
+        }
         val inputFailed = applyInput(app, plan.input, hideDoublePinyin, facts.online)
         val inputDone = (plan.input.lines + listOfNotNull(plan.input.hideLine?.takeIf { hideDoublePinyin }))
             .filterNot { it.startsWith("打字方式还是") }
             .filterNot { line -> "五笔" in line && inputFailed.any { "五笔" in it } }
         markShown(app)
         FileLogger.i("SetupGuide", "按推荐设置：语音=${plan.voiceMode} 九键=${plan.t9Model} " +
-            "删除=${removing.map { it.id }} 取回=${fromPackage.map { it.id }} 下载=${fromNetwork.map { it.id }} 打字=${plan.input}")
+            "删除=${removing.map { it.id }} 取回=${fromPackage.map { it.id }} 下载=${fromNetwork.map { it.id }} 打字=${plan.input} " +
+            "省内存=${plan.answers.memorySaver} 语音卸载=${plan.voiceIdleMinutes}")
         return Result(removing.count { it.source == SetupSource.ON_PHONE } - failed.size, freed, fromNetwork.sumOf { it.bytes }, waiting, failed,
             inputDone, inputFailed, fromNetwork.map { it.id }, fromPackage.map { it.id })
     }

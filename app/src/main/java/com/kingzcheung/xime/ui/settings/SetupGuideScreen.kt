@@ -282,6 +282,7 @@ private fun DeviceSection(facts: SetupFacts, onOpenPerformance: (() -> Unit)?) {
             if (hardware.isNotEmpty()) FactLine(hardware.joinToString("，"))
             // 档位按这个定，主频、核数只是显示（和「性能与省电」的「CPU 实测」同一句）。
             FactLine("CPU 实测 " + cpuLine(facts.cpu, null, running = false))
+            facts.availMemoryBytes?.let { FactLine("现在可用内存 ${SetupGuidePlanner.gbText(it)}") }
             facts.soc?.let { FactLine("处理器 $it") }
             facts.freeBytes?.let { FactLine("剩余空间 ${SetupGuidePlanner.gbText(it)}") }
             FactLine("网络 " + when { !facts.online -> "未联网"; facts.metered -> "移动数据"; else -> "Wi-Fi" })
@@ -444,6 +445,11 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
             "适合开会、上课，或和听力不好的人当面说话。用不用都不影响打字和语音输入。") {
         onAnswers(answers.copy(caption = it))
     }
+    // 用户 11-04：有人被几百兆吓退、内存不够。选了就只留必需的；默认照上次的回答，没答过是“没有”。
+    GuideQuestion("有内存焦虑吗？", listOf(
+        Triple(true, "有，能省就省", "只留必需的模型，九键用精简版(首选略差)，语音空闲 ${SetupGuidePlanner.SAVER_VOICE_IDLE_MINUTES} 分钟就从内存卸掉"),
+        Triple(false, "没有", "按这台${facts.device}的情况推荐"),
+    ), answers.memorySaver, "setup-memory-saver") { onAnswers(answers.copy(memorySaver = it)) }
 }
 
 /** 打字方式这一块要改的：每项一句；只有主动打开开关才收起其他双拼。 */

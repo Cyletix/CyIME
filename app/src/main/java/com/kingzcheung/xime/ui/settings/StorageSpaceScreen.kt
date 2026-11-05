@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,8 +57,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kingzcheung.xime.settings.MemoryStats
 import com.kingzcheung.xime.settings.StorageStats
 import com.kingzcheung.xime.viewmodel.StorageSpaceViewModel
 
@@ -71,10 +75,16 @@ import com.kingzcheung.xime.viewmodel.StorageSpaceViewModel
 fun StorageSpaceScreen(
     onBack: () -> Unit,
     onNavigateToPlugins: () -> Unit = {},
+    onNavigateToModels: () -> Unit = {},
+    onNavigateToPerformance: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val viewModel: StorageSpaceViewModel = viewModel()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val memory by viewModel.memory.collectAsStateWithLifecycle()
+    val releasingVoice by viewModel.releasingVoice.collectAsStateWithLifecycle()
+    // 从性能与省电、模型管理回来时重新量一次。
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshMemory() }
     val cleaningId by viewModel.cleaningId.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -138,6 +148,10 @@ fun StorageSpaceScreen(
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
             item {
+                MemorySection(memory, releasingVoice, onRelease = viewModel::releaseVoice,
+                    onNavigateToPerformance = onNavigateToPerformance)
+            }
+            item {
                 SettingsSection(title = "数据目录占用") {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         if (list == null) {
@@ -163,6 +177,13 @@ fun StorageSpaceScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            memory?.apkBytes?.let { apk ->
+                                Text(
+                                    text = "安装包本身另占 ${Formatter.formatFileSize(context, apk)}(系统管理，删不掉)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -180,7 +201,9 @@ fun StorageSpaceScreen(
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth()
-                                    .then(if (category.navigable) Modifier.clickable { onNavigateToPlugins() } else Modifier)
+                                    .then(if (category.navigable) Modifier.clickable {
+                                        if (category.id == StorageStats.ID_MODELS) onNavigateToModels() else onNavigateToPlugins()
+                                    } else Modifier)
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -245,6 +268,82 @@ fun StorageSpaceScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 运行内存（用户 11-04「更多对内存的控制和指示」）：CyIME 每个进程占多少、本机还剩多少；
+ * 语音模型在内存里时可以立刻释放。系统不足时会自己先收回后台的语音进程。
+ */
+@Composable
+private fun MemorySection(
+    memory: MemoryStats.Snapshot?,
+    releasing: Boolean,
+    onRelease: () -> Unit,
+    onNavigateToPerformance: () -> Unit,
+) {
+    val context = LocalContext.current
+    SettingsSection(title = "运行内存") {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (memory == null) {
+                Text("正在读取…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                return@Column
+            }
+            Text(
+                text = Formatter.formatFileSize(context, memory.totalPss),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (memory.availBytes != null && memory.totalBytes != null) Text(
+                text = "本机可用 ${Formatter.formatFileSize(context, memory.availBytes)} / 共 ${Formatter.formatFileSize(context, memory.totalBytes)}" +
+                    if (memory.lowMemory) "，内存不足" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (memory.lowMemory) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            memory.processes.forEach { process ->
+                Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(process.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Text(
+                        if (process.pssBytes > 0) Formatter.formatFileSize(context, process.pssBytes) else "—",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (process.isVoice) TextButton(enabled = !releasing, onClick = onRelease) {
+                        if (releasing) CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        else Text("释放")
+                    }
+                }
+            }
+            if (memory.voice == null) Text(
+                text = "语音模型没在内存里",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onNavigateToPerformance).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("性能与省电", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(
+                    "语音模型空闲多久从内存卸掉",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

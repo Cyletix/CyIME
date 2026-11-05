@@ -275,6 +275,13 @@ class AsrInferenceService : Service() {
                 releaseIdleModels()
             }
         }
+        override fun releaseIdleModelsNow(): Boolean = synchronized(lock) {
+            if (captionOwner != null || !sessions.isIdle) return false
+            FileLogger.i("AsrInferenceService", "release requested from settings: releasing voice models")
+            releaseIdleModels()
+            true
+        }
+        override fun memoryKb(): Long = com.kingzcheung.xime.settings.MemoryStats.selfPssKb() ?: 0L
         override fun setKeepModelAlive(keep: Boolean) = synchronized(lock) {
             keepAlive = keep
             cancelIdleRelease()

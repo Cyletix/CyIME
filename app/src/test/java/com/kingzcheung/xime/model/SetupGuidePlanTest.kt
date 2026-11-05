@@ -68,6 +68,48 @@ class SetupGuidePlanTest {
         assertTrue(veryTight.remove.single { it.id == SpeechModelCatalog.XASR }.reason.contains("空间"))
     }
 
+    // 11-04 「是否有内存焦虑」：选“有”只留必需的，语音空闲很快卸掉；没选时和以前一模一样。
+    @Test fun memorySaverKeepsOnlyWhatIsNeeded() {
+        val installed = setOf(SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.XASR,
+            CandidateModelCatalog.NGRAM, "ochwpro")
+        val answers = SetupAnswers(VoiceUse.OFTEN, t9 = true, caption = false, memorySaver = true)
+        val plan = SetupGuidePlanner.plan(facts(DeviceModelTier.ENHANCED, installed = installed), answers)
+        assertEquals(SpeechModelCatalog.SENSEVOICE, plan.voiceMode)
+        assertEquals(setOf(SpeechModelCatalog.SENSEVOICE, CandidateModelCatalog.NGRAM_SMALL, "ochwpro"), plan.keepIds())
+        assertEquals(setOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.XASR, CandidateModelCatalog.NGRAM), plan.removeIds())
+        assertTrue(plan.remove.all { "能省就省" in it.reason })
+        assertEquals(SetupGuidePlanner.SAVER_VOICE_IDLE_MINUTES, plan.voiceIdleMinutes)
+        assertTrue(plan.notes.any { "能省就省" in it })
+        assertTrue(plan.notes.any { "从内存卸掉" in it })
+        // 没选“有”：同一台设备照旧推荐，语音释放不改。
+        val normal = SetupGuidePlanner.plan(facts(DeviceModelTier.ENHANCED, installed = installed), answers.copy(memorySaver = false))
+        assertEquals(SpeechModelCatalog.TWO_PASS, normal.voiceMode)
+        assertEquals(CandidateModelCatalog.NGRAM, normal.t9Model)
+        assertNull(normal.voiceIdleMinutes)
+        assertTrue(normal.notes.none { "能省就省" in it || "从内存卸掉" in it })
+    }
+
+    @Test fun memorySaverAnswerIsRememberedAndOffByDefault() {
+        assertFalse(SetupGuidePlanner.suggest(facts(DeviceModelTier.ENHANCED)).memorySaver)
+        assertTrue(SetupGuidePlanner.suggest(facts(DeviceModelTier.ENHANCED).copy(memorySaver = true)).memorySaver)
+    }
+
+    @Test fun memorySaverWithoutVoiceLeavesVoiceReleaseAlone() {
+        val plan = SetupGuidePlanner.plan(facts(DeviceModelTier.ENHANCED),
+            SetupAnswers(VoiceUse.NEVER, t9 = false, caption = false, memorySaver = true))
+        assertNull(plan.voiceIdleMinutes)
+        assertEquals(setOf("ochwpro"), plan.keepIds())
+    }
+
+    @Test fun memorySaverKeepsFullT9ModelWhenOfflineAndSmallIsMissing() {
+        val offline = facts(DeviceModelTier.ENHANCED, installed = setOf(CandidateModelCatalog.NGRAM)).copy(online = false)
+        val plan = SetupGuidePlanner.plan(offline, SetupAnswers(VoiceUse.NEVER, t9 = true, caption = false, memorySaver = true))
+        assertEquals(CandidateModelCatalog.NGRAM, plan.t9Model)
+        val online = SetupGuidePlanner.plan(offline.copy(online = true),
+            SetupAnswers(VoiceUse.NEVER, t9 = true, caption = false, memorySaver = true))
+        assertEquals(CandidateModelCatalog.NGRAM_SMALL, online.t9Model)
+    }
+
     @Test fun frequentVoiceOnLightPhoneStaysOnOneModelAndSaysWhy() {
         val plan = SetupGuidePlanner.plan(facts(DeviceModelTier.LIGHT), SetupAnswers(VoiceUse.OFTEN, t9 = true, caption = false))
         assertEquals(SpeechModelCatalog.SENSEVOICE, plan.voiceMode)
