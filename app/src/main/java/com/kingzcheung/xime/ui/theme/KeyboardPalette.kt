@@ -12,13 +12,19 @@ data class KeyboardPalette(
     val background: Color, val key: Color, val text: Color, val accent: Color,
     val function: Color, val functionText: Color, val enter: Color,
     val candidateText: Color, val selectedText: Color,
+    /**
+     * 眼睛看到的键盘底色：纯色主题就是 [background]；渐变取各色的平均。iOS 渐变深色的 [background] 是 #000，
+     * 键盘上看到的却是深灰渐变，盖在键盘上的实心面板用这个才和键盘底一致。图片主题没有可取的颜色，仍是 [background]。
+     */
+    val surface: Color = background,
 )
 
 fun resolveKeyboardPalette(themeId: String, dark: Boolean): KeyboardPalette {
     val legacy = KeysConfigHelper.getKeyboardColors()
     fun color(value: Long) = Color(if (value > 0xFFFFFF) value else 0xFF000000 or value)
+    val background = KeyboardThemes.getKeyboardBackgroundColor(themeId, dark)
     return KeyboardPalette(
-        background = KeyboardThemes.getKeyboardBackgroundColor(themeId, dark),
+        background = background,
         key = KeyboardThemes.getKeyBgColorOverride(themeId, dark)
             ?: color(if (dark) legacy.keyBgColorDark else legacy.keyBgColor),
         text = KeyboardThemes.getKeyTextColorOverride(themeId, dark)
@@ -32,8 +38,19 @@ fun resolveKeyboardPalette(themeId: String, dark: Boolean): KeyboardPalette {
             ?: color(if (dark) legacy.candidateTextColorDark else legacy.candidateTextColor),
         selectedText = KeyboardThemes.getCandidateSelectedTextColorOverride(themeId, dark)
             ?: KeyboardThemes.getCandidateSelectedTextColor(themeId, dark),
+        surface = visibleBackground(KeyboardThemes.getRenderingScheme(themeId).keyboardBackground, dark) ?: background,
     )
 }
+
+private fun visibleBackground(config: com.kingzcheung.xime.settings.BackgroundConfig?, dark: Boolean): Color? =
+    when (config?.type) {
+        "solid" -> resolveSolidColor(config, dark)
+        "gradient" -> (if (dark) config.colorsDark ?: config.colors else config.colors)?.takeIf { it.isNotEmpty() }
+            ?.map { Color(0xFF000000 or it) }
+            ?.let { stops -> Color(stops.map { it.red }.average().toFloat(), stops.map { it.green }.average().toFloat(),
+                stops.map { it.blue }.average().toFloat()) }
+        else -> null
+    }
 
 internal val LocalKeyboardPalette = staticCompositionLocalOf<KeyboardPalette?> { null }
 

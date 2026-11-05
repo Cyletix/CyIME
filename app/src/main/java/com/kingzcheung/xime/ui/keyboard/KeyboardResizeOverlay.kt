@@ -8,7 +8,6 @@ import androidx.compose.material.icons.automirrored.rounded.RotateRight
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -111,7 +110,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.foundation.border
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -291,21 +289,25 @@ internal fun KeyboardResizeOverlay(
         val currentSplitEdges by rememberUpdatedState(splitInnerLeft to splitInnerRight)
         val currentSplitGapFraction by rememberUpdatedState<(ResizeRect) -> Float>(::splitGapFraction)
 
-        // 调节界面的面板、按钮和滑条使用键盘本身的配色（键帽色、文字色、强调色），
-        // 与键盘设计一致；没有键盘配色时（预览、测试）退回 Material 主题色。
+        // 调节界面的面板和按钮照键盘本体画（11-04「和键盘本体统一风格」）：面板是键盘底色，按钮是功能键
+        // （功能键颜色、按键圆角、不描边），开着的「悬浮」「分体」和亮起的 Shift 同色，「确认」和回车键同色。
+        // 玻璃主题也用实心色，盖住下面的键字。没有键盘配色时（预览、测试）退回 Material 主题色。
         val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
         val accentColor = (palette?.accent ?: MaterialTheme.colorScheme.primary).copy(alpha = 1f)
-        // 滑条面板和按钮用功能键的实心颜色，玻璃主题也不透明；文字用功能键文字色。
         val functionColor = (palette?.function ?: MaterialTheme.colorScheme.surfaceVariant).copy(alpha = 1f)
         val preferredText = (palette?.functionText ?: MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 1f)
         val functionTextColor = if (contrastRatio(functionColor, preferredText) >= 4.5f) preferredText else readableOn(functionColor)
-        val panelColor = (palette?.key ?: MaterialTheme.colorScheme.surface).copy(alpha = 1f)
+        val enterColor = (palette?.enter ?: functionColor).copy(alpha = 1f)
+        // 渐变主题取渐变的平均色（iOS 渐变深色的 background 是纯黑，面板会成一块黑板）。
+        val panelColor = (palette?.surface ?: MaterialTheme.colorScheme.surface).copy(alpha = 1f)
         val keyText = (palette?.text ?: MaterialTheme.colorScheme.onSurface).copy(alpha = 1f)
         val panelText = if (contrastRatio(panelColor, keyText) >= 4.5f) keyText else readableOn(panelColor)
-        // 描边和滑条没走过的一段带主题强调色（11-03「不会跟随主题变化 一直都是灰色的」）：
-        // 原来用文字色 28%，任何主题下都是一条灰线。
-        val toolOutlineColor = lerp(panelText, accentColor, 0.6f).copy(alpha = 0.40f)
-        val toolOutline = BorderStroke(1.dp, toolOutlineColor)
+        val keyRadius = LocalKeyCornerRadius.current
+        // 开关亮起时的颜色直接用 Shift 锁定的算法；按实心键算，玻璃下也不透。
+        val toggleOnColor = shiftKeyColors(functionColor, functionTextColor, accentColor, panelColor,
+            LocalKeyboardInputPreferences.current.frostedGlass.copy(enabled = false),
+            com.kingzcheung.xime.viewmodel.ShiftMode.CAPS, pressed = false, legacyStateColor = functionColor)
+            .background.compositeOver(panelColor)
         val panelShape = remember(floatingMode, roundedBottom, roundedTop) {
             keyboardPanelShape(floatingMode, roundedBottom, roundedTop)
         }
@@ -806,9 +808,10 @@ internal fun KeyboardResizeOverlay(
         val controlIconSize = 18.dp * controlScale
         val showButtonLabels = panelWidth - panelInset * 2 >=
             (140f + 120f * density.fontScale).dp * controlScale
-        val actionRadius = 10.dp * controlScale
-        val toolShape = RoundedCornerShape(actionRadius + panelInset)
-        val actionShape = RoundedCornerShape(actionRadius)
+        // 按钮和键盘上的键同一个圆角；面板圆角 = 按键圆角 + 边距，和按钮同心；直角按键时面板也是直角。
+        val panelRadius = if (keyRadius > 0.dp) keyRadius + panelInset else 0.dp
+        val toolShape = RoundedCornerShape(panelRadius)
+        val actionShape = RoundedCornerShape(keyRadius)
         fun confirmResize() {
             val finalRect = currentPreviewRect ?: previewState.rect
             if (floatingMode && finalRect != null) {
@@ -838,14 +841,14 @@ internal fun KeyboardResizeOverlay(
             Column(
                 modifier = Modifier.width(panelWidth).align(Alignment.Center)
                     // 拖透明度时底板只包住滑条那一行（下面画），按钮那一行藏起来，位置不动、不跳。
-                    .then(if (adjustingOpacity) Modifier else Modifier.background(panelColor, toolShape).border(toolOutline, toolShape))
+                    .then(if (adjustingOpacity) Modifier else Modifier.background(panelColor, toolShape))
                     .padding(start = panelInset, end = panelInset, top = (panelInset - sliderSlack).coerceAtLeast(0.dp),
                         bottom = panelInset),
                 verticalArrangement = Arrangement.spacedBy((rowGap - sliderSlack).coerceAtLeast(0.dp)),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // 滑条照外框画（用户 2026-11-01 要求跟随主题、和外面边框一致）：轨道和四边把手一样粗、一样的圆头，
-                // 走过的一段用把手的强调色，没走过的一段用按钮描边的颜色；「透明度 N%」和按钮文字同字号、同颜色，
+                // 走过的一段用把手的强调色，没走过的一段是强调色压在底板上的浅色；「透明度 N%」和按钮文字同字号、同颜色，
                 // 放在滑条右边，不压在细轨道中间把它截成两段。
                 val thumbSize = 18.dp * controlScale
                 val trackHeight = frameStyle.handleThicknessDp.dp
@@ -863,9 +866,8 @@ internal fun KeyboardResizeOverlay(
                             val dy = sliderBandTop.toPx()
                             val topLeft = Offset(-dx, -dy)
                             val band = Size(size.width + 2f * dx, size.height + 2f * dy)
-                            val corner = CornerRadius((actionRadius + panelInset).toPx())
+                            val corner = CornerRadius(panelRadius.toPx())
                             drawRoundRect(panelColor, topLeft, band, corner)
-                            drawRoundRect(toolOutlineColor, topLeft, band, corner, style = Stroke(1.dp.toPx()))
                         }
                         .testTag("keyboard-resize-opacity-panel"),
                     verticalAlignment = Alignment.CenterVertically,
@@ -951,12 +953,13 @@ internal fun KeyboardResizeOverlay(
                     icon: @Composable () -> Unit,
                     onClick: () -> Unit,
                 ) {
+                    // 和键盘上的键一个样：平时是功能键，开着的开关像亮起的 Shift，「确认」像回车键。
                     val container = when {
-                        selected == true -> accentColor
-                        emphasized -> lerp(panelColor, accentColor, 0.22f)
-                        else -> panelColor
+                        selected == true -> toggleOnColor
+                        emphasized -> enterColor
+                        else -> functionColor
                     }
-                    val preferredContent = if (selected == true) readableOn(container) else panelText
+                    val preferredContent = if (selected == true) readableOn(container) else functionTextColor
                     val content = if (contrastRatio(container, preferredContent) >= 4.5f) preferredContent else readableOn(container)
                     androidx.compose.material3.Button(
                         onClick = onClick,
@@ -966,13 +969,13 @@ internal fun KeyboardResizeOverlay(
                             if (selected != null) this.selected = selected
                         },
                         shape = actionShape,
-                        border = if (enabled) toolOutline else BorderStroke(1.dp, panelText.copy(alpha = 0.12f)),
+                        border = null,
                         elevation = null,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = container,
                             contentColor = content,
-                            disabledContainerColor = panelColor,
-                            disabledContentColor = panelText.copy(alpha = 0.45f),
+                            disabledContainerColor = lerp(panelColor, functionColor, 0.5f),
+                            disabledContentColor = functionTextColor.copy(alpha = 0.45f),
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp * controlScale, vertical = 0.dp),
                     ) {
