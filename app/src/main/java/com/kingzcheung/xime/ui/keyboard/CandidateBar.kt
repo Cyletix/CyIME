@@ -538,6 +538,7 @@ fun CandidateBar(
                     modifier = Modifier
                         .weight(1f)
                         .clipToBounds(),
+                    overscrollEffect = null,
                 ) {
                     itemsIndexed(inlineSuggestions, key = { index, _ -> index }) { _, suggestion ->
                         Box(modifier = Modifier.fillMaxHeight()) {
@@ -582,7 +583,8 @@ fun CandidateBar(
                     modifier = Modifier.fillMaxWidth(),
                     state = candidateListState,
                     flingBehavior = rememberCandidateFlingBehavior(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    overscrollEffect = null,
                 ) {
                     itemsIndexed(displayCandidates, key = { index, _ -> index }) { index, candidate ->
                         CandidateItem(
@@ -896,7 +898,8 @@ private fun ClipboardPreviewBar(
                     ClipboardImagePreview(image,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                         onPaste = { callbacks.onClipboardImageSelect?.invoke(image) })
-                } else LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll")) {
+                } else LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll"),
+                    overscrollEffect = null) {
                     itemsIndexed(previews) { index, preview ->
                         // 预览可横向滚动全部内容；换行仅在显示时折成空格，粘贴仍使用原文。
                         Text(preview, color = visuals.textColor, fontSize = 15.sp, maxLines = 1,
@@ -1706,9 +1709,13 @@ private fun ScrollableCandidateRow(
         androidx.compose.foundation.gestures.snapping.SnapPosition.Start)
     val freeFling = rememberCandidateFlingBehavior()
     val tailPadding = with(LocalDensity.current) { tailPaddingPx.toDp() }
+    // 候选栏不要边缘拉伸回弹（这个文件里的几条横滑行都一样）：回弹没收完时，列表把每次按下都当成接着滑，
+    // 点候选选不上，按着时栏尾藏起来的半截候选还会露出来（用户录屏 11-05：有的手机回弹一直收不完，
+    // 横滑一下才恢复）。
     LazyRow(Modifier.fillMaxWidth().testTag("candidate-scroll-row"), state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(end = tailPadding),
         flingBehavior = if (longVisible) freeFling else snapFling,
+        overscrollEffect = null,
         horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
         items(all.size) { index ->
             val hidden = index in cutAtEdge
