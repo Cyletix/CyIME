@@ -410,7 +410,7 @@ end
 local MAX_SERVER_MESSAGE = 80
 
 local function serverMessage(text, apiKey)
-  text = text or ""
+  text = tostring(text or "")
   local msg = nil
   local ok, data = pcall(host.json.decode, text)
   if ok and type(data) == "table" then
@@ -421,11 +421,14 @@ local function serverMessage(text, apiKey)
     elseif type(data.detail) == "string" then msg = data.detail
     elseif type(data.msg) == "string" then msg = data.msg
     end
-  elseif not trim(text):match("^[{%[<]") then
+  elseif text:match("^%s*{") then
+    -- 被截断、解析不了的 JSON：直接找 "message"
+    msg = text:match('"message"%s*:%s*"([^"]*)')
+  elseif not text:match("^%s*[%[<]") then
     msg = text  -- 纯文字回复；HTML 错误页不显示
   end
   if msg == nil then return "" end
-  msg = trim(msg:match("^[^\r\n]*") or "")
+  msg = (msg:match("^[^\r\n]*") or ""):gsub("^%s+", ""):gsub("%s+$", "")
   if apiKey ~= nil and #apiKey >= 6 then
     local s, e = msg:find(apiKey, 1, true)
     while s ~= nil do
@@ -438,14 +441,11 @@ local function serverMessage(text, apiKey)
     if pos > 1 and msg:sub(pos - 1, pos - 1):match("^[A-Za-z0-9_]$") then return key end
     return "sk-***"
   end)
-  if charCount(msg) > MAX_SERVER_MESSAGE then
-    local out, n = {}, 0
-    for ch in msg:gmatch(UTF8_CHAR) do
-      n = n + 1
-      if n > MAX_SERVER_MESSAGE then break end
-      out[#out + 1] = ch
-    end
-    msg = table.concat(out) .. "…"
+  local out, n = {}, 0
+  for ch in msg:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+    n = n + 1
+    if n > MAX_SERVER_MESSAGE then return table.concat(out) .. "…" end
+    out[#out + 1] = ch
   end
   return msg
 end
@@ -468,8 +468,8 @@ end
 -- 遇到这种 400 就不带 temperature 重发一次，并记住这个接口地址 + 模型，之后都不带。
 local noTemperature = {}
 
-local function rejectsTemperature(resp)
-  return resp.status == 400 and contains((resp.text or ""):lower(), "temperature")
+local function rejectsTemperature(status, text)
+  return status == 400 and tostring(text or ""):lower():find("temperature", 1, true) ~= nil
 end
 
 -- 返回 content, err
@@ -501,7 +501,7 @@ local function callApi(instruction, text, systemPrompt)
     return nil, "连不上接口：" .. (host.http.lastError() or "未知错误")
   end
   local detail = resp.status ~= 200 and serverMessage(resp.text, apiKey) or ""
-  if withTemperature and rejectsTemperature(resp) then
+  if withTemperature and rejectsTemperature(resp.status, resp.text) then
     noTemperature[endpoint] = true
     resp = send(false)
     if resp == nil then
