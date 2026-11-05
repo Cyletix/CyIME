@@ -19,6 +19,11 @@ class ClipboardGroupStore private constructor(context: Context) {
     @Volatile private var addTarget: Pair<String, Long>? = null
     /** Tab the board was on when it closed for the add / edit form; the board reopens on it. */
     @Volatile private var returnTab: Pair<String, Long>? = null
+    /**
+     * The keyboard opened the 剪贴板分组 page: "" from 管理分组, or the key of the record whose 分组 menu
+     * offered 新建分组 (the group made there takes that record). The page takes it once when it opens.
+     */
+    @Volatile private var keyboardEntry: Pair<String, Long>? = null
 
     private fun read(): ClipboardGroupState {
         val groups = ClipboardGroupCodec.decodeGroups(prefs.getString(KEY_GROUPS, null))
@@ -39,13 +44,18 @@ class ClipboardGroupStore private constructor(context: Context) {
         _state.value = next
     }
 
-    /** Null when the group was added; otherwise why the name cannot be used. */
-    @Synchronized fun add(name: String): String? {
+    /**
+     * Null when the group was added; otherwise why the name cannot be used. [records] go into the new
+     * group (the record whose 分组 menu led here).
+     */
+    @Synchronized fun add(name: String, records: Collection<String> = emptyList()): String? {
         val groups = _state.value.groups
         clipboardGroupNameError(name, groups)?.let { return it }
         var id = "g" + System.currentTimeMillis().toString(36)
         while (groups.any { it.id == id }) id += "x"
-        update { it.withGroup(ClipboardGroup(id, cleanClipboardGroupName(name))) }
+        update { it.withGroup(ClipboardGroup(id, cleanClipboardGroupName(name))).let { state ->
+            if (records.isEmpty()) state else state.assigned(records, id)
+        } }
         return null
     }
 
@@ -86,6 +96,22 @@ class ClipboardGroupStore private constructor(context: Context) {
         }?.first
     }
 
+    /** The group the add form will put its record into (for the form's title), without taking it. */
+    fun addTargetGroup(): ClipboardGroup? = addTarget?.takeIf { System.currentTimeMillis() - it.second < FORM_LIFETIME_MS }
+        ?.let { (id, _) -> _state.value.groups.firstOrNull { it.id == id } }
+
+    /** [recordKey]: the record whose 分组 menu opened the page; null from 管理分组. */
+    fun setKeyboardEntry(recordKey: String?) {
+        keyboardEntry = recordKey.orEmpty() to System.currentTimeMillis()
+    }
+
+    /** Null when the page was not opened from the keyboard just now; "" from 管理分组; else the record's key. */
+    fun takeKeyboardEntry(): String? {
+        val entry = keyboardEntry
+        keyboardEntry = null
+        return entry?.takeIf { System.currentTimeMillis() - it.second < KEYBOARD_ENTRY_MS }?.first
+    }
+
     fun setReturnTab(key: String) {
         returnTab = key to System.currentTimeMillis()
     }
@@ -101,6 +127,8 @@ class ClipboardGroupStore private constructor(context: Context) {
         private const val KEY_MEMBERS = "group_members"
         private const val KEY_HIDDEN = "hidden_categories"
         private const val FORM_LIFETIME_MS = 10 * 60_000L
+        /** Settings opens at once; an entry the page never took (it failed to open) must not stick. */
+        private const val KEYBOARD_ENTRY_MS = 60_000L
 
         @Volatile private var instance: ClipboardGroupStore? = null
 

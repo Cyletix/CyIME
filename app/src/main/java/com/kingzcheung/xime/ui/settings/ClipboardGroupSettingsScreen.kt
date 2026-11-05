@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.settings
 
+import android.app.Activity
+import android.content.ContextWrapper
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +45,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +70,16 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val store = remember(context) { ClipboardGroupStore.getInstance(context) }
     val state by store.state.collectAsState()
+    // Opened from the keyboard: null otherwise, "" from 管理分组, or the record whose 分组 menu offered
+    // 新建分组 (the group made here takes it). Back returns to the app the keyboard was in, not to the
+    // settings home (tablet 11-05).
+    val entry: String? = rememberSaveable { mutableStateOf(store.takeKeyboardEntry()) }.value
+    var pendingRecord by rememberSaveable { mutableStateOf(entry?.ifEmpty { null }) }
+    val leave: () -> Unit = if (entry == null) onBack else {
+        { generateSequence(context) { (it as? ContextWrapper)?.baseContext }.filterIsInstance<Activity>().firstOrNull()
+            ?.finish() ?: onBack() }
+    }
+    BackHandler(enabled = entry != null, onBack = leave)
     // Name dialog: null closed; a group being renamed, or a new one (id "").
     var naming by remember { mutableStateOf<ClipboardGroup?>(null) }
     var deleting by remember { mutableStateOf<ClipboardGroup?>(null) }
@@ -75,7 +89,7 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("剪贴板分组") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
@@ -121,8 +135,11 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
     }
     naming?.let { group ->
         ClipboardGroupNameDialog(group, state.groups, onDismiss = { naming = null }) { name ->
-            val error = if (group.id.isEmpty()) store.add(name) else store.rename(group.id, name)
-            if (error == null) naming = null
+            val error = if (group.id.isEmpty()) store.add(name, listOfNotNull(pendingRecord)) else store.rename(group.id, name)
+            if (error == null) {
+                naming = null
+                if (group.id.isEmpty()) pendingRecord = null
+            }
             error
         }
     }

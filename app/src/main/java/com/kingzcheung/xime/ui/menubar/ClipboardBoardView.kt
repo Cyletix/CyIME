@@ -193,9 +193,12 @@ internal fun ConnectedClipboardBoard(
         },
         groups = groups, initialTabKey = returnTab,
         onAssignGroup = groupStore::assign,
-        onManageGroups = {
+        onManageGroups = { record ->
+            groupStore.setKeyboardEntry(record)
             context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
                 com.kingzcheung.xime.ui.settings.SettingsRoutes.ClipboardGroups))
+            // The keyboard left open covered 新建分组 on the settings page (tablet 11-05); Back there returns here.
+            hideKeyboardFrom(context)
         },
         onOpenSettings = {
             context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
@@ -205,6 +208,12 @@ internal fun ConnectedClipboardBoard(
             groupStore.setReturnTab(tab.key)
             if (adding) groupStore.setAddTarget((tab as? ClipboardTab.Group)?.group?.id)
         })
+}
+
+/** Closes the keyboard this board is in (it runs inside the input method service). */
+internal fun hideKeyboardFrom(context: Context) {
+    generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+        .filterIsInstance<android.inputmethodservice.InputMethodService>().firstOrNull()?.requestHideSelf(0)
 }
 
 /** Preference (board prefs) for how many lines a history card shows: 2, 4 or 8. */
@@ -271,8 +280,11 @@ internal fun ClipboardBoardView(
     initialTabKey: String? = null,
     /** Puts records into a group (null: out of their group); they are not fixed. */
     onAssignGroup: (Set<String>, String?) -> Unit = { _, _ -> },
-    /** Opens the group settings (new, rename, delete); null hides those entries. */
-    onManageGroups: (() -> Unit)? = null,
+    /**
+     * Opens the group settings (new, rename, delete); null hides those entries. The argument is the
+     * record whose 分组 menu offered 新建分组 (the new group takes it); null from 管理分组.
+     */
+    onManageGroups: ((String?) -> Unit)? = null,
     /** Opens Settings › 剪贴板面板 (the switches of this menu and the board's other settings); null hides it. */
     onOpenSettings: (() -> Unit)? = null,
     /** The add (true) or edit form is about to open from this tab. */
@@ -681,8 +693,12 @@ internal fun ClipboardBoardView(
                     assignGroup(setOf(key), null)
                 })
                 onManageGroups?.let { manage ->
-                    add(LongPressMenuEntry(if (groups.groups.isEmpty()) Icons.Default.Add else Icons.Default.Settings,
-                        if (groups.groups.isEmpty()) "新建分组" else "管理分组", tag = "clipboard-group-manage", onClick = manage))
+                    // No group yet: the group made on the settings page takes this record (tablet 11-05).
+                    val creating = groups.groups.isEmpty()
+                    add(LongPressMenuEntry(if (creating) Icons.Default.Add else Icons.Default.Settings,
+                        if (creating) "新建分组" else "管理分组", tag = "clipboard-group-manage") {
+                        manage(key.takeIf { creating })
+                    })
                 }
             }
             keyboardMenuEntries[0] = actions
@@ -696,7 +712,10 @@ internal fun ClipboardBoardView(
                 add(CompactActionMenuEntry(Icons.Default.DoneAll, "多选", enabled = cards.isNotEmpty(), tag = "clipboard-select") {
                     selecting = true; selected = emptySet()
                 })
-                addPinned?.let { action -> add(CompactActionMenuEntry(Icons.Default.Edit, "新增固定内容", tag = "clipboard-add-text", onClick = action)) }
+                // Same words as the + button: on a group's tab the new record goes into the group, not fixed.
+                addPinned?.let { action -> add(CompactActionMenuEntry(Icons.Default.Edit,
+                    (tab as? ClipboardTab.Group)?.let { group -> "新增到「${group.label}」" } ?: "新增固定内容",
+                    tag = "clipboard-add-text", onClick = action)) }
                 add(CompactActionMenuEntry(Icons.Default.Image, "添加图片", tag = "clipboard-pick", onClick = onPick))
                 onRecognizeDocument?.let { action -> add(CompactActionMenuEntry(Icons.Default.DocumentScanner,
                     "拍照识别", tag = "clipboard-ocr", onClick = action)) }
@@ -704,7 +723,7 @@ internal fun ClipboardBoardView(
                     tag = "clipboard-photos", onClick = onPhotoAccess))
                 onPullRemote?.let { action -> add(CompactActionMenuEntry(Icons.Default.Sync, "同步", tag = "clipboard-sync", onClick = action)) }
                 onManageGroups?.let { action -> add(CompactActionMenuEntry(Icons.Default.Folder, "管理分组",
-                    tag = "clipboard-manage-groups", onClick = action)) }
+                    tag = "clipboard-manage-groups") { action(null) }) }
                 onOpenSettings?.let { action -> add(CompactActionMenuEntry(Icons.Default.Settings, "剪贴板设置",
                     tag = "clipboard-settings", onClick = action)) }
                 closeAfterPaste?.let { on -> add(CompactActionMenuEntry(

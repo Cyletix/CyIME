@@ -853,7 +853,13 @@ fun KeyboardView(
                 )
             } else if (state.showQuickSendForm) {
                 val clipboardGroups = com.kingzcheung.xime.clipboard.ClipboardGroupStore.getInstance(LocalContext.current)
+                // Opened from a group's tab: the record goes into that group and is not fixed, so the title says so.
+                val formTitle = remember(state.quickSendEditingItemId) {
+                    if (state.quickSendEditingItemId != null) "编辑剪贴板"
+                    else clipboardGroups.addTargetGroup()?.let { "新增到「${it.name}」" } ?: "新增固定"
+                }
                 QuickSendFormArea(
+                    title = formTitle,
                     backgroundColor = Color.Transparent,
                     textColor = keyTextColor,
                     accentColor = accentColor,
