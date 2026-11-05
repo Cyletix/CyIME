@@ -53,6 +53,8 @@ internal object EnterProbe {
         fun finish(message: String) { android.util.Log.i("DevLearning", message); pending.resultData = message; pending.finish() }
         val ime = service?.get() ?: return finish("enter_probe: keyboard not running")
         if (method !in methods && method != CLEAR) return finish("enter_probe: unknown method $method, one of ${methods.joinToString(",")}")
+        // 发出去以后有的应用会收起键盘，这时连接还在但量不到东西，不能算「发送」。
+        if (!ime.isInputViewShown) return finish("enter_probe: keyboard hidden, tap the input box")
         val ic = ime.currentInputConnection ?: return finish("enter_probe: no input field")
         val handler = ime.mainHandler
         ic.finishComposingText()
@@ -60,14 +62,17 @@ internal object EnterProbe {
         if (method == CLEAR) return finish("enter_probe: cleared")
         ic.commitText(marker, 1)
         handler.postDelayed({
-            val before = length(ic)
+            val before = length(ic) ?: return@postDelayed finish("enter_probe: method=$method result=unreadable")
             val returned = runCatching { perform(ime, ic, method) }.getOrElse { "error:${it.javaClass.simpleName}" }
             handler.postDelayed({
                 // 发送后应用可能重启输入框，量新的连接。
                 val now = ime.currentInputConnection ?: ic
                 val after = length(now)
                 val lf = now.getTextBeforeCursor(1, 0)?.toString() == "\n"
+                val hidden = !ime.isInputViewShown
                 val result = when {
+                    after == null -> "unreadable"
+                    after == 0 && hidden -> "sent-keyboard-closed"
                     after == 0 -> "sent"
                     after == before + 1 && lf -> "newline"
                     after == before -> "nothing"
@@ -78,8 +83,12 @@ internal object EnterProbe {
         }, SETTLE_MS)
     }
 
-    private fun length(ic: InputConnection): Int =
-        (ic.getTextBeforeCursor(MAX, 0)?.length ?: 0) + (ic.getTextAfterCursor(MAX, 0)?.length ?: 0)
+    /** 输入框里的字数；读不到（连接断了）是 null，不当成空。 */
+    private fun length(ic: InputConnection): Int? {
+        val before = ic.getTextBeforeCursor(MAX, 0) ?: return null
+        val after = ic.getTextAfterCursor(MAX, 0) ?: return null
+        return before.length + after.length
+    }
 
     private fun perform(ime: XimeInputMethodService, ic: InputConnection, method: String): String {
         val info = ime.currentInputEditorInfo
