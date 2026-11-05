@@ -1839,7 +1839,7 @@ object KeysConfigHelper {
         keyboardStrokeConfig.sideSymbols ?: DEFAULT_STROKE_SIDE_SYMBOLS
 
     /** 获取笔画键手势配置（xime.yaml keyboard.stroke.keys，custom 键级覆盖）。
-     *  键 id 为键面标签：一/丨/丿/丶/乛、*、分词、，、英。 */
+     *  键 id 为键面标签：一、丨、丿、丶、乛、*、分词、，、。 */
     fun getStrokeKeyGesture(key: String): KeyGestureConfig? = _strokeGestureConfigs[key]
 
     internal fun qwertySymbolEditorValues(context: Context, english: Boolean): Map<String, String> {

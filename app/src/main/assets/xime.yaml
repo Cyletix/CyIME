@@ -744,7 +744,7 @@ keyboard:
       "*": { swipe_up: { value: "6", display: "key" } }
       "分词": { swipe_up: { value: "7", display: "key" } }
       "，": { swipe_up: { value: "8", display: "key" } }
-      "英": { swipe_up: { value: "9", display: "key" } }
+      "。": { swipe_up: { value: "9", display: "key" } }
 
   # 手写键盘配置
   # schemas 声明使用手写布局的方案：手写不经过 rime 引擎（由 HandwritingEngine

@@ -144,7 +144,7 @@ class CornerHintConsistencyTest {
             assertEquals(digit.toString(), t9.swipeUp!!.value)
             assertNull("九键 $digit 没有下角标", t9.swipeDown)
         }
-        for ((index, key) in listOf("一", "丨", "丿", "丶", "乛", "*", "分词", "，", "英").withIndex()) {
+        for ((index, key) in listOf("一", "丨", "丿", "丶", "乛", "*", "分词", "，", "。").withIndex()) {
             val stroke = KeysConfigHelper.getStrokeKeyGesture(key)!!
             assertEquals((index + 1).toString(), stroke.swipeUp!!.value)
             assertNull("笔画 $key 没有下角标", stroke.swipeDown)

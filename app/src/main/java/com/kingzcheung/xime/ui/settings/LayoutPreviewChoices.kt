@@ -148,7 +148,7 @@ private fun previewRows(layout: InputLayout, language: InputLanguage, @Suppress(
     when (layout.kind) {
         LayoutKind.T9 -> listOf(listOf("分词", "ABC", "DEF"), listOf("GHI", "JKL", "MNO"), listOf("PQRS", "TUV", "WXYZ"))
         LayoutKind.KANA_KEYPAD -> japaneseKanaKeys.take(9).map { it.center.label }.chunked(3)
-        LayoutKind.STROKE_KEYPAD -> listOf(listOf("一", "丨", "丿"), listOf("丶", "乛", "*"), listOf("分词", "，", "英"))
+        LayoutKind.STROKE_KEYPAD -> listOf(listOf("一", "丨", "丿"), listOf("丶", "乛", "*"), listOf("分词", "，", "。"))
         LayoutKind.NUMBER -> (1..9).map(Int::toString).chunked(3)
         else -> KeysConfigHelper.previewKeyRows(layout, language)
     }

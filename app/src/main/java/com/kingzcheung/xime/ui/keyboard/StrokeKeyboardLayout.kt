@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,16 +62,16 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.util.SubcharHelper
 
 /**
- * 笔画键盘布局 — 参照 [T9KeyboardLayout] 结构。
+ * 笔画键盘布局 — 与 [T9KeyboardLayout] 同一套排布（用户 11-05：第 2 层数字要有 9 和 0，空格旁不要「.」）。
  *
  * 布局说明：
- * - 左侧候选区：。？ ！ ~ 4 个常用标点，纵向排列。
- * - 中间主键区：
- *   第1行：一(h) | 丨(s) | 丿(p)
- *   第2行：丶(n) | 乛(z) | *
- *   第3行：分词 | ， | 英
- *   第4行：符号 | 123 | 空格 | .
- * - 右侧功能键区：退格 | 重输 | 确定
+ * - 左侧候选区：。？ ！ ~ 4 个常用标点，纵向排列；下面 !@#。
+ * - 中间主键区（上滑出角标数字 1-9）：
+ *   第1行：一(h)1 | 丨(s)2 | 丿(p)3
+ *   第2行：丶(n)4 | 乛(z)5 | *6
+ *   第3行：分词7 | ，8 | 。9
+ *   第4行：123 | 空格 | 语言键（同九键）
+ * - 右侧功能键区：退格 | 重输 | 0 | 确定（同九键）
  */
 @Composable
 fun StrokeKeyboardLayout(
@@ -281,7 +282,6 @@ private fun StrokeKeyboardContent(
     compactMode: Boolean = false,
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
-    val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val strokeFontSize = if (compactMode) 13.sp else 16.sp
     val symbolFontSize = if (compactMode) 11.sp else 13.sp
     val specialCtxTextColor = if (compactMode) specialKeyTextColor
@@ -518,25 +518,19 @@ private fun StrokeKeyboardContent(
                     onSwipeStateChange = onSwipeStateChange,
                     swipes = swipesFor("，", "8"),
                 )
-                val languageSwipes = swipesFor("英", "9")
-                LanguageKeyButton(
-                    text = "英", badgeText = "9",
-                    onClick = { onKeyPress("ime_switch") },
-                    onPress = { onKeyPressDown?.invoke("ime_switch") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
+                StrokeDigitKey(
+                    digit = "。", swipeDigit = "9",
+                    onClick = { onKeyPress("。") },
+                    onPress = { onKeyPressDown?.invoke("。") },
+                    backgroundColor = keyBackgroundColor,
+                    textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius,
                     fontSize = strokeFontSize,
                     onSwipeStateChange = onSwipeStateChange,
-                    swipeText = languageSwipes.swipeUpText,
-                    swipeDownText = languageSwipes.swipeDownText,
-                    swipeUpKeyLabel = languageSwipes.swipeUpKeyLabel,
-                    swipeDownKeyLabel = languageSwipes.swipeDownKeyLabel,
-                    onSwipe = languageSwipes.onSwipeUp?.let { handler -> { _: String -> handler() } },
-                    onSwipeDown = languageSwipes.onSwipeDown?.let { handler -> { _: String -> handler() } },
+                    swipes = swipesFor("。", "9"),
                 )
             }
             Row(
@@ -558,17 +552,14 @@ private fun StrokeKeyboardContent(
                     shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius,
                 )
-                StrokeSymbolButton(
-                    text = ".",
-                    onClick = { onKeyPress(".") },
-                    backgroundColor = keyBackgroundColor,
-                    textColor = keyTextColor,
+                // 与九键底排同位：原来这里是半角「.」（上游遗留），语言键原在第 3 行占着 9 的位置。
+                LanguageKeyButton(
+                    icon = rememberVectorPainter(Icons.Default.Language),
+                    onClick = { onKeyPress("ime_switch") },
+                    backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
                     modifier = Modifier.weight(0.8f),
-                    onPress = { onKeyPressDown?.invoke(".") },
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                    fontSize = ctrlFontSize,
+                    onPress = { onKeyPressDown?.invoke("ime_switch") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
             }
         }
@@ -611,12 +602,23 @@ private fun StrokeKeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
+            // 0 与九键同位（重输下面）；点按和 1-9 的上滑数字走同一条路。
+            NineKeyButton(
+                digit = "", letters = "0",
+                onClick = { onKeyPress("0") },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = Modifier.weight(1f),
+                onPress = { onKeyPressDown?.invoke("0") },
+                onSwipeStateChange = onSwipeStateChange,
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius,
+            )
             ActionKeyButton(
                 text = "确定",
                 onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(2f),
+                modifier = Modifier.weight(1f),
                 onPress = { onKeyPressDown?.invoke("enter") },
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
@@ -752,33 +754,6 @@ private fun StrokeDigitKey(
         shadowEnabled = shadowEnabled,
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
-    )
-}
-
-@Composable
-private fun StrokeSymbolButton(
-    text: String,
-    onClick: () -> Unit,
-    backgroundColor: Color,
-    textColor: Color,
-    modifier: Modifier = Modifier,
-    onPress: (() -> Unit)? = null,
-    shadowEnabled: Boolean = true,
-    shadowElevation: Dp = 1.dp,
-    shadowShapeRadius: Dp = 8.dp,
-    fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
-) {
-    KeyButton(
-        text = text,
-        onClick = onClick,
-        backgroundColor = backgroundColor,
-        textColor = textColor,
-        modifier = modifier,
-        onPress = onPress,
-        shadowEnabled = shadowEnabled,
-        shadowElevation = shadowElevation,
-        shadowShapeRadius = shadowShapeRadius,
-        fontSize = fontSize,
     )
 }
 

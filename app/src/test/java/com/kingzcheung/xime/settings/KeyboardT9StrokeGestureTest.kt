@@ -189,7 +189,7 @@ class KeyboardT9StrokeGestureTest {
         val keys = loadAssetSection("stroke")
         val expected = mapOf(
             "一" to "1", "丨" to "2", "丿" to "3", "丶" to "4", "乛" to "5",
-            "*" to "6", "分词" to "7", "，" to "8", "英" to "9",
+            "*" to "6", "分词" to "7", "，" to "8", "。" to "9",
         )
         expected.forEach { (id, digit) ->
             val swipe = keys[id]?.swipeUp ?: error("stroke.keys 缺少 $id 的上滑绑定")
