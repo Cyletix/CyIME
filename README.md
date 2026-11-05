@@ -129,6 +129,8 @@ CyIME 输入法是我空闲时间制作的一款输入法, 遵循GPL协议, 所�
 
 [爱发电：afdian.com/a/cyletix](https://afdian.com/a/cyletix)
 
+海外可以用 Ko-fi：[ko-fi.com/cyletix](https://ko-fi.com/cyletix)
+
 <img src="docs/images/afdian.png" alt="爱发电 · Cyletix" width="240">
 
 ## 鸣谢

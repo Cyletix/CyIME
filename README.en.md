@@ -109,6 +109,10 @@ The source namespace `com.kingzcheung.xime`, plugin IDs, `xime.yaml` / `xime.cus
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese): open an issue first, then a minimal pull request.
 
+## Support the author
+
+CyIME is free and open source, built in my spare time. If it helps you, you can buy me a coffee on [Ko-fi](https://ko-fi.com/cyletix) or [爱发电 (afdian)](https://afdian.com/a/cyletix). Bug reports are just as welcome.
+
 ## Credits
 
 CyIME builds on the projects, data and models below. Thanks to all their authors. Full license texts and copyright notices ship in `app/src/main/assets/NOTICE.txt`, `app/src/main/assets/licenses/` and the NOTICE files next to each scheme. In the app, see "Settings › About › Credits" and "Open source licenses".
