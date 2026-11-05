@@ -3808,6 +3808,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** 宿主报来的光标还是输入框现在的光标（Android 可能晚送一条更早的「写到末尾」）。 */
+    private fun hostSelectionIsCurrent(selection: Int): Boolean = currentInputConnection?.let { connection ->
+        val value = runCatching { connection.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) }.getOrNull()
+        value != null && value.selectionStart == value.selectionEnd && value.startOffset + value.selectionStart == selection
+    } == true
+
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
@@ -3829,6 +3835,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     } == true &&
                     keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:inline:$offset") == true) {
                     inlineComposition.moveCaret(offset)
+                } else if (!state.inputTarget.isInternal && schemaController.japaneseReadingOnScreen() &&
+                    TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
+                    hostSelectionIsCurrent(newSelStart)) {
+                    // 日语：在输入框里点了读音中间，接着打的字插在那里（11-05 用户反馈：句中光标处输入的内容出现在句末）。
+                    inlineComposition.moveCaret(offset)
+                    keyRouter.postRimeJob("japanese_caret") { japaneseInputController.placeCaret(offset) }
                 }
             }
         }
@@ -4404,6 +4416,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun markInputBoxComposing(text: String? = null) {
         inlineComposition.shown(text)
     }
+
+    /** 输入框里的光标已挪到读音第 [offset] 个字后面（日语光标在读音中间）。 */
+    internal fun moveInlineCompositionCaret(offset: Int) = inlineComposition.moveCaret(offset)
 
     internal fun keepInlineEditCaret(text: String): Boolean =
         inlineComposition.text == text && inlineComposition.caret < text.length

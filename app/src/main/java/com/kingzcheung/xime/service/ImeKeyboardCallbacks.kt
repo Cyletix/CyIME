@@ -363,7 +363,9 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onExtendCandidateStrip = { service.extendCandidateStrip() },
             onCursorMove = { direction ->
-                if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$direction") == true) {
+                if (service.schemaController.moveJapaneseReadingCaret(direction)) {
+                    service.feedbackManager.cursorStepFeedback(view)
+                } else if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$direction") == true) {
                     service.feedbackManager.cursorStepFeedback(view)
                 } else service.schemaController.moveEditorCursor(direction, spaceCursorSelecting(service)) {
                     service.feedbackManager.cursorStepFeedback(view)
@@ -371,7 +373,8 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onCursorMoveVertical = { steps ->
                 val edge = if (steps < 0) "start" else "end"
-                if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$edge") != true)
+                if (!service.schemaController.moveJapaneseReadingCaret(if (steps < 0) -Int.MAX_VALUE / 2 else Int.MAX_VALUE / 2) &&
+                    service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$edge") != true)
                     service.schemaController.moveEditorCursorVertical(steps, spaceCursorSelecting(service))
             },
             onGestureAction = { action, value ->

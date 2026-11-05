@@ -481,6 +481,24 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
+    /**
+     * 日语打字中（读音还没上屏）长按空格、底部留白滑动、空格上下滑：挪读音里的光标，不挪输入框光标（11-05 用户反馈：
+     * 以前拖了没反应）。和按键同一个队列。不是日语打字中返回 false，照旧走拼音编辑或输入框光标。
+     */
+    internal fun moveJapaneseReadingCaret(steps: Int): Boolean {
+        if (steps == 0 || !japaneseReadingOnScreen()) return false
+        service.keyRouter.postRimeJob("japanese_caret") { service.japaneseInputController.moveCaret(steps) }
+        return true
+    }
+
+    /** 日语读音正显示着（不在英数、键盘自己的输入框里）。 */
+    internal fun japaneseReadingOnScreen(): Boolean {
+        val state = service.uiState.value
+        if (state.isAsciiMode || !state.inputProfile.capabilities.japaneseConversion || state.inputTarget.isInternal ||
+            state.quickSendFormFocused || state.toolPanelInputFocused) return false
+        return service.candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() }
+    }
+
     /** 已在按键队列中，不能再次排队，否则长按方向键会积压到后续操作之后。 */
     internal suspend fun moveJapaneseCursorFromKeyQueue(steps: Int) {
         val original = service.currentInputConnection ?: return

@@ -109,11 +109,54 @@ internal fun deleteJapaneseRomaji(input: String): String {
     val end = romajiDeleteStart(input)
     val completedEnd = input.length - (pendingRomajiTail(input)?.length ?: 0)
     val completedPrefix = input.take(minOf(end, completedEnd))
-    val contextualTail = pendingRomajiTail(completedPrefix).orEmpty()
-    val stablePrefix = completedPrefix.dropLast(contextualTail.length) + contextualTail.map {
+    return stableJapaneseRomaji(completedPrefix) + input.substring(minOf(end, completedEnd), end)
+}
+
+/**
+ * 已经成音、但要靠后一个字母才读对的尾部写死：单个 n（ん）写成 nn，促音的辅音写成 xtsu。
+ * 这样后面接上什么都不会再把它读成别的假名（kan|a 不会变成 かな）。
+ */
+internal fun stableJapaneseRomaji(input: String): String {
+    val contextualTail = pendingRomajiTail(input).orEmpty()
+    return input.dropLast(contextualTail.length) + contextualTail.map {
         when (it) { 'n' -> "nn"; 'N' -> "NN"; else -> if (it.isUpperCase()) "XTSU" else "xtsu" }
     }.joinToString("")
-    return stablePrefix + input.substring(minOf(end, completedEnd), end)
+}
+
+/** 读音中间插字的结果：新编码、光标在编码里的位置、光标处还没拼成假名的字母（先不进编码）。 */
+internal data class JapaneseInsertion(val input: String, val caret: Int, val pending: String)
+
+/** 一段已拼完的罗马音里每个假名的起点（含 0 和末尾），与退格单位同源。 */
+internal fun japaneseKanaStarts(romaji: String): List<Int> {
+    val starts = mutableListOf(romaji.length)
+    var end = romaji.length
+    while (end > 0) { end = romajiDeleteStart(romaji.take(end)).coerceIn(0, end - 1); starts += end }
+    return starts.distinct().reversed()
+}
+
+/**
+ * 插字后的假名边界：光标前、光标后的边界照旧（光标后的整体挪动），插进去的那段按退格单位切。
+ * [boundaries] 是插字前 [input] 的边界，[caret] 是插字前光标在编码里的位置（落在边界上）。
+ */
+internal fun boundariesAfterInsertion(input: String, boundaries: List<Int>, caret: Int, inserted: JapaneseInsertion): List<Int> {
+    if (inserted.input == input) return boundaries
+    val head = stableJapaneseRomaji(input.take(caret))
+    val chunk = inserted.input.substring(head.length, inserted.caret)
+    return (boundaries.filter { it < caret } + japaneseKanaStarts(chunk).map { it + head.length } +
+        boundaries.filter { it > caret }.map { it - caret + inserted.caret }).distinct()
+}
+
+/**
+ * 光标在读音中间（[prefix] 与 [suffix] 之间，按假名边界切开）时打的字母 [typed]。
+ * 只把已经拼成假名的部分写进编码，没拼完的字母留在光标处等下一个键：
+ * 直接插进去会和后面的读音连读（さぶら|いやー 里打 k 会变成 き）。
+ */
+internal fun insertJapaneseRomaji(prefix: String, typed: String, suffix: String): JapaneseInsertion {
+    val pending = pendingRomajiTail(typed).orEmpty()
+    val done = typed.dropLast(pending.length)
+    if (done.isEmpty()) return JapaneseInsertion(prefix + suffix, prefix.length, pending)
+    val head = stableJapaneseRomaji(prefix) + stableJapaneseRomaji(done)
+    return JapaneseInsertion(head + suffix, head.length, pending)
 }
 
 /**

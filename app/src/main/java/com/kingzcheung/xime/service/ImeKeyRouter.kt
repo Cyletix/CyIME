@@ -1090,7 +1090,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     hardware = hardwareEvent != null)?.invoke()
                 return@command
             }
-            if (service.japaneseInputController.handleKey(key)) return@command
+            if (service.japaneseInputController.handleKey(key, isShifted)) return@command
             val state = service.uiState.value
             val candState = service.candidateState.value
             var needsUIUpdate = false

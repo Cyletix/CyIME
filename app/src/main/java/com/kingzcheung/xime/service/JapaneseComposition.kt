@@ -32,12 +32,17 @@ internal fun RimeEngine.previousJapaneseBoundary(input: String): Int {
 }
 
 /**
- * 日语转换状态。[converted] 为 false 时只是光标挪进了读音（九键左右键，Gboard、iOS 日文翻页键盘同样）：
- * 读音原样显示，光标处画竖线，候选只给光标前那段；按変換才转成汉字。[caretKana]：光标前有几个假名。
+ * 日语转换状态。[converted] 为 false 时只是光标挪进了读音（翻页键盘左右键、长按空格或底部留白滑动、
+ * 在输入框里点读音中间，Gboard、iOS 日文键盘同样）：读音原样显示，光标处画竖线，候选只给光标前那段；
+ * 按変換才转成汉字。光标位置三选一：[caretKana] 光标前有几个假名，[caretAt] 光标在编码里的位置（落在假名边界），
+ * [caretReading] 光标前有几个读音字（输入框里点的位置）。[pending]：光标处打了还没拼成假名的字母。
  */
 internal class JapaneseConversion(private val engine: RimeEngine, val input: String,
-    converted: Boolean = true, caretKana: Int? = null) {
-    private val boundaries = RimeEngine.rimeLock.withLock { buildList {
+    converted: Boolean = true, caretKana: Int? = null, caretAt: Int? = null, caretReading: Int? = null,
+    val pending: String = "", knownBoundaries: List<Int>? = null) {
+    /** 假名边界（编码位置，含 0 和末尾）。[knownBoundaries]：插字时已知，不再逐字问引擎（每问一次都要转换一遍）。 */
+    val boundaries: List<Int> = knownBoundaries?.takeIf { it.firstOrNull() == 0 && it.lastOrNull() == input.length }
+        ?: RimeEngine.rimeLock.withLock { buildList {
         add(0)
         var end = input.length
         val reversed = mutableListOf(end)
@@ -45,7 +50,14 @@ internal class JapaneseConversion(private val engine: RimeEngine, val input: Str
         addAll(reversed.reversed())
         engine.setInput(input)
     } }
-    private var rangeIndex = caretKana?.coerceIn(1, boundaries.lastIndex) ?: boundaries.lastIndex
+    private var rangeIndex = when {
+        caretAt != null -> boundaries.indexOfFirst { it >= caretAt }.takeIf { it >= 0 } ?: boundaries.lastIndex
+        caretReading != null -> RimeEngine.rimeLock.withLock {
+            try { boundaries.indexOfLast { engine.japaneseReading(input.take(it)).length <= caretReading }.coerceAtLeast(0) }
+            finally { engine.setInput(input) }
+        }
+        else -> caretKana?.coerceIn(1, boundaries.lastIndex) ?: boundaries.lastIndex
+    }
     var converted = converted
         private set
     var candidateIndex = 0
@@ -61,12 +73,17 @@ internal class JapaneseConversion(private val engine: RimeEngine, val input: Str
     val partial get() = rangeIndex < boundaries.lastIndex
     /** 当前段之后的原编码，确认当前段后留着接着打。 */
     val rest get() = input.drop(boundaries[rangeIndex])
+    /** 光标在编码里的位置（光标前那段编码的长度）。 */
+    val caretOffset get() = boundaries[rangeIndex]
+    /** 光标在读音最前面：光标前没有可转换的字。 */
+    val atStart get() = rangeIndex == 0
 
     fun cycle() { candidateIndex++; refresh() }
-    fun convert() { converted = true; refresh() }
-    /** 按假名移光标/调转换段；到头不动，返回 false。 */
+    /** 光标在最前面时整段转换。 */
+    fun convert() { converted = true; if (rangeIndex == 0) rangeIndex = boundaries.lastIndex; refresh() }
+    /** 按假名移光标/调转换段；到头不动，返回 false。没转换时光标能挪到读音最前面（好在开头插字）。 */
     fun moveRange(steps: Int): Boolean {
-        val next = (rangeIndex + steps).coerceIn(1, boundaries.lastIndex)
+        val next = (rangeIndex + steps).coerceIn(if (converted) 1 else 0, boundaries.lastIndex)
         if (next == rangeIndex) return false
         rangeIndex = next
         candidateIndex = 0
@@ -74,7 +91,7 @@ internal class JapaneseConversion(private val engine: RimeEngine, val input: Str
         return true
     }
     /** 删掉光标前那个假名后的编码，以及光标前还剩几个假名。 */
-    fun withoutKanaBeforeCaret(): Pair<String, Int> =
+    fun withoutKanaBeforeCaret(): Pair<String, Int> = if (rangeIndex == 0) input to 0 else
         input.take(boundaries[rangeIndex - 1]) + input.drop(boundaries[rangeIndex]) to rangeIndex - 1
     fun choose(index: Int) { candidateIndex = index.coerceAtLeast(0); refresh() }
     fun refresh() {
@@ -89,7 +106,7 @@ internal class JapaneseConversion(private val engine: RimeEngine, val input: Str
             if (candidates.isNotEmpty()) engine.highlightCandidate(candidateIndex)
             segment = engine.conversionPreview().ifEmpty { engine.getComposition().preedit }.replace(" ", "")
             preview = if (converted) segment + suffix
-                else reading + (if (suffix.isEmpty()) "" else PREEDIT_CARET.toString()) + suffix
+                else reading + pending + (if (suffix.isEmpty()) "" else PREEDIT_CARET.toString()) + suffix
         } finally { engine.setInput(input); RimeEngine.rimeLock.unlock() }
     }
 }

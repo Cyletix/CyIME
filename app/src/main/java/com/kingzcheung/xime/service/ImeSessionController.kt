@@ -256,7 +256,14 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         // Typing into the keyboard's own field (clipboard search, tool panel, quick send): the pinyin
         // belongs there, never in the app behind it. 26-key search wrote it into the app's field and it
         // stayed after search closed (10-30 device check); all three callers pass through here.
-        if (service.uiState.value.inputTarget.isInternal || service.keepInlineEditCaret(displayText)) return
+        if (service.uiState.value.inputTarget.isInternal) return
+        // 日语光标在读音中间：竖线不写进输入框，输入框的光标放在那里（11-05 用户反馈）。
+        val caret = displayText.indexOf(PREEDIT_CARET)
+        if (caret >= 0 && service.uiState.value.inputProfile.capabilities.japaneseConversion) {
+            showInputBoxCompositionWithCaret(ic, displayText.removeRange(caret, caret + 1), caret)
+            return
+        }
+        if (service.keepInlineEditCaret(displayText)) return
         // 第二参数为 1：光标相对编码起始偏移 1 个字符，使光标落在编码末尾，
         // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
@@ -267,6 +274,18 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         } finally {
             ic.endBatchEdit()
         }
+    }
+
+    /** 写读音后把输入框光标挪到读音里第 [caret] 个字后面（setComposingText 只能把光标放在两头）。 */
+    private fun showInputBoxCompositionWithCaret(ic: android.view.inputmethod.InputConnection, text: String, caret: Int) {
+        ic.beginBatchEdit()
+        val written = try { ic.setComposingText(text, 1) } finally { ic.endBatchEdit() }
+        if (!written) return
+        service.markInputBoxComposing(text)
+        val value = runCatching { ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) }.getOrNull() ?: return
+        if (value.startOffset < 0 || value.selectionStart != value.selectionEnd) return
+        val position = value.startOffset + value.selectionStart - (text.length - caret)
+        if (position >= 0 && ic.setSelection(position, position)) service.moveInlineCompositionCaret(caret)
     }
 
     internal fun updateUIWithResult(
