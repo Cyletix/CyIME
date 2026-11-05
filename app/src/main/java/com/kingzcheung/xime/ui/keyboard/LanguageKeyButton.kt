@@ -172,9 +172,11 @@ fun LanguageKeyButton(
     val density = LocalDensity.current
     val panelBounds = LocalLanguageMenuPanel.current
     val fallbackBounds = Rect(0f, 0f, view.width.toFloat(), view.height.toFloat())
+    // 语言多时菜单往上长出键盘，最高到状态栏下沿（键盘窗口比键盘高，上面是透明的）。
+    val windowCeiling = remember(view, menuOpen) { languageMenuWindowCeiling(view) }
     val menuGeometry = languageMenuGeometry(
         panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds,
-        keyWindowBounds, density.density, menuSchemas.size)
+        keyWindowBounds, density.density, menuSchemas.size, windowCeiling)
     val rowHeight = menuGeometry.rowHeightPx
     // 下面的按键手势只在 hasMenu 变化时重建：直接用 rowHeight 会停在菜单还没打开时（0 种语言）算的行高。
     // 语言多、键上方放不下时菜单把行高压低，手指越往下滑，命中的行就差得越多（GitHub #40：差半行）。
@@ -227,7 +229,10 @@ fun LanguageKeyButton(
         val stop = watchWindowHidden(view) { closeMenu() }
         onDispose { stop() }
     }
-    val menuPanel = panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds
+    val keyboardPanel = panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds
+    // 弹窗盖住整块面板；菜单长出键盘时弹窗跟着往上伸到菜单顶。
+    val menuPanel = if (menuGeometry.bounds.top < keyboardPanel.top)
+        keyboardPanel.copy(top = menuGeometry.bounds.top) else keyboardPanel
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val blurBehind = glass.enabled && glass.normalized().blurRadiusDp >= 1f && rememberLanguageMenuBlurAvailable()
     // 玻璃下菜单和面板一样透出后面：菜单区域先叠一层实时模糊（盖在按键上面），再画半透明主题色。
@@ -390,6 +395,17 @@ fun LanguageKeyButton(
             }
         }
     }
+}
+
+/**
+ * 语言菜单在键盘窗口里最高能到的 y：状态栏和挖孔的下沿。拿不到窗口边衬区时为 0（窗口顶）。
+ * 键盘窗口只有键盘那么高时，这个值不高于面板顶，菜单照旧只在键盘里。
+ */
+private fun languageMenuWindowCeiling(view: android.view.View): Float {
+    val insets = androidx.core.view.ViewCompat.getRootWindowInsets(view) ?: return 0f
+    val type = androidx.core.view.WindowInsetsCompat.Type.statusBars() or
+        androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+    return insets.getInsets(type).top.coerceAtLeast(0).toFloat()
 }
 
 /**

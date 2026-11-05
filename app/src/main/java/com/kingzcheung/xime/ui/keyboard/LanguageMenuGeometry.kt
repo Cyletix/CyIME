@@ -20,7 +20,8 @@ internal fun LanguageMenuPanel(content: @Composable () -> Unit) {
 }
 
 /**
- * [anchoredAbove]：菜单贴在语言键正上方（底边对齐键的顶边），语言多时在菜单里滚动，不再往下盖住语言键。
+ * [anchoredAbove]：菜单贴在语言键正上方（底边对齐键的顶边），按语言数往上长，不再往下盖住语言键；
+ * 键盘里放不下时接着往键盘上方长，长到窗口顶也放不下才在菜单里滚动。
  * 键上方连标题加一行都放不下时才退回整块面板里摆放。
  */
 internal data class LanguageMenuGeometry(val bounds: Rect, val rowHeightPx: Float, val anchoredAbove: Boolean = false)
@@ -34,7 +35,13 @@ internal const val LANGUAGE_MENU_MIN_VISIBLE_ROWS = 3
 /** 贴键菜单为放下 [LANGUAGE_MENU_MIN_VISIBLE_ROWS] 行可以压到的最小行高（语言名 + 方案两行字）。 */
 internal const val LANGUAGE_MENU_MIN_ROW_DP = 40f
 
-internal fun languageMenuGeometry(panel: Rect, key: Rect, density: Float, count: Int): LanguageMenuGeometry {
+/**
+ * [ceiling]：贴键菜单最高能长到的窗口 y（状态栏下沿）。默认是面板顶，菜单只在键盘里；
+ * 键盘窗口比键盘高时传窗口顶，语言多时菜单伸到键盘上方，把所有语言整行摆出来（用户 11-05）。
+ */
+internal fun languageMenuGeometry(
+    panel: Rect, key: Rect, density: Float, count: Int, ceiling: Float = panel.top,
+): LanguageMenuGeometry {
     val d = density.coerceAtLeast(0.1f)
     if (panel.width <= 0f || panel.height <= 0f) return LanguageMenuGeometry(Rect.Zero, 44f * d)
     val margin = minOf(8f * d, panel.width / 4f, panel.height / 4f)
@@ -51,8 +58,10 @@ internal fun languageMenuGeometry(panel: Rect, key: Rect, density: Float, count:
     val visibleRows = count.coerceIn(1, LANGUAGE_MENU_MIN_VISIBLE_ROWS)
     val anchoredRow = ((above - chrome) / visibleRows).coerceIn(LANGUAGE_MENU_MIN_ROW_DP * d, rowHeight)
     if (key.height > 0f && above >= chrome + anchoredRow) {
-        val height = minOf(chrome + count.coerceAtLeast(1) * anchoredRow, above)
         val bottom = minOf(key.top, area.bottom)
+        // 键盘里放不下时往上长到窗口顶（留同样的边距），还放不下才滚动。
+        val top = minOf(area.top, ceiling.coerceAtLeast(0f) + margin)
+        val height = minOf(chrome + count.coerceAtLeast(1) * anchoredRow, bottom - top)
         return LanguageMenuGeometry(Rect(x, bottom - height, minOf(x + width, area.right), bottom), anchoredRow, true)
     }
     val height = minOf(full, area.height)

@@ -96,6 +96,66 @@ class LanguageMenuGeometryTest {
         }
     }
 
+    @Test fun manyLanguagesGrowAboveTheKeyboardUntilAllFit() {
+        // 用户 11-05：三种以上语言时列表滚不动，改成按高度往上长，伸出键盘把所有语言摆出来。
+        val d = 2.8f
+        val panel = Rect(0f, 1360f, 1080f, 2060f)
+        val key = Rect(190f, 1930f, 340f, 2060f)
+        val statusBar = 24f * d
+        for (count in listOf(3, 4, 6, 9)) {
+            val inside = languageMenuGeometry(panel, key, d, count)
+            val menu = languageMenuGeometry(panel, key, d, count, ceiling = statusBar)
+            assertTrue(menu.anchoredAbove)
+            assertEquals(key.top, menu.bounds.bottom, .001f)
+            // 行高、宽度和左右位置跟只在键盘里时一样，只是往上长。
+            assertEquals(inside.rowHeightPx, menu.rowHeightPx, .001f)
+            assertEquals(inside.bounds.left, menu.bounds.left, .001f)
+            assertEquals(inside.bounds.right, menu.bounds.right, .001f)
+            assertEquals("count=$count", LANGUAGE_MENU_CHROME_DP * d + count * menu.rowHeightPx, menu.bounds.height, .001f)
+            assertTrue(menu.bounds.top >= statusBar + 8f * d - .001f)
+            // 列表整个放得下，不用滚。
+            assertEquals(0, languageMenuInitialScroll(menu, count - 1, d))
+        }
+    }
+
+    @Test fun languagesThatFitInsideTheKeyboardDoNotGrowAboveIt() {
+        val d = 2.8f
+        val panel = Rect(0f, 1360f, 1080f, 2060f)
+        val key = Rect(190f, 1930f, 340f, 2060f)
+        for (count in 1..3) {
+            val inside = languageMenuGeometry(panel, key, d, count)
+            val menu = languageMenuGeometry(panel, key, d, count, ceiling = 0f)
+            assertEquals(inside.bounds.top, menu.bounds.top, .01f)
+            assertEquals(inside.bounds.bottom, menu.bounds.bottom, .01f)
+            assertEquals(inside.rowHeightPx, menu.rowHeightPx, .001f)
+            assertTrue(menu.bounds.top >= panel.top)
+        }
+    }
+
+    @Test fun shortWindowStopsBelowTheStatusBarAndScrolls() {
+        // 横屏手机：键盘上方也放不下全部语言时，菜单顶停在状态栏下沿留边距处，剩下的在菜单里滚动。
+        val d = 2.75f
+        val panel = Rect(0f, 500f, 2400f, 1080f)
+        val key = Rect(300f, 960f, 500f, 1080f)
+        val statusBar = 24f * d
+        val menu = languageMenuGeometry(panel, key, d, 30, ceiling = statusBar)
+        assertTrue(menu.anchoredAbove)
+        assertEquals(statusBar + 8f * d, menu.bounds.top, .001f)
+        assertEquals(key.top, menu.bounds.bottom, .001f)
+        assertTrue(menu.bounds.height < LANGUAGE_MENU_CHROME_DP * d + 30 * menu.rowHeightPx)
+    }
+
+    @Test fun ceilingBelowThePanelTopKeepsTheMenuInsideTheKeyboard() {
+        // 键盘窗口只有键盘那么高（拿到的窗口顶就是面板顶）时照旧只在键盘里。
+        val d = 2.8f
+        val panel = Rect(0f, 0f, 1080f, 700f)
+        val key = Rect(190f, 570f, 340f, 700f)
+        assertEquals(languageMenuGeometry(panel, key, d, 12),
+            languageMenuGeometry(panel, key, d, 12, ceiling = 0f))
+        assertEquals(languageMenuGeometry(panel, key, d, 12),
+            languageMenuGeometry(panel, key, d, 12, ceiling = 200f))
+    }
+
     @Test fun tallKeyboardKeepsTheNormalRowHeight() {
         val d = 2.8f
         val panel = Rect(0f, 1000f, 412f * d, 1000f + 360f * d)
