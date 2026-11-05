@@ -378,6 +378,7 @@ private fun CandidatePageContent(
                             .onSizeChanged { viewportHeightPx = it.height }
                             .testTag("expanded-candidates"),
                         state = listState,
+                        flingBehavior = rememberCandidateFlingBehavior(),
                         contentPadding = PaddingValues(vertical = 6.dp)
                     ) {
                         itemsIndexed(

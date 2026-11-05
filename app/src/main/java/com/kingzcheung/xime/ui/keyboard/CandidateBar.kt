@@ -581,6 +581,7 @@ fun CandidateBar(
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     state = candidateListState,
+                    flingBehavior = rememberCandidateFlingBehavior(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     itemsIndexed(displayCandidates, key = { index, _ -> index }) { index, candidate ->
@@ -1700,9 +1701,10 @@ private fun ScrollableCandidateRow(
             info.visibleItemsInfo.any { it.size > viewport }
         }
     }
-    val snapFling = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(listState,
+    // 松手后很快停住，方便马上点中候选（用户 11-05：惯性太大）。
+    val snapFling = rememberCandidateSnapFlingBehavior(listState,
         androidx.compose.foundation.gestures.snapping.SnapPosition.Start)
-    val freeFling = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
+    val freeFling = rememberCandidateFlingBehavior()
     val tailPadding = with(LocalDensity.current) { tailPaddingPx.toDp() }
     LazyRow(Modifier.fillMaxWidth().testTag("candidate-scroll-row"), state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(end = tailPadding),
