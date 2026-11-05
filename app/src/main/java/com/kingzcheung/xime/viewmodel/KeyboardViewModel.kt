@@ -61,6 +61,8 @@ data class KeyboardUiState(
     val handwritingExpanded: Boolean = false,
     val handwritingControlsWidthDp: Int = 0,
     val handwritingControlsOffsetX: Int = 0,
+    /** 平时（不全屏）键盘的高度：全屏手写时表情、编辑等面板按这个高度放在底部。 */
+    val handwritingNormalHeightDp: Int = 0,
     val clipboardImagesExpanded: Boolean = false,
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,

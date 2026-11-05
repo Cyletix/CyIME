@@ -2560,6 +2560,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     handwritingExpanded = handwritingExpanded,
                                     handwritingControlsWidthDp = protectedSize.width,
                                     handwritingControlsOffsetX = handwritingNormalX - handwritingOffsetX,
+                                    handwritingNormalHeightDp = keyboardHeight,
                                     keyboardHeightDp = effectiveKeyboardHeight,
                                     keyboardWidthDp = if (handwritingExpanded) handwritingWidth else protectedSize.width,
                                     keyboardBottomPaddingDp = contentBottomPaddingDp + (activeBottomDp - previewInsetDp),

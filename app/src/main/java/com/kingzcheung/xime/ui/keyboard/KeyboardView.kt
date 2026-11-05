@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -344,6 +345,9 @@ fun KeyboardView(
             imageSlot = backgroundImageSlot)
         .splitGapCutout(splitKeyboardGap)
     val panelMaterial = Modifier.inheritKeyboardBackground(!state.handwritingExpanded)
+    // 全屏手写时表情、编辑(方向)等面板回到平时键盘的大小（11-05），不再铺满整个屏幕。
+    val handwritingOverlaySlot = handwritingPanelSlot(state.handwritingExpanded, state.handwritingNormalHeightDp,
+        state.handwritingControlsWidthDp, state.handwritingControlsOffsetX, state.keyboardWidthDp, state.keyboardHeightDp)
     var cursorControlActive by remember { mutableStateOf(false) }
     val floatingBottomClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
     val floatingBottomVisualClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
@@ -1784,7 +1788,13 @@ fun KeyboardView(
             // above its canvas, so opening and closing a tool leave its geometry unchanged.
             if (state.handwritingExpanded && !candidatePageExpanded && overlayVisible) {
                 retainedOverlay?.let { toolbarPage ->
-                    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().keyboardPanelBackground(keyboardBgColor)
+                    // 面板的工具栏放在平时键盘的顶边（面板回到平时大小，上面留着全屏手写区）。
+                    val toolbarSlot = handwritingOverlaySlot
+                    Box((if (toolbarSlot == null) Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                        else Modifier.align(Alignment.BottomCenter)
+                            .padding(bottom = (toolbarSlot.heightDp - candidateBarHeightDp(candidateBarScaleState.floatValue)).coerceAtLeast(0f).dp)
+                            .absoluteOffset(x = toolbarSlot.offsetXDp.dp).width(toolbarSlot.widthDp.dp))
+                        .keyboardPanelBackground(keyboardBgColor)
                         .then(if (!overlayVisibility.targetState) Modifier.clearAndSetSemantics {} else Modifier)) {
                         renderCandidateBar(toolbarPage)
                         if (!overlayVisibility.targetState) {
@@ -1906,7 +1916,10 @@ fun KeyboardView(
         // A route change replaces only the panel content, never restarts the reveal host.
             KeyboardPanelReveal(
                 visible = page is KeyboardPage.Overlay,
-                modifier = Modifier.fillMaxSize().padding(top = candidateBarHeightDp(candidateBarScaleState.floatValue).dp)
+                modifier = (handwritingOverlaySlot?.let { slot ->
+                    Modifier.align(Alignment.BottomCenter).absoluteOffset(x = slot.offsetXDp.dp).width(slot.widthDp.dp)
+                        .height((slot.heightDp - candidateBarHeightDp(candidateBarScaleState.floatValue)).coerceAtLeast(0f).dp)
+                } ?: Modifier.fillMaxSize().padding(top = candidateBarHeightDp(candidateBarScaleState.floatValue).dp))
                     .testTag("keyboard-overlay"),
                 visibility = overlayVisibility,
                 revealState = overlayReveal,
