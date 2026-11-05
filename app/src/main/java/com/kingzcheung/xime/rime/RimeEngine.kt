@@ -448,6 +448,7 @@ class RimeEngine {
                 (nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull() ?: input.length) < input.length) return reading
         }
         val schema = nativeGetCurrentSchema().orEmpty()
+        if (doublePinyinKeysPreedit && com.kingzcheung.xime.settings.DoublePinyinSchemes.isT9(schema)) return t9DoublePinyinPreedit(input, preedit, spelling, schema)
         val profile = com.kingzcheung.xime.settings.InputProfiles.describe(schema)
         val groups = if (profile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
             com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(schema)?.mergedGroups.orEmpty()
@@ -458,6 +459,23 @@ class RimeEngine {
         // 14 键双拼的首选读音是全拼，换成这个方案的双拼键才能和合并编码一一对上。
         val reading = if (profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN) doublePinyinReading(spelling, schema) else spelling
         return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), reading, groups)
+    }
+
+    /**
+     * 「编码显示双拼键」（SpellingPatches.DOUBLE_PINYIN_RAW_PREEDIT_KEY，默认关）：输入法服务按设置写入。
+     * 双拼九键在这里把显示的读音换成双拼键（[t9DoublePinyinKeys]）；26 键由方案补丁清空编码显示规则，不经过这里。
+     */
+    @Volatile var doublePinyinKeysPreedit = false
+
+    /** 已选定的中文原样留着，后面的数字按首选读音换成双拼键；换不了时照原来显示。 */
+    private fun t9DoublePinyinPreedit(input: String, preedit: String, spelling: String, schema: String): String {
+        val scheme = com.kingzcheung.xime.settings.DoublePinyinSchemes.find(schema) ?: return preedit
+        if (nativeIsAsciiMode()) return preedit
+        val snapshot = nativePinyinEditSnapshot()
+        val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
+        val prefix = snapshot.getOrNull(3).orEmpty()
+        if (!preedit.startsWith(prefix) || preedit.removePrefix(prefix).any { it.code > 0x7f }) return preedit
+        return t9DoublePinyinKeys(input.drop(confirmed), spelling, scheme)?.let { prefix + it } ?: preedit
     }
 
     private fun withDisplayPreedit(result: RimeProcessResult): RimeProcessResult = result.copy(

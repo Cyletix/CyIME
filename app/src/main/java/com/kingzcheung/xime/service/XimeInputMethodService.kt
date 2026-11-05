@@ -931,6 +931,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun registerSharedPrefsListener() {
         val prefs = SettingsPreferences.getPrefsPublic(this)
         privacy.loadManual(SettingsPreferences.isIncognito(this))
+        rimeEngine.doublePinyinKeysPreedit = com.kingzcheung.xime.settings.SpellingPatches.doublePinyinRawPreedit(this)
         sharedPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key?.startsWith(com.kingzcheung.xime.settings.HardwareKeyboardPreferences.PREFIX) == true) {
                 uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
@@ -959,6 +960,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 com.kingzcheung.xime.settings.CustomKeyboardLayouts.REVISION -> schemaController.applyCustomLayouts()
                 com.kingzcheung.xime.settings.SpellingPatches.REVISION -> schemaController.applySpellingPatches()
+                // 九键双拼的显示在引擎显示层换，下一次按键就用新设置；26 键随 REVISION 重新部署。
+                com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_RAW_PREEDIT_KEY -> {
+                    rimeEngine.doublePinyinKeysPreedit = com.kingzcheung.xime.settings.SpellingPatches.doublePinyinRawPreedit(this)
+                }
                 // Saved custom phrases: an open session re-reads them only when its schema is selected again.
                 // Not tied to an editor: the keyboard may be hidden while phrases are edited in settings.
                 com.kingzcheung.xime.settings.PersonalDictManager.CUSTOM_PHRASE_REVISION -> inputCommands.submit {

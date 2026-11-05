@@ -6,7 +6,8 @@
   - 输入全是小写字母（26 键全拼、双拼、九键在左栏选定的拼音、14 键侧滑的精确字母）：直接按输入比对；
   - 九键数字、14 键合并键：按第一个候选的拼音注释（spelling_hints）比对，9482 第一个是 西塔（xi ta）就出 θ；
     74 第一个是 是（shi）就不出，要 π 在左栏选 pi；
-  - 双拼（方案带 cyime_rare_double_pinyin）：再按第一个候选的拼音（preedit_format 换成全拼）比对，ljmuda 也出 λ。
+  - 双拼（方案带 cyime_rare_double_pinyin）：再按第一个候选的拼音（preedit_format 换成全拼）比对，ljmuda 也出 λ；
+    编码显示双拼键时 preedit_format 是空的，按抄出的 cyime_double_pinyin_reading 换。
   开关关着时 tags_match 返回 false，Rime 整个跳过这个滤镜，不碰候选、不进 Lua 循环。
 --]]
 local OPTION = "cyime_greek_letters"
@@ -59,7 +60,20 @@ local function lookup(text)
 end
 
 local function init(env)
-  env.greek_double_pinyin = env.engine.schema.config:get_bool("cyime_rare_double_pinyin") == true
+  local config = env.engine.schema.config
+  env.greek_double_pinyin = config:get_bool("cyime_rare_double_pinyin") == true
+  -- 「编码显示双拼键」开着时编码显示规则是空的，候选的 preedit 就是双拼键；设置把原来的规则抄在
+  -- cyime_double_pinyin_reading，按它换回全拼再比对（SpellingPatches.rawPreeditLines）。
+  local rules = env.greek_double_pinyin and config:get_list("cyime_double_pinyin_reading")
+  if rules and rules.size > 0 then
+    env.greek_reading = Projection()
+    env.greek_reading:load(rules)
+  end
+end
+
+local function reading(env, preedit)
+  if env.greek_reading and preedit and preedit ~= "" then return env.greek_reading:apply(preedit, true) end
+  return preedit
 end
 
 local function tags_match(seg, env)
@@ -84,7 +98,7 @@ local function filter(input, env)
   for cand in input:iter() do
     index = index + 1
     if index == 1 and not row and cand._end == seg._end then
-      row = lookup(cand.comment) or (env.greek_double_pinyin and lookup(cand.preedit)) or nil
+      row = lookup(cand.comment) or (env.greek_double_pinyin and lookup(reading(env, cand.preedit))) or nil
     end
     if row and index == POSITION then emit() end
     yield(cand)

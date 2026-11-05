@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.ContentCut
+import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -102,6 +103,15 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                 scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
                             }, costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.DOUBLE_PINYIN_ABBREVIATION)
                         DoublePinyinAbbreviationLegend(abbreviation)
+                        // 编码显示打的键，不换回全拼（别人提的需求，用户 11-04 转述）：默认关，26 键和九键双拼共用；26 键改完要重新部署。
+                        var rawPreedit by remember { mutableStateOf(SpellingPatches.doublePinyinRawPreedit(context)) }
+                        SettingsToggleItem(Icons.TwoTone.Keyboard, "编码显示双拼键",
+                            "打字时编码显示按下的双拼键(如 ul pb)，不换成全拼。改完要几秒重新部署",
+                            checked = rawPreedit, onCheckedChange = { on ->
+                                SpellingPatches.setDoublePinyinRawPreedit(context, on)
+                                rawPreedit = on
+                                scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
+                            })
                     }
                 }
                 Button(onClick = { edit(copyOf(DoublePinyinScheme.FLYPY)) }, enabled = !busy,

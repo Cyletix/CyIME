@@ -23,4 +23,22 @@ class FlypyReadingTest {
         // 全拼 14 键照旧。
         assertEquals("ni'hao", merged14Preedit("BUGaO", "bu'gao", "ni hao"))
     }
+
+    /** 双拼九键开着「编码显示双拼键」：数字按首选读音换成双拼键，两键一字；对不上时 null，照原来显示拼音。 */
+    @Test fun nineKeyDoublePinyinShowsTheSchemeKeys() {
+        val flypy = com.kingzcheung.xime.settings.DoublePinyinScheme.FLYPY
+        assertEquals("ul pb", t9DoublePinyinKeys("8572", "shuang pin", flypy))
+        assertEquals("ul pb", t9DoublePinyinKeys("85'72", "shuang pin", flypy))
+        // 最后一个字只按了一个键：显示这个键的字母；首选读音比按键长也只取按了的部分。
+        assertEquals("ul p", t9DoublePinyinKeys("857", "shuang pin", flypy))
+        assertEquals("vs go", t9DoublePinyinKeys("8746", "zhong guo", flypy))
+        val ziranma = com.kingzcheung.xime.settings.DoublePinyinScheme.ZIRANMA
+        assertEquals("ud pn", t9DoublePinyinKeys("8376", "shuang pin", ziranma))
+        // 英文词、读音和按键对不上、读音不够长、分隔符落在字中间：照原来显示。
+        assertEquals(null, t9DoublePinyinKeys("8378", "~test", flypy))
+        assertEquals(null, t9DoublePinyinKeys("8573", "shuang pin", flypy))
+        assertEquals(null, t9DoublePinyinKeys("857266", "shuang pin", flypy))
+        assertEquals(null, t9DoublePinyinKeys("8'572", "shuang pin", flypy))
+        assertEquals(null, t9DoublePinyinKeys("", "shuang pin", flypy))
+    }
 }

@@ -29,6 +29,12 @@ object SpellingPatches {
      * 雾凇的双拼方案特意关着简拼：打到一半的奇数个键会被拆成简拼，候选变杂，所以只做成开关。
      */
     const val DOUBLE_PINYIN_ABBREVIATION_KEY = "double_pinyin_abbreviation"
+    /**
+     * 打双拼时编码显示打的键（ul pb），不换回全拼（shuang pin）。别人提的需求（用户 11-04 转述），默认关，同以前。
+     * 26 键写方案补丁清空编码显示规则；九键在 [com.kingzcheung.xime.rime.RimeEngine] 显示层把读音换成双拼键。
+     * 14 键和自建合并键布局上的双拼本来就显示双拼键，不受影响。
+     */
+    const val DOUBLE_PINYIN_RAW_PREEDIT_KEY = "double_pinyin_raw_preedit"
     /** 与 KeyboardInputPreferences.doublePinyinCorrection 同一个键：键盘按它决定是否把键位邻接表交给纠错。 */
     const val DOUBLE_PINYIN_CORRECTION_KEY = "double_pinyin_neighbor_correction"
     /**
@@ -124,6 +130,13 @@ object SpellingPatches {
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(DOUBLE_PINYIN_ABBREVIATION_KEY, enabled).apply()
     }
 
+    fun doublePinyinRawPreedit(context: Context): Boolean =
+        SettingsPreferences.getPrefsPublic(context).getBoolean(DOUBLE_PINYIN_RAW_PREEDIT_KEY, false)
+
+    fun setDoublePinyinRawPreedit(context: Context, enabled: Boolean) {
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(DOUBLE_PINYIN_RAW_PREEDIT_KEY, enabled).apply()
+    }
+
     fun doublePinyinCorrection(context: Context): Boolean =
         SettingsPreferences.getPrefsPublic(context).getBoolean(DOUBLE_PINYIN_CORRECTION_KEY, false)
 
@@ -178,6 +191,7 @@ object SpellingPatches {
         val doublePinyinFuzzy = if (fuzzyDoublePinyin(context)) fuzzy else emptySet()
         val t9Digits = fuzzyT9Digits(context)
         val abbreviation = doublePinyinAbbreviation(context)
+        val rawPreedit = doublePinyinRawPreedit(context)
         val typos = enabledTypos(context)
         var changed = false
         for (id in fullPinyinSchemas(context)) {
@@ -191,7 +205,8 @@ object SpellingPatches {
         for (id in doublePinyinSchemas(context)) {
             changed = write(rimeDir, id) { schema ->
                 listOf(doublePinyinPart(schema, doublePinyinFuzzy, abbreviation, id) ?: return@write null,
-                    Part(CORRECTION, if (correction) listOf("\"$CORRECTION\": true") else emptyList()))
+                    Part(CORRECTION, if (correction) listOf("\"$CORRECTION\": true") else emptyList()),
+                    Part(PREEDIT_FORMAT, if (rawPreedit) rawPreeditLines(preeditFormatOf(schema()).orEmpty()) else emptyList()))
             } || changed
         }
         for (id in doublePinyinLayoutVariants(rimeDir)) {
@@ -253,6 +268,9 @@ object SpellingPatches {
     private const val OMISSION_SCHEMA = "cyime_omission_schema"
 
     private const val ALGEBRA = "speller/algebra"
+    private const val PREEDIT_FORMAT = "translator/preedit_format"
+    /** 原来的编码显示规则抄在这里：希腊字母（cyime_greek_letters.lua）按它把双拼键换回全拼再比对名字。 */
+    internal const val DOUBLE_PINYIN_READING = "cyime_double_pinyin_reading"
     private const val CORRECTION = "translator/enable_correction"
 
     /** 补丁里的一个键：[lines] 为空表示不写这个键。 */
@@ -288,6 +306,19 @@ object SpellingPatches {
     internal fun fuzzyLines(algebra: List<String>, items: Set<Fuzzy>): List<String> = algebraLines(items.flatMap { it.penalized } + algebra)
     private fun algebraLines(rules: List<String>): List<String> =
         listOf("\"speller/algebra\":") + rules.map { "  - " + quote(it) }
+
+    /**
+     * 编码显示双拼键：清空编码显示规则，Rime 就显示打的键，音节之间照常隔开（ul pb）；原来的规则抄一份给希腊字母用。
+     * 两行同属一个补丁键：方案自定义文件自己改了编码显示规则时整段不写。
+     */
+    internal fun rawPreeditLines(format: List<String>): List<String> = listOf("\"$PREEDIT_FORMAT\": []") +
+        if (format.isEmpty()) emptyList() else listOf("\"$DOUBLE_PINYIN_READING\":") + format.map { "  - " + quote(it) }
+
+    internal fun preeditFormatOf(schema: String): List<String>? {
+        val root = runCatching { SchemaManager.yaml.parseToYamlNode(schema) }.getOrNull() as? YamlMap ?: return null
+        val list = ((root.node("translator") as? YamlMap)?.node("preedit_format") as? YamlList) ?: return null
+        return list.items.map { (it as? YamlScalar)?.content ?: return null }
+    }
 
     internal fun algebraOf(schema: String): List<String>? {
         val root = runCatching { SchemaManager.yaml.parseToYamlNode(schema) }.getOrNull() as? YamlMap ?: return null

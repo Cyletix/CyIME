@@ -34,3 +34,35 @@ internal fun flypySyllable(syllable: String): String {
     for ((pattern, replacement) in FLYPY_RULES) code = pattern.replace(code, replacement)
     return code.map { c -> CIRCLED.indexOf(c).let { if (it >= 0) KEYS[it] else c } }.joinToString("")
 }
+
+private const val T9_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+private const val T9_KEYS = "22233344455566677778889999"
+
+/**
+ * 双拼九键开着「编码显示双拼键」时的编码：按首选的读音 [spelling]（全拼，如 shuang pin）把 [raw] 里每个数字换成
+ * [scheme] 的双拼字母，两键一字隔开（8572 → ul pb）；只按了一个键的字显示这个键的字母。
+ * 读音不是这个方案能打的音节（英文词）、字母和按下的键对不上（含左栏选的全拼字母）、读音比按键短、
+ * 分隔符落在一个字中间时为 null，照原来显示。
+ */
+internal fun t9DoublePinyinKeys(raw: String, spelling: String, scheme: com.kingzcheung.xime.settings.DoublePinyinScheme): String? {
+    val syllables = spelling.trim().split(' ', '\'').filter { it.isNotEmpty() }
+    if (syllables.isEmpty()) return null
+    val codes = syllables.map { scheme.code(it.lowercase().replace('ü', 'v')) }
+    if (codes.any { it == null }) return null
+    val letters = codes.joinToString("")
+    val out = StringBuilder()
+    var used = 0
+    for (c in raw) {
+        if (c == '\'' || c == ' ') {
+            if (used % 2 != 0) return null
+            continue
+        }
+        val letter = letters.getOrNull(used) ?: return null
+        val matches = if (c.isDigit()) T9_LETTERS.indexOf(letter).let { it >= 0 && T9_KEYS[it] == c } else c.lowercaseChar() == letter
+        if (!matches) return null
+        if (used > 0 && used % 2 == 0) out.append(' ')
+        out.append(letter)
+        used++
+    }
+    return out.toString().takeIf { it.isNotEmpty() }
+}

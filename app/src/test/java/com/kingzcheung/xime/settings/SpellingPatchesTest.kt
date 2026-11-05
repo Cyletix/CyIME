@@ -81,6 +81,24 @@ class SpellingPatchesTest {
         assertEquals(SpellingPatches.patch("", listOf("\"translator/enable_correction\": true")), correctionOnly)
     }
 
+    /** 编码显示双拼键：编码显示规则清空，原来的规则原样抄给希腊字母；关掉时整段去掉，文件回到原样。 */
+    @Test fun doublePinyinRawPreeditEmptiesTheFormatAndKeepsACopy() {
+        val flypy = schema.replace("translator:\n  dictionary: rime_ice\n",
+            "translator:\n  dictionary: rime_ice\n  preedit_format:\n    - xform/([bpmfdtnljqx])n/${'$'}1iao/\n    - \"xform/(?<=[A-Z])\\\\s(?=[A-Z])//\"\n")
+        val format = SpellingPatches.preeditFormatOf(flypy)!!
+        assertEquals(listOf("xform/([bpmfdtnljqx])n/\$1iao/", "xform/(?<=[A-Z])\\s(?=[A-Z])//"), format)
+        assertNull(SpellingPatches.preeditFormatOf(schema))
+        val patched = SpellingPatches.patch("", SpellingPatches.rawPreeditLines(format))!!
+        val root = SchemaManager.yaml.parseToYamlNode(patched) as YamlMap
+        val patch = root.entries.entries.single { it.key.content == "patch" }.value as YamlMap
+        assertEquals(0, (patch.entries.entries.single { it.key.content == "translator/preedit_format" }.value as YamlList).items.size)
+        val copy = patch.entries.entries.single { it.key.content == SpellingPatches.DOUBLE_PINYIN_READING }.value as YamlList
+        assertEquals(format, copy.items.map { (it as YamlScalar).content })
+        // 方案没有编码显示规则时只清空，不抄空表。
+        assertEquals(listOf("\"translator/preedit_format\": []"), SpellingPatches.rawPreeditLines(emptyList()))
+        assertEquals("", SpellingPatches.patch(patched, emptyList())!!.replace("patch:\n", ""))
+    }
+
     /** 双拼在自建合并键布局上的版本也写模糊音：只认这些版本的方案文件，不认全拼布局、14 键和补丁文件。 */
     @Test fun doublePinyinLayoutVariantsAreListedFromTheRimeDirectory() {
         val dir = kotlin.io.path.createTempDirectory("spelling").toFile()
