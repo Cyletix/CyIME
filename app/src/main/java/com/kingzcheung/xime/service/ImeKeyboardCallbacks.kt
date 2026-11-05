@@ -217,10 +217,12 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             // 角标、长按、空格两侧标点键和符号面板上屏的符号：第三方方案把它当编码键时同样先交给 Rime（#87）。
+            // 雾凇 26 键打着 Unicode 码（U26）时角标、长按的数字也接进编码（U2603 → ☃）。
             onCommitText = { text ->
                 if (service.inputReadiness.ticket() != null) {
                     val schemeCode = if (numberPanelShown(service)) null else service.keyRouter.schemeCodeKey(text)
                     if (schemeCode != null) service.keyRouter.handleKeyPress(schemeCode, false)
+                    else if (!numberPanelShown(service) && service.keyRouter.unicodeCodeDigit(text)) service.keyRouter.handleKeyPress(text, false)
                     else service.textCommit.commitLiteralText(text)
                 }
             },

@@ -26,6 +26,13 @@ import kotlinx.coroutines.withContext
 private fun isRimeIceCapitalSchema(id: String) =
     id == "rime_ice" || com.kingzcheung.xime.settings.CustomKeyboardLayouts.isCustom(id)
 
+/** 雾凇的 Unicode 码（recognizer `^U[a-f0-9]+`，U2603 → ☃）：大写 U 起头，后面只有数字和小写 a–f。 */
+internal fun isUnicodeCodeInput(input: String) =
+    input.firstOrNull() == 'U' && input.drop(1).all { it in '0'..'9' || it in 'a'..'f' }
+
+/** 打了数字的 Unicode 码（U2、U26a）：只打字母的 Uber、Ubad 不算，照旧是英文。 */
+internal fun isUnicodeCodeWithDigit(input: String) = isUnicodeCodeInput(input) && input.any { it in '0'..'9' }
+
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
     private val hardwareNavigation = HardwareCandidateNavigation()
@@ -670,6 +677,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         return state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.EXTERNAL &&
             !service.candidateState.value.isComposing &&
             c in com.kingzcheung.xime.settings.SchemaManager.recognizerLeadChars(service, state.currentSchemaId)
+    }
+
+    /**
+     * 雾凇 26 键打着 Unicode 码（大写 U 加十六进制）时，角标、长按打的数字接进编码交给 Rime，
+     * 不再把 U 连同数字原样上屏。数字行的数字本来就进 Rime；九键、双拼、英文和数字面板不经过这里。
+     */
+    internal fun unicodeCodeDigit(text: String): Boolean {
+        val state = service.uiState.value
+        return text.length == 1 && text[0] in '0'..'9' && !state.isAsciiMode &&
+            isRimeIceCapitalSchema(state.currentSchemaId) && isUnicodeCodeInput(service.candidateState.value.inputText)
     }
 
     /** 导入方案的大写字母交给 Rime（#118）：字母表里有这个大写，或方案的 recognizer 规则以它起头（没在打字时）。 */
@@ -1406,7 +1423,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 点击（selectCandidateAsync 按 candidateActions 分流上屏）。
                     // actions 为空（无变换）时保持原生数字选词行为不变。
                     if (!state.isAsciiMode && candState.isComposing &&
-                        key.length == 1 && key[0] in '1'..'9'
+                        key.length == 1 && key[0] in '1'..'9' &&
+                        !(isRimeIceCapitalSchema(state.currentSchemaId) && isUnicodeCodeInput(candState.inputText))
                     ) {
                         val actions = service.candidateState.value.candidateActions
                         val digitIndex = key[0] - '1'
@@ -1479,6 +1497,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     service.t9PartialSegments.isNotEmpty())) {
                                 commitHardwareLiteral(char)
                                 return@command
+                            }
+                            // 打着带数字的 Unicode 码（U2、U26）接着打 a–f 以外的字母：不是在打码，先把它原样上屏，
+                            // 字母照常起新的编码（U2 kanle → U2看了）。先看屏上的编码，不是 U 起头就不读引擎。
+                            if (isChinese && isLetter && !japaneseCase && !mergedKey && char[0] !in 'a'..'f' &&
+                                candState.inputText.firstOrNull() == 'U' && isRimeIceCapitalSchema(state.currentSchemaId) &&
+                                service.rimeEngine.readQueuedComposition()?.input?.let(::isUnicodeCodeWithDigit) == true) {
+                                if (!commitHardwareLiteral("")) return@command
                             }
                             val result = if (capitalsInRime) service.rimeEngine.processQueuedKeyAndGetResult(char.uppercase()[0].code, 0)
                                 else service.rimeEngine.processQueuedKeyAndGetResult(keyCode, mask)
