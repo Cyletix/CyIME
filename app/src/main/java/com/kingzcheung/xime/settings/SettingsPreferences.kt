@@ -147,19 +147,6 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SPLIT_KEYBOARD, enabled).apply()
     }
 
-    const val KEY_SPLIT_LANDSCAPE_ONLY = "split_keyboard_landscape_only"
-
-    /** 分体只在横屏（别人提的需求，默认关）：打开后竖屏用完整键盘，横屏才分体；「分体键盘」本身的开关不变。 */
-    fun isSplitLandscapeOnly(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SPLIT_LANDSCAPE_ONLY, false)
-
-    fun setSplitLandscapeOnly(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_SPLIT_LANDSCAPE_ONLY, enabled).apply()
-    }
-
-    /** 这个方向上分体键盘是否真的分开：「分体键盘」开着，且不是「只在横屏分体」下的竖屏。 */
-    fun isSplitKeyboardShown(context: Context, landscape: Boolean): Boolean =
-        isSplitKeyboardEnabled(context) && (landscape || !isSplitLandscapeOnly(context))
-
     const val KEY_SPLIT_RIGHT_G = "split_keyboard_right_g"
 
     /** 分体 26 键右半中排开头再放一个 G（别人提的需求，默认关）；只影响分体键盘。 */

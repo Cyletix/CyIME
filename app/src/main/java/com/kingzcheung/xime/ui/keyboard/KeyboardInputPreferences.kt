@@ -85,8 +85,6 @@ data class KeyboardInputPreferences(
     val chineseLetterSwipes: Map<String, String> = emptyMap(),
     val englishLetterSwipes: Map<String, String> = emptyMap(),
     val splitKeyboardEnabled: Boolean = false,
-    /** 只在横屏分体（默认关）：竖屏时键盘按不分体排，见 [splitShownIn]。 */
-    val splitLandscapeOnly: Boolean = false,
     /** 分体 26 键右半中排再放一个 G（默认关）。 */
     val splitRightG: Boolean = false,
     /** 中缝和两侧留空用键盘底色填满（默认镂空）。 */
@@ -207,8 +205,6 @@ data class KeyboardInputPreferences(
     /** 按住空格说话时上滑取消：手指往上滑出空格约一个键高再松手，这次说的话不上屏（默认关，别人提的需求，11-02）。 */
     val voiceSwipeCancel: Boolean = false,
 ) {
-    /** 这个方向上键盘真的分开：「分体键盘」开着，且不是「只在横屏分体」下的竖屏。 */
-    fun splitShownIn(landscape: Boolean): Boolean = splitKeyboardEnabled && (landscape || !splitLandscapeOnly)
     internal val showCodeInCandidateBar: Boolean get() = showPreeditPreview &&
         com.kingzcheung.xime.service.TerminalEditor.inputTextLocation { inputTextLocation } == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR
     /** 拼音放进候选栏左侧：只在「显示在候选栏」下生效；切到输入框后留着的旧值不把气泡挤进栏里。 */
@@ -288,7 +284,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_LANDSCAPE_ONLY, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
@@ -327,7 +323,6 @@ data class KeyboardInputPreferences(
                 chineseLetterSwipes = com.kingzcheung.xime.settings.LetterSwipeBindings.load(context, false),
                 englishLetterSwipes = com.kingzcheung.xime.settings.LetterSwipeBindings.load(context, true),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
-                splitLandscapeOnly = SettingsPreferences.isSplitLandscapeOnly(context),
                 splitRightG = SettingsPreferences.isSplitRightGEnabled(context),
                 fillBlankAreas = SettingsPreferences.isKeyboardBlankFilled(context),
                 wideKeys = SettingsPreferences.isWideKeysEnabled(context),
