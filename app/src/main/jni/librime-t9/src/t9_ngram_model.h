@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "t9_ngram_format.h"
@@ -39,8 +40,17 @@ class T9NgramModel {
   // phrase) is estimated from its parts: split into model words by frequency (characters
   // outside the model stay kUnseen), then scored as a chain after the two histories.
   void Decompose(const std::string& text, std::vector<int32_t>* parts) const;
+  // Word pairs that are mostly a corpus misspelling (觉 的 for 觉得); a short list, scanned linearly.
+  using Pairs = std::vector<std::pair<int32_t, int32_t>>;
+  static bool HasPair(const Pairs& pairs, int32_t first, int32_t second) {
+    for (const auto& pair : pairs)
+      if (pair.first == first && pair.second == second) return true;
+    return false;
+  }
+  // A pair in typo_bigrams is scored from the second word's lower-order probability, as an unseen pair.
   double Chain(int32_t history2, int32_t history, bool first, bool sentence_start,
-               const std::vector<int32_t>& parts, int32_t* last2, int32_t* last) const;
+               const std::vector<int32_t>& parts, int32_t* last2, int32_t* last,
+               const Pairs* typo_bigrams = nullptr) const;
 
  private:
   T9NgramModel() = default;

@@ -79,6 +79,13 @@ class NgramModelTest : public ::testing::Test {
     const double chain = model->Chain(T9NgramModel::kUnseen, T9NgramModel::kUnseen, true, false, parts, &last2, &last);
     EXPECT_NEAR(-2.5 + -0.5 + -0.125, chain, 3 * tol);
     EXPECT_EQ(men, last2); EXPECT_EQ(de, last);
+    // A listed misspelling pair (们 的) is scored from lower(的) instead of the stored trigram -0.125;
+    // the other transitions and the returned histories are unchanged.
+    const T9NgramModel::Pairs typo{{men, de}};
+    const double typo_chain = model->Chain(T9NgramModel::kUnseen, T9NgramModel::kUnseen, true, false, parts,
+                                           &last2, &last, &typo);
+    EXPECT_NEAR(-2.5 + -0.5 + -1.0, typo_chain, 3 * tol);
+    EXPECT_EQ(men, last2); EXPECT_EQ(de, last);
   }
 };
 

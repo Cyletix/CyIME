@@ -5,10 +5,12 @@
 #define CYIME_T9_SCRIPT_OPTIONS_H_
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <set>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include <cylm.h>
 #include <rime/common.h>
@@ -65,6 +67,13 @@ struct T9ScriptOptions {
   double t9_particle_eos_weight_ = 0;
   bool t9_particle_bigram_after_start_ = false;
   double t9_particle_alternative_margin_ = 0;
+  // t9/single_key_initial_margin (ln units): when one key alone (2–9) decodes to a complete vowel (额, 啊, 哦)
+  // first, a character it starts as an initial (的 for 3) comes first instead if its corpus frequency is at
+  // least that much higher; the vowel stays second. 0 keeps the decoder order.
+  double t9_single_key_initial_margin_ = 0;
+  // t9/ngram_typo_bigrams ("觉 的"): word pairs whose corpus count is mostly a misspelling (觉的 for 觉得).
+  // The pair is scored as if never seen, from the second word's lower-order probability.
+  std::shared_ptr<const std::vector<std::pair<int32_t, int32_t>>> t9_ngram_typo_bigrams_;  // T9NgramModel::Pairs
   // 14-key: see T9PreferMergedTailWord (t9_sentence_rescore.h); 0 keeps the typed letters' sentence first.
   double t9_merged_tail_word_margin_ = 0;
   bool t9_ngram_merge_segmentations_ = false;

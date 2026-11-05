@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <deque>
+#include <limits>
 #include <tuple>
 #include <unordered_map>
 
@@ -151,6 +152,40 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
       if (x.sentence.text() != y.sentence.text()) return x.sentence.text() < y.sentence.text();
       return x.sentence.code() < y.sentence.code();
     });
+    // One key alone (t9/single_key_initial_margin): the word model ranks a lone 3 by how a message starts or
+    // by the preceding word (额 at a sentence start, 饿 after 就), and the initial reading pays the
+    // abbreviation penalty, so 的 came second. A character the key starts as an initial goes first when its
+    // corpus frequency is that many ln units above the vowel's (only 的 for 3: 你 for 6 and 不 for 2 are
+    // within 20 times of 哦 and 啊); the vowel sentence is shown right behind it.
+    size_t demoted = order.size();
+    if (single_t9_key && o.t9_ngram_ && o.t9_single_key_initial_margin_ > 0 && order.size() > 1) {
+      auto lone = [&](const T9Path& path, bool* initial) {
+        const auto& parts = path.sentence.components();
+        if (parts.size() != 1) return -std::numeric_limits<double>::infinity();
+        *initial = parts.front().quality_len < 1.0;
+        const int32_t id = o.t9_ngram_->Id(parts.front().text);
+        return id == ::T9NgramModel::kUnseen ? -std::numeric_limits<double>::infinity()
+                                             : o.t9_ngram_->Start(id, false);
+      };
+      bool initial = true;
+      const double vowel = lone(paths[order.front().first], &initial);
+      if (!initial && std::isfinite(vowel)) {
+        size_t pick = 0;
+        double best = vowel + o.t9_single_key_initial_margin_;
+        for (size_t i = 1; i < order.size(); ++i) {
+          bool abbreviated = false;
+          const double frequency = lone(paths[order[i].first], &abbreviated);
+          if (abbreviated && frequency >= best) { best = frequency; pick = i; }
+        }
+        if (pick) {
+          auto item = order[pick];
+          item.second = std::max(item.second, order.front().second);
+          order.erase(order.begin() + pick);
+          order.insert(order.begin(), item);
+          demoted = 1;
+        }
+      }
+    }
     set<string> displayed;
 #ifndef T9_ALGO_ONLY_BUILD
     // Sentences the user deleted (long press) are skipped here, so the next best one takes the slot.
@@ -167,16 +202,20 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
     // Only where a particle is among the first three sentences (as for the particle end weight below).
     const bool particle_near = std::any_of(order.begin(), order.begin() + std::min<size_t>(order.size(), 3),
         [&](const auto& item) { return !particle_stem(paths[item.first].sentence).empty(); });
-    for (const auto& item : order) {
+    for (size_t position = 0; position < order.size(); ++position) {
+      const auto& item = order[position];
       const auto& path = paths[item.first];
       bool extra = false;
+      const bool kept_vowel = position == demoted;
       // t9/display_sentences: whole-input sentences shown before the dictionary words
       // (1 = the best sentence, then shorter words, as stock Rime; 0 = all decoded).
       // When a sentence ending in a particle (吗, 呢, 吧…) is among the first three, one more sentence is
       // shown: the best one ending in a particle after other words than those shown (济南吗, then 礼貌吗;
       // 我们那, then 我们吗). Behind the particle those words fell below every shorter word, so such a
       // sentence could not be typed although its words alone come second.
-      if (o.t9_display_sentences_ && sentences->size() >= o.t9_display_sentences_) {
+      if (kept_vowel) {
+        extra = true;
+      } else if (o.t9_display_sentences_ && sentences->size() >= o.t9_display_sentences_) {
         if (particle_alternative || !particle_near || o.t9_particle_alternative_margin_ <= 0) break;
         // Not far behind the first sentence (t9/particle_alternative_margin, ln units): 2026-11-02 host sweep,
         // 541 of the 546 wanted sentences (礼貌吗) were within 4 of it, and most odd ones (我门吗) beyond.
@@ -202,7 +241,7 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
       sentence->set_weight(item.second);
       sentence->set_quality(path.coverage + 0.1 * (0.5 + std::atan(item.second / 10.0) / 3.141592653589793) + q.translator->initial_quality());
       sentences->push_back(std::move(sentence));
-      if (extra) particle_alternative = true;
+      if (extra && !kept_vowel) particle_alternative = true;
     }
   };
   const string cache_key = q.input + "#" + std::to_string(q.start) +
@@ -413,13 +452,24 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
   }
   // Model word of each entry; an entry the corpus never contained is kept as its parts,
   // so a long unseen entry never wins by paying a single unseen-word cost.
-  struct T9LmEntry { int32_t id; vector<int32_t> parts; double reading = 0; bool particle = false; };
+  // typo: the entry's own words contain a t9/ngram_typo_bigrams pair (a learned 觉的); typo_follow: its first word
+  // is the second word of such a pair (的), so only those entries look at the pair list while scoring.
+  struct T9LmEntry {
+    int32_t id; vector<int32_t> parts; double reading = 0; bool particle = false;
+    bool typo = false, typo_follow = false;
+  };
   std::unordered_map<const DictEntry*, T9LmEntry> lm_entries;
   auto lm_entry_of = [&](const an<DictEntry>& entry) -> const T9LmEntry& {
     const auto found = lm_entries.find(entry.get());
     if (found != lm_entries.end()) return found->second;
     T9LmEntry lm{o.t9_ngram_->Id(entry->text), {}};
     if (lm.id == ::T9NgramModel::kUnseen) o.t9_ngram_->Decompose(entry->text, &lm.parts);
+    if (const auto* typos = o.t9_ngram_typo_bigrams_.get()) {
+      const int32_t head = lm.parts.empty() ? lm.id : lm.parts.front();
+      for (const auto& pair : *typos) if (pair.second == head) lm.typo_follow = true;
+      for (size_t k = 1; k < lm.parts.size(); ++k)
+        if (::T9NgramModel::HasPair(*typos, lm.parts[k - 1], lm.parts[k])) lm.typo = true;
+    }
     lm.particle = o.t9_final_particles_ && o.t9_final_particles_->count(entry->text);
     if (o.t9_readings_) {
       const auto readings = o.t9_readings_->find(entry->text);
@@ -457,11 +507,17 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
             // The root carries a history only when the committed text before it is known.
             const bool first = !previous->entry && previous->lm_id == ::T9NgramModel::kUnseen;
             const auto& lm = lm_entry_of(entry);
+            // A phrase spelling a corpus misspelling (觉的; t9/ngram_typo_bigrams), from the dictionary or learned
+            // fewer than three times (most likely picked once because it came first), gets neither the dictionary
+            // prior nor the user layer, which lifted a once-picked 觉的 over 觉得 by its user-dictionary weight.
+            constexpr int kTypoLearnedMinCommits = 3;
+            const bool typo_unconfirmed = lm.typo && entry->commit_count < kTypoLearnedMinCommits;
             double lp;
             if (!lm.parts.empty()) {
               lp = o.t9_ngram_->Chain(previous->lm_prev, previous->lm_id, first, o.t9_ngram_sentence_start_,
-                                    lm.parts, &lm_prev, &lm_id);
-              if (o.t9_ngram_dictionary_prior_ > 0 && std::isfinite(entry->weight)) {
+                                    lm.parts, &lm_prev, &lm_id,
+                                    lm.typo || lm.typo_follow ? o.t9_ngram_typo_bigrams_.get() : nullptr);
+              if (o.t9_ngram_dictionary_prior_ > 0 && std::isfinite(entry->weight) && !typo_unconfirmed) {
                 // A dictionary (or cell-pack) word the corpus never contained: its dictionary
                 // frequency is the only evidence for the whole word, so mix it in as a unigram
                 // probability of the entry, like the user layer; the chain of parts keeps 1-μ.
@@ -472,6 +528,12 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
               lm_id = lm.id;
               lm_prev = o.t9_ngram_sentence_start_ ? o.t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
               lp = o.t9_ngram_->Start(lm.id, o.t9_ngram_sentence_start_);
+            } else if (lm.typo_follow && ::T9NgramModel::HasPair(*o.t9_ngram_typo_bigrams_, previous->lm_id, lm.id)) {
+              // A corpus misspelling (觉的 for 觉得): ln P(的 | 就 觉) was -0.66, so 就觉的 beat 就觉得.
+              // Score the word as after an unknown history (its lower-order probability).
+              lm_id = lm.id;
+              lm_prev = previous->lm_id;
+              lp = o.t9_ngram_->LogProb(::T9NgramModel::kUnseen, lm.id);
             } else {
               lm_id = lm.id;
               lm_prev = previous->lm_id;
@@ -482,7 +544,7 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
                   ? o.t9_ngram_->LogProb(previous->lm_id, lm.id)
                   : o.t9_ngram_->LogProb3(previous->lm_prev, previous->lm_id, lm.id);
             }
-            if (entry->commit_count > 0 && o.t9_ngram_user_weight_ > 0) {
+            if (entry->commit_count > 0 && o.t9_ngram_user_weight_ > 0 && !typo_unconfirmed) {
               // User layer: P = (1-λ)·P(base) + λ·P(user), where P(user) is the user dictionary's own
               // estimate (commit share plus a recency term that fades over a few hundred commits).
               // The base model is read-only and keeps weight 1-λ, so learning never forgets grammar.

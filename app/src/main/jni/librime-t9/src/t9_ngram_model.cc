@@ -243,7 +243,8 @@ void T9NgramModel::Decompose(const std::string& text, std::vector<int32_t>* part
 }
 
 double T9NgramModel::Chain(int32_t history2, int32_t history, bool first, bool sentence_start,
-                           const std::vector<int32_t>& parts, int32_t* last2, int32_t* last) const {
+                           const std::vector<int32_t>& parts, int32_t* last2, int32_t* last,
+                           const Pairs* typo_bigrams) const {
   double total = 0;
   int32_t a = history2, b = history;
   for (size_t k = 0; k < parts.size(); ++k) {
@@ -251,7 +252,8 @@ double T9NgramModel::Chain(int32_t history2, int32_t history, bool first, bool s
       total += Start(parts[k], sentence_start);
       a = sentence_start ? Bos() : kUnseen;
     } else {
-      total += LogProb3(a, b, parts[k]);
+      total += typo_bigrams && HasPair(*typo_bigrams, b, parts[k]) ? LogProb(kUnseen, parts[k])
+                                                                    : LogProb3(a, b, parts[k]);
       a = b;
     }
     b = parts[k];

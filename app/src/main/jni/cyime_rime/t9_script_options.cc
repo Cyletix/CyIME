@@ -144,6 +144,21 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       if (!particles->empty()) t9_final_particles_ = std::move(particles);
     }
     config->GetBool("t9/ngram_merge_segmentations", &t9_ngram_merge_segmentations_);
+    config->GetDouble("t9/single_key_initial_margin", &t9_single_key_initial_margin_);
+    if (auto list = config->GetList("t9/ngram_typo_bigrams"); list && t9_ngram_) {
+      auto pairs = std::make_shared<T9NgramModel::Pairs>();
+      for (size_t i = 0; i < list->size(); ++i) {
+        auto value = list->GetValueAt(i);
+        if (!value) continue;
+        const string& text = value->str();
+        const size_t space = text.find(' ');
+        if (space == string::npos) continue;
+        const int32_t first = t9_ngram_->Id(text.substr(0, space));
+        const int32_t second = t9_ngram_->Id(text.substr(space + 1));
+        if (first != T9NgramModel::kUnseen && second != T9NgramModel::kUnseen) pairs->emplace_back(first, second);
+      }
+      if (!pairs->empty()) t9_ngram_typo_bigrams_ = std::move(pairs);
+    }
     config->GetDouble("t9/correction_penalty", &t9_correction_penalty_);
     config->GetBool("t9/prefer_user_entries", &t9_prefer_user_entries_);
     { int whole = 0; config->GetInt("t9/whole_input_phrases", &whole); t9_whole_input_phrases_ = static_cast<size_t>(std::max(0, whole)); }
