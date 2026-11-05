@@ -288,9 +288,9 @@ class RoundThreeImeTest {
             chooseMode("t9_pinyin")
             rule.waitUntil(10_000) {
                 engine.getCurrentSchema() == "t9_pinyin" && !engine.isAsciiMode() &&
-                    rule.onAllNodesWithText("ABC").fetchSemanticsNodes().isNotEmpty()
+                    rule.onAllNodesWithText("ABC", ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
             }
-            rule.onNodeWithText("ABC").assertIsDisplayed()
+            rule.onNodeWithText("ABC", ignoreCase = true).assertIsDisplayed()
             rule.onNodeWithTag("shift-key").assertDoesNotExist()
             screenshot("round3-handwriting-english-t9")
             // 从九键再进入手写：英文与九键共用同一个 Rime schema 时也必须正确退出 ASCII。
@@ -300,9 +300,9 @@ class RoundThreeImeTest {
             chooseMode("t9_pinyin")
             rule.waitUntil(10_000) {
                 engine.getCurrentSchema() == "t9_pinyin" && !engine.isAsciiMode() &&
-                    rule.onAllNodesWithText("ABC").fetchSemanticsNodes().isNotEmpty()
+                    rule.onAllNodesWithText("ABC", ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
             }
-            rule.onNodeWithText("ABC").assertIsDisplayed()
+            rule.onNodeWithText("ABC", ignoreCase = true).assertIsDisplayed()
             screenshot("round3-same-schema-return-t9")
             assertTrue(engine.switchSchema("japanese_kana"))
             engine.setOption("ascii_mode", false)

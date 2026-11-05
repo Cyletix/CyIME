@@ -376,10 +376,10 @@ class LiteralInputModesImeTest {
         rule.waitUntil(5000) { engine.getInput() == "4" }
         val secondCandidate = engine.getCandidates().first()
         // Send the next touch immediately, before waiting for Compose/service work to settle.
-        val digitNode = rule.onNodeWithText("ABC")
+        val digitNode = rule.onNodeWithText("ABC", ignoreCase = true)
         val digitBounds = digitNode.fetchSemanticsNode().boundsInRoot
         val digit = digitBounds.center - digitBounds.topLeft
-        val next = rule.onNodeWithText("JKL").fetchSemanticsNode().boundsInRoot.center - digitBounds.topLeft
+        val next = rule.onNodeWithText("JKL", ignoreCase = true).fetchSemanticsNode().boundsInRoot.center - digitBounds.topLeft
         val distance = swipeDistance
         digitNode.performTouchInput {
             down(digit)

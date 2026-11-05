@@ -191,7 +191,7 @@ class GlideAndFlickGestureTest {
         schema.value = "t9_pinyin"; ascii.value = false
         KeysConfigHelper.setActiveKeyboardSchema("t9_pinyin")
         show()
-        val abc = rule.onNodeWithText("ABC", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center -
+        val abc = rule.onNodeWithText("ABC", ignoreCase = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center -
             rule.onNodeWithTag("glide-host").fetchSemanticsNode().boundsInRoot.topLeft
         val left = Offset(-40f, 0f)
         rule.onNodeWithTag("glide-host").performTouchInput { down(abc); moveTo(abc + left * 0.5f); moveTo(abc + left); up() }
@@ -221,7 +221,7 @@ class GlideAndFlickGestureTest {
         schema.value = "t9_pinyin"; ascii.value = false
         KeysConfigHelper.setActiveKeyboardSchema("t9_pinyin")
         show()
-        val abc = rule.onNodeWithText("ABC", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center -
+        val abc = rule.onNodeWithText("ABC", ignoreCase = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center -
             rule.onNodeWithTag("glide-host").fetchSemanticsNode().boundsInRoot.topLeft
         // 与原长按选字母同一路径：精确字母经 onKeyPress 进入九键。
         val flicks = listOf(Offset(-40f, 0f) to "key:A", Offset(0f, -40f) to "key:B", Offset(40f, 0f) to "key:C")

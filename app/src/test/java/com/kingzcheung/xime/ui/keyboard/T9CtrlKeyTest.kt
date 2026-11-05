@@ -75,7 +75,7 @@ class T9CtrlKeyTest {
     private fun bounds(tag: String) = rule.onNodeWithTag(tag, true).fetchSemanticsNode().boundsInRoot
     /** 数字键中心（在快捷键键面出来前取，出来后原键面透明但还在）。 */
     private fun digitCenter(digit: Int): Offset =
-        rule.onNodeWithText(digitFaces[digit - 1], useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+        rule.onNodeWithText(digitFaces[digit - 1], ignoreCase = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
     private fun labelShown(text: String) = rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     @Test fun holdShowsShortcutFacesOnDigitKeys() {

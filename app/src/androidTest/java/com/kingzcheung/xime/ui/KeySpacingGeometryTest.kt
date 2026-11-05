@@ -170,7 +170,7 @@ class KeySpacingGeometryTest {
             // Text spans the keycap width. Measure its painted vertical extent from the screenshot,
             // so this catches extra row gaps, not just the formula used by production code.
             fun cap(label: String, row: Int): Rect {
-                val text = rule.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val text = rule.onNodeWithText(label, ignoreCase = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                     .translate(-origin.x, -origin.y)
                 val left = text.left.toInt() + 1
                 val right = text.right.toInt() - 1

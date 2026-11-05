@@ -105,13 +105,13 @@ class KeyboardSwipeIntegrationTest {
             schema.value = layout.schema
         }
         rule.waitForIdle()
-        rule.onNodeWithText(layout.label, useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithText(layout.label, ignoreCase = true, useUnmergedTree = true).assertIsDisplayed()
         rule.runOnIdle { commits.clear(); cursorMoves.clear() }
     }
 
     private fun startOf(layout: Layout): Offset {
         val host = rule.onNodeWithTag("swipe-host").fetchSemanticsNode().boundsInRoot
-        return rule.onNodeWithText(layout.label, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center - host.topLeft
+        return rule.onNodeWithText(layout.label, ignoreCase = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center - host.topLeft
     }
 
     @Test fun diagonalVerticalSelectionSurvivesOtherKeysAndLeavingTheKeyboardForEveryLayout() {

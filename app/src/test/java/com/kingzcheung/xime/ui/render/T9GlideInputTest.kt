@@ -63,7 +63,7 @@ class T9GlideInputTest {
         }
     }
     private val board get() = rule.onNodeWithTag("keyboard")
-    private fun centerOf(text: String) = rule.onNodeWithText(text, useUnmergedTree = true)
+    private fun centerOf(text: String) = rule.onNodeWithText(text, ignoreCase = true, useUnmergedTree = true)
         .fetchSemanticsNode().boundsInRoot.center - board.fetchSemanticsNode().boundsInRoot.topLeft
 
     @Test fun tapAndCrossKeyStrokeComposeExactlyOnce() {

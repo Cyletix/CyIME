@@ -118,7 +118,7 @@ class FlickComboSurveyTest {
             rule.runOnIdle { modeState.value = mode; commits.clear() }
             rule.waitForIdle()
             val host = rule.onNodeWithTag("host").fetchSemanticsNode().boundsInRoot
-            val node = if (layout == "t9") rule.onAllNodesWithText("JKL", useUnmergedTree = true).onFirst()
+            val node = if (layout == "t9") rule.onAllNodesWithText("JKL", ignoreCase = true, useUnmergedTree = true).onFirst()
                 else rule.onNodeWithTag("kana-key:na")
             val bounds = node.fetchSemanticsNode().boundsInRoot
             val c = bounds.center - host.topLeft

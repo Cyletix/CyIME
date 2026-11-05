@@ -55,7 +55,7 @@ class T9EnglishImeTest {
             rule.chooseModeThroughLanguageAndPanel("t9_pinyin")
             val labels = mapOf('2' to "ABC", '3' to "DEF", '4' to "GHI", '5' to "JKL", '6' to "MNO", '7' to "PQRS", '8' to "TUV", '9' to "WXYZ")
             val sentenceKeys = "48452474687445394942"
-            sentenceKeys.forEach { key -> rule.onNodeWithText(labels.getValue(key)).performTouchInput { down(center); up() } }
+            sentenceKeys.forEach { key -> rule.onNodeWithText(labels.getValue(key), ignoreCase = true).performTouchInput { down(center); up() } }
             // Observe the production controller's idle update, without calling the
             // test-only await/refine helper or replacing the native candidate list.
             rule.waitUntil(10_000) {
@@ -72,7 +72,7 @@ class T9EnglishImeTest {
             for ((word, keys) in listOf("steam" to "78326", "Dota2" to "36822", "CS2" to "272")) {
                 var firstRank = -1
                 repeat(2) { attempt ->
-                    keys.forEach { key -> rule.onNodeWithText(labels.getValue(key)).performTouchInput { down(center); up() } }
+                    keys.forEach { key -> rule.onNodeWithText(labels.getValue(key), ignoreCase = true).performTouchInput { down(center); up() } }
                     rule.waitUntil(10_000) { engine.getInput() == keys }
                     rule.waitForIdle()
                     val rows = engine.inspectCandidates(200)
