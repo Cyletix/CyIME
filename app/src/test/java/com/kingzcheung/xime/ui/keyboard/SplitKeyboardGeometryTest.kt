@@ -26,6 +26,14 @@ class SplitKeyboardGeometryTest {
         }
     }
 
+    /** 屏幕太窄（手机竖屏）时分体自动用完整键盘；手机横屏、平板竖屏和横屏照旧分体（用户 11-05）。 */
+    @Test fun narrowScreensFallBackToTheFullKeyboard() {
+        for (phonePortrait in listOf(320, 360, 393, 412, 480, 599))
+            assertEquals("width=$phonePortrait", false, SplitKeyboardGeometry.fitsScreen(phonePortrait))
+        for (wide in listOf(600, 640, 732, 853, 915, 1280))
+            assertEquals("width=$wide", true, SplitKeyboardGeometry.fitsScreen(wide))
+    }
+
     @Test fun customTenKeyRowsUseTheSameRule() {
         val colemakMiddle = "arstdhneio".map { it.toString() }
         assertEquals(5, SplitKeyboardGeometry.leftCount(colemakMiddle, 0f, false))

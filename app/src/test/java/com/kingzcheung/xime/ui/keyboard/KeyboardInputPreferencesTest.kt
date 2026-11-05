@@ -434,6 +434,17 @@ class KeyboardInputPreferencesTest {
         assertEquals(false, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
     }
 
+    /** 屏幕太窄时分体不分开，但存着的「分体键盘」不改；转到够宽的方向再分开。 */
+    @Test fun `split keyboard shows only on wide screens and keeps the stored choice`() {
+        SettingsPreferences.setSplitKeyboardEnabled(context, true)
+        assertEquals(false, SettingsPreferences.isSplitKeyboardShown(context, 393))
+        assertEquals(true, SettingsPreferences.isSplitKeyboardEnabled(context))
+        assertEquals(true, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
+        assertEquals(true, SettingsPreferences.isSplitKeyboardShown(context, 853))
+        SettingsPreferences.setSplitKeyboardEnabled(context, false)
+        for (width in listOf(393, 853)) assertEquals(false, SettingsPreferences.isSplitKeyboardShown(context, width))
+    }
+
     @Test fun `legacy combined preference preserves both effects until edited independently`() {
         for (old in listOf(false, true)) {
             values.clear()

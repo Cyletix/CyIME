@@ -147,6 +147,10 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SPLIT_KEYBOARD, enabled).apply()
     }
 
+    /** 这块屏幕上分体键盘是否真的分开：「分体键盘」开着，且屏幕够宽；屏幕太窄时用完整键盘，存着的开关不改。 */
+    fun isSplitKeyboardShown(context: Context, screenWidthDp: Int = context.resources.configuration.screenWidthDp): Boolean =
+        isSplitKeyboardEnabled(context) && com.kingzcheung.xime.ui.keyboard.SplitKeyboardGeometry.fitsScreen(screenWidthDp)
+
     const val KEY_SPLIT_RIGHT_G = "split_keyboard_right_g"
 
     /** 分体 26 键右半中排开头再放一个 G（别人提的需求，默认关）；只影响分体键盘。 */

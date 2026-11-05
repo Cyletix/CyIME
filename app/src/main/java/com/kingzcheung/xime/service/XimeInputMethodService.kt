@@ -593,9 +593,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         updateKeyboardGlass()
     }
 
-    /** 当前布局真正以分体显示（偏好开启且是 26 键字母布局）。 */
+    /** 当前布局真正以分体显示（偏好开启、屏幕够宽，且是 26 键字母布局）。 */
     internal fun splitKeyboardActive(state: InputUIState): Boolean =
-        SettingsPreferences.isSplitKeyboardEnabled(this) &&
+        SettingsPreferences.isSplitKeyboardShown(this) &&
             com.kingzcheung.xime.ui.keyboard.supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode)
 
     private fun updateGlassOpacity(opacity: Float) {
@@ -2640,10 +2640,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                      onFloatingModeChange = { enabled ->
                                          restoreKeyboardDisplayMode(enabled, floatingMinY, persist = false)
                                      },
-                                     isSplitKeyboard = SettingsPreferences.isSplitKeyboardEnabled(this@XimeInputMethodService),
+                                     // 屏幕太窄（手机竖屏）时分体按钮显示未选中并禁用，存着的「分体键盘」不动。
+                                     isSplitKeyboard = SettingsPreferences.isSplitKeyboardShown(this@XimeInputMethodService),
                                      // 始终传入回调：当前方案不支持分体时由覆盖层禁用按钮，
                                      // 而不是让按钮整个消失（用户无法判断是禁用还是坏了）。
-                                     splitKeyboardSupported = com.kingzcheung.xime.ui.keyboard.supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode),
+                                     splitKeyboardSupported = com.kingzcheung.xime.ui.keyboard.supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode) &&
+                                         com.kingzcheung.xime.ui.keyboard.SplitKeyboardGeometry.fitsScreen(resources.configuration.screenWidthDp),
                                      onSplitKeyboardChange = { enabled -> SettingsPreferences.setSplitKeyboardEnabled(this@XimeInputMethodService, enabled) },
                                      onPositionDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
                                      onPositionDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },

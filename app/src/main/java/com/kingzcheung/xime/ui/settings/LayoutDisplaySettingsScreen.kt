@@ -153,7 +153,7 @@ private fun LayoutDisplayPage(
                 SettingsSection(title = "分体与键宽", content = {
                     val split = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitKeyboardEnabled
                     SettingsToggleItem(SplitKeyboardIcon, "分体键盘",
-                        "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
+                        "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。屏幕太窄 (手机竖屏) 时自动用完整键盘。间距与尺寸在键盘调整面板中设置。",
                         checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val rightG = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitRightG

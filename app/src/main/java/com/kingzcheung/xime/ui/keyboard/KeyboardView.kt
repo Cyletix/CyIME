@@ -300,7 +300,14 @@ fun KeyboardView(
     val resizeActive = resizeOverlay != null
     val opacityEditingState = remember(resizeActive) { mutableStateOf(false) }
     val resizeControlDensity = LocalDensity.current
-    val inputPreferences = rememberKeyboardInputPreferences(state.isDarkTheme)
+    val storedInputPreferences = rememberKeyboardInputPreferences(state.isDarkTheme)
+    // 屏幕太窄（手机竖屏）时分体自动用完整键盘：整个键盘（字母区、中缝、调节框）都按不分体排；
+    // 转到够宽的方向再分开。存着的「分体键盘」不改。
+    val splitFitsScreen = SplitKeyboardGeometry.fitsScreen(LocalConfiguration.current.screenWidthDp)
+    val inputPreferences = remember(storedInputPreferences, splitFitsScreen) {
+        if (storedInputPreferences.splitKeyboardEnabled && !splitFitsScreen)
+            storedInputPreferences.copy(splitKeyboardEnabled = false) else storedInputPreferences
+    }
     // 「ing 放在 Shift 键上」决定 26 键第二排补不补分号键；只由输入法自己的键盘交给 KeysConfigHelper（设置页的预览不改它）。
     LaunchedEffect(inputPreferences.doublePinyinSemicolonOnShift) {
         com.kingzcheung.xime.settings.KeysConfigHelper.setSemicolonOnShift(inputPreferences.doublePinyinSemicolonOnShift)

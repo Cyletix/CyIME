@@ -54,6 +54,11 @@ internal object SplitKeyboardGeometry {
     const val FALLBACK_GAP_FRACTION = 0.25f
     /** 每半至少保留的单键宽度。 */
     const val MIN_UNIT_DP = 28f
+    /** 屏幕宽度不到这个值（手机竖屏）时分体太窄，自动用完整键盘；转到够宽的方向再分开（用户 11-05）。 */
+    const val MIN_SCREEN_WIDTH_DP = 600
+
+    /** 这个屏幕宽度上分体放得下；分体两半总是贴边占满屏宽，所以按屏宽判断，不按键盘宽。 */
+    fun fitsScreen(screenWidthDp: Int): Boolean = screenWidthDp >= MIN_SCREEN_WIDTH_DP
 
     /** 取消键宽上限后，键区左右仍保留的外边距（与 [keyboardGridMetrics] 的 gutter 一致）。 */
     fun gutterDp(floating: Boolean, horizontalInsetDp: Float = 8f): Float {
