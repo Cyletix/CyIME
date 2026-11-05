@@ -301,6 +301,13 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     }
     
     private val editorCursor = EditorCursor()
+    private val selectAllGuard = SelectAllGuard(log = { message ->
+        val info = service.currentInputEditorInfo
+        // 密码框不记长度。
+        if (!EditorInfoClassifier.isSecretEditor(info)) FileLogger.w(XimeInputMethodService.TAG,
+            "SelectAll ${info?.packageName} type=0x${Integer.toHexString(info?.inputType ?: 0)} " +
+                "options=0x${Integer.toHexString(info?.imeOptions ?: 0)} $message")
+    })
     private val pendingCursorSteps = PendingCursorSteps()
     private val japaneseKanaComposer = JapaneseKanaComposer()
     private var japaneseKanaSession = Long.MIN_VALUE
@@ -436,11 +443,15 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
 
     internal fun observeEditorSelection(start: Int, end: Int) {
-        service.currentInputConnection?.let { editorCursor.observeSelection(it, start, end) }
+        service.currentInputConnection?.let {
+            editorCursor.observeSelection(it, start, end)
+            selectAllGuard.selectionReported(it, start, end)
+        }
     }
 
     /** Main thread, called inside the existing key FIFO; never enqueue a second cursor job. */
     internal fun moveHardwareCursor(event: KeyEvent) {
+        selectAllGuard.cancel()
         val target = service.uiState.value.inputTarget
         val internalEditor = target.editText()
         val ic = if (target.isInternal) {
@@ -485,6 +496,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     // 以前全选/复制/剪切/粘贴/撤销直接作用于当前连接，排在前面的扩选还没执行就剪了旧选区）。
     internal fun handleToolbarEditingAction(action: String) {
         if (service.currentInputConnection == null) return
+        if (action != "select_all") selectAllGuard.cancel()
         if (service.isTerminalEditor()) {
             val key = TerminalEditor.keyForEditingAction(action)
             when {
@@ -500,7 +512,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "undo", "redo" -> editCursor { service.sendUndoShortcut(it, redo = action == "redo") }
             // Ctrl+回车：发送（见 EnterKeyAction.ctrlEnter）。
             "send" -> editCursor { service.keyRouter.performIdleEnter(it, ctrl = true) }
-            "select_all" -> editCursor { it.performContextMenuAction(android.R.id.selectAll) }
+            "select_all" -> editCursor { selectAllGuard.selectAll(it) }
             "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
             "cut" -> editCursor { it.performContextMenuAction(android.R.id.cut) }
             "paste", "paste_plain" -> editCursor {
