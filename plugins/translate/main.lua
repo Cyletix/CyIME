@@ -92,11 +92,71 @@ local function cleanOutput(out)
   return s
 end
 
-local function httpErrorText(status)
-  if status == 401 or status == 403 then return "密钥不对或没有权限（" .. status .. "）" end
-  if status == 404 then return "接口地址或模型名不对（404）" end
-  if status == 429 then return "请求太多或余额不足（429）" end
-  return "接口返回 " .. tostring(status)
+-- 服务器在错误回复里说的原因（OpenAI 格式 {"error":{"message":…}}，也认 {"message":…}、{"error":"…"}、
+-- {"detail":"…"}，不是 JSON 就取第一行）。只取一行、最多 80 字；回复里万一带了密钥就换成 ***。
+local MAX_SERVER_MESSAGE = 80
+
+local function serverMessage(text, apiKey)
+  text = tostring(text or "")
+  local msg = nil
+  local ok, data = pcall(host.json.decode, text)
+  if ok and type(data) == "table" then
+    local e = data.error
+    if type(e) == "table" and type(e.message) == "string" then msg = e.message
+    elseif type(e) == "string" then msg = e
+    elseif type(data.message) == "string" then msg = data.message
+    elseif type(data.detail) == "string" then msg = data.detail
+    elseif type(data.msg) == "string" then msg = data.msg
+    end
+  elseif text:match("^%s*{") then
+    -- 被截断、解析不了的 JSON：直接找 "message"
+    msg = text:match('"message"%s*:%s*"([^"]*)')
+  elseif not text:match("^%s*[%[<]") then
+    msg = text  -- 纯文字回复；HTML 错误页不显示
+  end
+  if msg == nil then return "" end
+  msg = (msg:match("^[^\r\n]*") or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if apiKey ~= nil and #apiKey >= 6 then
+    local s, e = msg:find(apiKey, 1, true)
+    while s ~= nil do
+      msg = msg:sub(1, s - 1) .. "***" .. msg:sub(e + 1)
+      s, e = msg:find(apiKey, s + 3, true)
+    end
+  end
+  -- 别家的 sk- 密钥也遮掉（task-1 这类不算）
+  msg = msg:gsub("()(sk%-[A-Za-z0-9_%-]+)", function(pos, key)
+    if pos > 1 and msg:sub(pos - 1, pos - 1):match("^[A-Za-z0-9_]$") then return key end
+    return "sk-***"
+  end)
+  local out, n = {}, 0
+  for ch in msg:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+    n = n + 1
+    if n > MAX_SERVER_MESSAGE then return table.concat(out) .. "…" end
+    out[#out + 1] = ch
+  end
+  return msg
+end
+
+-- 有的模型只接受固定的 temperature（Kimi K2.5 以后的模型、OpenAI 推理模型等），带了就回 400。
+-- 遇到这种 400 就不带 temperature 重发一次，并记住这个接口地址 + 模型，之后都不带。
+local noTemperature = {}
+
+local function rejectsTemperature(status, text)
+  return status == 400 and tostring(text or ""):lower():find("temperature", 1, true) ~= nil
+end
+
+local function httpErrorText(status, detail)
+  local head
+  if status == 401 or status == 403 then head = "密钥不对或没有权限（" .. status .. "）"
+  elseif status == 404 then head = "接口地址或模型名不对（404）"
+  elseif status == 429 then head = "请求太多或余额不足（429）"
+  else
+    -- 其他状态直接给服务器原话，例：400: invalid temperature: only 1 is allowed for this model
+    if detail ~= nil and detail ~= "" then return tostring(status) .. ": " .. detail end
+    return "接口返回 " .. tostring(status)
+  end
+  if detail ~= nil and detail ~= "" then return head .. "：" .. detail end
+  return head
 end
 
 -- ================= 状态 =================
@@ -127,23 +187,28 @@ local function userMessage(text, lang)
   return "把下面这段话翻译成" .. lang .. "。\n\n<原文>\n" .. text .. "\n</原文>"
 end
 
+-- 这次请求的接口地址 + 模型（记哪些不能带 temperature）
+local function endpointKey()
+  return trim(configOr(KEY_BASE_URL, DEFAULT_BASE_URL)):gsub("/+$", "") .. "|" .. trim(configOr(KEY_MODEL, DEFAULT_MODEL))
+end
+
 local function requestParts(text, stream)
   local apiKey = trim(host.config.get(KEY_API_KEY) or "")
   local baseUrl = trim(configOr(KEY_BASE_URL, DEFAULT_BASE_URL)):gsub("/+$", "")
-  local body = host.json.encode({
+  local req = {
     model = trim(configOr(KEY_MODEL, DEFAULT_MODEL)),
     messages = {
       { role = "system", content = SYSTEM_PROMPT },
       { role = "user", content = userMessage(text, targetLang().name) },
     },
-    temperature = 0.2,
     stream = stream,
-  })
+  }
+  if not noTemperature[endpointKey()] then req.temperature = 0.2 end
   local headers = {
     ["Content-Type"] = "application/json",
     ["Authorization"] = "Bearer " .. apiKey,
   }
-  return baseUrl .. "/chat/completions", headers, body
+  return baseUrl .. "/chat/completions", headers, host.json.encode(req)
 end
 
 -- 整段（非流式）回包里的译文
@@ -158,12 +223,21 @@ end
 
 -- 同步请求：宿主没有流式接口时用，也给「测试接口」用。返回 content, err
 local function requestOnce(text)
+  local key = endpointKey()
+  local withTemperature = not noTemperature[key]
   local url, headers, body = requestParts(text, false)
   local resp = host.http.request("POST", url, headers, body, TIMEOUT_MS)
+  if resp ~= nil and withTemperature and rejectsTemperature(resp.status, resp.text) then
+    noTemperature[key] = true
+    url, headers, body = requestParts(text, false)
+    resp = host.http.request("POST", url, headers, body, TIMEOUT_MS)
+  end
   if resp == nil then
     return nil, "连不上接口：" .. (host.http.lastError() or "未知错误")
   end
-  if resp.status ~= 200 then return nil, httpErrorText(resp.status) end
+  if resp.status ~= 200 then
+    return nil, httpErrorText(resp.status, serverMessage(resp.text, trim(host.config.get(KEY_API_KEY) or "")))
+  end
   local content = contentOf(resp.text)
   if content == nil then return nil, "接口返回的格式看不懂" end
   return content, nil
@@ -217,6 +291,19 @@ local function translate(text)
     onError = function(message)
       if token ~= mine then return end
       sessionId = -1
+      -- 宿主把 HTTP 错误写成「HTTP 400: 回包前 300 字」
+      local status, rest = tostring(message or ""):match("^HTTP (%d+):?%s*(.*)$")
+      status = tonumber(status)
+      if status ~= nil then
+        local key = endpointKey()
+        if not noTemperature[key] and rejectsTemperature(status, rest) then
+          noTemperature[key] = true
+          translate(text)  -- 不带 temperature 再翻一次
+          return
+        end
+        fail(httpErrorText(status, serverMessage(rest, trim(host.config.get(KEY_API_KEY) or ""))))
+        return
+      end
       fail("翻译出错：" .. tostring(message or "未知错误"))
     end,
   }, TIMEOUT_MS, "POST", body)

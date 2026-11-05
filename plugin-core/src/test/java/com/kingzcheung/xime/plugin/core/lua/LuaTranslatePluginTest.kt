@@ -149,4 +149,34 @@ class LuaTranslatePluginTest {
         assertFalse(state.loading)
         assertEquals("Hello.", state.items.single().text)
     }
+
+    private val kimiTemperatureError =
+        """HTTP 400: {"error":{"message":"invalid temperature: only 1 is allowed for this model","type":"invalid_request_error"}}"""
+
+    @Test
+    fun `只接受固定 temperature 的模型：去掉 temperature 重翻一次，之后不再带`() {
+        val (adapter, sse, _) = setup()
+        adapter.onPanelInput("你好")
+        adapter.onPanelAction("generate")
+        assertTrue(sse.bodies[0].contains("\"temperature\""))
+        sse.listeners[0].onError(kimiTemperatureError)
+        assertEquals(2, sse.bodies.size)
+        assertFalse(sse.bodies[1].contains("\"temperature\""))
+        sse.listeners[1].onData(chunk("Hello."))
+        sse.listeners[1].onDone("")
+        assertEquals("Hello.", adapter.getPanelState("").items.single().text)
+        adapter.onPanelInput("你好，明天见")
+        adapter.onPanelAction("generate")
+        assertFalse("记住了，下一句直接不带", sse.bodies[2].contains("\"temperature\""))
+    }
+
+    @Test
+    fun `接口出错时写服务器原话，密钥遮掉`() {
+        val (adapter, sse, _) = setup(key = "test-key-000000")
+        adapter.onPanelInput("你好")
+        adapter.onPanelAction("generate")
+        sse.listeners[0].onError("""HTTP 400: {"error":{"message":"Invalid model kimi-k9 for test-key-000000","type":"invalid_request_error"}}""")
+        assertEquals("400: Invalid model kimi-k9 for ***", adapter.getPanelState("").ui!!.first { it.type == UiNodeType.TEXT }.value)
+        assertEquals("不是 temperature 的问题就不重发", 1, sse.bodies.size)
+    }
 }
