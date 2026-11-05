@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -55,13 +56,17 @@ class LanguageAndPagingSettingsTest {
             }
         }
         rule.onNodeWithTag("language-settings-list").performScrollToKey("language-key-switch")
+        rule.onNodeWithTag("language-switch-mode:cycle").assertDoesNotExist()
+        rule.onNodeWithTag("settings-fold:语言键切换方式").performClick()
         rule.onNodeWithTag("language-switch-mode:cycle").performScrollTo().performClick().assertIsSelected()
+        rule.onNodeWithTag("settings-fold:语言键切换方式").assertTextContains("按已启用语言顺序循环切换")
         assertEquals(LanguageSwitchMode.CYCLE, LanguageSwitchPreferences.read(context).mode)
         assertEquals(hardwareBefore, HardwareKeyboardPreferences.read(context))
         rule.runOnIdle { hardwarePage.value = true }
         rule.onNodeWithTag("language-key-switch-settings").assertDoesNotExist()
         rule.runOnIdle { hardwarePage.value = false }
         rule.onNodeWithTag("language-settings-list").performScrollToKey("language-key-switch")
+        rule.onNodeWithTag("settings-fold:语言键切换方式").performClick()
         rule.onNodeWithTag("language-switch-mode:cycle").performScrollTo().assertIsSelected()
     }
 

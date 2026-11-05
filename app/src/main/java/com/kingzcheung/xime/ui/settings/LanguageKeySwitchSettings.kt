@@ -1,10 +1,15 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,17 +57,35 @@ internal fun LanguageKeySwitchSettings(
     }
     val selectedLanguage = options.language?.takeIf { it in nativeLanguages }
         ?: currentNative.takeIf { it in nativeLanguages } ?: nativeLanguages.firstOrNull()
+    val modes = listOf(
+        LanguageSwitchMode.CURRENT_ENGLISH to "当前语言与英文切换(默认)",
+        LanguageSwitchMode.CYCLE to "按已启用语言顺序循环切换",
+        LanguageSwitchMode.SPECIFIC_ENGLISH to "指定语言与英文切换",
+    )
+    // 语言一多，指定语言那一列很长（用户 11-05）：默认收起，标题下一行写当前选的；设置搜索点中时自动展开。
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val searchRequest = SettingsSearchFocus.request
+    LaunchedEffect(searchRequest) {
+        if (searchRequest != null && "语言键切换方式" in searchRequest.keys) expanded = true
+    }
+    val summary = if (options.mode == LanguageSwitchMode.SPECIFIC_ENGLISH && selectedLanguage != null)
+        "${selectedLanguage.displayName} ↔ 英文" else modes.first { it.first == options.mode }.second
     Surface(modifier = Modifier.settingsSearchAnchor("语言键切换方式").testTag("language-key-switch-settings"), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("语言键切换方式", style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(16.dp)
+            .testTag("settings-fold:语言键切换方式"), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("语言键切换方式", style = MaterialTheme.typography.titleSmall)
+                Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "收起语言键切换方式" else "展开语言键切换方式")
+        }
+        if (expanded) Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("屏幕键盘和物理浮条共用此设置；点按语言键切换，长按打开语言列表。物理键盘的 Shift 和 Ctrl + 空格快捷键保持各自功能。",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.selectableGroup()) {
-                for ((mode, title) in listOf(
-                    LanguageSwitchMode.CURRENT_ENGLISH to "当前语言与英文切换(默认)",
-                    LanguageSwitchMode.CYCLE to "按已启用语言顺序循环切换",
-                    LanguageSwitchMode.SPECIFIC_ENGLISH to "指定语言与英文切换",
-                )) {
+                for ((mode, title) in modes) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
                         .testTag("language-switch-mode:${mode.id}")
                         .selectable(options.mode == mode, role = Role.RadioButton) {
@@ -99,6 +122,7 @@ internal fun LanguageKeySwitchSettings(
                     }
                 }
             }
+        }
         }
     }
 }
