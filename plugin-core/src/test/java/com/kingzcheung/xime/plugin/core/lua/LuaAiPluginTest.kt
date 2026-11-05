@@ -287,8 +287,12 @@ class LuaAiPluginTest {
         assertEquals("https://api.example.com/v1/chat/completions", http.lastUrl)
 
         // 接口报错、回包看不懂、连不上：都给出原因，不算成功
-        http.response = HttpResponse(status = 401, body = "no".toByteArray())
+        http.response = HttpResponse(status = 401, body = "".toByteArray())
         assertEquals("接口返回 401", kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
+        // 带上服务器原话，密钥遮掉
+        http.response = HttpResponse(status = 401,
+            body = """{"error":{"message":"Incorrect API key provided: sk-abcdef123456","type":"invalid_request_error"}}""".toByteArray())
+        assertEquals("401: Incorrect API key provided: sk-***", kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
         http.response = HttpResponse(status = 200, body = "{}".toByteArray())
         assertTrue(kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") }!!.contains("看不懂"))
         http.response = null
@@ -305,7 +309,7 @@ class LuaAiPluginTest {
         val state = adapter.getPanelState("")
         assertTrue(state.items.isEmpty())
         assertFalse(state.loading)
-        assertTrue(state.ui!!.any { it.value == "接口返回 429" })
+        assertTrue(state.ui!!.any { it.value == "429: x" })
     }
 
     @Test
@@ -340,5 +344,40 @@ class LuaAiPluginTest {
             assertTrue(err!!, err.startsWith("插件出错：") && err.contains("坏了"))
         }
         dir.deleteRecursively()
+    }
+
+    /** 像 Kimi K2.5 以后的模型：带了 temperature 就回 400。 */
+    private class FixedTemperatureApi : HttpHostApi {
+        val bodies = mutableListOf<String>()
+        override fun request(
+            method: String,
+            url: String,
+            headers: Map<String, String>,
+            body: ByteArray?,
+            timeoutMillis: Int?
+        ): HttpResponse? {
+            val text = body?.toString(Charsets.UTF_8).orEmpty()
+            bodies += text
+            if (text.contains("\"temperature\"")) {
+                return HttpResponse(status = 400, body = """{"error":{"message":"invalid temperature: only 1 is allowed for this model","type":"invalid_request_error"}}""".toByteArray())
+            }
+            return HttpResponse(status = 200, body = """{"choices":[{"message":{"content":"{\"candidates\":[\"能来\"]}"}}]}""".toByteArray())
+        }
+        override fun lastError(): String? = null
+    }
+
+    @Test
+    fun `ai-reply 只接受固定 temperature 的模型：去掉 temperature 重发一次，之后不再带`() {
+        val store = InMemoryConfigStore()
+        store.set("apiKey", "k")
+        store.set("baseUrl", "https://api.example.com/v1")
+        store.set("model", "kimi-k3")
+        val http = FixedTemperatureApi()
+        val adapter = replyAdapter(store, http)
+        assertEquals(null, kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
+        assertEquals(2, http.bodies.size)
+        assertFalse(http.bodies[1].contains("\"temperature\""))
+        assertEquals(null, kotlinx.coroutines.runBlocking { adapter.onAction("testConnection") })
+        assertEquals("记住了，第二次直接不带", 3, http.bodies.size)
     }
 }

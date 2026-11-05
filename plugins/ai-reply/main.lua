@@ -192,6 +192,59 @@ function plugin.onPanelInput(text)
   lastContext = text or ""
 end
 
+-- 服务器在错误回复里说的原因（OpenAI 格式 {"error":{"message":…}}，也认 {"message":…}、{"error":"…"}、
+-- {"detail":"…"}，不是 JSON 就取第一行）。只取一行、最多 80 字；回复里万一带了密钥就换成 ***。
+local MAX_SERVER_MESSAGE = 80
+
+local function serverMessage(text, apiKey)
+  text = tostring(text or "")
+  local msg = nil
+  local ok, data = pcall(host.json.decode, text)
+  if ok and type(data) == "table" then
+    local e = data.error
+    if type(e) == "table" and type(e.message) == "string" then msg = e.message
+    elseif type(e) == "string" then msg = e
+    elseif type(data.message) == "string" then msg = data.message
+    elseif type(data.detail) == "string" then msg = data.detail
+    elseif type(data.msg) == "string" then msg = data.msg
+    end
+  elseif text:match("^%s*{") then
+    -- 被截断、解析不了的 JSON：直接找 "message"
+    msg = text:match('"message"%s*:%s*"([^"]*)')
+  elseif not text:match("^%s*[%[<]") then
+    msg = text  -- 纯文字回复；HTML 错误页不显示
+  end
+  if msg == nil then return "" end
+  msg = (msg:match("^[^\r\n]*") or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if apiKey ~= nil and #apiKey >= 6 then
+    local s, e = msg:find(apiKey, 1, true)
+    while s ~= nil do
+      msg = msg:sub(1, s - 1) .. "***" .. msg:sub(e + 1)
+      s, e = msg:find(apiKey, s + 3, true)
+    end
+  end
+  -- 别家的 sk- 密钥也遮掉（task-1 这类不算）
+  msg = msg:gsub("()(sk%-[A-Za-z0-9_%-]+)", function(pos, key)
+    if pos > 1 and msg:sub(pos - 1, pos - 1):match("^[A-Za-z0-9_]$") then return key end
+    return "sk-***"
+  end)
+  local out, n = {}, 0
+  for ch in msg:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+    n = n + 1
+    if n > MAX_SERVER_MESSAGE then return table.concat(out) .. "…" end
+    out[#out + 1] = ch
+  end
+  return msg
+end
+
+-- 有的模型只接受固定的 temperature（Kimi K2.5 以后的模型、OpenAI 推理模型等），带了就回 400。
+-- 遇到这种 400 就不带 temperature 重发一次，并记住这个接口地址 + 模型，之后都不带。
+local noTemperature = {}
+
+local function rejectsTemperature(status, text)
+  return status == 400 and tostring(text or ""):lower():find("temperature", 1, true) ~= nil
+end
+
 -- 调接口给 context 想几条回复。返回 items, err（err 非 nil 时 items 为 nil）
 local function requestReplies(context)
   local apiKey = trim(host.config.get(KEY_API_KEY) or "")
@@ -207,29 +260,41 @@ local function requestReplies(context)
   local prompt = configOr(KEY_PROMPT, DEFAULTS.prompt)
   prompt = prompt:gsub("{context}", function() return context end)
 
-  local body = host.json.encode({
-    model = model,
-    messages = {
-      { role = "system", content = "你是智能回复助手。严格按格式输出：只输出一个 JSON 对象，格式为 {\"candidates\": [\"回复一\", \"回复二\"]}，不要任何其他文字。" },
-      { role = "user", content = prompt },
-    },
-    temperature = 0.8,
-  })
   local headers = {
     ["Content-Type"] = "application/json",
     ["Authorization"] = "Bearer " .. apiKey,
   }
   local url = baseUrl .. "/chat/completions"
+  local endpoint = baseUrl .. "|" .. model
+  local function send(withTemperature)
+    local req = {
+      model = model,
+      messages = {
+        { role = "system", content = "你是智能回复助手。严格按格式输出：只输出一个 JSON 对象，格式为 {\"candidates\": [\"回复一\", \"回复二\"]}，不要任何其他文字。" },
+        { role = "user", content = prompt },
+      },
+    }
+    if withTemperature then req.temperature = 0.8 end
+    return host.http.request("POST", url, headers, host.json.encode(req), 60000)
+  end
 
-  local resp = host.http.request("POST", url, headers, body, 60000)
+  local withTemperature = not noTemperature[endpoint]
+  local resp = send(withTemperature)
+  if resp ~= nil and withTemperature and rejectsTemperature(resp.status, resp.text) then
+    noTemperature[endpoint] = true
+    resp = send(false)
+  end
   if resp == nil then
     local err = "连不上接口：" .. (host.http.lastError() or "未知错误")
     host.logError(err)
     return nil, err
   end
   if resp.status ~= 200 then
+    -- 带上服务器原话，例：400: invalid temperature: only 1 is allowed for this model
+    local detail = serverMessage(resp.text, apiKey)
     local err = "接口返回 " .. tostring(resp.status)
-    host.logError(err .. ": " .. tostring(resp.text))
+    if detail ~= "" then err = tostring(resp.status) .. ": " .. detail end
+    host.logError(err)
     return nil, err
   end
 
