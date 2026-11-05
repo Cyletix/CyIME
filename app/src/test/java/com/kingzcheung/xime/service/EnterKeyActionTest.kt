@@ -46,15 +46,14 @@ class EnterKeyActionTest {
     }
 
     @Test fun ctrlEnterSends() {
-        // 用户 11-03：QQ、微信聊天框（SEND + 回车不做动作）执行发送动作、发 Ctrl+回车键都不发；发回车键才发。
-        assertEquals(EnterKey, EnterKeyAction.ctrlEnter(send or noEnter, multiLine, terminal = false))
-        // 键上写着发送：照回车执行发送。
+        // 用户 11-04 TIM 实测（回车发送关）：聊天框 DONE + 回车不做动作，回车键只会换行，执行「发送」才发出去。
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_DONE or noEnter, multiLine, false))
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(send or noEnter, multiLine, terminal = false))
         assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(send, multiLine, terminal = false))
-        // 普通多行框不执行「完成」（会收起键盘），发回车键交给应用。
-        assertEquals(EnterKey, EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_DONE or noEnter, multiLine, false))
-        assertEquals(EnterKey, EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_UNSPECIFIED, multiLine, false))
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_UNSPECIFIED, multiLine, false))
         // 回车本来就执行动作的输入框：照回车。
         assertEquals(EditorAction(EditorInfo.IME_ACTION_SEARCH), EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_SEARCH, text, false))
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_DONE), EnterKeyAction.ctrlEnter(EditorInfo.IME_ACTION_DONE, text, false))
         // 终端：Ctrl+回车交给终端。
         assertEquals(CtrlEnterKey, EnterKeyAction.ctrlEnter(send, multiLine, terminal = true))
     }
