@@ -7,6 +7,7 @@
    合并到 contrib/samples.jsonl。坏行、别的格式跳过并记数。
 3. 按 App 的中文手写逻辑回放全部样本（内置 ochwpro、每笔 8 点 / 连笔多取点、常用度重排、生僻字模板），
    写 contrib/REPORT.md（总体、按书写人、认错的字）和 contrib/history.csv（每次运行一行）。
+4. 按最新样本和模型重排贡献页题目（build_contribute_prompts.py），写 contrib/next_prompts.tsv，报告末尾写出变化。
 
 用法（电脑上，需要 numpy、onnxruntime）：
     python tools/handwriting_training/contrib_ingest.py
@@ -328,6 +329,24 @@ def report(data: pathlib.Path, samples, skipped, new_files, rows):
                     sum(r["label"] in r["app"] for r in ro)])
 
 
+def next_prompts(data: pathlib.Path, model: pathlib.Path, assets: pathlib.Path) -> None:
+    """按最新样本重排贡献页的常用字题目（缺数据、易认错的在前），写 next_prompts.tsv，并在报告末尾写出与 App 里题目的差别。"""
+    import build_contribute_prompts as bcp
+    nxt = data / "next_prompts.tsv"
+    ranked = bcp.build(model, data / "samples.jsonl", nxt)
+    old, new = bcp.prompt_chars(assets / "contribute_prompts.tsv"), bcp.prompt_chars(nxt)
+    fresh = [c for c in new if c not in old]
+    lines = ["", "## 下一版贡献题目（缺数据、易认错的在前）", "",
+             f"常用字 {len(new)} 个，其中还没有样本的 {sum(r['n'] == 0 for r in ranked[:len(new)])} 个；"
+             f"和 App 里现在的题目比，换了 {len(fresh)} 个字。",
+             "前 20：" + " ".join(f"{r['char']}（{r['err']:.0%}）" for r in ranked[:20]), ""]
+    if fresh:
+        lines.append(f"要让 App 用新题目：把 {nxt} 复制成 app/src/main/assets/handwriting/contribute_prompts.tsv，"
+                     "或在仓库里运行 python tools/handwriting_training/build_contribute_prompts.py，再打包。")
+    with open(data / "REPORT.md", "a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--watch", nargs="*", help="找样本文件的目录，默认 <inbox>、下载目录、contrib/inbox")
@@ -351,6 +370,8 @@ def main() -> int:
         return 0
     rows = [] if args.no_replay else evaluate(Replay(pathlib.Path(args.model), pathlib.Path(args.assets)), samples)
     report(data, samples, skipped, new, rows)
+    if not args.no_replay:
+        next_prompts(data, pathlib.Path(args.model), pathlib.Path(args.assets))
     print(f"报告：{data / 'REPORT.md'}")
     return 0
 
