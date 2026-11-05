@@ -15,6 +15,19 @@
 --]]
 local OPTION = "cyime_rare_chars"
 
+-- 粤语常用字（GitHub #72）：开着生僻字时排到第一、二页（主词库同音字之后，约第 10–14 个），不沉到整表最后。
+-- 冇 在主词库里读 mao，这里补上粤语读音 mou。只在这个开关开着时出现，默认不变。
+local COMMON = { qu = "佢", ge = "嘅", zuo = "咗", mou = "冇" }
+local COMMON_QUALITY = 2.2005
+local function yield_common(syllable, seg, comment)
+  local text = COMMON[syllable]
+  if not text then return nil end
+  local cand = Candidate("rare", seg.start, seg._end, text, comment)
+  cand.quality = COMMON_QUALITY
+  yield(cand)
+  return text
+end
+
 local KEYPAD = "22233344455566677778889999"
 
 -- Loaded once per Lua state, only after the option is first on. Each list is one string, not a table per character:
@@ -132,10 +145,13 @@ local function merged_translate(input, seg, env)
   local syllables = merged_syllables(merged_map(env), input)
   for _, syllable in ipairs(syllables) do
     local comment = #syllables > 1 and syllable or ""
+    local common = yield_common(syllable, seg, comment)
     for text in (chars[syllable] or ""):gmatch(utf8.charpattern) do
+      if text == common then goto next_char end
       local cand = Candidate("rare", seg.start, seg._end, text, comment)
       cand.quality = -1000
       yield(cand)
+      ::next_char::
     end
   end
 end
@@ -149,12 +165,15 @@ local function translator(input, seg, env)
   end
   if env.rare_merged_keys then return merged_translate(input, seg, env) end
   local list = load_chars()[input:lower()]
-  if list then
-    for text in list:gmatch(utf8.charpattern) do
+  local common = yield_common(input:lower(), seg, "")
+  if list or common then
+    for text in (list or ""):gmatch(utf8.charpattern) do
+      if text == common then goto next_char end
       local cand = Candidate("rare", seg.start, seg._end, text, "")
       -- Rime orders whole-input candidates by quality: below every dictionary word of this reading.
       cand.quality = -1000
       yield(cand)
+      ::next_char::
     end
     return
   end
