@@ -996,12 +996,15 @@ fun SwipeableIconKeyButton(
     val currentOnSwipeLeft by rememberUpdatedState(onSwipeLeft)
     val startDeleteDrag by rememberUpdatedState(LocalDeleteDrag.current.takeIf { distanceDelete })
     val repeatIntervalMs by rememberUpdatedState(if (deleteKey) LocalKeyboardInputPreferences.current.deleteRepeatSpeed.intervalMs else 30L)
+    // 删除键的清空、撤回按「清空滑动距离」，其他功能键照旧 80dp。
+    val actionDistanceDp by rememberUpdatedState(if (deleteKey) LocalKeyboardInputPreferences.current.clearSwipeDistanceDp else 80f)
     val currentOnSwipeStateChange by rememberUpdatedState(onSwipeStateChange)
     val currentSwipeText by rememberUpdatedState(swipeText)
     val currentSwipeUpLabel by rememberUpdatedState(swipeUpLabel)
     val currentSwipeDownLabel by rememberUpdatedState(swipeDownLabel)
+    // 删除键另有「删除键单独反向」，实际方向见 deleteSwipeReversed；其他键只跟「反转上下滑方向」。
     val swapVertical by rememberUpdatedState(followSymbolSwipeDirection &&
-        !LocalKeyboardInputPreferences.current.reverseSymbolSwipe)
+        !LocalKeyboardInputPreferences.current.let { if (deleteKey) it.deleteSwipeReversed else it.reverseSymbolSwipe })
     var isPressed by remember { mutableStateOf(false) }
     var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
@@ -1073,6 +1076,7 @@ fun SwipeableIconKeyButton(
                         downLabel = currentSwipeDownLabel,
                         startDeleteDrag = startDeleteDrag,
                         repeatIntervalMs = repeatIntervalMs,
+                        actionDistanceDp = actionDistanceDp,
                         onPreview = { state ->
                             flickPreview = state.keyFlick
                             currentOnSwipeStateChange?.invoke(state, buttonBounds)

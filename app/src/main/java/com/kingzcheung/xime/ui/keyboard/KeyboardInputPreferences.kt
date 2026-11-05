@@ -37,6 +37,13 @@ internal fun normalizeSymbolKeyHoldSeconds(value: Float): Float =
 internal fun normalizeCornerHintOpacity(value: Float): Float =
     if (!value.isFinite()) 1f else (kotlin.math.round(value.coerceIn(0.1f, 1f) * 20f) / 20f)
 
+/** 删除键上下滑清空、撤回的距离：原来 80dp 的 70%–120%，每档 10%，默认 100%（11-05 别人提的需求，范围只够微调）。 */
+internal fun normalizeClearSwipePercent(value: Float): Float =
+    ((value.takeIf { it.isFinite() } ?: 100f).coerceIn(70f, 120f) / 10f).roundToInt() * 10f
+
+/** 删除键上下滑要滑过的距离（dp）；100% 就是原来所有按键共用的 80dp。 */
+internal const val CLEAR_SWIPE_BASE_DP = 80f
+
 internal fun normalizeCandidateDragPercent(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 50f).coerceIn(20f, 80f) / 10f).roundToInt() * 10f
 
@@ -164,6 +171,10 @@ data class KeyboardInputPreferences(
     val swipeDistanceDelete: Boolean = true,
     /** 按住删除键连删的快慢，振动间隔跟着换档；默认「标准」即原来的手感（11-03 别人提的需求）。 */
     val deleteRepeatSpeed: com.kingzcheung.xime.keyboard.DeleteRepeatSpeed = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.DEFAULT,
+    /** 删除键单独反向：在「反转上下滑方向」给的方向上再把删除键的清空、撤回对调，角标不动，默认关（11-05 别人提的需求）。实际方向看 [deleteSwipeReversed]。 */
+    val reverseDeleteSwipe: Boolean = false,
+    /** 删除键上下滑清空、撤回要滑多远，按原来距离的百分比，见 [normalizeClearSwipePercent]；默认 100% 不变（11-05 别人提的需求）。 */
+    val clearSwipePercent: Float = 100f,
     val cursorHoldSeconds: Float = 0.2f,
     /** 移动光标时每走一字轻震一下；原来一直有，默认开保持手感（2026-10-22 起可关）。 */
     val cursorStepHaptic: Boolean = true,
@@ -209,6 +220,10 @@ data class KeyboardInputPreferences(
         com.kingzcheung.xime.service.TerminalEditor.inputTextLocation { inputTextLocation } == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR
     /** 拼音放进候选栏左侧：只在「显示在候选栏」下生效；切到输入框后留着的旧值不把气泡挤进栏里。 */
     internal val preeditInsideKeyboard: Boolean get() = showCodeInCandidateBar && inlinePreeditPreview
+    /** 删除键实际是否「上滑清空、下滑撤回」：跟「反转上下滑方向」走，「删除键单独反向」打开再对调一次。 */
+    val deleteSwipeReversed: Boolean get() = reverseSymbolSwipe != reverseDeleteSwipe
+    /** 删除键上下滑清空、撤回的触发距离（dp）。 */
+    val clearSwipeDistanceDp: Float get() = CLEAR_SWIPE_BASE_DP * normalizeClearSwipePercent(clearSwipePercent) / 100f
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
     /** 长按空格不再移动光标时，滑动移动光标改成哪种：键盘滑动；滑行输入锁着键盘滑动就关掉。 */
@@ -234,6 +249,9 @@ data class KeyboardInputPreferences(
         const val CLEAR_BEFORE_CURSOR_ONLY_KEY = "clear_before_cursor_only"
         /** 删除键左右滑动删除；键盘界面读它决定删除键接不接横滑删字（KeyboardView）。 */
         const val SWIPE_DISTANCE_DELETE_KEY = "swipe_distance_delete"
+        /** 删除键单独反向、清空滑动距离；键盘界面读（KeyButton）。 */
+        const val REVERSE_DELETE_SWIPE_KEY = "reverse_delete_swipe"
+        const val CLEAR_SWIPE_PERCENT_KEY = "clear_swipe_percent"
         /** 字母键帽显示大写。 */
         const val UPPERCASE_KEY_LABELS_KEY = "uppercase_key_labels"
         const val CHINESE_UPPERCASE_KEY_LABELS_KEY = "chinese_uppercase_key_labels"
@@ -286,7 +304,7 @@ data class KeyboardInputPreferences(
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
+                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
@@ -386,6 +404,8 @@ data class KeyboardInputPreferences(
                 swipeDistanceDelete = prefs.getBoolean(SWIPE_DISTANCE_DELETE_KEY, true),
                 deleteRepeatSpeed = com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.fromName(
                     prefs.getString(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, null)),
+                reverseDeleteSwipe = prefs.getBoolean(REVERSE_DELETE_SWIPE_KEY, false),
+                clearSwipePercent = normalizeClearSwipePercent(prefs.getFloat(CLEAR_SWIPE_PERCENT_KEY, 100f)),
                 kanaDirectionHints = prefs.getBoolean("kana_direction_hints", false),
                 // 10.11 的默认关已写进旧键；v2 一次性恢复为开，之后用户手动关闭的保留。
                 flickDirectionDisc = prefs.getBoolean("flick_direction_disc_v2", true),
@@ -446,6 +466,8 @@ data class KeyboardInputPreferences(
             .putBoolean(CLEAR_BEFORE_CURSOR_ONLY_KEY, clearBeforeCursorOnly)
             .putBoolean(SWIPE_DISTANCE_DELETE_KEY, swipeDistanceDelete)
             .putString(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, deleteRepeatSpeed.name)
+            .putBoolean(REVERSE_DELETE_SWIPE_KEY, reverseDeleteSwipe)
+            .putFloat(CLEAR_SWIPE_PERCENT_KEY, normalizeClearSwipePercent(clearSwipePercent))
             .putBoolean("kana_direction_hints", kanaDirectionHints)
             .putBoolean("flick_direction_disc_v2", flickDirectionDisc)
             .putBoolean("flick_direction_disc", flickDirectionDisc)

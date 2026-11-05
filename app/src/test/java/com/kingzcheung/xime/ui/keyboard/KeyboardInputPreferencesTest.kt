@@ -210,6 +210,31 @@ class KeyboardInputPreferencesTest {
         assertTrue(com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY in KeyboardInputPreferences.watchedKeys)
     }
 
+    @Test fun `delete swipe reverse and clear distance default to the old behaviour and persist`() {
+        val before = KeyboardInputPreferences.read(context)
+        assertEquals(false, before.reverseDeleteSwipe)
+        assertEquals(100f, before.clearSwipePercent, 0.001f)
+        assertEquals(80f, before.clearSwipeDistanceDp, 0.001f)
+        assertEquals(before.reverseSymbolSwipe, before.deleteSwipeReversed)
+        before.copy(reverseDeleteSwipe = true, clearSwipePercent = 70f).save(context)
+        val after = KeyboardInputPreferences.read(context)
+        assertEquals(true, after.reverseDeleteSwipe)
+        assertEquals(56f, after.clearSwipeDistanceDp, 0.001f)
+        assertEquals(before, after.copy(reverseDeleteSwipe = false, clearSwipePercent = 100f))
+        // 单独反向在「反转上下滑方向」之上再对调
+        assertEquals(true, KeyboardInputPreferences(reverseDeleteSwipe = true).deleteSwipeReversed)
+        assertEquals(false, KeyboardInputPreferences(reverseSymbolSwipe = true, reverseDeleteSwipe = true).deleteSwipeReversed)
+        assertTrue(KeyboardInputPreferences.REVERSE_DELETE_SWIPE_KEY in KeyboardInputPreferences.watchedKeys)
+        assertTrue(KeyboardInputPreferences.CLEAR_SWIPE_PERCENT_KEY in KeyboardInputPreferences.watchedKeys)
+    }
+
+    @Test fun `clear distance stays inside the narrow fine-tune range`() {
+        assertEquals(70f, normalizeClearSwipePercent(10f), 0.001f)
+        assertEquals(120f, normalizeClearSwipePercent(500f), 0.001f)
+        assertEquals(90f, normalizeClearSwipePercent(88f), 0.001f)
+        assertEquals(100f, normalizeClearSwipePercent(Float.NaN), 0.001f)
+    }
+
     @Test fun `every saved setting refreshes the keyboard already on screen`() {
         // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
         KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)

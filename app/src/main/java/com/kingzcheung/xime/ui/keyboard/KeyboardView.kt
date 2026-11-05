@@ -2070,8 +2070,9 @@ fun KeyboardView(
                         },
                         onSelect = { symbol ->
                             onHapticFeedback?.invoke()
-                            if (symbol == "delete") {
-                                callbacks.onKeyPress("delete", false)
+                            // 删除键的清空、撤回同其他键盘（11-05「部分页面的删除键功能缺失」）。
+                            if (symbol == "delete" || symbol == "clear_all" || symbol == "undo_clear") {
+                                callbacks.onKeyPress(symbol, false)
                             } else {
                                 callbacks.onCommitText?.invoke(symbol)
                             }

@@ -263,6 +263,11 @@ fun SymbolKeyboardLayout(
                     androidx.compose.material.icons.Icons.AutoMirrored.Filled.Backspace),
                 onClick = { onSelect("delete") },
                 onLongClick = { onSelect("delete") }, distanceDelete = true,
+                // 清空、撤回同其他键盘的删除键（11-05「部分页面的删除键功能缺失」），方向跟删除键设置走。
+                followSymbolSwipeDirection = true,
+                upFeedback = KeyFlickFeedback.DELETE, swipeUpLabel = "上滑清空",
+                downFeedback = KeyFlickFeedback.UNDO, swipeDownLabel = "下滑撤回",
+                onSwipeUp = { onSelect("clear_all") }, onSwipeDown = { onSelect("undo_clear") },
                 backgroundColor = specialKeyBackgroundColor,
                 iconColor = specialKeyTextColor,
                 modifier = Modifier.weight(bottom.enter).testTag("symbol-delete")

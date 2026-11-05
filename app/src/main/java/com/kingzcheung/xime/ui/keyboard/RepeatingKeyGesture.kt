@@ -26,6 +26,8 @@ internal data class RepeatingKeyActions(
     val startDeleteDrag: (() -> (Int) -> Unit)? = null,
     /** 按住后每隔多久再来一下；删除键按「长按删除速度」，其他键 30 ms。 */
     val repeatIntervalMs: Long = 30L,
+    /** 上下滑松手生效的距离；删除键按「清空滑动距离」，其他键 80dp。 */
+    val actionDistanceDp: Float = 80f,
 )
 
 /** A single owner for hold and swipe: touch slop must not cancel repeated deletion. */
@@ -33,8 +35,6 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
     currentActions: () -> RepeatingKeyActions,
 ) = coroutineScope {
     val scope = this
-    val actionDistance = 80.dp.toPx()
-    val previewDistance = 50.dp.toPx()
     // 灵敏度比 1.15.41 略低（用户 11-01）：横移 16dp 内不打断点按和长按，30dp 起删，每 16dp 多删一个。
     val dragCancel = maxOf(viewConfiguration.touchSlop, 16.dp.toPx())
     val dragStart = 30.dp.toPx()
@@ -43,6 +43,9 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
     awaitEachGesture {
         val down = awaitFirstDown()
         val actions = currentActions()
+        val actionDistance = actions.actionDistanceDp.dp.toPx()
+        // 提示字出现的距离跟着按比例走：默认 80dp 时仍是 50dp。
+        val previewDistance = minOf(50.dp.toPx(), actionDistance * 0.625f)
         val repeat = RepeatInput()
         var repeated = false
         var crossed = false

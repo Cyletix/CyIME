@@ -30,6 +30,13 @@ class KeyTipsTest {
         assertTrue(reversed.contains("上拉字母键|输入键上方的角标；下拉输入下方的角标。"))
         assertTrue(reversed.contains("删除键上拉|"))
         assertTrue(reversed.contains("1.5 秒内"))
+        // 删除键单独反向：只对调删除键，角标方向不变。
+        val deleteOnly = text(KeyboardInputPreferences(reverseDeleteSwipe = true))
+        assertTrue(deleteOnly.contains("删除键上拉|"))
+        assertTrue(deleteOnly.contains("下拉字母键|"))
+        val both = text(KeyboardInputPreferences(reverseSymbolSwipe = true, reverseDeleteSwipe = true))
+        assertTrue(both.contains("删除键下拉|"))
+        assertTrue(both.contains("上拉字母键|"))
         val longPress = text(KeyboardInputPreferences(symbolInputMode = SymbolInputMode.LONG_PRESS))
         assertTrue(longPress.contains("长按字母键|"))
     }

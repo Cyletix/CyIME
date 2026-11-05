@@ -93,7 +93,7 @@ internal fun InputExperienceSettings(
                 Column(Modifier.weight(1f)) {
                     Text("反转上下滑方向", style = MaterialTheme.typography.titleSmall)
                     // 卡片图例已画出每个方向出什么，这里只写打开后的变化（11-01 统一用「上滑／下滑」，不再混用「上拉／下拉」）。
-                    Text(if (settings.reverseSymbolSwipe) "上滑出上角标、下滑出下角标；删除键上滑清空、下滑撤销。"
+                    Text(if (settings.reverseSymbolSwipe) "上滑出上角标、下滑出下角标；删除键${if (settings.deleteSwipeReversed) "上滑清空、下滑撤销" else "下滑清空、上滑撤销"}。"
                         else "打开后上滑出上角标、下滑出下角标，删除键也反过来。", style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = settings.reverseSymbolSwipe,
@@ -104,8 +104,8 @@ internal fun InputExperienceSettings(
             }
             if (InputExperiencePart.DELETE in parts) {
             // 删除键的几种行为放一组（11-01，B站评论找「删除跳过候选」找不到）：原来分在「角标与长按」和「智能联想」两页。
-            val clearSwipe = if (settings.reverseSymbolSwipe) "上滑" else "下滑"
-            val undoSwipe = if (settings.reverseSymbolSwipe) "下滑" else "上滑"
+            val clearSwipe = if (settings.deleteSwipeReversed) "上滑" else "下滑"
+            val undoSwipe = if (settings.deleteSwipeReversed) "下滑" else "上滑"
             divider()
             Row(Modifier.settingsSearchAnchor("左右滑动删除", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -131,6 +131,29 @@ internal fun InputExperienceSettings(
                 Text("按住删除键连删的快慢，振动跟着变密或变疏。默认标准。", style = MaterialTheme.typography.bodySmall)
             }
             divider()
+            // 删除键单独反向（11-05 别人的评论）：在「反转上下滑方向」之上再对调删除键的清空和撤回，角标不动；默认关，原来的方向不变。
+            Row(Modifier.settingsSearchAnchor("删除键单独反向", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("删除键单独反向", style = MaterialTheme.typography.titleSmall)
+                    Text("现在${clearSwipe}清空、${undoSwipe}撤回；只对调删除键，角标方向不变。", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.reverseDeleteSwipe, colors = settingsSwitchColors(),
+                    modifier = Modifier.testTag("reverse-delete-swipe"), onCheckedChange = {
+                        settings = settings.copy(reverseDeleteSwipe = it); settings.save(context)
+                    })
+            }
+            divider()
+            // 清空滑动距离（11-05 别人的评论：键盘矮时滑到屏幕边也不够 80dp）：只给 70%–120% 微调，默认 100% 不变。
+            Column(Modifier.settingsSearchAnchor("清空滑动距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val percent = com.kingzcheung.xime.ui.keyboard.normalizeClearSwipePercent(settings.clearSwipePercent).toInt()
+                Text("清空滑动距离：${if (percent == 100) "标准" else "$percent%"}")
+                Slider(value = percent.toFloat(), modifier = Modifier.testTag("clear-swipe-percent"),
+                    onValueChange = { settings = settings.copy(clearSwipePercent =
+                        com.kingzcheung.xime.ui.keyboard.normalizeClearSwipePercent(it)) },
+                    onValueChangeFinished = { settings.save(context) }, valueRange = 70f..120f, steps = 4)
+                Text("删除键${clearSwipe}清空、${undoSwipe}撤回要滑多远。默认标准。", style = MaterialTheme.typography.bodySmall)
+            }
+            divider()
             Column(Modifier.settingsSearchAnchor("打字中清空整个输入框", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -144,7 +167,7 @@ internal fun InputExperienceSettings(
                             settings = settings.copy(clearAllWhileComposing = it); settings.save(context)
                         })
                 }
-                ClearWhileComposingLegend(settings.clearAllWhileComposing, settings.reverseSymbolSwipe)
+                ClearWhileComposingLegend(settings.clearAllWhileComposing, settings.deleteSwipeReversed)
             }
             divider()
             Column(Modifier.settingsSearchAnchor("只清空光标前的内容", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(),
@@ -159,7 +182,7 @@ internal fun InputExperienceSettings(
                             settings = settings.copy(clearBeforeCursorOnly = it); settings.save(context)
                         })
                 }
-                ClearBeforeCursorLegend(settings.clearBeforeCursorOnly, settings.reverseSymbolSwipe)
+                ClearBeforeCursorLegend(settings.clearBeforeCursorOnly, settings.deleteSwipeReversed)
             }
             // 下面两项存在 SettingsPreferences（原在「智能联想 › 联想行为」），值不变，只是换了地方。
             var deleteSkipsAssociation by remember { mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context)) }

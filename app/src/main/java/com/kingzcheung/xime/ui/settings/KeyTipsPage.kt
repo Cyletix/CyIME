@@ -33,8 +33,8 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
         else -> "下拉"
     }
     val lower = if (settings.reverseSymbolSwipe) "下拉" else "上拉"
-    val clearSwipe = if (settings.reverseSymbolSwipe) "上拉" else "下拉"
-    val restoreSwipe = if (settings.reverseSymbolSwipe) "下拉" else "上拉"
+    val clearSwipe = if (settings.deleteSwipeReversed) "上拉" else "下拉"
+    val restoreSwipe = if (settings.deleteSwipeReversed) "下拉" else "上拉"
     val hold = "%.1f".format(com.kingzcheung.xime.ui.keyboard.normalizeSymbolKeyHoldSeconds(settings.symbolKeyHoldSeconds))
     return listOf(
         KeyTipGroup("Shift", listOf(
