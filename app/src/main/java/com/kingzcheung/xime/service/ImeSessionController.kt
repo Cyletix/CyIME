@@ -32,12 +32,14 @@ private val SETTING_SWITCHES = setOf("traditionalization", "emoji")
 internal class ImeSessionController(private val service: XimeInputMethodService) {
     private var omissionJob: kotlinx.coroutines.Job? = null
     private var omissionRevision = 0L
+    private val omissionPause = OmissionPause()
 
     private fun scheduleOmission(ascii: Boolean) {
         val state = service.candidateState.value
         if (state.engineRevision == omissionRevision) return
         omissionRevision = state.engineRevision
         omissionJob?.cancel()
+        omissionPause.onComposition(state.inputText.length, android.os.SystemClock.uptimeMillis())
         val ui = service.uiState.value
         val profile = ui.inputProfile
         if (ascii || !service.isChineseMode || !state.isComposing || state.hasPrevPage ||
@@ -49,12 +51,25 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         // 停顿后只补漏键和打反两种读法：两个都关了就不再算一遍（方案补丁已让引擎不查，这里省掉这次重算）。
         if (!com.kingzcheung.xime.settings.SpellingPatches.typo(service, com.kingzcheung.xime.settings.SpellingPatches.Typo.OMISSION) &&
             !com.kingzcheung.xime.settings.SpellingPatches.typo(service, com.kingzcheung.xime.settings.SpellingPatches.Typo.TRANSPOSITION)) return
+        val length = state.inputText.length
         omissionJob = service.serviceScope.launch(Dispatchers.Main.immediate) {
-            kotlinx.coroutines.delay(180)
+            // 停顿按自己的打字节奏算，打字途中不补算；补算占着引擎时退格和下一键都得等（见 OmissionPause）。
+            kotlinx.coroutines.delay(omissionPause.delayMs())
             if (service.uiState.value.inputSessionId != ui.inputSessionId ||
-                !state.hasSameSelectionSource(service.candidateState.value) || service.inputCommands.hasPendingCommands)
+                !state.hasSameSelectionSource(service.candidateState.value) || service.inputCommands.hasPendingCommands ||
+                !omissionPause.withinBudget(length, android.os.SystemClock.uptimeMillis()))
                 return@launch
-            val changed = withContext(service.keyProcessingDispatcher) { service.rimeEngine.refineOmission(state.engineRevision) }
+            var elapsedMs = -1L
+            val changed = withContext(service.keyProcessingDispatcher) {
+                val started = android.os.SystemClock.uptimeMillis()
+                service.rimeEngine.refineOmission(state.engineRevision).also {
+                    elapsedMs = android.os.SystemClock.uptimeMillis() - started
+                }
+            }
+            if (elapsedMs >= 0) {
+                omissionPause.onRefined(length, elapsedMs, android.os.SystemClock.uptimeMillis())
+                if (KeyLatencyProbe.enabled) android.util.Log.d(KeyLatencyProbe.TAG, "refine len=$length ms=$elapsedMs changed=$changed")
+            }
             if (changed && service.uiState.value.inputSessionId == ui.inputSessionId &&
                 service.candidateState.value.engineRevision == state.engineRevision) {
                 omissionRevision = state.engineRevision + 1

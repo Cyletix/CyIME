@@ -2043,9 +2043,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         // Keep this physical action at its original position, including D-D-A and D-A-D.
         val hold = com.kingzcheung.xime.keyboard.RepeatInput.current.get()
         if (hold != null && !hold.acquire()) return
+        val queuedAt = if (KeyLatencyProbe.enabled) android.os.SystemClock.uptimeMillis() else 0L
         postRimeJob("delete") {
+            val startedAt = if (queuedAt != 0L) android.os.SystemClock.uptimeMillis() else 0L
             try { if (!hasPendingCandidateCommit && hold?.isActive != false) processDeleteKey(hold) }
-            finally { hold?.completed() }
+            finally {
+                hold?.completed()
+                // 退格排队等了多久（前面有补算、解码时会变长）、自己算了多久；只在打开延迟探针时记。
+                if (queuedAt != 0L) android.util.Log.d(KeyLatencyProbe.TAG, "delete queue=${startedAt - queuedAt} " +
+                    "run=${android.os.SystemClock.uptimeMillis() - startedAt} repeat=${hold != null}")
+            }
         }
     }
 
