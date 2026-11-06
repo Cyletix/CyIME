@@ -194,6 +194,35 @@ patch:
 
 例如 `aaad` 自动上屏「工期」，`aaaa` 有多个候选，仍可手选。这条规则看整个混输候选栏，四码时唯一候选若来自拼音反查，也会自动上屏。不要给混输方案设置四码长度上限，否则会影响长拼音。
 
+### 自己导入的字母排列：去掉 Shift、上下对齐（如乱序 17 双拼）
+
+乱序 17 双拼这类方案不是 CyIME 自带的，按键排列写在你自己的 `xime.custom.yaml` 里。CyIME 的规则是所有字母键盘默认都留 Shift，自带的 14 键、17 键也一样。CyIME 只按标准 26 键（每排 10/9/7 个字母左右）自动对齐上下两排；其他排列的第二行左右各缩进 16 dp，所以第二行和第一行是错开的。
+
+想去掉 Shift 或让上下对齐，在排列所在的那一段加 `geometry`。需要 1.15.51 或更新的版本。
+
+1. 打开「设置 → 语言与方案 → 已安装的方案」，点底部「Rime 配置文件(高级)」，打开 `xime.custom.yaml`。
+2. 找到写着 `schemas: [你的方案 id]` 和 `layout: rows:` 的那一段，在它下面加 `geometry`。`geometry` 和 `schemas`、`layout` 同级，要写在带 `layout` 的同一段里，单独新开一段不生效。
+3. 点保存，键盘马上按新配置显示。1.15.66 及更早的版本保存后还要回到「已安装的方案」点「应用方案更改」。
+
+```yaml
+keyboard:
+  qwerty_lxsq17:                      # 你自己的段名
+    schemas: [double_pinyin_lxsq17]   # 你自己的方案 id
+    layout:                           # 原有的排列保持不动
+      rows:
+        - [h, s, z, b, x, m]
+        - [l, d, y, w, j, n]
+        - [c, q, g, f, t]
+    geometry:
+      middle_row_inset: 0     # 第二行不缩进，第二行第一个键对齐第一行第一个键
+      shift_key: false        # 去掉 Shift
+```
+
+- `middle_row_inset`：第二行左右各缩进几格，可填 0 到 3，可以带小数。一格是第一行一个键宽。第一、二行键数相同时填 0，两行就逐列上下对齐。
+- `shift_key: false`：第三行不放 Shift，字母和删除键分这一行。大写，以及「ing 放在 Shift 上」也跟着没有。只想改宽度时写 `shift_key: { weight: 1 }`，可填 0.2 到 5。
+- `delete_key_weight`：删除键在第三行占几份，可填 0.2 到 5。Shift 默认约 1.4 份，第三行的字母一共 7 份。
+- 不写哪项，哪项就照旧。这个方案换用应用内的「自定义布局」时，这些参数同样生效。完整例子：[layout_geometry/xime.custom.yaml](config_examples/layout_geometry/xime.custom.yaml)
+
 ## 和电脑同步剪贴板
 
 配合 Windows 上的 [CyIME Windows](https://github.com/Cyletix/CyIME-Windows)：
