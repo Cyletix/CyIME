@@ -950,15 +950,19 @@ internal fun candidateTwoLineTextStyle(primary: TextStyle, fontSize: androidx.co
     primary.copy(fontSize = fontSize, lineHeight = (fontSize.value * CANDIDATE_TWO_LINE_SPACING).sp)
 
 internal val LocalCorrectedCandidates = androidx.compose.runtime.compositionLocalOf<Map<String, String>> { emptyMap() }
+internal val LocalCorrectionFullScheme = androidx.compose.runtime.compositionLocalOf<com.kingzcheung.xime.settings.DoublePinyinScheme?> { null }
 
 private val CorrectionRed = Color(0xFFE53935)
 
 /** 纠错候选的拼音只显示改正后的读音（所打字母已在输入框里），改动的字母标红：补上的、换成的、对调的；多打的不再显示。 */
-internal fun correctionAnnotatedString(marks: String, plain: Color): androidx.compose.ui.text.AnnotatedString =
+internal fun correctionAnnotatedString(marks: String, plain: Color,
+    fullScheme: com.kingzcheung.xime.settings.DoublePinyinScheme? = null): androidx.compose.ui.text.AnnotatedString =
     androidx.compose.ui.text.buildAnnotatedString {
         val keep = androidx.compose.ui.text.SpanStyle(color = plain)
         val changed = androidx.compose.ui.text.SpanStyle(color = CorrectionRed)
-        for (mark in com.kingzcheung.xime.rime.CorrectionMarks.parse(marks)) when (mark) {
+        val parsed = if (fullScheme == null) com.kingzcheung.xime.rime.CorrectionMarks.parse(marks)
+            else com.kingzcheung.xime.rime.CorrectionMarks.doublePinyinFull(marks, fullScheme)
+        for (mark in parsed) when (mark) {
             is com.kingzcheung.xime.rime.CorrectionMark.Keep -> withStyle(keep) { append(mark.letter) }
             is com.kingzcheung.xime.rime.CorrectionMark.Extra -> Unit
             is com.kingzcheung.xime.rime.CorrectionMark.Missing -> withStyle(changed) { append(mark.letter) }
@@ -1042,7 +1046,7 @@ fun CandidateItem(
             Spacer(modifier = Modifier.width(3.dp))
             val commentColor = if (isSelected) selectedTextColor.copy(alpha = if (opaqueComment) 1f else 0.6f) else textColor.copy(alpha = if (opaqueComment) 1f else 0.5f)
             Text(
-                text = if (correction.isNotEmpty()) correctionAnnotatedString(correction, commentColor)
+                text = if (correction.isNotEmpty()) correctionAnnotatedString(correction, commentColor, LocalCorrectionFullScheme.current)
                     else androidx.compose.ui.text.AnnotatedString(comment),
                 modifier = Modifier.candidateBaseline(fontSize),
                 color = commentColor,
@@ -1058,8 +1062,9 @@ fun CandidateItem(
 }
 
 /** 候选后面那段小字：有纠错显示纠错，否则显示注释（和 [CandidateItem] 一致）。 */
-internal fun candidateSecondaryText(comment: String, correction: String): AnnotatedString =
-    if (correction.isNotEmpty()) correctionAnnotatedString(correction, Color.Unspecified) else AnnotatedString(comment)
+internal fun candidateSecondaryText(comment: String, correction: String,
+    fullScheme: com.kingzcheung.xime.settings.DoublePinyinScheme? = null): AnnotatedString =
+    if (correction.isNotEmpty()) correctionAnnotatedString(correction, Color.Unspecified, fullScheme) else AnnotatedString(comment)
 
 /** 候选两侧的默认留白。 */
 internal val CANDIDATE_ITEM_PADDING = 4.dp
@@ -1482,7 +1487,8 @@ internal fun FixedCandidateStrip(
         val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
         // 纠错和画出来的一样算进宽度，否则放不下的最后一个候选也算「显示了」，「下一项」移到它时被栏边切掉。
         val correctedCandidates = LocalCorrectedCandidates.current
-        val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, correctedCandidates) {
+        val fullCorrectionScheme = LocalCorrectionFullScheme.current
+        val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, correctedCandidates, fullCorrectionScheme) {
             val bodyWidths = HashMap<Int, Int>()
             fun bodyWidth(index: Int): Int = bodyWidths.getOrPut(index) {
                 val numbered = index < candidates.size
@@ -1495,7 +1501,7 @@ internal fun FixedCandidateStrip(
             val fullWidths = HashMap<Int, Int>()
             fun widthAt(index: Int): Int = fullWidths.getOrPut(index) {
                 val secondaryText = candidateSecondaryText(shownComments.getOrElse(index) { "" },
-                    if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "")
+                    if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "", fullCorrectionScheme)
                 val secondary = if (secondaryText.isEmpty()) 0 else measurer.measure(secondaryText,
                     inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
                         fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
