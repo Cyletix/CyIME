@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -49,8 +50,7 @@ internal fun PressBubbleLayer(controller: SwipeBubbleController, background: Col
         onDispose { controller.onPreviewChanged = null }
     }
     Spacer(Modifier.onGloballyPositioned { coordinates ->
-        val parent = coordinates.parentLayoutCoordinates ?: coordinates
-        layer.anchorAt(parent.localToWindow(Offset.Zero))
+        layer.anchorTo(coordinates.parentLayoutCoordinates ?: coordinates)
     }.semantics { if (controller.state.isPlainPress()) testTag = "key-choice-popup" })
 }
 
@@ -61,16 +61,26 @@ private class PressBubbleDrawable(private val host: View) : Drawable() {
     private val location = IntArray(2)
     private val transform = Matrix()
     private val area = RectF()
-    private var anchor: Offset? = null
+    private var anchor: LayoutCoordinates? = null
     private var rotation = 0f
     private var preview: BubbleDrawData? = null
     private var drawing: BubbleDrawData? = null
 
-    fun anchorAt(windowOrigin: Offset) {
-        host.getLocationInWindow(location)
-        val origin = Offset(windowOrigin.x - location[0], windowOrigin.y - location[1])
-        anchor = origin
+    fun anchorTo(coordinates: LayoutCoordinates) {
+        anchor = coordinates
         place()
+    }
+
+    /**
+     * 每次显示时现算键盘在窗口里的位置，不用上次布局时记下的值：键盘窗口里的内容会在没有
+     * Compose 重新布局的情况下挪动（语音悬浮条和键盘互换时的上浮动画、窗口高度变化），
+     * 记下的旧位置会让气泡落到别的行（用户 11-06：按住 j，气泡出在最下面一排）。
+     */
+    private fun currentOrigin(): Offset? {
+        val coordinates = anchor?.takeIf { it.isAttached } ?: return null
+        val windowOrigin = coordinates.localToWindow(Offset.Zero)
+        host.getLocationInWindow(location)
+        return Offset(windowOrigin.x - location[0], windowOrigin.y - location[1])
     }
 
     fun show(data: BubbleDrawData?, angle: Float) {
@@ -82,7 +92,7 @@ private class PressBubbleDrawable(private val host: View) : Drawable() {
 
     private fun place() {
         val data = preview
-        val origin = anchor
+        val origin = if (data == null) null else currentOrigin()
         if (data == null || origin == null) {
             drawing = null
             setBounds(0, 0, 0, 0)
