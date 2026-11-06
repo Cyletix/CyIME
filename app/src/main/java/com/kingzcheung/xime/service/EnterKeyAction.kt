@@ -13,6 +13,8 @@ import android.view.inputmethod.EditorInfo
  *
  * 应用把回车设成「发送」（微信「回车键发送消息」等）也不改普通回车：照样换行、键面写换行，
  * 只有按住 Ctrl 才发送（用户 11-04，11-05 真机确认生效）。搜索、前往、下一项、完成照旧由回车执行。
+ * 设置里打开「回车发送」（默认关，用户 11-05）后，应用自己把回车设成发送的框里普通回车执行发送、键面写发送，
+ * 应用没设的框照样换行。
  *
  * Shift+回车：换行，不管输入框声明了什么动作（用户 11-04）：多行框声明完成、搜索也换行，单行的发送框也换行。
  * 终端发 Shift+回车键，由终端自己处理；没有换行可言的单行框、数字框照普通回车。
@@ -44,9 +46,11 @@ internal object EnterKeyAction {
         return action.takeIf { imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION == 0 && it in actions }
     }
 
-    fun enter(imeOptions: Int, inputType: Int, terminal: Boolean): Plan {
+    /** [appSend]：设置「回车发送」开着。 */
+    fun enter(imeOptions: Int, inputType: Int, terminal: Boolean, appSend: Boolean = false): Plan {
         editorAction(imeOptions)?.let { return EditorAction(it) }
         if (terminal) return EnterKey
+        if (appSend && appDeclaresSend(imeOptions)) return EditorAction(EditorInfo.IME_ACTION_SEND)
         return if (isMultiLineText(inputType) || isSendTextField(imeOptions, inputType)) Newline else EnterKey
     }
 
@@ -62,14 +66,20 @@ internal object EnterKeyAction {
         return editorAction(imeOptions)?.let(::EditorAction) ?: EditorAction(EditorInfo.IME_ACTION_SEND)
     }
 
-    /** 回车键面上的动作名，和 [enter] 同一判断；发送框也写换行。 */
-    fun label(imeOptions: Int): String = when (editorAction(imeOptions)) {
+    /** 回车键面上的动作名，和 [enter] 同一判断；发送框也写换行，「回车发送」开着且应用设了回车发送时写发送。 */
+    fun label(imeOptions: Int, appSend: Boolean = false): String = if (appSend && appDeclaresSend(imeOptions)) "发送"
+    else when (editorAction(imeOptions)) {
         EditorInfo.IME_ACTION_GO -> "前往"
         EditorInfo.IME_ACTION_SEARCH -> "搜索"
         EditorInfo.IME_ACTION_NEXT -> "下一项"
         EditorInfo.IME_ACTION_DONE -> "完成"
         else -> "换行"
     }
+
+    /** 应用自己把回车设成发送：声明「发送」且没标「回车不做动作」（微信开着「回车键发送消息」时就是这样，11-04 实测）。 */
+    fun appDeclaresSend(imeOptions: Int): Boolean =
+        imeOptions and EditorInfo.IME_MASK_ACTION == EditorInfo.IME_ACTION_SEND &&
+            imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION == 0
 
     /** 单行的发送框也上屏换行：发回车键应用会当成发送。 */
     private fun isSendTextField(imeOptions: Int, inputType: Int): Boolean =

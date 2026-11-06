@@ -92,4 +92,24 @@ class EnterKeyActionTest {
         // 终端：Shift+回车交给终端。
         assertEquals(ShiftEnterKey, EnterKeyAction.shiftEnter(send, multiLine, terminal = true))
     }
+
+    /** 用户 11-05：「回车发送」打开时，应用自己设了回车发送的框里普通回车发送、键面写发送；默认关时不变。 */
+    @Test fun enterSendsSwitchFollowsTheAppOnlyWhenOn() {
+        assertEquals(EditorAction(send), EnterKeyAction.enter(send, multiLine, terminal = false, appSend = true))
+        assertEquals(EditorAction(send), EnterKeyAction.enter(send, text, terminal = false, appSend = true))
+        assertEquals("发送", EnterKeyAction.label(send, appSend = true))
+        // 应用没设回车发送的聊天框（标了回车不做动作）、普通多行框：照样换行。
+        assertEquals(Newline, EnterKeyAction.enter(send or noEnter, multiLine, terminal = false, appSend = true))
+        assertEquals(Newline, EnterKeyAction.enter(EditorInfo.IME_ACTION_DONE or noEnter, multiLine, false, appSend = true))
+        assertEquals("换行", EnterKeyAction.label(send or noEnter, appSend = true))
+        // 搜索框照旧搜索；终端照旧回车键；Shift+回车照旧换行；Ctrl+回车照旧发送。
+        assertEquals(EditorAction(EditorInfo.IME_ACTION_SEARCH),
+            EnterKeyAction.enter(EditorInfo.IME_ACTION_SEARCH, text, false, appSend = true))
+        assertEquals(EnterKey, EnterKeyAction.enter(send, multiLine, terminal = true, appSend = true))
+        assertEquals(Newline, EnterKeyAction.shiftEnter(send, multiLine, terminal = false))
+        assertEquals(EditorAction(send), EnterKeyAction.ctrlEnter(send or noEnter, multiLine, terminal = false))
+        // 默认关：和以前一样。
+        assertEquals(Newline, EnterKeyAction.enter(send, multiLine, terminal = false))
+        assertEquals("换行", EnterKeyAction.label(send))
+    }
 }

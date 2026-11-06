@@ -4132,7 +4132,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun editorEnterKeyText(): String = currentInputEditorInfo?.let(::enterKeyTextFor) ?: "发送"
 
     /** 键面和回车实际做的事同一判断（[EnterKeyAction]）：写换行就换行，写发送才发送。 */
-    private fun enterKeyTextFor(editorInfo: EditorInfo): String = EnterKeyAction.label(editorInfo.imeOptions)
+    private fun enterKeyTextFor(editorInfo: EditorInfo): String =
+        EnterKeyAction.label(editorInfo.imeOptions, appSend = SettingsPreferences.isEnterSendsEnabled(this))
 
     override fun onFinishInput() {
         // 离开后的最后一帧仍不可输入，下一次 onStartInput 按新编辑器恢复正常行为。

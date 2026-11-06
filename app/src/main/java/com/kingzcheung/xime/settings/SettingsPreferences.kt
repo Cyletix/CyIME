@@ -60,6 +60,16 @@ object SettingsPreferences {
     }
 
     /**
+     * 回车发送：应用自己把回车设成发送时（微信「回车键发送消息」等），普通回车直接发送、键面写发送；
+     * 默认关 = 回车换行、Ctrl+回车发送（用户 11-05）。见 EnterKeyAction。
+     */
+    const val KEY_ENTER_SENDS = "enter_sends"
+    fun isEnterSendsEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_ENTER_SENDS, false)
+    fun setEnterSendsEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ENTER_SENDS, enabled).apply()
+    }
+
+    /**
      * 标点上屏首选：中文打字中点逗号、句号这类断句标点时，先上屏首选候选再接标点（nihao 点逗号得到「你好，」）。
      * 默认关：关着时照旧先上屏打的字母（Gboard 规则，用户 10-24），这是别的用户要的选项（11-02）。
      */

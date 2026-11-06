@@ -54,7 +54,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val plan = when {
             ctrl -> EnterKeyAction.ctrlEnter(options, type, terminal)
             shift -> EnterKeyAction.shiftEnter(options, type, terminal)
-            else -> EnterKeyAction.enter(options, type, terminal)
+            else -> EnterKeyAction.enter(options, type, terminal, appSend = SettingsPreferences.isEnterSendsEnabled(service))
         }
         // Ctrl+回车在没声明动作的框里执行「发送」；有的应用不理这个动作，见 [sendWithFallback]。
         if (ctrl && !terminal && plan == EnterKeyAction.EditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_SEND))
