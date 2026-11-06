@@ -48,6 +48,10 @@ internal fun ReorderableToolbar(
     val edge = with(LocalDensity.current) { 24.dp.toPx() }
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val inlineEditor = LocalInlineQuickActionEditor.current
+    // The inline editor already owns the draft order; render it in the same frame so
+    // placement animations see the old and new slots as one change.
+    val displayedOrder = if (inlineEditor?.active == true || dragged == null) ids else order
     LaunchedEffect(ids) { if (dragged == null) order = ids }
     fun moveToPointer() {
         val source = dragged ?: return
@@ -62,6 +66,21 @@ internal fun ReorderableToolbar(
         while (dragged != null) {
             val delta = when { pointer.x < rowBounds.left + edge -> -8f; pointer.x > rowBounds.right - edge -> 8f; else -> 0f }
             if (delta != 0f) { scroll.scrollBy(delta); moveToPointer() }
+            delay(30)
+        }
+    }
+    LaunchedEffect(inlineEditor?.dragging) {
+        while (inlineEditor?.dragging != null) {
+            val point = inlineEditor.pointer
+            val delta = if (point.y !in rowBounds.top..rowBounds.bottom) 0f else when {
+                point.x < rowBounds.left + edge -> -8f
+                point.x > rowBounds.right - edge -> 8f
+                else -> 0f
+            }
+            if (delta != 0f && scroll.scrollBy(delta) != 0f) {
+                withFrameNanos { }
+                inlineEditor.refreshHover()
+            }
             delay(30)
         }
     }
@@ -98,10 +117,10 @@ internal fun ReorderableToolbar(
             }
         }) {
         // 每个图标占等宽一格，整格可点；放不下时按最小格宽横向滚动。
-        val slotWidth = maxOf(maxWidth / order.size.coerceAtLeast(1), 36.dp)
-        Row(Modifier.horizontalScroll(scroll).widthIn(min = maxWidth),
+        val slotWidth = maxOf(maxWidth / displayedOrder.size.coerceAtLeast(1), 36.dp)
+        Row(Modifier.horizontalScroll(scroll, enabled = inlineEditor?.dragging == null).widthIn(min = maxWidth),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            order.forEach { id ->
+            displayedOrder.forEach { id ->
                 val action = actions.firstOrNull { it.item.id == id } ?: return@forEach
                 key(id) {
                     Box(Modifier.width(slotWidth).testTag("toolbar-slot")

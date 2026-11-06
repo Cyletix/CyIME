@@ -7,6 +7,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +21,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import com.kingzcheung.xime.ui.common.menuSwipeBack
 import com.kingzcheung.xime.ui.common.wheelPages
+import kotlinx.coroutines.delay
 
 /**
  * 横着划过了触摸阈值、而这一边又翻不了页时，吃掉后面的移动：格子的点击在松手时看到被消费就不触发。
@@ -75,6 +77,28 @@ internal fun <T> KeyboardPanelGrid(
             maxHeight - (if (preferSinglePage && items.size <= columns * 2) 0.dp else indicatorHeight) >= minimumRowHeight * 2 + spacing) 2 else 1
         val pages = items.chunked(rows * columns)
         val pagerState = rememberPagerState(pageCount = { pages.size })
+        val inlineEditor = LocalInlineQuickActionEditor.current
+        val latestPageCount by androidx.compose.runtime.rememberUpdatedState(pages.size)
+        val pageEdge = with(LocalDensity.current) { 28.dp.toPx() }
+        LaunchedEffect(inlineEditor?.dragging, pagerState) {
+            while (inlineEditor?.dragging != null) {
+                delay(650)
+                val area = inlineEditor.menuArea
+                val point = inlineEditor.pointer
+                if (point.y in area.top..area.bottom) {
+                    val next = when {
+                        point.x < area.left + pageEdge -> pagerState.currentPage - 1
+                        point.x > area.right - pageEdge -> pagerState.currentPage + 1
+                        else -> pagerState.currentPage
+                    }.coerceIn(0, (latestPageCount - 1).coerceAtLeast(0))
+                    if (next != pagerState.currentPage) {
+                        pagerState.scrollToPage(next)
+                        androidx.compose.runtime.withFrameNanos { }
+                        inlineEditor.refreshHover()
+                    }
+                }
+            }
+        }
         val pageIndicatorHeight = if (pages.size == 1) 0.dp else indicatorHeight
         val gridHeight = if (compactCards) minOf(maxHeight,
             maxOf(120.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight) else minOf(maxHeight,
@@ -88,11 +112,13 @@ internal fun <T> KeyboardPanelGrid(
             .menuSwipeBack(Unit, onSwipeBack, PointerEventPass.Initial, edgeOnly = false, distanceDp = 64f,
                 active = { !pagerState.canScrollForward })
             // 划不动的方向（第一页往右、最后一页又没有返回时往左）：这一划什么也不做，也不能在松手时算成点了格子。
-            .swallowDeadHorizontalDrag(rightDead = { !pagerState.canScrollBackward },
-                leftDead = { !pagerState.canScrollForward && onSwipeBack == null })) {
+            .then(if (inlineEditor?.active == true) Modifier else Modifier.swallowDeadHorizontalDrag(
+                rightDead = { !pagerState.canScrollBackward },
+                leftDead = { !pagerState.canScrollForward && onSwipeBack == null }))) {
         Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
+            HorizontalPager(pagerState, pageSpacing = spacing, userScrollEnabled = inlineEditor?.dragging == null,
+                modifier = Modifier.fillMaxWidth().weight(1f).wheelPages(pagerState).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {
                     repeat(rows) { row ->
                         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(spacing)) {

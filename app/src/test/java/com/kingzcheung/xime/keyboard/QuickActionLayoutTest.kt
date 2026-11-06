@@ -14,10 +14,10 @@ class QuickActionLayoutTest {
         assertTrue("caption" !in QuickActionLayout.defaultMenu(emptyList()))
     }
 
-    @Test fun eachEntryLivesInOnePlaceAndSettingsCannotBeRemoved() {
+    @Test fun eachEntryLivesInOnePlaceAndSettingsCanBeHidden() {
         val layout = QuickActionLayout.normalize(listOf("emoji", "emoji", "glass"), listOf("glass", "ocr"))
         assertEquals(listOf("emoji", "glass"), layout.toolbar)
-        assertEquals(listOf("ocr", "settings"), layout.menu)
+        assertEquals(listOf("ocr"), layout.menu)
     }
 
     @Test fun draggingAcrossDividersMovesBetweenToolbarMenuAndUnused() {
@@ -28,7 +28,7 @@ class QuickActionLayoutTest {
         val edited = listOf("emoji", "glass", "#menu", "voice", "sound", "#unused", "settings", "ocr")
         val layout = QuickActionLayout.fromEditorOrder(edited)
         assertEquals(listOf("emoji", "glass"), layout.toolbar)
-        assertEquals(listOf("voice", "sound", "settings"), layout.menu)
+        assertEquals(listOf("voice", "sound"), layout.menu)
         assertTrue("unused entries are not stored", "ocr" !in layout.toolbar + layout.menu)
     }
 
