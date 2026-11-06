@@ -25,8 +25,6 @@ object GlideLexicon {
     @Volatile private var bigrams: EnglishBigrams? = null
     /** 英文、全拼、双拼各留一份；双拼换方案（或改了键位）时按方案内容重建。 */
     private val cached = HashMap<String, Pair<Any?, GlideDecoder>>()
-    /** 滑行实时预览用的编码 → 拼音，全拼、双拼各一份，只在打开预览时才建。 */
-    private val readings = HashMap<String, Pair<DoublePinyinScheme?, Map<String, String>>>()
 
     fun words(context: Context): List<String> = words ?: synchronized(this) {
         words ?: vocabulary(context).filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } }.also { words = it }
@@ -69,16 +67,6 @@ object GlideLexicon {
     fun chineseDecoder(context: Context, keyboard: GlideKeyboard, doublePinyin: DoublePinyinScheme?): GlideDecoder =
         cachedDecoder(if (doublePinyin == null) "py" else "sp", doublePinyin, keyboard) { pinyinCodes(pinyin(context), doublePinyin) }
 
-    /** 中文滑行编码的拼音写法（nihao → ni hao，双拼也写成全拼），实时预览显示它；须在后台线程调用。 */
-    fun chineseReading(context: Context, code: String, doublePinyin: DoublePinyinScheme?): String? {
-        val kind = if (doublePinyin == null) "py" else "sp"
-        val map = synchronized(this) {
-            readings[kind]?.takeIf { it.first == doublePinyin }?.second
-                ?: pinyinReadings(pinyin(context), doublePinyin).also { readings[kind] = doublePinyin to it }
-        }
-        return map[code]
-    }
-
     /**
      * 九键滑行出的数字串：全拼、双拼按词表比对整条线最像哪个词的编码（[dictionary] 为真）；
      * 认不出或不是拼音方案时只取起点、拐弯和终点的键。须在后台线程调用。
@@ -113,14 +101,3 @@ internal fun pinyinCodes(entries: List<List<String>>, doublePinyin: DoublePinyin
         if (doublePinyin == null) syllables.joinToString("")
         else syllables.map { doublePinyin.code(it) ?: return@mapNotNull null }.joinToString("")
     }.distinct()
-
-/** 编码 → 用空格隔开的拼音；同一编码取最常用的那个词（与 [pinyinCodes] 去重一致）。 */
-internal fun pinyinReadings(entries: List<List<String>>, doublePinyin: DoublePinyinScheme?): Map<String, String> {
-    val result = HashMap<String, String>(entries.size * 2)
-    for (syllables in entries) {
-        val code = if (doublePinyin == null) syllables.joinToString("")
-            else syllables.map { doublePinyin.code(it) }.takeIf { null !in it }?.joinToString("") ?: continue
-        result.putIfAbsent(code, syllables.joinToString(" "))
-    }
-    return result
-}

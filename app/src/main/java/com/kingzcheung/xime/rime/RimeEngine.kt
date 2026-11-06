@@ -235,6 +235,21 @@ class RimeEngine {
 
     private val candidateRevision = java.util.concurrent.atomic.AtomicLong(1L)
 
+    internal fun glidePreviewRevision(): Long = candidateRevision.get()
+
+    /** Preview a glide in an isolated Rime session without mutating the active composition. */
+    internal fun glidePreview(code: String, revision: Long): RimeProcessResult? = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsAsciiMode() || candidateRevision.get() != revision) return@locked null
+        val values = nativeGlidePreview(code)
+        if (values.size < 3 || candidateRevision.get() != revision) return@locked null
+        val candidates = values.drop(3).chunked(2).mapNotNull { pair ->
+            if (pair.size == 2) RimeCandidate(pair[0], pair[1]) else null
+        }.toTypedArray()
+        RimeProcessResult(true, "", values[0], displayPreedit(values[0], values[1], candidates.firstOrNull()?.comment.orEmpty()),
+            candidates, false, values[2] == "1", false, engineRevision = revision)
+    }
+    private external fun nativeGlidePreview(code: String): Array<String>
+
     /** A successful lock acquisition starts a mutation, invalidating previously published candidates. */
     private inline fun <T> mutateLocked(block: () -> T): T = locked {
         candidateRevision.incrementAndGet()
@@ -462,7 +477,7 @@ class RimeEngine {
     }
 
     /**
-     * 「编码显示双拼键」（SpellingPatches.DOUBLE_PINYIN_RAW_PREEDIT_KEY，默认关）：输入法服务按设置写入。
+     * 「双拼编码显示全拼」关闭时显示双拼键：输入法服务按设置写入。
      * 双拼九键在这里把显示的读音换成双拼键（[t9DoublePinyinKeys]）；26 键由方案补丁清空编码显示规则，不经过这里。
      */
     @Volatile var doublePinyinKeysPreedit = false

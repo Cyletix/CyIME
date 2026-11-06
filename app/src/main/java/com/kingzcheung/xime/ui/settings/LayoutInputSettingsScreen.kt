@@ -100,7 +100,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     HorizontalDivider()
                     // 别的用户 11-02 提的（用惯 Gboard）：默认关；两种滑行都没开时没有作用，关着就置灰。
                     SettingsToggleItem(Icons.TwoTone.Gesture, "滑行时实时显示词",
-                        "划的过程中在手指上方显示现在抬手会出的词，中文显示拼音。不影响点按打字和抬手后出词的速度。",
+                        "划的过程中按编码显示位置展示识别结果，中文显示拼音；抬手后按最终结果输入。",
                         checked = settings.glidePreview, onCheckedChange = {
                             settings = settings.copy(glidePreview = it); settings.save(context)
                         },

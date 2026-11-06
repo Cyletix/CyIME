@@ -212,6 +212,8 @@ fun CandidateBar(
     showNumberLabels: Boolean = false,
     inlinePreeditEditor: (@Composable () -> Unit)? = null,
     commentsAreGlosses: Boolean = false,
+    glidePreviewText: String = "",
+    isGlidePreview: Boolean = false,
 ) {
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val glassEnabled = glass.enabled
@@ -384,9 +386,11 @@ fun CandidateBar(
         targetValue = if (candidatePageExpanded) -180f else 0f,
         animationSpec = tween(200, easing = FastOutSlowInEasing), label = "candidateExpansion",
     )
-    val preeditText = (state as? CandidateBarState.ChineseCandidates)?.let {
+    val existingPreedit = (state as? CandidateBarState.ChineseCandidates)?.let {
         it.preeditText.ifEmpty { it.inputText }
     }.orEmpty()
+    val preeditText = if (glidePreviewText.isEmpty()) existingPreedit else
+        listOf(existingPreedit, glidePreviewText).filter { it.isNotBlank() }.joinToString(" ")
     val previewPrefs = LocalKeyboardInputPreferences.current
     // 编码只显示在选中的一处：显示在输入框时不再另浮气泡（用户 11-01「只显示一处」；另设开关被他否掉：「这是想干什么」）。
     val showPreedit = showPreeditPreview && showInputTextRow && preeditText.isNotEmpty() &&
@@ -557,12 +561,21 @@ fun CandidateBar(
                 }
             }
 
-            if (state is CandidateBarState.ChineseCandidates || (splitGapX != null && state !is CandidateBarState.Idle) ||
+            if (state is CandidateBarState.ChineseCandidates || (isGlidePreview && state is CandidateBarState.AssociationOnly) ||
+                (splitGapX != null && state !is CandidateBarState.Idle) ||
                 (candidatePageExpanded && state is CandidateBarState.AssociationOnly && state.hasMore)) {
+                val previewAssociations = isGlidePreview && state is CandidateBarState.AssociationOnly
+                val stripCallbacks = if (isGlidePreview) callbacks.copy(
+                    onVisibleCandidatesChanged = null,
+                    onVisibleAssociationsChanged = null,
+                    onCandidateSelect = if (previewAssociations) { index -> callbacks.onAssociationSelect?.invoke(index); Unit }
+                        else callbacks.onCandidateSelect,
+                ) else callbacks
                 FixedCandidateStrip(
-                    candidates = displayCandidates, associations = displayAssociation,
+                    candidates = if (previewAssociations) displayAssociation else displayCandidates,
+                    associations = if (previewAssociations) emptyList() else displayAssociation,
                     comments = displayComments,
-                    visuals = protectedVisuals, callbacks = callbacks,
+                    visuals = protectedVisuals, callbacks = stripCallbacks,
                     fontSize = candidateTextSize.sp,
                     modifier = Modifier.weight(1f),
                     commentMode = commentsAllowed,
@@ -570,7 +583,7 @@ fun CandidateBar(
                     highlightIndex = (state as? CandidateBarState.ChineseCandidates)?.highlightIndex ?: 0,
                     showNumberLabels = showNumberLabels,
                     gapWindowX = splitGapX,
-                    scrollable = state is CandidateBarState.ChineseCandidates,
+                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview,
                     onUserScroll = callbacks.onCandidateStripScrolled,
                     onNearEnd = callbacks.onCandidateStripNearEnd,
                     scrollKey = (state as? CandidateBarState.ChineseCandidates)?.let { it.inputText to it.candidates.firstOrNull() },
@@ -722,12 +735,16 @@ fun CandidateBar(
             }
             // 打字时候选栏只放候选：亮着的开关（悬浮、繁体、全角等）只在空闲工具栏里显示，
             // 不再挤到候选右边（11-03：悬浮键盘里一直多一个蓝色悬浮按钮，候选只剩一个）。
-            if (state !is CandidateBarState.Idle && (candidatePageExpanded || hasAnyMore)) {
+            if (state !is CandidateBarState.Idle && (candidatePageExpanded || hasAnyMore || isGlidePreview)) {
                 val action = if (candidatePageExpanded) callbacks.onBack else callbacks.onShowMoreCandidates
                 action?.let {
-                    CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor,
-                        expanded = candidatePageExpanded, rotation = expansionRotation, restingFill = edgeButtonFill,
-                        slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
+                    if (isGlidePreview && !candidatePageExpanded && !hasAnyMore) {
+                        Spacer(Modifier.width(edgeSlot ?: 40.dp))
+                    } else {
+                        CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor,
+                            expanded = candidatePageExpanded, rotation = expansionRotation, restingFill = edgeButtonFill,
+                            slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
+                    }
                 }
             }
         }
