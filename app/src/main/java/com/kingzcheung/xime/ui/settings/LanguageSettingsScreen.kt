@@ -126,11 +126,11 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                             Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) { entry ->
                             InputModes.selectProfile(context, entry)
                             remembered = remembered + (language to entry.schemaId)
+                            // 正在用的语言：同时改当前方案，键盘下次弹出就换（收起时在这里改了布局也算数）。
+                            val current = SettingsPreferences.getCurrentSchema(context)
+                            val active = current.isNotBlank() && !com.kingzcheung.xime.ui.keyboard.isHandwritingSchema(current) &&
+                                InputModes.languageOf(current, availableProfiles) == language
                             if (entry.schemaId in profilesState.enabledSchemas) {
-                                // 正在用的语言：同时改当前方案，键盘下次弹出就换（收起时在这里改了布局也算数）。
-                                val current = SettingsPreferences.getCurrentSchema(context)
-                                val active = current.isNotBlank() && !com.kingzcheung.xime.ui.keyboard.isHandwritingSchema(current) &&
-                                    InputModes.languageOf(current, availableProfiles) == language
                                 if (active) SettingsPreferences.setCurrentSchema(context, entry.schemaId, language)
                                 message = "已保存：${language.displayName} · ${entry.selectionLabel}，" +
                                     if (active) "键盘下次弹出时使用" else "下次切换到该语言时使用"
@@ -144,8 +144,13 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                                         LanguagePreferences.enableForSchema(context, entry.schemaId)
                                     }
                                     profilesModel.refresh()
-                                    profilesModel.deploySchema()
-                                    message = "已打开并选好：${language.displayName} · ${entry.selectionLabel}，正在部署，几秒后就能用"
+                                    // 关着的方案（笔画、仓颉等）点了也要像开着的一样换上：以前只启用不换，键盘还是拼音，
+                                    // 以为点的是笔画、其实在拼音键盘上打（11-06）。部署完再换，没编译好的方案键盘会退回第一个方案。
+                                    profilesModel.deploySchema {
+                                        if (active) SettingsPreferences.setCurrentSchema(context, entry.schemaId, language)
+                                    }
+                                    message = "已打开并选好：${language.displayName} · ${entry.selectionLabel}，正在部署，几秒后好；" +
+                                        if (active) "键盘下次弹出时使用" else "下次切换到该语言时使用"
                                 } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                                 catch (error: Exception) { message = error.message ?: "打开方案失败，请稍后再试" }
                                 finally { saving = false }

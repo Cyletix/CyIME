@@ -167,7 +167,8 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun deploySchema() {
+    /** [onDeployed] runs on the main thread only after a deployment without problems. */
+    fun deploySchema(onDeployed: (() -> Unit)? = null) {
         if (_uiState.value.isDeploying) return
         viewModelScope.launch {
             _uiState.update { it.copy(isDeploying = true) }
@@ -189,7 +190,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
             val problem = RimeConfigHelper.deploymentProblem(context)
             when {
                 problem.isNotEmpty() -> _uiState.update { it.copy(deployReport = problem) }
-                success -> showToast("部署完成")
+                success -> { showToast("部署完成"); onDeployed?.invoke() }
                 else -> _uiState.update { it.copy(deployReport = "部署失败，原因见「关于 › 日志查看器」。") }
             }
             refresh()
