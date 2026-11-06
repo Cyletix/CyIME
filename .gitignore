@@ -72,3 +72,8 @@ app/src/main/assets/rime_chinese/cylm_*
 # Python 字节码缓存、JVM 崩溃日志
 __pycache__/
 hs_err_pid*.log
+
+# 开发日志和研究文档只留在本地，不进公开仓库（用户 2026-11-06 要求）
+/docs/development/
+/docs/research/
+/docs/*-research.md
