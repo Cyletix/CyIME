@@ -78,7 +78,7 @@ def main(argv=None) -> int:
         download(DATASETS["handwriting"], hand_cloud)
 
     sources = [str(d) for d in versioned(dict_cloud, "dict")]
-    sources += [str(d) for d in (pathlib.Path("<inbox>"), pathlib.Path.home() / "Downloads", DICT_DIR / "inbox")
+    sources += [str(d) for d in (*([pathlib.Path(os.environ["CYIME_CONTRIB_INBOX"])] if os.environ.get("CYIME_CONTRIB_INBOX") else []), pathlib.Path.home() / "Downloads", DICT_DIR / "inbox")
                 if d.is_dir()]
     if sources:
         subprocess.run([sys.executable, str(ROOT / "tools/dict_contribute/aggregate.py"), *sources,

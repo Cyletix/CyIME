@@ -3,7 +3,7 @@
 # the theme it started with. Plain `input tap` is fast enough at this pace. Coordinates: layouts/sm-x800.json
 # and screenshots of 1.14.148. Run it inside scripts/guarded-device-run.py so every setting comes back.
 set -e
-S=${SERIAL:-TABLET_SERIAL}
+S=${SERIAL:-${CYIME_TABLET_SERIAL:?set SERIAL or CYIME_TABLET_SERIAL}}
 a() { adb -s "$S" shell "$@"; }
 tap() { a input tap "$1" "$2"; sleep "${3:-1.2}"; }
 typed() { for k in "$@"; do a input tap $k; done; }

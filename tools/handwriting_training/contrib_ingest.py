@@ -42,7 +42,7 @@ FIXED_LEN = 200
 
 
 def default_watch() -> list[pathlib.Path]:
-    dirs = [pathlib.Path("<inbox>"), pathlib.Path.home() / "Downloads", DATA / "inbox"]
+    dirs = [*([pathlib.Path(os.environ["CYIME_CONTRIB_INBOX"])] if os.environ.get("CYIME_CONTRIB_INBOX") else []), pathlib.Path.home() / "Downloads", DATA / "inbox"]
     return [d for d in dirs if d.is_dir()]
 
 

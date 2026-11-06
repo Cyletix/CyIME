@@ -619,7 +619,7 @@ def cmd_record_ink(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--serial", default="TABLET_SERIAL")
+    parser.add_argument("--serial", default=os.environ.get("CYIME_TABLET_SERIAL"))
     parser.add_argument("--script", default=os.path.join(HERE, "demo.yaml"))
     parser.add_argument("--layouts", default=os.path.join(HERE, "layouts", "sm-x800.json"))
     parser.add_argument("--data", default="D:/CyIME-Data/demo-video")

@@ -12,6 +12,8 @@ Android 输入法，基于 Rime，Kotlin + Jetpack Compose。
 
 ## 约束
 
+- 本机路径和设备编号（`<notes>`、`<projects>`、`<inbox>`、`TABLET_SERIAL`、`PHONE_SERIAL` 等）见本机的 `AGENTS.local.md`，那份不进仓库。
+
 - 仓库路径不能含空格。
 - 禁止使用 `subst` 映射盘。
 - 禁止 `./gradlew clean`。

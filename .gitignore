@@ -77,3 +77,25 @@ hs_err_pid*.log
 /docs/development/
 /docs/research/
 /docs/*-research.md
+/AGENTS.local.md
+# 涉及个人隐私、已从历史里清掉的文件（本地保留，用户 2026-11-07 要求）
+/tools/ime_lab/fixtures/t9_rank_20261105.json
+/tools/ime_lab/fixtures/t9_rank_20261105.README.md
+/tools/ime_lab/fixtures/user_reported_20261009.json
+/app/src/androidTest/assets/ime_lab/t9_reported_cases.json
+/tools/ime_lab/chat_corpus*.py
+/tools/ime_lab/project_messages.py
+/tools/ime_lab/project_testset.py
+/tools/ime_lab/personal_holdout.py
+/tools/ime_lab/ngram/private_corpus.py
+/tools/ime_lab/learning_workbench.py
+/tools/ime_lab/test_learning_workbench.py
+/tools/ime_lab/workbench.*
+/tools/ime_lab/inspect_backup.py
+/tools/ime_lab/comment_typing_bench.py
+/tools/ime_lab/test_chat_corpus*.py
+/tools/dictionaries/glossary/build_private_addon.py
+/tools/speech_lab/tuning_replay.py
+/tools/handwriting_training/finetune_ochwpro.py
+/tools/handwriting_training/fewshot_eval.py
+/tools/handwriting_training/read_samples.py
