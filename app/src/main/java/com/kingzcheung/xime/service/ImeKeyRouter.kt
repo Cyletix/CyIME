@@ -34,6 +34,29 @@ internal fun isUnicodeCodeInput(input: String) =
 internal fun isUnicodeCodeWithDigit(input: String) = isUnicodeCodeInput(input) && input.any { it in '0'..'9' }
 
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
+    private val chineseGlideDeletes = ChineseGlideDeleteHistory()
+
+    private fun chineseGlideDeleteEnabled(): Boolean = SettingsPreferences.getPrefsPublic(service).getBoolean(
+        com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DELETE_CHINESE_GLIDE_CHARACTER_KEY, false)
+
+    private fun chineseGlideState(): ChineseGlideDeleteHistory.State? {
+        val snapshot = service.rimeEngine.readPinyinEditSnapshot()
+        if (snapshot.size < 4) return null
+        val caret = snapshot[1].toIntOrNull() ?: return null
+        val confirmed = snapshot[2].toIntOrNull() ?: return null
+        val ui = service.uiState.value
+        return ChineseGlideDeleteHistory.State(snapshot[0], caret, confirmed, snapshot[3],
+            ui.currentSchemaId, ui.inputSessionId, ui.inputTarget, service.rimeEngine.currentCandidateRevision())
+    }
+
+    private fun chineseCodeSyllables(code: String, result: com.kingzcheung.xime.rime.RimeProcessResult?): List<String>? {
+        val isDouble = service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN
+        return runCatching {
+            com.kingzcheung.xime.glide.chineseCodeSyllables(code, isDouble,
+                listOf(result?.candidates?.firstOrNull()?.comment.orEmpty(), result?.preeditText.orEmpty()),
+                if (isDouble) emptyList() else com.kingzcheung.xime.glide.GlideLexicon.pinyin(service))
+        }.getOrNull()
+    }
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
     private val hardwareNavigation = HardwareCandidateNavigation()
     private val hardwareSelectionRevision = androidx.compose.runtime.mutableIntStateOf(0)
@@ -708,9 +731,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      */
     internal fun typeGlideCode(code: String) {
         if (code.isEmpty() || hasPendingCandidateCommit) return
+        val trackGlide = chineseGlideDeleteEnabled()
+        var beforeGlide: ChineseGlideDeleteHistory.State? = null
+        var typedTail: ChineseGlideDeleteHistory.TypedTail? = null
+        var typedSyllables: List<String>? = null
+        if (trackGlide) postRimeJob("glide_delete_start") {
+            beforeGlide = chineseGlideState()
+            typedTail = beforeGlide?.let { chineseGlideDeletes.typedTail(it) }
+            typedSyllables = typedTail?.let { chineseCodeSyllables(it.code, service.rimeEngine.readQueuedResult()) }
+        }
         val input = service.candidateState.value.inputText
         if (input.isNotEmpty() && input.last() != '\'') handleKeyPress("'", false)
         code.forEach { handleKeyPress(it.toString(), false) }
+        if (trackGlide) postRimeJob("glide_delete_finish") {
+            val result = service.rimeEngine.readQueuedResult()
+            typedTail?.takeIf { typedSyllables != null }?.let {
+                chineseGlideDeletes.record(it.before, beforeGlide, it.code, typedSyllables)
+            }
+            chineseGlideDeletes.record(beforeGlide, chineseGlideState(), code, chineseCodeSyllables(code, result))
+        }
     }
 
     /**
@@ -2163,6 +2202,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         ).skippingAssociation(SettingsPreferences.isDeleteSkipsAssociation(service), candState.isShowingRecentClipboard)
         if (target == DeletionTarget.WAIT) return
         if (hold?.allowsDeletion(target.consumesImeContent) == false) return
+        if (target == DeletionTarget.COMPOSITION && chineseGlideDeleteEnabled()) {
+            val current = chineseGlideState()
+            val lastGlide = chineseGlideDeletes.last(current)
+            if (current != null && lastGlide != null && service.rimeEngine.isCandidateRevisionCurrent(current.revision) &&
+                service.rimeEngine.applyPinyinEdit(current.input, lastGlide.remainingInput, lastGlide.removeStart,
+                    current.confirmed, current.confirmedText, expectedSchema = current.schema)) {
+                chineseGlideDeletes.removed(chineseGlideState())
+                service.rimeEngine.readQueuedResult()?.let { sendTransformedResult(it) }
+                return
+            }
+        }
         // 计算器模式：追踪退格
         val calculatorWasActive = service.calculatorEngine.isActive()
         service.calculatorEngine.handleDelete()

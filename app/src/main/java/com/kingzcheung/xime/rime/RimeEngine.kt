@@ -234,6 +234,7 @@ class RimeEngine {
     }
 
     private val candidateRevision = java.util.concurrent.atomic.AtomicLong(1L)
+    internal fun currentCandidateRevision(): Long = candidateRevision.get()
 
     /** A successful lock acquisition starts a mutation, invalidating previously published candidates. */
     private inline fun <T> mutateLocked(block: () -> T): T = locked {
