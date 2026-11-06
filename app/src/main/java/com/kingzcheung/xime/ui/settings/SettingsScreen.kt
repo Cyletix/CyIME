@@ -284,8 +284,12 @@ fun SettingsScreen(
         composable(SettingsRoutes.Dictionary) {
             DictionarySettingsContent(
                 onBack = { navController.popBackStack() },
-                onCellDictionaries = { navController.navigate(SettingsRoutes.CellDictionaries) }
+                onCellDictionaries = { navController.navigate(SettingsRoutes.CellDictionaries) },
+                onContribute = { navController.navigate(SettingsRoutes.DictContribute) }
             )
+        }
+        composable(SettingsRoutes.DictContribute) {
+            DictContributeScreen(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoutes.CellDictionaries) {
             CellDictionarySettingsContent(onBack = { navController.popBackStack() })

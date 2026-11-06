@@ -69,6 +69,7 @@ import com.kingzcheung.xime.viewmodel.CustomPhraseViewModel
 fun DictionarySettingsContent(
     onBack: () -> Unit,
     @Suppress("UNUSED_PARAMETER") onCellDictionaries: () -> Unit = {},
+    onContribute: () -> Unit = {},
 ) {
     var selectedDictTab by remember { mutableIntStateOf(0) }
     val customPhraseVM: CustomPhraseViewModel = viewModel(key = "dict_custom_phrase")
@@ -85,6 +86,7 @@ fun DictionarySettingsContent(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
+                actions = { TextButton(onClick = onContribute) { Text("贡献") } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface

@@ -18,6 +18,7 @@ object SettingsRoutes {
     const val Performance = "performance"
     const val LayoutDisplay = "layout_display"
     const val Dictionary = "dictionary"
+    const val DictContribute = "dict_contribute"
     const val CellDictionaries = "cell_dictionaries"
     const val Plugins = "plugins"
     const val PluginSettings = "plugin_settings"
