@@ -629,8 +629,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (schemaId.isEmpty()) return
         val rimeAsciiBefore = service.rimeEngine.isAsciiMode()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
-        val cangjie = com.kingzcheung.xime.settings.InputProfiles.describe(schemaId).scheme ==
-            com.kingzcheung.xime.settings.InputScheme.CANGJIE
+        val scheme = com.kingzcheung.xime.settings.InputProfiles.describe(schemaId).scheme
+        val cangjie = scheme == com.kingzcheung.xime.settings.InputScheme.CANGJIE
         // 方案写的默认值（reset）只给导入的方案用；APK 自带的方案保持原来的行为（没切过就是关），不改内置默认。
         val useDeclaredDefault = !SchemaManager.isBundledSchema(service, schemaId)
         for (def in defs) {
@@ -639,6 +639,12 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             if (isPunctuationWidthSwitch(def)) continue
             // 简繁、表情也不从 user.yaml 恢复：权威来源是设置页的开关，由下面的 applyCandidateOptions 写回。
             if (def.name in SETTING_SWITCHES || def.name == "simplification" && cangjie) continue
+            // 注音一律出正体（没有简繁按钮，「繁体输出」也不管它）：zh_tw 不从 user.yaml 恢复，也不按内置方案
+            // 「没切过就是关」处理，否则切到注音后 simplifier 关着，國 出成 国（GitHub #182）。
+            if (def.name == "zh_tw" && scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN) {
+                service.rimeEngine.setOption("zh_tw", true)
+                continue
+            }
             if (def.name.isNotEmpty()) {
                 // 导入的方案用户没切过（user.yaml 里没有这一项）就按方案写的默认值（reset），不能一律当成关：
                 // 导入的声笔 sbxm 写 pro_char reset: 1（单字），原来被改成 0（词组）（GitHub #105）。
