@@ -36,7 +36,15 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>, pri
     /** [shape] 是合并相邻重复字母后的写法，形状相同的词只比一次。 */
     private class Template(val word: String, val shape: String, val prior: Float, val xs: FloatArray, val ys: FloatArray)
 
+    /** 起止点够近的词：[endpoints] 是起止点偏差的代价，[least] 是加上词频和形状下界后，这个词代价至少多少。 */
+    private class Reachable(val template: Template, val endpoints: Float, val least: Float)
+
     private val templates: List<Template>
+    /** 各词首末键中心另存成连续数组：每一笔都要扫一遍全部词，绝大多数词在这一步就筛掉，不必去碰各词的模板。 */
+    private val startX: FloatArray
+    private val startY: FloatArray
+    private val endX: FloatArray
+    private val endY: FloatArray
     val revision: Int get() = keyboard.revision
 
     init {
@@ -50,6 +58,10 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>, pri
             val (xs, ys) = resample(px, py)
             Template(word, code, ln(rank + 2.0).toFloat() / logMax, xs, ys)
         }
+        startX = FloatArray(templates.size) { templates[it].xs[0] }
+        startY = FloatArray(templates.size) { templates[it].ys[0] }
+        endX = FloatArray(templates.size) { templates[it].xs[SAMPLES - 1] }
+        endY = FloatArray(templates.size) { templates[it].ys[SAMPLES - 1] }
     }
 
     val size: Int get() = templates.size
@@ -62,21 +74,42 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>, pri
         val qy = FloatArray(ys.size) { ys[it] / unit }
         if (pathLength(qx, qy) < MIN_PATH_KEYS) return emptyList()
         val (sx, sy) = resample(qx, qy)
+        val envelope = Envelope(sx, sy)
         val last = SAMPLES - 1
-        val results = ArrayList<GlideCandidate>()
-        val shapes = HashMap<String, Float>()
-        // 已有 limit 个候选后，第 limit 好的代价；比它差的词不必算完。词表按常用程度排列，同形状的词后面的只会更差。
-        val kept = java.util.PriorityQueue<Float>(limit.coerceAtLeast(1), reverseOrder())
-        for (template in templates) {
+        // 先比平方（略放宽）筛掉远的词，留下的再照原样开方比较，结果与直接开方一样。
+        val near = maxEndpoint * maxEndpoint * 1.001f
+        val reachable = ArrayList<Reachable>()
+        for (index in templates.indices) {
+            val ax = sx[0] - startX[index]; val ay = sy[0] - startY[index]
+            if (ax * ax + ay * ay > near) continue
+            val bx = sx[last] - endX[index]; val by = sy[last] - endY[index]
+            if (bx * bx + by * by > near) continue
+            val template = templates[index]
             val start = hypot(sx[0] - template.xs[0], sy[0] - template.ys[0])
             if (start > maxEndpoint) continue
             val end = hypot(sx[last] - template.xs[last], sy[last] - template.ys[last])
             if (end > maxEndpoint) continue
-            val fixed = (start + end) / 2f * ENDPOINT_WEIGHT + template.prior * PRIOR_WEIGHT
+            // 下界（几十次加法）已超过形状上限的词，DTW 算完只会更大。
+            val lower = envelope.lowerBound(template.xs, template.ys, start, end)
+            if (lower > MAX_SHAPE + BOUND_SLACK) continue
+            val endpoints = (start + end) / 2f * ENDPOINT_WEIGHT
+            reachable += Reachable(template, endpoints, endpoints + template.prior * PRIOR_WEIGHT + lower)
+        }
+        // 按“代价至少多少”从小到大算 DTW：前几名很快凑齐，后面的词下界一超过第 limit 名就全部不用算。
+        // 形状相同的词起止点一样、只差词频，仍按词频先后算到，与逐个算的结果一样。
+        reachable.sortBy { it.least }
+        val results = ArrayList<GlideCandidate>()
+        val shapes = HashMap<String, Float>()
+        // 已有 limit 个候选后，第 limit 好的代价；比它差的词不必算完。
+        val kept = java.util.PriorityQueue<Float>(limit.coerceAtLeast(1), reverseOrder())
+        for (item in reachable) {
+            if (kept.size >= limit && item.least > kept.peek() + BOUND_SLACK) break
+            val template = item.template
+            val fixed = item.endpoints + template.prior * PRIOR_WEIGHT
             val bound = if (kept.size < limit) MAX_SHAPE else min(MAX_SHAPE, kept.peek() - fixed)
             val shape = shapes.getOrPut(template.shape) { dtw(sx, sy, template.xs, template.ys, bound) }
             if (shape > MAX_SHAPE) continue
-            val geometry = shape + (start + end) / 2f * ENDPOINT_WEIGHT
+            val geometry = shape + item.endpoints
             val cost = geometry + template.prior * PRIOR_WEIGHT
             results += GlideCandidate(template.word, cost, geometry)
             if (kept.size < limit) kept += cost else if (cost < kept.peek()) { kept.poll(); kept += cost }
@@ -91,6 +124,8 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>, pri
         const val MAX_ENDPOINT = 1.0f
         const val MAX_SHAPE = 1.0f
         const val ENDPOINT_WEIGHT = 0.35f
+        /** 下界与 DTW 求和顺序不同，浮点误差留一点余量，保证筛掉的词 DTW 算完也一定超过 bound。 */
+        private const val BOUND_SLACK = 1e-4f
         /** 常用词与罕见词之间最多差这么多形状代价（单位：键宽）。 */
         const val PRIOR_WEIGHT = 0.2f
 
@@ -127,17 +162,54 @@ class GlideDecoder(private val keyboard: GlideKeyboard, words: List<String>, pri
             return outX to outY
         }
 
-        /** 首尾固定、带宽为四分之一的 DTW，按样本数归一。 */
         /** 两点距离；比 kotlin.math.hypot（走 Math.hypot，防溢出但慢很多）快，坐标都是几个键宽，不会溢出。 */
         private fun hypot(dx: Float, dy: Float): Float = sqrt(dx * dx + dy * dy)
 
+        /** DTW 的带宽：第 i 个样本只与对方第 i±[BAND] 个样本对齐。 */
+        private const val BAND = SAMPLES / 4
+
         /**
+         * 轨迹每个样本附近（±[BAND]）的外接矩形。DTW 路径上模板的每个样本至少对齐一个带宽内的轨迹样本，
+         * 所以“模板各样本到对应矩形的距离”之和不超过 DTW 代价，可作下界（LB_Keogh），每个词只算 [SAMPLES] 次距离。
+         */
+        private class Envelope(xs: FloatArray, ys: FloatArray) {
+            private val minX = FloatArray(SAMPLES); private val maxX = FloatArray(SAMPLES)
+            private val minY = FloatArray(SAMPLES); private val maxY = FloatArray(SAMPLES)
+
+            init {
+                for (j in 0 until SAMPLES) {
+                    var x0 = Float.POSITIVE_INFINITY; var x1 = Float.NEGATIVE_INFINITY
+                    var y0 = Float.POSITIVE_INFINITY; var y1 = Float.NEGATIVE_INFINITY
+                    for (i in max(0, j - BAND)..min(SAMPLES - 1, j + BAND)) {
+                        x0 = min(x0, xs[i]); x1 = max(x1, xs[i]); y0 = min(y0, ys[i]); y1 = max(y1, ys[i])
+                    }
+                    minX[j] = x0; maxX[j] = x1; minY[j] = y0; maxY[j] = y1
+                }
+            }
+
+            /**
+             * 与 [dtw] 同一单位（按样本数归一）。DTW 首尾固定，首样本、末样本的那一格必在路径上，
+             * 直接用已算好的起点距离 [start]、终点距离 [end]。
+             */
+            fun lowerBound(bx: FloatArray, by: FloatArray, start: Float, end: Float): Float {
+                var sum = start + end
+                for (j in 1 until SAMPLES - 1) {
+                    val dx = if (bx[j] < minX[j]) minX[j] - bx[j] else if (bx[j] > maxX[j]) bx[j] - maxX[j] else 0f
+                    val dy = if (by[j] < minY[j]) minY[j] - by[j] else if (by[j] > maxY[j]) by[j] - maxY[j] else 0f
+                    if (dx != 0f || dy != 0f) sum += hypot(dx, dy)
+                }
+                return sum / SAMPLES
+            }
+        }
+
+        /**
+         * 首尾固定、带宽为四分之一的 DTW，按样本数归一。
          * 一整行都超过 [bound]（不超过 [MAX_SHAPE]）时提前结束、当作筛掉：累计代价逐行只增不减，
          * 最后的结果只会更大，这个词反正进不了前几名，排出的候选与算完一样。
          */
         private fun dtw(ax: FloatArray, ay: FloatArray, bx: FloatArray, by: FloatArray, bound: Float = MAX_SHAPE): Float {
             val n = SAMPLES
-            val band = max(1, n / 4)
+            val band = max(1, BAND)
             var previous = FloatArray(n + 1) { Float.POSITIVE_INFINITY }
             var current = FloatArray(n + 1) { Float.POSITIVE_INFINITY }
             previous[0] = 0f

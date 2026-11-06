@@ -55,6 +55,19 @@ class GlideDecoderTest {
         assertTrue("god" in result)
     }
 
+    /** 下界筛选、提前结束都只跳过进不了前几名的词：只取前 6 个时，与几乎不筛（要全部候选）时的前 6 个完全一样。 */
+    @Test fun pruningNeverChangesTheTopCandidates() {
+        val words = java.io.File("src/main/assets/english.txt").readLines().map { it.trim() }
+            .filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } }
+        val big = GlideDecoder(GlideLexicon.keyboard(keys), words)
+        val random = Random(3)
+        repeat(300) { index ->
+            val word = words[random.nextInt(2000)]
+            val (xs, ys) = trace(word, jitter = 40f, seed = index)
+            assertEquals(word, big.decode(xs, ys, limit = 100_000).take(6), big.decode(xs, ys))
+        }
+    }
+
     @Test fun traceStartingFarFromEveryWordIsRejected() {
         val xs = floatArrayOf(5f * unit, 5.3f * unit); val ys = floatArrayOf(height * .5f, height * .5f)
         assertTrue(decoder.decode(xs, ys).isEmpty())
