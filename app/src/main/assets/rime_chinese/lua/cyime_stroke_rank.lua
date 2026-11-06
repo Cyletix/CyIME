@@ -1,7 +1,11 @@
 -- 笔画方案的候选排序：笔画打全的常用字在前，其后是还没打完的常用字（按字频），生僻字最后。
 -- Rime 原本把没打完的字按码长排，常用字排在生僻字后面（丿丶一丨 先出 仐 仝 㒰，后出 合）。
 -- 只重排前 200 个候选，后面的照原样跟上。
+-- 笔画打全但很少用的字（乛 的 〇）不压在最常用的没打完的字（了）前面：字频不到其千分之一时，
+-- 放在没打完的前 4 个字之后，仍在第一页。
 local LIMIT = 200
+local MINOR = 1e-3
+local MINOR_AFTER = 4
 -- 字频低于此值（约为最常用字的千万分之一）算生僻字；码表权重见 tasks-stroke.gradle.kts。
 local COMMON = 1e-7
 
@@ -34,8 +38,19 @@ return function(input, env)
     if a.freq ~= b.freq then return a.freq > b.freq end
     return a.order < b.order
   end)
-  for _, cand in ipairs(exact) do yield(cand) end
-  for _, item in ipairs(partial) do yield(item.cand) end
+  local top = partial[1] and partial[1].freq or 0
+  local minor = {}
+  for _, cand in ipairs(exact) do
+    if cand.quality < top * MINOR then minor[#minor + 1] = cand else yield(cand) end
+  end
+  for i, item in ipairs(partial) do
+    if i == MINOR_AFTER + 1 then
+      for _, cand in ipairs(minor) do yield(cand) end
+      minor = {}
+    end
+    yield(item.cand)
+  end
+  for _, cand in ipairs(minor) do yield(cand) end
   for _, cand in ipairs(rare) do yield(cand) end
   if rest then
     for _, cand in ipairs(rest) do yield(cand) end
