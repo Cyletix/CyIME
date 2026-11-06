@@ -21,6 +21,7 @@ import androidx.compose.material.icons.twotone.EmojiSymbols
 import androidx.compose.material.icons.twotone.DashboardCustomize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.twotone.Send
 import androidx.compose.material.icons.twotone.Straighten
 import androidx.compose.material.icons.twotone.ViewWeek
 import androidx.compose.material.icons.twotone.Reorder
@@ -146,6 +147,13 @@ private fun LayoutDisplayPage(
                             "退格删掉空的一对。实体键盘不变。",
                         checked = pairedSymbols, onCheckedChange = {
                             pairedSymbols = it; SettingsPreferences.setPairedSymbolsEnabled(context, it)
+                        })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    var enterSends by remember { mutableStateOf(SettingsPreferences.isEnterSendsEnabled(context)) }
+                    SettingsToggleItem(Icons.AutoMirrored.TwoTone.Send, "回车发送",
+                        "应用把回车设成发送时(如微信「回车键发送消息」)，回车直接发送；关闭时回车换行，发送用 Ctrl+回车。",
+                        checked = enterSends, onCheckedChange = {
+                            enterSends = it; SettingsPreferences.setEnterSendsEnabled(context, it)
                         })
                 })
             }
