@@ -534,6 +534,10 @@ private fun LayoutDisplayPage(
             }
             if (page == "candidates") item {
                 SettingsSection(title = "拼音显示", content = {
+                    var showCorrectionMarks by remember { mutableStateOf(SettingsPreferences.showCorrectionMarks(context)) }
+                    SettingsToggleItem(Icons.TwoTone.Spellcheck, "显示纠错标记",
+                        "在纠错候选旁显示修正后的编码；关闭后仍可使用纠错候选。",
+                        showCorrectionMarks, { showCorrectionMarks = it; SettingsPreferences.setShowCorrectionMarks(context, it) })
                     var inputTextLocation by remember {
                         mutableStateOf(SettingsPreferences.getInputTextLocation(context))
                     }
@@ -582,6 +586,7 @@ private fun LayoutDisplayPage(
                         }
                     }
 
+                    DoublePinyinRawPreeditToggle()
                     if (inputTextLocation == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR) {
                         var showPreview by remember { mutableStateOf(SettingsPreferences.showPreeditPreview(context)) }
                         SettingsToggleItem(Icons.TwoTone.DataObject, "显示拼音编辑栏", "打字时在候选区显示编码，支持编辑的方案可点按修改。",

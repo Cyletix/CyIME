@@ -1065,8 +1065,23 @@ fun KeyboardView(
                 }
             }
 
+            val correctionVisible = rememberCorrectionMarksVisible()
+            val doublePinyinKeysShown = rememberDoublePinyinKeysShown()
+            val correctionScheme = remember(state.currentSchemaId) {
+                com.kingzcheung.xime.settings.DoublePinyinSchemes.find(state.currentSchemaId)
+            }
+            val correctionMarks = remember(cs.correctedCandidates, correctionVisible, correctionScheme, doublePinyinKeysShown) {
+                when {
+                    !correctionVisible -> emptyMap()
+                    correctionScheme == null || !doublePinyinKeysShown -> cs.correctedCandidates
+                    else -> cs.correctedCandidates.mapValues { (_, marks) ->
+                        com.kingzcheung.xime.rime.CorrectionMarks.doublePinyin(marks, correctionScheme)
+                    }
+                }
+            }
             androidx.compose.runtime.CompositionLocalProvider(
-                LocalCorrectedCandidates provides candidateState.value.correctedCandidates) {
+                LocalCorrectedCandidates provides correctionMarks,
+                LocalCorrectionFullScheme provides correctionScheme.takeIf { !doublePinyinKeysShown }) {
             ScaledCandidateBar(candidateBarScaleState.floatValue) {
             CandidateBar(
                 modifier = Modifier.clipboardPanelExpandGesture().drawWithContent {
