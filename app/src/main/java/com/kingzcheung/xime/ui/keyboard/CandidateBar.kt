@@ -1545,7 +1545,11 @@ internal fun FixedCandidateStrip(
                 else -> measureFit(index).also { fits[index] = it }
             }
             fun shownWidth(index: Int): Int = fitAt(index)?.totalWidth ?: widthAt(index)
-            val edgeWidthAt = glossBodyWidthAt?.let { body -> { index: Int -> body(index) ?: shownWidth(index) } }
+            // The transparent tap padding may cross the edge without clipping the label.
+            val edgeWidthAt: ((Int) -> Int)? = if (scrollable && localGap == null) { index ->
+                ((glossBodyWidthAt?.invoke(index) ?: shownWidth(index)) - with(density) { itemPadding.roundToPx() })
+                    .coerceAtLeast(0)
+            } else glossBodyWidthAt?.let { body -> { index: Int -> body(index) ?: shownWidth(index) } }
             val spacing = with(density) { itemSpacing.roundToPx() }
             val split = if (localGap != null) {
                 splitCandidateWindow(all.size, focused, localGap.first, constraints.maxWidth - localGap.second,
@@ -1724,7 +1728,10 @@ private fun ScrollableCandidateRow(
         overscrollEffect = null,
         horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
         items(all.size) { index ->
-            val hidden = index in cutAtEdge
+            // A fresh list has no measured layout yet. Use the already measured candidate window
+            // for its first frame, then use actual scroll positions as soon as they are available.
+            val awaitingLayout = !listState.isScrollInProgress && listState.layoutInfo.visibleItemsInfo.isEmpty()
+            val hidden = if (awaitingLayout) index !in shown else index in cutAtEdge
             val numbered = index < candidates.size
             if (index == focused) DisposableEffect(Unit) { onDispose { onFocusedGone() } }
             // 选中的候选停在栏边被藏起来：选中底色也先不画。
