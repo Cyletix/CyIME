@@ -10,6 +10,9 @@ internal class StreamingVoiceText {
     private var frozenPrefix = ""
     private var ownedCursor: Int? = null
 
+    /** 最近一次写完后光标该在的位置；没写过、读不到或用户动过光标时为 null。 */
+    val writeEnd: Int? get() = ownedCursor
+
     fun reset() {
         previousResult = ""
         visibleTail = ""

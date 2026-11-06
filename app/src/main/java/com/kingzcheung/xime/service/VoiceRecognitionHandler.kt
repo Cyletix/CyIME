@@ -142,6 +142,8 @@ class VoiceRecognitionHandler(
         toolbarSentencePrefix = null
         lastToolbarFinal = ""
         lastPartialText = ""
+        recentDictation = ""
+        dictationCaret = null
 
         textBeforeVoiceInput = getInputConnection()?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
         textLengthBeforeVoiceInput = textBeforeVoiceInput.length
@@ -535,6 +537,45 @@ class VoiceRecognitionHandler(
             toolbarSentencePrefix = if (preceding == lastToolbarFinal && !preceding.isNullOrEmpty()) " " else ""
         }
         toolbarText.update(ic, toolbarSentencePrefix.orEmpty() + text)
+        recentDictation = toolbarSentencePrefix.orEmpty() + text
+        dictationCaret = toolbarText.writeEnd
+    }
+
+    /** 工具栏听写最近写进输入框的字和写完后的光标位置：宿主重启输入框后靠它们回到原处接着写。 */
+    private var recentDictation = ""
+    private var dictationCaret: Int? = null
+
+    /**
+     * 宿主在听写中重启了同一个输入框（B 站评论框写满一行时重设文字，光标被放回开头；11-06 用户：说着说着
+     * 自己停了、光标飘到最前面）：核对听写写过的字还在原处，就把光标放回去、接上新的输入会话，听写继续。
+     * [hostCarets] 是重启前宿主最近报来的光标（新的在前）。核对不上返回 false，由调用方照旧结束听写。
+     */
+    fun continueAfterHostRestart(hostCarets: List<Int>): Boolean {
+        if (!::speechRecognitionManager.isInitialized || inputSession == null || sessionAbandoned || finishing ||
+            suppressDuplicateFinal || remoteSink != null || TerminalEditor.active) return false
+        val ic = getInputConnection() ?: return false
+        val extracted = runCatching { ic.getExtractedText(ExtractedTextRequest(), 0) }.getOrNull() ?: return false
+        val text = extracted.text ?: return false
+        if (extracted.startOffset < 0 || extracted.selectionStart < 0 || extracted.selectionEnd < 0) return false
+        // 按住说话的临时结果在组合区里：重启时框架把它定成了正文，要重新标回组合区，否则下一次临时结果会重复写一遍。
+        val composing = !toolbarSession && lastPartialText.isNotEmpty()
+        val tail = if (composing) lastPartialText else recentDictation.takeIf { it.isNotBlank() }?.takeLast(8).orEmpty()
+        val candidates = listOfNotNull(dictationCaret.takeIf { toolbarSession }) + hostCarets
+        val at = voiceResumeCaret(text, extracted.startOffset, candidates, tail) ?: return false
+        val caretStart = extracted.startOffset + extracted.selectionStart
+        val caretEnd = extracted.startOffset + extracted.selectionEnd
+        val moved = runCatching {
+            ic.beginBatchEdit()
+            try {
+                if (caretStart != at || caretEnd != at) ic.setSelection(at, at)
+                if (composing) { onComposingWritten(); ic.setComposingRegion(at - lastPartialText.length, at) }
+            } finally { ic.endBatchEdit() }
+        }.isSuccess
+        if (!moved) return false
+        FileLogger.w(TAG, "host restarted the field during dictation: resumed at=$at caret=$caretStart/$caretEnd " +
+            "toolbar=$toolbarSession composing=$composing")
+        inputSession = getState().inputSessionId
+        return true
     }
 
     private fun normalizeResult(text: String, parts: List<SpeechSegment>?): String {

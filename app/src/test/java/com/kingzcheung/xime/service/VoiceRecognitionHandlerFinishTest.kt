@@ -813,4 +813,55 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals("继续", editor.toString())
         verify(mockManager, never()).cancelRecognition()
     }
+
+    /** 宿主重设文字后的输入框：光标被放回 [caret]，之后光标跟着上屏走。 */
+    private var hostCaret = 0
+    private fun hostRestartsField(caret: Int) {
+        hostCaret = caret
+        whenever(mockInputConnection.getExtractedText(any(), anyInt())).thenAnswer {
+            android.view.inputmethod.ExtractedText().also { e ->
+                e.text = editor.toString(); e.startOffset = 0; e.selectionStart = hostCaret; e.selectionEnd = hostCaret
+            }
+        }
+        whenever(mockInputConnection.setSelection(anyInt(), anyInt())).thenAnswer { hostCaret = it.getArgument(0); true }
+        whenever(mockInputConnection.commitText(any(), anyInt())).thenAnswer {
+            editor.append(it.getArgument<CharSequence>(0)); hostCaret = editor.length; true
+        }
+        currentState = currentState.copy(inputSessionId = currentState.inputSessionId + 1)
+    }
+
+    @Test fun `toolbar dictation survives the host restarting the same field and its caret goes back`() {
+        startToolbar()
+        onPartial("你好世界")
+        hostRestartsField(caret = 0)
+        assertTrue(handler.continueAfterHostRestart(listOf(0, 4)))
+        verify(mockInputConnection).setSelection(4, 4)
+        onPartial("你好世界今天")
+        assertEquals("你好世界今天", editor.toString())
+        verify(mockManager, never()).cancelRecognition()
+        handler.finishRecognition(); onResult("你好世界今天")
+        assertEquals("你好世界今天", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `host restart that replaced the dictated text still ends the dictation`() {
+        startToolbar()
+        onPartial("你好世界")
+        editor.replace(0, editor.length, "别的内容")
+        hostRestartsField(caret = 0)
+        assertFalse(handler.continueAfterHostRestart(listOf(0, 4)))
+        verify(mockInputConnection, never()).setSelection(anyInt(), anyInt())
+    }
+
+    @Test fun `hold to talk partial is marked as composing again after the host restart`() {
+        handler.startRecognition()
+        onPartial("你好")
+        editor.append("你好") // 重启时框架把组合区定成了正文
+        hostRestartsField(caret = 0)
+        assertTrue(handler.continueAfterHostRestart(listOf(0, 2)))
+        verify(mockInputConnection).setSelection(2, 2)
+        verify(mockInputConnection).setComposingRegion(0, 2)
+        onPartial("你好世界")
+        verify(mockInputConnection).setComposingText(eq("你好世界"), eq(1))
+    }
 }

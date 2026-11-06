@@ -456,6 +456,9 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 // 面板（数字/符号）不应被新会话事件重置，否则输入一个数字后键盘会切回全键盘
                 if (current is KeyboardViewState.NumberPanel || current is KeyboardViewState.CommonSymbolPanel) {
                     Triple(current, _page.value, _keyboardState.value)
+                } else if (currentPage is KeyboardPage.Main && currentPage.type == MainType.VOICE) {
+                    // 按住说话中宿主重启了同一个输入框，听写还在继续：语音页留着；听写结束时 exitVoice 再切回。
+                    Triple(current, currentPage, _keyboardState.value)
                 } else if (currentPage is KeyboardPage.Overlay) {
                     // 还开着的面板（编辑/方向盘、剪贴板等）说明是同一输入框重启会话：真正换输入框或收起键盘时
                     // onFinishInput/onWindowHidden 已先关掉面板。有的应用粘贴后会重启输入（如短信），不能因此关面板。

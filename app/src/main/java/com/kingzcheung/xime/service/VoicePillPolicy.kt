@@ -64,3 +64,19 @@ internal fun voicePillResumeApplies(mark: VoicePillResumeMark?, packageName: Str
 /** 输入框本身是否允许自动开麦：密码等敏感框、不许语音的框、通话中都不开。 */
 internal fun voicePillResumeFieldAllows(sensitive: Boolean, locksNativeInput: Boolean, inCall: Boolean, hasMicPermission: Boolean): Boolean =
     !sensitive && !locksNativeInput && !inCall && hasMicPermission
+
+/**
+ * 宿主在听写中重启了同一个输入框（B 站评论框写满一行时重设文字，光标被放回开头）后，听写接着写的位置；
+ * 拿不准时返回 null，照旧结束听写。
+ *
+ * [text] 是输入框从 [startOffset] 起的文字；[candidates] 是重启前听写写到的位置（绝对位置，按可信程度排）；
+ * [tail] 是该位置前应有的、听写最近写进去的字（为空时只认输入框末尾）。
+ */
+internal fun voiceResumeCaret(text: CharSequence, startOffset: Int, candidates: List<Int>, tail: String): Int? {
+    for (at in candidates) {
+        val index = at - startOffset
+        if (at < 0 || index < 0 || index > text.length) continue
+        if (if (tail.isEmpty()) index == text.length else text.subSequence(0, index).endsWith(tail)) return at
+    }
+    return null
+}

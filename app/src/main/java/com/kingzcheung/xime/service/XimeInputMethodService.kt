@@ -3565,6 +3565,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 新连接开始时旧组合区一律失效；同一输入框重启时撤掉被定格的拼音编码。
         val identity = attribute?.let { Triple(it.packageName, it.fieldId, it.inputType) }
         val sameField = restarting && identity != null && identity == lastEditorIdentity
+        // 听写中宿主重启了同一个输入框（B 站评论框写满一行时重设文字、改输入类型，光标被放回开头）：
+        // 不算换输入框，听写接着写（见 VoiceRecognitionHandler.continueAfterHostRestart）。
+        val voiceThroughRestart = restarting && (uiState.value.isVoiceMode || voiceRecordingStarted) &&
+            !attribute?.packageName.isNullOrEmpty() && attribute?.packageName == lastEditorIdentity?.first &&
+            !EditorInfoClassifier.isSecretEditor(attribute)
+        val hostCaretsBeforeRestart = listOf(voiceHostCaret, voiceHostCaretBefore)
         lastEditorIdentity = identity
         // Search belongs to the field it was opened in; another field starts without it.
         if (!sameField) closeClipboardSearch(openBoard = false)
@@ -3594,9 +3600,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         updateHardwareKeyboardConnection()
         applyCompactMode()
         requestHardwareCursorUpdates()
-        noteVoicePillInterrupted(VoiceSessionEnd.FOCUS_TO_OTHER_FIELD)
-        newInputGeneration()
-        if (uiState.value.isVoiceMode || voiceRecordingStarted) {
+        if (!voiceThroughRestart) noteVoicePillInterrupted(VoiceSessionEnd.FOCUS_TO_OTHER_FIELD)
+        newInputGeneration(keepVoice = voiceThroughRestart)
+        if (!voiceThroughRestart && (uiState.value.isVoiceMode || voiceRecordingStarted)) {
             voiceRecognitionHandler.abandonSession()
             voiceRecognitionHandler.cancelPreStart()
             restoreAfterVoiceFinish()
@@ -3644,6 +3650,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             clipboardImagesExpanded = false,
             isSttEnabled = SettingsPreferences.isSttEnabled(this@XimeInputMethodService),
         )
+        // 听写接上新的输入会话；文字或光标对不上时照旧结束听写。
+        if (voiceThroughRestart && !voiceRecognitionHandler.continueAfterHostRestart(hostCaretsBeforeRestart)) {
+            noteVoicePillInterrupted(VoiceSessionEnd.FOCUS_TO_OTHER_FIELD)
+            voiceRecognitionHandler.endInputSession()
+            if (uiState.value.isVoiceMode || voiceRecordingStarted) restoreAfterVoiceFinish()
+        }
+        voiceHostCaretBefore = -1
+        voiceHostCaret = attribute?.takeIf { it.initialSelStart >= 0 && it.initialSelStart == it.initialSelEnd }?.initialSelStart ?: -1
 
         // Show the existing layout immediately. Native preparation is queued below,
         // before the first key, rather than loading translators on this callback.
@@ -3822,6 +3836,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             ?.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         inlineComposition.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
+        val hostCaret = if (newSelStart >= 0 && newSelStart == newSelEnd) newSelStart else -1
+        if (hostCaret != voiceHostCaret) { voiceHostCaretBefore = voiceHostCaret; voiceHostCaret = hostCaret }
         if (oldSelStart != newSelStart || oldSelEnd != newSelEnd) {
             inlineComposition.hostCaret(candidatesStart, candidatesEnd, newSelStart, newSelEnd)?.let { offset ->
                 val state = uiState.value
@@ -4324,10 +4340,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * commit is dropped and its voice input session ends, releasing the microphone. Each caller
      * then gives [InputUIState.inputSessionId] a new value once its own cleanup is done.
      */
-    private fun newInputGeneration() {
+    private fun newInputGeneration(keepVoice: Boolean = false) {
         inputReadiness.newEditorSession()
         keyRouter.discardPendingCandidateCommit()
-        voiceRecognitionHandler.endInputSession()
+        if (!keepVoice) voiceRecognitionHandler.endInputSession()
     }
 
     /**
@@ -4412,6 +4428,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private val inlineComposition = InlineCompositionTracker()
     /** 上一个输入框（包名、fieldId、inputType），判断重启输入是否仍是同一个框。 */
     private var lastEditorIdentity: Triple<String?, Int, Int>? = null
+    /**
+     * 宿主最近报来的折叠光标和它之前的一个（没有或有选区时为 -1）：听写中宿主重启输入框后，用来把光标放回原处。
+     * 宿主重设文字时「光标到开头」那条可能先于重启送到，所以多留一个。
+     */
+    private var voiceHostCaret = -1
+    private var voiceHostCaretBefore = -1
 
     /** 标记刚向输入框写入了 composing 文本；拼音编码同时记下文字（语音 partial 不记）。 */
     internal fun markInputBoxComposing(text: String? = null) {
