@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 import kotlin.random.Random
 
-/** 随包词表（english.txt）上的合成轨迹：常用词应排第一，单次识别耗时有上限。 */
+/** 随包滑行词表（english.txt 加补充词）上的合成轨迹：常用词应排第一，单次识别耗时有上限。 */
 class GlideRealLexiconTest {
     private val unit = 60f
     private val height = 80f
@@ -15,8 +15,11 @@ class GlideRealLexiconTest {
             letters.forEachIndexed { index, char -> put(char, LetterKeyRect((inset + index) * unit, row * height, unit, height)) }
         }
     }
-    private val words = File("src/main/assets/english.txt").readLines()
-        .map { it.trim().lowercase() }.filter { it.length >= 2 && it.all { c -> c in 'a'..'z' } }.distinct()
+    /** 与应用同一个滑行词表：english.txt 加缩写写法和补充词。 */
+    private val words = EnglishContractions(File("src/main/assets/english_contractions.txt").readLines().asSequence())
+        .vocabulary(File("src/main/assets/english.txt").readLines(),
+            glideExtraWords(File("src/main/assets/english_glide_words.txt").readLines().asSequence()))
+        .filter { it.length >= 2 && it.all { c -> c in 'a'..'z' } }
 
     private fun trace(word: String, seed: Int): Pair<FloatArray, FloatArray> {
         val random = Random(seed)

@@ -4,6 +4,8 @@
 
 2026-11-04：雾凇词频偏低的口语（牛逼 niu bi 在第 68007 名）排不进前 30000，一笔划不出来，双拼划牛逼落到 nabi、nwvi。`glide_pinyin_extra.txt` 列出这类词（网络口语和 B 站评论里常打、原词表缺的词），生成时另外补进词表、排在第 10000 名的位置，原有编码不变。以后发现划不出的常用词，加进这个文件再重新生成。
 
+2026-11-06：英文滑行划不出 fuck（全落到 duck、frederick）。滑行词表原来就是 `english.txt`，那是去掉脏话的网页常用词表，fuck、shit、god、huh、alright、goodbye、kidding 这类聊天常用词都没有，留出对白里 8.1% 的词一笔划不出来。`build_english_bigrams.py` 现在另外生成 `english_glide_words.txt`：对白里出现至少 5 次、网页词频里也有的词（人名、带撇号的写法、goin 这类丢 g 的写法、侮辱性称呼不收），加上 `english_glide_extra.txt` 手写的聊天用词，按词频插进滑行词表（9868 → 16412 个），只给滑行用，英文补全不变；双词表一起重新生成。以后发现划不出的常用英文词，加进 `english_glide_extra.txt` 再重新生成。词表变大后解码器改成先用下界排序、筛掉进不了前几名的词再算 DTW，候选与原来逐条一致，耗时反而更短。
+
 2026-10-31：英文滑行连着划时前后两个词一起选（i 划到 m、n 之间再划 done → I'm done），缩写上屏带撇号。`english_bigrams.txt`、`english_contractions.txt` 由 `python -B tools/glide_lab/build_english_bigrams.py --norvig <count_1w/2w 所在目录> --cornell <movie_lines.txt>` 生成（原始语料不进仓库，来源见脚本和 NOTICE）；加 `--holdout` 留出十分之一对白做回放。留出 1.3 万句、合成轨迹（键位抖动 ±¼/±½/±¾ 键宽）每词首选：各划各的 98.4/94.5/77.6%，按上下文连同前一个词 99.4/98.4/90.8%（SHAPE_SCALE=32）。回归见 `GlidePairCorrectionTest`。
 
 2026-10-03：**仅电脑离线原型，未接入 Android，未验收。** 本目录不在应用 source set 内，不修改键盘、候选、Rime、配置或词库，不运行 Gradle，不打包、不安装、不联系设备，不自动联网或下载依赖。

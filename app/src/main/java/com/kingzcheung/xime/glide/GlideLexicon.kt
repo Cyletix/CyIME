@@ -6,7 +6,8 @@ import com.kingzcheung.xime.settings.DoublePinyinScheme
 
 /**
  * 滑行词表与模板缓存。
- * - 英文：随包的 english.txt（按词频排序的常用英文词，与英文补全共用）加上缩写的去撇号写法；
+ * - 英文：随包的 english.txt（按词频排序的常用英文词，与英文补全共用）加上缩写的去撇号写法和
+ *   english_glide_words.txt 的补充词（english.txt 没有的 fuck、alright 等，只给滑行用）；
  *   连着划时用 english_bigrams.txt 给前后两个词整对打分（[rankGlideChoices]）。
  * - 中文：随包的 glide_pinyin.txt（雾凇词频合并同音后的常用拼音编码，音节用空格隔开，
  *   由 tools/glide_lab/build_pinyin_lexicon.py 生成）。全拼直接连写；双拼按当前方案逐音节换码。
@@ -19,6 +20,7 @@ object GlideLexicon {
     @Volatile private var pinyin: List<List<String>>? = null
     private const val CONTRACTIONS_FILE = "english_contractions.txt"
     private const val BIGRAMS_FILE = "english_bigrams.txt"
+    private const val EXTRA_FILE = "english_glide_words.txt"
     @Volatile private var contractions: EnglishContractions? = null
     @Volatile private var bigrams: EnglishBigrams? = null
     /** 英文、全拼、双拼各留一份；双拼换方案（或改了键位）时按方案内容重建。 */
@@ -30,9 +32,10 @@ object GlideLexicon {
         words ?: vocabulary(context).filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } }.also { words = it }
     }
 
-    /** english.txt 加上插进去的缩写写法（didnt、youre），滑行词表和双词表共用这一个排名。 */
+    /** english.txt 加上插进去的缩写写法（didnt、youre）和滑行补充词（fuck、alright），滑行词表和双词表共用这一个排名。 */
     private fun vocabulary(context: Context): List<String> = contractions(context).vocabulary(
-        context.applicationContext.assets.open(FILE).bufferedReader().useLines { it.toList() })
+        context.applicationContext.assets.open(FILE).bufferedReader().useLines { it.toList() },
+        context.applicationContext.assets.open(EXTRA_FILE).bufferedReader().useLines { glideExtraWords(it) })
 
     fun contractions(context: Context): EnglishContractions = contractions ?: synchronized(this) {
         contractions ?: context.applicationContext.assets.open(CONTRACTIONS_FILE).bufferedReader()

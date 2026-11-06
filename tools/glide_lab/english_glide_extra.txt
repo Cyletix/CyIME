@@ -1,0 +1,20 @@
+# 英文滑行补充词：english.txt 没有、电影对白里也少见的聊天用词。每行一个词，# 后面是说明。
+# tools/glide_lab/build_english_bigrams.py 生成 english_glide_words.txt 时按网页词频插进滑行词表。
+# 以后发现划不出来的常用词，加在这里再重新生成。
+god  # 对白里多写成 God，按人名筛掉了
+lol
+lmao
+omg
+wtf
+btw
+idk
+imo
+tbh
+haha
+hahaha
+hehe
+bro
+selfie
+emoji
+emojis
+texting

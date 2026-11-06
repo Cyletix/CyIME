@@ -21,7 +21,8 @@ class GlidePairCorrectionTest {
         }
     }
     private val contractions = EnglishContractions(File("src/main/assets/english_contractions.txt").readLines().asSequence())
-    private val vocabulary = contractions.vocabulary(File("src/main/assets/english.txt").readLines())
+    private val extra = glideExtraWords(File("src/main/assets/english_glide_words.txt").readLines().asSequence())
+    private val vocabulary = contractions.vocabulary(File("src/main/assets/english.txt").readLines(), extra)
     private val lm = File("src/main/assets/english_bigrams.txt").bufferedReader().useLines { EnglishBigrams(vocabulary, it) }
     private val decoder = GlideDecoder(GlideLexicon.keyboard(keys),
         vocabulary.filter { it.length >= 2 && it.all { char -> char in 'a'..'z' } })
@@ -53,6 +54,25 @@ class GlidePairCorrectionTest {
         assertNull(contractions.offer("dont"))
         assertTrue(lm.cost("im", "done") < lm.cost("in", "done"))
         assertTrue(lm.cost("i", "dont") < lm.cost("i", "font"))
+    }
+
+    /**
+     * english.txt 是去掉脏话的网页词表，fuck、alright、goodbye 这类常用词不在里面，划了只能落到 duck、frederick
+     * （用户 11-06：fuck 滑不出来，0% 成功率）。补充词插进滑行词表后要能划出来，原来的词照样划得出。
+     */
+    @Test fun commonWordsMissingFromEnglishTxtCanBeGlided() {
+        val english = File("src/main/assets/english.txt").readLines().toSet()
+        val added = listOf("fuck", "fucking", "shit", "damn", "huh", "alright", "goodbye", "kidding", "boyfriend", "hurry", "omg", "wtf")
+        assertTrue("这些词 english.txt 本来没有", added.none { it in english })
+        assertTrue("补充词都进了滑行词表和双词表", added.all { it in vocabulary && lm.cost(it) < 20f })
+        val random = Random(11)
+        val misses = (added + listOf("duck", "frederick", "thanks", "please", "giving", "birth")).flatMap { word ->
+            List(5) { glide(word, random, noise = 15f) }.mapNotNull { candidates ->
+                planGlideCommit(candidates, { it }, null, null, lm, contractions).word.takeIf { it != word }?.let { "$word→$it" }
+            }
+        }
+        assertTrue("misses: $misses", misses.isEmpty())
+        assertTrue("didn、goin 这类半截写法不收", "didn" !in vocabulary && "goin" !in vocabulary)
     }
 
     @Test fun glidingDoneAfterAnAmbiguousImCorrectsItToImDone() {

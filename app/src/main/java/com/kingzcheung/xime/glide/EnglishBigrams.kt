@@ -94,6 +94,17 @@ const val PAIR_TOP = 5
 const val SHAPE_SCALE = 32f
 
 /**
+ * 滑行词表补充词（english_glide_words.txt，tools/glide_lab/build_english_bigrams.py 生成）：english.txt 是去掉脏话的网页常用词，
+ * 没有 fuck、god、huh、alright、goodbye 这类常用词。每行「词 插入排名」，只给滑行和滑行双词表用，英文补全不读。
+ */
+fun glideExtraWords(lines: Sequence<String>): List<Pair<String, Int>> = lines.mapNotNull { line ->
+    if (line.isBlank() || line.startsWith("#")) return@mapNotNull null
+    val parts = line.trim().split(' ')
+    val rank = parts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
+    parts[0] to rank
+}.toList()
+
+/**
  * 滑行用的英文缩写（english_contractions.txt，tools/glide_lab/build_english_bigrams.py 生成）。
  * 滑行词表和双词表都用去撇号的写法（im、dont），上屏时换成缩写（I'm、don't）；
  * 去撇号写法本身也常用的（were、well、hell）不换，缩写排在候选里。english.txt 没有的写法按给定排名插进词表。
@@ -111,20 +122,23 @@ class EnglishContractions(lines: Sequence<String>) {
         }
     }
 
-    /** english.txt（去空白、小写、按第一次出现去重）加上插进去的写法；同一排名时插入的在前。 */
-    fun vocabulary(english: List<String>): List<String> {
+    /**
+     * english.txt（去空白、小写、按第一次出现去重）加上插进去的写法和 [extra]（滑行补充词，见 [glideExtraWords]）；
+     * 同一排名时插入的在前，缩写又在补充词前。
+     */
+    fun vocabulary(english: List<String>, extra: List<Pair<String, Int>> = emptyList()): List<String> {
         val words = english.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct()
-        val inserted = entries.filterValues { it.rank != null }.entries.sortedBy { it.value.rank }
+        val inserted = (entries.entries.mapNotNull { (stem, entry) -> entry.rank?.let { stem to it } } + extra).sortedBy { it.second }
         val known = words.toHashSet()
         val result = ArrayList<String>(words.size + inserted.size)
         var next = 0
         for ((index, word) in words.withIndex()) {
-            while (next < inserted.size && inserted[next].value.rank!! <= index) {
-                inserted[next].key.takeIf { it !in known }?.let(result::add); next++
+            while (next < inserted.size && inserted[next].second <= index) {
+                inserted[next].first.takeIf { it !in known }?.let(result::add); next++
             }
             result += word
         }
-        while (next < inserted.size) { inserted[next].key.takeIf { it !in known }?.let(result::add); next++ }
+        while (next < inserted.size) { inserted[next].first.takeIf { it !in known }?.let(result::add); next++ }
         return result
     }
 
