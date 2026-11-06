@@ -5199,8 +5199,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return TextCommitResult.ACCEPTED_INTERNAL
         }
         val connection = currentInputConnection ?: return TextCommitResult.NO_CONNECTION
-        val committed = if (caret == CommitCaret.NONE) connection.commitText(delivered, 1)
-            else connection.commitTextWithCaret(delivered, caret)
+        val committed = when {
+            caret != CommitCaret.NONE -> connection.commitTextWithCaret(delivered, caret)
+            // 多行短语一行一行上屏（见 commitPhraseLines）。
+            com.kingzcheung.xime.settings.PhraseLineBreaks.STORED in text && !isPaste -> connection.commitPhraseLines(delivered)
+            else -> connection.commitText(delivered, 1)
+        }
         if (!committed) return TextCommitResult.REJECTED
         if (isSensitive || isSecretEditor()) return TextCommitResult.ACCEPTED_HOST
         pluginEvents.onTextCommitted(delivered, isPaste)
@@ -5365,7 +5369,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         ic.beginBatchEdit()
         try {
             if (!ic.deleteSurroundingText(expected.length, 0)) return false
-            replaced = ic.commitText(replacement, 1)
+            replaced = if ('\n' in replacement) ic.commitPhraseLines(replacement) else ic.commitText(replacement, 1)
         } finally {
             ic.endBatchEdit()
         }
