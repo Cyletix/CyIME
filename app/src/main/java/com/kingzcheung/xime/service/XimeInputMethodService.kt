@@ -2038,7 +2038,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             isFocusable = true
             isFocusableInTouchMode = true
             composeViewRef = this
-            setContent {
+            // 键盘里所有能滑的列表都不要边缘拉伸回弹，见 NoKeyboardOverscroll。
+            setContent { com.kingzcheung.xime.ui.keyboard.NoKeyboardOverscroll {
               androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                 val inputWindowWidthDp = maxWidth.value.roundToInt().coerceAtLeast(1)
                 val state = uiState.value
@@ -2845,7 +2846,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                       }
                  }
              }
-         }
+         } }
         
         }
         keyboardContainer.addView(composeView)
