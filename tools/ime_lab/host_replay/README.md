@@ -153,3 +153,11 @@ case file from `../word_typo_bench.py make`, the output file and the neighbour m
 neighbors`) types common words and everyday clauses with one slip each and records where the intended text lands
 while typing and after the pause refinement. Score with `word_typo_bench.py score`. A copy of the user directory
 with `t9_ngram.lm` added measures the word-model configuration.
+
+`FuzzyExactFirstProbe.java` (library dir, a disposable copy of a deployed `rime_ice` user directory, the
+neighbour map from `../typo_bench.py neighbors`, optionally a file for the first words without fuzzy pinyin) types
+every single syllable of the bundled 8105 dictionary twice: as deployed, then with every fuzzy group the app offers
+written into `rime_ice.custom.yaml` (the probe writes and deploys it). A first word spelled by the typed letters
+must stay first with the groups on, and ne/neng must still offer 了/冷 in the first three. 2026-11-05: 1.15.63
+loses 88 of 412 (ne → 了, neng → 冷, si → 是, zong → 中); with the fix 411 of 411 stay, and the first words
+without fuzzy pinyin are the same as 1.15.58's for all 413 syllables.

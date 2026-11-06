@@ -208,6 +208,24 @@ class PolicyTranslation : public Translation {
     }
     for (size_t i = 0; i < slots.size(); ++i) head_[slots[i]] = ranked[i].candidate;
     KeepFixedOrder();
+    // Fuzzy pinyin (模糊音) only adds readings: the first word is always one the typed letters spell (2026-11-05:
+    // with n/l on, ne gave 了 before 呢 and neng 冷 before 能, the frequent fuzzy word winning by weight). The best
+    // such word moves up to the first fuzzy word's place; the fuzzy words keep their order after it. Sentences
+    // stay where they are, and nine-key digits keep their own order.
+    if (!numeric) {
+      auto whole_word = [&](const an<Candidate>& c) -> an<Phrase> {
+        const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+        return p && !As<Sentence>(p) && p->end() == end_ && !HanCharacters(p->text()).empty() ? p : nullptr;
+      };
+      const auto first = std::find_if(head_.begin(), head_.end(), [&](const auto& c) { return whole_word(c) != nullptr; });
+      if (first != head_.end() && whole_word(*first)->fuzzy_spelling()) {
+        const auto typed = std::find_if(first + 1, head_.end(), [&](const auto& c) {
+          const auto p = whole_word(c);
+          return p && !p->fuzzy_spelling();
+        });
+        if (typed != head_.end()) std::rotate(first, typed, typed + 1);
+      }
+    }
     // A whole English word should not lose to guessed Chinese abbreviations.
     // Fully spelled Chinese (e.g. you -> 有) and explicit non-dictionary entries
     // retain their native priority. No word list or fixed candidate is injected.
