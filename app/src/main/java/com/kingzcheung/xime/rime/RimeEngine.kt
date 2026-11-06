@@ -234,6 +234,7 @@ class RimeEngine {
     }
 
     private val candidateRevision = java.util.concurrent.atomic.AtomicLong(1L)
+    internal fun currentCandidateRevision(): Long = candidateRevision.get()
 
     /** A successful lock acquisition starts a mutation, invalidating previously published candidates. */
     private inline fun <T> mutateLocked(block: () -> T): T = locked {
@@ -640,6 +641,22 @@ class RimeEngine {
             nativeSetInput(if (japanese) canonicalJapaneseRomaji(input) else input)
         }
     }
+
+    internal fun saveClearUndo(): Boolean = locked {
+        isInitialized && nativeHasSession() && !nativeIsAsciiMode() && nativeSaveClearUndo()
+    }
+
+    internal fun restoreClearUndo(expectedRevision: Long): RimeProcessResult? = locked {
+        if (!isInitialized || !nativeHasSession() || candidateRevision.get() != expectedRevision || nativeIsAsciiMode()) return@locked null
+        if (!nativeRestoreClearUndo()) return@locked null
+        candidateRevision.incrementAndGet()
+        withDisplayPreedit(nativeGetProcessResult(true))
+    }
+
+    internal fun discardClearUndo() = locked { nativeDiscardClearUndo() }
+    private external fun nativeSaveClearUndo(): Boolean
+    private external fun nativeRestoreClearUndo(): Boolean
+    private external fun nativeDiscardClearUndo()
 
     /** Snapshot/apply run on the existing input FIFO, under one engine lock. */
     internal fun readPinyinEditSnapshot(): Array<String> = locked {

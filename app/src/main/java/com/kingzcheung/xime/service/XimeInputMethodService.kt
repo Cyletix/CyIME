@@ -630,6 +630,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var pendingVoiceAction: (() -> Unit)? = null
     internal var composeViewRef: View? = null
     internal var lastClearedText: String = ""
+    internal var lastClearedComposition: ClearedComposition? = null
     /** 空闲态上滑清空掉的整框文字，供下滑撤回原位恢复；与 [lastClearedText]（清掉的编码）互斥。 */
     @Volatile internal var lastClearedDocument: ClearedDocument? = null
     /** 上面两样是从哪个输入框清掉的：下滑撤回只放回同一个框（应用的框清掉的字不能撤回到「新增固定」里）。 */
@@ -3615,6 +3616,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         voicePillResumePending = voicePillResumeEnabled() && voicePillResume.appliesTo(attribute?.packageName) &&
             voicePillResumeFieldAllowed()
         lastClearedText = ""
+        if (lastClearedComposition != null) inputCommands.submit { rimeEngine.discardClearUndo() }
+        lastClearedComposition = null
         lastClearedDocument = null
         lastSwipeDelete = null
 

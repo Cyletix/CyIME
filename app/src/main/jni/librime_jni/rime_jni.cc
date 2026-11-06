@@ -359,6 +359,39 @@ public:
         return rime && session_id_ && index >= 0 && rime->highlight_candidate(session_id_, index);
     }
 
+    bool saveClearUndo() {
+        discardClearUndo();
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->context()) return false;
+        auto ctx = session->context();
+        auto t9 = rime::T9ProcessorRequire();
+        if (ctx->input().empty() && !t9) return false;
+        if (t9) t9->SaveClearUndo();
+        clear_undo_ = ClearUndo{session_id_, getCurrentSchema(), ctx->input(), ctx->caret_pos(),
+                                ctx->composition(), t9};
+        return true;
+    }
+
+    bool restoreClearUndo() {
+        if (!clear_undo_ || clear_undo_->session != session_id_ || clear_undo_->schema != getCurrentSchema()) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->context() || !session->context()->input().empty() ||
+            (clear_undo_->t9 && rime::T9ProcessorRequire() != clear_undo_->t9)) return false;
+        auto saved = std::move(*clear_undo_);
+        clear_undo_.reset();
+        auto ctx = session->context();
+        ctx->set_input(saved.input);
+        ctx->set_composition(std::move(saved.composition));
+        ctx->set_caret_pos(saved.caret);
+        return !saved.t9 || saved.t9->RestoreClearUndo();
+    }
+
+    void discardClearUndo() {
+        if (clear_undo_ && clear_undo_->t9 && rime::T9ProcessorRequire() == clear_undo_->t9)
+            clear_undo_->t9->DiscardClearUndo();
+        clear_undo_.reset();
+    }
+
     // Editable suffix only: confirmed segments stay owned by Rime and are never replayed.
     std::vector<std::string> pinyinEditSnapshot() {
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
@@ -1420,6 +1453,15 @@ public:
     const std::string& get_shared_data_dir() const { return shared_data_dir_; }
 
 private:
+    struct ClearUndo {
+        RimeSessionId session;
+        std::string schema;
+        std::string input;
+        size_t caret;
+        rime::Composition composition;
+        rime::T9Processor* t9;
+    };
+    std::optional<ClearUndo> clear_undo_;
     RimeApi* rime;
     RimeSessionId session_id_ = 0;
     bool incognito_ = false;
@@ -1779,6 +1821,21 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinEditSnapshot(JNIEnv* env, 
     }
     env->DeleteLocalRef(stringClass);
     return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSaveClearUndo(JNIEnv*, jobject) {
+    return Rime::Instance().saveClearUndo() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeRestoreClearUndo(JNIEnv*, jobject) {
+    return Rime::Instance().restoreClearUndo() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeDiscardClearUndo(JNIEnv*, jobject) {
+    Rime::Instance().discardClearUndo();
 }
 
 JNIEXPORT void JNICALL
