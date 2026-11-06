@@ -191,59 +191,16 @@ internal class CaptionSpeechSession(
     private var lastProbeEnd = 0L
     private var lastRegroupAt = 0L
 
-    // The last three minutes of sentence audio, for the after-the-fact re-check (audio worker adds,
-    // speaker worker reads; guarded by itself).
-    private val heard = ArrayDeque<Triple<Long, Long, FloatArray>>()
-    private var heardSamples = 0
-
     /**
-     * Every 15 s, looking back: all audio each person said so far (up to 20 s) gives a long, steady
-     * voiceprint; two people whose long prints match are one person and merge, and a "person"
-     * holding under 1 s of speech joins whoever spoke next to it. Short probes find a new voice
-     * quickly but sometimes split one voice; this undoes those splits. PC replay with room echo
-     * (0.75 s probes + this): missed turn changes 29% → 15%, wrong speech time 8.4% → 6.1%,
-     * long single-voice sessions with an extra lane 2/20 → 1/20.
+     * Every 5 s, looking back: the last five minutes of windows are grouped again at once
+     * ([SpeakerTracker.recluster]), which pulls apart voices the running averages folded together and
+     * joins one voice that was split; then a "person" holding under 3 s of speech joins whoever they
+     * sound like. Replaces the 15 s long-print merge, which joined two people whose prints were already
+     * mixed and cost up to 20 s of audio per person to embed again.
      */
     private fun regroup() {
         val tracker = tracker ?: return
-        val embed = embed ?: return
-        val clips = synchronized(heard) { heard.toList() }
-        if (clips.isEmpty()) return
-        val audio = HashMap<Int, ArrayList<FloatArray>>()
-        val length = HashMap<Int, Int>()
-        for ((from, to, who) in tracker.spans()) {
-            if ((length[who] ?: 0) >= REGROUP_MAX_SAMPLES) continue
-            for ((clipFrom, clipTo, pcm) in clips) {
-                val a = maxOf(from, clipFrom); val b = minOf(to, clipTo)
-                if (b - a < 100) continue
-                val start = ((a - clipFrom) * 16).toInt().coerceIn(0, pcm.size)
-                val end = ((b - clipFrom) * 16).toInt().coerceIn(start, pcm.size)
-                audio.getOrPut(who) { ArrayList() }.add(pcm.copyOfRange(start, end))
-                length[who] = (length[who] ?: 0) + end - start
-            }
-        }
-        val prints = HashMap<Int, FloatArray>()
-        for ((who, parts) in audio) {
-            if ((length[who] ?: 0) < REGROUP_MIN_SAMPLES) continue
-            val joined = FloatArray(minOf(length.getValue(who), REGROUP_MAX_SAMPLES))
-            var at = 0
-            for (part in parts) { if (at >= joined.size) break; val n = minOf(part.size, joined.size - at); part.copyInto(joined, at, 0, n); at += n }
-            timedEmbed(embed, joined)?.let { prints[who] = SpeakerTracker.normalized(it) }
-        }
-        val ids = prints.keys.sorted()
-        var best: Triple<Float, Int, Int>? = null
-        for (i in ids.indices) for (j in i + 1 until ids.size) {
-            val a = ids[i]; val b = ids[j]
-            if (!tracker.automatic(a) && !tracker.automatic(b)) continue
-            val sim = SpeakerTracker.similarity(prints.getValue(a), prints.getValue(b))
-            if (sim >= REGROUP_SIMILARITY && (best == null || sim > best.first)) best = Triple(sim, a, b)
-        }
-        best?.let { (_, a, b) ->
-            // Keep the named / remembered one, else the one with more speech.
-            val keepA = !tracker.automatic(a) || (tracker.automatic(b) && (length[a] ?: 0) >= (length[b] ?: 0))
-            val (from, into) = if (keepA) b to a else a to b
-            publish(tracker.merge(from, into))
-        }
+        publish(tracker.recluster())
         publish(tracker.absorbFragments())
     }
 
@@ -335,10 +292,13 @@ internal class CaptionSpeechSession(
         if (tracker == null) { listener.onSegment(id, final.text, final.startMs, final.endMs, final.boundary, true, final.event); return }
         val label = synchronized(join) { firstLabels.remove(id) ?: run { finals[id] = final; null } }
         if (label != null) { emitFinal(id, final, label); return }
-        // The speaker worker has already queued this sentence's windows; behind them, release the text
-        // unsplit if no label came (no speech window covered it).
+        // The speaker worker has already queued this sentence's windows; behind them, label it with what
+        // is known (so it can still be split between two voices), else release the text unsplit. Without
+        // the first step a sentence whose last window came late was always shown whole: PC replay
+        // 2026-11-06, 2 of 7 sentences of a quick two-person exchange never split.
         try {
             speaker.execute {
+                if (!abandoned.get()) tracker.labelNow(id).let { if (it.isNotEmpty()) publish(it) }
                 val held = synchronized(join) { finals.remove(id) } ?: return@execute
                 listener.onSegment(id, held.text, held.startMs, held.endMs, held.boundary, true, held.event)
             }
@@ -403,15 +363,21 @@ internal class CaptionSpeechSession(
         val startMs = regionStartSample / 16
         val endMs = processedSamples / 16
         val preview = if (engine.isStreaming) cleanCaptionText(engine.finishStream()) else lastPreview
-        if (tracker != null) synchronized(heard) {
-            heard.addLast(Triple(startMs, endMs, samples))
-            heardSamples += samples.size
-            while (heardSamples > HEARD_MAX_SAMPLES && heard.size > 1) heardSamples -= heard.removeFirst().third.size
-        }
         regionAudio.clear()
-        val needsRefine = engine.hasRefinement || !engine.isStreaming
         // The preview stays live (not closed) until the final text and its speaker are both known.
         listener.onSegment(id, preview, startMs, endMs, boundary, false, "")
+        // Labelled before the text is decoded: a fast second pass used to queue its "release unsplit"
+        // fallback on the speaker worker ahead of this sentence, so it was never split between two
+        // voices (PC replay 2026-11-06: 8 of 12 sentences of one quick two-person exchange).
+        if (tracker != null) {
+            // Cover the sentence's tail, then group again (so its voices and split points come from the
+            // look-back groups, not from averages that drifted since) and label it.
+            speakerWindow(force = true)
+            try {
+                speaker.execute { if (!abandoned.get()) { publish(tracker.recluster()); publish(tracker.addSegment(id, startMs, endMs)) } }
+            } catch (_: RejectedExecutionException) { }
+        }
+        val needsRefine = engine.hasRefinement || !engine.isStreaming
         if (!needsRefine) deliverFinal(id, Final(preview, emptyArray(), FloatArray(0), startMs, endMs, boundary, ""))
         if (needsRefine) {
             val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(refineTimeoutMs)
@@ -437,12 +403,7 @@ internal class CaptionSpeechSession(
                 deliverFinal(id, Final(preview, emptyArray(), FloatArray(0), startMs, endMs, boundary, "timeout"))
             }
         }
-        if (tracker == null) { listener.onSpeaker(id, CaptionSpeakers.SINGLE, true); return }
-        // Cover the sentence's tail, then label it from the windows it spans.
-        speakerWindow(force = true)
-        try {
-            speaker.execute { if (!abandoned.get()) publish(tracker.addSegment(id, startMs, endMs)) }
-        } catch (_: RejectedExecutionException) { }
+        if (tracker == null) listener.onSpeaker(id, CaptionSpeakers.SINGLE, true)
     }
 
     override fun finish(): String {
@@ -494,11 +455,7 @@ internal const val SPLIT_BASE = 1L shl 40
 private const val CAPTION_MAX_SEGMENT_MS = 12_000
 private const val CAPTION_MIN_PAUSE_MS = 600
 private const val PROBE_MS = 750L
-private const val REGROUP_EVERY_MS = 15_000L
-private const val REGROUP_SIMILARITY = .5f
-private const val REGROUP_MIN_SAMPLES = 16000 * 8 / 10   // 0.8 s
-private const val REGROUP_MAX_SAMPLES = 16000 * 20       // 20 s per person
-private const val HEARD_MAX_SAMPLES = 16000 * 180        // three minutes kept for the re-check
+private const val REGROUP_EVERY_MS = 5_000L
 /** Re-read the sentence after this much new audio (0.6 s) on engines without streaming. */
 private const val PREVIEW_STEP = 9600
 /**
