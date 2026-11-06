@@ -133,6 +133,7 @@ fun PluginsSettingsContent(
     ) { padding ->
         InstalledPluginsList(
             modifier = Modifier.padding(padding),
+            onNavigateToPluginMarket = onNavigateToPluginMarket,
             onNavigateToPluginSettings = onNavigateToPluginSettings,
             onNavigateToPluginDetail = onNavigateToPluginDetail,
             onNavigateToSpeechToText = onNavigateToSpeechToText,
@@ -166,6 +167,7 @@ internal fun InstalledPluginActions() {
 @Composable
 internal fun InstalledPluginsList(
     modifier: Modifier = Modifier,
+    onNavigateToPluginMarket: () -> Unit = {},
     onNavigateToPluginSettings: (String) -> Unit = {},
     onNavigateToPluginDetail: (String) -> Unit = {},
     onNavigateToSpeechToText: () -> Unit = {},
@@ -228,16 +230,13 @@ internal fun InstalledPluginsList(
                                 modifier = Modifier.size(48.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
+                            // 不留一句空话：直接给去装的路（11-05「你不能光在那空着吧」）。
                             Text(
-                                text = "暂无已安装的插件",
+                                text = "还没装插件",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                text = "安装插件后将在此显示",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
+                            TextButton(onClick = onNavigateToPluginMarket) { Text("去插件市场") }
                         }
                     }
                 }

@@ -55,7 +55,8 @@ object DeviceDefaults {
      * installs only; existing settings are never changed:
      * - 九键拼音 as the keyboard, with 手写 one tap away on the toolbar;
      * - toolbar 语音、手写、字幕、拍照识别、表情、剪贴板、输入方式 (no cursor editing tools);
-     * - the separate 字幕 home-screen icon on;
+     * - the separate 字幕 home-screen icon on (the 字幕 plugin itself is installed by CaptionPlugin.migrateOnce,
+     *   which treats the elder package as a caption user);
      * - larger candidates (24 sp) and a taller keyboard (40 % of the long screen side);
      * - the high-contrast 黑白 theme, which is already the default.
      */

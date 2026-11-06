@@ -44,7 +44,7 @@ enum class ToolbarButton(
     VOICE("voice", "语音", Icons.TwoTone.Mic),
     // 以下原为菜单专属；工具栏与菜单共用一组入口，可放在任一处或不使用。
     SETTINGS("settings", "设置", Icons.TwoTone.Settings),
-    // 整屏实时字幕（给听力不好的人看周围人说话），打开独立页面。
+    // 整屏实时字幕（给听力不好的人看周围人说话），打开独立页面。装了「字幕」插件才出现（CaptionPlugin）。
     CAPTION("caption", "字幕", Icons.TwoTone.Subtitles),
     SOUND("sound", "声音振动", Icons.TwoTone.VolumeUp),
     FLOATING("floating", "悬浮", Icons.TwoTone.PictureInPictureAlt),
@@ -69,7 +69,7 @@ enum class ToolbarButton(
         val DEFAULT_VISIBLE = linkedSetOf(SCHEMA, EMOJI, EDIT, CLIPBOARD, HANDWRITING_LOOKUP, VOICE)
 
         /** 菜单默认一页 8 项（另加末尾的“排列”）：只放打字时会临时调整的入口，其余可在“排列”中加入。 */
-        // 字幕不在这份一页 8 项的清单里；新装用户由 QuickActionLayout.defaultMenu 加入，已保存菜单由 SettingsPreferences 插入一次。
+        // 字幕不在这份清单里：它是「字幕」插件的按钮，插件装上并启用时才放进菜单（CaptionPlugin）。
         val DEFAULT_MENU = listOf(SETTINGS, FLOAT, OCR, SOUND, GLASS, INCOGNITO, FULL_SHAPE, ARRANGE)
         /** 布局手势开关：默认排在菜单的“排列”之前（见 QuickActionLayout.defaultMenu），每个布局只显示适用的一两个。 */
         val LAYOUT_GESTURES = listOf(GLIDE, T9_FLICK, FOURTEEN_SWIPE, KANA_HINTS, FLICK_DISC)

@@ -34,6 +34,9 @@ data class PluginCapabilities(
     /** 通讯录候选（manifest 声明 `contacts: true`）：插件启用且授权后，宿主自己读通讯录、
      *  在候选里给人名和号码。通讯录内容只在宿主内存里，不交给插件脚本，不学习、不备份、不同步。 */
     val contacts: Boolean = false,
+    /** 字幕（manifest 声明 `caption: true`）：字幕页面、识别、下拉快捷开关和桌面图标都在宿主里，
+     *  插件装上并启用才放出这些入口，停用或卸载就收起。脚本拿不到录音和字幕内容。 */
+    val caption: Boolean = false,
 ) {
     companion object {
         val EMPTY = PluginCapabilities()

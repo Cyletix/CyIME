@@ -26,8 +26,6 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
         /** 未保存过菜单时使用默认菜单，但不重复已放在工具栏上的入口；布局手势开关放在“排列”之前。 */
         fun defaultMenu(toolbar: List<String>): List<String> {
             val base = (ToolbarButton.DEFAULT_MENU - ToolbarButton.ARRANGE).toMutableList()
-            // 字幕是主入口：新装用户的默认菜单也有它（紧跟拍照识别），不放进一页 8 项的 DEFAULT_MENU 契约。
-            base.add(base.indexOf(ToolbarButton.OCR) + 1, ToolbarButton.CAPTION)
             // 悬浮、简繁两个开关也默认放进菜单，紧跟全角/半角（用户 2026-10-31）；简繁只在拼音、双拼、仓颉键盘出现。
             base.addAll(base.indexOf(ToolbarButton.FULL_SHAPE) + 1, MENU_TOGGLES_1031)
             return (base + ToolbarButton.LAYOUT_GESTURES + ToolbarButton.ARRANGE).map { it.id }.filter { it !in toolbar }

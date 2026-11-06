@@ -284,6 +284,8 @@ fun PluginConfigFormScreen(
                         )
                     }
                 } else if (entryHint != null) item { SettingsNote(entryHint) }
+                // 字幕插件：字幕的设置在宿主里（11-05 从 语音转文本 › 字幕 整组搬来），插件开着才显示。
+                if (pluginId == com.kingzcheung.xime.ui.caption.CaptionPlugin.ID && pluginEnabled) item { CaptionSettingsSection() }
                 groupedFields.forEach { (section, sectionFields) ->
                     item {
                         sectionContent(section, sectionFields)

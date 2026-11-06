@@ -267,7 +267,6 @@ object SettingsPreferences {
     fun getMenuButtons(context: Context): List<String> {
         val toolbar = getToolbarButtons(context)
         restoreFullShapeMenuItemOnce(context, toolbar)
-        insertMenuItemOnce(context, toolbar, com.kingzcheung.xime.keyboard.ToolbarButton.CAPTION.id, KEY_CAPTION_MENU_INSERTED)
         // 悬浮、简繁：放在全角/半角后面（不在菜单里就放在“排列”前），与新装默认菜单同一位置。
         var after = com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE.id
         com.kingzcheung.xime.keyboard.QuickActionLayout.MENU_TOGGLES_1031.forEach {
@@ -325,7 +324,6 @@ object SettingsPreferences {
         }
         editor.apply()
     }
-    private const val KEY_CAPTION_MENU_INSERTED = "quick_actions_caption_inserted"
     private const val KEY_PLUGIN_BUTTONS_PLACED = "quick_actions_plugin_buttons_placed"
 
     /**
@@ -356,7 +354,9 @@ object SettingsPreferences {
         val prefs = getPrefs(context)
         val editor = prefs.edit()
         com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.clear(context, pluginId)
-        val gone = buttonIds.toSet()
+        // 字幕插件的按钮是内置的 caption：卸载时一起拿掉，再装上时放回菜单「排列」前。
+        val caption = pluginId == com.kingzcheung.xime.ui.caption.CaptionPlugin.ID
+        val gone = buttonIds.toSet() + listOfNotNull(com.kingzcheung.xime.ui.caption.CaptionPlugin.BUTTON_ID.takeIf { caption })
         for (key in listOf(KEY_TOOLBAR_BUTTONS, KEY_MENU_BUTTONS, KEY_PLUGIN_BUTTONS_PLACED)) {
             val raw = prefs.getString(key, null) ?: continue
             val ids = raw.split(",").filter { it.isNotEmpty() }
@@ -364,6 +364,7 @@ object SettingsPreferences {
             if (kept.size != ids.size) editor.putString(key, kept.joinToString(","))
         }
         editor.apply()
+        if (caption) com.kingzcheung.xime.ui.caption.CaptionPlugin.sync(context)
     }
 
     /** 插件按钮现在在哪：设置里「用法」那一行照这个写。 */
@@ -803,6 +804,8 @@ object SettingsPreferences {
 
     fun setPluginEnabled(context: Context, pluginId: String, enabled: Boolean) {
         com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.setEnabled(context, pluginId, enabled)
+        // 字幕插件：开关一拨，键盘菜单、下拉快捷开关、桌面图标、设置里的字幕跟着出现或收起。
+        if (pluginId == com.kingzcheung.xime.ui.caption.CaptionPlugin.ID) com.kingzcheung.xime.ui.caption.CaptionPlugin.sync(context)
         // 通讯录插件：关掉立刻丢掉内存里的通讯录，打开（已授权）就后台读入。
         if (com.kingzcheung.xime.contacts.ContactSuggestions.isContactsPlugin(pluginId)) {
             val app = context.applicationContext

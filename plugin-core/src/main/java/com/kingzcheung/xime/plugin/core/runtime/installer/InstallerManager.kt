@@ -93,7 +93,9 @@ internal data class CapabilitiesConfig(
     @kotlinx.serialization.SerialName("clipboard_read")
     val clipboardRead: Boolean = false,
     /** 通讯录候选（宿主读通讯录，内容不给插件）。 */
-    val contacts: Boolean = false
+    val contacts: Boolean = false,
+    /** 字幕入口（字幕在宿主里，插件只管装没装）。 */
+    val caption: Boolean = false
 )
 
 @Serializable
@@ -180,7 +182,8 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
         candidateTransform = candidateTransform,
         quickSendRead = quickSendRead,
         clipboardRead = clipboardRead,
-        contacts = contacts
+        contacts = contacts,
+        caption = caption
     )
 }
 

@@ -33,6 +33,22 @@ class ManifestParseTest {
     }
 
     @Test
+    fun `字幕插件只声明 caption 能力：不联网、没有自己的按钮`() {
+        val content = java.io.File("../plugins/caption/manifest.yaml").readText()
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("com.kingzcheung.xime.plugin.caption", config.id)
+        assertEquals("tool", config.type)
+        assertTrue(config.capabilities?.caption == true)
+        assertTrue(config.capabilities?.contacts != true)
+        assertTrue(config.declaredHosts.isEmpty())
+        assertTrue(!config.allowCustomHosts)
+        // 键盘菜单用宿主内置的 caption 按钮，老用户放好的位置不变。
+        assertTrue(config.toolbarButtons.isEmpty())
+        val other = (InstallerManager.parseManifestContent("id: x\ntype: tool") as PluginParseResult.Success).config
+        assertTrue(other.capabilities?.caption != true)
+    }
+
+    @Test
     fun `翻译插件的 manifest 声明 live 翻译栏`() {
         val content = java.io.File("../plugins/translate/manifest.yaml").readText()
         val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config

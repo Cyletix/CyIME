@@ -9,7 +9,9 @@ class QuickActionLayoutTest {
         val toolbar = listOf("schema", "emoji", "ocr", "clipboard")
         val layout = QuickActionLayout.normalize(toolbar, QuickActionLayout.defaultMenu(toolbar))
         assertEquals(toolbar, layout.toolbar)
-        assertEquals(listOf("settings", "float", "caption", "sound", "glass", "incognito", "full_shape", "floating", "traditional", "arrange"), layout.menu.filter { it !in ToolbarButton.LAYOUT_GESTURES.map { g -> g.id } })
+        assertEquals(listOf("settings", "float", "sound", "glass", "incognito", "full_shape", "floating", "traditional", "arrange"), layout.menu.filter { it !in ToolbarButton.LAYOUT_GESTURES.map { g -> g.id } })
+        // 字幕是插件的按钮：新装的默认菜单里没有，装了字幕插件才放进去。
+        assertTrue("caption" !in QuickActionLayout.defaultMenu(emptyList()))
     }
 
     @Test fun eachEntryLivesInOnePlaceAndSettingsCannotBeRemoved() {

@@ -72,6 +72,22 @@ internal data class SettingsSearchEntry(
     val section: String? = null,
 )
 
+/** 字幕插件的那一页（字幕的设置都在这里）。 */
+internal val CAPTION_PLUGIN_TARGET = "${SettingsRoutes.PluginSettings}/${com.kingzcheung.xime.ui.caption.CaptionPlugin.ID}"
+
+/**
+ * 字幕插件没装（或停用）时，字幕的几项设置不列出来（点进去是空页），换成一条「字幕」去插件市场装；装着就照常（11-05）。
+ */
+internal fun withCaptionPluginState(results: List<SettingsSearchEntry>, captionActive: Boolean): List<SettingsSearchEntry> {
+    if (captionActive) return results
+    val at = results.indexOfFirst { it.target == CAPTION_PLUGIN_TARGET }
+    if (at < 0) return results
+    val rest = results.filter { it.target != CAPTION_PLUGIN_TARGET }.toMutableList()
+    rest.add(at.coerceAtMost(rest.size), SettingsSearchEntry("字幕", "系统 › 扩展 › 插件市场", SettingsRoutes.MarketPlugins,
+        "字幕 插件", anchor = null))
+    return rest
+}
+
 /** 布局编辑器是独立的 Activity，不在设置的导航图里。 */
 internal const val SEARCH_TARGET_CUSTOM_LAYOUT = "activity:custom_layout"
 
@@ -98,6 +114,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
     val dictionary = "$smart › 词库"
     val prediction = "$smart › 智能联想"
     val speech = "$smart › 语音转文本"
+    val captionPage = "$system › 扩展 › 插件 › 字幕"
     val handwriting = "$smart › 手写"
     val clipboard = "$system › 剪贴板与同步"
     val clipboardPanel = "$clipboard › 剪贴板面板"
@@ -307,12 +324,13 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("自动加标点", speech, SettingsRoutes.SpeechToText, "标点 逗号 句号 问号 感叹号 顿号 分号 自动标点 去掉标点 不加标点 部分标点 只要逗号 不要句号 末尾标点 句末标点 最后不带标点 空格 在线接口 语音", section = "语音标点"),
         SettingsSearchEntry("数字转阿拉伯数字", speech, SettingsRoutes.SpeechToText, "数字 阿拉伯数字 中文数字 大写数字 小写数字 ITN 金额 年份 电话 百分比 小数 时间 语音", section = "数字"),
         SettingsSearchEntry("语音纠错", speech, SettingsRoutes.SpeechToText, "纠错 错词 正词 替换 同音字 识别错 认错 改词 映射 纠错词库 语音", section = "纠错"),
-        SettingsSearchEntry("字幕", speech, SettingsRoutes.SpeechToText, "字幕 听障 老人 对话 实时字幕"),
-        SettingsSearchEntry("桌面显示“字幕”图标", speech, SettingsRoutes.SpeechToText, "字幕 桌面图标 快捷方式"),
-        SettingsSearchEntry("后台浮窗", speech, SettingsRoutes.SpeechToText, "字幕 浮窗 后台 悬浮 其他应用"),
-        SettingsSearchEntry("自动保存字幕", speech, SettingsRoutes.SpeechToText, "字幕 保存 文件 记录 下载"),
-        SettingsSearchEntry("字幕只保留 3 天", speech, SettingsRoutes.SpeechToText, "字幕 记录 删除 三天 保留"),
-        SettingsSearchEntry("有人叫我名字时振动", speech, SettingsRoutes.SpeechToText, "字幕 名字 振动 提醒 叫我"),
+        // 字幕是插件（11-05）：设置在字幕插件那一页；没装时搜索结果换成去插件市场（[withCaptionPluginState]）。
+        SettingsSearchEntry("字幕", captionPage, CAPTION_PLUGIN_TARGET, "字幕 听障 老人 对话 实时字幕 插件"),
+        SettingsSearchEntry("桌面显示“字幕”图标", captionPage, CAPTION_PLUGIN_TARGET, "字幕 桌面图标 快捷方式"),
+        SettingsSearchEntry("后台浮窗", captionPage, CAPTION_PLUGIN_TARGET, "字幕 浮窗 后台 悬浮 其他应用"),
+        SettingsSearchEntry("自动保存字幕", captionPage, CAPTION_PLUGIN_TARGET, "字幕 保存 文件 记录 下载"),
+        SettingsSearchEntry("字幕只保留 3 天", captionPage, CAPTION_PLUGIN_TARGET, "字幕 记录 删除 三天 保留"),
+        SettingsSearchEntry("有人叫我名字时振动", captionPage, CAPTION_PLUGIN_TARGET, "字幕 名字 振动 提醒 叫我"),
         SettingsSearchEntry("在线语音", speech, SettingsRoutes.SpeechToText, "在线 插件 api 密钥 接口 联网 openai whisper 在线语音接口", section = "在线语音"),
         // 智能 › 手写
         SettingsSearchEntry("已安装的手写模型", handwriting, SettingsRoutes.Handwriting, "手写模型 公式 个人手写 下载 切换 删除"),
@@ -538,7 +556,8 @@ internal fun SettingsSearchField(query: String, onQueryChange: (String) -> Unit,
 
 @Composable
 internal fun SettingsSearchResults(query: String, onOpen: (SettingsSearchEntry) -> Unit) {
-    val results = searchSettings(query)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val results = withCaptionPluginState(searchSettings(query), com.kingzcheung.xime.ui.caption.CaptionPlugin.isActive(context))
     if (results.isEmpty()) {
         Text("没有找到「$query」相关的设置", style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))

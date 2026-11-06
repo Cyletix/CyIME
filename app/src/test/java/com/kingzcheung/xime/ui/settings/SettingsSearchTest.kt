@@ -157,6 +157,19 @@ class SettingsSearchTest {
         assertTrue("语音纠错" in titles("同音字"))
     }
 
+    /** 字幕是插件（11-05）：装着时搜到字幕插件页里的设置；没装时这些换成一条「字幕」去插件市场。 */
+    @Test fun captionSettingsFollowThePlugin() {
+        val found = searchSettings("字幕")
+        assertTrue(found.any { it.title == "自动保存字幕" && it.target == CAPTION_PLUGIN_TARGET })
+        assertEquals(found, withCaptionPluginState(found, captionActive = true))
+        val offered = withCaptionPluginState(found, captionActive = false)
+        assertTrue(offered.none { it.target == CAPTION_PLUGIN_TARGET })
+        assertEquals(1, offered.count { it.target == SettingsRoutes.MarketPlugins && it.title == "字幕" })
+        // 搜别的不受影响。
+        val other = searchSettings("繁体输出")
+        assertEquals(other, withCaptionPluginState(other, captionActive = false))
+    }
+
     /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */
     @Test fun everyAnchorExistsOnItsPage() {
         val dir = java.io.File("src/main/java/com/kingzcheung/xime/ui/settings")

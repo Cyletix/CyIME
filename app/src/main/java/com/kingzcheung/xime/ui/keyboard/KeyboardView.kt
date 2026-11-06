@@ -695,8 +695,9 @@ fun KeyboardView(
                     })
                     ToolbarButton.EDIT -> ({ viewModel.toggleOverlay(OverlayRoute.Edit) })
                     ToolbarButton.SETTINGS -> ({ callbacks.onSettings?.invoke(); viewModel.closeOverlay() })
-                    // 字幕是独立全屏页面，键盘随之收起，麦克风交给字幕页。
-                    ToolbarButton.CAPTION -> ({ viewModel.closeOverlay(); com.kingzcheung.xime.ui.caption.CaptionActivity.open(quickContext) })
+                    // 字幕是独立全屏页面，键盘随之收起，麦克风交给字幕页。没装「字幕」插件就不出现（排列页也不列）。
+                    ToolbarButton.CAPTION -> if (com.kingzcheung.xime.ui.caption.CaptionPlugin.isActive(quickContext))
+                        ({ viewModel.closeOverlay(); com.kingzcheung.xime.ui.caption.CaptionActivity.open(quickContext) }) else return null
                     ToolbarButton.ARRANGE -> ({ viewModel.showOverlay(OverlayRoute.ToolbarCustomize) })
                     // 布局手势开关只在适用的布局出现；排列页用同一规则（[quickAction] 为 null 即不列出）。
                     ToolbarButton.GLIDE, ToolbarButton.T9_FLICK, ToolbarButton.FOURTEEN_SWIPE,

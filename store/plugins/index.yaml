@@ -53,3 +53,14 @@ plugins:
     downloadUrl:
     - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/translate-0.1.0.xipk
       sha256: fe4f1877a396a79162d90dbb1a4f2a640df378ee1f4aafa3a6a825e75b19befc
+- id: com.kingzcheung.xime.plugin.caption
+  name: 字幕
+  description: 把身边的人说的话实时变成大字显示在屏幕上，还能分清是谁在说。装好后键盘菜单和下拉快捷开关里有「字幕」，桌面图标在本页打开。识别在手机上做，不联网。
+  pluginType: tool
+  appVersion: '>=1.15.63'
+  currentVersion: 0.1.0
+  versions:
+  - version: 0.1.0
+    downloadUrl:
+    - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/caption-0.1.0.xipk
+      sha256: 5dfdcd8dccf9ea8c6853fdb3f7091201015df9b341e78749a657719d883f14df

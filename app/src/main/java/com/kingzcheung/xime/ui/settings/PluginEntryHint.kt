@@ -14,6 +14,9 @@ import kotlinx.coroutines.withContext
  * 只给在键盘上有按钮的插件；按钮在哪就写哪。
  */
 internal fun pluginEntryHint(context: Context, info: PluginInfo?, enabled: Boolean): String? {
+    // 字幕插件用内置的「字幕」按钮，manifest 里没有按钮。
+    if (info?.id == com.kingzcheung.xime.ui.caption.CaptionPlugin.ID) return pluginEntryHintText("字幕",
+        if (enabled) SettingsPreferences.pluginButtonPlace(context, com.kingzcheung.xime.ui.caption.CaptionPlugin.BUTTON_ID) else null)
     val button = info?.toolbarButtons?.firstOrNull() ?: return null
     val place = if (enabled) SettingsPreferences.pluginButtonPlace(context, button.id) else null
     return pluginEntryHintText(button.label.ifBlank { info.name }, place)

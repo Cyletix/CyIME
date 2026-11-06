@@ -359,8 +359,13 @@ object SetupGuide {
         }
 
         input.captionIcon?.let { on ->
+            // 字幕是插件（11-05）：要用就先从随包目录装上（不联网），入口才出现；不用只关图标，插件不动。
+            if (on && !com.kingzcheung.xime.ui.caption.CaptionPlugin.install(app)) {
+                failed += "「字幕」插件没装上，可以在 设置 → 扩展 → 插件 里装。"
+                return@let
+            }
             runCatching { withContext(Dispatchers.Main) { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.setEnabled(app, on) } }
-                .onFailure { failed += "桌面「字幕」图标没改成，可以在 设置 → 语音转文本 → 字幕 里开关。" }
+                .onFailure { failed += "桌面「字幕」图标没改成，可以在 设置 → 扩展 → 插件 → 字幕 里开关。" }
         }
         return failed
     }

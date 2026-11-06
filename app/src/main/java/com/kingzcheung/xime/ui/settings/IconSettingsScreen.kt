@@ -64,9 +64,10 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
                     }, style = MaterialTheme.typography.bodySmall)
                     Text("桌面可能要过一会儿才刷新。三星等桌面每换一次图标会先移除再添加，图标可能跑到应用列表最后，要重新拖回原位。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    // 字幕的桌面图标开关在字幕那一组（和字幕的其他设置在一起），这里只指路，不放第二个开关。
-                    SettingsNote("字幕的桌面图标在「语音转文本 › 桌面显示“字幕”图标」。",
-                        jumps = listOf("语音转文本 › 桌面显示“字幕”图标"))
+                    // 字幕的桌面图标开关在字幕插件页（和字幕的其他设置在一起），这里只指路，不放第二个开关；没装字幕插件不提。
+                    if (com.kingzcheung.xime.ui.caption.CaptionPlugin.isActive(androidx.compose.ui.platform.LocalContext.current))
+                        SettingsNote("字幕的桌面图标在「字幕 › 桌面显示“字幕”图标」。",
+                            jumps = listOf("字幕 › 桌面显示“字幕”图标"))
                 }
             }
             // 跟随主题色时是固定的带底板图标，底板和样式不起作用，那两组就不显示。

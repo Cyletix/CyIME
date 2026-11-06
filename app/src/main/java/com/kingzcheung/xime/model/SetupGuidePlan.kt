@@ -337,7 +337,7 @@ object SetupGuidePlanner {
 
         val captionIcon = answers.caption.takeIf { facts.captionIconChangeable && it != facts.usesCaption }
         when (captionIcon) {
-            true -> lines += "桌面上加一个「字幕」图标(系统会问一次要不要添加)。"
+            true -> lines += "装上「字幕」插件，桌面上加一个「字幕」图标(系统会问一次要不要添加)。"
             false -> lines += "桌面上的「字幕」图标关掉(变灰后可长按移除)。"
             null -> {}
         }

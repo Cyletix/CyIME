@@ -439,7 +439,7 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
     GuideQuestion("要用「字幕」吗？", listOf(
         Triple(true, "用字幕", "$icon；键盘菜单里也能进。会留下分清谁在说话的模型$speaker"),
         Triple(false, "不用字幕", (if (facts.captionIconChangeable) "桌面上不放「字幕」图标(已有的会变灰，可长按移除)，" else "") +
-            "删掉分清谁在说话的模型。以后想用，在 设置 → 语音转文本 → 字幕 打开"),
+            "删掉分清谁在说话的模型。以后想用，在 设置 → 扩展 → 插件 里装「字幕」"),
     ), answers.caption, "setup-caption",
         note = "「字幕」是 CyIME 里单独的一个页面：把身边的人说的话实时变成大字显示在屏幕上，还能分清是谁在说。" +
             "适合开会、上课，或和听力不好的人当面说话。用不用都不影响打字和语音输入。") {

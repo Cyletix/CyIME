@@ -1,0 +1,26 @@
+# =============================================
+# CyIME Lua 插件元数据（宿主用 YAML 解析）
+# =============================================
+
+id: com.kingzcheung.xime.plugin.caption
+
+name: 字幕
+icon: "幕"
+description: 把身边的人说的话实时变成大字显示在屏幕上，还能分清是谁在说。装好后键盘菜单和下拉快捷开关里有「字幕」，桌面图标在本页打开。识别在手机上做，不联网。
+
+version: 0.1.0
+
+# tool：键盘菜单里的「字幕」按钮由宿主给（沿用内置的 caption 按钮，已放好的位置不变）
+type: tool
+activation: multi
+
+entry: main.lua
+
+# 宿主从这一版起按插件管字幕的入口
+minHostVersion: 1.15.63
+
+# 不联网：不声明任何域名
+
+capabilities:
+  # 字幕页面、识别、下拉快捷开关、桌面图标、通话字幕都在宿主里；装上并启用才出现入口
+  caption: true
