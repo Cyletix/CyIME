@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.asContextElement
 
 /**
  * 按键输入路由。
@@ -34,6 +35,9 @@ internal fun isUnicodeCodeInput(input: String) =
 internal fun isUnicodeCodeWithDigit(input: String) = isUnicodeCodeInput(input) && input.any { it in '0'..'9' }
 
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
+    // Tag only the queued keys from one glide; ordinary typing still publishes every result.
+    private var submittingGlide = false
+    private val glideBatch = ThreadLocal<Boolean>()
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
     private val hardwareNavigation = HardwareCandidateNavigation()
     private val hardwareSelectionRevision = androidx.compose.runtime.mutableIntStateOf(0)
@@ -556,6 +560,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         result: com.kingzcheung.xime.rime.RimeProcessResult,
         afterUpdate: (suspend () -> Unit)? = null,
     ) {
+        if (glideBatch.get() == true) return
         // 日语罗马音的显示归一化收口在 updateUIWithResult（刷新路径同样生效），此处不再单独加工
         val transformed = service.candidateTransform.transformFor(result)
         KeyLatencyProbe.posted(result.inputText.length)
@@ -690,15 +695,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 英文滑行实时预览：手指还没抬起时，按和 [commitGlideWord] 同一套上下文规则算出“现在抬手会上屏什么”。
      * 一笔滑行只在开头读一次光标前的文字，返回的函数不再碰输入框，可在后台线程调用。
      */
-    internal fun glidePreviewer(): ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> String)? {
+    internal fun glidePreviewer(): ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> com.kingzcheung.xime.ui.keyboard.GlideEnglishPreview)? {
         if (!service.uiState.value.isAsciiMode) return null
         val state = service.candidateState.value
         val textBefore = runCatching { service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString() }.getOrNull().orEmpty()
         val previous = previousGlide(state, textBefore, service.supportsEnglishCandidateReplace())
         val before = com.kingzcheung.xime.glide.glideContextWord(if (previous != null) textBefore.dropLast(previous.text.length) else textBefore)
         return { candidates, case ->
-            com.kingzcheung.xime.glide.planGlideCommit(candidates, case, previous, before,
-                com.kingzcheung.xime.glide.GlideLexicon.loadedBigrams(), com.kingzcheung.xime.glide.GlideLexicon.loadedContractions()).preview
+            val plan = com.kingzcheung.xime.glide.planGlideCommit(candidates, case, previous, before,
+                com.kingzcheung.xime.glide.GlideLexicon.loadedBigrams(), com.kingzcheung.xime.glide.GlideLexicon.loadedContractions())
+            com.kingzcheung.xime.ui.keyboard.GlideEnglishPreview(
+                com.kingzcheung.xime.glide.glideCommitText(plan.word, textBefore.lastOrNull()),
+                listOf(plan.word) + plan.alternatives)
         }
     }
 
@@ -706,11 +714,38 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 中文滑行：一个词的编码按点按同一路径逐键送进 Rime，已打的拼音、分段选词、邻键纠错和候选刷新都不变。
      * 接在未上屏的编码后面时先补音节分隔符（xi 后面划 an 是 xi'an，不会并成 xian）。
      */
-    internal fun typeGlideCode(code: String) {
-        if (code.isEmpty() || hasPendingCandidateCommit) return
+    internal fun typeGlideCode(code: String, previewToken: Long?) {
+        if (code.isEmpty() || hasPendingCandidateCommit) {
+            previewToken?.let { service.finishGlidePreview(it, false) }
+            return
+        }
         val input = service.candidateState.value.inputText
-        if (input.isNotEmpty() && input.last() != '\'') handleKeyPress("'", false)
-        code.forEach { handleKeyPress(it.toString(), false) }
+        submittingGlide = previewToken != null
+        try {
+            if (input.isNotEmpty() && input.last() != '\'') handleKeyPress("'", false)
+            code.forEach { handleKeyPress(it.toString(), false) }
+        } finally {
+            submittingGlide = false
+        }
+        // The FIFO barrier reads the final engine state after all of the glide's normal key events.
+        if (previewToken != null) postRimeJob("glide_finish") {
+            try {
+                val result = service.rimeEngine.readQueuedResult()
+                val transformed = result?.let { service.candidateTransform.transformFor(it) }
+                withEditor {
+                    if (result != null && service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) {
+                        service.sessionController.updateUIWithResult(
+                            transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
+                            transformed?.actions ?: emptyList(),
+                            updateInputBoxComposition = service.isGlidePreviewHeld(previewToken),
+                        )
+                        service.finishGlidePreview(previewToken, true)
+                    } else service.finishGlidePreview(previewToken, false)
+                }
+            } finally {
+                withContext(Dispatchers.Main) { service.finishGlidePreview(previewToken, false) }
+            }
+        }
     }
 
     /**
@@ -947,7 +982,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             else -> "key"
         }
         if (latencyKind == "letter" && hardwareEvent == null) KeyLatencyProbe.fired(service.uiState.value.inputProfile.layout.id)
-        service.inputCommands.submit(InputCommandOwner.requireOwner().context(), kind = latencyKind) command@{
+        val inputContext = InputCommandOwner.requireOwner().context()
+        val commandContext = if (submittingGlide) inputContext + glideBatch.asContextElement(true) else inputContext
+        service.inputCommands.submit(commandContext, kind = latencyKind) command@{
             KeyLatencyProbe.started()
             InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command

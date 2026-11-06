@@ -192,7 +192,7 @@ data class KeyboardInputPreferences(
     val glideTyping: Boolean = false,
     /** 中文全拼、双拼 26 键滑行输入，与英文分开、默认关（用户 10-31：开着英文滑行的老用户不能被带着开）。 */
     val chineseGlideTyping: Boolean = false,
-    /** 滑行时在手指上方实时显示现在抬手会出的词；滑动中反复识别，多占 CPU，默认关（别的用户 11-02 提的，同 Gboard）。 */
+    /** 滑行时在输入框实时显示识别结果；滑动中反复识别，多占 CPU，默认关。 */
     val glidePreview: Boolean = false,
     /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
     val letterLongPressMenu: Boolean = false,
