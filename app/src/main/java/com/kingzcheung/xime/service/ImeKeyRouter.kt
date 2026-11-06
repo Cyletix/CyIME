@@ -56,6 +56,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             shift -> EnterKeyAction.shiftEnter(options, type, terminal)
             else -> EnterKeyAction.enter(options, type, terminal)
         }
+        // Ctrl+回车在没声明动作的框里执行「发送」；有的应用不理这个动作，见 [sendWithFallback]。
+        if (ctrl && !terminal && plan == EnterKeyAction.EditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_SEND))
+            return sendWithFallback(ic, info?.packageName)
         when (plan) {
             is EnterKeyAction.EditorAction -> ic.performEditorAction(plan.action)
             EnterKeyAction.Newline -> ic.commitText("\n", 1)
@@ -65,6 +68,35 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             EnterKeyAction.ShiftEnterKey -> com.kingzcheung.xime.keyboard.CtrlShortcuts.shiftEnterKeyEvents(
                 android.os.SystemClock.uptimeMillis()).forEach(ic::sendKeyEvent)
         }
+    }
+
+    /**
+     * Ctrl+回车发送：先执行「发送」动作（QQ、TIM、微信认这个，11-04 实测）。过一会儿输入框没变，说明应用没接这个动作
+     * （用户 11-05：Claude 里 Ctrl+回车发不出去；Compose 写的输入框没设 onSend 时「发送」动作什么都不做），
+     * 就补发一次回车键：这类应用一般把实体键盘的回车当发送。补发后输入框只是多了一个换行（应用不拿回车发送），
+     * 把这个换行删掉，Ctrl+回车不在里面留东西。空框不补发；输入框换了、内容被应用改了都当已经发出。
+     */
+    private fun sendWithFallback(ic: android.view.inputmethod.InputConnection, pkg: String?) {
+        val before = CtrlEnterSend.snapshot(ic)
+        ic.performEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_SEND)
+        if (before == null || before.isEmpty) return
+        service.mainHandler.postDelayed({
+            if (service.currentInputConnection !== ic) return@postDelayed
+            if (CtrlEnterSend.outcome(before, CtrlEnterSend.snapshot(ic)) != CtrlEnterSend.Outcome.UNCHANGED) return@postDelayed
+            service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            service.mainHandler.postDelayed({
+                if (service.currentInputConnection !== ic) return@postDelayed
+                when (CtrlEnterSend.outcome(before, CtrlEnterSend.snapshot(ic))) {
+                    CtrlEnterSend.Outcome.NEWLINE_ADDED -> {
+                        ic.deleteSurroundingText(1, 0)
+                        FileLogger.w(XimeInputMethodService.TAG, "Ctrl+Enter: $pkg takes neither send action nor Enter key")
+                    }
+                    CtrlEnterSend.Outcome.UNCHANGED ->
+                        FileLogger.w(XimeInputMethodService.TAG, "Ctrl+Enter: $pkg ignored send action and Enter key")
+                    else -> Unit
+                }
+            }, CtrlEnterSend.SETTLE_MS)
+        }, CtrlEnterSend.SETTLE_MS)
     }
 
     /** Literal field input bypasses the decoder, calculator, learning and candidate snapshots. */
