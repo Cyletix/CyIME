@@ -2,6 +2,7 @@
 #include "candidate_pins.h"
 #include "basic_particle_choices.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <map>
@@ -253,6 +254,42 @@ class PolicyTranslation : public Translation {
         return !p || !p->language() || p->language()->name().rfind("user_cyime_cells_en", 0) != 0;
       });
       if (chinese != head_.begin() && chinese != head_.end()) std::rotate(head_.begin(), chinese, chinese + 1);
+    }
+    // A corrected whole word goes first when it is far more common than the typed reading's word (2026-11-05,
+    // replacing the 10-21 rule that kept the typed reading first: fandu gave 贩毒 before 单独). The corrected word's
+    // own frequency (its weight without the log 0.01 correction penalty per corrected syllable) must be at least
+    // 50 times the typed word's; a typed reading that is a sentence keeps its place (promoting over sentences
+    // changed 35 of 3158 correctly typed comment clauses, 牛逼 → 就比), and so does a typed word read mostly
+    // through initials (ld 老大, not 了; wyjyx 我研究一下, not 网易邮箱). A slip often leaves one letter read as an
+    // initial, so a word with at least half of its letters fully spelled still counts as typed out. A single
+    // syllable keeps its typed character: one slipped letter there is a different syllable (ga 尬, not 他; ao 奥, not 我;
+    // den 扽, not 人, though 的呢 read as de + n comes first here and only cyime_single_syllable moves it down).
+    if (!numeric && head_.size() >= 2) {
+      auto corrections = [](const an<Phrase>& p) {
+        const auto marks = p->correction_marks();
+        return static_cast<int>(std::count(marks.begin(), marks.end(), '='));
+      };
+      const bool syllable = std::any_of(head_.begin(), head_.end(), [&](const auto& c) {
+        const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+        return p && p->end() == end_ && HanCharacters(p->text()).size() == 1 && corrections(p) == 0;
+      });
+      const auto top = As<Phrase>(Candidate::GetGenuineCandidate(head_.front()));
+      if (!syllable && top && !As<Sentence>(top) && top->end() == end_ && HanCharacters(top->text()).size() >= 2 &&
+          SpellingCoverage(top) >= 0.5) {
+        const auto limit = head_.begin() + std::min<size_t>(5, head_.size());
+        int count = 0;
+        const auto corrected = std::find_if(head_.begin() + 1, limit, [&](const auto& c) {
+          const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+          return p && !As<Sentence>(p) && p->end() == end_ && !HanCharacters(p->text()).empty() &&
+                 (count = corrections(p)) > 0;
+        });
+        static const double kPenalty = std::log(100.0), kMargin = std::log(50.0);
+        if (corrected != limit && corrections(top) == 0) {
+          const auto p = As<Phrase>(Candidate::GetGenuineCandidate(*corrected));
+          if (p->weight() + count * kPenalty >= top->weight() + kMargin)
+            std::rotate(head_.begin(), corrected, corrected + 1);
+        }
+      }
     }
     size_t inserted = 0;
     if (omission && head_.size() >= 2) {

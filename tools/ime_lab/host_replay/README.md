@@ -161,3 +161,9 @@ written into `rime_ice.custom.yaml` (the probe writes and deploys it). A first w
 must stay first with the groups on, and ne/neng must still offer 了/冷 in the first three. 2026-11-05: 1.15.63
 loses 88 of 412 (ne → 了, neng → 冷, si → 是, zong → 中); with the fix 411 of 411 stay, and the first words
 without fuzzy pinyin are the same as 1.15.58's for all 413 syllables.
+
+`CorrectionFirstProbe.java` (library dir, a deployed `rime_ice` user directory, the neighbour map) checks the
+2026-11-05 rule after the pause: a corrected whole word goes first when it is 50 times more common than the typed
+reading's word (chengong → 成功), not below that (jinian → 几年, aniu → 阿牛), and a typed reading that is a
+sentence keeps first place (jiucup → 就粗平), and a single syllable keeps its typed character (ao → 奥, den → 扽).
+Must-pass words included.
