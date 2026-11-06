@@ -262,8 +262,9 @@ object SettingsPreferences {
     }
 
     private const val KEY_MENU_BUTTONS = "menu_buttons"
+    private const val KEY_SETTINGS_VISIBILITY_CUSTOMIZED = "quick_actions_settings_visibility_customized"
 
-    /** 菜单与工具栏共用一组入口；读出时去掉已在工具栏上的项，并保证“设置”可达。 */
+    /** 菜单与工具栏共用一组入口；读出时去掉已在工具栏上的项。 */
     fun getMenuButtons(context: Context): List<String> {
         val toolbar = getToolbarButtons(context)
         restoreFullShapeMenuItemOnce(context, toolbar)
@@ -280,7 +281,12 @@ object SettingsPreferences {
         val raw = getPrefs(context).getString(KEY_MENU_BUTTONS, null)
         val menu = raw?.split(",")?.filter { it.isNotEmpty() }
             ?: com.kingzcheung.xime.keyboard.QuickActionLayout.defaultMenu(toolbar)
-        return com.kingzcheung.xime.keyboard.QuickActionLayout.normalize(toolbar, menu).menu
+        val normalized = com.kingzcheung.xime.keyboard.QuickActionLayout.normalize(toolbar, menu)
+        val settings = com.kingzcheung.xime.keyboard.ToolbarButton.SETTINGS.id
+        // Old saved layouts relied on normalization to add Settings. Preserve that
+        // behavior until the user explicitly saves a layout with visibility controls.
+        return if (!getPrefs(context).getBoolean(KEY_SETTINGS_VISIBILITY_CUSTOMIZED, false) &&
+            settings !in normalized.toolbar && settings !in normalized.menu) normalized.menu + settings else normalized.menu
     }
 
     /**
@@ -377,6 +383,7 @@ object SettingsPreferences {
         getPrefs(context).edit()
             .putString(KEY_TOOLBAR_BUTTONS, com.kingzcheung.xime.keyboard.ToolbarButton.normalizeIds(layout.toolbar).joinToString(","))
             .putString(KEY_MENU_BUTTONS, layout.menu.joinToString(","))
+            .putBoolean(KEY_SETTINGS_VISIBILITY_CUSTOMIZED, true)
             .apply()
     }
 
