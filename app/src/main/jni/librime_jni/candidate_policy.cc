@@ -171,6 +171,16 @@ class PolicyTranslation : public Translation {
       if (p && (!best_sentence || p->weight() > best_sentence->weight())) best_sentence = p;
     }
     const auto best_ends = best_sentence ? SyllableEnds(best_sentence) : std::vector<size_t>();
+    // 26 keys: after the whole-input words, the shorter words that break the input where the first one does come
+    // before those that read its syllables another way (2026-11-06, kejishuip: 科技 and 客机 before 科技社会, which
+    // reads shui as s + hui, and 科技树, which stops inside shui). Both stay; only their order changes.
+    std::vector<size_t> whole_ends;
+    if (!numeric) {
+      for (const auto& c : head_) {
+        const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+        if (p && p->end() == end_ && !HanCharacters(p->text()).empty()) { whole_ends = SyllableEnds(p); break; }
+      }
+    }
     for (size_t i = 0; i < head_.size(); ++i) {
       const auto p = As<Phrase>(Candidate::GetGenuineCandidate(head_[i]));
       if (!p || HanCharacters(p->text()).empty()) continue;
@@ -183,6 +193,13 @@ class PolicyTranslation : public Translation {
       if (numeric && As<Sentence>(p) && !best_ends.empty() && SyllableEnds(p) != best_ends &&
           !SameLastWord(p, best_sentence))
         group = 2;
+      if (group == 1 && !whole_ends.empty()) {
+        const auto ends = SyllableEnds(p);
+        if (ends.empty() || std::any_of(ends.begin(), ends.end(), [&](size_t e) {
+              return std::find(whole_ends.begin(), whole_ends.end(), e) == whole_ends.end();
+            }))
+          group = 2;
+      }
       slots.push_back(i);
       ranked.push_back({head_[i], group, numeric ? SpellingCoverage(p) : 0.0});
     }

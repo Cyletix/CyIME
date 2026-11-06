@@ -166,4 +166,5 @@ without fuzzy pinyin are the same as 1.15.58's for all 413 syllables.
 2026-11-05 rule after the pause: a corrected whole word goes first when it is 50 times more common than the typed
 reading's word (chengong → 成功), not below that (jinian → 几年, aniu → 阿牛), and a typed reading that is a
 sentence keeps first place (jiucup → 就粗平), and a single syllable keeps its typed character (ao → 奥, den → 扽).
-Must-pass words included.
+Must-pass words included. It also checks that a shorter word breaking
+the input where the first word does comes second (kejishuip → 科技水平, 科技).

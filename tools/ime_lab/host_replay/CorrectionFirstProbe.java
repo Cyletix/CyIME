@@ -32,6 +32,16 @@ public class CorrectionFirstProbe {
           {"shangshigongsi", "上市公司", "must-pass"},
           {"bangwonagekuaidi", "帮我拿个快递", "must-pass"},
       };
+      // Shorter words that break the input where the first word does come right after it (2026-11-06).
+      String[][] second = {{"kejishuip", "科技"}, {"womenzoub", "我们走"}};
+      for (String[] c : second) {
+        for (char ch : c[0].toCharArray()) engine.nativeProcessKey(ch, 0);
+        engine.nativeRefineOmission();
+        String[][] rows = engine.nativeInspectCandidates(2);
+        engine.nativeProcessKey(0xff1b, 0);
+        System.out.println(c[0] + " second => " + (rows.length > 1 ? rows[1][0] : "-"));
+        if (rows.length < 2 || !rows[1][0].equals(c[1])) failures.add(c[0] + " second should be " + c[1]);
+      }
       for (String[] c : cases) {
         for (char ch : c[0].toCharArray()) engine.nativeProcessKey(ch, 0);
         engine.nativeRefineOmission();
