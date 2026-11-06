@@ -45,27 +45,22 @@ class VoiceAudioFocusTest {
         verify(audio, never()).setStreamVolume(any(), any(), any())
     }
 
-    @Test fun eachModeAsksForItsOwnFocusAndGivesItBack() {
-        for ((mode, gain) in listOf(VoiceOtherAudio.DUCK to AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
-                VoiceOtherAudio.PAUSE to AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)) {
-            reset(audio)
-            whenever(audio.isMusicActive).thenReturn(true)
-            focusAnswers(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-            SettingsPreferences.setSttOtherAudio(app, mode)
-            val focus = VoiceAudioFocus(context)
-            val owner = Any()
-            focus.acquire(owner)
-            val request = argumentCaptor<AudioFocusRequest>()
-            verify(audio).requestAudioFocus(request.capture())
-            assertEquals(mode.name, gain, request.firstValue.focusGain)
-            verify(audio, never()).abandonAudioFocusRequest(any())
-            focus.release(owner)
-            verify(audio).abandonAudioFocusRequest(request.firstValue)
-            focus.release(owner)
-            verify(audio, times(1)).abandonAudioFocusRequest(any())
-            verify(audio, never()).adjustStreamVolume(any(), any(), any())
-            verify(audio, never()).setStreamVolume(any(), any(), any())
-        }
+    @Test fun pauseAsksForExclusiveFocusAndGivesItBack() {
+        SettingsPreferences.setSttOtherAudio(app, VoiceOtherAudio.PAUSE)
+        focusAnswers(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        val focus = VoiceAudioFocus(context)
+        val owner = Any()
+        focus.acquire(owner)
+        val request = argumentCaptor<AudioFocusRequest>()
+        verify(audio).requestAudioFocus(request.capture())
+        assertEquals(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE, request.firstValue.focusGain)
+        verify(audio, never()).abandonAudioFocusRequest(any())
+        focus.release(owner)
+        verify(audio).abandonAudioFocusRequest(request.firstValue)
+        focus.release(owner)
+        verify(audio, times(1)).abandonAudioFocusRequest(any())
+        verify(audio, never()).adjustStreamVolume(any(), any(), any())
+        verify(audio, never()).setStreamVolume(any(), any(), any())
     }
 
     @Test fun overlappingSessionsRestoreAfterTheLastOne() {
@@ -96,9 +91,10 @@ class VoiceAudioFocusTest {
         assertFalse(SettingsPreferences.isSttMusicMutedByVoice(app))
     }
 
-    @Test fun refusedDuckLowersVolumeAndRestoresIt() {
+    /** 用户 11-06：靠系统压低（可压低焦点）实测没用，压低音量改为直接调低媒体音量，不再申请焦点。 */
+    @Test fun duckLowersMediaVolumeItselfAndRestoresIt() {
         SettingsPreferences.setSttOtherAudio(app, VoiceOtherAudio.DUCK)
-        focusAnswers(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        focusAnswers(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
         whenever(audio.getStreamVolume(AudioManager.STREAM_MUSIC)).thenReturn(10)
         val focus = VoiceAudioFocus(context)
         val owner = Any()
@@ -109,12 +105,28 @@ class VoiceAudioFocusTest {
         focus.release(owner)
         verify(audio).setStreamVolume(AudioManager.STREAM_MUSIC, 10, 0)
         assertEquals(-1, SettingsPreferences.getSttMusicVolumeBeforeVoice(app))
+        verify(audio, never()).requestAudioFocus(any<AudioFocusRequest>())
+        verify(audio, never()).abandonAudioFocusRequest(any())
         verify(audio, never()).adjustStreamVolume(any(), any(), any())
+    }
+
+    @Test fun duckLeavesMutedOrFixedVolumeAlone() {
+        SettingsPreferences.setSttOtherAudio(app, VoiceOtherAudio.DUCK)
+        whenever(audio.getStreamVolume(AudioManager.STREAM_MUSIC)).thenReturn(10)
+        whenever(audio.isStreamMute(AudioManager.STREAM_MUSIC)).thenReturn(true)
+        val focus = VoiceAudioFocus(context)
+        val owner = Any()
+        focus.acquire(owner)
+        focus.release(owner)
+        whenever(audio.isStreamMute(AudioManager.STREAM_MUSIC)).thenReturn(false)
+        whenever(audio.isVolumeFixed).thenReturn(true)
+        focus.acquire(owner)
+        focus.release(owner)
+        verify(audio, never()).setStreamVolume(any(), any(), any())
     }
 
     @Test fun volumeTheUserChangedWhileTalkingIsKept() {
         SettingsPreferences.setSttOtherAudio(app, VoiceOtherAudio.DUCK)
-        focusAnswers(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
         whenever(audio.getStreamVolume(AudioManager.STREAM_MUSIC)).thenReturn(10)
         val focus = VoiceAudioFocus(context)
         val owner = Any()

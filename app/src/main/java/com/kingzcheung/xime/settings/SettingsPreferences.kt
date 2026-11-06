@@ -1067,7 +1067,7 @@ object SettingsPreferences {
         if (muted) editor.commit() else editor.apply()
     }
 
-    /** VoiceAudioFocus 退回手动压低媒体音量时记下原音量（-1 表示没压），用途同上。 */
+    /** VoiceAudioFocus 压低媒体音量时记下原音量（-1 表示没压），用途同上。 */
     internal fun getSttMusicVolumeBeforeVoice(context: Context): Int =
         getPrefs(context).getInt(KEY_STT_MUSIC_VOLUME_BEFORE_VOICE, -1)
 
