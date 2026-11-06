@@ -429,11 +429,11 @@ fun CandidateBar(
             .glassTextHalo(textSurface?.halo),
         verticalArrangement = Arrangement.Center,
     ) {
-        if (showPreedit && !previewPrefs.preeditInsideKeyboard) {
+        PreeditBubbleHost(showPreedit && !previewPrefs.preeditInsideKeyboard) { hidden ->
             PreeditPreview(preeditText, protectedVisuals, onEditPreedit,
                 preeditBubbleColor(themeSurface, visuals.preeditBackgroundColor,
                     blurBehind = glass.enabled && glass.normalized().blurRadiusDp >= 1f,
-                    opacity = previewPrefs.preeditBubbleOpacity))
+                    opacity = previewPrefs.preeditBubbleOpacity), hidden)
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
@@ -1170,7 +1170,9 @@ private fun Modifier.glassStripBoost(alpha: Float): Modifier {
 
 /** 非聚焦窗口提供真实触控区域，点击编码不会抢走宿主编辑框焦点。 */
 @Composable
-private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?, bubbleColor: Color) {
+private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?, bubbleColor: Color,
+    /** 编码刚清空、窗口还没拆：气泡画成全透明，不能点，也不再垫模糊（见 [PreeditBubbleHost]）。 */
+    hidden: Boolean = false) {
     val density = LocalDensity.current
     // 放大后的候选栏里 dp 变大了，按屏宽限宽要换回同样的像素宽度。
     val screenWidth = (LocalConfiguration.current.screenWidthDp / LocalCandidateBarScale.current).dp
@@ -1178,7 +1180,8 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val gap = with(density) { 2.dp.roundToPx() }
     val rotation = LocalFloatingKeyboardRotation.current
     if (isFloatingRotated(rotation)) {
-        RotatedPreeditPreview(text, visuals, onEdit, rotation, gap, screenWidth, bubbleColor)
+        RotatedPreeditPreview(text, visuals, onEdit.takeUnless { hidden }, rotation, gap, screenWidth, bubbleColor,
+            if (hidden) HiddenPreeditBubble else Modifier)
         return
     }
     // 气泡在键盘外面（上方），键盘的玻璃模糊盖不到它：开玻璃时给气泡单独垫一块同样的实时模糊（用户反馈 10-31
@@ -1202,7 +1205,7 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         }
     }
     val glass = LocalKeyboardInputPreferences.current.frostedGlass.normalized()
-    if (glass.enabled && glass.blurRadiusDp >= 1f) {
+    if (!hidden && glass.enabled && glass.blurRadiusDp >= 1f) {
         // 气泡内容最少 44dp 高、上下各留 6dp，真正的底色块在中间，圆角 4dp（见下面 PreeditLabel）。
         val inset = with(density) { 6.dp.roundToPx() }
         PreeditBubbleBlur(bubbleBounds.value?.let { IntRect(it.left, it.top + inset, it.right, it.bottom - inset) },
@@ -1211,11 +1214,35 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     Popup(popupPositionProvider = positionProvider,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = true)) {
-        PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
-            .heightIn(min = 44.dp).padding(vertical = 6.dp),
+        PreeditLabel(text, visuals, onEdit.takeUnless { hidden }, Modifier.widthIn(max = screenWidth - 16.dp)
+            .heightIn(min = 44.dp).padding(vertical = 6.dp).then(if (hidden) HiddenPreeditBubble else Modifier),
             solidBackground = bubbleColor, maxLines = PREEDIT_BUBBLE_MAX_LINES)
     }
 }
+
+/**
+ * 拼音气泡是单独的 Popup 小窗口。窗口一拆，系统会拿它最后一帧放退出动画：先往下沉一小段，约半秒才没
+ * （用户 11-06 转来的反馈）。编码清空时先把气泡画成全透明，等这几帧画面真正送上屏再拆窗口，
+ * 退出动画播的就是空白，看上去当场消失。重新打字时窗口还在就直接接着用。位置、底色、不透明度都不变。
+ */
+@Composable
+private fun PreeditBubbleHost(visible: Boolean, bubble: @Composable (hidden: Boolean) -> Unit) {
+    var windowOpen by remember { mutableStateOf(false) }
+    SideEffect { if (visible) windowOpen = true }
+    LaunchedEffect(visible) {
+        if (!visible && windowOpen) {
+            repeat(PREEDIT_BUBBLE_CLEAR_FRAMES) { androidx.compose.runtime.withFrameNanos { } }
+            windowOpen = false
+        }
+    }
+    if (visible || windowOpen) bubble(!visible)
+}
+
+/** 气泡清空后再画几帧透明的才拆窗口：一帧排版绘制，其余留给合成器把这张空白画面换上屏。 */
+private const val PREEDIT_BUBBLE_CLEAR_FRAMES = 3
+
+/** 透明且没有语义节点：测试和无障碍都当气泡已经没了。 */
+private val HiddenPreeditBubble = Modifier.alpha(0f).clearAndSetSemantics {}
 
 /** 拼音气泡最多排几行；再长就在气泡里上下滚，始终露出光标所在的那行（没有光标时露出最后一行）。 */
 private const val PREEDIT_BUBBLE_MAX_LINES = 3
@@ -1261,7 +1288,8 @@ private fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadiu
  */
 @Composable
 private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?,
-    rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp, bubbleColor: Color) {
+    rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp, bubbleColor: Color,
+    labelModifier: Modifier = Modifier) {
     val labelSize = remember { IntArray(2) }
     val positionProvider = remember(rotation, gap) {
         object : PopupPositionProvider {
@@ -1291,7 +1319,7 @@ private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, on
             }
         }) {
             PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
-                .heightIn(min = 44.dp).padding(vertical = 6.dp),
+                .heightIn(min = 44.dp).padding(vertical = 6.dp).then(labelModifier),
                 solidBackground = bubbleColor, maxLines = PREEDIT_BUBBLE_MAX_LINES)
         }
     }
