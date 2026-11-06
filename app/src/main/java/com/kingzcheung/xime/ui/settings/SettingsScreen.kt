@@ -330,7 +330,6 @@ fun SettingsScreen(
                 onNavigateToLicenses = { navController.navigate(SettingsRoutes.Licenses) },
                 onNavigateToCredits = { navController.navigate(SettingsRoutes.Credits) },
                 onNavigateToLogViewer = { navController.navigate(SettingsRoutes.LogViewer) },
-                onNavigateToHandwritingCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) },
                 onNavigateToStorageSpace = { navController.navigate(SettingsRoutes.StorageSpace) }
             )
         }
@@ -356,7 +355,6 @@ fun SettingsScreen(
             HandwritingSettingsContent(onBack = { navController.popBackStack() },
                 onOpenModels = { navController.navigate(SettingsRoutes.ModelLocal) },
                 onOpenTraining = { navController.navigate(SettingsRoutes.HandwritingTraining) },
-                onOpenCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) },
                 onOpenContribute = { navController.navigate(SettingsRoutes.HandwritingContribute) })
         }
         composable(SettingsRoutes.HandwritingContribute) {
@@ -366,13 +364,13 @@ fun SettingsScreen(
             )
         }
         composable(SettingsRoutes.HandwritingTraining) {
+            val context = androidx.compose.ui.platform.LocalContext.current
             HandwritingTrainingScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable(SettingsRoutes.HandwritingCapture) {
-            HandwritingCaptureScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                // 上次停在贡献题就接着写贡献题
+                contribute = androidx.compose.runtime.remember {
+                    com.kingzcheung.xime.handwriting.training.HandwritingContribution.lastOpened(context)
+                },
             )
         }
         composable(SettingsRoutes.Privacy) {

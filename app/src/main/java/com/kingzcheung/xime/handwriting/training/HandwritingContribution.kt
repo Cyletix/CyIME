@@ -86,6 +86,14 @@ object HandwritingContribution {
 
     fun resetUploaded(context: Context) = setUploadedLines(context, 0)
 
+    /** 自用包里「手写训练」一页两用：记住上次停在贡献题还是训练题库，下次进来接着写。 */
+    fun lastOpened(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("last_opened", false)
+
+    fun setLastOpened(context: Context, contribute: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("last_opened", contribute).apply()
+    }
+
     /** 上传结果：[count] 是这次传了几条；没有新样本时为 0。 */
     data class UploadResult(val count: Int)
 

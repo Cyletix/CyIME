@@ -78,7 +78,7 @@ internal fun handwritingLanguageHint(language: InputLanguage, useTemplates: Bool
     // 手写训练页只在自用测试包里有，公开包不指向它。
     language == InputLanguage.JAPANESE && missingKana ->
         if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
-            "日语 · 假名模板没读到，去 设置 → 手写训练模式 导入样本备份" else "日语 · 假名模板没读到"
+            "日语 · 假名模板没读到，去 设置 → 手写训练 导入样本备份" else "日语 · 假名模板没读到"
     else -> language.displayName
 }
 

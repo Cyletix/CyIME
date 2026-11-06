@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.IosShare
@@ -45,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -54,9 +56,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,6 +140,21 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 private const val TRAINING_TAG = "HandwritingTraining"
+
+/** 「自己的文字」：一段话按出现顺序去重、去掉空白，每个字一题。汉字按中文汉字出题（同样做识别检查），其余按自定义题。 */
+internal fun textPrompts(text: String): List<TrainingPrompt> {
+    val seen = LinkedHashSet<String>()
+    var i = 0
+    while (i < text.length) {
+        val cp = text.codePointAt(i)
+        i += Character.charCount(cp)
+        if (!Character.isWhitespace(cp) && !Character.isSpaceChar(cp)) seen += String(Character.toChars(cp))
+    }
+    return seen.map { ch ->
+        val han = Character.UnicodeScript.of(ch.codePointAt(0)) == Character.UnicodeScript.HAN
+        TrainingPrompt("text:$ch", if (han) TrainingPromptType.Chinese else TrainingPromptType.Custom, ch, source = "text")
+    }
+}
 
 private fun TrainingBank.isExternal() =
     this == TrainingBank.MathFormula || this == TrainingBank.Japanese || this == TrainingBank.English ||
@@ -253,6 +272,7 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
         TrainingBank.RandomFormula -> randomFormulas
         TrainingBank.ImportedFormula -> formulaBank
         TrainingBank.Contribute -> contributePrompts
+        TrainingBank.Text -> textPrompts(store.textBank)
     }
 
     private val randomFormulas by lazy { FormulaGenerator.prompts() }
@@ -319,6 +339,35 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
             return
         }
         _state.update { it.copy(custom = BuiltinTrainingPrompts.custom(value)) }
+    }
+
+    /** 「自己的文字」：换成这段话，从第一个字写起。 */
+    fun setText(text: String) {
+        val value = text.trim()
+        if (textPrompts(value).isEmpty()) {
+            _events.tryEmit(TrainingEvent.Message("先粘贴或输入一段话"))
+            return
+        }
+        store.textBank = value
+        store.setPosition(TrainingBank.Text, 0)
+        selectBank(TrainingBank.Text)
+    }
+
+    /** 「自己的文字」：清掉这段话，重新填（已写的样本不删）。 */
+    fun clearText() {
+        store.textBank = ""
+        store.setPosition(TrainingBank.Text, 0)
+        selectBank(TrainingBank.Text)
+    }
+
+    /** 删掉当前这题已写的全部样本（「自己的文字」里写坏了重来）。 */
+    fun removeCurrentSamples() {
+        val prompt = _state.value.current ?: return
+        viewModelScope.launch {
+            val removed = withContext(Dispatchers.IO) { store.removeSamples(prompt.id) }
+            _state.update { it.copy(counts = it.counts - prompt.id) }
+            _events.emit(TrainingEvent.Message(if (removed == 0) "这个字还没有样本" else "已删除「${prompt.label}」的 $removed 个样本"))
+        }
     }
 
     /** 保存当前题样本并前进；strokes 为空时不保存。 */
@@ -628,10 +677,48 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
 }
 
 /**
- * 手写训练模式（数据收集）：顶部出题，下方全屏画板，按“下一题”保存当前笔迹。
+ * 手写训练（数据收集）：顶部出题，下方全屏画板，按“下一题”保存当前笔迹。
+ *
+ * 训练和贡献共用这一页（用户 11-05：两个一样的界面不要分两个入口）。公开包只有「贡献手写样本」；
+ * 自用包和调试包的题库菜单里既有训练题库，也有「贡献手写样本」。两边样本仍分开存：
+ * 贡献的另存一处、可上传、不改本机手写模板；训练的照旧边写边学、可导入题库和备份。
+ * [devTools] 为 false 时不出题库菜单，只能写贡献题。
  */
 @Composable
-fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
+fun HandwritingTrainingScreen(
+    onBack: () -> Unit,
+    contribute: Boolean = false,
+    devTools: Boolean = BuildConfig.DEV_TOOLS || BuildConfig.DEBUG,
+) {
+    val context = LocalContext.current
+    var contributeMode by rememberSaveable { mutableStateOf(contribute) }
+    // 从贡献切到某个训练题库时，训练那边进来先选这个题库
+    var requestedBank by remember { mutableStateOf<TrainingBank?>(null) }
+    // 切换时整页重建：画板清空，各用各的 ViewModel 和样本
+    key(contributeMode) {
+        HandwritingTrainingBody(
+            onBack = onBack,
+            contribute = contributeMode,
+            bankMenu = devTools || !contributeMode,
+            requestedBank = requestedBank,
+            onSwitch = { bank ->
+                val toContribute = bank == TrainingBank.Contribute
+                requestedBank = if (toContribute) null else bank
+                contributeMode = toContribute
+                HandwritingContribution.setLastOpened(context, toContribute)
+            },
+        )
+    }
+}
+
+@Composable
+private fun HandwritingTrainingBody(
+    onBack: () -> Unit,
+    contribute: Boolean,
+    bankMenu: Boolean,
+    requestedBank: TrainingBank?,
+    onSwitch: (TrainingBank) -> Unit,
+) {
     val context = LocalContext.current
     val app = context.applicationContext as android.app.Application
     val viewModel: HandwritingTrainingViewModel = viewModel(
@@ -639,10 +726,13 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
         factory = viewModelFactory { initializer { HandwritingTrainingViewModel(app, contribute) } },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(requestedBank) { if (!contribute) requestedBank?.let { viewModel.selectBank(it) } }
     val snackbarHostState = remember { SnackbarHostState() }
-    var bankMenu by remember { mutableStateOf(false) }
+    var bankMenuOpen by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    // 「自己的文字」还没填时，题目区的输入框内容
+    var textDraft by rememberSaveable { mutableStateOf("") }
     // 贡献样本：第一次分享或上传前先同意用途；同意后接着做刚才点的那件事
     var consentFor by remember { mutableStateOf<(() -> Unit)?>(null) }
     fun withConsent(action: () -> Unit) {
@@ -737,20 +827,33 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出")
                 }
-                if (contribute) Text(TrainingBank.Contribute.title, fontSize = 16.sp)
+                if (!bankMenu) Text(TrainingBank.Contribute.title, fontSize = 16.sp)
                 else Box {
-                    TextButton(onClick = { bankMenu = true }) {
-                        Text(state.bank.title, fontSize = 16.sp)
+                    TextButton(onClick = { bankMenuOpen = true }) {
+                        Text(if (contribute) TrainingBank.Contribute.title else state.bank.title, fontSize = 16.sp)
                         Icon(Icons.Filled.ArrowDropDown, contentDescription = "切换题库")
                     }
-                    CompactDropdownMenu(expanded = bankMenu, onDismissRequest = { bankMenu = false }) {
+                    CompactDropdownMenu(expanded = bankMenuOpen, onDismissRequest = { bankMenuOpen = false }) {
                         for (bank in TrainingBank.entries.filter { it.inMenu }) {
                             CompactMenuRow(
                                 label = bank.title,
-                                selected = bank == state.bank,
-                                onClick = { bankMenu = false; viewModel.selectBank(bank) },
+                                selected = !contribute && bank == state.bank,
+                                onClick = {
+                                    bankMenuOpen = false
+                                    if (contribute) onSwitch(bank) else viewModel.selectBank(bank)
+                                },
                             )
                         }
+                        // 贡献题放最后：样本另存，可分享或上传给作者
+                        CompactMenuRow(
+                            label = TrainingBank.Contribute.title,
+                            selected = contribute,
+                            supportingText = "分享或上传给作者",
+                            onClick = {
+                                bankMenuOpen = false
+                                if (!contribute) onSwitch(TrainingBank.Contribute)
+                            },
+                        )
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -784,6 +887,17 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                             onClick = { moreMenu = false; confirmClear = true },
                         )
                     } else CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                        if (state.bank == TrainingBank.Text && state.prompts.isNotEmpty()) {
+                            CompactMenuRow(
+                                label = "换一段文字", icon = Icons.Filled.Edit,
+                                onClick = { moreMenu = false; textDraft = ""; viewModel.clearText() },
+                            )
+                            if ((state.current?.let { state.counts[it.id] } ?: 0) > 0) CompactMenuRow(
+                                label = "删除这个字的样本", icon = Icons.Filled.Delete,
+                                tint = MaterialTheme.colorScheme.error,
+                                onClick = { moreMenu = false; viewModel.removeCurrentSamples() },
+                            )
+                        }
                         CompactMenuRow(
                             label = "导入公式题库(CSV)", icon = Icons.Filled.FileOpen,
                             onClick = { moreMenu = false; importLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*")) },
@@ -855,6 +969,19 @@ fun HandwritingTrainingScreen(onBack: () -> Unit, contribute: Boolean = false) {
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    prompt == null && state.bank == TrainingBank.Text -> Row(
+                        verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        OutlinedTextField(
+                            value = textDraft,
+                            onValueChange = { textDraft = it },
+                            modifier = Modifier.weight(1f).testTag("training-text-input"),
+                            label = { Text("粘贴或输入一段话") },
+                            singleLine = true,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = { viewModel.setText(textDraft) }, enabled = textDraft.isNotBlank()) { Text("开始") }
+                    }
                     prompt == null -> Text("这个分类没有题目", fontSize = 16.sp)
                     prompt.latex != null && prompt.type != TrainingPromptType.Symbol -> Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

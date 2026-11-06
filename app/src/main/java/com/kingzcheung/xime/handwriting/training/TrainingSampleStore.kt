@@ -230,6 +230,28 @@ class TrainingSampleStore(private val context: Context, private val name: String
         missFile.delete()
     }
 
+    /** 删掉某一题的全部样本（「自己的文字」里写坏的字），返回删掉几条。 */
+    fun removeSamples(promptId: String): Int {
+        if (!samplesFile.exists()) return 0
+        var removed = 0
+        val tmp = File(dir, "samples.jsonl.tmp")
+        tmp.bufferedWriter(Charsets.UTF_8).use { out ->
+            samplesFile.forEachLine(Charsets.UTF_8) { line ->
+                if (line.isBlank()) return@forEachLine
+                val id = runCatching { JSONObject(line).optString("prompt_id") }.getOrNull()
+                if (id == promptId) removed++ else { out.write(line); out.write("\n") }
+            }
+        }
+        if (removed == 0) { tmp.delete(); return 0 }
+        if (!tmp.renameTo(samplesFile)) { tmp.copyTo(samplesFile, overwrite = true); tmp.delete() }
+        return removed
+    }
+
+    /** 「自己的文字」题库用的那段话；空表示还没填。 */
+    var textBank: String
+        get() = prefs.getString("text_bank", "").orEmpty()
+        set(value) = prefs.edit().putString("text_bank", value).apply()
+
     fun loadFormulaBank(): List<TrainingPrompt> {
         if (!formulaFile.exists()) return emptyList()
         val out = mutableListOf<TrainingPrompt>()

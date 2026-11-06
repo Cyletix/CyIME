@@ -318,8 +318,8 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("手写停顿识别", handwriting, SettingsRoutes.Handwriting, "手写 停顿 识别 延迟 时长 秒"),
         SettingsSearchEntry("手写边写边识别", handwriting, SettingsRoutes.Handwriting, "手写 边写边识别 提前 延迟 慢 等待 快"),
         SettingsSearchEntry("手写公式两边的标记", handwriting, SettingsRoutes.Handwriting, "公式 latex 美元 数学"),
-        SettingsSearchEntry("手写训练模式", handwriting, SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式", anchor = null),
-        SettingsSearchEntry("手写数据采集", handwriting, SettingsRoutes.HandwritingCapture, "手写 采集 样本 笔迹 标注", anchor = null),
+        SettingsSearchEntry("手写训练", handwriting, SettingsRoutes.HandwritingTraining, "手写 训练 训练模式 样本 假名 字母 公式 贡献 上传 分享 采集 数据采集 笔迹 标注 自己的文字", anchor = null),
+        // 自用包里贡献题并进「手写训练」的题库菜单，搜索只留上面那条
         SettingsSearchEntry("贡献手写样本", handwriting, SettingsRoutes.HandwritingContribute, "手写 贡献 样本 上传 分享 训练 改进 认不出", anchor = null),
         // 系统 › 剪贴板与同步
         SettingsSearchEntry("连接状态", clipboard, SettingsRoutes.ClipboardSync, "扫码连接电脑 连接电脑 Windows 配对 连接码 二维码 互联"),
@@ -371,8 +371,11 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
     ).filter {
         // Developer-only tools (handwriting training, speech tuning recordings, raw Rime file manager)
         // are hidden in public, elder and friend packages.
-        (it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.HandwritingCapture, SettingsRoutes.RimeFileBrowser) &&
+        (it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.RimeFileBrowser) &&
             it.title != "保存语音调优录音") || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
+    }.filter {
+        it.target != SettingsRoutes.HandwritingContribute ||
+            !(com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
     }.filter {
         // The elder package has no update entry (AppUpdater.supported).
         com.kingzcheung.xime.update.AppUpdater.supported || it.title !in setOf("检查更新", "自动检查更新")

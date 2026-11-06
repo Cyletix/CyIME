@@ -10,10 +10,8 @@ import androidx.compose.material.icons.twotone.ModelTraining
 import androidx.compose.material.icons.twotone.Inventory
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.Edit
 import androidx.compose.material.icons.twotone.VolunteerActivism
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,8 +25,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * 手写的设置都放在这一页（用户 10-21 要求和语音分开）：停顿识别、公式标记、手写模型；
- * 手写训练和数据采集只在「装到我的设备」和调试包里出现；「贡献手写样本」各个包都有。
+ * 手写的设置都放在这一页（用户 10-21 要求和语音分开）：停顿识别、公式标记、手写模型。
+ * 「改进手写」只留一个写字入口（用户 11-05 合并）：公开包是「贡献手写样本」；「装到我的设备」和调试包是
+ * 「手写训练」，贡献题和原「手写数据采集」（自己的文字）都在它的题库菜单里。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,7 +35,6 @@ fun HandwritingSettingsContent(
     onBack: () -> Unit,
     onOpenModels: () -> Unit = {},
     onOpenTraining: () -> Unit = {},
-    onOpenCapture: () -> Unit = {},
     onOpenContribute: () -> Unit = {},
     devTools: Boolean = com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG,
 ) {
@@ -54,14 +52,13 @@ fun HandwritingSettingsContent(
                     "内置手写、公式手写模型和个人手写模型；下载、切换和删除", onClick = onOpenModels, showArrow = true)
             })
             SettingsSection(title = "改进手写", content = {
-                SettingsItem(Icons.TwoTone.VolunteerActivism, "贡献手写样本",
-                    "按题写字，分享或上传给作者训练手写模型", onClick = onOpenContribute, showArrow = true)
-            })
-            if (devTools) SettingsSection(title = "训练与采集", content = {
-                SettingsItem(Icons.TwoTone.ModelTraining, "手写训练模式",
-                    "按题写假名、字母、符号和公式，收集样本导出给电脑训练", onClick = onOpenTraining, showArrow = true)
-                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                SettingsItem(Icons.TwoTone.Edit, "手写数据采集", "自由书写并标注，采集笔迹样本", onClick = onOpenCapture, showArrow = true)
+                if (devTools) {
+                    SettingsItem(Icons.TwoTone.ModelTraining, "手写训练",
+                        "按题写字，导出训练或贡献给作者", onClick = onOpenTraining, showArrow = true)
+                } else {
+                    SettingsItem(Icons.TwoTone.VolunteerActivism, "贡献手写样本",
+                        "按题写字，分享或上传给作者训练手写模型", onClick = onOpenContribute, showArrow = true)
+                }
             })
         }
     }

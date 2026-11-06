@@ -30,7 +30,6 @@ object SettingsRoutes {
     const val Licenses = "licenses"
     const val Credits = "credits"
     const val LogViewer = "log_viewer"
-    const val HandwritingCapture = "handwriting_capture"
     const val HandwritingTraining = "handwriting_training"
     const val HandwritingContribute = "handwriting_contribute"
     const val Handwriting = "handwriting_settings"

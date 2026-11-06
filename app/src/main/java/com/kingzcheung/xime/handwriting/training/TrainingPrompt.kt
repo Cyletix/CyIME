@@ -28,13 +28,15 @@ enum class TrainingBank(val id: String, val title: String, val inMenu: Boolean =
     Latin("latin", "英文字母"),
     Symbol("symbol", "数学符号"),
     Chinese("hanzi", "中文汉字"),
+    /** 自己粘贴或输入一段话，逐字出题（原「手写数据采集」页并进来，11-05）。 */
+    Text("text", "自己的文字"),
     /** 识别检查认错、还没写到认对就跳过的题；认对一次后自动移出。 */
     Missed("missed", "认错的字"),
     /** 已合并进“公式”，不再单独列出；保留以兼容旧的进度记录。 */
     ImportedFormula("formula", "导入公式", inMenu = false),
     /** 随机生成的公式，暂不在菜单里出现，代码保留以后可再开。 */
     RandomFormula("formula_random", "随机公式", inMenu = false),
-    /** 公开版「贡献手写样本」的固定题目（见 HandwritingContribution），不在训练模式菜单里。 */
+    /** 「贡献手写样本」的固定题目（见 HandwritingContribution）；自用包在题库菜单最后单独列出，样本另存。 */
     Contribute("contribute", "贡献手写样本", inMenu = false),
 }
 
