@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kingzcheung.xime.settings.ExportMode
 import com.kingzcheung.xime.settings.ExportResult
+import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.RimeExportManager
 import com.kingzcheung.xime.settings.SchemaManager
 import io.github.rosemoe.sora.event.ContentChangeEvent
@@ -347,6 +348,14 @@ private fun YamlEditor(file: File, onDeleted: () -> Unit, onBack: () -> Unit) {
     var editor by remember { mutableStateOf<CodeEditor?>(null) }
     var textLength by remember { mutableIntStateOf(0) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // xime.yaml / xime.custom.yaml 是 CyIME 自己的键盘配置，Rime 不读：保存或删除后马上重读，
+    // 不用再去点「应用方案更改」（那一步会重新部署整个 Rime）。删除后页面就退出，不挂在页面协程上。
+    val keyboardConfig = file.name == "xime.custom.yaml" || file.name == "xime.yaml"
+    fun reloadKeyboardConfig() {
+        if (!keyboardConfig) return
+        val appContext = context.applicationContext
+        Thread { runCatching { KeysConfigHelper.loadConfig(appContext) } }.start()
+    }
 
     val initialContent = remember(file) {
         try {
@@ -362,7 +371,8 @@ private fun YamlEditor(file: File, onDeleted: () -> Unit, onBack: () -> Unit) {
         try {
             file.writeText(content, Charsets.UTF_8)
             isModified = false
-            Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
+            reloadKeyboardConfig()
+            Toast.makeText(context, if (keyboardConfig) "已保存，键盘已更新" else "已保存", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
@@ -377,6 +387,7 @@ private fun YamlEditor(file: File, onDeleted: () -> Unit, onBack: () -> Unit) {
                 TextButton(onClick = {
                     showDeleteConfirm = false
                     file.delete()
+                    reloadKeyboardConfig()
                     Toast.makeText(context, "已删除: ${file.name}", Toast.LENGTH_SHORT).show()
                     onDeleted()
                 }) {
