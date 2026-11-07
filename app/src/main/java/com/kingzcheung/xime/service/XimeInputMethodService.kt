@@ -4444,6 +4444,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 输入框里的光标已挪到读音第 [offset] 个字后面（日语光标在读音中间）。 */
     internal fun moveInlineCompositionCaret(offset: Int) = inlineComposition.moveCaret(offset)
 
+    internal fun inlinePinyinText(): String? = inlineComposition.text
+
+    internal fun hasInlinePinyinCaretInside(): Boolean = inlineComposition.text?.let {
+        inlineComposition.caret < it.length
+    } == true
+
     internal fun keepInlineEditCaret(text: String): Boolean =
         inlineComposition.text == text && inlineComposition.caret < text.length
 
@@ -4479,6 +4485,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             content.subSequence(start, start + code.length).toString() != code) return
         val position = value.startOffset + start + offset
         if (ic.setSelection(position, position)) inlineComposition.moveCaret(offset)
+    }
+
+    /** Restore the displayed caret to the engine position after editing inside code. */
+    internal fun showInlinePinyinCaret(snapshot: Array<String>, sessionId: Long, schema: String) {
+        if (uiState.value.inputSessionId != sessionId || uiState.value.currentSchemaId != schema || snapshot.size < 5) return
+        val input = snapshot[0]
+        val caret = snapshot[1].toIntOrNull() ?: return
+        val confirmed = snapshot[2].toIntOrNull()?.coerceIn(0, input.length) ?: return
+        if (caret !in confirmed until input.length) return
+        val raw = com.kingzcheung.xime.rime.PinyinEditBuffer.normalized(input.drop(confirmed))
+        val prefix = snapshot[3]
+        val display = com.kingzcheung.xime.rime.PinyinEditDisplay(raw, snapshot[4].removePrefix(prefix).trim())
+        val frame = com.kingzcheung.xime.rime.PinyinEditSession(sessionId, schema, input,
+            input.take(confirmed), prefix, display.text, display.displayOffset(caret - confirmed), false)
+        showInlineEditCaret(frame)
     }
 
     internal fun syncInlinePinyinLocation() {
