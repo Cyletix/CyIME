@@ -48,6 +48,7 @@ fun CellDictionarySettingsContent(onBack: () -> Unit, embedded: Boolean = false)
             runCatching { uriHandler.openUri(url) }.onFailure { linkError = "无法打开浏览器" }
         },
         onRemove = model::remove, embedded = embedded, onSelectEnglish = model::selectEnglish,
+        onRestoreBuiltin = model::restoreBuiltin,
         // 本机或同型号实测过词库曲线就用实测（dict_cost_bench），否则用电脑上的最坏估计。
         curve = rememberPerformanceCostSource()?.takeIf { it.sameModel }
             ?.let { CellDictionaryCost.Curve.fromDevice(it.device) } ?: CellDictionaryCost.Curve.DESKTOP,
@@ -69,6 +70,7 @@ fun CellDictionarySettingsPanel(
     onImport: () -> Unit,
     onSource: (String) -> Unit,
     onRemove: (String) -> Unit = {},
+    onRestoreBuiltin: (String) -> Unit = {},
     /** Inside the 词库 page: no own top bar. */
     embedded: Boolean = false,
     onSelectEnglish: (Boolean) -> Unit = {},
@@ -88,7 +90,9 @@ fun CellDictionarySettingsPanel(
     // One list grouped by category: built-in first, then Sogou, then the user's own imports.
     val rows = buildList {
         CellDictionaryCatalog.builtins.forEach { builtin ->
-            installed[builtin.id]?.let { add(DictionaryItem(builtin.id, builtin.name, builtin.category, it, null, builtin.sourceUrl)) }
+            val entry = installed[builtin.id]
+            if (entry != null || builtin.id in dictionaries.removedBuiltins)
+                add(DictionaryItem(builtin.id, builtin.name, builtin.category, entry, null, builtin.sourceUrl))
         }
         CellDictionaryCatalog.offers.forEach { offer ->
             add(DictionaryItem(offer.id, offer.name, offer.category, installed[offer.id], offer, offer.sourceUrl))
@@ -159,7 +163,8 @@ fun CellDictionarySettingsPanel(
                             cost = share(item.id, item.installed?.count ?: item.offer?.entryCount ?: 0),
                             onSelect = { onSelect(item.id, it) }, onDownload = { item.offer?.let(onDownload) },
                             onSource = item.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } },
-                            onRemove = if (item.id in builtinIds) null else ({ onRemove(item.id) }))
+                            onRemove = { onRemove(item.id) },
+                            onRestore = if (item.id in builtinIds) ({ onRestoreBuiltin(item.id) }) else null)
                     }
                 }
             }
@@ -234,39 +239,44 @@ private fun DictionaryRow(
     /** 这个词库让打字最多慢多少（[CellDictionaryCost.share]），单个词库就超出正常时这一行也变色。 */
     cost: Double,
     onSelect: (Boolean) -> Unit, onDownload: () -> Unit, onSource: (() -> Unit)?, onRemove: (() -> Unit)?,
+    onRestore: (() -> Unit)?,
 ) {
     var menu by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val installed = item.installed
     val detail = when {
+        installed == null && onRestore != null -> "已删除，可恢复"
         installed == null -> "${words(item.offer?.entryCount ?: 0)} · 最多慢 ${CellDictionaryCost.format(cost)} · 需下载"
         selected != applied -> "${words(installed.count + installed.english)} · 最多慢 ${CellDictionaryCost.format(cost)} · 应用后生效"
         else -> "${words(installed.count + installed.english)} · 最多慢 ${CellDictionaryCost.format(cost)}"
     }
     val level = CellDictionaryCost.level(cost)
-    // Delete only what is not in use: switch it off and apply first.
-    val removable = installed != null && onRemove != null && !selected && !applied && !busy
     SettingsListRow(item.name, detail,
         detailColor = if (level == CellDictionaryCost.Level.NORMAL) Color.Unspecified else costColor(level)) {
         if (installed != null) Switch(checked = selected, onCheckedChange = onSelect, enabled = !busy,
             colors = settingsSwitchColors(),
             modifier = Modifier.semantics { contentDescription = "启用${item.name}" })
-        else TextButton(onClick = onDownload, enabled = !busy) { Text("下载") }
-        if (onSource != null || installed != null) Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "${item.name}的更多操作") }
+        else TextButton(onClick = onRestore ?: onDownload, enabled = !busy) { Text(if (onRestore != null) "恢复" else "下载") }
+        if (onSource != null || (installed != null && onRemove != null)) Box {
+            IconButton(onClick = { menu = true }, enabled = !busy) { Icon(Icons.Default.MoreVert, "${item.name}的更多操作") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 if (onSource != null) DropdownMenuItem(text = { Text("查看来源") }, onClick = { menu = false; onSource() })
-                if (installed != null) {
-                    val label = when {
-                        onRemove == null -> "内置词库随安装包提供，可关闭"
-                        selected -> "删除前请关闭词库并应用更改"
-                        applied -> "应用更改后可删除"
-                        else -> "删除词库"
-                    }
-                    DropdownMenuItem(text = { Text(label, color = if (removable)
-                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = removable,
-                        onClick = { menu = false; onRemove?.invoke() })
-                }
+                if (installed != null && onRemove != null) DropdownMenuItem(
+                    text = { Text("删除词库", color = MaterialTheme.colorScheme.error) },
+                    onClick = { menu = false; confirmDelete = true },
+                )
             }
-        } else Spacer(Modifier.width(48.dp))
+        }
     }
+    if (confirmDelete) AlertDialog(
+        onDismissRequest = { confirmDelete = false },
+        title = { Text("删除词库？") },
+        text = { Text(if (applied)
+            "删除「${item.name}」前会先停用并应用当前所有待应用的词库更改，输入法会短暂暂停。" +
+                if (onRestore != null) "之后可在这里恢复；安装包内的原始资源仍会保留。" else "之后需要重新导入或下载。"
+            else if (onRestore != null) "删除「${item.name}」后可在这里恢复；安装包内的原始资源仍会保留。"
+            else "删除「${item.name}」后需要重新导入或下载。") },
+        confirmButton = { TextButton(onClick = { confirmDelete = false; onRemove?.invoke() }) { Text("删除") } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+    )
 }

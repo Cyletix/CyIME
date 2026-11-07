@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -48,9 +45,9 @@ import java.io.File
 class DictionaryPageRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
 
-    @Test fun installedDictionaryExplainsWhenRemovalIsAvailable() {
-        val id = "import_test"
-        val item = InstalledCellDictionary(id, "测试词库", "导入", 10, sha256 = "test")
+    @Test fun installedDictionaryCanBeDeletedAfterConfirmation() {
+        val id = "builtin_arknights"
+        val item = InstalledCellDictionary(id, "明日方舟", "电子游戏", 10, sha256 = "test")
         val state = mutableStateOf(CellDictionaryState(installed = listOf(item), selected = setOf(id), applied = setOf(id)))
         val removed = mutableListOf<String>()
         rule.setContent {
@@ -58,21 +55,29 @@ class DictionaryPageRenderTest {
                 {}, {}, onRemove = { removed.add(it) }, embedded = true)
         }
         rule.onNode(hasSetTextAction()).performTextInput(item.name)
+        rule.onNodeWithContentDescription("${item.name}的更多操作").assertIsEnabled().performClick()
+        rule.onNodeWithText("删除词库").performClick()
+        rule.onNodeWithText("删除词库？").assertExists()
+        rule.onNodeWithText("取消").performClick()
+        rule.runOnIdle { org.junit.Assert.assertTrue(removed.isEmpty()) }
         rule.onNodeWithContentDescription("${item.name}的更多操作").performClick()
-        rule.onNodeWithText("删除前请关闭词库并应用更改").assertIsNotEnabled()
-        System.getenv("CYIME_RENDER_OUT")?.let { out ->
-            rule.runOnIdle {
-                val popup = android.view.inspector.WindowInspector.getGlobalWindowViews().last()
-                val bitmap = Bitmap.createBitmap(popup.width, popup.height, Bitmap.Config.ARGB_8888)
-                popup.draw(android.graphics.Canvas(bitmap))
-                File(out, "dictionary-remove.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            }
-        }
-        rule.runOnIdle { state.value = state.value.copy(selected = emptySet()) }
-        rule.onNodeWithText("应用更改后可删除").assertIsNotEnabled()
-        rule.runOnIdle { state.value = state.value.copy(applied = emptySet()) }
-        rule.onNodeWithText("删除词库").assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithText("删除词库").performClick()
+        rule.onNodeWithText("删除", useUnmergedTree = true).performClick()
         rule.runOnIdle { org.junit.Assert.assertEquals(listOf(id), removed) }
+    }
+
+    @Test fun removedBuiltinOffersRestore() {
+        val id = "builtin_arknights"
+        val restored = mutableListOf<String>()
+        rule.setContent {
+            CellDictionarySettingsPanel(
+                CellDictionaryUiState(dictionaries = CellDictionaryState(removedBuiltins = setOf(id)), busy = false),
+                {}, {}, { _, _ -> }, {}, {}, {}, onRestoreBuiltin = { restored.add(it) }, embedded = true)
+        }
+        rule.onNode(hasSetTextAction()).performTextInput("明日方舟")
+        rule.onNodeWithText("已删除，可恢复").assertExists()
+        rule.onNodeWithText("恢复").performClick()
+        rule.runOnIdle { org.junit.Assert.assertEquals(listOf(id), restored) }
     }
 
     @Test fun renderDictionaryPage() {
