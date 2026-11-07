@@ -12,13 +12,15 @@ import com.kingzcheung.xime.service.CandidateState
 internal fun CollapseEmptyCandidatePage(
     expanded: Boolean,
     candidates: State<CandidateState>,
+    isDeleteDragging: () -> Boolean = { false },
     onCollapse: () -> Unit,
 ) {
     val currentCollapse = rememberUpdatedState(onCollapse)
+    val currentDragging = rememberUpdatedState(isDeleteDragging)
     LaunchedEffect(expanded, candidates) {
         if (expanded) {
             snapshotFlow {
-                candidates.value.let { it.candidates.isEmpty() && it.associationCandidates.isEmpty() }
+                !currentDragging.value() && candidates.value.let { it.candidates.isEmpty() && it.associationCandidates.isEmpty() }
             }.collect { empty -> if (empty) currentCollapse.value() }
         }
     }
