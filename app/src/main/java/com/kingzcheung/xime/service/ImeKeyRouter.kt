@@ -144,6 +144,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             key == "clear_all" -> withEditor {
                 // Never read or retain a password in the clear/undo buffer.
                 service.lastClearedText = ""
+                service.lastClearedComposition = null
                 service.lastClearedDocument = null
                 service.lastSwipeDelete = null
                 service.currentInputConnection?.let { connection ->
@@ -1007,6 +1008,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             KeyLatencyProbe.started()
             InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command
+            if (service.lastClearedComposition != null && (key.length == 1 || key in setOf("enter", "space", "clear_composition"))) {
+                service.lastClearedComposition = null
+                service.rimeEngine.discardClearUndo()
+            }
             if (usesDirectFieldInput && routeDirectFieldKey(key, isShifted, hardwareEvent)) return@command
             if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.EXTERNAL &&
                 !service.uiState.value.isAsciiMode &&
@@ -1208,6 +1213,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
                     val skipAssociation = SettingsPreferences.clearSwipeSkipsAssociation(service)
                     val scope = ClearAllScope.of(hasInputState(candState, includeAssociation = !skipAssociation), wholeField)
+                    service.lastClearedComposition = null
+                    service.rimeEngine.discardClearUndo()
+                    val savedPartials = service.t9PartialSegments.toList()
+                    val selectedCount = service.uiState.value.t9RightCandidateSelectedCount
+                    val selectedPinyin = service.uiState.value.t9SelectedCandidatePinyin
+                    val savedComposition = scope.composition && candState.pendingEnglishText.isEmpty() &&
+                        !service.isSecretEditor() && service.rimeEngine.saveClearUndo()
                     // 清的是焦点所在的框：键盘自己的输入框（新增固定等）有焦点时清它，不清后面应用的框。
                     service.lastClearedTarget = service.uiState.value.inputTarget
                     // 清空比之前的左右滑删字新，撤回放回的是这次清空。
@@ -1273,6 +1285,22 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         rejected?.let(::unlearnRejectedCommit)
                     }
+                    if (savedComposition) {
+                        val saved = withEditor {
+                            runCatching {
+                                val ic = service.editorConnection() ?: return@runCatching null
+                                val before = ic.getTextBeforeCursor(64, 0)?.toString() ?: return@runCatching null
+                                val after = ic.getTextAfterCursor(64, 0)?.toString() ?: return@runCatching null
+                                if (!ic.getSelectedText(0).isNullOrEmpty()) return@runCatching null
+                                ClearedComposition(service.uiState.value.inputSessionId, ic, before, after,
+                                    service.rimeEngine.currentCandidateRevision(), savedPartials, selectedCount, selectedPinyin)
+                            }.getOrNull()
+                        }
+                        if (saved != null) {
+                            service.lastClearedComposition = saved
+                            service.lastClearedText = ""
+                        } else service.rimeEngine.discardClearUndo()
+                    }
                     needsUIUpdate = true
                 }
                 "undo_clear" -> {
@@ -1284,6 +1312,40 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (swiped != null && withEditor { swiped.undo() }) {
                         service.lastSwipeDelete = null
                     } else if (!hasInputState(candState) && service.lastClearedTarget == service.uiState.value.inputTarget) {
+                        val composition = service.lastClearedComposition
+                        if (composition != null) {
+                            val ready = withEditor {
+                                runCatching {
+                                    val ic = service.editorConnection()
+                                    ic === composition.connection && service.uiState.value.inputSessionId == composition.session &&
+                                        ic.getTextBeforeCursor(64, 0)?.toString() == composition.before &&
+                                        ic.getTextAfterCursor(64, 0)?.toString() == composition.after &&
+                                        ic.getSelectedText(0).isNullOrEmpty()
+                                }.getOrDefault(false)
+                            }
+                            if (!ready || !service.rimeEngine.isCandidateRevisionCurrent(composition.revision)) return@command
+                            val document = service.lastClearedDocument
+                            if (document != null && !withEditor {
+                                    composition.connection.restoreDocument(document, XimeInputMethodService.SAFE_TEXT_LIMIT)
+                                }) return@command
+                            val result = service.rimeEngine.restoreClearUndo(composition.revision) ?: return@command
+                            val transformed = service.candidateTransform.transformFor(result)
+                            service.lastClearedComposition = null
+                            service.lastClearedDocument = null
+                            service.t9PartialSegments.clear()
+                            service.t9PartialSegments.addAll(composition.partialSegments)
+                            withEditor {
+                                service.uiState.value = service.uiState.value.copy(
+                                    t9RightCandidateSelectedCount = composition.selectedCount,
+                                    t9SelectedCandidatePinyin = composition.selectedPinyin)
+                                if (isT9Schema(service.uiState.value.currentSchemaId))
+                                    service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
+                                service.sessionController.updateUIWithResult(
+                                    transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
+                                    transformed?.actions ?: emptyList())
+                            }
+                            return@command
+                        }
                         val text = service.lastClearedText
                         val document = service.lastClearedDocument
                         if (document != null) withEditor {
