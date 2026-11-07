@@ -192,6 +192,8 @@ data class KeyboardInputPreferences(
     val glideTyping: Boolean = false,
     /** 中文全拼、双拼 26 键滑行输入，与英文分开、默认关（用户 10-31：开着英文滑行的老用户不能被带着开）。 */
     val chineseGlideTyping: Boolean = false,
+    /** Delete the last syllable of an uncommitted Chinese glide as one unit. */
+    val deleteChineseGlideCharacter: Boolean = false,
     /** 滑行时在输入框实时显示识别结果；滑动中反复识别，多占 CPU，默认关。 */
     val glidePreview: Boolean = false,
     /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
@@ -259,6 +261,7 @@ data class KeyboardInputPreferences(
         const val DATETIME_CANDIDATES_KEY = "datetime_candidates"
         /** 中文滑行输入；新键，旧版本没写过，读不到就是关。 */
         const val CHINESE_GLIDE_KEY = "glide_typing_chinese"
+        const val DELETE_CHINESE_GLIDE_CHARACTER_KEY = "delete_chinese_glide_word"
         /** 滑行实时预览；新键，读不到就是关。 */
         const val GLIDE_PREVIEW_KEY = "glide_preview"
         /** 双拼键位提示开关；设置在「双拼方案」页。 */
@@ -302,7 +305,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, DELETE_CHINESE_GLIDE_CHARACTER_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
@@ -413,6 +416,7 @@ data class KeyboardInputPreferences(
                 // 分不出是不是用户自己开的，所以只认新键；没有新键就是默认关。
                 glideTyping = prefs.getBoolean("glide_typing_v2", false),
                 chineseGlideTyping = prefs.getBoolean(CHINESE_GLIDE_KEY, false),
+                deleteChineseGlideCharacter = prefs.getBoolean(DELETE_CHINESE_GLIDE_CHARACTER_KEY, false),
                 glidePreview = prefs.getBoolean(GLIDE_PREVIEW_KEY, false),
                 letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
@@ -475,6 +479,7 @@ data class KeyboardInputPreferences(
             .putBoolean("letter_long_press_menu", letterLongPressMenu)
             .putBoolean("glide_typing", glideTyping)
             .putBoolean(CHINESE_GLIDE_KEY, chineseGlideTyping)
+            .putBoolean(DELETE_CHINESE_GLIDE_CHARACTER_KEY, deleteChineseGlideCharacter)
             .putBoolean(GLIDE_PREVIEW_KEY, glidePreview)
             .putBoolean("t9_flick_letters", t9FlickLetters)
             .putBoolean("t9_glide_typing", t9GlideTyping)

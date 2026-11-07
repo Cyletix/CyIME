@@ -24,14 +24,25 @@ internal fun PinyinEditSession.inlineOffset(code: String): Int? {
     val suffix = code.drop(protectedText.length).replace(' ', '\'')
     if (suffix == text) return protectedText.length + caret
     if (suffix.replace("'", "") != text.replace("'", "")) return null
-    return protectedText.length + offsetAfterCodeKeys(suffix, codeKeysBefore(text, caret))
+    return protectedText.length + mapCodeOffset(text, suffix, caret)
 }
 
 internal fun PinyinEditSession.editOffset(code: String, offset: Int): Int? {
     if (inlineOffset(code) == null) return null
     val suffix = code.drop(protectedText.length).replace(' ', '\'')
     val local = (offset - protectedText.length).coerceIn(0, suffix.length)
-    return if (suffix == text) local else offsetAfterCodeKeys(text, codeKeysBefore(suffix, local))
+    return if (suffix == text) local else mapCodeOffset(suffix, text, local)
+}
+
+/** Preserve which side of a visible boundary the user selected when both texts have one. */
+internal fun mapCodeOffset(from: String, to: String, offset: Int): Int {
+    val position = offset.coerceIn(0, from.length)
+    val keys = codeKeysBefore(from, position)
+    val fromBoundary = offsetAfterCodeKeys(from, keys)
+    val toBoundary = offsetAfterCodeKeys(to, keys)
+    val afterSeparator = (position - fromBoundary).coerceAtLeast(0)
+    val separatorCount = to.drop(toBoundary).takeWhile { it == '\'' }.length
+    return toBoundary + afterSeparator.coerceAtMost(separatorCount)
 }
 
 internal object PinyinEditBuffer {
@@ -44,6 +55,15 @@ internal object PinyinEditBuffer {
     fun normalized(text: String): String = text.lowercase().replace('ü', 'v')
         .replace(' ', '\'').filter { it in 'a'..'z' || it == '\'' }
 
+    fun mergeSeparators(text: String, caret: Int): Pair<String, Int> {
+        val result = StringBuilder()
+        var newCaret = 0
+        text.forEachIndexed { index, char ->
+            if (char != '\'' || result.isEmpty() || result.last() != '\'') result.append(char)
+            if (index < caret) newCaret = result.length
+        }
+        return result.toString() to newCaret
+    }
 }
 
 /** Maps engine syllables to code. Editor sessions retain these boundaries as editable text. */
@@ -108,6 +128,9 @@ internal fun dropReadingKeys(reading: String, keys: Int): String {
 /** Preserve confirmed Chinese text and real codes; make Latin syllable spaces visible. */
 internal fun pinyinPreviewText(preedit: String): String = preedit.trim()
     .replace(Regex("(?<=[a-zA-ZüÜ'])\\s+(?=[a-zA-ZüÜ'])"), "'")
+
+internal fun editablePreeditText(text: String, schema: String, isAscii: Boolean): String =
+    if (!isAscii && PinyinEditBuffer.supports(schema)) pinyinPreviewText(text) else text
 
 internal val merged14Groups = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
 internal fun merged14Representative(c: Char): Char = merged14Groups.firstOrNull { c in it }?.first() ?: c

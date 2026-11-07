@@ -106,6 +106,7 @@ object SettingsPreferences {
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
+    private const val KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION = "clear_swipe_skips_association"
     private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
     private const val KEY_DELETE_RECOVERY = "delete_recovery_candidates"
     private const val KEY_UNLEARN_REJECTED_COMMIT = "unlearn_rejected_commit"
@@ -855,6 +856,13 @@ object SettingsPreferences {
      * 退格直接删字（B站反馈 10-31，别人的需求，默认关）：联想词出现时退格直接删掉刚上屏的字、顺手收起联想，
      * 不用先按一下收起联想。关着时照旧：第一下收起联想，第二下才删字。
      */
+    fun clearSwipeSkipsAssociation(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION, false)
+
+    fun setClearSwipeSkipsAssociation(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION, enabled).apply()
+    }
+
     fun isDeleteSkipsAssociation(context: Context): Boolean =
         getPrefs(context).getBoolean(KEY_DELETE_SKIPS_ASSOCIATION, false)
 

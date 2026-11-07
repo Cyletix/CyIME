@@ -38,6 +38,30 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     // Tag only the queued keys from one glide; ordinary typing still publishes every result.
     private var submittingGlide = false
     private val glideBatch = ThreadLocal<Boolean>()
+    private val chineseGlideDeletes = ChineseGlideDeleteHistory()
+
+    private fun chineseGlideDeleteEnabled(): Boolean = SettingsPreferences.getPrefsPublic(service).getBoolean(
+        com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DELETE_CHINESE_GLIDE_CHARACTER_KEY, false)
+
+    private fun chineseGlideState(): ChineseGlideDeleteHistory.State? {
+        val snapshot = service.rimeEngine.readPinyinEditSnapshot()
+        if (snapshot.size < 4) return null
+        val caret = snapshot[1].toIntOrNull() ?: return null
+        val confirmed = snapshot[2].toIntOrNull() ?: return null
+        val ui = service.uiState.value
+        return ChineseGlideDeleteHistory.State(snapshot[0], caret, confirmed, snapshot[3],
+            ui.currentSchemaId, ui.inputSessionId, ui.inputTarget, service.rimeEngine.currentCandidateRevision())
+    }
+
+    private fun chineseCodeSyllables(code: String, result: com.kingzcheung.xime.rime.RimeProcessResult?,
+        allowIncomplete: Boolean = false): List<String>? {
+        val isDouble = service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN
+        return runCatching {
+            com.kingzcheung.xime.glide.chineseCodeSyllables(code, isDouble,
+                listOf(result?.candidates?.firstOrNull()?.comment.orEmpty(), result?.preeditText.orEmpty()),
+                if (isDouble) emptyList() else com.kingzcheung.xime.glide.GlideLexicon.pinyin(service), allowIncomplete)
+        }.getOrNull()
+    }
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
     private val hardwareNavigation = HardwareCandidateNavigation()
     private val hardwareSelectionRevision = androidx.compose.runtime.mutableIntStateOf(0)
@@ -563,6 +587,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (glideBatch.get() == true) return
         // 日语罗马音的显示归一化收口在 updateUIWithResult（刷新路径同样生效），此处不再单独加工
         val transformed = service.candidateTransform.transformFor(result)
+        val state = service.uiState.value
+        val caretSnapshot = if (!result.isAsciiMode && result.inputText.isNotEmpty() &&
+            service.hasInlinePinyinCaretInside() && com.kingzcheung.xime.rime.PinyinEditBuffer.supports(state.currentSchemaId))
+            service.rimeEngine.readPinyinEditSnapshot() else null
         KeyLatencyProbe.posted(result.inputText.length)
         publishUi {
             if (!service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) return@publishUi
@@ -570,6 +598,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
                 transformed?.actions ?: emptyList()
             )
+            if (caretSnapshot != null) service.showInlinePinyinCaret(caretSnapshot, state.inputSessionId, state.currentSchemaId)
             if (afterUpdate != null) afterUpdate()
         }
     }
@@ -719,6 +748,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             previewToken?.let { service.finishGlidePreview(it, false) }
             return
         }
+        // The editor's snapshot predates this glide; queued edits still finish in FIFO order.
+        service.keyboardCallbacks?.onDismissPreeditEditor?.invoke()
+        val trackGlide = chineseGlideDeleteEnabled()
+        var beforeGlide: ChineseGlideDeleteHistory.State? = null
+        var typedTail: ChineseGlideDeleteHistory.TypedTail? = null
+        var typedSyllables: List<String>? = null
+        if (trackGlide) postRimeJob("glide_delete_start") {
+            beforeGlide = chineseGlideState()
+            typedTail = beforeGlide?.let { chineseGlideDeletes.typedTail(it) }
+            typedSyllables = typedTail?.let { chineseCodeSyllables(it.code, service.rimeEngine.readQueuedResult(), allowIncomplete = true) }
+        }
         val input = service.candidateState.value.inputText
         submittingGlide = previewToken != null
         try {
@@ -728,9 +768,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             submittingGlide = false
         }
         // The FIFO barrier reads the final engine state after all of the glide's normal key events.
-        if (previewToken != null) postRimeJob("glide_finish") {
+        val glideSession = service.uiState.value.inputSessionId
+        val glideSchema = service.uiState.value.currentSchemaId
+        postRimeJob("glide_finish") {
+            val result = service.rimeEngine.readQueuedResult()
+            val caretSnapshot = service.rimeEngine.readPinyinEditSnapshot()
+            if (trackGlide) {
+                typedTail?.takeIf { typedSyllables != null }?.let {
+                    chineseGlideDeletes.record(it.before, beforeGlide, it.code, typedSyllables)
+                }
+                chineseGlideDeletes.record(beforeGlide, chineseGlideState(), code, chineseCodeSyllables(code, result))
+            }
+            if (previewToken == null) {
+                withEditor {
+                    if (result != null && service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision))
+                        service.showInlinePinyinCaret(caretSnapshot, glideSession, glideSchema)
+                }
+                return@postRimeJob
+            }
             try {
-                val result = service.rimeEngine.readQueuedResult()
                 val transformed = result?.let { service.candidateTransform.transformFor(it) }
                 withEditor {
                     if (result != null && service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) {
@@ -740,6 +796,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             updateInputBoxComposition = service.isGlidePreviewHeld(previewToken),
                         )
                         service.finishGlidePreview(previewToken, true)
+                        service.showInlinePinyinCaret(caretSnapshot, glideSession, glideSchema)
                     } else service.finishGlidePreview(previewToken, false)
                 }
             } finally {
@@ -1187,7 +1244,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 「只清空光标前的内容」（默认关）：清输入框时光标后的字留着。
                     val beforeOnly = clearPrefs.getBoolean(
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
-                    val scope = ClearAllScope.of(hasInputState(candState), wholeField)
+                    val skipAssociation = SettingsPreferences.clearSwipeSkipsAssociation(service)
+                    val scope = ClearAllScope.of(hasInputState(candState, includeAssociation = !skipAssociation), wholeField)
                     // 清的是焦点所在的框：键盘自己的输入框（新增固定等）有焦点时清它，不清后面应用的框。
                     service.lastClearedTarget = service.uiState.value.inputTarget
                     // 清空比之前的左右滑删字新，撤回放回的是这次清空。
@@ -1218,6 +1276,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     } else {
                         // 直接上屏的英文已经在输入框里，跟着下面整框一起删、一起撤回，这里不单独回删。
                         // 输入框本来是空的（只有拼音）时，撤回照原来一样放回拼音。
+                        service.predictionManager.invalidatePendingPredictions()
                         val composedText = if (scope.composition && candState.pendingEnglishText.isEmpty()) candState.inputText else ""
                         if (scope.composition) clearInputStateForKeys()
                         // 空闲态：清空整个输入框（光标前、选区、光标后），记下来供下滑撤回原位恢复。
@@ -2200,6 +2259,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         ).skippingAssociation(SettingsPreferences.isDeleteSkipsAssociation(service), candState.isShowingRecentClipboard)
         if (target == DeletionTarget.WAIT) return
         if (hold?.allowsDeletion(target.consumesImeContent) == false) return
+        if (target == DeletionTarget.COMPOSITION && chineseGlideDeleteEnabled()) {
+            val current = chineseGlideState()
+            val lastGlide = chineseGlideDeletes.last(current)
+            if (current != null && lastGlide != null && service.rimeEngine.isCandidateRevisionCurrent(current.revision) &&
+                service.rimeEngine.applyPinyinEdit(current.input, lastGlide.remainingInput, lastGlide.removeStart,
+                    current.confirmed, current.confirmedText, expectedSchema = current.schema)) {
+                chineseGlideDeletes.removed(chineseGlideState())
+                service.rimeEngine.readQueuedResult()?.let { sendTransformedResult(it) }
+                return
+            }
+        }
         // 计算器模式：追踪退格
         val calculatorWasActive = service.calculatorEngine.isActive()
         service.calculatorEngine.handleDelete()
@@ -2599,16 +2669,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 或 T9 partial 累积。
      * 不能用 RIME getInput()——tryLocked 锁竞争时静默返回空，会误判空闲态。
      */
-    private fun hasInputState(candState: CandidateState): Boolean =
+    private fun hasInputState(candState: CandidateState, includeAssociation: Boolean = true): Boolean =
         candState.isComposing ||
             candState.inputText.isNotEmpty() ||
             candState.preeditText.isNotEmpty() ||
             candState.pendingEnglishText.isNotEmpty() ||
             service.t9PartialSegments.isNotEmpty() ||
             service.rimeEngine.compositionActiveForDeletion() != false ||
-            (candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery && !candState.isDigitPhraseList) ||
+            (includeAssociation && candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery && !candState.isDigitPhraseList) ||
             candState.isShowingRecentClipboard ||
-            service.predictionManager.hasPendingPrediction
+            (includeAssociation && service.predictionManager.hasPendingPrediction)
 
     /** Ends the composition in the input FIFO, T9's own digit state included (see [com.kingzcheung.xime.rime.RimeEngine.endQueuedComposition]). */
     internal fun endQueuedComposition() =

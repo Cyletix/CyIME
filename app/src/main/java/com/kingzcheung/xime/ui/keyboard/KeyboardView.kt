@@ -54,6 +54,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -120,7 +121,7 @@ import kotlin.math.roundToInt
 
 val LocalStretchFactor = compositionLocalOf { 1f }
 val LocalSuppressCursorMove = compositionLocalOf { mutableStateOf(false) }
-internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> (Int) -> Unit)?> { null }
+internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> DeleteDragSession)?> { null }
 
 /** How long startup may take before the loading panel shows "正在加载词库" and its progress bar. */
 internal const val DEPLOY_NOTICE_DELAY_MS = 600L
@@ -194,7 +195,7 @@ fun KeyboardView(
 
     // 候选展开页自动收起：编码删空（无候选也无联想）时不留空页。
     // 展开态是候选栏的在位扩展（非 Overlay），删除实时更新页内候选，删空即回到键盘。
-    CollapseEmptyCandidatePage(candidatePageExpanded, candidateState) {
+    CollapseEmptyCandidatePage(candidatePageExpanded, candidateState, callbacks.isDeleteDragging) {
         viewModel.setCandidatePageExpanded(false)
     }
     val viewState by viewModel.viewState.collectAsStateWithLifecycle()
@@ -597,6 +598,8 @@ fun KeyboardView(
             // Queued keystrokes must finish before a following commit/candidate event.
             // Ownership checks still reject work after a host or schema change.
             preeditEditSession = null
+            callbacks.onPreeditKeyInput = null
+            callbacks.onDismissPreeditEditor = null
             preeditFrame = null
             preeditOpening = false
             pendingPreeditMoves.clear()
@@ -638,7 +641,7 @@ fun KeyboardView(
                     else -> false
                 }
             }
-            callbacks.onDismissPreeditEditor = if (preeditEditSession != null) ({ closePreeditEditor() }) else null
+            callbacks.onDismissPreeditEditor = if (preeditEditSession != null || preeditOpening) ({ closePreeditEditor() }) else null
             callbacks.onPreeditKeyInput = if (preeditEditSession != null) ({ key ->
                 val t9 = preeditEditSession?.isT9 == true
                 if (key.startsWith("preedit_cursor:")) {
@@ -977,12 +980,14 @@ fun KeyboardView(
             })
             if (!inputPreferences.inlinePreeditPreview) drawPreeditEditor?.invoke()
 
-            // 候选栏与展开页共用：候选栏实际显示了哪些，展开页就从后面接着排。编码变化时清空。
+            // 候选栏与展开页共用：展开页从同一版本中实际显示的候选之后接着排。
             var visibleBarAssociations by remember(singleCharFilter) { mutableStateOf(emptyList<String>()) }
             var visibleBarCandidates by remember(singleCharFilter) { mutableStateOf(emptyList<String>()) }
+            var visibleBarCandidateRevision by remember(singleCharFilter) { mutableLongStateOf(Long.MIN_VALUE) }
+            var visibleBarUsesExpanded by remember(singleCharFilter) { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 snapshotFlow { candidateState.value.inputText }.drop(1).collect {
-                    visibleBarAssociations = emptyList(); visibleBarCandidates = emptyList()
+                    visibleBarAssociations = emptyList()
                 }
             }
             // 上屏后换了一组联想：栏里上一组放下了几个不再作数，展开页按新的一组重新接。
@@ -1137,7 +1142,11 @@ fun KeyboardView(
                     preeditBackgroundColor = keyBgColor,
                 ),
                 callbacks = CandidateBarCallbacks(
-                    onVisibleCandidatesChanged = { visibleBarCandidates = it },
+                    onVisibleCandidatesChanged = {
+                        visibleBarCandidates = it
+                        visibleBarCandidateRevision = cs.engineRevision
+                        visibleBarUsesExpanded = expandedDataMode
+                    },
                     onVisibleAssociationsChanged = { visibleBarAssociations = it },
                     onReorderToolbar = callbacks.onUpdateToolbarButtons,
                     onCancelInput = {
@@ -1309,8 +1318,8 @@ fun KeyboardView(
                 var syllableRequest by remember { mutableIntStateOf(0) }
                 LaunchedEffect(canChooseSyllable, syllableRevision, state.inputSessionId, state.currentSchemaId, merged14) {
                     val request = ++syllableRequest
-                    syllableChoices = null
-                    if (canChooseSyllable) callbacks.onRequestPinyinSyllables?.invoke(syllableRevision) { choices ->
+                    if (!canChooseSyllable) syllableChoices = null
+                    else callbacks.onRequestPinyinSyllables?.invoke(syllableRevision) { choices ->
                         if (request == syllableRequest && candidateState.value.engineRevision == syllableRevision)
                             syllableChoices = choices
                     }
@@ -1328,7 +1337,7 @@ fun KeyboardView(
                 // 仅过滤并保留引擎索引；换行在候选区测得实际可用宽度后进行。
                 val glossExpanded = !state.isAsciiMode && state.inputProfile.language == InputLanguage.CHINESE
                 val expandedGlossRevision = CandidateGlossary.revision
-                val expandedEntries = remember(allExpanded, singleCharFilter, visibleBarCandidates, glossExpanded, expandedGlossRevision) {
+                val currentEntries = remember(allExpanded, singleCharFilter, visibleBarCandidates, glossExpanded, expandedGlossRevision) {
                     ExpandedCandidatePager.filterIndices(allExpanded, singleCharFilter).map { gi ->
                         val comment = allExpanded[gi].comment
                         CandidateEntry(allExpanded[gi].text,
@@ -1338,6 +1347,17 @@ fun KeyboardView(
                         remainingCandidates(entries, visibleBarCandidates)
                     }
                 }
+                var lastExpandedFrame by remember(candidatePageOpening, state.inputSessionId, singleCharFilter) {
+                    mutableStateOf(0L to emptyList<CandidateEntry>())
+                }
+                val expandedReady = cs.expandedCandidatesLoaded && visibleBarUsesExpanded &&
+                    visibleBarCandidateRevision == cs.engineRevision
+                SideEffect {
+                    if (expandedReady) lastExpandedFrame = cs.engineRevision to currentEntries
+                }
+                // Keep the previous frame until both sides have measured the new revision.
+                val expandedEntries = if (!expandedReady && cs.candidates.isNotEmpty()) lastExpandedFrame.second else currentEntries
+                val displayedExpandedRevision = if (!expandedReady && cs.candidates.isNotEmpty()) lastExpandedFrame.first else cs.engineRevision
                 val candidateQwerty = remember(configVersion, keyboardState, state.inputProfile,
                     inputPreferences.splitKeyboardEnabled, underlyingPage) {
                     val ascii = keyboardState is KeyboardLayoutState.English
@@ -1358,7 +1378,7 @@ fun KeyboardView(
                 CandidatePage(
                     state = CandidatePageState(
                         candidates = expandedEntries,
-                        engineRevision = candidateState.value.engineRevision,
+                        engineRevision = displayedExpandedRevision,
                         associationCandidates = cs.associationCandidates.drop(barAssociationCount),
                         backgroundColor = keyboardBgColor,
                         textColor = candidateTextColor,
@@ -1377,11 +1397,13 @@ fun KeyboardView(
                     ),
                     callbacks = CandidatePageCallbacks(
                         onCandidateSelect = { entry ->
+                            if (!expandedReady || !candidateState.value.expandedCandidatesLoaded) return@CandidatePageCallbacks
                             if (!callbacks.isCandidateSnapshotCurrent(cs)) return@CandidatePageCallbacks
                             // entry.globalIndex 即跨页全局索引（引擎侧 select_candidate）
                             callbacks.onGlobalCandidateSelect?.invoke(entry.globalIndex)
                         },
                         onCandidateLongPress = { entry ->
+                            if (!expandedReady || !candidateState.value.expandedCandidatesLoaded) return@CandidatePageCallbacks
                             // 长按删除自造词：与候选栏共用确认弹窗
                             val word = cs.expandedCandidates
                                 .getOrNull(entry.globalIndex)?.text
@@ -1821,7 +1843,7 @@ fun KeyboardView(
                 CompositionLocalProvider(LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
                     LocalCandidateBarScale provides candidateBarScaleState.floatValue) {
                     // The closing curtain retains its content. A quick reopen must start a new list.
-                    key(candidatePageOpening, state.inputSessionId, candidateState.value.inputText) {
+                    key(candidatePageOpening, state.inputSessionId) {
                         renderExpandedCandidates()
                     }
                 }

@@ -36,6 +36,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
         var fromProbes = false
         /** Session time it first appeared; fragments are judged only once they are old enough. */
         var bornMs = 0L
+        /** Placed by [recluster]: drifting centroids no longer merge it (the look-back regrouping decides). */
+        var regrouped = false
+        /** The user joined someone into it: the look-back regrouping never splits it again. */
+        var joinedByUser = false
         fun add(print: FloatArray) {
             prints.addLast(print)
             while (prints.size > MAX_PRINTS) prints.removeFirst()
@@ -45,7 +49,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         }
     }
 
-    private class Window(val startMs: Long, val endMs: Long, val print: FloatArray, var speaker: Int)
+    private class Window(val startMs: Long, val endMs: Long, val print: FloatArray, var speaker: Int, var pinned: Boolean = false)
     private class Pending(val id: Long, val startMs: Long, val endMs: Long)
 
     private val speakers = linkedMapOf<Int, Speaker>()
@@ -162,11 +166,29 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     /** Who speaks around [ms]: the sure probe centred nearest, else the covering window. */
     private fun speakerAt(ms: Long): Int? {
-        val probe = probes.filter { it.speaker > 0 && it.speaker in speakers && it.startMs <= ms && ms <= it.endMs }
-            .minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }
-        if (probe != null) return probe.speaker
-        return windows.filter { it.speaker in speakers && it.startMs <= ms && ms <= it.endMs }.minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }?.speaker
+        nearestCovering(probes, ms) { it.speaker > 0 && it.speaker in speakers }?.let { return it.speaker }
+        return nearestCovering(windows, ms) { it.speaker in speakers }?.speaker
     }
+
+    /**
+     * The item covering [ms] whose centre is nearest, among those passing [keep]. Windows and probes
+     * arrive in time order, so a binary search finds the few that cover [ms]: a sentence used to scan
+     * all 1200 probes for each of its 250 ms steps, and the look-back regrouping votes every sentence.
+     */
+    private inline fun nearestCovering(items: ArrayDeque<Window>, ms: Long, keep: (Window) -> Boolean): Window? {
+        var lo = 0; var hi = items.size
+        while (lo < hi) { val mid = (lo + hi) ushr 1; if (items[mid].endMs < ms) lo = mid + 1 else hi = mid }
+        var best: Window? = null; var distance = Long.MAX_VALUE
+        var i = lo
+        while (i < items.size && items[i].startMs <= ms) {
+            val w = items[i]
+            val d = kotlin.math.abs((w.startMs + w.endMs) / 2 - ms)
+            if (ms <= w.endMs && keep(w) && d < distance) { best = w; distance = d }
+            i++
+        }
+        return best
+    }
+
 
     /** Votes over [startMs, endMs] sampled every 250 ms with [speakerAt]. */
     private fun sampledVotes(startMs: Long, endMs: Long): Map<Int, Int> {
@@ -174,6 +196,14 @@ internal class SpeakerTracker(strictness: Int = 1) {
         var t = startMs + 125
         while (t < endMs) { speakerAt(t)?.let { votes[it] = (votes[it] ?: 0) + 1 }; t += 250 }
         return votes
+    }
+
+    /** The voice of most of the sentence's sure probes, else of most of its window time. */
+    private fun sentenceVoice(startMs: Long, endMs: Long): Int? {
+        sampledVotes(startMs, endMs).maxByOrNull { it.value }?.let { return it.key }
+        val votes = HashMap<Int, Long>()
+        for (w in windows) { val o = minOf(w.endMs, endMs) - maxOf(w.startMs, startMs); if (o > 0) votes[w.speaker] = (votes[w.speaker] ?: 0) + o }
+        return votes.maxByOrNull { it.value }?.key
     }
 
     /** A finished sentence; labelled once a window covers its end (or [settle] is called). */
@@ -185,18 +215,15 @@ internal class SpeakerTracker(strictness: Int = 1) {
     /** Label every waiting sentence with what is known now (end of speech, stop). */
     @Synchronized fun settle(): List<Label> = resolve(Long.MAX_VALUE)
 
-    private fun resolve(upTo: Long): List<Label> {
+    /** Label one waiting sentence with what is known now: its text is ready and should not wait for the next window. */
+    @Synchronized fun labelNow(segmentId: Long): List<Label> = resolve(Long.MAX_VALUE, only = segmentId)
+
+    private fun resolve(upTo: Long, only: Long? = null): List<Label> {
         if (pending.isEmpty() || windows.isEmpty()) return emptyList()
-        val done = pending.filter { it.endMs <= upTo }
+        val done = pending.filter { it.endMs <= upTo && (only == null || it.id == only) }
         pending.removeAll(done.toSet())
         return done.map { segment ->
-            val votes = HashMap<Int, Long>()
-            for (w in windows) {
-                val overlap = minOf(w.endMs, segment.endMs) - maxOf(w.startMs, segment.startMs)
-                if (overlap > 0) votes[w.speaker] = (votes[w.speaker] ?: 0) + overlap
-            }
-            val sampled = sampledVotes(segment.startMs, segment.endMs)
-            val speaker = sampled.maxByOrNull { it.value }?.key ?: votes.maxByOrNull { it.value }?.key
+            val speaker = sentenceVoice(segment.startMs, segment.endMs)
                 ?: windows.minBy { minOf(kotlin.math.abs(it.endMs - segment.startMs), kotlin.math.abs(it.startMs - segment.endMs)) }.speaker
             segmentSpeaker[segment.id] = speaker
             segmentSpan[segment.id] = longArrayOf(segment.startMs, segment.endMs)
@@ -250,6 +277,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
             var pair: Pair<Speaker, Speaker>? = null
             loop@ for (i in list.indices) for (j in i + 1 until list.size) {
                 if (list[i].named && list[j].named) continue
+                if (list[i].regrouped && list[j].regrouped) continue
                 if (similarity(list[i].centroid ?: continue, list[j].centroid) >= MERGE_SIMILARITY) { pair = list[i] to list[j]; break@loop }
             }
             val (keep, drop) = pair ?: return changed
@@ -277,6 +305,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         if (from == into) return emptyList()
         val source = speakers[from] ?: return emptyList()
         val target = speakers[into] ?: return emptyList()
+        target.joinedByUser = true
         return moveAll(source, target)
     }
 
@@ -287,6 +316,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         val span = segmentSpan[segmentId] ?: return
         for (w in windows) if (w.startMs >= span[0] - 500 && w.endMs <= span[1] + 500) {
             w.speaker = speakerId
+            w.pinned = true
             target.add(w.print)
         }
     }
@@ -344,6 +374,110 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     private var nowMs = 0L
     private fun newSpeaker(print: FloatArray): Speaker = Speaker(nextId++).also { it.add(print); it.bornMs = nowMs; speakers[it.id] = it }
+
+    /**
+     * Looking back: the last [RECLUSTER_WINDOWS] two-second windows (about five minutes of speech) are
+     * grouped again all at once, and every sentence in that stretch is voted again.
+     *
+     * Online, each window joins the closest running average; a second voice that starts close enough
+     * joins the first, pulls its average over and from then on everything matches it (PC replay
+     * 2026-11-06, 160 dialogues built from FLEURS speakers: 23–38% of two-person speech on the wrong
+     * person, 11–16 of 20 two-person loudspeaker dialogues shown as one person). Grouping everything
+     * heard so far at once does not drift. The cut is chosen per session: through a loudspeaker every
+     * voice sounds alike and only a stricter cut separates them, so each cut must show clearly
+     * separated groups (silhouette) before it is used; one voice alone never passes a split.
+     * Ids stay stable: a new group takes the id most of its windows already had.
+     */
+    @Synchronized fun recluster(): List<Label> {
+        val recent = windows.toList().takeLast(RECLUSTER_WINDOWS)
+        val n = recent.size
+        if (n < 2 * MIN_GROUP) return emptyList()
+        val sim = Array(n) { FloatArray(n) }
+        for (i in 0 until n) { sim[i][i] = 1f; for (j in i + 1 until n) { val v = similarity(recent[i].print, recent[j].print); sim[i][j] = v; sim[j][i] = v } }
+        val merges = averageLinkage(sim)
+        var chosen: IntArray? = null
+        var chosenScore = Float.NEGATIVE_INFINITY
+        var fallback: IntArray? = null
+        for ((level, need) in RECLUSTER_LEVELS) {
+            val groups = absorbSmall(cut(merges, n, level), recent)
+            if (level == RECLUSTER_LEVELS.first().first) fallback = groups
+            if (groups.toSet().size < 2) continue
+            val score = silhouette(sim, groups) - need
+            if (score >= 0f && score > chosenScore) { chosen = groups; chosenScore = score }
+        }
+        val groups = chosen ?: fallback ?: return emptyList()
+        // Each group takes the id most of its windows had (one group per id), else a remembered voice
+        // it sounds like, else a new person.
+        val counts = HashMap<Int, HashMap<Int, Int>>()
+        for (i in 0 until n) { val old = recent[i].speaker; if (old in speakers) counts.getOrPut(groups[i]) { HashMap() }.let { it[old] = (it[old] ?: 0) + 1 } }
+        val target = HashMap<Int, Int>()
+        val taken = HashSet<Int>()
+        // Someone the user joined keeps every group that holds a real part of them: no split comes back.
+        for ((g, m) in counts) m.filter { (old, c) -> c >= MIN_GROUP && speakers[old]?.joinedByUser == true }.maxByOrNull { it.value }?.let { target[g] = it.key; taken += it.key }
+        for ((g, old, _) in counts.flatMap { (g, m) -> m.map { (old, c) -> Triple(g, old, c) } }.sortedByDescending { it.third }) {
+            if (g in target) continue
+            if (old !in taken || speakers[old]?.joinedByUser == true) { target[g] = old; taken += old }
+        }
+        val centroids = HashMap<Int, FloatArray>()
+        for (g in groups.toSet()) {
+            val sum = FloatArray(recent[0].print.size)
+            for (i in 0 until n) if (groups[i] == g) for (k in sum.indices) sum[k] += recent[i].print[k]
+            centroids[g] = normalized(sum)
+        }
+        for (g in groups.toSet().sorted()) {
+            if (g in target) continue
+            val c = centroids.getValue(g)
+            val known = speakers.values.filter { (it.named || it.ignored) && it.id !in taken }.maxByOrNull { similarity(c, it.centroid) }
+            target[g] = if (known != null && similarity(c, known.centroid) >= threshold) known.id else newSpeaker(c).id
+            taken += target.getValue(g)
+        }
+        val before = recent.map { it.speaker }
+        for (i in 0 until n) if (!recent[i].pinned) recent[i].speaker = target.getValue(groups[i])
+        // Averages restart from their own windows only.
+        for (g in groups.toSet()) {
+            val sp = speakers[target.getValue(g)] ?: continue
+            val own = (0 until n).filter { groups[it] == g }
+            if (own.size >= MIN_GROUP) { sp.prints.clear(); for (i in own.takeLast(MAX_PRINTS)) sp.add(recent[i].print) }
+            sp.regrouped = true; sp.fromProbes = false
+        }
+        unmatched = null
+        val changed = ArrayList<Label>()
+        // Automatic people whose every window went elsewhere disappear; their older sentences follow
+        // the group that took most of their windows.
+        val gone = before.toSet().filter { old -> old in speakers && recent.none { it.speaker == old } && automatic(old) }
+        for (old in gone) {
+            val into = (0 until n).filter { before[it] == old }.groupingBy { recent[it].speaker }.eachCount().maxByOrNull { it.value }?.key ?: continue
+            speakers.remove(old)
+            for (w in windows) if (w.speaker == old) w.speaker = into
+            for (entry in segmentSpeaker.entries) if (entry.value == old) { entry.setValue(into); changed += Label(entry.key, into) }
+        }
+        // Probes in the stretch are judged again against the new averages, then sentences are voted again.
+        val from = recent.first().startMs
+        val to = recent.last().endMs
+        for (p in probes) if (p.endMs >= from) {
+            val ranked = speakers.values.map { it.id to similarity(p.print, it.centroid) }.sortedByDescending { it.second }
+            val best = ranked.firstOrNull()
+            val second = ranked.getOrNull(1)?.second ?: -1f
+            p.speaker = if (best != null && best.second >= threshold - PROBE_SLACK && best.second - second >= PROBE_MARGIN) best.first else -1
+        }
+        for ((id, span) in segmentSpan.entries.toList()) {
+            if (span[1] < from || span[0] > to) continue
+            val speaker = sentenceVoice(span[0], span[1]) ?: continue
+            if (segmentSpeaker[id] != speaker) { segmentSpeaker[id] = speaker; changed += Label(id, speaker) }
+        }
+        // A person the short probes or a stray window opened inside this stretch who holds none of its
+        // windows is not a group: their sentences go to the voice they sound most like.
+        val owners = recent.map { it.speaker }.toSet()
+        val strays = speakers.values.filter { it.id !in owners && it.bornMs >= from && automatic(it.id) }.map { it.id }
+        for (id in strays) {
+            val c = speakers[id]?.centroid ?: continue
+            speakers.remove(id)
+            val into = speakers.values.filter { it.id in owners }.maxByOrNull { similarity(c, it.centroid) }?.id ?: continue
+            for (p in probes) if (p.speaker == id) p.speaker = -1
+            for (entry in segmentSpeaker.entries) if (entry.value == id) { entry.setValue(into); changed += Label(entry.key, into) }
+        }
+        return changed.associateBy { it.segmentId }.values.toList()
+    }
 
     /** Every labelled sentence or piece as (start, end, speaker), for the after-the-fact re-check. */
     @Synchronized fun spans(): List<Triple<Long, Long, Int>> =
@@ -413,6 +547,95 @@ internal class SpeakerTracker(strictness: Int = 1) {
             level <= 0 -> .35f
             level == 1 -> .45f
             else -> .45f
+        }
+
+        /** Windows grouped again by [recluster]: about five minutes of speech. */
+        const val RECLUSTER_WINDOWS = 300
+        /** Smaller groups are not people: their windows join the closest group. */
+        const val MIN_GROUP = 3
+        /**
+         * Cuts tried (average similarity inside a group) with the silhouette each must reach; the first
+         * is used when none passes. Stricter cuts need clearer groups: one voice split at 0.5–0.55
+         * scored up to 0.31, real two-person loudspeaker dialogues 0.19–0.49; a quiet room needs the
+         * loose 0.35 or one person's changing voice became two (PC replay 2026-11-06).
+         */
+        val RECLUSTER_LEVELS = listOf(.35f to .15f, .40f to .15f, .45f to .20f, .50f to .30f, .55f to .33f)
+
+        /**
+         * Average-linkage merges of [sim] (n × n), as (kept index, absorbed index, similarity), highest
+         * first. Nearest-neighbour chain: O(n²) instead of O(n³), so 300 windows take a few ms.
+         */
+        internal fun averageLinkage(sim: Array<FloatArray>): List<Triple<Int, Int, Float>> {
+            val n = sim.size
+            val d = Array(n) { sim[it].copyOf() }
+            val size = IntArray(n) { 1 }
+            val alive = BooleanArray(n) { true }
+            var left = n
+            val merges = ArrayList<Triple<Int, Int, Float>>(n)
+            val chain = IntArray(n); var top = 0
+            while (left > 1) {
+                if (top == 0) { chain[top++] = alive.indexOfFirst { it } }
+                val a = chain[top - 1]
+                val previous = if (top >= 2) chain[top - 2] else -1
+                var b = -1; var best = Float.NEGATIVE_INFINITY
+                for (k in 0 until n) if (alive[k] && k != a) { val v = d[a][k]; if (v > best || v == best && k == previous) { best = v; b = k } }
+                if (b == previous) {
+                    top -= 2
+                    val (keep, drop) = if (a < b) a to b else b to a
+                    merges += Triple(keep, drop, best)
+                    val sk = size[keep]; val sd = size[drop]
+                    for (k in 0 until n) if (alive[k] && k != keep && k != drop) {
+                        val v = (sk * d[keep][k] + sd * d[drop][k]) / (sk + sd)
+                        d[keep][k] = v; d[k][keep] = v
+                    }
+                    size[keep] = sk + sd; alive[drop] = false; left--
+                } else chain[top++] = b
+            }
+            merges.sortByDescending { it.third }
+            return merges
+        }
+
+        /** Group of each item when merges down to [level] are applied (average linkage never inverts). */
+        internal fun cut(merges: List<Triple<Int, Int, Float>>, n: Int, level: Float): IntArray {
+            val parent = IntArray(n) { it }
+            fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; var y = x; while (parent[y] != r) { val next = parent[y]; parent[y] = r; y = next }; return r }
+            for ((a, b, s) in merges) { if (s < level) break; parent[find(b)] = find(a) }
+            return IntArray(n) { find(it) }
+        }
+
+        private fun absorbSmall(groups: IntArray, items: List<Window>): IntArray {
+            val sizes = groups.toList().groupingBy { it }.eachCount()
+            val big = sizes.filter { it.value >= MIN_GROUP }.keys
+            if (big.isEmpty()) return IntArray(groups.size) { groups[0] }
+            if (big.size == sizes.size) return groups
+            val centroids = big.associateWith { g ->
+                val sum = FloatArray(items[0].print.size)
+                for (i in groups.indices) if (groups[i] == g) for (k in sum.indices) sum[k] += items[i].print[k]
+                normalized(sum)
+            }
+            return IntArray(groups.size) { i -> if (groups[i] in big) groups[i] else centroids.maxBy { similarity(items[i].print, it.value) }.key }
+        }
+
+        /** Mean silhouette with distance 1 − similarity. */
+        internal fun silhouette(sim: Array<FloatArray>, groups: IntArray): Float {
+            val ids = groups.distinct()
+            if (ids.size < 2) return -1f
+            val g = IntArray(groups.size) { ids.indexOf(groups[it]) }
+            val counts = IntArray(ids.size); for (x in g) counts[x]++
+            val sums = FloatArray(ids.size)
+            var total = 0f
+            for (i in g.indices) {
+                java.util.Arrays.fill(sums, 0f)
+                val row = sim[i]
+                for (j in g.indices) if (j != i) sums[g[j]] += 1f - row[j]
+                val own = g[i]
+                if (counts[own] < 2) continue
+                val a = sums[own] / (counts[own] - 1)
+                var b = Float.POSITIVE_INFINITY
+                for (k in ids.indices) if (k != own) b = minOf(b, sums[k] / counts[k])
+                total += (b - a) / maxOf(a, b)
+            }
+            return total / groups.size
         }
 
         fun similarity(a: FloatArray, b: FloatArray?): Float {

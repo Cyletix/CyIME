@@ -101,7 +101,8 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                     "start" -> 0
                     "end" -> text.length
                     else -> if (movement.startsWith("inline:")) {
-                        val code = service.candidateState.value.shownPreedit(service.uiState.value.inputProfile)
+                        val code = service.inlinePinyinText()
+                            ?: service.candidateState.value.shownPreedit(service.uiState.value.inputProfile)
                         movement.removePrefix("inline:").toIntOrNull()?.let { session.editOffset(code, it) } ?: caret
                     } else (caret + (movement.toIntOrNull() ?: 0)).coerceIn(0, text.length)
                 }
@@ -111,6 +112,11 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 val insertion = if (session.isT9 && key == "1") "'" else key.lowercase()
                 text = text.take(caret) + insertion + text.drop(caret)
                 caret += insertion.length
+            }
+            if (text != session.text) {
+                val merged = PinyinEditBuffer.mergeSeparators(text, caret)
+                text = merged.first
+                caret = merged.second
             }
             val engine = service.rimeEngine
             val changed = text != session.text
@@ -145,7 +151,9 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 if (session.isT9) service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
                 // A caret-only move leaves the host's text and composing span intact.
                 service.sessionController.updateUIWithResult(result, updateInputBoxComposition = changed)
-                service.showInlineEditCaret(next)
+                // A host drag has already placed the cursor. Replaying queued positions here
+                // would pull the handle backwards while the user is still dragging it.
+                if (key?.startsWith("preedit_cursor:inline:") != true) service.showInlineEditCaret(next)
                 reply(next)
             }
         }

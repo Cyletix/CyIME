@@ -10,6 +10,7 @@ import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
+import com.kingzcheung.xime.ui.keyboard.DeleteDragSession
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.util.FileLogger
 import kotlin.math.abs
@@ -56,7 +57,11 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
-            startDeleteDrag = { ImeDistanceBackspace(service, state.inputSessionId)::move },
+            startDeleteDrag = {
+                val generation = service.beginDeleteDrag()
+                DeleteDragSession(ImeDistanceBackspace(service, state.inputSessionId)::move) { service.finishDeleteDrag(generation) }
+            },
+            isDeleteDragging = { service.deleteDragActive.value },
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
             onGlideWord = service.keyRouter::commitGlideWord,
             onGlideCode = service.keyRouter::typeGlideCode,

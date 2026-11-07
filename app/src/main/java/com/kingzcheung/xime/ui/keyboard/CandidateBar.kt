@@ -1747,9 +1747,12 @@ private fun ScrollableCandidateRow(
         }
     }.value
     SideEffect {
-        callbacks.onVisibleCandidatesChanged?.invoke(candidates.take(readablePrefix))
-        callbacks.onVisibleAssociationsChanged?.invoke(if (readablePrefix > candidates.size)
-            all.subList(candidates.size, readablePrefix.coerceAtMost(all.size)) else emptyList())
+        val layout = listState.layoutInfo
+        if (all.isEmpty() || (layout.viewportEndOffset > layout.viewportStartOffset && layout.visibleItemsInfo.isNotEmpty())) {
+            callbacks.onVisibleCandidatesChanged?.invoke(candidates.take(readablePrefix))
+            callbacks.onVisibleAssociationsChanged?.invoke(if (readablePrefix > candidates.size)
+                all.subList(candidates.size, readablePrefix.coerceAtMost(all.size)) else emptyList())
+        }
     }
     // 露出长候选时不对齐，停在手指松开的地方，才能看到长候选中间的字。
     val longVisible by remember(listState) {

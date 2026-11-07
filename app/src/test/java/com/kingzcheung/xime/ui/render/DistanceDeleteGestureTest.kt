@@ -36,6 +36,7 @@ internal class DistanceDeleteScene {
     var taps = 0
     var clear = 0
     var undo = 0
+    var finishedDrags = 0
     var pixelsPerDp = 1f
     /** The last touch's edit, kept after release like XimeInputMethodService.lastSwipeDelete. */
     var last: DistanceBackspace? = null
@@ -53,7 +54,7 @@ internal class DistanceDeleteScene {
                     if (edit == null) edit = DistanceBackspace.open(ic, forward = signed < 0).also { last = it }
                     check(edit?.move(kotlin.math.abs(signed)) == true)
                 }
-                apply
+                DeleteDragSession(apply) { finishedDrags++ }
             }) {
                 Box(Modifier.size(76.dp, 56.dp)) {
                     SwipeableIconKeyButton(rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace), { taps++ },
@@ -182,6 +183,7 @@ class DistanceDeleteGestureTest {
         open()
         key.performTouchInput { down(center) }; drag(-64); text("甲尾")
         key.performTouchInput { cancel() }; text(scene.original)
+        rule.runOnIdle { assertEquals(1, scene.finishedDrags) }
         key.performTouchInput { down(center) }; drag(-20); key.performTouchInput { up() }
         key.performTouchInput { down(center); up() }
         key.performTouchInput { down(center) }; drag(0, -90); key.performTouchInput { up() }

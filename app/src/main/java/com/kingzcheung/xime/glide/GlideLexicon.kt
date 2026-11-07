@@ -101,3 +101,70 @@ internal fun pinyinCodes(entries: List<List<String>>, doublePinyin: DoublePinyin
         if (doublePinyin == null) syllables.joinToString("")
         else syllables.map { doublePinyin.code(it) ?: return@mapNotNull null }.joinToString("")
     }.distinct()
+
+/** Use the engine's reading to resolve codes such as xian (xian or xi an). */
+internal fun chineseGlideSyllables(
+    code: String, doublePinyin: Boolean, readings: List<String>, entries: List<List<String>>,
+): List<String>? {
+    if (code.isEmpty()) return null
+    if (doublePinyin) return code.chunked(2).takeIf { code.length % 2 == 0 }
+    val matches = entries.asSequence().filter { syllables ->
+        var offset = 0
+        syllables.all { syllable ->
+            val matches = code.regionMatches(offset, syllable, 0, syllable.length)
+            offset += syllable.length
+            matches
+        } && offset == code.length
+    }.distinct().toList()
+    for ((readingIndex, reading) in readings.withIndex()) {
+        val normalized = java.text.Normalizer.normalize(reading.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace("u\u0308", "v").replace(Regex("\\p{M}+"), "").replace(Regex("[1-5]"), "")
+        val tokens = normalized.split(Regex("[\\s'’]+"))
+        for (start in tokens.indices) {
+            val suffix = tokens.drop(start)
+            // An unsegmented preedit can be the raw code rather than the chosen reading.
+            if (readingIndex > 0 && suffix.size == 1 && matches.size != 1) continue
+            if (suffix.joinToString("") == code &&
+                (suffix in matches || suffix.all { DoublePinyinScheme.FLYPY.code(it) != null })) return suffix
+        }
+    }
+    return matches.singleOrNull()
+}
+
+/** Keep explicit apostrophes with the following syllable so deleting it also removes its separator. */
+internal fun chineseCodeSyllables(
+    raw: String, doublePinyin: Boolean, readings: List<String>, entries: List<List<String>>,
+    allowIncomplete: Boolean = false,
+): List<String>? {
+    val code = raw.replace("'", "")
+    fun mapToRaw(syllables: List<String>): List<String>? {
+        var offset = 0
+        val result = syllables.map { syllable ->
+            val start = offset
+            while (offset < raw.length && raw[offset] == '\'') offset++
+            if (!raw.regionMatches(offset, syllable, 0, syllable.length)) return null
+            offset += syllable.length
+            raw.substring(start, offset)
+        }.toMutableList()
+        if (offset < raw.length && result.isNotEmpty() && raw.drop(offset).all { it == '\'' }) {
+            result[result.lastIndex] += raw.substring(offset)
+            offset = raw.length
+        }
+        return result.takeIf { offset == raw.length }
+    }
+    if (doublePinyin && allowIncomplete && code.isNotEmpty()) {
+        // Prefer the engine's actual key boundaries; full-pinyin comments will not match the keys.
+        for (reading in readings) {
+            val tokens = reading.lowercase().split(Regex("[\\s'’]+"))
+            for (start in tokens.indices) {
+                val suffix = tokens.drop(start)
+                if (suffix.all { it.length in 1..2 && it.all { c -> c in 'a'..'z' || c == ';' } } &&
+                    suffix.joinToString("") == code) mapToRaw(suffix)?.let { return it }
+            }
+        }
+        // Explicit separators are boundaries; an unfinished last key remains one deletion.
+        val parts = raw.split('\'').filter { it.isNotEmpty() }
+        return mapToRaw(parts.flatMap { it.chunked(2) })
+    }
+    return mapToRaw(chineseGlideSyllables(code, doublePinyin, readings, entries) ?: return null)
+}

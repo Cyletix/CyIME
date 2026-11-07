@@ -10,6 +10,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+class DeleteDragSession(val move: (Int) -> Unit, val finish: () -> Unit)
+
 internal data class RepeatingKeyActions(
     val onTap: () -> Unit,
     val onPress: () -> Unit,
@@ -23,7 +25,7 @@ internal data class RepeatingKeyActions(
     val downLabel: String? = null,
     // 上下动作对调后，预览仍从原提示所在一侧出现（“清空”标在上方，下拉时也从上方移入）。
     val swappedVertical: Boolean = false,
-    val startDeleteDrag: (() -> (Int) -> Unit)? = null,
+    val startDeleteDrag: (() -> DeleteDragSession)? = null,
     /** 按住后每隔多久再来一下；删除键按「长按删除速度」，其他键 30 ms。 */
     val repeatIntervalMs: Long = 30L,
     /** 上下滑松手生效的距离；删除键按「清空滑动距离」，其他键 80dp。 */
@@ -49,7 +51,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
         val repeat = RepeatInput()
         var repeated = false
         var crossed = false
-        var drag: ((Int) -> Unit)? = null
+        var drag: DeleteDragSession? = null
         // 右滑是对称的向后删除（Delete）：起手方向定下后本次触摸不再换向。
         var forwardDrag = false
         var lastCount = 0
@@ -96,7 +98,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                     // A tiny wobble on a boundary must not alternately delete and reinsert a character.
                     val distance = if (forwardDrag) dx else -dx
                     val count = maxOf(stops(distance), minOf(lastCount, stops(distance + backtrackSlop)))
-                    if (count != lastCount) { drag.invoke(if (forwardDrag) -count else count); lastCount = count }
+                    if (count != lastCount) { drag.move(if (forwardDrag) -count else count); lastCount = count }
                     change.consume()
                     if (!change.pressed) { released = true; break }
                     continue
@@ -142,11 +144,15 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                 }
             }
         } finally {
-            if (!released && lastCount != 0) drag?.invoke(0)
-            repeat.stop()
-            timer?.cancel()
-            actions.onRelease()
-            actions.onPreview(SwipeState())
+            try {
+                if (!released && lastCount != 0) drag?.move?.invoke(0)
+            } finally {
+                drag?.finish?.invoke()
+                repeat.stop()
+                timer?.cancel()
+                actions.onRelease()
+                actions.onPreview(SwipeState())
+            }
         }
     }
 }

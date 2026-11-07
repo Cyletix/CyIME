@@ -234,6 +234,7 @@ class RimeEngine {
     }
 
     private val candidateRevision = java.util.concurrent.atomic.AtomicLong(1L)
+    internal fun currentCandidateRevision(): Long = candidateRevision.get()
 
     internal fun glidePreviewRevision(): Long = candidateRevision.get()
 
