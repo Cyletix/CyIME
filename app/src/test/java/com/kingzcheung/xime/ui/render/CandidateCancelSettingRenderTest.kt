@@ -14,6 +14,9 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
@@ -74,6 +77,21 @@ class CandidateCancelSettingRenderTest {
         rule.onNodeWithText("候选词从最左边开始", useUnmergedTree = true).assertExists()
         rule.onNodeWithText("↑ 点它取消当前输入", useUnmergedTree = true).assertDoesNotExist()
         assertFalse(SettingsPreferences.shouldShowCandidateCancelButton(context))
+    }
+
+    @Test fun cancelPreviewTracksCrossSwitch() {
+        SettingsPreferences.setShowCandidateCancelButton(context, true)
+        SettingsPreferences.setAssociationCancelCross(context, false)
+        KeyboardThemes.initFromConfig(context)
+        rule.setContent { XimeTheme(darkTheme = false, themeId = "soft_blue") {
+            LayoutDisplaySettingsContent(onBack = {}, initialPage = "candidates") } }
+        val tag = hasTestTag("settings-search-anchor:候选栏关闭键用叉号") or hasTestTag("association-cancel-cross-setting")
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(tag)
+        rule.onNodeWithContentDescription("预览取消按钮：左箭头", useUnmergedTree = true).assertExists()
+        rule.onNode(tag).performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithContentDescription("预览取消按钮：叉号", useUnmergedTree = true).assertExists()
+        rule.onNode(tag).performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithContentDescription("预览取消按钮：左箭头", useUnmergedTree = true).assertExists()
     }
 
     @Test fun renderLegend() {

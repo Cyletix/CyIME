@@ -274,9 +274,7 @@ fun CandidateBar(
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
-    // 候选栏两端最多两个按钮（用户 11-03）：左边取消，最右展开候选，位置固定。左边打字和联想都是「<」，
-    // 设置「联想关闭键用叉号」打开后联想时才是 ⊗（用户 11-03：两种状态图标不一样）；
-    // 收起键盘只在空闲（没有候选）时有。手写候选也是纯联想态，但那里的取消是撤销当前字，仍用「<」。
+    // 候选栏两端的按钮位置固定；开启叉号后，各种候选的取消按钮都用 ⊗，动作不变。
     val closesAssociation = state is CandidateBarState.AssociationOnly &&
         !(page is KeyboardPage.Main && page.type == MainType.HANDWRITING)
     // 手写候选的注释是读音，单字也放得下：「自动」在手写里照样显示，只有「隐藏」才不显示
@@ -471,11 +469,11 @@ fun CandidateBar(
                 .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (showCompositionCancel && closesAssociation && associationCancelCross) {
+            if (showCompositionCancel && associationCancelCross) {
                 KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
-                    modifier = Modifier.testTag("association-cancel-cross"), restingFill = edgeButtonFill,
+                    modifier = Modifier.testTag(if (closesAssociation) "association-cancel-cross" else "candidate-cancel-cross"), restingFill = edgeButtonFill,
                     slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
-                    Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
+                    Icon(Icons.Outlined.HighlightOff, contentDescription = if (closesAssociation) "关闭联想" else "取消输入",
                         tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(4.dp))

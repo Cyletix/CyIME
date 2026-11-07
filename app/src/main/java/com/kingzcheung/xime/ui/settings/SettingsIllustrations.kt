@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.HighlightOff
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -198,26 +199,27 @@ internal fun CandidateCommentIllustration(mode: CandidateCommentMode) {
  * 两端圆底按钮和真实候选栏一样（左取消、右展开），随开关实时变化。
  */
 @Composable
-internal fun CandidateCancelIllustration(show: Boolean) = LegendKeyboardColors { CandidateCancelContent(show) }
+internal fun CandidateCancelIllustration(show: Boolean, cross: Boolean = false) = LegendKeyboardColors { CandidateCancelContent(show, cross) }
 
 @Composable
-private fun CandidateCancelContent(show: Boolean) {
+private fun CandidateCancelContent(show: Boolean, cross: Boolean) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     val primary = MaterialTheme.colorScheme.primary
     val muted = onSurface.copy(alpha = 0.6f)
     @Composable
-    fun EdgeButton(icon: ImageVector, highlight: Boolean) {
+    fun EdgeButton(icon: ImageVector, highlight: Boolean, description: String? = null) {
         Box(Modifier.size(26.dp).clip(CircleShape)
             .background(if (highlight) primary.copy(alpha = 0.3f) else onSurface.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = if (highlight) primary else muted, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = description, tint = if (highlight) primary else muted, modifier = Modifier.size(20.dp))
         }
     }
     Column(Modifier.fillMaxWidth().testTag("candidate-cancel-illustration").clip(RoundedCornerShape(6.dp))
         .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp)) {
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 4.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (show) EdgeButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, highlight = true)
+            if (show) EdgeButton(if (cross) Icons.Outlined.HighlightOff else Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                highlight = true, description = if (cross) "预览取消按钮：叉号" else "预览取消按钮：左箭头")
             Spacer(Modifier.width(if (show) 8.dp else 4.dp))
             Text("你好", fontSize = 13.sp, color = primary, fontWeight = FontWeight.Medium, maxLines = 1)
             Spacer(Modifier.width(12.dp))
