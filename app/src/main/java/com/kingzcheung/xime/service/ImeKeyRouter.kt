@@ -1150,7 +1150,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 「只清空光标前的内容」（默认关）：清输入框时光标后的字留着。
                     val beforeOnly = clearPrefs.getBoolean(
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
-                    val scope = ClearAllScope.of(hasInputState(candState), wholeField)
+                    val scope = ClearAllScope.of(hasInputState(candState, includeAssociation = false), wholeField)
                     // 清的是焦点所在的框：键盘自己的输入框（新增固定等）有焦点时清它，不清后面应用的框。
                     service.lastClearedTarget = service.uiState.value.inputTarget
                     // 清空比之前的左右滑删字新，撤回放回的是这次清空。
@@ -1181,6 +1181,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     } else {
                         // 直接上屏的英文已经在输入框里，跟着下面整框一起删、一起撤回，这里不单独回删。
                         // 输入框本来是空的（只有拼音）时，撤回照原来一样放回拼音。
+                        service.predictionManager.invalidatePendingPredictions()
                         val composedText = if (scope.composition && candState.pendingEnglishText.isEmpty()) candState.inputText else ""
                         if (scope.composition) clearInputStateForKeys()
                         // 空闲态：清空整个输入框（光标前、选区、光标后），记下来供下滑撤回原位恢复。
@@ -2562,16 +2563,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 或 T9 partial 累积。
      * 不能用 RIME getInput()——tryLocked 锁竞争时静默返回空，会误判空闲态。
      */
-    private fun hasInputState(candState: CandidateState): Boolean =
+    private fun hasInputState(candState: CandidateState, includeAssociation: Boolean = true): Boolean =
         candState.isComposing ||
             candState.inputText.isNotEmpty() ||
             candState.preeditText.isNotEmpty() ||
             candState.pendingEnglishText.isNotEmpty() ||
             service.t9PartialSegments.isNotEmpty() ||
             service.rimeEngine.compositionActiveForDeletion() != false ||
-            (candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery && !candState.isDigitPhraseList) ||
+            (includeAssociation && candState.associationCandidates.isNotEmpty() && !candState.isDeletionRecovery && !candState.isDigitPhraseList) ||
             candState.isShowingRecentClipboard ||
-            service.predictionManager.hasPendingPrediction
+            (includeAssociation && service.predictionManager.hasPendingPrediction)
 
     /** Ends the composition in the input FIFO, T9's own digit state included (see [com.kingzcheung.xime.rime.RimeEngine.endQueuedComposition]). */
     internal fun endQueuedComposition() =
