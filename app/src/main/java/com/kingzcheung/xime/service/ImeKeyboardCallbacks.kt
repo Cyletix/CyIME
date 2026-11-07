@@ -56,7 +56,11 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
-            startDeleteDrag = { ImeDistanceBackspace(service, state.inputSessionId)::move },
+            startDeleteDrag = {
+                service.beginDeleteDrag()
+                ImeDistanceBackspace(service, state.inputSessionId)::move
+            },
+            isDeleteDragging = { service.deleteDragActive.value },
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
             onGlideWord = service.keyRouter::commitGlideWord,
             onGlideCode = service.keyRouter::typeGlideCode,
@@ -129,6 +133,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
             onKeyRelease = { key ->
+                if (key == "delete") service.finishDeleteDrag()
                 service.feedbackManager.hapticFeedback(view, keyUp = true, type = KeyFeedbackType.fromKey(key))
             },
             onCandidateSelect = { index ->

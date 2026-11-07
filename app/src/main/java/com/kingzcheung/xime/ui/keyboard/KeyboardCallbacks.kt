@@ -214,4 +214,5 @@ data class KeyboardCallbacks(
     /** Create a gesture-local editor; its argument is the net number of characters to remove
      *  before the caret, or minus the number to remove after it (right swipe = forward delete). */
     val startDeleteDrag: (() -> (Int) -> Unit)? = null,
+    val isDeleteDragging: () -> Boolean = { false },
 )

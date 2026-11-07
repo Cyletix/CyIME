@@ -677,10 +677,36 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 候选展开页自动收起：候选与联想均空（编码删空）时收起在位展开页，不留空页。
      *  在状态生产端调用（而非依赖 UI 重组观察）——候选变化时键盘区作用域被设计为跳过重组。 */
     internal fun maybeCollapseCandidatePage() {
-        if (!keyboardViewModel.candidatePageExpanded.value) return
+        if (deleteDragActive.value || !keyboardViewModel.candidatePageExpanded.value) return
         val cs = candidateState.value
         if (cs.candidates.isEmpty() && cs.associationCandidates.isEmpty()) {
             keyboardViewModel.setCandidatePageExpanded(false)
+        }
+    }
+
+    internal val deleteDragActive = androidx.compose.runtime.mutableStateOf(false)
+    private var deleteDragGeneration = 0L
+
+    internal fun beginDeleteDrag() {
+        deleteDragGeneration++
+        deleteDragActive.value = true
+    }
+
+    internal fun finishDeleteDrag() {
+        if (!deleteDragActive.value) return
+        val generation = deleteDragGeneration
+        if (inputReadiness.ticket() == null) {
+            deleteDragActive.value = false
+            maybeCollapseCandidatePage()
+            return
+        }
+        keyRouter.postRimeJob("finish_delete_drag") {
+            withContext(Dispatchers.Main) {
+                if (generation == deleteDragGeneration) {
+                    deleteDragActive.value = false
+                    maybeCollapseCandidatePage()
+                }
+            }
         }
     }
 
@@ -4367,6 +4393,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun clearInputState() {
+        deleteDragGeneration++
+        deleteDragActive.value = false
         newInputGeneration()
         if (uiState.value.handwritingExpanded) uiState.value = uiState.value.copy(handwritingExpanded = false)
         if (uiState.value.voiceCollapsed) uiState.value = uiState.value.copy(voiceCollapsed = false)

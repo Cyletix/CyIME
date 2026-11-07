@@ -12,6 +12,24 @@ import org.junit.Test
 class CollapseEmptyCandidatePageTest {
     @get:Rule val rule = createComposeRule()
 
+    @Test fun emptyPageWaitsUntilDeleteDragEnds() {
+        val candidates = mutableStateOf(CandidateState(candidates = listOf("测试")))
+        val dragging = mutableStateOf(false)
+        var collapses = 0
+        rule.setContent { CollapseEmptyCandidatePage(true, candidates, { dragging.value }) { collapses++ } }
+        rule.runOnIdle { dragging.value = true; candidates.value = CandidateState() }
+        rule.waitForIdle()
+        rule.runOnIdle { assertEquals(0, collapses); candidates.value = CandidateState(candidates = listOf("测试")) }
+        rule.waitForIdle()
+        rule.runOnIdle { dragging.value = false }
+        rule.waitForIdle()
+        rule.runOnIdle { assertEquals(0, collapses); dragging.value = true; candidates.value = CandidateState() }
+        rule.waitForIdle()
+        rule.runOnIdle { dragging.value = false }
+        rule.waitForIdle()
+        rule.runOnIdle { assertEquals(1, collapses) }
+    }
+
     @Test fun typingDoesNotRecomposeHostAndOnlyEmptyExpandedPageCollapses() {
         val candidates = mutableStateOf(CandidateState())
         val expanded = mutableStateOf(false)
