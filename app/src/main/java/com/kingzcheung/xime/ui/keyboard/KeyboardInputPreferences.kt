@@ -105,7 +105,7 @@ data class KeyboardInputPreferences(
     /** 分体中缝比例（竖屏/横屏），null 为自动。 */
     val splitGapPortrait: Float? = null,
     val splitGapLandscape: Float? = null,
-    /** 26 键三行错位；自定义时取 [qwertyStaggerCustom]（0 手机常见，1 实体键盘）。 */
+    /** 26 键三行错位；自定义时取 [qwertyStaggerCustom]（0 手机常见，负数向右更多，1 实体键盘）。 */
     val qwertyStagger: QwertyStaggerMode = QwertyStaggerMode.AUTO,
     val qwertyStaggerCustom: Float = 0.5f,
     /** 空格左侧逗号键、右侧句号键。 */
@@ -353,7 +353,7 @@ data class KeyboardInputPreferences(
                 splitGapLandscape = SettingsPreferences.getSplitGapFraction(context, true),
                 qwertyStagger = QwertyStaggerMode.entries.firstOrNull { it.name == prefs.getString("qwerty_stagger_mode", null) }
                     ?: QwertyStaggerMode.AUTO,
-                qwertyStaggerCustom = prefs.getFloat("qwerty_stagger_custom", 0.5f).takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f,
+                qwertyStaggerCustom = prefs.getFloat("qwerty_stagger_custom", 0.5f).takeIf { it.isFinite() }?.coerceIn(QWERTY_STAGGER_MIN, QWERTY_STAGGER_MAX) ?: 0.5f,
                 qwertyCommaKey = prefs.getBoolean("qwerty_comma_key", true),
                 // 句号键 10-19 起默认开。旧键会被 save() 连同其他设置一起写成旧默认 false，
                 // 分不出是不是用户自己关的，所以只认新键；没有新键就是默认开。
@@ -500,7 +500,7 @@ data class KeyboardInputPreferences(
             .putString("handwriting_formula_delimiter", formulaDelimiter.name)
             .putString("fixed_symbols", fixedSymbols)
             .putString("qwerty_stagger_mode", qwertyStagger.name)
-            .putFloat("qwerty_stagger_custom", qwertyStaggerCustom.coerceIn(0f, 1f))
+            .putFloat("qwerty_stagger_custom", qwertyStaggerCustom.coerceIn(QWERTY_STAGGER_MIN, QWERTY_STAGGER_MAX))
             .putBoolean("qwerty_comma_key", qwertyCommaKey)
             .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)
             .putBoolean("syllable_split_key", syllableSplitKey)
