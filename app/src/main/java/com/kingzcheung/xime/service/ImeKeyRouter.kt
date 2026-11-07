@@ -558,6 +558,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     ) {
         // 日语罗马音的显示归一化收口在 updateUIWithResult（刷新路径同样生效），此处不再单独加工
         val transformed = service.candidateTransform.transformFor(result)
+        val state = service.uiState.value
+        val caretSnapshot = if (!result.isAsciiMode && result.inputText.isNotEmpty() &&
+            service.hasInlinePinyinCaretInside() && com.kingzcheung.xime.rime.PinyinEditBuffer.supports(state.currentSchemaId))
+            service.rimeEngine.readPinyinEditSnapshot() else null
         KeyLatencyProbe.posted(result.inputText.length)
         publishUi {
             if (!service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) return@publishUi
@@ -565,6 +569,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
                 transformed?.actions ?: emptyList()
             )
+            if (caretSnapshot != null) service.showInlinePinyinCaret(caretSnapshot, state.inputSessionId, state.currentSchemaId)
             if (afterUpdate != null) afterUpdate()
         }
     }
@@ -708,9 +713,20 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      */
     internal fun typeGlideCode(code: String) {
         if (code.isEmpty() || hasPendingCandidateCommit) return
+        service.keyboardCallbacks?.onDismissPreeditEditor?.invoke()
         val input = service.candidateState.value.inputText
         if (input.isNotEmpty() && input.last() != '\'') handleKeyPress("'", false)
         code.forEach { handleKeyPress(it.toString(), false) }
+        val glideSession = service.uiState.value.inputSessionId
+        val glideSchema = service.uiState.value.currentSchemaId
+        postRimeJob("glide_caret_finish") {
+            val result = service.rimeEngine.readQueuedResult()
+            val caretSnapshot = service.rimeEngine.readPinyinEditSnapshot()
+            withEditor {
+                if (result != null && service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision))
+                    service.showInlinePinyinCaret(caretSnapshot, glideSession, glideSchema)
+            }
+        }
     }
 
     /**
