@@ -1,6 +1,9 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.twotone.SwapHoriz
 import androidx.compose.material.icons.twotone.OpenWith
 import androidx.compose.material.icons.twotone.SpaceBar
@@ -17,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.SpellingPatches
@@ -106,7 +111,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     HorizontalDivider()
                     // 别的用户 11-02 提的（用惯 Gboard）：默认关；两种滑行都没开时没有作用，关着就置灰。
                     SettingsToggleItem(Icons.TwoTone.Gesture, "滑行时实时显示词",
-                        "划的过程中在手指上方显示现在抬手会出的词，中文显示拼音。不影响点按打字和抬手后出词的速度。",
+                        "划的过程中按编码显示位置展示识别结果，中文显示拼音；抬手后按最终结果输入。",
                         checked = settings.glidePreview, onCheckedChange = {
                             settings = settings.copy(glidePreview = it); settings.save(context)
                         },
@@ -362,6 +367,7 @@ internal fun FuzzyPinyinSection() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QwertyStaggerSettings(
     settings: com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences,
@@ -389,13 +395,50 @@ private fun QwertyStaggerSettings(
         }
         if (settings.qwertyStagger == com.kingzcheung.xime.ui.keyboard.QwertyStaggerMode.CUSTOM) {
             var custom by remember(settings.qwertyStaggerCustom) { mutableStateOf(settings.qwertyStaggerCustom) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("手机", style = MaterialTheme.typography.bodySmall)
-                Slider(value = custom, onValueChange = { custom = it },
-                    onValueChangeFinished = { onChange(settings.copy(qwertyStaggerCustom = custom)) },
-                    valueRange = 0f..1f, modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                        .testTag("qwerty-stagger-custom"))
-                Text("实体", style = MaterialTheme.typography.bodySmall)
+            var sliderWidth by remember { mutableIntStateOf(0) }
+            var draggingEdge by remember { mutableStateOf<Float?>(null) }
+            val currentSettings by rememberUpdatedState(settings)
+            val currentOnChange by rememberUpdatedState(onChange)
+            fun Modifier.edgeDrag(endpoint: Float): Modifier {
+                if (draggingEdge != endpoint && kotlin.math.abs(-custom - endpoint) > 0.0001f) return this
+                return pointerInput(sliderWidth, endpoint) {
+                    var sliderValue = endpoint
+                    detectHorizontalDragGestures(
+                        onDragStart = { draggingEdge = endpoint; sliderValue = -custom },
+                        onHorizontalDrag = { change, distance ->
+                            if (sliderWidth > 0) {
+                                sliderValue = (sliderValue + 2f * distance / sliderWidth).coerceIn(-1f, 1f)
+                                custom = com.kingzcheung.xime.ui.keyboard.customStaggerFromSlider(sliderValue)
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            currentOnChange(currentSettings.copy(qwertyStaggerCustom = custom))
+                            draggingEdge = null
+                        },
+                        onDragCancel = { draggingEdge = null },
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Box(Modifier.height(48.dp).edgeDrag(-1f), contentAlignment = Alignment.Center) {
+                    Text("向左", style = MaterialTheme.typography.bodySmall)
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Slider(value = -custom, onValueChange = { custom = com.kingzcheung.xime.ui.keyboard.customStaggerFromSlider(it) },
+                            onValueChangeFinished = { onChange(settings.copy(qwertyStaggerCustom = custom)) },
+                            valueRange = com.kingzcheung.xime.ui.keyboard.QWERTY_STAGGER_MIN..com.kingzcheung.xime.ui.keyboard.QWERTY_STAGGER_MAX,
+                            track = { sliderState -> SliderDefaults.Track(sliderState = sliderState, drawStopIndicator = {}) },
+                            modifier = Modifier.fillMaxWidth().onSizeChanged { sliderWidth = it.width }.testTag("qwerty-stagger-custom"))
+                        Box(Modifier.size(4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
+                    }
+                    Text("S 与 Z 对齐", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Box(Modifier.height(48.dp).edgeDrag(1f), contentAlignment = Alignment.Center) {
+                    Text("向右", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }
