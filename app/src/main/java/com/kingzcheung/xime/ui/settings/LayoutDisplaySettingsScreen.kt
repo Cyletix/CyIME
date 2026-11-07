@@ -390,6 +390,9 @@ private fun LayoutDisplayPage(
                     var showCandidateCancel by remember {
                         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
                     }
+                    var associationCancelCross by remember {
+                        mutableStateOf(SettingsPreferences.isAssociationCancelCross(context))
+                    }
                     // 图例放在开关下面，随开关实时变化；整块都可点。
                     Column(
                         modifier = Modifier.settingsSearchAnchor("候选栏取消按钮")
@@ -417,20 +420,17 @@ private fun LayoutDisplayPage(
                             Switch(checked = showCandidateCancel, onCheckedChange = null)
                         }
                         Spacer(Modifier.height(10.dp))
-                        CandidateCancelIllustration(showCandidateCancel)
+                        CandidateCancelIllustration(showCandidateCancel, associationCancelCross)
                     }
-                    // 联想关闭键用叉号（用户 11-03，默认关）：只在取消按钮开着时有用，关着就不显示。
+                    // 候选栏关闭键用叉号（用户 11-03，默认关）：只在取消按钮开着时有用，关着就不显示。
                     if (showCandidateCancel) {
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 16.dp),
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                         )
-                        var associationCancelCross by remember {
-                            mutableStateOf(SettingsPreferences.isAssociationCancelCross(context))
-                        }
                         Row(
-                            modifier = Modifier.settingsSearchAnchor("联想关闭键用叉号")
+                            modifier = Modifier.settingsSearchAnchor("候选栏关闭键用叉号")
                                 .fillMaxWidth()
                                 .testTag("association-cancel-cross-setting")
                                 .toggleable(
@@ -445,9 +445,9 @@ private fun LayoutDisplayPage(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text("联想关闭键用叉号", style = MaterialTheme.typography.bodyLarge,
+                                Text("候选栏关闭键用叉号", style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium)
-                                Text("上屏后出联想词时，最左边的左箭头换成 ⊗",
+                                Text("候选栏最左边的左箭头换成 ⊗",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

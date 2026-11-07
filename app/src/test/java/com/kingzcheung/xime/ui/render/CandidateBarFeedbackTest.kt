@@ -132,8 +132,9 @@ class CandidateBarFeedbackTest {
         var cancelled = 0
         rule.setContent { Column { Bar(association, onCancel = { cancelled++ }); Bar(composing) } }
         rule.waitForIdle()
-        // 打开「联想关闭键用叉号」：只有联想时换成 ⊗，打字时仍是「<」。
+        // 打开叉号后，联想和输入候选都显示叉号，动作各自不变。
         assertEquals(1, countTag("association-cancel-cross"))
+        assertEquals(1, countTag("candidate-cancel-cross"))
         assertEquals(0, countTag("association-cancel"))
         assertEquals(1, count("取消输入"))
         rule.onNodeWithContentDescription("关闭联想", useUnmergedTree = true).performClick()
