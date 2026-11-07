@@ -3057,3 +3057,10 @@ index 49a19479..a788c70d 100644
  };
  
  }  // namespace rime
+diff --git a/src/rime/service.h b/src/rime/service.h
+--- a/src/rime/service.h
++++ b/src/rime/service.h
+@@ -44,2 +44,3 @@ class Session {
+   Schema* schema() const;
++  Engine* engine() const { return engine_.get(); }
+   time_t last_active_time() const { return last_active_time_; }
