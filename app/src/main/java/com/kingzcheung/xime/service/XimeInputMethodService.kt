@@ -4188,6 +4188,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         EnterKeyAction.label(editorInfo.imeOptions, appSend = SettingsPreferences.isEnterSendsEnabled(this))
 
     override fun onFinishInput() {
+        keyRouter.discardPreviousAssociations()
         suspendCompositionForScreenOff()
         // 离开后的最后一帧仍不可输入，下一次 onStartInput 按新编辑器恢复正常行为。
         settingsPreviewPanel = null

@@ -159,6 +159,9 @@ fun SmartPredictionSettingsContent(
                     var singleMode by remember {
                         mutableStateOf(SettingsPreferences.isSingleAssociationMode(context))
                     }
+                    var restoreAssociations by remember {
+                        mutableStateOf(SettingsPreferences.isRestorePreviousAssociationsEnabled(context))
+                    }
                     Column { SettingsSection(title = "联想行为", content = {
                         SettingsToggleItem(
                             icon = Icons.TwoTone.AutoAwesome,
@@ -168,6 +171,21 @@ fun SmartPredictionSettingsContent(
                             onCheckedChange = {
                                 spaceCommitEnabled = it
                                 SettingsPreferences.setSpaceCommitAssociationEnabled(context, it)
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsToggleItem(
+                            icon = Icons.TwoTone.AutoAwesome,
+                            title = "删空字符后恢复联想",
+                            subtitle = "联想出现后继续输入，删空新输入的字符时恢复之前的联想。",
+                            checked = restoreAssociations,
+                            onCheckedChange = {
+                                restoreAssociations = it
+                                SettingsPreferences.setRestorePreviousAssociationsEnabled(context, it)
                             }
                         )
                         HorizontalDivider(
