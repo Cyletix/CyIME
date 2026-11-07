@@ -2812,6 +2812,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         else -> CandidateState()
                                     })
                                 },
+                                predictionTransition = if (settingsPreviewEditor) null else predictionManager.transitionPending,
                                 voiceAmplitudeState = this@XimeInputMethodService.voiceAmplitudeState,
                                 voiceSpectrumState = this@XimeInputMethodService.voiceSpectrumState,
                                 callbacks = callbacks,

@@ -145,7 +145,9 @@ class LatestPredictionTest {
     @Test fun reservationWithoutSubmitIsReleased() = runTest {
         val worker = LatestPrediction(backgroundScope, { listOf(it) }, { })
         val token = worker.reserve()
+        assertTrue(worker.transitionPending.value)
         worker.release(token) // post 里没发请求（切了英文、不能联想的上下文）
+        assertFalse(worker.transitionPending.value)
         assertFalse(worker.invalidate())
     }
 
@@ -156,8 +158,10 @@ class LatestPredictionTest {
         if (worker.revision == token) worker.submit("你好")
         worker.release(token)
         assertTrue(worker.isPending)
+        assertTrue(worker.transitionPending.value)
         advanceTimeBy(300); runCurrent()
         assertEquals(listOf("你好"), output)
+        assertFalse(worker.transitionPending.value)
         assertFalse(worker.invalidate())
     }
 
