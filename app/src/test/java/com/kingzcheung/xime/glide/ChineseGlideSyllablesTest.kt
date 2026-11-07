@@ -27,5 +27,9 @@ class ChineseGlideSyllablesTest {
         assertEquals(listOf("ni", "'hao"), chineseCodeSyllables("ni'hao", false, emptyList(), entries))
         assertEquals(listOf("hv", "'jk"), chineseCodeSyllables("hv'jk", true, emptyList(), emptyList()))
         assertNull(chineseCodeSyllables("hv'j", true, emptyList(), emptyList()))
+        assertEquals(listOf("hv", "'j"), chineseCodeSyllables("hv'j", true, emptyList(), emptyList(), allowIncomplete = true))
+        assertEquals(listOf("h", "'vj"), chineseCodeSyllables("h'vj", true, emptyList(), emptyList(), allowIncomplete = true))
+        assertEquals(listOf("h", "vj"), chineseCodeSyllables("hvj", true, listOf("", "h vj"), emptyList(), allowIncomplete = true))
+        assertEquals(listOf("hv", "j"), chineseCodeSyllables("hvj", true, emptyList(), emptyList(), allowIncomplete = true))
     }
 }

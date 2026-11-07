@@ -593,6 +593,8 @@ fun KeyboardView(
             // Queued keystrokes must finish before a following commit/candidate event.
             // Ownership checks still reject work after a host or schema change.
             preeditEditSession = null
+            callbacks.onPreeditKeyInput = null
+            callbacks.onDismissPreeditEditor = null
             preeditFrame = null
             preeditOpening = false
             pendingPreeditMoves.clear()
@@ -634,7 +636,7 @@ fun KeyboardView(
                     else -> false
                 }
             }
-            callbacks.onDismissPreeditEditor = if (preeditEditSession != null) ({ closePreeditEditor() }) else null
+            callbacks.onDismissPreeditEditor = if (preeditEditSession != null || preeditOpening) ({ closePreeditEditor() }) else null
             callbacks.onPreeditKeyInput = if (preeditEditSession != null) ({ key ->
                 val t9 = preeditEditSession?.isT9 == true
                 if (key.startsWith("preedit_cursor:")) {

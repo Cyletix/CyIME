@@ -101,6 +101,22 @@ class ChineseGlideDeleteHistoryTest {
         assertEquals("hv", history.last(restored)?.remainingInput)
     }
 
+    @Test fun editedTypedCodeKeepsCompleteSyllablesAfterTheIncompleteKey() {
+        val history = ChineseGlideDeleteHistory()
+        val typed = state("hv'j", 2)
+        val tail = history.typedTail(typed)!!
+        history.record(tail.before, typed, tail.code, listOf("hv", "'j"))
+        val glided = state("hv'j'aa", 3)
+        history.record(typed, glided, "aa", listOf("aa"))
+        val backToTyped = typed.copy(revision = 4)
+        assertEquals("hv'j", history.last(glided)?.remainingInput)
+        history.removed(backToTyped)
+        assertEquals("hv", history.last(backToTyped)?.remainingInput)
+        val complete = state("hv", 5)
+        history.removed(complete)
+        assertEquals("", history.last(complete)?.remainingInput)
+    }
+
     @Test fun typedSuffixAfterAnEarlierGlideIsRecordedSeparately() {
         val history = ChineseGlideDeleteHistory()
         val first = state("hvjk", 2)

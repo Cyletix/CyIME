@@ -157,16 +157,37 @@ internal fun chineseGlideSyllables(
 /** Keep explicit apostrophes with the following syllable so deleting it also removes its separator. */
 internal fun chineseCodeSyllables(
     raw: String, doublePinyin: Boolean, readings: List<String>, entries: List<List<String>>,
+    allowIncomplete: Boolean = false,
 ): List<String>? {
     val code = raw.replace("'", "")
-    val syllables = chineseGlideSyllables(code, doublePinyin, readings, entries) ?: return null
-    var offset = 0
-    val result = syllables.map { syllable ->
-        val start = offset
-        if (offset < raw.length && raw[offset] == '\'') offset++
-        if (!raw.regionMatches(offset, syllable, 0, syllable.length)) return null
-        offset += syllable.length
-        raw.substring(start, offset)
+    fun mapToRaw(syllables: List<String>): List<String>? {
+        var offset = 0
+        val result = syllables.map { syllable ->
+            val start = offset
+            while (offset < raw.length && raw[offset] == '\'') offset++
+            if (!raw.regionMatches(offset, syllable, 0, syllable.length)) return null
+            offset += syllable.length
+            raw.substring(start, offset)
+        }.toMutableList()
+        if (offset < raw.length && result.isNotEmpty() && raw.drop(offset).all { it == '\'' }) {
+            result[result.lastIndex] += raw.substring(offset)
+            offset = raw.length
+        }
+        return result.takeIf { offset == raw.length }
     }
-    return result.takeIf { offset == raw.length }
+    if (doublePinyin && allowIncomplete && code.isNotEmpty()) {
+        // Prefer the engine's actual key boundaries; full-pinyin comments will not match the keys.
+        for (reading in readings) {
+            val tokens = reading.lowercase().split(Regex("[\\s'’]+"))
+            for (start in tokens.indices) {
+                val suffix = tokens.drop(start)
+                if (suffix.all { it.length in 1..2 && it.all { c -> c in 'a'..'z' || c == ';' } } &&
+                    suffix.joinToString("") == code) mapToRaw(suffix)?.let { return it }
+            }
+        }
+        // Explicit separators are boundaries; an unfinished last key remains one deletion.
+        val parts = raw.split('\'').filter { it.isNotEmpty() }
+        return mapToRaw(parts.flatMap { it.chunked(2) })
+    }
+    return mapToRaw(chineseGlideSyllables(code, doublePinyin, readings, entries) ?: return null)
 }

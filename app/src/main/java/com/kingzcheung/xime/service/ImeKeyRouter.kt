@@ -49,12 +49,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             ui.currentSchemaId, ui.inputSessionId, ui.inputTarget, service.rimeEngine.currentCandidateRevision())
     }
 
-    private fun chineseCodeSyllables(code: String, result: com.kingzcheung.xime.rime.RimeProcessResult?): List<String>? {
+    private fun chineseCodeSyllables(code: String, result: com.kingzcheung.xime.rime.RimeProcessResult?,
+        allowIncomplete: Boolean = false): List<String>? {
         val isDouble = service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN
         return runCatching {
             com.kingzcheung.xime.glide.chineseCodeSyllables(code, isDouble,
                 listOf(result?.candidates?.firstOrNull()?.comment.orEmpty(), result?.preeditText.orEmpty()),
-                if (isDouble) emptyList() else com.kingzcheung.xime.glide.GlideLexicon.pinyin(service))
+                if (isDouble) emptyList() else com.kingzcheung.xime.glide.GlideLexicon.pinyin(service), allowIncomplete)
         }.getOrNull()
     }
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
@@ -731,6 +732,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      */
     internal fun typeGlideCode(code: String) {
         if (code.isEmpty() || hasPendingCandidateCommit) return
+        // The editor snapshot predates this glide; earlier queued edits finish in FIFO order.
+        service.keyboardCallbacks?.onDismissPreeditEditor?.invoke()
         val trackGlide = chineseGlideDeleteEnabled()
         var beforeGlide: ChineseGlideDeleteHistory.State? = null
         var typedTail: ChineseGlideDeleteHistory.TypedTail? = null
@@ -738,7 +741,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (trackGlide) postRimeJob("glide_delete_start") {
             beforeGlide = chineseGlideState()
             typedTail = beforeGlide?.let { chineseGlideDeletes.typedTail(it) }
-            typedSyllables = typedTail?.let { chineseCodeSyllables(it.code, service.rimeEngine.readQueuedResult()) }
+            typedSyllables = typedTail?.let { chineseCodeSyllables(it.code, service.rimeEngine.readQueuedResult(), allowIncomplete = true) }
         }
         val input = service.candidateState.value.inputText
         if (input.isNotEmpty() && input.last() != '\'') handleKeyPress("'", false)
