@@ -151,6 +151,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("按设备推荐配置", "配置选择", SettingsRoutes.SetupGuide, "推荐 自动 检测 手机 平板 配置 引导 向导 不会设置 不懂 省空间 删模型 体积 太大 占空间 语音模型 九键模型 怎么选 打字习惯 全拼 双拼 小鹤 自然码 微软双拼 五笔 模糊音 平翘舌 前后鼻音 字幕 桌面图标"),
         page("关于 CyIME", system, SettingsRoutes.About, "版本 开发者 联系 许可 检查更新 最新版本 源代码"),
         // 输入 › 语言与方案
+        SettingsSearchEntry("删空字符后恢复联想", prediction, SettingsRoutes.SmartPrediction, "联想 候选 删除 退格 撤销 恢复 拼音 编码", section = "联想行为"),
         SettingsSearchEntry("语言键切换方式", languages, "languages", "语言键 切换语言 中英切换 循环切换 指定语言 英文 地球键 点按语言键"),
         SettingsSearchEntry("繁体输出", chinesePath, chinese, "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换"),
         SettingsSearchEntry("生僻字", chinesePath, chinese, "生僻字 罕用字 缺字 打不出 大字表 扩展字 字库 冷僻字"),
