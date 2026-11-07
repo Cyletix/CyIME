@@ -173,6 +173,72 @@ class SpeakerTrackerTest {
         assertNotEquals(1001, again.first { it.segmentId == 2L }.speakerId)
     }
 
+    /**
+     * Voiceprints closer to the real model: 64 dimensions, one direction per voice plus noise, so two
+     * windows of one voice score about 0.6 and different voices about [cross] × 0.6.
+     */
+    private class Voices(seed: Long) {
+        private val random = java.util.Random(seed)
+        fun voice(): FloatArray = FloatArray(64) { random.nextGaussian().toFloat() }.let(SpeakerTracker::normalized)
+        fun mix(a: FloatArray, b: FloatArray, w: Float) = SpeakerTracker.normalized(FloatArray(64) { a[it] * (1 - w) + b[it] * w })
+        fun window(voice: FloatArray) = SpeakerTracker.normalized(FloatArray(64) { voice[it] * 1.6f + random.nextGaussian().toFloat() * .2f })
+    }
+
+    private fun talk(t: SpeakerTracker, v: Voices, from: Long, seconds: Int, voice: FloatArray) =
+        (1..seconds).flatMap { k -> t.addWindow(from + (k - 2) * 1000L, from + k * 1000L, v.window(voice)) }
+
+    @Test fun `two voices the running average folded together come apart when grouped again`() {
+        val v = Voices(7)
+        val a = v.voice()
+        val b = v.mix(a, v.voice(), .6f) // close to A (about 0.3 between their windows)
+        val t = SpeakerTracker()
+        var at = 0L
+        repeat(4) { talk(t, v, at, 6, a); at += 6000; talk(t, v, at, 6, b); at += 6000 }
+        t.addSegment(1, 1000, 5000); t.addSegment(2, 7000, 11_000); t.settle()
+        t.recluster()
+        assertEquals(2, t.speakerIds.size)
+        val spans = t.spans().associate { it.first to it.third }
+        assertNotEquals(spans[1000L], spans[7000L])
+    }
+
+    @Test fun `one voice with ordinary variation stays one person when grouped again`() {
+        for (seed in 1L..5L) {
+            val v = Voices(seed)
+            val a = v.voice()
+            val t = SpeakerTracker()
+            talk(t, v, 0, 60, a)
+            t.recluster()
+            assertEquals("seed $seed", 1, t.speakerIds.size)
+        }
+    }
+
+    @Test fun `grouping again keeps a remembered voice and a user's merge`() {
+        val v = Voices(11)
+        val a = v.voice(); val b = v.voice()
+        val t = SpeakerTracker()
+        t.seedKnown(1001, a)
+        talk(t, v, 0, 8, a); talk(t, v, 8000, 8, b); talk(t, v, 16_000, 8, a)
+        t.recluster()
+        assertTrue(1001 in t.speakerIds)
+        assertEquals(2, t.speakerIds.size)
+        val other = t.speakerIds.first { it != 1001 }
+        t.merge(other, 1001) // "they are the same person"
+        talk(t, v, 24_000, 8, b)
+        t.recluster()
+        assertEquals(listOf(1001), t.speakerIds)
+    }
+
+    @Test fun `average linkage cut and silhouette`() {
+        val sim = arrayOf(floatArrayOf(1f, .9f, .1f, .1f), floatArrayOf(.9f, 1f, .1f, .1f), floatArrayOf(.1f, .1f, 1f, .8f), floatArrayOf(.1f, .1f, .8f, 1f))
+        val merges = SpeakerTracker.averageLinkage(sim)
+        assertEquals(listOf(.9f, .8f, .1f), merges.map { it.third })
+        val two = SpeakerTracker.cut(merges, 4, .4f)
+        assertEquals(2, two.toSet().size)
+        assertTrue(two[0] == two[1] && two[2] == two[3])
+        assertEquals(1, SpeakerTracker.cut(merges, 4, .05f).toSet().size)
+        assertTrue(SpeakerTracker.silhouette(sim, two) > .8f)
+    }
+
     @Test fun `two pass keeps the preview when SenseVoice drops most of the speech`() {
         assertEquals("明天上午我来接你去医院", chooseFinal("明天上午我来接你去医院", "明天。"))
         assertEquals("明天上午我来接你，去医院。", chooseFinal("明天上午我来接你去医院", "明天上午我来接你，去医院。"))

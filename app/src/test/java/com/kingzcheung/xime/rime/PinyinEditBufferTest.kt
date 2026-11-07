@@ -12,6 +12,18 @@ class PinyinEditBufferTest {
         assertEquals("nv'er", PinyinEditBuffer.normalized("Nü er"))
         assertEquals("ni'hao", PinyinEditBuffer.normalized("ni hao"))
     }
+    @Test fun mergingAdjacentSeparatorsPreservesTheCaret() {
+        assertEquals("a'b" to 2, PinyinEditBuffer.mergeSeparators("a''b", 2))
+        assertEquals("a'b" to 2, PinyinEditBuffer.mergeSeparators("a'''b", 4))
+        assertEquals("a'b" to 3, PinyinEditBuffer.mergeSeparators("a'''b", 5))
+        assertEquals("a'b" to 0, PinyinEditBuffer.mergeSeparators("a'b", 0))
+    }
+    @Test fun mapsCaretOnBothSidesOfASeparator() {
+        assertEquals(2, mapCodeOffset("ni'hao", "ni'hao", 2))
+        assertEquals(3, mapCodeOffset("ni'hao", "ni'hao", 3))
+        assertEquals(2, mapCodeOffset("ni'hao", "nihao", 3))
+        assertEquals(3, mapCodeOffset("ni''hao", "ni'hao", 4))
+    }
     @Test fun engineBoundariesAreVisibleButDoNotChangeTheEditableCode() {
         val display = PinyinEditDisplay("xiugaishuru", "xiu'gai'shu'ru")
         assertEquals("xiu'gai'shu'ru", display.text)
@@ -42,6 +54,9 @@ class PinyinEditBufferTest {
         assertEquals("nihao", PinyinEditDisplay("nihao", "ni hao", includeAutomaticBoundaries = false).text)
         assertEquals("你ni'hao", pinyinPreviewText("你ni hao"))
         assertEquals("xiu'gai'shu'ru", pinyinPreviewText("xiu gai shu ru"))
+        assertEquals("ni'hao", editablePreeditText("ni hao", "double_pinyin_flypy", false))
+        assertEquals("ni hao", editablePreeditText("ni hao", "double_pinyin_flypy", true))
+        assertEquals("ni hao", editablePreeditText("ni hao", "english", false))
     }
 
     @Test fun nineKeyCaretInsideTheReadingMapsToTheKeysBeforeIt() {

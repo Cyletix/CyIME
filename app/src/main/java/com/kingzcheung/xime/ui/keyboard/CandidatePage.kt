@@ -226,7 +226,11 @@ private fun CandidatePageContent(
     val railItems = state.railPinyinOptions.ifEmpty { railSymbols }
     val isPinyinRail = state.railPinyinOptions.isNotEmpty()
     // 中间候选区滚动；翻页 = 滚动一屏
-    val listState = remember(state.engineRevision, state.singleCharFilter) { LazyListState() }
+    val listState = remember { LazyListState() }
+    LaunchedEffect(state.engineRevision, state.singleCharFilter) {
+        if (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0)
+            listState.scrollToItem(0)
+    }
     var viewportHeightPx by remember { mutableIntStateOf(0) }
     val scrollScope = rememberCoroutineScope()
     fun scrollPage(direction: Int) {

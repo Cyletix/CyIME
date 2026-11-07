@@ -678,10 +678,36 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 候选展开页自动收起：候选与联想均空（编码删空）时收起在位展开页，不留空页。
      *  在状态生产端调用（而非依赖 UI 重组观察）——候选变化时键盘区作用域被设计为跳过重组。 */
     internal fun maybeCollapseCandidatePage() {
-        if (!keyboardViewModel.candidatePageExpanded.value) return
+        if (deleteDragActive.value || !keyboardViewModel.candidatePageExpanded.value) return
         val cs = candidateState.value
         if (cs.candidates.isEmpty() && cs.associationCandidates.isEmpty()) {
             keyboardViewModel.setCandidatePageExpanded(false)
+        }
+    }
+
+    internal val deleteDragActive = androidx.compose.runtime.mutableStateOf(false)
+    private var deleteDragGeneration = 0L
+
+    internal fun beginDeleteDrag(): Long {
+        deleteDragGeneration++
+        deleteDragActive.value = true
+        return deleteDragGeneration
+    }
+
+    internal fun finishDeleteDrag(generation: Long) {
+        if (!deleteDragActive.value || generation != deleteDragGeneration) return
+        if (inputReadiness.ticket() == null) {
+            deleteDragActive.value = false
+            maybeCollapseCandidatePage()
+            return
+        }
+        keyRouter.postRimeJob("finish_delete_drag") {
+            withContext(Dispatchers.Main) {
+                if (generation == deleteDragGeneration) {
+                    deleteDragActive.value = false
+                    maybeCollapseCandidatePage()
+                }
+            }
         }
     }
 
@@ -3563,7 +3589,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             settingsArrangeBounds = null
         }
         // 宿主在打拼音时重启了同一个输入框（QQ 留言板等每改一次字就重设文字）：编码原样还在就接着打。
-        if (resumeCompositionAfterRestart(attribute, restarting)) return
+        val resumingAfterLock = lockCompositionSuspended
+        if (resumeCompositionAfterRestart(attribute, restarting, resumingAfterLock)) {
+            lockCompositionSuspended = false
+            if (resumingAfterLock) {
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+                refreshLockResumedCandidates()
+            }
+            return
+        }
+        lockCompositionSuspended = false
         // 新连接开始时旧组合区一律失效；同一输入框重启时撤掉被定格的拼音编码。
         val identity = attribute?.let { Triple(it.packageName, it.fieldId, it.inputType) }
         val sameField = restarting && identity != null && identity == lastEditorIdentity
@@ -4156,6 +4191,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         EnterKeyAction.label(editorInfo.imeOptions, appSend = SettingsPreferences.isEnterSendsEnabled(this))
 
     override fun onFinishInput() {
+        suspendCompositionForScreenOff()
         // 离开后的最后一帧仍不可输入，下一次 onStartInput 按新编辑器恢复正常行为。
         settingsPreviewPanel = null
         KeyboardPanelLaunch.previewVisible = false
@@ -4185,7 +4221,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         clearHardwareSurfaceBounds()
         try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
         uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
-        discardInlinePinyinBeforeFrameworkFinish()
+        if (!lockCompositionSuspended) discardInlinePinyinBeforeFrameworkFinish()
         super.onFinishInput()
         if (::clipboardManager.isInitialized) clipboardManager.images.dismissPresentedPreview()
         runtimeObserver?.stop()
@@ -4203,9 +4239,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        suspendCompositionForScreenOff()
         KeyboardPanelLaunch.previewVisible = false
         DictionaryPrefetch.onHide()
-        discardInlinePinyinBeforeFrameworkFinish()
+        if (!lockCompositionSuspended) discardInlinePinyinBeforeFrameworkFinish()
         // The search bar belongs to this keyboard session; leaving restores learning.
         closeClipboardSearch(openBoard = false)
         super.onFinishInputView(finishingInput)
@@ -4370,6 +4407,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun clearInputState() {
+        deleteDragGeneration++
+        deleteDragActive.value = false
         newInputGeneration()
         if (uiState.value.handwritingExpanded) uiState.value = uiState.value.copy(handwritingExpanded = false)
         if (uiState.value.voiceCollapsed) uiState.value = uiState.value.copy(voiceCollapsed = false)
@@ -4386,7 +4425,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         calculatorEngine.clear()
         keyRouter.englishAutoSpace.disarm()
-        inputCommands.submit { rimeEngine.clearQueuedComposition(); rimeEngine.clearQueuedT9Composition() }
+        if (!lockCompositionSuspended) inputCommands.submit { rimeEngine.clearQueuedComposition(); rimeEngine.clearQueuedT9Composition() }
         t9PartialSegments.clear()
         // 录音已在本方法入口停止；这里仅重置语音 UI。
         if (uiState.value.isVoiceMode || voiceRecordingStarted) {
@@ -4409,7 +4448,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             t9SelectedCandidatePinyin = ""
         )
         synchronizeKeyboardInputSession()
-        candidateState.value = candidateState.value.copy(
+        if (!lockCompositionSuspended) candidateState.value = candidateState.value.copy(
             candidates = emptyList(),
             candidateComments = emptyList(),
             inputText = "",
@@ -4422,7 +4461,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             englishReplaceSupported = true,
             candidateActions = emptyList()
         )
-        endComposingInputBox()
+        if (!lockCompositionSuspended) endComposingInputBox()
     }
 
     /**
@@ -4430,6 +4469,39 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * Android 无法查询宿主编辑器的 composing 状态，由写入点主动标记。
      */
     private val inlineComposition = InlineCompositionTracker()
+    private var lockCompositionSuspended = false
+
+    private fun refreshLockResumedCandidates() {
+        val session = uiState.value.inputSessionId
+        val schema = uiState.value.currentSchemaId
+        val input = candidateState.value.inputText
+        keyRouter.postRimeJob("lock_resume_candidates") {
+            val result = rimeEngine.readQueuedResult()
+            val matches = result != null && result.inputText == input && !result.isAsciiMode
+            if (!matches || result == null) return@postRimeJob
+            val transformed = candidateTransform.transformFor(result)
+            withContext(Dispatchers.Main) {
+                if (uiState.value.inputSessionId != session || uiState.value.currentSchemaId != schema ||
+                    !rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) return@withContext
+                sessionController.updateUIWithResult(
+                    transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
+                    transformed?.actions ?: emptyList(), updateInputBoxComposition = false)
+            }
+        }
+    }
+
+    private fun suspendCompositionForScreenOff() {
+        if (lockCompositionSuspended) return
+        val state = uiState.value
+        if (!(getSystemService(POWER_SERVICE) as android.os.PowerManager).isInteractive &&
+            state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
+            !state.isAsciiMode && !state.inputTarget.isInternal && !isSecretEditor() && !isTerminalEditor() &&
+            !state.isVoiceMode && !voiceRecordingStarted && candidateState.value.isComposing &&
+            inlineComposition.active && !inlineComposition.text.isNullOrEmpty() && lastEditorIdentity != null &&
+            TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
+            lockCompositionSuspended = true
+        }
+    }
     /** 上一个输入框（包名、fieldId、inputType），判断重启输入是否仍是同一个框。 */
     private var lastEditorIdentity: Triple<String?, Int, Int>? = null
     /**
@@ -4446,6 +4518,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 输入框里的光标已挪到读音第 [offset] 个字后面（日语光标在读音中间）。 */
     internal fun moveInlineCompositionCaret(offset: Int) = inlineComposition.moveCaret(offset)
+
+    internal fun inlinePinyinText(): String? = inlineComposition.text
+
+    internal fun hasInlinePinyinCaretInside(): Boolean = inlineComposition.text?.let {
+        inlineComposition.caret < it.length
+    } == true
 
     internal fun keepInlineEditCaret(text: String): Boolean =
         inlineComposition.text == text && inlineComposition.caret < text.length
@@ -4484,6 +4562,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (ic.setSelection(position, position)) inlineComposition.moveCaret(offset)
     }
 
+    /** Restore the displayed caret to the engine position after editing inside code. */
+    internal fun showInlinePinyinCaret(snapshot: Array<String>, sessionId: Long, schema: String) {
+        if (uiState.value.inputSessionId != sessionId || uiState.value.currentSchemaId != schema || snapshot.size < 5) return
+        val input = snapshot[0]
+        val caret = snapshot[1].toIntOrNull() ?: return
+        val confirmed = snapshot[2].toIntOrNull()?.coerceIn(0, input.length) ?: return
+        if (caret !in confirmed until input.length) return
+        val raw = com.kingzcheung.xime.rime.PinyinEditBuffer.normalized(input.drop(confirmed))
+        val prefix = snapshot[3]
+        val display = com.kingzcheung.xime.rime.PinyinEditDisplay(raw, snapshot[4].removePrefix(prefix).trim())
+        val frame = com.kingzcheung.xime.rime.PinyinEditSession(sessionId, schema, input,
+            input.take(confirmed), prefix, display.text, display.displayOffset(caret - confirmed), false)
+        showInlineEditCaret(frame)
+    }
+
     internal fun syncInlinePinyinLocation() {
         if (TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX)
             sessionController.refreshInputBoxComposition()
@@ -4496,13 +4589,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 编码原样还在原处时把它重新标成组合区，拼音、候选和引擎都不动，接着打。
      * 换了框、成了密码/网址/数字等框、不在打拼音、找不到原编码时返回 false，照原来的流程重启。
      */
-    private fun resumeCompositionAfterRestart(attribute: EditorInfo?, restarting: Boolean): Boolean {
+    private fun resumeCompositionAfterRestart(attribute: EditorInfo?, restarting: Boolean, afterLock: Boolean = false): Boolean {
         val code = inlineComposition.text
         val ic = currentInputConnection
         val last = lastEditorIdentity
         val state = uiState.value
-        if (!restarting || attribute == null || ic == null || last == null || code.isNullOrEmpty() || !inlineComposition.active ||
+        if ((!restarting && !afterLock) || attribute == null || ic == null || last == null || code.isNullOrEmpty() || !inlineComposition.active ||
             attribute.packageName.isNullOrEmpty() || attribute.packageName != last.first || attribute.fieldId != last.second ||
+            (afterLock && attribute.inputType != last.third) ||
             editorInputPolicy.field.scoped || EditorFieldPolicy.from(attribute).scoped ||
             EditorInfoClassifier.isSecretEditor(attribute) || EditorInfoClassifier.isTerminalEditor(attribute) ||
             state.inputTarget.isInternal || state.isVoiceMode || voiceRecordingStarted || !candidateState.value.isComposing ||

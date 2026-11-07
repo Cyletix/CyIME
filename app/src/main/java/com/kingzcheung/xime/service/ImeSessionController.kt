@@ -112,7 +112,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         } else {
             filteredTexts to filteredComments
         }
-        val displayText: String
+        var displayText: String
         val displayCandidates: List<String>
         val displayComments: List<String>
         val isComposing: Boolean
@@ -181,6 +181,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             isComposing = inputText.isNotEmpty()
         }
 
+        displayText = com.kingzcheung.xime.rime.editablePreeditText(displayText, service.uiState.value.currentSchemaId, isAsciiMode)
         // 用户开始实际输入时，清除候选栏中残留的 inline suggestions
         if (displayText.isNotEmpty() || displayCandidates.isNotEmpty()) {
             service.dismissInlineSuggestions()
@@ -321,7 +322,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         } else {
             filteredTexts to filteredComments
         }
-        val displayText: String
+        var displayText: String
         val displayCandidates: List<String>
         val displayComments: List<String>
         val isComposing: Boolean
@@ -349,6 +350,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             isComposing = result.inputText.isNotEmpty()
         }
 
+        displayText = com.kingzcheung.xime.rime.editablePreeditText(displayText, service.uiState.value.currentSchemaId, isAsciiMode)
         // 用户开始实际输入时，清除候选栏中残留的 inline suggestions
         if (displayText.isNotEmpty() || displayCandidates.isNotEmpty()) {
             service.dismissInlineSuggestions()

@@ -111,7 +111,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese): open an issue first, then a mi
 
 ## Support the author
 
-CyIME is free and open source, built in my spare time. If it helps you, you can buy me a coffee on [Ko-fi](https://ko-fi.com/cyletix) or [爱发电 (afdian)](https://afdian.com/a/cyletix). Bug reports are just as welcome.
+CyIME is free and open source, built in my spare time. If it helps you, you can buy me a coffee on [Ko-fi](https://ko-fi.com/cyletix). Bug reports are just as welcome.
+
+My [Afdian](https://afdian.com/a/cyletix) account has yet to pass verification. To support me through Alipay, scan my personal payment code below.
+
+<img src="docs/images/alipay.jpg" alt="Author’s personal Alipay payment code" width="240">
 
 ## Credits
 
