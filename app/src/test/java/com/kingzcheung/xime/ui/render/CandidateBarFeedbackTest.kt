@@ -157,6 +157,18 @@ class CandidateBarFeedbackTest {
         assertEquals(typing.left, bounds("candidate-expansion").left, 0.5f)
     }
 
+    @Test fun idleHideAndCandidateExpandShareIconCenter() {
+        val state = androidx.compose.runtime.mutableStateOf<CandidateBarState>(CandidateBarState.Idle)
+        rule.setContent { Bar(state.value) }
+        rule.waitForIdle()
+        val idle = bounds("toolbar-hide").center
+        rule.runOnIdle { state.value = composing }
+        rule.waitForIdle()
+        val expanded = bounds("candidate-expansion").center
+        assertEquals(idle.x, expanded.x, 1f)
+        assertEquals(idle.y, expanded.y, 1f)
+    }
+
     @Test fun hideKeyboardOnlyWhenThereAreNoCandidates() {
         rule.setContent { Bar(CandidateBarState.Idle) }
         rule.waitForIdle()

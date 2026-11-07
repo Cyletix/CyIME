@@ -725,9 +725,12 @@ fun CandidateBar(
             if (state !is CandidateBarState.Idle && (candidatePageExpanded || hasAnyMore)) {
                 val action = if (candidatePageExpanded) callbacks.onBack else callbacks.onShowMoreCandidates
                 action?.let {
-                    CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor,
-                        expanded = candidatePageExpanded, rotation = expansionRotation, restingFill = edgeButtonFill,
-                        slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
+                    val endSlot = idleToolbarCell ?: edgeSlot ?: 40.dp
+                    Box(Modifier.width(endSlot), contentAlignment = Alignment.Center) {
+                        CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor,
+                            expanded = candidatePageExpanded, rotation = expansionRotation, restingFill = edgeButtonFill,
+                            slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
+                    }
                 }
             }
         }
