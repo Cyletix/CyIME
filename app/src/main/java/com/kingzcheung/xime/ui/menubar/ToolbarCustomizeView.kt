@@ -42,7 +42,7 @@ import com.kingzcheung.xime.ui.keyboard.ToolbarButtonIcon
 
 /**
  * 工具栏与菜单的统一排列：一个列表，长按拖动即可在“工具栏 / 菜单 / 不使用”之间移动和排序。
- * 分隔条不可拖动；“设置”被拖到“不使用”时自动回到菜单末尾，保证始终能进入设置。
+ * 分隔条不可拖动；未使用的入口可以随时拖回工具栏或菜单。
  * 面板能像剪贴板一样拉高（同一个 ClipboardPanelExpansion，见 clipboardPanelCanExpand）。
  */
 @Composable
@@ -64,7 +64,7 @@ fun ToolbarCustomizeView(
     val allButtons = ToolbarButton.CUSTOMIZABLE.map { ToolbarButtonItem.Builtin(it) } + pluginButtons
     val itemById = allButtons.associateBy { it.id }
     val saved = QuickActionLayout.normalize(toolbarButtons.filter { it in itemById }, menuButtons.filter { it in itemById })
-    val hidden = allButtons.map { it.id }.filterNot { it == QuickActionLayout.PINNED || isShown(it) }.toSet()
+    val hidden = allButtons.map { it.id }.filterNot { it == ToolbarButton.SETTINGS.id || isShown(it) }.toSet()
     val layout = QuickActionLayout(saved.toolbar - hidden, saved.menu - hidden)
     val dragOrder = rememberDragOrder(layout.editorOrder(allButtons.map { it.id }.filterNot { it in hidden })) { order ->
         onUpdateQuickActions?.invoke(QuickActionLayout.restoreHidden(QuickActionLayout.fromEditorOrder(order), saved, hidden))
@@ -99,7 +99,7 @@ fun ToolbarCustomizeView(
                             keyTextColor)
                     }
                     QuickActionLayout.UNUSED_DIVIDER -> Box(dragOrderItem(dragOrder, id, enabled = false)) {
-                        SectionHeader("不使用", "“设置”必须保留在工具栏或菜单中", keyTextColor)
+                        SectionHeader("不使用", "长按拖回工具栏或菜单", keyTextColor)
                     }
                     else -> {
                         val item = itemById[id] ?: return@items
