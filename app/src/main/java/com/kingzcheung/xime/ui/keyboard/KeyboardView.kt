@@ -120,7 +120,7 @@ import kotlin.math.roundToInt
 
 val LocalStretchFactor = compositionLocalOf { 1f }
 val LocalSuppressCursorMove = compositionLocalOf { mutableStateOf(false) }
-internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> (Int) -> Unit)?> { null }
+internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> DeleteDragSession)?> { null }
 
 /** How long startup may take before the loading panel shows "正在加载词库" and its progress bar. */
 internal const val DEPLOY_NOTICE_DELAY_MS = 600L

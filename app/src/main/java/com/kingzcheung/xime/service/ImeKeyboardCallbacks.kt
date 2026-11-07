@@ -10,6 +10,7 @@ import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
+import com.kingzcheung.xime.ui.keyboard.DeleteDragSession
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.util.FileLogger
 import kotlin.math.abs
@@ -57,8 +58,8 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
             startDeleteDrag = {
-                service.beginDeleteDrag()
-                ImeDistanceBackspace(service, state.inputSessionId)::move
+                val generation = service.beginDeleteDrag()
+                DeleteDragSession(ImeDistanceBackspace(service, state.inputSessionId)::move) { service.finishDeleteDrag(generation) }
             },
             isDeleteDragging = { service.deleteDragActive.value },
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
@@ -133,7 +134,6 @@ internal fun rememberImeKeyboardCallbacks(
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
             onKeyRelease = { key ->
-                if (key == "delete") service.finishDeleteDrag()
                 service.feedbackManager.hapticFeedback(view, keyUp = true, type = KeyFeedbackType.fromKey(key))
             },
             onCandidateSelect = { index ->

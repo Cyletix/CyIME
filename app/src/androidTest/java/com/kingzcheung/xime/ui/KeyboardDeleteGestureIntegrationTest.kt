@@ -20,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
+import com.kingzcheung.xime.ui.keyboard.DeleteDragSession
 import com.kingzcheung.xime.ui.keyboard.KeyboardView
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.viewmodel.KeyboardUiState
@@ -69,7 +70,7 @@ class KeyboardDeleteGestureIntegrationTest {
         KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
     }
 
-    private fun show() {
+    private fun show(startDrag: (() -> DeleteDragSession)? = null) {
         rule.setContent {
             val configuration = Configuration(LocalConfiguration.current).apply {
                 screenWidthDp = 600; screenHeightDp = 800
@@ -83,7 +84,7 @@ class KeyboardDeleteGestureIntegrationTest {
                             val callbacks = remember {
                                 KeyboardCallbacks(onKeyPress = { text, _ -> actions += text },
                                     onCandidateSelect = {}, onCommitText = { actions += "literal:$it" },
-                                    onCursorMove = { cursorMoves += it })
+                                    onCursorMove = { cursorMoves += it }, startDeleteDrag = startDrag)
                             }
                             activeCallbacks = callbacks
                             KeyboardView(vm,
@@ -142,6 +143,27 @@ class KeyboardDeleteGestureIntegrationTest {
                 assertTrue("$case must not move the application cursor", cursorMoves.isEmpty())
             }
             rule.onNodeWithTag("key-flick-preview").assertDoesNotExist()
+        }
+    }
+
+    @Test fun horizontalDeleteAlwaysFinishesOnReleaseAndOnSystemCancel() {
+        var starts = 0
+        var ends = 0
+        show { starts++; DeleteDragSession({}) { ends++ } }
+        for (layout in layouts) {
+            activate(layout, reverse = false)
+            for (cancelled in listOf(false, true)) {
+                val prior = starts
+                val origin = start()
+                rule.onNodeWithTag("delete-host").performTouchInput {
+                    down(origin); moveTo(origin - Offset(50f, 0f))
+                    if (cancelled) cancel() else up()
+                }
+                rule.runOnIdle {
+                    assertEquals(layout, prior + 1, starts)
+                    assertEquals(layout, starts, ends)
+                }
+            }
         }
     }
 

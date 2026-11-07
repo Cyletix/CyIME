@@ -687,14 +687,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal val deleteDragActive = androidx.compose.runtime.mutableStateOf(false)
     private var deleteDragGeneration = 0L
 
-    internal fun beginDeleteDrag() {
+    internal fun beginDeleteDrag(): Long {
         deleteDragGeneration++
         deleteDragActive.value = true
+        return deleteDragGeneration
     }
 
-    internal fun finishDeleteDrag() {
-        if (!deleteDragActive.value) return
-        val generation = deleteDragGeneration
+    internal fun finishDeleteDrag(generation: Long) {
+        if (!deleteDragActive.value || generation != deleteDragGeneration) return
         if (inputReadiness.ticket() == null) {
             deleteDragActive.value = false
             maybeCollapseCandidatePage()
