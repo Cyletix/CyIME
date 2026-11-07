@@ -137,6 +137,7 @@ fun KeyboardView(
     /** 悬浮卡片外四角角标把手的热区（窗口坐标），宿主并进触摸区；角标没亮时为空表。 */
     onCornerHandlesPositioned: (List<android.graphics.Rect>) -> Unit = {},
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
+    predictionTransition: kotlinx.coroutines.flow.StateFlow<Boolean>? = null,
     voiceAmplitudeState: State<Float> = remember { mutableFloatStateOf(0f) },
     voiceSpectrumState: State<FloatArray> = remember { mutableStateOf(FloatArray(16)) },
     /**
@@ -1070,17 +1071,35 @@ fun KeyboardView(
                 }
             }
 
+            val predictionPending = predictionTransition?.collectAsStateWithLifecycle()?.value == true
+            var previousBar by remember(state.inputSessionId) { mutableStateOf<CandidateBarState?>(null) }
+            SideEffect {
+                if (candidateBarState is CandidateBarState.ChineseCandidates || candidateBarState is CandidateBarState.AssociationOnly) {
+                    previousBar = candidateBarState
+                } else if (candidateBarState is CandidateBarState.Idle && !predictionPending) {
+                    previousBar = null
+                }
+            }
+            val holdingBar = predictionPending && candidateBarState is CandidateBarState.Idle && previousBar != null
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalCorrectedCandidates provides candidateState.value.correctedCandidates) {
             ScaledCandidateBar(candidateBarScaleState.floatValue) {
             CandidateBar(
-                modifier = Modifier.clipboardPanelExpandGesture().drawWithContent {
+                modifier = Modifier.then(if (holdingBar) Modifier.clearAndSetSemantics {}.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                                .changes.forEach { it.consume() }
+                        }
+                    }
+                } else Modifier)
+                    .clipboardPanelExpandGesture().drawWithContent {
                     drawContent()
                     InputLatencyTrace.finish(candidateState.value.traceEventId, "draw-submitted")
                 },
                 state = if (barPage is KeyboardPage.Overlay || candidateBarState is CandidateBarState.ClipboardDisplay &&
                     (state.voiceSticky || state.isHandwritingMode || viewModel.hasTemporaryHandwriting))
-                    CandidateBarState.Idle else candidateBarState,
+                    CandidateBarState.Idle else if (holdingBar) previousBar!! else candidateBarState,
                 page = barPage,
                 candidatePageExpanded = candidatePageExpanded,
                 commentsAreGlosses = glossChinese && CandidateGlossary.isLoaded,

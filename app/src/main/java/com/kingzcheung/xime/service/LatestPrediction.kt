@@ -21,6 +21,9 @@ internal class LatestPrediction(
     private val pendingGeneration = MutableStateFlow(0L)
     /** Zero means no pending request; the generation keeps stale completions from clearing a newer request. */
     val pendingRequest: StateFlow<Long> = pendingGeneration.asStateFlow()
+    private val transition = MutableStateFlow(false)
+    /** Includes the reservation between a commit and the posted prediction request. */
+    val transitionPending: StateFlow<Boolean> = transition.asStateFlow()
     val isPending: Boolean get() = pendingGeneration.value != 0L
     val revision: Long get() = generation
     private var nextAllowed = 0L
@@ -39,6 +42,7 @@ internal class LatestPrediction(
         val reserved = reservation != null
         reservation = null
         val pending = pendingGeneration.getAndUpdate { 0L } != 0L
+        transition.value = false
         job?.cancel(); job = null
         return pending || reserved || held
     }
@@ -53,18 +57,23 @@ internal class LatestPrediction(
     /** Marks a request that will be submitted after a post; [invalidate] reports it as pending. */
     @Synchronized fun reserve(): Long {
         reservation = generation
+        transition.value = true
         return generation
     }
 
     /** Drops a reservation that ended without a submit; a newer request is left alone. */
     @Synchronized fun release(token: Long) {
-        if (reservation == token && generation == token) reservation = null
+        if (reservation == token && generation == token) {
+            reservation = null
+            if (!isPending) transition.value = false
+        }
     }
 
     @Synchronized fun submit(text: String) {
         invalidate()
         val request = generation
         pendingGeneration.value = request
+        transition.value = true
         val submittedAt = now()
         // 单独一次上屏（最常见：打完一个词停下来）不再固定等 160 ms，立刻推理（用户反馈 10-31「联想有延迟」）；
         // 连着上屏（连续点联想词、实体键盘连打）才等这一串停下，再跑昂贵的原生推理。
@@ -89,8 +98,12 @@ internal class LatestPrediction(
                         nextAllowed = now() + if (elapsed > 350) elapsed.coerceAtMost(1500) else 0
                     }
                 }
-            } finally { pendingGeneration.compareAndSet(request, 0L) }
+            } finally { finish(request) }
         }
+    }
+
+    @Synchronized private fun finish(request: Long) {
+        if (pendingGeneration.compareAndSet(request, 0L)) transition.value = false
     }
 
     private companion object {
