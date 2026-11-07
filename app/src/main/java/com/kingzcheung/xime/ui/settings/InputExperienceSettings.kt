@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.foundation.layout.*
@@ -185,6 +187,13 @@ internal fun InputExperienceSettings(
                 ClearBeforeCursorLegend(settings.clearBeforeCursorOnly, settings.deleteSwipeReversed)
             }
             // 下面两项存在 SettingsPreferences（原在「智能联想 › 联想行为」），值不变，只是换了地方。
+            var clearSkipsAssociation by remember { mutableStateOf(SettingsPreferences.clearSwipeSkipsAssociation(context)) }
+            divider()
+            SettingsToggleItem(Icons.AutoMirrored.Filled.Backspace, "滑动清空时跳过联想",
+                "只剩联想词时，一次清空手势就按已选范围删除正文。关闭时先收起联想。", clearSkipsAssociation, {
+                    clearSkipsAssociation = it
+                    SettingsPreferences.setClearSwipeSkipsAssociation(context, it)
+                })
             var deleteSkipsAssociation by remember { mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context)) }
             var deleteRecovery by remember { mutableStateOf(SettingsPreferences.isDeleteRecovery(context)) }
             val predictionOn = remember { SettingsPreferences.isSmartPredictionEnabled(context) }
