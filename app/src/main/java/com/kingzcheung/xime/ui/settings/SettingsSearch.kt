@@ -202,6 +202,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("模糊音", chinesePath, chinese, "模糊音 模糊 平翘舌 前后鼻音 z zh c ch s sh n l f h r an ang en eng in ing 分不清 口音 方言 九键模糊音 九宫格 14键模糊音 14 键 双拼"),
         SettingsSearchEntry("滑行输入", qwertyPath, qwerty, "滑行 划词 滑动输入 手势输入 英文 整词 swype"),
         SettingsSearchEntry("中文滑行输入", qwertyPath, qwerty, "滑行 划词 中文滑行 拼音滑行 双拼滑行 手势输入 swype"),
+        SettingsSearchEntry("逐字删除中文滑行", qwertyPath, qwerty, "滑行 划词 删除 退格 拼音 音节 中文"),
         SettingsSearchEntry("滑行时实时显示词", qwertyPath, qwerty, "滑行 实时 预览 显示 抬手 gboard 划词 swype"),
         SettingsSearchEntry("三行字母错位", qwertyPath, qwerty, "错位 排布 实体键盘 对齐 手机排布 字母行 偏移"),
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),

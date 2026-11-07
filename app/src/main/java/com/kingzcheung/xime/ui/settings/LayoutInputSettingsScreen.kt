@@ -98,6 +98,12 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             ?.takeIf { !settings.chineseGlideTyping }?.message,
                         costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.CHINESE_GLIDE)
                     HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.Gesture, "逐字删除中文滑行",
+                        "开启后，删除键一次删除滑行输入中最后一个字对应的编码。",
+                        checked = settings.deleteChineseGlideCharacter, onCheckedChange = {
+                            settings = settings.copy(deleteChineseGlideCharacter = it); settings.save(context)
+                        })
+                    HorizontalDivider()
                     // 别的用户 11-02 提的（用惯 Gboard）：默认关；两种滑行都没开时没有作用，关着就置灰。
                     SettingsToggleItem(Icons.TwoTone.Gesture, "滑行时实时显示词",
                         "划的过程中在手指上方显示现在抬手会出的词，中文显示拼音。不影响点按打字和抬手后出词的速度。",
