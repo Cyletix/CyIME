@@ -191,6 +191,12 @@ internal fun KeyboardSettingsScaffold(
         }
     }
     val visible = preview && selected && KeyboardPanelLaunch.previewVisible
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    var trialOwnsIme by remember { mutableStateOf(false) }
+    LaunchedEffect(typing, imeBottom) {
+        if (typing) trialOwnsIme = true
+        else if (imeBottom == 0) trialOwnsIme = false
+    }
     Box(modifier) {
     Scaffold(modifier = Modifier.fillMaxSize(), containerColor = MaterialTheme.colorScheme.surface, topBar = {
         TopAppBar(title = { Text(title) }, navigationIcon = {
@@ -211,7 +217,7 @@ internal fun KeyboardSettingsScaffold(
         val floatingButton = preview && !visible
         val listEndInset = keyboardInset + if (floatingButton) SHOW_KEYBOARD_BUTTON_SPACE else 0.dp
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
-            .then(if (preview && !visible) Modifier.imePadding() else Modifier)) {
+            .then(if (preview && !visible && !typing && !trialOwnsIme) Modifier.imePadding() else Modifier)) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
               CompositionLocalProvider(LocalKeyboardPreviewInset provides listEndInset, LocalTypingTrialOpen provides typing) {
                 if (editPanel == null) content(Modifier.fillMaxSize())
@@ -269,15 +275,23 @@ private fun TypingTrialOverlay(onReady: () -> Unit, onClose: () -> Unit) {
         field?.let { imm?.hideSoftInputFromWindow(it.windowToken, 0) }
         onClose()
     }
+    val currentOnClose by rememberUpdatedState(onClose)
+    DisposableEffect(Unit) {
+        val dismiss = { currentOnClose() }
+        KeyboardPanelLaunch.closeTypingTrial = dismiss
+        onDispose { if (KeyboardPanelLaunch.closeTypingTrial === dismiss) KeyboardPanelLaunch.closeTypingTrial = null }
+    }
     // 键盘没弹出时的返回。
     BackHandler(onBack = close)
-    // 键盘开着时，返回手势先由输入法收起键盘；键盘一收就关闭，不用再按第二次。
-    // 稍等一下再确认，焦点从只读预览换到这里时键盘不会被误判为已收起。
+    // 系统返回手势先收起输入法；动画目标变为零时就关闭，别等动画结束后的可见性通知。
     val imeVisible = WindowInsets.isImeVisible
+    val density = LocalDensity.current
+    val imeSource = WindowInsets.imeAnimationSource.getBottom(density)
+    val imeTarget = WindowInsets.imeAnimationTarget.getBottom(density)
     var imeShown by remember { mutableStateOf(false) }
-    LaunchedEffect(imeVisible) {
+    LaunchedEffect(imeVisible, imeSource, imeTarget) {
         if (imeVisible) imeShown = true
-        else if (imeShown) { kotlinx.coroutines.delay(200); close() }
+        if (imeShown && ((!imeVisible) || (imeSource > 0 && imeTarget == 0))) onClose()
     }
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     Box(Modifier.fillMaxSize().testTag("typing-trial")

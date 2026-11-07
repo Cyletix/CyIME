@@ -4870,6 +4870,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (collapseScreenKeyboardToHardwareToolbar()) return
         // 语音听写中：收起成底部悬浮条，语音继续（仿 Gboard），不结束本次听写。
         if (collapseToVoicePill(VoiceSessionEnd.COLLAPSE_BUTTON)) return
+        KeyboardPanelLaunch.closeTypingTrial?.invoke()
         clearInputState()
         requestHideSelf(0)
     }

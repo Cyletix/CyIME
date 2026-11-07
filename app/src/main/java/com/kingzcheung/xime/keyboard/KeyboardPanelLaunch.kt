@@ -41,6 +41,8 @@ object KeyboardPanelLaunch {
     internal var previewVisible by mutableStateOf(false)
     /** 只读预览键盘被点了：设置页据此打开试打框（真实输入框），键盘随即能打字（11-01「根本点不了」）。 */
     internal var typingRequested by mutableStateOf(false)
+    /** 键盘主动收起时同步关闭设置页试打层。 */
+    internal var closeTypingTrial: (() -> Unit)? = null
     internal fun editorOption(panel: Panel?): String = if (panel == null) PREVIEW_EDITOR else "$PREVIEW_EDITOR/${panel.name}"
     internal fun editorPanel(info: EditorInfo?): Panel? = Panel.entries.firstOrNull { info?.privateImeOptions == editorOption(it) }
     internal fun isPreview(info: EditorInfo?, packageName: String): Boolean =
