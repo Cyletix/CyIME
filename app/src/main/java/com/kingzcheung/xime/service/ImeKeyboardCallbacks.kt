@@ -66,6 +66,11 @@ internal fun rememberImeKeyboardCallbacks(
             onGlideWord = service.keyRouter::commitGlideWord,
             onGlideCode = service.keyRouter::typeGlideCode,
             glidePreviewer = service.keyRouter::glidePreviewer,
+            onGlideEnglishPreview = service::showGlideEnglishPreview,
+            onGlidePreviewCode = service::showGlidePreviewCode,
+            onGlidePreviewEnd = service::endGlidePreview,
+            onGlidePreviewHold = service::holdGlidePreview,
+            onGlidePreviewFinish = service::finishGlidePreview,
             inputAdmissionTicket = {
                 (if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket())
                     ?: null.also { service.noteInputDropped("t9_no_ticket") }

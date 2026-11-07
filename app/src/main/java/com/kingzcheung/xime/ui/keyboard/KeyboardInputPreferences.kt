@@ -194,7 +194,7 @@ data class KeyboardInputPreferences(
     val chineseGlideTyping: Boolean = false,
     /** Delete the last syllable of an uncommitted Chinese glide as one unit. */
     val deleteChineseGlideCharacter: Boolean = false,
-    /** 滑行时在手指上方实时显示现在抬手会出的词；滑动中反复识别，多占 CPU，默认关（别的用户 11-02 提的，同 Gboard）。 */
+    /** 滑行时在输入框实时显示识别结果；滑动中反复识别，多占 CPU，默认关。 */
     val glidePreview: Boolean = false,
     /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
     val letterLongPressMenu: Boolean = false,
