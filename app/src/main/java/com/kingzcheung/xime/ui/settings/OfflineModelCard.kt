@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.model.*
 import com.kingzcheung.xime.speech.AsrModelManager
@@ -159,29 +161,71 @@ internal fun OfflineModelCard() {
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     editing?.let { language ->
-        AlertDialog(onDismissRequest = { editing = null }, title = { Text("${language.displayName}主模型") },
-            text = {
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).selectableGroup()) {
-                    SpeechModelSelection.offeredIds(SpeechModelSelection.primary(selected.getValue(language)))
-                        .filter { SpeechLanguages.supports(it, language) }.forEach { id ->
-                        val checked = SpeechModelSelection.primary(selected.getValue(language)) == id
-                        Row(Modifier.fillMaxWidth().testTag("speech-choice:${language.id}:$id")
-                            .selectable(checked, enabled = id in ready, role = Role.RadioButton, onClick = {
-                                manager.setFirstPassModel(id, language); refresh(language); editing = null
-                            }).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(checked, onClick = null, enabled = id in ready)
-                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Text(SpeechModelSelection.displayName(id).orEmpty(), style = MaterialTheme.typography.bodyLarge)
-                                Text(speechModelFacts(id), style = MaterialTheme.typography.bodySmall)
-                                Text(if (id in ready) "已下载" else "未下载", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        if (id !in ready) ModelDownloadAction(id, downloads) { download(id) }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
-                    }
+        SpeechModelPicker(language, SpeechModelSelection.primary(selected.getValue(language)), ready, downloads,
+            onSelect = { manager.setFirstPassModel(it, language); refresh(language); editing = null },
+            onDownload = ::download, onClose = { editing = null })
+    }
+}
+
+@Composable
+internal fun SpeechModelPicker(language: InputLanguage, selected: String, ready: Set<String>,
+    downloads: Map<String, ModelDownloadState>, onSelect: (String) -> Unit, onDownload: (String) -> Unit,
+    onClose: () -> Unit) {
+    AlertDialog(onDismissRequest = onClose, title = { Text("${language.displayName}主模型") },
+        text = {
+            SpeechModelChoices(language, selected, ready, downloads, onSelect, onDownload)
+        }, confirmButton = { TextButton(onClick = onClose) { Text("关闭") } })
+}
+
+@Composable
+internal fun SpeechModelChoices(language: InputLanguage, selected: String, ready: Set<String>,
+    downloads: Map<String, ModelDownloadState>, onSelect: (String) -> Unit, onDownload: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).selectableGroup()) {
+        SpeechModelSelection.offeredIds(selected).filter { SpeechLanguages.supports(it, language) }
+            .forEachIndexed { index, id ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+                SpeechModelChoice(language, id, selected == id, id in ready, downloads[id],
+                    onSelect = { onSelect(id) }, onDownload = { onDownload(id) })
+            }
+    }
+}
+
+@Composable
+private fun SpeechModelChoice(language: InputLanguage, id: String, checked: Boolean, ready: Boolean,
+    state: ModelDownloadState?, onSelect: () -> Unit, onDownload: () -> Unit) {
+    val name = SpeechModelSelection.displayName(id).orEmpty()
+    val progress = (state as? ModelDownloadState.Downloading)?.progress?.coerceIn(0f, 1f)
+    val error = state as? ModelDownloadState.Error
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).testTag("speech-choice:${language.id}:$id")
+            .selectable(checked, enabled = ready, role = Role.RadioButton, onClick = onSelect)
+            .padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(checked, onClick = null, enabled = ready)
+            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                Text(name, style = MaterialTheme.typography.bodyLarge)
+                Text(speechModelFacts(id).replace(" MB", "\u00A0MB"), style = MaterialTheme.typography.bodySmall)
+                val status = when {
+                    ready -> "已下载"
+                    progress != null -> "下载中 ${(progress * 100).toInt()}%"
+                    error != null -> error.message
+                    else -> "未下载"
                 }
-            }, confirmButton = { TextButton(onClick = { editing = null }) { Text("关闭") } })
+                Text(status, style = MaterialTheme.typography.labelSmall, color =
+                    if (error != null && !ready) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (!ready) {
+            if (progress != null) {
+                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            } else {
+                val action = if (error != null) "重试" else "下载"
+                TextButton(onClick = onDownload, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .testTag("speech-download:$id").semantics { contentDescription = "$action$name" },
+                    contentPadding = PaddingValues(horizontal = 6.dp)) { Text(action) }
+            }
+        }
     }
 }
 
