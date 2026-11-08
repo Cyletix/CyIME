@@ -66,7 +66,7 @@ android {
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/rime-manifest").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/speech-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/builtin-sync-assets").get().asFile)
-    compileSdk = 36
+    compileSdk = libs.versions.androidCompileSdk.get().toInt()
 
     // JVM 单测中未 mock 的 Android 框架方法（如 android.util.Log）返回默认值而非抛异常，
     // 使服务层状态机（如语音收尾流程）可直接实例化测试
@@ -81,8 +81,8 @@ android {
         // applicationId 使用 CyIME 自己的包名，namespace 保留 com.kingzcheung.xime，
         // 以便继续跟踪上游、避免大规模移动源码目录。
         applicationId = "com.cyletix.cyime"
-        minSdk = 28
-        targetSdk = 35
+        minSdk = libs.versions.androidMinSdk.get().toInt()
+        targetSdk = libs.versions.androidTargetSdk.get().toInt()
         // 按发布批次定号：兼容修复升 PATCH，兼容功能升 MINOR 并归零 PATCH。
         // 不兼容变更升 MAJOR；日常编辑不逐次升号。完整规则见 docs/packaging.md。
         // versionCode 是独立递增的交付序号；同批普通版与内置版共用。

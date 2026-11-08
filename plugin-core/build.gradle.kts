@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "com.kingzcheung.xime.plugin.core"
-    compileSdk = 36
+    compileSdk = libs.versions.androidCompileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 28
+        minSdk = libs.versions.androidMinSdk.get().toInt()
         consumerProguardFiles("consumer-rules.pro")
     }
 

@@ -1,4 +1,7 @@
 [versions]
+androidCompileSdk = "36"
+androidMinSdk = "28"
+androidTargetSdk = "35"
 agp = "9.1.0"
 kotlin = "2.4.20"
 kotlinSerialization = "2.4.20"
