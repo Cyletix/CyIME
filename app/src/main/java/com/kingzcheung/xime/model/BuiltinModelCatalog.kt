@@ -76,6 +76,33 @@ object BuiltinModelCatalog {
                     ModelFile("joiner.int8.onnx", "", "", 0L),
                     ModelFile("tokens.txt", "", "", 0L),
                 )))),
+        // 离线翻译（翻译插件没填 API 时用，translate/OfflineTranslation.kt；引擎 libcytranslate.so 在安装包里）。
+        // Mozilla Firefox 翻译模型，取自 storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data
+        // 的 db/models.json（2026-11-08），解压后原样转存到 Release `models` 和魔搭，文件名前加 translate-<方向>-v1-。
+        // 中译英：Firefox「Release Android」版 models/zh-en/cjk_retrain_base-memory_cNY_yaJCStGwnTeXgW8A5w，两边共用一个词表。
+        ModelInfo("translate-zh-en", "离线翻译 · 中译英", "翻译插件没填 API 时，在手机上把中文翻成英文，不联网。Mozilla Firefox 的翻译模型。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v1", size = "52.0 MB",
+                files = listOf(
+                    ModelFile("model.zhen.intgemm.alphas.bin", RELEASE + "translate-zh-en-v1-model.zhen.intgemm.alphas.bin", "5cd149601802fc8a18124a1c1306144dbbedc058630c4ddb2d53aa76fa9c7c06", 43977787L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-zh-en-v1-model.zhen.intgemm.alphas.bin")),
+                    ModelFile("vocab.zhen.spm", RELEASE + "translate-zh-en-v1-vocab.zhen.spm", "dff594318ab7d8b7b60b844ab98ebe6b932ae8045fab15235404c787715965b3", 1359697L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-zh-en-v1-vocab.zhen.spm")),
+                    ModelFile("lex.50.50.zhen.s2t.bin", RELEASE + "translate-zh-en-v1-lex.50.50.zhen.s2t.bin", "8524dd4c93ffd7f0ae7be32f77a7c14fea7cdbbebe34ea6ad0ec368d5ddd8b13", 9219192L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-zh-en-v1-lex.50.50.zhen.s2t.bin")),
+                )))),
+        // 英译中：Firefox「Release」版 models/en-zh/llmaat_finetune10M_qe8_f2_ByQcSxGXQRqGi-UTxYE43g，源、目标各一个词表。
+        ModelInfo("translate-en-zh", "离线翻译 · 英译中", "翻译插件没填 API 时，在手机上把英文翻成中文，不联网。Mozilla Firefox 的翻译模型。", ModelCategory.OTHER,
+            versions = listOf(ModelVersion(version = "v1", size = "47.6 MB",
+                files = listOf(
+                    ModelFile("model.enzh.intgemm.alphas.bin", RELEASE + "translate-en-zh-v1-model.enzh.intgemm.alphas.bin", "4e5accc141373565ddc8fa1565bceaa8d0c3482a82cab8131c719ebcc6c2157c", 43849787L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-model.enzh.intgemm.alphas.bin")),
+                    ModelFile("srcvocab.enzh.spm", RELEASE + "translate-en-zh-v1-srcvocab.enzh.spm", "bd9b65504acc6d9726dd281f7defc2adb7c2c22d0688fe2f84697de25197c8c5", 806952L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-srcvocab.enzh.spm")),
+                    ModelFile("trgvocab.enzh.spm", RELEASE + "translate-en-zh-v1-trgvocab.enzh.spm", "aded6993c36e440284d11cec3f6b8aef9c0e43188a772d80be342a713adf223d", 772004L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-trgvocab.enzh.spm")),
+                    ModelFile("lex.50.50.enzh.s2t.bin", RELEASE + "translate-en-zh-v1-lex.50.50.enzh.s2t.bin", "8575d8daa10e2dbff316dcdf8e1ce475357bcc2c92bdc63b736a2d5add22f681", 4485184L,
+                        mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-lex.50.50.enzh.s2t.bin")),
+                )))),
         // 字母逐字上屏的语言（LetterLanguage）的补全词表：不进安装包，开启语言时下载。
         // 源文件在 tools/wordlists（build_words.py 生成，来源见 NOTICE），原样传到 Release `models` 和魔搭。
         ModelInfo("words-es", "西班牙语补全词表", "西班牙语键盘的单词补全，约 4 万个常用词。不打重音也能补全：cancion → canción、ano → año。", ModelCategory.OTHER,

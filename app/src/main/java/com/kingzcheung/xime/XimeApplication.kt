@@ -102,6 +102,9 @@ class XimeApplication : Application(), ImageLoaderFactory {
         PluginManager.clipboardHostApiFactory = { _ ->
             com.kingzcheung.xime.plugin.ClipboardHostApiImpl(this)
         }
+        PluginManager.offlineTranslateHostApiFactory = { _ ->
+            com.kingzcheung.xime.translate.OfflineTranslateHostApiImpl(this)
+        }
         com.kingzcheung.xime.clipboard.sync.WindowsDevices.initialize(this)
         PluginManager.initialize(this) {
             // Available offline in Release too. Preserve existing installs and configuration.

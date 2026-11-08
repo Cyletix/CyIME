@@ -17,6 +17,7 @@ apply(from = "build-logic/tasks-bundled-models.gradle.kts")
 apply(from = "build-logic/tasks-builtin-sync.gradle.kts")
 apply(from = "build-logic/tasks-plugin-dev.gradle.kts")
 apply(from = "build-logic/tasks-japanese.gradle.kts")
+apply(from = "build-logic/tasks-offline-translate.gradle.kts")
 apply(from = "build-logic/tasks-chinese.gradle.kts")
 apply(from = "build-logic/tasks-stroke.gradle.kts")
 apply(from = "build-logic/tasks-cangjie.gradle.kts")
@@ -60,6 +61,8 @@ android {
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-azookey-assets").get().asFile)
     // libCyAzooKey.so per ABI (tasks-japanese.gradle.kts), loaded by the Japanese Rime translator.
     sourceSets.getByName("main").jniLibs.srcDir(layout.buildDirectory.dir("generated/azookey-jniLibs").get().asFile)
+    // libcytranslate.so (arm64-v8a, x86_64; tasks-offline-translate.gradle.kts): offline translation engine.
+    sourceSets.getByName("main").jniLibs.srcDir(layout.buildDirectory.dir("generated/translate-jniLibs").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/stroke-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/cangjie-assets").get().asFile)
