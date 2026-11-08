@@ -1499,7 +1499,8 @@ fun KeyboardView(
                 .cySwapFadeIn(underlaySwapKey, instantKey = listOf(state.isAsciiMode, state.inputProfile.language))
                 .excludeRevealedKeyboardPanels(inputPreferences.frostedGlass.enabled, candidateReveal, overlayReveal).then(
                 if (candidatePageExpanded || overlayVisible) Modifier.clearAndSetSemantics {} else Modifier
-            )) {
+            // 全屏手写开着工具面板时书写区仍露在面板上方，照旧不动它。
+            ).blockCoveredKeyboardTouches((candidatePageExpanded || overlayVisible) && !state.handwritingExpanded)) {
             val isMainKeyboard = underlyingPage is KeyboardPage.Main
             if (isMainKeyboard) {
                 val mainType = (underlyingPage as KeyboardPage.Main).type

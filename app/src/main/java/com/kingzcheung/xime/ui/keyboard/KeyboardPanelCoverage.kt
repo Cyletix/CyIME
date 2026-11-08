@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ClipOp
@@ -58,3 +59,13 @@ internal fun Modifier.excludeRevealedKeyboardPanels(
         drawOutside(0)
     }
 }
+
+/**
+ * A page kept composed under a panel must not take touches. Inside its bounds the panel's shield
+ * wins, but Compose still hands a key shorter than the 48 dp minimum touch target a touch just
+ * outside its bounds: with the number row on, the strip under the toolbar typed digits through
+ * the emoji page (B站反馈 11-08). Clipping the covered page ends hit testing at its bounds; an
+ * uncovered page keeps its touch targets unchanged.
+ */
+internal fun Modifier.blockCoveredKeyboardTouches(covered: Boolean): Modifier =
+    if (covered) clipToBounds() else this
