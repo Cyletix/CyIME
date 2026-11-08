@@ -142,7 +142,7 @@ fun HandwritingKeyboardLayout(
         // 日语手写靠公式模型算特征来比对假名：缺的是这个模型时，直接说去哪下载。
         val missingModel = HandwritingTemplates.Script.forLanguage(language) != null
         HandwritingUnavailable(language, modifier, onUnsupportedExit, unsupportedExitLabel,
-            message = if (missingModel) "${language.displayName}手写需要先在 设置 → 模型管理 下载「公式手写模型」"
+            message = if (missingModel) "${language.displayName}手写需要先在 设置 → 扩展 → 模型 下载「公式手写模型」"
                 else HandwritingLanguages.unavailableMessage(language))
         return
     }
@@ -190,7 +190,8 @@ fun HandwritingKeyboardLayout(
     val formulaPrefs = remember(context) { context.getSharedPreferences("handwriting", android.content.Context.MODE_PRIVATE) }
     // 公式只在英文手写里提供：中文、日语手写不显示公式按钮，也不沿用上次的公式模式。
     val formulaAvailable = remember(context, language) { language == InputLanguage.ENGLISH && FormulaRecognizer.isAvailable(context) }
-    // 英文手写里总显示公式按钮；还没有公式模型时点它走模型管理的下载
+    // 英文手写里总显示公式按钮；还没有公式模型时点它直接打开公式模型的下载页
+    // （以前跳「模型管理」，那页只列已安装的模型，没装过的公式模型在那里找不到）
     val formulaShown = language == InputLanguage.ENGLISH
     var formulaMode by remember(formulaAvailable) { mutableStateOf(formulaAvailable && formulaPrefs.getBoolean("formula_mode", false)) }
     val formulaActive by rememberUpdatedState(formulaMode && formulaAvailable)
@@ -354,7 +355,8 @@ fun HandwritingKeyboardLayout(
             if (formulaShown) Surface(
                 onClick = {
                     if (!formulaAvailable) {
-                        context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context, "model_management"))
+                        context.startActivity(com.kingzcheung.xime.service.settingsActivityIntent(context,
+                            "model_market_detail/${FormulaRecognizer.MODEL_ID}"))
                         return@Surface
                     }
                     session.clear()

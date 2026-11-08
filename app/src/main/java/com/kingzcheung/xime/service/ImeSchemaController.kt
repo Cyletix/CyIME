@@ -33,6 +33,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 缺手写模型时打开的下载页（HandwritingEngine.hasModel 认的是 ochwpro）。 */
+internal const val HANDWRITING_MODEL_DOWNLOAD_ROUTE = "model_market_detail/ochwpro"
+
 /** Reuse the settings activity; onNewIntent handles explicit destinations without recreating it. */
 internal fun settingsActivityIntent(context: android.content.Context, route: String? = null) =
     Intent(context, MainActivity::class.java).apply {
@@ -607,7 +610,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
         if (!templateHandwriting && !com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service, recognitionLanguage!!)) {
             Toast.makeText(service, "请先下载手写模型", Toast.LENGTH_SHORT).show()
-            service.startActivity(settingsActivityIntent(service, "model_management"))
+            // 直接打开手写模型的下载页；「模型管理」只列已安装的，没装时那里没有下载入口。
+            service.startActivity(settingsActivityIntent(service, HANDWRITING_MODEL_DOWNLOAD_ROUTE))
             return
         }
         service.editorInputPolicy.choose(false)
@@ -647,7 +651,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 android.widget.Toast.makeText(
                     service, "请先下载手写模型", android.widget.Toast.LENGTH_LONG
                 ).show()
-                service.startActivity(settingsActivityIntent(service, "model_management"))
+                service.startActivity(settingsActivityIntent(service, HANDWRITING_MODEL_DOWNLOAD_ROUTE))
                 return
             }
             service.keyboardViewModel.discardTemporaryHandwriting()

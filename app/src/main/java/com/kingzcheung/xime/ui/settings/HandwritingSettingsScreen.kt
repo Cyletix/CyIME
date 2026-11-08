@@ -49,7 +49,7 @@ fun HandwritingSettingsContent(
             HandwritingSettings()
             SettingsSection(title = "手写模型", content = {
                 SettingsItem(Icons.TwoTone.Inventory, "已安装的手写模型",
-                    "内置手写、公式手写模型和个人手写模型；下载、切换和删除", onClick = onOpenModels, showArrow = true)
+                    "已装的手写、公式手写和个人手写模型；切换和删除。下载在 扩展 › 模型", onClick = onOpenModels, showArrow = true)
             })
             SettingsSection(title = "改进手写", content = {
                 if (devTools) {
