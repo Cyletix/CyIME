@@ -95,6 +95,8 @@ class DeviceModelDefaultsTest {
         val lines = com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.CpuThresholds(
             20_000_000, 25_000_000, 60_000_000, 70_000_000)
         fun cpu(single: Long, dual: Long) = com.kingzcheung.xime.runtime.adaptation.CpuMeasurement(single, dual)
+        assertEquals(DeviceModelTier.LIGHT, DeviceModelProfiles.choose(device().copy(cpu = cpu(85_160_000, 91_000_000))).tier)
+        assertEquals(DeviceModelTier.ENHANCED, DeviceModelProfiles.choose(device().copy(cpu = cpu(16_520_000, 23_060_000))).tier)
         // 2.4 GHz、8 GB 但实测慢：不再推荐边说边出字那一套。
         assertEquals(DeviceModelTier.LIGHT, DeviceModelProfiles.choose(device().copy(cpu = cpu(80_000_000, 90_000_000)),
             thresholds = lines).tier)

@@ -20,14 +20,19 @@ object PerformanceTiers {
 
     /**
      * 实测分档线：跑完一遍要多少纳秒，越快越强。单线程、双线程各自定档，取低的那个。
-     * 来自平板、手机的大中小核实测（tools/ime_lab/cpu_bench_calibrate.py，见 docs/development/device-adaptation-plan.md 「CPU 实测分档」）。
+     * 低配线来自真机核簇实测；高配线留待跨设备复核。数据见 device-adaptation-plan.md。
      */
-    data class CpuThresholds(val highSingleNs: Long, val highDualNs: Long, val lowSingleNs: Long, val lowDualNs: Long) {
-        init { require(highSingleNs in 1 until lowSingleNs && highDualNs in 1 until lowDualNs) }
+    data class CpuThresholds(val highSingleNs: Long?, val highDualNs: Long?, val lowSingleNs: Long, val lowDualNs: Long) {
+        init {
+            require(lowSingleNs > 0 && lowDualNs > 0)
+            require((highSingleNs == null) == (highDualNs == null))
+            require(highSingleNs == null || highSingleNs in 1 until lowSingleNs)
+            require(highDualNs == null || highDualNs in 1 until lowDualNs)
+        }
     }
 
-    /** null = 分档线还没按实测定下来：实测结果照常显示，但不拿来定档（按“未测”算，最多中配）。 */
-    val cpuThresholds: CpuThresholds? = null
+    val cpuThresholds = CpuThresholds(highSingleNs = null, highDualNs = null,
+        lowSingleNs = 80_000_000, lowDualNs = 85_000_000)
 
     /** 档位卡在哪：给页面写一句为什么是这一档。 */
     enum class Limit {
@@ -45,9 +50,10 @@ object PerformanceTiers {
 
     /** 只看实测的算力档；没测、版本对不上或分档线没定返回 null。 */
     fun cpuTier(cpu: CpuMeasurement?, thresholds: CpuThresholds? = cpuThresholds): PerformanceTier? {
-        if (cpu == null || thresholds == null || cpu.version != CpuBenchmark.VERSION) return null
-        fun tier(ns: Long, high: Long, low: Long) = when {
-            ns <= high -> PerformanceTier.HIGH
+        if (cpu == null || thresholds == null || cpu.version != CpuBenchmark.VERSION ||
+            cpu.singleNs <= 0 || cpu.dualNs <= 0) return null
+        fun tier(ns: Long, high: Long?, low: Long) = when {
+            high != null && ns <= high -> PerformanceTier.HIGH
             ns >= low -> PerformanceTier.LOW
             else -> PerformanceTier.MEDIUM
         }

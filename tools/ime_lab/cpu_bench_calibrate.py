@@ -91,7 +91,10 @@ def conditions(serial):
 
 def run_once(serial, apk, lib, cpus):
     prefix = f"taskset {mask(cpus)} " if cpus else ""
-    out = sh(serial, f"CLASSPATH={apk} {prefix}app_process /system/bin {MAIN} {lib}", check=False)
+    # Samsung may withdraw a core between enumeration and the next sample.
+    out = sh(serial, f"CLASSPATH={apk} {prefix}app_process /system/bin {MAIN} {lib} 2>&1", check=False)
+    if cpus and "taskset: failed to set" in out and "Invalid argument" in out:
+        return None
     line = next((l for l in out.splitlines() if l.startswith("{")), None)
     if line is None:
         raise SystemExit(f"benchmark printed no result:\n{out}")
@@ -100,7 +103,7 @@ def run_once(serial, apk, lib, cpus):
         raise SystemExit(f"benchmark failed: {result}")
     if cpus:
         seen = set(parse_cpus(result["single_cpus"])) | set(parse_cpus(result["dual_cpus"]))
-        result["pin_ok"] = seen <= set(cpus)
+        result["pin_ok"] = bool(result["single_cpus"] and result["dual_cpus"]) and seen <= set(cpus)
     return result
 
 
@@ -134,11 +137,24 @@ def main():
         lib = f"{TMP}/{LIB}"
 
         groups = clusters(args.serial)
-        targets = [("all", [])] + [(f"{p} ({len(c)}x {khz / 1e6:.2f} GHz)", c) for p, c, khz in groups]
+        targets = [("all", [])]
+        for policy, cpus, khz in groups:
+            # A device can list online cores that its shell process cannot use.
+            status = sh(args.serial, f"taskset {mask(cpus)} cat /proc/self/status", check=False)
+            match = re.search(r"^Cpus_allowed_list:\s*([0-9,-]+)", status, re.M)
+            if not match:
+                print(f"skipping unavailable cluster {policy} (CPUs {cpus})", file=sys.stderr)
+                continue
+            allowed = parse_cpus(match.group(1))
+            targets.append((f"{policy} ({len(allowed)}x {khz / 1e6:.2f} GHz)", allowed))
         runs = {name: [] for name, _ in targets}
         for round_index in range(args.rounds):
             for name, cpus in targets:
-                runs[name].append(run_once(args.serial, apk, lib, cpus))
+                sample = run_once(args.serial, apk, lib, cpus)
+                if sample is None:
+                    print(f"{name} unavailable in round {round_index + 1}", file=sys.stderr)
+                    continue
+                runs[name].append(sample)
                 time.sleep(args.cooldown)
             print(f"round {round_index + 1}/{args.rounds} done", file=sys.stderr)
         after = conditions(args.serial)
@@ -156,8 +172,11 @@ def main():
     summary = {}
     for name, cpus in targets:
         results = runs[name]
+        if not results:
+            continue
         summary[name] = {
             "cpus": cpus,
+            "rounds": len(results),
             "single_ms": round(statistics.median(r["single_ns"] for r in results) / 1e6, 2),
             "dual_ms": round(statistics.median(r["dual_ns"] for r in results) / 1e6, 2),
             "single_spread_ms": [round(min(r["single_ns"] for r in results) / 1e6, 2),

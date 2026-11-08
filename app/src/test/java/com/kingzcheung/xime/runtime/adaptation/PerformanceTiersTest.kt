@@ -15,6 +15,15 @@ class PerformanceTiersTest {
 
     private fun verdict(d: DeviceCapabilities) = PerformanceTiers.explain(d, lines)
 
+    @Test fun productionThresholdsDowngradeSlowComputeEvenWithAmpleRamAndHighClock() {
+        fun tier(single: Long, dual: Long) = PerformanceTiers.classify(device.copy(cpu = CpuMeasurement(single, dual)))
+        assertEquals(PerformanceTier.LOW, tier(85_160_000, 91_000_000))
+        assertEquals(PerformanceTier.MEDIUM, tier(22_820_000, 24_320_000))
+        assertEquals(PerformanceTier.LOW, tier(80_000_000, 24_320_000))
+        assertEquals(PerformanceTier.LOW, tier(22_820_000, 85_000_000))
+        assertNull(PerformanceTiers.cpuTier(CpuMeasurement(0, 91_000_000)))
+    }
+
     @Test fun `big memory and a high clock are not enough for high without a measurement`() {
         // 11-04 用户反馈：很差的手机也评成高配（8 GB + 2.2 GHz 以上）。
         listOf(device, device.copy(totalMemoryBytes = 11 * gib, maxCpuKHz = 2_840_000), device.copy(totalMemoryBytes = 16 * gib))
