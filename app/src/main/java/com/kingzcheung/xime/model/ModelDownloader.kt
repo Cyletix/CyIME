@@ -47,6 +47,37 @@ internal fun modelFailureText(error: Throwable): String {
     }
 }
 
+/** 这条线路明显太慢，还有没试过的线路时先换过去（见 [SlowRouteGuard]）。 */
+internal class SlowRouteException(message: String) : IOException(message)
+
+/**
+ * 下载头 [WINDOW_MS] 毫秒的平均速度低于 [MIN_BYTES_PER_SECOND] 时判为慢线路。
+ * 只看大文件（小文件慢几秒无所谓）；只在 [enabled]（后面还有没试过的线路）时生效，最后一条线路照常下完。
+ */
+internal class SlowRouteGuard(
+    private val enabled: Boolean,
+    private val totalBytes: Long,
+    private val startMs: Long,
+) {
+    private var checked = false
+
+    /** 返回 true 表示该放弃这条线路。 */
+    fun isSlow(downloadedBytes: Long, nowMs: Long): Boolean {
+        if (!enabled || checked || totalBytes in 0 until MIN_FILE_BYTES) return false
+        val elapsed = nowMs - startMs
+        if (elapsed < WINDOW_MS) return false
+        checked = true
+        return downloadedBytes * 1000 < MIN_BYTES_PER_SECOND * elapsed
+    }
+
+    companion object {
+        const val WINDOW_MS = 15_000L
+        /** 150 KB/s：200 多 MB 的语音模型按这个速度要二十多分钟。 */
+        const val MIN_BYTES_PER_SECOND = 150L * 1024
+        const val MIN_FILE_BYTES = 8L * 1024 * 1024
+    }
+}
+
 object ModelDownloader {
 
     private const val TAG = "ModelDownloader"
@@ -123,10 +154,14 @@ object ModelDownloader {
             val urls = DownloadMirrors.candidates(context, file.downloadUrl, file.mirrors)
             if (urls.isEmpty()) throw IOException("缺少下载地址：${file.name}")
             var lastError: Exception? = null
-            for (url in urls) {
+            // 慢线路先跳过、排到最后再试：只按地区排序时，一条能连上但很慢的线路会一直下到底，不会换到快的。
+            val pending = ArrayDeque(urls)
+            val slow = ArrayDeque<String>()
+            while (pending.isNotEmpty() || slow.isNotEmpty()) {
+                val url = pending.removeFirstOrNull() ?: slow.removeFirst()
                 currentCoroutineContext().ensureActive()
                 try {
-                    downloadSingleFile(url, target) { fileProgress ->
+                    downloadSingleFile(url, target, skipIfSlow = pending.isNotEmpty()) { fileProgress ->
                         val overall = (index.toFloat() + fileProgress) / totalFiles
                         onProgress(ModelDownloadState.Downloading(overall, 0, -1))
                     }
@@ -137,6 +172,10 @@ object ModelDownloader {
                 } catch (e: CancellationException) {
                     target.delete()
                     throw e
+                } catch (e: SlowRouteException) {
+                    FileLogger.w(TAG, "${file.name} 从 $url 下载太慢（${e.message}），先换下一条线路")
+                    target.delete()
+                    slow.addLast(url)
                 } catch (e: Exception) {
                     FileLogger.w(TAG, "${file.name} 从 $url 下载失败，尝试下一条线路：${e.message}")
                     target.delete()
@@ -150,6 +189,7 @@ object ModelDownloader {
     private suspend fun downloadSingleFile(
         url: String,
         targetFile: File,
+        skipIfSlow: Boolean = false,
         onProgress: (Float) -> Unit = {}
     ) {
         val request = modelDownloadRequest(url).build()
@@ -162,6 +202,7 @@ object ModelDownloader {
         val body = response.body ?: throw IOException("Response body is null")
         val totalBytes = body.contentLength()
         var downloadedBytes = 0L
+        val guard = SlowRouteGuard(skipIfSlow, totalBytes, System.currentTimeMillis())
 
         targetFile.parentFile?.mkdirs()
         body.byteStream().use { input ->
@@ -173,6 +214,9 @@ object ModelDownloader {
                     downloadedBytes += bytesRead
                     if (totalBytes > 0) {
                         onProgress(downloadedBytes.toFloat() / totalBytes.toFloat())
+                    }
+                    if (guard.isSlow(downloadedBytes, System.currentTimeMillis())) {
+                        throw SlowRouteException("${downloadedBytes / 1024} KB / ${SlowRouteGuard.WINDOW_MS / 1000} s")
                     }
                 }
             }
