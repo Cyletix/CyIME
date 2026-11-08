@@ -464,7 +464,7 @@ private fun LayoutDisplayPage(
                     Column(Modifier.settingsSearchAnchor("候选注释")) {
                         Text("候选注释", style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                        Text("自动：宽时显示、窄时隐藏，手写里照样显示。中文手写的注释总是读音。",
+                        Text("自动：宽时显示、窄时隐藏，手写里照样显示。中文手写默认显示读音。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp))
                         Row(Modifier.fillMaxWidth().choiceCardRowHeight(136.dp).padding(horizontal = 16.dp),
@@ -489,6 +489,13 @@ private fun LayoutDisplayPage(
 
                     // 注释隐藏时内容选项无意义：整段不显示，也不会触发释义词典下载。
                     if (commentMode != com.kingzcheung.xime.settings.CandidateCommentMode.HIDE) {
+                        val prefs = SettingsPreferences.getPrefsPublic(context)
+                        var wubiHints by remember { mutableStateOf(prefs.getBoolean(SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, false)) }
+                        SettingsToggleItem(Icons.TwoTone.FormatColorFill, "手写候选显示五笔编码",
+                            "使用五笔方案时显示该方案的编码，切回拼音时显示读音。", wubiHints, {
+                                wubiHints = it
+                                prefs.edit().putBoolean(SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, it).apply()
+                            })
                         var commentContent by remember { mutableStateOf(SettingsPreferences.candidateCommentContent(context)) }
                         Column(Modifier.settingsSearchAnchor("候选注释内容")) {
                             Text("候选注释内容", style = MaterialTheme.typography.bodyLarge,

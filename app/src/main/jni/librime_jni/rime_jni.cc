@@ -1042,7 +1042,7 @@ public:
     
     // 查找词汇的编码
     // 使用 reverse_lookup_dictionary API 反查字符编码
-    bool lookupText(const char* text, std::string& outCode) {
+    bool lookupText(const char* text, std::string& outCode, bool primary_only) {
         if (!rime || !text) return false;
         LOGD("lookupText: word='%s'", text);
         
@@ -1067,6 +1067,7 @@ public:
                         }
                         delete d;
                     }
+                    if (primary_only) { rime->config_close(&config); return false; }
                     // 也查 reverse_lookup 字典
                     const char* rev = rime->config_get_cstring(&config, "reverse_lookup/dictionary");
                     if (rev) {
@@ -1083,6 +1084,7 @@ public:
             }
         }
         
+        if (primary_only) return false;
         // fallback: 依次尝试已知编码字典
         const char* fallbacks[] = {"wubi86", "pinyin_simp", nullptr};
         for (int i = 0; fallbacks[i]; i++) {
@@ -2865,11 +2867,11 @@ JNIEXPORT jstring JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeLookupText(
     JNIEnv* env,
     jobject thiz,
-    jstring text
+    jstring text, jboolean primary_only
 ) {
     const char* text_ptr = env->GetStringUTFChars(text, nullptr);
     std::string code;
-    bool found = Rime::Instance().lookupText(text_ptr, code);
+    bool found = Rime::Instance().lookupText(text_ptr, code, primary_only == JNI_TRUE);
     env->ReleaseStringUTFChars(text, text_ptr);
     
     if (found && !code.empty()) {

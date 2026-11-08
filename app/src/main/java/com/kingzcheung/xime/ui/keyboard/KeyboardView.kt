@@ -841,11 +841,20 @@ fun KeyboardView(
             val showHandwritingCandidates = isHandwritingPage && handwritingCandidates.isNotEmpty()
             // 中文手写候选的注释是读音（带声调），忘了读音的字写出来对一下；释义模式下也显示读音。
             val handwritingChinese = isHandwritingPage && state.inputProfile.language == InputLanguage.CHINESE
-            LaunchedEffect(handwritingChinese) {
-                if (handwritingChinese) com.kingzcheung.xime.handwriting.HanziPinyin.load(handwritingContext)
+            val wubiHints = handwritingChinese && inputPreferences.handwritingWubiHints &&
+                state.inputProfile.scheme in setOf(com.kingzcheung.xime.settings.InputScheme.WUBI,
+                    com.kingzcheung.xime.settings.InputScheme.WUBI_PINYIN)
+            LaunchedEffect(handwritingChinese, wubiHints) {
+                if (handwritingChinese && !wubiHints) com.kingzcheung.xime.handwriting.HanziPinyin.load(handwritingContext)
             }
             val hanziPinyinRevision = com.kingzcheung.xime.handwriting.HanziPinyin.revision
-            val handwritingComments = remember(handwritingCandidates, handwritingChinese, hanziPinyinRevision) {
+            val handwritingComments = if (wubiHints) androidx.compose.runtime.key(state.currentSchemaId, handwritingCandidates) {
+                androidx.compose.runtime.produceState<List<String>>(emptyList()) {
+                    if (handwritingCandidates.isNotEmpty()) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        com.kingzcheung.xime.rime.RimeEngine.getInstance().currentSchemeCodes(state.currentSchemaId, handwritingCandidates)
+                    }
+                }.value
+            } else remember(handwritingCandidates, handwritingChinese, hanziPinyinRevision) {
                 if (handwritingChinese) com.kingzcheung.xime.handwriting.HanziPinyin.comments(handwritingCandidates) else emptyList()
             }
 

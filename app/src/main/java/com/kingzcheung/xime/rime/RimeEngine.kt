@@ -1009,11 +1009,20 @@ class RimeEngine {
         }
     }
 
+    /** Read only the active translator's codes, keeping pronunciation dictionaries out of shape-code hints. */
+    internal fun currentSchemeCodes(schema: String, candidates: List<String>): List<String> {
+        if (!isInitialized) return emptyList()
+        return locked {
+            if (!nativeHasSession() || schema != nativeGetCurrentSchema()) emptyList()
+            else candidates.map { nativeLookupText(it, true) }
+        }
+    }
+
     fun lookupText(text: String): String {
         if (!isInitialized || text.isEmpty()) return ""
         return tryLocked("") {
             if (!nativeHasSession()) return@tryLocked ""
-            nativeLookupText(text) ?: ""
+            nativeLookupText(text, false)
         }
     }
 
@@ -1259,7 +1268,7 @@ class RimeEngine {
     private external fun nativeJoinMaintenance()
     private external fun nativeDeploy(): Boolean
     private external fun nativeDeploySchema(schemaId: String): Boolean
-    private external fun nativeLookupText(text: String): String
+    private external fun nativeLookupText(text: String, primaryOnly: Boolean): String
     private external fun nativeGetAvailableSchemas(): Array<String>?
     private external fun nativeGetSchemaList(schemaId: String, key: String): Array<String>?
     private external fun nativeGetSchemaString(schemaId: String, key: String): String?
