@@ -37,8 +37,15 @@ class KeyboardSurfaceConsistencyTest {
         // 玻璃下面板底是透的：盖在按键上的覆盖层要么用 keyboardOverlayBackground 挡住，要么把下面的按键压淡，
         // 否则按键和字叠在一起。光标调整走后一种（空格仍收拖动）。
         assertTrue(source("ui/keyboard/RejectedCommitOverlay.kt").contains("keyboardOverlayBackground("))
+        // 按键区任何时候都压淡；只有拼音放在键盘内且正在打字时，候选栏（拼音就在里面）不压淡（#162）。
+        val keyboardView = source("ui/keyboard/KeyboardView.kt")
         assertTrue("光标调整时键盘内容没压淡",
-            source("ui/keyboard/KeyboardView.kt").contains(".hiddenDuringCursorControl(cursorControlActive)"))
+            keyboardView.contains(".hiddenDuringCursorControl(cursorControlActive && !cursorKeepsBar)"))
+        assertTrue("拼音放在键盘内时，光标调整没压淡按键区",
+            keyboardView.contains(".hiddenDuringCursorControl(cursorKeepsBar).testTag(\"keyboard-underlay\")"))
+        assertTrue("候选栏不压淡的条件放宽了：只限光标调整中、拼音放在键盘内、正在打字",
+            Regex("""val cursorKeepsBar = cursorControlActive && inputPreferences\.preeditInsideKeyboard &&\s+candidateState\.value\.shownPreedit\(state\.inputProfile\)\.isNotEmpty\(\)""")
+                .containsMatchIn(keyboardView))
         // 光标调整不铺底：键盘自己的背景（主题、渐变、图片、玻璃）照常显示。铺不透明主题底色时深色主题整个键盘变黑。
         val cursorOverlay = source("ui/keyboard/CursorControlOverlay.kt")
         assertTrue("光标调整遮罩又铺了底色", listOf("keyboardPanelBackground(", "keyboardOverlayBackground(", ".background(")
