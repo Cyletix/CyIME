@@ -58,6 +58,10 @@ class VoiceRecognitionHandlerFinishTest {
     private var currentState = InputUIState(currentSchemaId = "rime_ice")
     private var wholeSentence = false
     private var autoPunctuation = false
+    /** 繁体输出时注入的简转繁；测试里用逐字对照代替 OpenCC。 */
+    private var traditional: ((String) -> String)? = null
+    private val fakeS2t = mapOf('说' to '說', '话' to '話', '语' to '語', '纠' to '糾', '错' to '錯')
+    private fun fakeTraditional(text: String) = text.map { fakeS2t[it] ?: it }.joinToString("")
 
     /** mock mainHandler 的 postDelayed 队列，可手动推进超时。 */
     private val posted = mutableListOf<Runnable>()
@@ -98,7 +102,8 @@ class VoiceRecognitionHandlerFinishTest {
             getInputConnection = { mockInputConnection },
             onVoiceComplete = { voiceCompleteCount++ },
             managerFactory = { mockManager },
-            mainHandler = mockMainHandler
+            mainHandler = mockMainHandler,
+            traditionalConverter = { traditional },
         )
         handler.initialize()
 
@@ -863,5 +868,36 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockInputConnection).setComposingRegion(0, 2)
         onPartial("你好世界")
         verify(mockInputConnection).setComposingText(eq("你好世界"), eq(1))
+    }
+
+    @Test
+    fun `繁体输出时预览和上屏都是正体`() {
+        traditional = this::fakeTraditional
+        onPartial.invoke("说话")
+        verify(mockInputConnection).setComposingText(eq("說話"), eq(1))
+        assertEquals("說話", currentState.voiceRecognizedText)
+        handler.finishRecognition()
+        onResult.invoke("说话语音")
+        // 预览和定稿按同一张表转换，前缀对得上，只补后面的字
+        verify(mockInputConnection).commitText(eq("語音"), eq(1))
+    }
+
+    @Test
+    fun `繁体输出关着时语音照旧出简体`() {
+        onPartial.invoke("说话")
+        verify(mockInputConnection).setComposingText(eq("说话"), eq(1))
+        handler.finishRecognition()
+        onResult.invoke("说话语音")
+        verify(mockInputConnection).commitText(eq("语音"), eq(1))
+    }
+
+    @Test
+    fun `繁体输出时简体和正体写的纠错条目都配得上`() {
+        traditional = this::fakeTraditional
+        whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_CORRECTIONS), any<Boolean>())).thenReturn(true)
+        whenever(mockPrefs.getString(eq(SettingsPreferences.KEY_STT_CORRECTIONS_TEXT), any())).thenReturn("说话 讲话\n語音 纠错")
+        onResult.invoke("说话语音")
+        // 词表同样转过：简体写的「说话」配上「說話」，正体写的「語音」照样配上；换上的字也是转过的（假表里没有「讲」，「话」转成「話」）
+        verify(mockInputConnection).commitText(eq("讲話糾錯"), eq(1))
     }
 }

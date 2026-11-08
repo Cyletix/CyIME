@@ -14,6 +14,8 @@
 #include <rime/candidate.h>
 #include <rime/menu.h>
 #include <rime/gear/translator_commons.h>
+#include <opencc/Config.hpp>
+#include <opencc/Converter.hpp>
 #include "candidate_policy.h"
 #include "candidate_pins.h"
 #include "jni_text.h"
@@ -27,6 +29,7 @@
 #include <android/log.h>
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -2878,6 +2881,46 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeLookupText(
         return env->NewStringUTF(code.c_str());
     }
     return env->NewStringUTF("");
+}
+
+// 语音等不经 Rime 候选的文字跟「繁体输出」走：用方案 traditionalization 同一份 OpenCC 配置整句转换，
+// 和打字出的字是同一张表。与 Rime 会话无关，不占 rimeLock，单独一把锁；转换器第一次用时加载，之后常驻。
+// 配置加载失败时记住失败的路径，原样返回，不每个临时结果都重试。
+static std::mutex g_openccMutex;
+static std::string g_openccPath;
+static bool g_openccFailed = false;
+static opencc::ConverterPtr g_openccConverter;
+
+JNIEXPORT jstring JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeOpenccConvert(
+    JNIEnv* env,
+    jobject thiz,
+    jstring config_path, jstring text
+) {
+    const std::string path = CandidateUtf8(env, config_path);
+    const std::string input = CandidateUtf8(env, text);
+    if (path.empty() || input.empty()) return text;
+    std::lock_guard<std::mutex> lock(g_openccMutex);
+    if (g_openccPath != path) {
+        g_openccPath = path;
+        g_openccFailed = false;
+        g_openccConverter.reset();
+    }
+    if (g_openccFailed) return text;
+    try {
+        if (!g_openccConverter) {
+            opencc::Config config;
+            g_openccConverter = config.NewFromFile(path);
+        }
+        return CandidateString(env, g_openccConverter->Convert(input));
+    } catch (const std::exception& e) {
+        LOGE("opencc convert failed (%s): %s", path.c_str(), e.what());
+    } catch (...) {
+        LOGE("opencc convert failed (%s)", path.c_str());
+    }
+    g_openccFailed = true;
+    g_openccConverter.reset();
+    return text;
 }
 
 // 设置候选词每页数量

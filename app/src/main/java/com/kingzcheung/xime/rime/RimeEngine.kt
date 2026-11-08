@@ -1026,6 +1026,20 @@ class RimeEngine {
         }
     }
 
+    @Volatile private var traditionalConfig: String? = null
+
+    /**
+     * 简体转台湾正体，给语音这类不经 Rime 候选的文字用：和方案 traditionalization 是同一份 opencc/cyime_s2tw.json，
+     * 跟打字出的字一致。不碰 Rime 会话、不拿 rimeLock（部署中也能转）；表还没装好或转换失败时原样返回。
+     */
+    fun toTraditional(text: String): String {
+        if (text.isEmpty()) return text
+        val config = traditionalConfig ?: listOf(userDataDir, sharedDataDir).filter { it.isNotEmpty() }
+            .map { File(it, "opencc/cyime_s2tw.json") }.firstOrNull { it.isFile }?.path?.also { traditionalConfig = it }
+            ?: return text
+        return runCatching { nativeOpenccConvert(config, text) }.getOrNull() ?: text
+    }
+
     fun getAvailableSchemas(): Array<String> {
         return nativeGetAvailableSchemas() ?: emptyArray()
     }
@@ -1269,6 +1283,7 @@ class RimeEngine {
     private external fun nativeDeploy(): Boolean
     private external fun nativeDeploySchema(schemaId: String): Boolean
     private external fun nativeLookupText(text: String, primaryOnly: Boolean): String
+    private external fun nativeOpenccConvert(configPath: String, text: String): String
     private external fun nativeGetAvailableSchemas(): Array<String>?
     private external fun nativeGetSchemaList(schemaId: String, key: String): Array<String>?
     private external fun nativeGetSchemaString(schemaId: String, key: String): String?

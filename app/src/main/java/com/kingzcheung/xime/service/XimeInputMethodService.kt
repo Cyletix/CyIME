@@ -793,6 +793,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         },
         onComposingWritten = { markInputBoxComposing() },
         remoteTyping = { remoteTypingSink() },
+        traditionalConverter = { if (traditionalChineseOutput()) rimeEngine::toTraditional else null },
     )
 
     /** 隔空输入开着、存过电脑时：说完的话发到电脑（RemoteTyping），开始说话时提示一次发到哪。 */

@@ -37,6 +37,11 @@ class VoiceRecognitionHandler(
      * 手机输入框里只用 composing 预览，句子说完即清掉，不上屏。
      */
     private val remoteTyping: () -> ((String) -> Unit)? = { null },
+    /**
+     * 「繁体输出」开着（或当前是注音）时返回简转繁函数（和打字同一张 OpenCC 表），否则 null：
+     * 中文语音的预览、上屏、隔空输入都按它出正体。每次出字时取，设置中途改了下一句起生效。
+     */
+    private val traditionalConverter: () -> ((String) -> String)? = { null },
 ) {
     companion object {
         private const val TAG = "VoiceRecognition"
@@ -152,8 +157,18 @@ class VoiceRecognitionHandler(
         val providerName = resolveProviderName()
         onStateChanged(getState().copy(voicePluginName = providerName))
 
+        // 转换表第一次用要从文件加载：开始说话时在后台先载好，第一个临时结果不在主线程等。
+        if (!traditionalWarmed && language == InputLanguage.CHINESE) traditionalConverter()?.let { convert ->
+            traditionalWarmed = true
+            Thread({ convert("语音") }, "voice-traditional-warm").start()
+        }
+
         speechRecognitionManager.startRecognition(language)
     }
+
+    private var traditionalWarmed = false
+    /** 繁体输出时把语音纠错词表也转成正体：表里原来用简体写的条目照样配得上转换后的文字。 */
+    private var traditionalRules: Pair<String, String> = "" to ""
 
     fun stopRecognition() {
         if (::speechRecognitionManager.isInitialized) {
@@ -586,14 +601,19 @@ class VoiceRecognitionHandler(
         val marks = voiceMarks()
         // 预览和定稿走同一条转换，说到一半出的 300 和说完的 325 是同一种写法，不会中文、数字来回跳。
         val arabicNumbers = SettingsPreferences.isSttArabicNumbers(context)
-        // 语音纠错放在最后：词表里写的是用户看到的结果(已转好数字和标点)；预览和定稿同样替换，不会先出错词再跳。
+        // 繁体输出：识别器只出简体，中文结果按打字同一张表转成正体；预览和定稿同一条路，不会先简后繁地跳。
+        val traditional = if (language == InputLanguage.CHINESE) traditionalConverter() else null
+        // 语音纠错放在最后：词表里写的是用户看到的结果(已转好数字、标点和繁体)；预览和定稿同样替换，不会先出错词再跳。
         val corrections = if (SettingsPreferences.isSttCorrections(context))
-            VoiceCorrections.of(SettingsPreferences.getSttCorrectionsText(context)) else null
+            VoiceCorrections.of(SettingsPreferences.getSttCorrectionsText(context).let { rules ->
+                if (traditional == null || rules.isEmpty()) rules
+                else traditionalRules.takeIf { it.first == rules }?.second ?: traditional(rules).also { traditionalRules = rules to it }
+            }) else null
         return segments.mapIndexed { index, part ->
             val keep = automatic && (part.serverPunctuation || (localSentences && part.language == InputLanguage.CHINESE))
             normalizeVoiceText(part.text, language, keep, if (index == segments.lastIndex) marks else marks.copy(trailing = true),
                 arabicNumbers)
-        }.filter(String::isNotEmpty).joinToString(" ").let { corrections?.apply(it) ?: it }
+        }.filter(String::isNotEmpty).joinToString(" ").let { traditional?.invoke(it) ?: it }.let { corrections?.apply(it) ?: it }
     }
 
     private fun voiceMarks() = VoiceMarks(comma = SettingsPreferences.isSttPunctuationComma(context),
