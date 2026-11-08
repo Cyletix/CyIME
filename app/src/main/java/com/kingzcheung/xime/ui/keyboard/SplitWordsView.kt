@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -91,11 +93,14 @@ fun SplitWordsView(
 
     BoxWithConstraints(modifier.fillMaxWidth().keyboardPanelBackground(backgroundColor)) {
     val compactActions = maxWidth < 420.dp
+    val panel = LocalClipboardPanelExpansion.current?.takeIf { it.canExpand }
+    val expanded = panel != null && panel.contentHeight > panel.collapsedHeight
     Column(Modifier.fillMaxSize()) {
         // 导航区
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clipboardPanelExpandGesture()
                 .heightIn(min = 50.dp)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -118,13 +123,20 @@ fun SplitWordsView(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Text(
-                text = "拆词",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = textColor,
-                modifier = Modifier
-            )
+            Row(
+                modifier = if (panel == null) Modifier else Modifier
+                    .clickable(onClickLabel = if (expanded) "收起拆词面板" else "拉高拆词面板") {
+                        panel.setExpanded(!expanded)
+                    }.heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("拆词", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, color = textColor)
+                if (panel != null) Icon(
+                    if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                    contentDescription = null, tint = textColor, modifier = Modifier.size(18.dp)
+                )
+            }
 
             TextButton(
                 modifier = Modifier.weight(1f),
