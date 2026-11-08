@@ -37,6 +37,7 @@ public final class RimeEngine {
     public native int nativeT9GetAndConsumeUndoneRightCommitCount();
     public native String[][] nativeInspectCandidates(int limit);
     public native void nativeDestroy();
+    public native boolean nativeT9Memorize(String text, String pinyin);
     // Host replay only (tools/ime_lab/host_replay/host_replay_jni.cc); absent from the Android library.
     public native String[] nativeHostWorkCounterNames();
     public native long[] nativeHostTakeWorkCounters();

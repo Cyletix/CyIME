@@ -168,3 +168,10 @@ reading's word (chengong → 成功), not below that (jinian → 几年, aniu �
 sentence keeps first place (jiucup → 就粗平), and a single syllable keeps its typed character (ao → 奥, den → 扽).
 Must-pass words included. It also checks that a shorter word breaking
 the input where the first word does comes second (kejishuip → 科技水平, 科技).
+
+`T9MixedLearnProbe.java` runs the same cases on 9, 14 and 26 keys: English and mixed words (fuck, B站) must
+be among the candidates, and a word typed once by picking segments must come first for the same keys, alone
+and inside a longer input, also after other commits. `LayoutTopOneProbe.java` writes the first candidate of
+the fixture sentences on all three layouts, with or without a preset user dictionary, so two engines can be
+compared. `T9PreeditSyllableProbe.java` checks the nine-key code bar after every key. All three use a
+disposable user directory, never an installed application's data.
