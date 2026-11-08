@@ -176,6 +176,8 @@ CyIME builds on the projects, data and models below. Thanks to all their authors
 | [ReazonSpeech k2 v2](https://huggingface.co/reazon-research/reazonspeech-k2-v2) | Reazon Research | Japanese recognition | Apache-2.0 |
 | [3D-Speaker CAM++](https://github.com/modelscope/3D-Speaker) | Alibaba 3D-Speaker | Telling speakers apart in captions | Apache-2.0 |
 | [PaddleOCR PP-OCRv5](https://github.com/PaddlePaddle/PaddleOCR), [RapidOCR](https://github.com/RapidAI/RapidOCR) | PaddlePaddle; RapidAI | Text recognition models and their ONNX versions | Apache-2.0 |
+| [slimt](https://github.com/jerinphilip/slimt) | Jerin Philip; David Ventura | Offline translation engine | GPL-2.0 |
+| [Firefox Translations models](https://github.com/mozilla/translations) | Mozilla | Offline Chinese-English translation (downloadable) | MPL-2.0 |
 | [OpenCV](https://github.com/opencv/opencv) | OpenCV | Image processing for text recognition | Apache-2.0 |
 | [KaTeX](https://github.com/KaTeX/KaTeX) | KaTeX authors | Rendering handwritten formulas | MIT |
 | [UER-py](https://github.com/dbiir/UER-py) Chinese RoBERTa | UER team | 9-key sentence scoring (retired; the vocabulary still ships) | Apache-2.0 |

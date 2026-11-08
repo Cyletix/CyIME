@@ -168,6 +168,8 @@ CyIME 用到了下面這些項目、數據和模型，感謝作者們的工作�
 | [ReazonSpeech k2 v2](https://huggingface.co/reazon-research/reazonspeech-k2-v2) | Reazon Research | 日語語音識別 | Apache-2.0 |
 | [3D-Speaker CAM++](https://github.com/modelscope/3D-Speaker) | 阿里巴巴 3D-Speaker | 字幕區分說話人 | Apache-2.0 |
 | [PaddleOCR PP-OCRv5](https://github.com/PaddlePaddle/PaddleOCR)、[RapidOCR](https://github.com/RapidAI/RapidOCR) | PaddlePaddle；RapidAI | 拍照識字模型及其 ONNX 版本 | Apache-2.0 |
+| [slimt](https://github.com/jerinphilip/slimt) | Jerin Philip；David Ventura | 離線翻譯引擎 | GPL-2.0 |
+| [Firefox 翻譯模型](https://github.com/mozilla/translations) | Mozilla | 離線翻譯（中英互譯，可下載） | MPL-2.0 |
 | [OpenCV](https://github.com/opencv/opencv) | OpenCV | 拍照識字的圖像處理 | Apache-2.0 |
 | [KaTeX](https://github.com/KaTeX/KaTeX) | KaTeX 作者 | 顯示手寫公式 | MIT |
 | [UER-py](https://github.com/dbiir/UER-py) 中文 RoBERTa | UER 團隊 | 九鍵整句打分（已停用，詞表仍在包裡） | Apache-2.0 |

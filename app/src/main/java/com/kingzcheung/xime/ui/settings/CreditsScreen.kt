@@ -47,6 +47,7 @@ object Credits {
                 "https://github.com/microsoft/onnxruntime"),
             CreditItem("azooKey", "Miwa / Ensan", "日语假名汉字转换", "MIT",
                 "https://github.com/azooKey/AzooKeyKanaKanjiConverter"),
+            CreditItem("slimt", "Jerin Philip；David Ventura", "离线翻译", "GPL-2.0", "https://github.com/jerinphilip/slimt"),
         ),
         "词库与数据" to listOf(
             CreditItem("雾凇拼音", "iDvel", "拼音词库和方案", "GPL-3.0", "https://github.com/iDvel/rime-ice"),
@@ -75,6 +76,7 @@ object Credits {
             CreditItem("PP-OCRv5", "PaddlePaddle；RapidAI", "拍照识字", "Apache-2.0", "https://github.com/PaddlePaddle/PaddleOCR"),
             CreditItem("ochwpro", "bikeand(ModelScope)", "中文手写识别",
                 "MIT", "https://www.modelscope.cn/models/bikeand/ochwpro"),
+            CreditItem("Firefox 翻译模型", "Mozilla", "离线翻译（中英互译）", "MPL-2.0", "https://github.com/mozilla/translations"),
         ),
         "设计参考" to listOf(
             CreditItem("三星键盘", "Samsung", "键盘交互和外观", null, "https://www.samsung.com/"),

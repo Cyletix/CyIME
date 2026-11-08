@@ -52,6 +52,19 @@ Source, model hashes, adaptations and full licenses: licenses/ocr/PP-OCR-NOTICE.
 Recognition is offline; models are bundled and never require Play Services or first-use downloads.
 
 ================================================================================
+Offline translation
+================================================================================
+
+libcytranslate.so is built from slimt (https://github.com/jerinphilip/slimt,
+fork https://github.com/DavidVentura/slimt at fdc0f98706b193bf17cb419f2fe08bf1d9913607),
+GPL-2.0, by Jerin Philip and contributors, with its bundled SentencePiece
+(browsermt fork, Apache-2.0) and ruy (Google, Apache-2.0). JNI wrapper source:
+tools/offline_translate in the CyIME repository.
+Models (downloaded on request, not bundled): Firefox Translations zh-en and en-zh
+(https://github.com/mozilla/translations), Mozilla, MPL-2.0.
+Translation runs on the device; no text is sent anywhere.
+
+================================================================================
 Offline speech recognition runtime and models
 ================================================================================
 
