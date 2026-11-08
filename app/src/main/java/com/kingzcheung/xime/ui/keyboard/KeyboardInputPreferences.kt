@@ -111,6 +111,9 @@ data class KeyboardInputPreferences(
     /** 空格左侧逗号键、右侧句号键。 */
     val qwertyCommaKey: Boolean = true,
     val qwertyPeriodKey: Boolean = true,
+    val bottomPunctuationSwipeUp: Boolean = true,
+    val handwritingWubiHints: Boolean = false,
+    val englishSentenceCaps: Boolean = false,
     /** 逗号键分词（默认关）：空格旁的标点键左下角放 '，打拼音时它和字母键角标里的 ' 都是分词，见 [syllableSplitActive]。 */
     val syllableSplitKey: Boolean = false,
     /** Shift 键分词（默认关）：打拼音时点 Shift 插入 '，键面写「分词」；没在打拼音时照旧大小写。 */
@@ -309,7 +312,7 @@ data class KeyboardInputPreferences(
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
-                "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
+                SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2", "bottom_punctuation_swipe_up", com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS,
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
                 SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
@@ -354,6 +357,9 @@ data class KeyboardInputPreferences(
                 qwertyStagger = QwertyStaggerMode.entries.firstOrNull { it.name == prefs.getString("qwerty_stagger_mode", null) }
                     ?: QwertyStaggerMode.AUTO,
                 qwertyStaggerCustom = prefs.getFloat("qwerty_stagger_custom", 0.5f).takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f,
+                bottomPunctuationSwipeUp = prefs.getBoolean("bottom_punctuation_swipe_up", true),
+                handwritingWubiHints = prefs.getBoolean(SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, false),
+                englishSentenceCaps = prefs.getBoolean(com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS, false),
                 qwertyCommaKey = prefs.getBoolean("qwerty_comma_key", true),
                 // 句号键 10-19 起默认开。旧键会被 save() 连同其他设置一起写成旧默认 false，
                 // 分不出是不是用户自己关的，所以只认新键；没有新键就是默认开。
@@ -501,6 +507,8 @@ data class KeyboardInputPreferences(
             .putString("fixed_symbols", fixedSymbols)
             .putString("qwerty_stagger_mode", qwertyStagger.name)
             .putFloat("qwerty_stagger_custom", qwertyStaggerCustom.coerceIn(0f, 1f))
+            .putBoolean("bottom_punctuation_swipe_up", bottomPunctuationSwipeUp)
+            .putBoolean(com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS, englishSentenceCaps)
             .putBoolean("qwerty_comma_key", qwertyCommaKey)
             .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)
             .putBoolean("syllable_split_key", syllableSplitKey)

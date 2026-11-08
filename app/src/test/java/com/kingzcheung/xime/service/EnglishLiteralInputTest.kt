@@ -2,8 +2,26 @@ package com.kingzcheung.xime.service
 
 import org.junit.Assert.*
 import org.junit.Test
+import org.mockito.kotlin.*
 
 class EnglishLiteralInputTest {
+    @Test fun sentenceCapsHonorsParagraphResponsesWithoutRequestingWordCapitalization() {
+        val app = mock<android.content.Context>()
+        val prefs = mock<android.content.SharedPreferences>()
+        val editor = mock<android.view.inputmethod.InputConnection>()
+        whenever(app.getSharedPreferences("kime_settings", 0)).thenReturn(prefs)
+        assertFalse(englishSentenceStart(app, editor))
+        verifyNoInteractions(editor)
+        whenever(prefs.getBoolean(ENGLISH_SENTENCE_CAPS, false)).thenReturn(true)
+        val mode = android.text.TextUtils.CAP_MODE_SENTENCES
+        whenever(editor.getCursorCapsMode(mode)).thenReturn(android.text.TextUtils.CAP_MODE_WORDS, mode, 0)
+        assertTrue(englishSentenceStart(app, editor))
+        assertTrue(englishSentenceStart(app, editor))
+        assertFalse(englishSentenceStart(app, editor))
+        whenever(editor.getCursorCapsMode(mode)).thenThrow(IllegalStateException("closed editor"))
+        assertFalse(englishSentenceStart(app, editor))
+    }
+
     @Test fun lettersCommitLiterallyEvenWithStaleChineseDecoderCandidates() {
         for (word in listOf("hello", "fuck", "you", "Hello")) {
             var state = CandidateState(candidates = listOf("核力量哦"), isComposing = true, inputText = "old")

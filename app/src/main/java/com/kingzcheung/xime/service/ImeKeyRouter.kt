@@ -667,6 +667,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     /** 紧挨着的上一笔英文滑行（候选、大小写），连着划时连同它一起选；屏上不再紧跟它就作废。 */
     private var lastGlide: com.kingzcheung.xime.glide.PreviousGlide? = null
 
+    private fun capitalizeEnglishHere(): Boolean {
+        val state = service.uiState.value
+        if (state.inputTarget.isInternal || service.editorInputPolicy.field.scoped || service.isSecretEditor() ||
+            service.isTerminalEditor() || service.textCommit.isJapaneseProfile()) return false
+        return englishSentenceStart(service, service.editorConnection())
+    }
+
+    private fun glideCase(case: (String) -> String, start: Boolean): (String) -> String =
+        if (start) { word -> case(word).replaceFirstChar(Char::uppercaseChar) } else case
+
     /**
      * 英文滑行整词上屏：与逐字母英文输入同一提交边界。前面紧挨文字时补空格；
      * 按光标前的词选这一笔的词，紧挨着上一笔滑行时前后两个词一起选，必要时先改掉上一个词（I'm done）。
@@ -682,8 +692,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val textBefore = service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
                 val replaceSupported = service.supportsEnglishCandidateReplace()
                 val previous = previousGlide(state, textBefore, replaceSupported)
+                val wordCase = glideCase(case, previous == null && capitalizeEnglishHere())
                 fun planFor(previous: com.kingzcheung.xime.glide.PreviousGlide?) = com.kingzcheung.xime.glide.planGlideCommit(
-                    candidates, case, previous,
+                    candidates, wordCase, previous,
                     com.kingzcheung.xime.glide.glideContextWord(if (previous != null) textBefore.dropLast(previous.text.length) else textBefore),
                     com.kingzcheung.xime.glide.GlideLexicon.loadedBigrams(), com.kingzcheung.xime.glide.GlideLexicon.loadedContractions())
                 var plan = planFor(previous)
@@ -696,7 +707,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val before = service.editorConnection()?.getTextBeforeCursor(1, 0)?.lastOrNull()
                 val text = com.kingzcheung.xime.glide.glideCommitText(word, before)
                 if (!service.commitTextAndPredict(text, isPaste = false, allowPrediction = false).accepted) return@withEditor
-                lastGlide = com.kingzcheung.xime.glide.PreviousGlide(word, candidates.take(com.kingzcheung.xime.glide.PAIR_TOP), case)
+                lastGlide = com.kingzcheung.xime.glide.PreviousGlide(word, candidates.take(com.kingzcheung.xime.glide.PAIR_TOP), wordCase)
                 service.candidateState.value = state.copy(
                     inputText = "", preeditText = "", isComposing = false,
                     candidates = emptyList(), candidateComments = emptyList(), candidateActions = emptyList(),
@@ -725,8 +736,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val textBefore = runCatching { service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString() }.getOrNull().orEmpty()
         val previous = previousGlide(state, textBefore, service.supportsEnglishCandidateReplace())
         val before = com.kingzcheung.xime.glide.glideContextWord(if (previous != null) textBefore.dropLast(previous.text.length) else textBefore)
+        val sentenceStart = previous == null && capitalizeEnglishHere()
         return { candidates, case ->
-            com.kingzcheung.xime.glide.planGlideCommit(candidates, case, previous, before,
+            com.kingzcheung.xime.glide.planGlideCommit(candidates, glideCase(case, sentenceStart), previous, before,
                 com.kingzcheung.xime.glide.GlideLexicon.loadedBigrams(), com.kingzcheung.xime.glide.GlideLexicon.loadedContractions()).preview
         }
     }
@@ -1107,7 +1119,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             ?.toString() == current.glidedWord
                     // Japanese 英数 follows 全角／半角, so full-width letters can be typed directly.
                     val fullWidthLetter = service.textCommit.isJapaneseProfile() && service.textCommit.isFullWidthPunctuation()
-                    val next = commitEnglishLetter(current, key, isShifted,
+                    val autoCaps = hardwareEvent == null && letterLanguage == null &&
+                        !isShifted && capitalizeEnglishHere()
+                    val next = commitEnglishLetter(current, key, isShifted || autoCaps,
                         service::supportsEnglishCandidateReplace, afterGlide = afterGlide) {
                         val letter = if (fullWidthLetter) fullWidthLetters(it) else it
                         service.commitTextAndPredict(letter, isPaste = false, allowPrediction = false).accepted

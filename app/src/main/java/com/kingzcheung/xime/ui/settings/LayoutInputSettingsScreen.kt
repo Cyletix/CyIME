@@ -69,6 +69,13 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
             when (category) {
                 LayoutInputCategory.Qwerty -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // 邻键纠错、模糊音 11-01 搬到「语言与方案」（跟着方案走，九键和 26 键页不再各放一份）。
+                SettingsSection(title = "英文输入", content = {
+                    SettingsToggleItem(Icons.TwoTone.Abc, "英文句首自动大写",
+                        "英文输入时，新句子和新段落的第一个字母自动大写。",
+                        checked = settings.englishSentenceCaps, onCheckedChange = {
+                            settings = settings.copy(englishSentenceCaps = it); settings.save(context)
+                        })
+                })
                 SettingsSection(title = "混输", content = {
                     SettingsToggleItem(Icons.TwoTone.Abc, "中英混输",
                         "仅用于中文全拼 26 键；拼音里夹着英文词(nihaohello)时首选“你好hello”。本身像拼音的英文词(game、nice)认不出。",

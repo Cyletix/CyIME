@@ -1,5 +1,10 @@
 package com.kingzcheung.xime.service
 
+import android.content.Context
+import android.text.TextUtils
+import android.view.inputmethod.InputConnection
+import com.kingzcheung.xime.settings.SettingsPreferences
+
 /** a–z typed straight into the editor; on a [com.kingzcheung.xime.settings.LetterLanguage] keyboard also its [extraLetters] (ñ, ä, é, й…). */
 internal fun isDirectLetter(key: String, extraLetters: String): Boolean = key.length == 1 &&
     (key[0] in 'a'..'z' || key[0] in 'A'..'Z' || key[0] in extraLetters)
@@ -26,4 +31,20 @@ internal fun commitEnglishLetter(
         associationCandidates = emptyList(), englishReplaceSupported = replaceSupported(),
         hasNextPage = false, hasPrevPage = false, isShowingRecentClipboard = false,
     )
+}
+
+internal const val ENGLISH_SENTENCE_CAPS = "english_sentence_caps"
+
+/** Ask the editor about the real insertion point, including text the user moved into or selected. */
+internal fun englishSentenceStart(context: Context, connection: InputConnection?): Boolean {
+    if (!SettingsPreferences.getPrefsPublic(context).getBoolean(ENGLISH_SENTENCE_CAPS, false)) return false
+    val sentences = TextUtils.CAP_MODE_SENTENCES
+    return try {
+        // TextUtils returns CAP_MODE_WORDS at the start of a paragraph even when only
+        // sentences were requested. Requesting both would also capitalize ordinary words.
+        val mode = connection?.getCursorCapsMode(sentences) ?: 0
+        mode and (sentences or TextUtils.CAP_MODE_WORDS) != 0
+    } catch (_: RuntimeException) {
+        false // Some editors close their connection while switching fields.
+    }
 }
