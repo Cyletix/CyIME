@@ -74,10 +74,13 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("按键角标的符号和数字", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
                 val corner = com.kingzcheung.xime.ui.keyboard.CornerInputChoice.of(settings)
+                // 26 键滑行开着时角标的滑动输入用不了：两张「滑动」卡置灰，下面写明是哪个滑行锁的，点名字跳过去关掉。
+                val glideLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.glideCornerLock(settings)
                 Row(Modifier.fillMaxWidth().choiceCardRowHeight(176.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.entries.forEach { choice ->
                         IllustratedChoiceCard(choice.label, corner == choice,
                             onClick = { settings = choice.applyTo(settings); settings.save(context) },
+                            enabled = glideLock == null || choice == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS,
                             modifier = Modifier.weight(1f).then(if (choice == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE)
                                 Modifier.settingsSearchAnchor("长按弹出字母气泡") else Modifier),
                             tag = "corner-input:${choice.name}", titleMaxLines = 2, illustrationPadding = 2.dp) {
@@ -92,6 +95,7 @@ internal fun InputExperienceSettings(
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS ->
                         "按住 0.3 秒输入上方角标。九键长按出数字，选字母改用拂动。西班牙语的元音和 n 长按仍出 á é ñ，它们的上角标改用滑动。"
                 }, style = MaterialTheme.typography.bodySmall)
+                glideLock?.let { SettingsLockNote("${it.message}：字母键的滑动都用来滑词，角标改为长按输入") }
             }
             Row(Modifier.settingsSearchAnchor("反转上下滑方向", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

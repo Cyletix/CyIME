@@ -112,6 +112,17 @@ class InputGesturePresetsTest {
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.SEMICOLON_ON_SHIFT, true))
     }
 
+    @Test fun `twenty six key glide locks corner symbols to long press and says which glide`() {
+        val glide = base.copy(glideTyping = true)
+        assertEquals(CornerInputChoice.LONG_PRESS, CornerInputChoice.of(glide))
+        assertEquals("已被「滑行输入」锁定", InputGestureLocks.glideCornerLock(glide)?.message)
+        assertEquals("已被「中文滑行输入」锁定", InputGestureLocks.glideCornerLock(base.copy(chineseGlideTyping = true))?.message)
+        // 九键滑行只占 2～9 键，不锁 26 键的角标；没开滑行也不锁。
+        assertNull(InputGestureLocks.glideCornerLock(base.copy(t9GlideTyping = true)))
+        assertNull(InputGestureLocks.glideCornerLock(base))
+        assertEquals(CornerInputChoice.SWIPE, CornerInputChoice.of(base))
+    }
+
     @Test fun `choosing long press turns nine key flick on`() {
         assertTrue(InputGestureLocks.withSymbolInputMode(base, SymbolInputMode.LONG_PRESS).t9FlickLetters)
         assertEquals(false, InputGestureLocks.withSymbolInputMode(base, SymbolInputMode.SWIPE_UP).t9FlickLetters)

@@ -23,6 +23,8 @@ enum class CornerInputChoice(val label: String) {
     companion object {
         /** 角标“长按”时长按总是出角标，气泡出不来；加锁以前两个都开着的，照实际效果认作「长按输入」。 */
         fun of(settings: KeyboardInputPreferences): CornerInputChoice = when {
+            // 开着 26 键滑行时字母键的滑动都给了滑行，角标只能长按出（键盘也按长按处理，见 KeyButton）。
+            InputGestureLocks.glideCornerLock(settings) != null -> LONG_PRESS
             settings.symbolInputMode == SymbolInputMode.LONG_PRESS -> LONG_PRESS
             settings.letterLongPressMenu -> SWIPE_BUBBLE
             else -> SWIPE
@@ -111,6 +113,11 @@ object InputGestureLocks {
         } else if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) {
             add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "按键角标的符号和数字：长按输入"))
         }
+        // 26 键滑行开着时字母键往任何方向滑都是滑行，角标的滑动输入用不了：锁在「长按输入」，写明是哪个滑行锁的（11-08）。
+        when {
+            settings.glideTyping -> add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP, "滑行输入"))
+            settings.chineseGlideTyping -> add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP, "中文滑行输入"))
+        }
         if (settings.glideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "滑行输入"))
         } else if (settings.chineseGlideTyping) {
@@ -132,6 +139,10 @@ object InputGestureLocks {
     fun withSymbolInputMode(settings: KeyboardInputPreferences, mode: SymbolInputMode): KeyboardInputPreferences =
         settings.copy(symbolInputMode = mode,
             t9FlickLetters = settings.t9FlickLetters || mode == SymbolInputMode.LONG_PRESS)
+
+    /** 角标的滑动输入被 26 键滑行锁住时返回那把锁（设置页置灰「滑动输入」两张卡并说明原因）。 */
+    fun glideCornerLock(settings: KeyboardInputPreferences): InputGestureLock? =
+        lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP)
 
     /** 这个值能不能选；不能选时返回锁的原因，设置页据此置灰并显示 [InputGestureLock.message]。 */
     fun lockFor(settings: KeyboardInputPreferences, option: InputGestureLock.Option, value: Any): InputGestureLock? =

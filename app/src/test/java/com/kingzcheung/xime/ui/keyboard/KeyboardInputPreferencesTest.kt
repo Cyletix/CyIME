@@ -126,8 +126,9 @@ class KeyboardInputPreferencesTest {
         val onlyChinese = KeyboardInputPreferences(chineseGlideTyping = true)
         assertEquals("已被「中文滑行输入」锁定", InputGestureLocks.lockFor(onlyChinese,
             InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD)?.message)
-        // 角标输入方式不管中文滑行：开着它，「滑动输入」照样认得出。
-        assertEquals(CornerInputChoice.SWIPE, CornerInputChoice.of(CornerInputChoice.SWIPE.applyTo(onlyChinese)))
+        // 用户 11-08：开着滑行时字母键的滑动都给滑行，角标锁在「长按输入」，并说明是中文滑行锁的。
+        assertEquals(CornerInputChoice.LONG_PRESS, CornerInputChoice.of(CornerInputChoice.SWIPE.applyTo(onlyChinese)))
+        assertEquals("已被「中文滑行输入」锁定", InputGestureLocks.glideCornerLock(onlyChinese)?.message)
     }
 
     @Test fun `comma and period keys are both on by default and the old saved period default does not turn it off`() {

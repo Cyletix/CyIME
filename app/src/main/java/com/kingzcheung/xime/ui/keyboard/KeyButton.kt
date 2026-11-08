@@ -405,7 +405,8 @@ fun SwipeableKeyButton(
             letters[if (ctrlTapFraction[0] < 0.5f) 0 else 1].toString() else letters
         if (ctrlTargets?.ctrlTap(pick) != true) onClick()
     }
-    val reserveDragForGlide = (LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true) ||
+    val letterGlideOwnsDrag = LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true
+    val reserveDragForGlide = letterGlideOwnsDrag ||
         (LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true)
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
@@ -462,7 +463,10 @@ fun SwipeableKeyButton(
         onLongPressSelect = onLongPressSelect,
         longPressTimeoutMillis = longPressTimeoutMillis,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ).withSymbolInput(symbolInputMode, symbolInputText, keepSymbolSwipeOnLongPress).let {
+    ).withSymbolInput(
+        // 26 键滑行开着时字母键的滑动给了滑行，角标改由长按输入（设置页同样锁在「长按输入」）。
+        if (letterGlideOwnsDrag) SymbolInputMode.LONG_PRESS else symbolInputMode,
+        symbolInputText, keepSymbolSwipeOnLongPress).let {
         if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
     }
     val inputActions = LocalKeyboardInputActions.current
