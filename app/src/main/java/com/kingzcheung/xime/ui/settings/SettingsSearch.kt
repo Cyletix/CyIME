@@ -222,7 +222,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("拂动时显示方向圆盘", ninePath, nine, "圆盘 方向 箭头 拂动 提示 假名 日语"),
         SettingsSearchEntry("假名方向提示", ninePath, nine, "日语 日文 假名 灰色小字 方向"),
         // 输入 › 按键与手势
-        SettingsSearchEntry("按键角标的符号和数字", gestures, gesturePage, "角标 角标输入方式 滑动输入 长按输入 符号 数字 上滑 下滑 输入方式 手势预设 预设"),
+        SettingsSearchEntry("按键角标的符号和数字", gestures, gesturePage, "角标 角标输入方式 滑动输入 长按输入 符号 数字 上滑 下滑 输入方式 手势预设 预设 关闭角标滑动 长按时间 长按时长 长按触发 触发时间"),
         SettingsSearchEntry("长按弹出字母气泡", gestures, gesturePage, "长按 字母 大写 小写 音调 气泡 弹出 拼音声调 九键 字母键长按弹出大小写 字母菜单 滑动＋字母气泡", section = "按键角标的符号和数字"),
         SettingsSearchEntry("反转上下滑方向", gestures, gesturePage, "反转 方向 上滑 下滑 上拉 下拉 删除键 清空 撤销"),
         SettingsSearchEntry("左右滑动删除", gestures, gesturePage, "删除键 左滑 右滑 滑动删除 按距离 向后删 Delete 光标后 连删 长按 误触 撤回 恢复", section = "删除键"),

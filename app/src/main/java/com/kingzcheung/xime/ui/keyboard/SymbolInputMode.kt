@@ -33,17 +33,28 @@ internal fun RepeatingKeyActions.withSymbolSwipeDirection(reverse: Boolean): Rep
 internal fun symbolInputValue(value: String?, action: GestureAction?): String? =
     value?.takeIf { it.isNotBlank() && (action == null || action == GestureAction.COMMIT) }
 
-internal fun KeyGestureActions.withSymbolInput(mode: SymbolInputMode, symbol: String?, keepSwipe: Boolean = false): KeyGestureActions {
+/** 「长按输入」原来写死的时长；设置项 [KeyboardInputPreferences.symbolLongPressSeconds] 的默认值。 */
+internal const val DEFAULT_SYMBOL_LONG_PRESS_MS = 300L
+
+/**
+ * 「长按输入」（关闭角标滑动）：按满 [timeoutMillis] 立刻输入上方角标，不等松手；
+ * 同时把气泡换成刚输入的角标，松手消失（用户 11-08，各布局、各语言一样）。
+ */
+internal fun KeyGestureActions.withSymbolInput(
+    mode: SymbolInputMode, symbol: String?, keepSwipe: Boolean = false,
+    timeoutMillis: Long = DEFAULT_SYMBOL_LONG_PRESS_MS,
+): KeyGestureActions {
     if (mode != SymbolInputMode.LONG_PRESS || symbol.isNullOrBlank() || onUp == null ||
         onLongPress != null || longPressDrawableIds.isNotEmpty()) return this
     val commitSymbol = onUp
     return copy(
         onUp = if (keepSwipe) onUp else null,
         blockUpSwipe = !keepSwipe,
-        longPressTimeoutMillis = 300L,
+        longPressTimeoutMillis = timeoutMillis,
         // The timeout callback commits once; no release-time menu may commit a second value.
         longPressItems = emptyList(),
         onLongPressSelect = null,
         onLongPress = { commitSymbol(symbol) },
+        longPressBubbleText = symbol,
     )
 }

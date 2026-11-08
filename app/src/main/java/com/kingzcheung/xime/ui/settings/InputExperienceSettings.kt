@@ -14,6 +14,7 @@ import com.kingzcheung.xime.ui.keyboard.normalizeHandwritingPause
 import com.kingzcheung.xime.ui.keyboard.normalizeCursorHoldSeconds
 import com.kingzcheung.xime.ui.keyboard.normalizeLanguageMenuHoldSeconds
 import com.kingzcheung.xime.ui.keyboard.normalizeSymbolKeyHoldSeconds
+import com.kingzcheung.xime.ui.keyboard.normalizeSymbolLongPressSeconds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,9 +94,21 @@ internal fun InputExperienceSettings(
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE ->
                         "长按弹出这个字母的大写和带声调的写法；滑得慢时可能先弹出气泡。"
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS ->
-                        "按住 0.3 秒输入上方角标。九键长按出数字，选字母改用拂动。西班牙语的元音和 n 长按仍出 á é ñ，它们的上角标改用滑动。"
+                        "按住 ${symbolLongPressLabel(settings.symbolLongPressSeconds)} 秒立刻输入上方角标，不用松手；气泡显示输入的角标，松手消失。" +
+                            "九键长按出数字，选字母改用拂动。西班牙语的元音和 n 长按仍出 á é ñ，它们的上角标改用滑动。"
                 }, style = MaterialTheme.typography.bodySmall)
                 glideLock?.let { SettingsLockNote("${it.message}：字母键的滑动都用来滑词，角标改为长按输入") }
+                // 只在「长按输入」（含被滑行锁成长按）时有用，这时才显示（用户 11-08：关闭角标滑动后要能调长按时间）。
+                if (corner == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS) {
+                    // 搜索「长按时间」等落到上面「按键角标的符号和数字」（SettingsSearch 的关键词），不单设锚点：没选长按时这里不显示。
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("长按多久输入角标：${symbolLongPressLabel(settings.symbolLongPressSeconds)} 秒")
+                        Text("默认 0.3 秒。26、14 键，九键和笔画都用这个时长。", style = MaterialTheme.typography.bodySmall)
+                        Slider(value = settings.symbolLongPressSeconds, modifier = Modifier.testTag("symbol-long-press-slider"),
+                            onValueChange = { settings = settings.copy(symbolLongPressSeconds = normalizeSymbolLongPressSeconds(it)) },
+                            onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..1f, steps = 17)
+                    }
+                }
             }
             Row(Modifier.settingsSearchAnchor("反转上下滑方向", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -485,3 +498,7 @@ internal fun InputExperienceSettings(
         }
     })
 }
+
+/** 0.3、0.25、1：去掉多余的 0。 */
+internal fun symbolLongPressLabel(seconds: Float): String =
+    String.format(java.util.Locale.ROOT, "%.2f", normalizeSymbolLongPressSeconds(seconds)).trimEnd('0').trimEnd('.')

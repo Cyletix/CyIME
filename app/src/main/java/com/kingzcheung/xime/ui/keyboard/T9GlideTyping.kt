@@ -11,7 +11,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import com.kingzcheung.xime.glide.GlideTracker
 import kotlin.math.ceil
 
 internal val LocalT9GlideKeys = staticCompositionLocalOf<MutableMap<Char, Rect>?> { null }
@@ -53,6 +52,8 @@ internal fun Modifier.t9GlideTyping(
     val origin = rememberUpdatedState(rootOrigin)
     val ticket = rememberUpdatedState(admission)
     val submit = rememberUpdatedState(onStroke)
+    // 「长按输入」时数字按满设定时长就已上屏，之后再拖动不能又滑出一串键。
+    val holdMs = rememberUpdatedState(LocalKeyboardInputPreferences.current.glideHoldMs)
     if (keys == null) return this
     return pointerInput(keys, trail) {
         awaitEachGesture {
@@ -82,7 +83,7 @@ internal fun Modifier.t9GlideTyping(
                         }
                         break
                     }
-                    if (!moved && change.uptimeMillis - down.uptimeMillis >= GlideTracker.HOLD_MS) break
+                    if (!moved && change.uptimeMillis - down.uptimeMillis >= holdMs.value) break
                     moved = moved || (change.position - down.position).getDistance() > viewConfiguration.touchSlop
                     for (position in change.historical.map { it.position } + change.position) {
                         if (path.last() != position) {

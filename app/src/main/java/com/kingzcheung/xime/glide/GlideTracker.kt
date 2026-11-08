@@ -14,6 +14,8 @@ class GlideTracker(
     private val keys: Map<Char, LetterKeyRect>,
     private val touchSlop: Float,
     x: Float, y: Float, private val downTime: Long,
+    /** 按住这么久才移动的留给长按；「长按输入」角标设得更短时跟着缩短，见 KeyboardInputPreferences.glideHoldMs。 */
+    private val holdMs: Long = HOLD_MS,
 ) {
     private val keyWidth = keys.values.map { it.width }.sorted().let { it.getOrNull(it.size / 2) } ?: 1f
     private val keyHeight = keys.values.map { it.height }.sorted().let { it.getOrNull(it.size / 2) } ?: 1f
@@ -43,7 +45,7 @@ class GlideTracker(
         if (!moved && (abs(x - startX) > touchSlop || abs(y - startY) > touchSlop)) {
             moved = true
             // 批量历史采样到达时，长按可能已经触发；不能用较早的采样时间反过来抢走它。
-            if (eventTime - downTime > HOLD_MS && !claimed) { abandoned = true; return false }
+            if (eventTime - downTime > holdMs && !claimed) { abandoned = true; return false }
         }
         add(x, y)
         if (claimed) return false

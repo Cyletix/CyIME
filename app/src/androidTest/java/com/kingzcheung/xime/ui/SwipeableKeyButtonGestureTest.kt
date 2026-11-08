@@ -221,12 +221,17 @@ class SwipeableKeyButtonGestureTest {
         rule.mainClock.advanceTimeBy(1L, ignoreFrameDuration = true)
         rule.runOnIdle {
             assertEquals(listOf("up:1"), events.commits)
-            assertFalse(events.state.isLongPress) // Immediate input has no selection menu.
+            // 用户 11-08：到点的同时气泡换成输入的角标（一个字，不是选择菜单），按住一直显示。
+            assertTrue(events.state.isLongPress)
+            assertEquals(listOf("1"), events.state.longPressItems)
         }
         rule.mainClock.advanceTimeBy(1000L)
-        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits); assertTrue(events.state.isLongPress) }
         rule.onNodeWithTag("key").performTouchInput { up() }
-        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+        rule.runOnIdle {
+            assertEquals(listOf("up:1"), events.commits)
+            assertFalse("松手气泡消失", events.state.isLongPress)
+        }
     }
 
     @Test fun symbolHoldCancellationBeforeTimeoutInputsNothingAndAfterTimeoutDoesNotRepeat() {

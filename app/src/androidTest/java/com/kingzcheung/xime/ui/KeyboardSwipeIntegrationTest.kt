@@ -172,9 +172,12 @@ class KeyboardSwipeIntegrationTest {
             rule.onNodeWithTag("swipe-host").performTouchInput { down(start) }
             rule.mainClock.advanceTimeBy(320L)
             rule.runOnIdle { assertEquals(listOf("literal:${layout.symbol}"), commits) }
-            rule.onNodeWithTag("key-choice-popup").assertDoesNotExist()
+            // 用户 11-08：到点已经输入，气泡显示输入的角标（不是松手才选的菜单），松手消失。
+            rule.onNodeWithTag("key-choice-popup").assertExists()
             rule.onNodeWithTag("swipe-host").performTouchInput { moveTo(Offset(580f, start.y + 80f)); up() }
             rule.runOnIdle { assertEquals(listOf("literal:${layout.symbol}"), commits); assertTrue(cursorMoves.isEmpty()) }
+            rule.mainClock.advanceTimeByFrame()
+            rule.onNodeWithTag("key-choice-popup").assertDoesNotExist()
             rule.mainClock.autoAdvance = true
         }
     }

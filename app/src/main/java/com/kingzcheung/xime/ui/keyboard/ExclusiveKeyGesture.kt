@@ -36,6 +36,11 @@ internal data class KeyGestureActions(
     val onLongPressSelect: ((String) -> Unit)? = null,
     val onLongPressFeedback: () -> Unit = {},
     val longPressTimeoutMillis: Long? = null,
+    /**
+     * [onLongPress] 到点立刻输入的那个字（「长按输入」的角标、九键数字）：同一刻气泡换成它，按住一直显示，松手消失。
+     * 不受按压气泡开关限制，和长按菜单一样是选择反馈。
+     */
+    val longPressBubbleText: String? = null,
     val blockUpSwipe: Boolean = false,
     val blockDownSwipe: Boolean = false,
     val inlineVerticalPreview: Boolean = false,
@@ -124,7 +129,12 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                     longPressItems = items, selectedLongPressIndex = selectedIndex,
                     longPressDrawableIds = actions.longPressDrawableIds))
-            } else actions.onLongPress?.invoke()
+            } else {
+                actions.onLongPress?.invoke()
+                actions.longPressBubbleText?.takeIf { it.isNotEmpty() }?.let { shown ->
+                    actions.onPreview(SwipeState(isPressed = true, isLongPress = true, longPressItems = listOf(shown)))
+                }
+            }
         } else null
         try {
             while (true) {

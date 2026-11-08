@@ -101,6 +101,20 @@ class SymbolInputModeTest {
         assertEquals(listOf("symbol:2", "tap", "down:!", "previous"), events)
     }
 
+    @Test fun `hold uses the configured delay and shows the entered symbol until release`() {
+        // 用户 11-08：长按时长可调；到点立刻输入，气泡显示输入的角标。
+        val events = mutableListOf<String>()
+        val held = actions(events).withSymbolInput(SymbolInputMode.LONG_PRESS, "2", timeoutMillis = 550L)
+        assertEquals(550L, held.longPressTimeoutMillis)
+        assertEquals("2", held.longPressBubbleText)
+        held.onLongPress?.invoke()
+        assertEquals(listOf("symbol:2"), events)
+        assertEquals("默认时长仍是 0.3 秒", 300L, actions(events).withSymbolInput(SymbolInputMode.LONG_PRESS, "2").longPressTimeoutMillis)
+        val swipe = actions(events)
+        assertSame(swipe, swipe.withSymbolInput(SymbolInputMode.SWIPE_UP, "2", timeoutMillis = 550L))
+        assertNull(swipe.longPressBubbleText)
+    }
+
     @Test fun `swipe mode preserves the complete original behavior`() {
         val events = mutableListOf<String>()
         val original = actions(events)

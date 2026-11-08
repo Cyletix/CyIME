@@ -93,4 +93,19 @@ class GlideShortStrokeTest {
         assertTrue(tracker.abandoned)
         assertFalse(tracker.claimed)
     }
+
+    @Test fun aShorterCornerLongPressAlsoEndsTheGlideWindow() {
+        // 「长按输入」设成 0.15 秒：按住 0.2 秒角标已经上屏，再拖到邻键不能又滑出一个词（用户 11-08）。
+        val keys = keys(24f, 56f)
+        val a = keys.center('d'); val b = keys.center('e')
+        val held = GlideTracker(keys, 8f, a.first, a.second, 0, holdMs = 150)
+        held.move(b.first, b.second, 200)
+        held.move(b.first, b.second, 260)
+        assertTrue(held.abandoned)
+        assertFalse(held.claimed)
+        // 角标没到点前照常滑行。
+        val quick = GlideTracker(keys, 8f, a.first, a.second, 0, holdMs = 150)
+        quick.move(b.first, b.second, 100)
+        assertTrue(quick.claimed)
+    }
 }

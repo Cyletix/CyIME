@@ -84,7 +84,7 @@ class SettingsRoundTripTest {
         val changed = KeyboardInputPreferences().copy(
             spaceHold = SpaceHoldAction.VOICE_TOGGLE, cursorGesture = CursorGestureMode.KEYBOARD,
             cursorHoldSeconds = 0.5f, languageMenuHoldSeconds = 0.3f, symbolKeyHoldSeconds = 1.5f, candidateDragPercent = 30f, neighborCorrection = false,
-            fourteenLetterSwipe = false, fourteenLetterSwipeDp = 30f, symbolInputMode = SymbolInputMode.LONG_PRESS,
+            fourteenLetterSwipe = false, fourteenLetterSwipeDp = 30f, symbolInputMode = SymbolInputMode.LONG_PRESS, symbolLongPressSeconds = 0.45f,
             reverseSymbolSwipe = true, clearAllWhileComposing = true, clearBeforeCursorOnly = true, kanaDirectionHints = true, flickDirectionDisc = false, glideTyping = true,
             t9FlickLetters = true, letterLongPressMenu = true, cursorStepDp = 14f, cursorSwipeLines = 1.75f, keyTextScale = 1.3f, handwritingPauseSeconds = 0.8f,
             formulaDelimiter = FormulaDelimiter.entries.last { it != FormulaDelimiter.DOLLAR }, fixedSymbols = "，\n。",

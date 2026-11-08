@@ -390,7 +390,9 @@ fun SwipeableKeyButton(
     }
     // In flick mode the held key's own value (the digit) is a one-item long-press popup: it shows
     // what will be entered and commits only on release, like every other long-press choice.
+    // 「长按输入」（关闭角标滑动）时和其他布局的角标一样：按满设定时长立刻输入，气泡显示它，松手消失（用户 11-08）。
     val flickLongPressLabel = (badgeText ?: swipeText ?: text).takeIf { onFlickLongPress != null }
+    val flickLongPressNow = flickLongPressLabel != null && symbolInputMode == SymbolInputMode.LONG_PRESS
     fun flickAt(index: Int): String? = flick?.getOrNull(index)
     fun flickAction(index: Int): (() -> Unit)? = flickAt(index)?.let { letter -> { onFlickLetter?.invoke(letter); Unit } }
     // 按住符号键当 Ctrl 时，另一根手指点字母发 Ctrl+字母，不打字（用户 10-24）。
@@ -428,16 +430,19 @@ fun SwipeableKeyButton(
         reserveHorizontalSwipe = true,
         freeDirection = true,
         keyWidth = buttonBounds.width,
-        longPressItems = listOfNotNull(flickLongPressLabel),
-        onLongPressSelect = { onFlickLongPress?.invoke() },
-        longPressTimeoutMillis = 300L,
+        longPressItems = if (flickLongPressNow) emptyList() else listOfNotNull(flickLongPressLabel),
+        onLongPressSelect = if (flickLongPressNow) null else { _ -> onFlickLongPress?.invoke() },
+        onLongPress = if (flickLongPressNow) { { onFlickLongPress?.invoke() } } else null,
+        longPressBubbleText = flickLongPressLabel?.takeIf { flickLongPressNow },
+        longPressTimeoutMillis = if (flickLongPressNow) inputPreferences.symbolLongPressMs else 300L,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
     ) else KeyGestureActions(
         text = text,
         onTap = tapOrCtrl,
         onPress = { isPressed = true; discRevealed = false; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { flickPreview = keyPreview(it); onSwipeStateChange?.invoke(it, buttonBounds) },
+        // 长按到点后（角标已输入或弹出菜单）方向盘收起，和拂动键一样只留长按气泡。
+        onPreview = { flickPreview = keyPreview(it); longPressShown = it.isLongPress; onSwipeStateChange?.invoke(it, buttonBounds) },
         inlineVerticalPreview = true,
         upText = swipeText,
         downText = swipeDownText,
@@ -466,7 +471,7 @@ fun SwipeableKeyButton(
     ).withSymbolInput(
         // 26 键滑行开着时字母键的滑动给了滑行，角标改由长按输入（设置页同样锁在「长按输入」）。
         if (letterGlideOwnsDrag) SymbolInputMode.LONG_PRESS else symbolInputMode,
-        symbolInputText, keepSymbolSwipeOnLongPress).let {
+        symbolInputText, keepSymbolSwipeOnLongPress, inputPreferences.symbolLongPressMs).let {
         if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
     }
     val inputActions = LocalKeyboardInputActions.current

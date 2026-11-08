@@ -94,6 +94,7 @@ internal fun Modifier.glideTyping(
     val currentOnTrace by rememberUpdatedState(onTrace)
     val currentOnProgress by rememberUpdatedState(onProgress)
     val currentOrigin by rememberUpdatedState(rootOrigin)
+    val holdMs by rememberUpdatedState(LocalKeyboardInputPreferences.current.glideHoldMs)
     if (!enabled || letterGeometry == null) return this
     return pointerInput(letterGeometry, trail) { awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -101,7 +102,7 @@ internal fun Modifier.glideTyping(
         if (keys.size < 26) return@awaitEachGesture
         val origin = currentOrigin()
         val tracker = GlideTracker(keys, viewConfiguration.touchSlop,
-            down.position.x + origin.x, down.position.y + origin.y, down.uptimeMillis)
+            down.position.x + origin.x, down.position.y + origin.y, down.uptimeMillis, holdMs)
         if (tracker.abandoned) return@awaitEachGesture
         val local = arrayListOf(down.position)
         try {
