@@ -1850,5 +1850,17 @@ TEST(T9RightCommitHandlerTest, Apostrophe_KeHe_543_ExactSyllableOverUnassigned_F
     EXPECT_TRUE(ctx.input_buffer.is_empty());
 }
 
+TEST(T9RightCommitHandlerTest, FuzzySingleCharacterConsumesOneWholeSelectedSyllable) {
+    std::vector<SyllableOption> selected{{"chuo", 4}, {"yi", 2}, {"dian", 4}};
+    for (const auto* reading : {"chuo", "cuo"}) {
+        auto ctx = MakeContext({"2486943426", selected, 10, T9StateMachine::State::kSelection,
+                                selected.back(), "3426", "chuoyi", selected});
+        T9RightCommitHandler handler;
+        EXPECT_FALSE(handler.HandleRightCommit(ctx, std::string(reading), 1));
+        EXPECT_EQ("yi'dian", ctx.input_buffer.ToPreeditString('\''));
+        EXPECT_TRUE(ctx.input_buffer.unassigned().empty());
+    }
+}
+
 }  // namespace
 }  // namespace rime

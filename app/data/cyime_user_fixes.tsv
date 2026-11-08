@@ -17,3 +17,9 @@
 在词库里没有	zai ci ku li mei you	20000
 # His report (2026-11-03): yijingyongdehenshuangle read 已经用的很爽了 (用的 706440 vs 用得 42575, 很爽 is a word).
 用得很	yong de hen	100000
+# His report (2026-11-06, Q 群): woyongzhizhechengleyigezhichuan read 我用指着成了一个只穿 (纸船 2072 under 只穿 16843,
+# 折成 not in the dictionary, so 指着+成了 won); baomaodeshaonian read 豹猫的少年 (抱猫 not in the dictionary).
+纸船	zhi chuan	20000
+折成	zhe cheng	50000
+折纸船	zhe zhi chuan	3000
+抱猫	bao mao	3000

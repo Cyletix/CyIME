@@ -1174,3 +1174,7 @@ user-t9-limaoma	9	5462662	礼貌吗	2	user	2026-11-02	「礼貌吗打不出来�
 user-t9-womenma	9	9663662	我们吗	1	found	2026-11-02	同上排查：常用词+吗 3000 条之一，曾出「我们那」且「我们吗」看不到
 user-yongdehen	26	yijingyongdehenshuangle	已经用得很爽了	1	user	2026-11-03	「已经用的很爽来，这句都打错了」：用的词频远高于用得，整句拆成 用的+很爽；补「用得很」
 user-yongdehen-de	26	woyongdeshi	我用的是	1	found	2026-11-03	同上反例：「用的」本身不受影响
+user-zhichuan	26	woyongzhizhechengleyigezhichuan	我用纸折成了一个纸船	1	user	2026-11-06	Q 群：曾出「我用指着成了一个只穿」(纸船词频远低于只穿，折成不在词库)；补 纸船 折成 折纸船
+user-baomao	26	baomaodeshaonian	抱猫的少年	1	user	2026-11-06	Q 群：曾出「豹猫的少年」(抱猫不在词库)
+user-zhichuan-zhi	26	zhichuanyijian	只穿一件	1	found	2026-11-06	同上反例：「只穿」本身不受影响
+user-baomao-bao	26	baomao	豹猫	3	found	2026-11-06	同上反例：单打 baomao 时「豹猫」还在前三 (抱猫/豹猫没有上下文可分，句子里按词频取抱猫)

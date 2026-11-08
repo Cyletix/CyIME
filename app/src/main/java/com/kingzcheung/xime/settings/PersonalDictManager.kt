@@ -371,6 +371,18 @@ object PersonalDictManager {
         return best[letters.length]?.second.orEmpty()
     }
 
+    internal fun t9PhraseReadings(rimeDir: File): Map<Pair<String, String>, String> {
+        val source = File(rimeDir, CUSTOM_PHRASE_FILE)
+        if (!source.isFile) return emptyMap()
+        val content = try { source.readText(Charsets.UTF_8) } catch (_: java.io.IOException) { return emptyMap() }
+        return buildMap {
+            for (entry in parseStableDbEntries(content)) {
+                val digits = PhraseKeys.T9.codes(entry.code).singleOrNull() ?: continue
+                putIfAbsent(entry.word to digits, entry.code.lowercase().replace(' ', '\''))
+            }
+        }
+    }
+
     internal fun writeKeyedPhrases(rimeDir: File, keys: PhraseKeys) =
         writeKeyedPhrases(rimeDir, KeyedPhrases(keys.dictName, keys::codes))
 

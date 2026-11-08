@@ -298,11 +298,14 @@ bool LetterBufferStrategy::HandleSelectionPrefixConsumed(
             for (const auto& sel : remaining_sels) {
                 new_consumed += sel.digit_length;
             }
-            ctx.input_buffer = T9Buffer(remaining_digits, remaining_sels,
-                new_consumed, static_cast<int>(remaining_digits.size()));
+            // cut_index removes whole selected syllables. A fuzzy reading (chuo -> cuo)
+            // can match fewer digit keys; keeping that shorter cut reintroduces used keys at the tail.
+            const std::string suffix = remaining_digits.substr(cumulative - consumed_digit_count);
+            ctx.input_buffer = T9Buffer(suffix, remaining_sels,
+                new_consumed, static_cast<int>(suffix.size()));
             ctx.left_column_locked = false;
             const auto& last_sel = remaining_sels.back();
-            std::string sel_digits = remaining_digits.substr(
+            std::string sel_digits = suffix.substr(
                 new_consumed - last_sel.digit_length);
             std::vector<SyllableOption> new_history(
                 ctx.state_machine.selection_history().begin() + cut_index,

@@ -31,6 +31,19 @@ private fun mockContext(): Context {
 
 class PersonalDictManagerTest {
 
+    @Test fun phraseEnterUsesItsOwnCodeWhenSeveralReadingsShareTheDigits() {
+        val dir = java.nio.file.Files.createTempDirectory("t9-phrase-reading").toFile()
+        try {
+            File(dir, "custom_phrase.txt").writeText("……\thao\t5\n高处\tgao\t2\n")
+            val readings = PersonalDictManager.t9PhraseReadings(dir)
+            for ((phrase, code) in listOf("……" to "hao", "高处" to "gao")) {
+                val preedit = readings.getValue(phrase to "426")
+                assertEquals(code, com.kingzcheung.xime.service.rawCompositionCommitText("426", preedit, true))
+            }
+            org.junit.Assert.assertNull(readings["……" to "42"])
+        } finally { dir.deleteRecursively() }
+    }
+
     @Test
     fun `shared symbol shortcuts reach each keyboard without replacing private tables or manual translators`() {
         val context = mockContext()

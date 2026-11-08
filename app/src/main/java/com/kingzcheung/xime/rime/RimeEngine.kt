@@ -257,6 +257,8 @@ class RimeEngine {
                 if (!isInitialized) {
                     try {
                         candidateRevision.incrementAndGet()
+                        phraseReadings = null
+                        mergedEditReading = null
                         this.userDataDir = userDataDir
                         this.sharedDataDir = sharedDataDir
                         nativeInstallSignalHandler(userDataDir)
@@ -442,15 +444,26 @@ class RimeEngine {
     private external fun nativeConversionPreview(): String
     private external fun nativeHighlightCandidate(index: Int): Boolean
 
-    private fun displayPreedit(input: String, preedit: String, spelling: String): String {
+    private var phraseReadings: Map<Pair<String, String>, String>? = null
+    private var mergedEditReading: Pair<String, String>? = null
+
+    private fun displayPreedit(input: String, preedit: String, top: RimeCandidate?): String {
+        val spelling = top?.comment.orEmpty()
+        val schema = nativeGetCurrentSchema().orEmpty()
+        val profile = com.kingzcheung.xime.settings.InputProfiles.describe(schema)
+        if (profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.T9 &&
+            profile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN &&
+            top != null && input.isNotEmpty() && preedit == input && spelling == input && input.all { it in '2'..'9' }) {
+            val readings = phraseReadings ?: com.kingzcheung.xime.settings.PersonalDictManager
+                .t9PhraseReadings(File(userDataDir)).also { phraseReadings = it }
+            readings[top.text to input]?.let { return it }
+        }
         // A nine-key caret inside the code leaves the raw keys after it in Rime's preedit.
         t9CaretReading?.let { (code, reading) ->
             if (code == input && reading.isNotEmpty() && preedit != reading &&
                 (nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull() ?: input.length) < input.length) return reading
         }
-        val schema = nativeGetCurrentSchema().orEmpty()
         if (doublePinyinKeysPreedit && com.kingzcheung.xime.settings.DoublePinyinSchemes.isT9(schema)) return t9DoublePinyinPreedit(input, preedit, spelling, schema)
-        val profile = com.kingzcheung.xime.settings.InputProfiles.describe(schema)
         val groups = if (profile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
             com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(schema)?.mergedGroups.orEmpty()
         if (groups.none { it.length > 1 } || nativeIsAsciiMode()) return preedit
@@ -459,7 +472,11 @@ class RimeEngine {
         val prefix = snapshot.getOrNull(3).orEmpty()
         // 14 键双拼的首选读音是全拼，换成这个方案的双拼键才能和合并编码一一对上。
         val reading = if (profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN) doublePinyinReading(spelling, schema) else spelling
-        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), reading, groups)
+        val caret = snapshot.getOrNull(1)?.toIntOrNull() ?: input.length
+        // At an interior caret Rime translates the prefix and echoes its physical keys for the tail.
+        if (mergedEditReading?.first != input || caret !in confirmed until input.length) mergedEditReading = null
+        val editReading = mergedEditReading?.second
+        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), editReading ?: reading, groups)
     }
 
     /**
@@ -480,7 +497,7 @@ class RimeEngine {
     }
 
     private fun withDisplayPreedit(result: RimeProcessResult): RimeProcessResult = result.copy(
-        preeditText = displayPreedit(result.inputText, result.preeditText, result.candidates.firstOrNull()?.comment.orEmpty()),
+        preeditText = displayPreedit(result.inputText, result.preeditText, result.candidates.firstOrNull()),
         engineRevision = candidateRevision.get()).also { noteCommit(it.committedText) }
 
     /** For destructive routing: null means busy/unavailable, never an empty composition. */
@@ -508,7 +525,7 @@ class RimeEngine {
     fun getComposition(): RimeComposition {
         return tryLocked(RimeComposition("", "", "", emptyArray(), false, false, false)) {
             nativeGetComposition().let { result -> result.copy(preedit = displayPreedit(
-                result.input, result.preedit, result.candidates.firstOrNull()?.comment.orEmpty()), engineRevision = candidateRevision.get()) }
+                result.input, result.preedit, result.candidates.firstOrNull()), engineRevision = candidateRevision.get()) }
                 .also { noteCommit(it.committedText) }
         }
     }
@@ -646,7 +663,7 @@ class RimeEngine {
     internal fun readPinyinEditSnapshot(): Array<String> = locked {
         if (nativeHasSession()) nativePinyinEditSnapshot().also { snapshot ->
             if (snapshot.size > 4) snapshot[4] = displayPreedit(snapshot[0], snapshot[4],
-                nativeGetCandidatesWithComments()?.firstOrNull()?.getOrNull(1).orEmpty())
+                nativeGetCandidatesWithComments()?.firstOrNull()?.let { RimeCandidate(it.getOrElse(0) { "" }, it.getOrElse(1) { "" }) })
         } else emptyArray()
     }
 
@@ -740,6 +757,7 @@ class RimeEngine {
 
     internal fun applyPinyinEdit(expectedInput: String, newInput: String, caret: Int,
         protectedLength: Int = 0, protectedText: String = "", expectedSchema: String? = null,
+        visibleReading: String? = null,
         isStillCurrent: () -> Boolean = { true },
     ): Boolean = mutateLocked {
         if (!nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode() ||
@@ -750,6 +768,7 @@ class RimeEngine {
         // A cursor step must not rebuild unchanged code or discard confirmed segments.
         if (newInput != expectedInput && !nativeSetInput(newInput)) return@mutateLocked false
         nativeSetCaret(caret.coerceIn(0, newInput.length))
+        mergedEditReading = visibleReading?.takeIf { caret < newInput.length }?.let { newInput to it }
         true
     }
 
@@ -816,7 +835,7 @@ class RimeEngine {
         }.toTypedArray()
         RimeProcessResult(
             processed = true, committedText = "", inputText = snapshot.getOrNull(0).orEmpty(),
-            preeditText = displayPreedit(snapshot.getOrNull(0).orEmpty(), snapshot.getOrNull(4).orEmpty(), candidates.firstOrNull()?.comment.orEmpty()), candidates = candidates,
+            preeditText = displayPreedit(snapshot.getOrNull(0).orEmpty(), snapshot.getOrNull(4).orEmpty(), candidates.firstOrNull()), candidates = candidates,
             isAsciiMode = nativeIsAsciiMode(), hasNextPage = nativeHasNextPage(), hasPrevPage = nativeHasPrevPage(),
             engineRevision = candidateRevision.get(),
         )
@@ -920,6 +939,8 @@ class RimeEngine {
             // 这会在 user_data_dir 中创建 {schemaId}.custom.yaml 文件，
             // RIME 引擎加载方案时会自动应用 custom.yaml 中的 patch 补丁
             nativeEnsureT9SchemaPatches(schemaId)
+            phraseReadings = null
+            mergedEditReading = null
             val switched = nativeSwitchSchema(schemaId)
             mergedAlphabet = null
             if (switched) mergedSpellerAlphabet()
@@ -941,6 +962,8 @@ class RimeEngine {
         if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@mutateLocked false
         val current = nativeGetCurrentSchema().orEmpty()
         mergedAlphabet = null
+        phraseReadings = null
+        mergedEditReading = null
         current.isNotEmpty() && nativeSwitchSchema(current)
     }
 
@@ -1566,7 +1589,7 @@ class RimeEngine {
         if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked null
         val result = nativeGetComposition()
         noteCommit(result.committedText)
-        result.copy(preedit = displayPreedit(result.input, result.preedit, result.candidates.firstOrNull()?.comment.orEmpty()),
+        result.copy(preedit = displayPreedit(result.input, result.preedit, result.candidates.firstOrNull()),
             engineRevision = candidateRevision.get())
     }
 

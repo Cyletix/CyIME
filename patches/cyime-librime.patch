@@ -2002,7 +2002,7 @@ index 99e45117..a0ccb38f 100644
 +  // CyLM's best sentence takes the place of Rime's sentence (cyime_rime/t9_cylm_sentence.cc).
 +  void ApplyCylmSentence(Dictionary* dict) {
 +    if (!t9_cylm_ || sentences_.empty()) return;
-+    T9ApplyCylmSentence(t9_cylm_.get(), translator_, syllabifier_->input(), t9_left_context_, dict,
++    T9ApplyCylmSentence(t9_cylm_.get(), cylm_long_alternative_, syllabifier_->input(), t9_left_context_, dict,
 +                        translator_->language(), start_, syllabifier_, &sentences_);
 +  }
    bool CheckEmpty();
