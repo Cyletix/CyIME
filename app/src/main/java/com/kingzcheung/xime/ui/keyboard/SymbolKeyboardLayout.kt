@@ -68,7 +68,7 @@ fun SymbolKeyboardLayout(
     keyBgColor: Color,
     bottomPaddingDp: Int = 0,
     modifier: Modifier = Modifier,
-    /** 分类 tab 切换与返回按钮的振动钩子（符号点击/删除经 onSelect 由调用方统一振动）。 */
+    /** 分类切换的振动，也供没有按键反馈回调的面板使用。 */
     onHapticFeedback: (() -> Unit)? = null,
     onNumber: () -> Unit,
     shadowEnabled: Boolean = true,
@@ -120,7 +120,7 @@ fun SymbolKeyboardLayout(
             .fillMaxWidth()
             .inheritKeyboardBackground(inheritBackground)
             .keyboardPanelBackground(backgroundColor)
-            .padding(bottom = 8.dp)
+            .padding(bottom = KeyboardGridBottomMargin)
     ) {
         // 内容区：符号网格 + HorizontalPager
         BoxWithConstraints(
@@ -170,6 +170,7 @@ fun SymbolKeyboardLayout(
                                         symbol = symbol,
                                         preserveWidth = preserveWidth,
                                         onClick = {
+                                            if (onKeyPressDown != null) onKeyPressDown(symbol) else onHapticFeedback?.invoke()
                                             recentSymbols = RecentUsageStore.record(
                                                 context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
                                             )
