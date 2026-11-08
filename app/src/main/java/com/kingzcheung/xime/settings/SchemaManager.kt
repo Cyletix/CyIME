@@ -14,6 +14,9 @@ import com.charleskorn.kaml.YamlScalar
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
@@ -95,6 +98,9 @@ internal data class SchemaEntry(
 
 object SchemaManager {
     private const val TAG = "SchemaManager"
+    private val enabledChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    internal val enabledSchemasChanged = enabledChanges.asSharedFlow()
     internal const val ASSET_INSTALL_MARKER = ".cyime-assets-installing"
     private const val CUSTOM_YAML = "default.custom.yaml"
     internal val yaml = Yaml(configuration = YamlConfiguration(strictMode = false, anchorsAndAliases = com.charleskorn.kaml.AnchorsAndAliases.Permitted(maxAliasCount = UInt.MAX_VALUE)))
@@ -656,6 +662,16 @@ object SchemaManager {
         return issues
     }
 
+    /** The combinations the keyboard can actually switch to after deployment. Call on IO. */
+    internal fun keyboardMenuSchemas(context: Context): List<SchemaInfo> {
+        val enabled = getEnabledSchemas(context).toSet()
+        val languages = LanguagePreferences.enabled(context)
+        val schemas = discoverSchemas(context).filter {
+            it.schemaId in enabled && it.language in languages && isSchemaCompiled(context, it.schemaId)
+        }
+        return InputModes.ordered(context, schemas.map(SchemaMeta::toSchemaInfo))
+    }
+
     fun discoverSchemas(context: Context): List<SchemaMeta> {
         val rimeDir = getRimeDir(context)
         if (!rimeDir.exists()) return emptyList<SchemaMeta>().also(InputProfiles::updateInstalled)
@@ -1001,6 +1017,7 @@ object SchemaManager {
         val normalized = CyimeInputDefaults.withCompanions(CyimeInputDefaults.canonicalIds(requestedIds, available), available)
         val schemaIds = normalized.ifEmpty { fallbackNativeSchema(available) }
         val customFile = getCustomYamlFile(context)
+        var changed = !customFile.exists()
         if (!customFile.exists()) {
             // 首次写入以 app 固定模板为基底（含 menu/page_size 等默认 patch），
             // 不再把整文件重写成只剩 schema_list 的空壳——那会丢掉 default.custom.yaml
@@ -1010,6 +1027,7 @@ object SchemaManager {
                 // 以文件存在为前提）且 schema_list 有效
                 writeSchemaListOnlyCustom(customFile, schemaIds)
                 applyEnabledSchemasToDefaultYaml(context, schemaIds)
+                enabledChanges.tryEmit(Unit)
                 return
             }
         }
@@ -1019,12 +1037,14 @@ object SchemaManager {
             val updated = replaceSchemaListBlock(text, schemaIds)
             if (updated != text) {
                 customFile.writeText(updated)
+                changed = true
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to write custom.yaml schema_list", e)
         }
         // F1: 同步写进 default.yaml，确保 librime 真正编译启用的方案
         applyEnabledSchemasToDefaultYaml(context, schemaIds)
+        if (changed) enabledChanges.tryEmit(Unit)
     }
 
     private fun writeSchemaListOnlyCustom(customFile: File, schemaIds: List<String>) {

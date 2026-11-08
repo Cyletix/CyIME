@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.kingzcheung.xime.CoroutineTestRule
 import com.kingzcheung.xime.viewmodel.SchemaSettingsViewModel
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -33,6 +35,19 @@ class ChineseSchemeDefaultsMigrationTest {
     }
 
     @Test fun missingListOffersFlypyOnBothLayouts() = assertFreshChoices()
+
+    @Test fun enablingAnAlreadyDeployedSchemaNotifiesTheOpenKeyboardAndKeepsCurrentScheme() = runBlocking {
+        val initial = SchemaManager.getEnabledSchemas(app) - "my_scheme"
+        SchemaManager.setEnabledSchemas(app, initial)
+        SettingsPreferences.setCurrentSchema(app, "rime_ice")
+        SchemaManager.getBuildDir(app).apply { mkdirs() }.resolve("my_scheme.schema.yaml").writeText("schema: {}")
+        val change = async(start = CoroutineStart.UNDISPATCHED) { SchemaManager.enabledSchemasChanged.first() }
+        SchemaManager.setEnabledSchemas(app, initial + "my_scheme")
+        withTimeout(2_000) { change.await() }
+        assertTrue("my_scheme" in SchemaManager.getEnabledSchemas(app))
+        assertTrue(SchemaManager.isSchemaCompiled(app, "my_scheme"))
+        assertEquals("rime_ice", SettingsPreferences.getCurrentSchema(app))
+    }
 
     @Test fun bundledTemplateOffersFlypyOnBothLayouts() {
         custom.writeText(app.assets.open("default.custom.yaml").bufferedReader().use { it.readText() })

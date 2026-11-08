@@ -25,7 +25,7 @@ class LayoutDisplayPagesTest {
         rule.setContent { MaterialTheme { LayoutDisplaySettingsContent(onBack = {}) } }
         rule.onNodeWithText("键盘布局").assertExists()
         rule.onNodeWithText("九键与 14 键").assertExists()
-        rule.onNodeWithText("自定义布局").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("布局管理").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("按键符号").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("分体键盘").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("数字框自动数字键盘").performScrollTo().assertIsDisplayed()

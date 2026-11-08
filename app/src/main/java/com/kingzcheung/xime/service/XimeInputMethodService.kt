@@ -1139,6 +1139,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         loadDarkModePreference()
         registerSharedPrefsListener()
         
+        serviceScope.launch {
+            SchemaManager.enabledSchemasChanged.collect {
+                if (inputReadiness.ticket() != null) sessionController.updateSchemaName()
+            }
+        }
         initRimeEngine()
         
         serviceScope.launch(Dispatchers.IO) {

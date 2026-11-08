@@ -173,7 +173,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 输入 › 键盘布局
         page("26 键", layouts, qwerty, "26键 全键盘 全拼 qwerty 中英混输 滑行输入"),
         page("九键与 14 键", layouts, nine, "九键 9键 14键 拂动 假名 触发距离"),
-        SettingsSearchEntry("自定义布局", layouts, SEARCH_TARGET_CUSTOM_LAYOUT, "自定义按键布局 布局管理 新建布局 复制 编辑按键排列", anchor = null),
+        SettingsSearchEntry("布局管理", layouts, SEARCH_TARGET_CUSTOM_LAYOUT, "自定义布局 自定义按键布局 切换栏 隐藏布局 布局排序 新建布局 复制 编辑按键排列", anchor = null),
         SettingsSearchEntry("按键符号", layouts, layoutIndex, "角标 符号编辑 字母键符号 上下角标 下滑符号 14键符号 自定义布局符号 侧栏 笔画 短语 常用符号栏 手写符号 数字行 滑动动作 zxcv 撤销 剪切 复制 粘贴 全选 段首 段尾"),
         SettingsSearchEntry("标点上屏首选", layouts, layoutIndex, "标点 逗号 句号 问号 首选 第一个候选 上屏 候选上屏 打逗号 选词 搜狗"),
         SettingsSearchEntry("输入成对符号", layouts, layoutIndex, "成对 配对 括号 引号 书名号 自动补全 闭合 光标中间"),

@@ -57,6 +57,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class CustomLayoutActivity : ComponentActivity() {
+    companion object { const val EXTRA_LANGUAGE = "layout_menu_language" }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -83,6 +85,7 @@ class CustomLayoutActivity : ComponentActivity() {
             XimeTheme(darkTheme = dark, themeId = themeId) {
                 Surface(Modifier.fillMaxSize()) { com.kingzcheung.xime.ui.settings.SettingsWidthLimit {
                     CustomLayoutManager(themeId, dark,
+                        initialLanguage = intent.getStringExtra(EXTRA_LANGUAGE)?.let(InputLanguage::fromId),
                         editSymbols = intent.getBooleanExtra("edit_symbols", false),
                         symbolTarget = intent.getStringExtra("symbol_target"),
                         createNew = savedInstanceState == null && intent.getBooleanExtra("create_layout", false)) { finish() }
@@ -95,7 +98,7 @@ class CustomLayoutActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boolean = false,
-    editSymbols: Boolean = false, symbolTarget: String? = null, close: () -> Unit) {
+    editSymbols: Boolean = false, symbolTarget: String? = null, initialLanguage: InputLanguage? = null, close: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var layouts by remember { mutableStateOf<List<CustomKeyboardLayout>>(emptyList()) }
@@ -163,10 +166,9 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
             }
         }
     ) { paddingValues ->
-    Column(Modifier.fillMaxSize().padding(paddingValues).imePadding().settingsVerticalScroll()
-        .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (id == null) {
-            // 和词库、已安装的方案同一套：分组卡片、一行一项、次要操作收进「更多」、新建用右下角的 +。
+    val page = Modifier.fillMaxSize().padding(paddingValues).imePadding()
+    if (id == null) {
+        com.kingzcheung.xime.ui.settings.LayoutMenuManagement(initialLanguage, message, page) {
             SettingsSection(title = "按键符号") {
                 SettingsListRow("26键", "固定字母排列 · 各输入方案共用符号") {
                     TextButton(onClick = { symbols = true }) { Text("编辑符号") }
@@ -182,9 +184,13 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                 }
             }
             SettingsNote("按键布局：调整字母排列，保留词库和功能键；中文启用的字母布局，英文和日文罗马字也能选。")
-        } else {
-            SettingsSection(title = "方案名称") {
-            OutlinedTextField(value = name, onValueChange = { name = it.take(32) }, label = { Text("方案名称") },
+            if (message.isNotBlank()) SettingsNote(message)
+        }
+    } else {
+        Column(page.settingsVerticalScroll().padding(horizontal = 16.dp).padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsSection(title = "布局名称") {
+            OutlinedTextField(value = name, onValueChange = { name = it.take(32) }, label = { Text("布局名称") },
                 modifier = Modifier.fillMaxWidth().padding(16.dp), singleLine = true, enabled = !busy)
             }
             val layout = draft()
@@ -254,16 +260,15 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                         .onFailure { message = "保存失败：${it.message}" }
                     busy = false
                 }
-            }) { Text(if (busy) "保存中…" else "保存方案") }
+            }) { Text(if (busy) "保存中…" else "保存布局") }
+            if (message.isNotBlank()) SettingsNote(message)
         }
-        if (message.isNotBlank()) SettingsNote(message)
-        if (id == null) Spacer(Modifier.height(72.dp))
     }
     }
     if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("放弃未保存的修改？") },
         confirmButton = { TextButton(onClick = { discard = false; id = null }) { Text("放弃") } },
         dismissButton = { TextButton(onClick = { discard = false }) { Text("继续编辑") } })
-    deleteId?.let { target -> AlertDialog(onDismissRequest = { deleteId = null }, title = { Text("删除自定义方案？") },
+    deleteId?.let { target -> AlertDialog(onDismissRequest = { deleteId = null }, title = { Text("删除自定义布局？") },
         text = { Text("只删除这个布局，不删除词库和学习记录。当前正在使用它时会切回中文26键。") },
         confirmButton = { TextButton(onClick = {
             deleteId = null; busy = true

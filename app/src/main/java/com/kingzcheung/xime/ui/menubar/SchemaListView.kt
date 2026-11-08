@@ -35,7 +35,6 @@ fun SchemaListView(
     val current = all.firstOrNull { it.schemaId == currentSchemaId }
     val entries = all.filter { current != null && it.profile.language == current.profile.language }
     var layoutId by remember(currentSchemaId, current?.profile) { mutableStateOf(current?.profile?.layout?.id) }
-    val layouts = InputProfileSelection.layoutRow(entries, all)
     val schemes = entries.filter { entry -> layoutId?.let { InputProfileSelection.offers(entry, it, all) } == true }
     BoxWithConstraints(modifier.fillMaxWidth().keyboardPanelBackground(backgroundColor).testTag("input-profile-panel")) {
     val density = LocalDensity.current
@@ -67,6 +66,8 @@ fun SchemaListView(
         if (current == null) {
             Text("正在读取当前输入方式…", color = keyTextColor)
         } else {
+            val menu = LayoutMenuPreferences.observe(current.profile.language)
+            val layouts = menu.shown(menu.ordered(InputProfileSelection.layoutRow(entries, all)))
             val switches = layouts.associate { it.id to InputProfileSelection.switchLayout(entries, current, it.id, all) }
             LayoutPreviewChoices(layouts, current.profile.language, layoutId,
                 "profile-layout-list", itemTagPrefix = "panel-layout:",
@@ -75,6 +76,7 @@ fun SchemaListView(
                 qwertyPreviewStagger = qwertyStagger,
                 onManage = {
                     context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
+                        .putExtra(com.kingzcheung.xime.CustomLayoutActivity.EXTRA_LANGUAGE, current.profile.language.id)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 },
                 containerColor = keyBgColor, contentColor = keyTextColor, accentColor = accentColor) { id ->

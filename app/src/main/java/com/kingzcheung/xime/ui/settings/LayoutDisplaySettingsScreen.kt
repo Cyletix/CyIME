@@ -123,7 +123,7 @@ private fun LayoutDisplayPage(
             }
             if (page == null) item {
                 SettingsSection(title = "布局与符号", content = {
-                    SettingsItem(Icons.TwoTone.DashboardCustomize, "自定义布局", "新建、复制和编辑按键排列",
+                    SettingsItem(Icons.TwoTone.DashboardCustomize, "布局管理", "显示或排列切换栏里的布局，编辑自定义按键排列",
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
                         showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))

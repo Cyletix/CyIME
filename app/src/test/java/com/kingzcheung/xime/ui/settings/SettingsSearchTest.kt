@@ -9,6 +9,12 @@ import org.junit.Test
 class SettingsSearchTest {
     private fun titles(q: String) = searchSettings(q).map { it.title }
 
+    @Test fun layoutManagementIsReachableWithThePreviousName() {
+        for (query in listOf("布局管理", "自定义布局", "布局排序")) {
+            assertTrue(searchSettings(query).any { it.title == "布局管理" && it.target == SEARCH_TARGET_CUSTOM_LAYOUT })
+        }
+    }
+
     @Test fun everydayWordsFindTheSwitch() {
         // 用户以为九键长按坏了：搜“长按”要能找到九键拂动。
         assertTrue("拂动选字母" in titles("长按"))
