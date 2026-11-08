@@ -3871,11 +3871,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         (currentInputConnection as? TrackedInputConnection)?.memory
             ?.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         inlineComposition.selectionReported(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val restored = if (candidateState.value.isComposing && !uiState.value.inputTarget.isInternal &&
+            !uiState.value.isVoiceMode && !isSecretEditor())
+            inlineComposition.restoreLostSpan(currentInputConnection, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        else null
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
         val hostCaret = if (newSelStart >= 0 && newSelStart == newSelEnd) newSelStart else -1
         if (hostCaret != voiceHostCaret) { voiceHostCaretBefore = voiceHostCaret; voiceHostCaret = hostCaret }
-        if (oldSelStart != newSelStart || oldSelEnd != newSelEnd) {
-            inlineComposition.hostCaret(candidatesStart, candidatesEnd, newSelStart, newSelEnd)?.let { offset ->
+        if (restored != null || oldSelStart != newSelStart || oldSelEnd != newSelEnd) {
+            inlineComposition.hostCaret(restored?.start ?: candidatesStart, restored?.end ?: candidatesEnd, newSelStart, newSelEnd)?.let { offset ->
                 val state = uiState.value
                 if (!state.inputTarget.isInternal && !state.isAsciiMode && state.inputProfile.capabilities.editablePinyin &&
                     candidateState.value.isComposing && TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
@@ -4568,7 +4572,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (caret !in confirmed until input.length) return
         val raw = com.kingzcheung.xime.rime.PinyinEditBuffer.normalized(input.drop(confirmed))
         val prefix = snapshot[3]
-        val display = com.kingzcheung.xime.rime.PinyinEditDisplay(raw, snapshot[4].removePrefix(prefix).trim())
+        val groups = if (uiState.value.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
+            com.kingzcheung.xime.rime.merged14Groups else com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(schema)?.mergedGroups.orEmpty()
+        val display = com.kingzcheung.xime.rime.PinyinEditDisplay(raw, snapshot[4].removePrefix(prefix).trim(), groups = groups)
         val frame = com.kingzcheung.xime.rime.PinyinEditSession(sessionId, schema, input,
             input.take(confirmed), prefix, display.text, display.displayOffset(caret - confirmed), false)
         showInlineEditCaret(frame)
@@ -5323,6 +5329,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             else -> connection.commitText(delivered, 1)
         }
         if (!committed) return TextCommitResult.REJECTED
+        if (inlineComposition.text != null) inlineComposition.ended()
         if (isSensitive || isSecretEditor()) return TextCommitResult.ACCEPTED_HOST
         pluginEvents.onTextCommitted(delivered, isPaste)
         typingStatsSource().let { source ->

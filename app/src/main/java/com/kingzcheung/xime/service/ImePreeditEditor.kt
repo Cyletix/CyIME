@@ -133,7 +133,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                         session.expectedInput.drop(session.protectedInput.length), session.text, isMerged14 = com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, groups = com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(session.schemaId)?.rows?.flatten() ?: if (com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) com.kingzcheung.xime.rime.merged14Groups else emptyList()).rawOffset(caret)
                     engine.applyPinyinEdit(session.expectedInput, engineText,
                         session.protectedInput.length + engineCaret, session.protectedInput.length,
-                        session.protectedText, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
+                        session.protectedText, session.schemaId, visibleReading = text) { owner.isActive() && isOwnerCurrent(session) }
                 }
             }
             if (result == null) { withContext(Dispatchers.Main) { reply(null) }; return@enqueue }

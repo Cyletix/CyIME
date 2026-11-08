@@ -58,6 +58,21 @@ class PinyinEditEngineTest {
         engine.clearQueuedComposition()
     }
 
+    @Test fun fourteenKeyCaretDoesNotExposeRepresentativeKeysAfterTheCursor() {
+        mode("pinyin_14jian")
+        assertTrue(engine.setInput("QOGAO"))
+        val before = engine.readPinyinEditSnapshot()
+        val reading = before[4]
+        assertTrue(reading.isNotBlank() && reading.none(Char::isUpperCase))
+        assertTrue(engine.applyPinyinEdit(before[0], before[0], 2, expectedSchema = "pinyin_14jian", visibleReading = reading))
+        val middle = engine.readPinyinEditSnapshot()
+        assertEquals("2", middle[1])
+        assertEquals(before[0], middle[0])
+        assertEquals(reading.replace(' ', '\''), middle[4].replace(' ', '\''))
+        assertEquals("", engine.commit())
+        engine.clearQueuedComposition()
+    }
+
     @Test fun fullPinyinEditPreservesHostCommitAndSetsRealCaret() {
         mode("rime_ice")
         assertTrue(engine.setInput("nihao"))

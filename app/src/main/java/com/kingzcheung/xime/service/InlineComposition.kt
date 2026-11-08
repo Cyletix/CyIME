@@ -25,6 +25,7 @@ internal class InlineCompositionTracker {
         private set
     /** 还没打拼音时宿主最近报来的折叠光标：下一段编码从这里开始写。 */
     private var anchor = -1
+    private var hostReportedSpan = false
 
     /**
      * onUpdateSelection（和新输入框的初始选区）：记下编码起点。宿主换了整段文字（setText）后光标常被放回开头，
@@ -32,7 +33,10 @@ internal class InlineCompositionTracker {
      */
     fun selectionReported(selStart: Int, selEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         if (active) {
-            if (text != null && candidatesStart >= 0 && candidatesEnd > candidatesStart) start = candidatesStart
+            if (text != null && candidatesStart >= 0 && candidatesEnd - candidatesStart == text?.length) {
+                start = candidatesStart
+                hostReportedSpan = true
+            }
         } else anchor = if (selStart >= 0 && selStart == selEnd && (candidatesStart < 0 || candidatesStart == candidatesEnd)) selStart else -1
     }
     fun hostCaret(start: Int, end: Int, selection: Int, selectionEnd: Int): Int? {
@@ -40,7 +44,16 @@ internal class InlineCompositionTracker {
         if (start < 0 || end - start != code.length || selection != selectionEnd || selection !in start..end) return null
         return (selection - start).takeIf { it != caret }
     }
-    fun ended() { active = false; text = null; start = -1; anchor = -1 }
+    /** A host can finish composing when a selection handle is touched without restarting input. */
+    fun takeLostSpan(selection: Int, end: Int, candidatesStart: Int, candidatesEnd: Int): DetachedComposition? {
+        val code = text ?: return null
+        if (!hostReportedSpan || candidatesStart != -1 || candidatesEnd != -1) return null
+        hostReportedSpan = false
+        if (selection != end || selection !in start..(start + code.length)) return null
+        return DetachedComposition(start, start + code.length)
+    }
+
+    fun ended() { active = false; text = null; start = -1; anchor = -1; hostReportedSpan = false }
 
     /** 新的输入连接开始：旧组合区已不可再用，返回其拼音文字供核对。 */
     fun detach(): String? = text.takeIf { active }.also { ended() }
