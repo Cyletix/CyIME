@@ -20,10 +20,12 @@ internal class RecordingAudioOwner(initial: AudioRecord? = null) {
         }
     }
 
-    fun start(): Boolean = synchronized(lock) {
+    fun start(onStarted: () -> Unit = {}): Boolean = synchronized(lock) {
         val current = record
         if (closed || current == null) return false
         if (current.recordingState != AudioRecord.RECORDSTATE_RECORDING) current.startRecording()
+        // Complete capture startup before a concurrent close can restore the media volume.
+        onStarted()
         true
     }
 

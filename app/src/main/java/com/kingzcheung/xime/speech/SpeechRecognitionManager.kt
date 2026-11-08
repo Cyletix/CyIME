@@ -134,6 +134,8 @@ class SpeechRecognitionManager(
 
         loadingCancelled = false
         stopAfterLoad = false
+        // A pending gesture may already have opened the mic. Quiet media as soon as voice is confirmed.
+        synchronized(this) { preStartedRecord?.let { audioFocus.acquire(it) } }
         FileLogger.i(TAG, "Starting speech recognition")
         setState(RecognitionState.PROCESSING)
 
@@ -253,10 +255,12 @@ class SpeechRecognitionManager(
     }
 
     fun stopRecognition() {
-        if (recordingThread == null && loadPending && !released && synchronized(this) { preStartedRecord != null }) {
+        val pendingMic = synchronized(this) { preStartedRecord }
+        if (recordingThread == null && loadPending && !released && pendingMic != null) {
             // 模型还在加载：麦克风里已经存着刚才说的话，加载完认完再结束（原来这里直接丢掉，什么都不出）
             stopAfterLoad = true
             stopRequestedAtNs = System.nanoTime()
+            audioFocus.release(pendingMic)
             FileLogger.i(TAG, "Stop during model load: recognizing the captured audio once loaded")
             return
         }
@@ -336,7 +340,11 @@ class SpeechRecognitionManager(
         try {
             record.startRecording()
             preStartedAtNs = System.nanoTime()
-            synchronized(this) { preStartedRecord = record }
+            synchronized(this) {
+                preStartedRecord = record
+                // The toolbar can request voice first, then open this mic while the model loads.
+                if (loadPending && !loadingCancelled && !stopAfterLoad) audioFocus.acquire(record)
+            }
         } catch (error: Exception) {
             try { record.release() } catch (_: Exception) { }
             Log.w(TAG, "Microphone pre-start failed", error)
@@ -366,6 +374,7 @@ class SpeechRecognitionManager(
             if (record != null) {
                 try { record.stop() } catch (_: Exception) { }
                 try { record.release() } catch (_: Exception) { }
+                audioFocus.release(record)
             }
         }
     }
@@ -523,6 +532,8 @@ class SpeechRecognitionManager(
 
         // Own the pre-started microphone before Thread.start(): stop may arrive before run().
         private val microphone = RecordingAudioOwner(preStarted)
+        // Retain the same owner across handoff so volume changes only once per live capture.
+        private val otherAudioOwner = preStarted ?: this
         @Volatile var requestedLanguage = language
         private val audioQueue = ArrayBlockingQueue<CapturedAudio>(100) // At most 10 s / 320 KB of PCM.
         private val backendFinished = CountDownLatch(1)
@@ -683,10 +694,11 @@ class SpeechRecognitionManager(
                     ?: if (stopRequested) return else error("麦克风打不开：请检查 CyIME 的录音权限，或关掉正在用麦克风的应用")
                 if (stopRequested) return
                 // 麦克风启动失败不能悄无声息地结束：报给用户（键盘上会显示）。
-                if (!microphone.start()) error("麦克风没能开始录音：可能被其他应用占用，或没有录音权限")
+                val started = microphone.start {
+                    if (drainBytes < 0 && !stopRequested) audioFocus.acquire(otherAudioOwner)
+                }
+                if (!started) error("麦克风没能开始录音：可能被其他应用占用，或没有录音权限")
                 FileLogger.i(TAG, "Microphone ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
-                // 加载中已松手的收尾段不再开麦说话，不去动别人的声音
-                if (drainBytes < 0 && !stopRequested) audioFocus.acquire(this)
                 deliveryThread = Thread(::deliverAudio, "AsrAudioDelivery").also { it.start() }
                 deliveryStarted = true
                 val draining = drainBytes >= 0
@@ -760,7 +772,7 @@ class SpeechRecognitionManager(
             } finally {
                 stopRequested = true
                 microphone.close()
-                audioFocus.release(this)
+                audioFocus.release(otherAudioOwner)
                 captureEnded = true
                 watchShutdown()
                 if (deliveryStarted) {
@@ -779,7 +791,7 @@ class SpeechRecognitionManager(
         fun forceStopAudio() {
             stopRequested = true
             microphone.close()
-            audioFocus.release(this)
+            audioFocus.release(otherAudioOwner)
             watchShutdown()
         }
 

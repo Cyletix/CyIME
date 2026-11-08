@@ -2,6 +2,7 @@ package com.kingzcheung.xime.speech
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.os.Handler
 import com.kingzcheung.xime.settings.InputLanguage
@@ -141,7 +142,7 @@ class SpeechRecognitionLanguageSessionTest {
         }
     }
 
-    private class Fixture(preload: Boolean = true, initialKeepAlive: Boolean = true) : AutoCloseable {
+    private class Fixture(preload: Boolean = true, initialKeepAlive: Boolean = true, duckMedia: Boolean = false) : AutoCloseable {
         val queue = LinkedBlockingQueue<Runnable>()
         val delayed = CopyOnWriteArrayList<Pair<Runnable, Long>>()
         val backend = Backend()
@@ -152,6 +153,7 @@ class SpeechRecognitionLanguageSessionTest {
         val results = mutableListOf<String>()
         val errors = mutableListOf<String>()
         val microphones = CopyOnWriteArrayList<Microphone>()
+        val mediaVolumes = CopyOnWriteArrayList<Int>()
         val allocations: Int get() = microphones.size
         @Volatile var keepAlive = initialKeepAlive
         val manager: SpeechRecognitionManager
@@ -165,6 +167,18 @@ class SpeechRecognitionLanguageSessionTest {
             whenever(prefs.getBoolean(eq(SettingsPreferences.KEY_STT_KEEP_ENGINE_ALIVE), any())).thenAnswer { keepAlive }
             // Residency is now read as idle minutes (0 = keep), defaulting from the old switch; an unstubbed getInt was 0 = always resident.
             whenever(prefs.getInt(any(), any())).thenAnswer { it.getArgument(1) }
+            if (duckMedia) {
+                val audio = mock<AudioManager>()
+                whenever(context.getSystemService(Context.AUDIO_SERVICE)).thenReturn(audio)
+                whenever(audio.isMusicActive).thenReturn(true)
+                whenever(audio.getStreamVolume(AudioManager.STREAM_MUSIC)).thenAnswer { mediaVolumes.lastOrNull() ?: 10 }
+                doAnswer { mediaVolumes += it.getArgument<Int>(1); null }.whenever(audio)
+                    .setStreamVolume(eq(AudioManager.STREAM_MUSIC), any(), eq(0))
+                whenever(prefs.getString(eq(SettingsPreferences.KEY_STT_OTHER_AUDIO), isNull())).thenReturn("duck")
+                val editor = mock<SharedPreferences.Editor>()
+                whenever(prefs.edit()).thenReturn(editor)
+                whenever(editor.putInt(any(), any())).thenReturn(editor)
+            }
             val handler = mock<Handler>()
             whenever(handler.post(any())).thenAnswer { queue.put(it.getArgument(0)); true }
             whenever(handler.postDelayed(any(), any())).thenAnswer {
@@ -274,16 +288,18 @@ class SpeechRecognitionLanguageSessionTest {
 
     // 2026-10-31 tablet user: right after the keyboard opens, the first short phrase gave no text.
     // Releasing (or tapping stop) while the model still loaded threw the captured audio away.
-    @Test fun stoppingWhileTheModelLoadsStillRecognizesWhatWasSaid() = Fixture(preload = false).use { f ->
+    @Test fun stoppingWhileTheModelLoadsStillRecognizesWhatWasSaid() = Fixture(preload = false, duckMedia = true).use { f ->
         f.backend.initGate = CountDownLatch(1)
         f.manager.startRecognition()
         f.manager.startPreStart()
         val mic = f.microphones.single()
+        assertEquals(listOf(2), f.mediaVolumes.toList())
         mic.feed(1000)
         mic.feed(1001)
         // The keyboard ends the voice session the same way endVoiceSession does: pre-start first, then stop.
         f.manager.cancelPreStart()
         f.manager.stopRecognition()
+        assertEquals(listOf(2, 10), f.mediaVolumes.toList())
         assertFalse("The captured audio must survive until the model is ready", mic.released.get())
 
         f.backend.initGate?.countDown()
@@ -293,10 +309,11 @@ class SpeechRecognitionLanguageSessionTest {
         assertEquals(listOf(1000.toShort(), 1001.toShort()), f.backend.audio.map { (_, pcm) -> pcm.toShortSample() })
         assertEquals(listOf("closing result"), f.results)
         f.await { mic.released.get() }
+        assertEquals("Decoding saved audio must not lower volume again", listOf(2, 10), f.mediaVolumes.toList())
         assertTrue(f.errors.isEmpty())
     }
 
-    @Test fun cancellingWhileTheModelLoadsStillDiscardsTheAudio() = Fixture(preload = false).use { f ->
+    @Test fun cancellingWhileTheModelLoadsStillDiscardsTheAudio() = Fixture(preload = false, duckMedia = true).use { f ->
         f.backend.initGate = CountDownLatch(1)
         f.manager.startRecognition()
         f.manager.startPreStart()
@@ -305,12 +322,26 @@ class SpeechRecognitionLanguageSessionTest {
         f.manager.cancelPreStart()
         f.manager.cancelRecognition()
         assertTrue(mic.released.get())
+        assertEquals(listOf(2, 10), f.mediaVolumes.toList())
 
         f.backend.initGate?.countDown()
         f.await { f.manager.getState() == RecognitionState.IDLE }
         assertTrue(f.backend.sessions.isEmpty())
         assertTrue(f.backend.audio.isEmpty())
         assertTrue(f.results.isEmpty())
+    }
+
+    @Test fun confirmedPreStartKeepsMediaLowAcrossHandoffToLiveRecording() = Fixture(preload = false, duckMedia = true).use { f ->
+        f.backend.initGate = CountDownLatch(1)
+        f.manager.startPreStart()
+        assertTrue("A pending gesture alone must leave media alone", f.mediaVolumes.isEmpty())
+        f.manager.startRecognition()
+        assertEquals(listOf(2), f.mediaVolumes.toList())
+        f.backend.initGate?.countDown()
+        f.session()
+        assertEquals(listOf(2), f.mediaVolumes.toList())
+        f.manager.stopRecognition()
+        assertEquals(listOf(2, 10), f.mediaVolumes.toList())
     }
 
     private fun ByteArray.toShortSample(): Short = ((this[1].toInt() shl 8) or (this[0].toInt() and 0xFF)).toShort()
