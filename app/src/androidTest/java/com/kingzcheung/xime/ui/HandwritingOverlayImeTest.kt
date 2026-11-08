@@ -59,7 +59,7 @@ class HandwritingOverlayImeTest {
         val fixtureKeys = setOf("toolbar_buttons", LanguagePreferences.KEY,
             "floating_mode", "floating_mode_landscape", "fixed_width_dp", "fixed_width_dp_landscape",
             "fixed_offset_x", "fixed_offset_x_landscape", "keyboard_height_dp", "keyboard_height_dp_landscape",
-            "keyboard_bottom_padding_dp_portrait", "keyboard_bottom_padding_dp_landscape")
+            "keyboard_bottom_padding_dp")
         fun fixtureKey(key: String) = key in fixtureKeys || key.startsWith("current_schema") ||
             key.startsWith("last_input_mode_") || key.startsWith("selected_input_profile_")
         val saved = prefs.all.filterKeys(::fixtureKey).mapValues { (_, value) ->
