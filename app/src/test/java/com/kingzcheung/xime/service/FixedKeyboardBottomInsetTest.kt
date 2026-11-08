@@ -20,10 +20,11 @@ import org.robolectric.shadows.ShadowBuild
 @Config(sdk = [34], application = android.app.Application::class, qualifiers = "sw360dp-w360dp-h800dp-mdpi")
 class FixedKeyboardBottomInsetTest {
     private val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-    private fun measure(controls: Int = 0, cutout: Int = 0): Int {
+    private fun measure(controls: Int = 0, cutout: Int = 0, mandatory: Int = 0): Int {
         val insets = WindowInsets.Builder()
             .setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
             .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, controls))
+            .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, mandatory))
         if (cutout > 0) {
             @Suppress("DEPRECATION")
             insets.setDisplayCutout(DisplayCutout(Rect(0, 0, 0, cutout), emptyList()))
@@ -128,9 +129,13 @@ class FixedKeyboardBottomInsetTest {
         assertEquals(0, measure(controls = 48))
         assertEquals(16, measure(controls = 48, cutout = 16))
         mode(0)
-        assertEquals(48, measure())
-        Settings.Secure.putInt(activity.contentResolver, "hide_navigationbar_enable", 1)
+        // 三键导航的样子（整条都是强制手势区）：留着。
+        assertEquals(48, measure(mandatory = 48))
+        // navigation_mode 写 0，但底下没有能按的东西（11-08「别让我看到底下有缝」）：贴到底。
         assertEquals(0, measure())
+        assertEquals(16, measure(cutout = 16))
+        Settings.Secure.putInt(activity.contentResolver, "hide_navigationbar_enable", 1)
+        assertEquals(0, measure(mandatory = 48))
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
         assertEquals(48, measure())
     }
@@ -174,6 +179,18 @@ class FixedKeyboardBottomInsetTest {
         // 贴底关着不猜。
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
         assertEquals(48, fixedKeyboardBottomInsetPx(reported, activity.window, 48))
+    }
+
+    @Test fun nothingToPressMeansNoButtonsAndNotAThreeButtonBar() {
+        // 手势条 16dp，什么都没报成可点：贴到底。
+        assertEquals(true, nothingToPressAtBottom(tappablePx = 0, navButtonsPx = 0, navPx = 42, mandatoryPx = 42, density = 2.625f))
+        // 48dp 框里只报了手势条那段强制手势区：贴到底。
+        assertEquals(true, nothingToPressAtBottom(tappablePx = 0, navButtonsPx = 0, navPx = 126, mandatoryPx = 63, density = 2.625f))
+        // 系统报了可点区域，或本窗口里画了返回/切换输入法按钮：留着。
+        assertEquals(false, nothingToPressAtBottom(tappablePx = 126, navButtonsPx = 0, navPx = 126, mandatoryPx = 63, density = 2.625f))
+        assertEquals(false, nothingToPressAtBottom(tappablePx = 0, navButtonsPx = 126, navPx = 126, mandatoryPx = 63, density = 2.625f))
+        // 整条 48dp 都是强制手势区：三键导航的样子，可点区域没报也留着。
+        assertEquals(false, nothingToPressAtBottom(tappablePx = 0, navButtonsPx = 0, navPx = 126, mandatoryPx = 126, density = 2.625f))
     }
 
     @Test fun windowGapIgnoresOnePixelRounding() {

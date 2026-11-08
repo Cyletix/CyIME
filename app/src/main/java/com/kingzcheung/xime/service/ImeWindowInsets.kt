@@ -199,6 +199,15 @@ internal fun insetsShowGestureNavigation(navPx: Int, mandatoryPx: Int, tappableP
     mandatoryPx > 0 && mandatoryPx <= (GESTURE_ZONE_MAX_DP * density).roundToInt() &&
         navPx - mandatoryPx >= (4 * density).roundToInt() && tappablePx < navPx
 
+/**
+ * 贴底时底下有没有能按的东西（11-08「别让我看到底下有缝」）：系统报的可点区域是 0、本窗口里也没画输入法按钮，
+ * 底下就只是手势条或空白，键盘可以贴到底，不管 navigation_mode 写的是什么（有的厂商手势导航时仍写 0）。
+ * 整条导航栏都是强制手势区、又高过手势条上限，是三键导航的样子，不算。
+ */
+internal fun nothingToPressAtBottom(tappablePx: Int, navButtonsPx: Int, navPx: Int, mandatoryPx: Int, density: Float): Boolean =
+    tappablePx <= 0 && navButtonsPx <= 0 &&
+        !(navPx > (GESTURE_ZONE_MAX_DP * density).roundToInt() && mandatoryPx >= navPx)
+
 /** 系统的手势条高度：手势导航时 navigation_bar_height 是手势条那一小条，限制在 [GESTURE_BAR_MAX_DP] 内。 */
 private fun gestureBarHeightPx(context: Context, hintHidden: Boolean): Int {
     val max = ((if (hintHidden) GESTURE_HINT_HIDDEN_DP else GESTURE_BAR_MAX_DP) *
@@ -299,7 +308,8 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     val density = context.resources.displayMetrics.density
     val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null ||
         (edge && (navBarResourceShowsGestureBar(systemNavBarHeightPx(context), normalPx, density) ||
-            insetsShowGestureNavigation(navInset, mandatory, tappable, density)))
+            insetsShowGestureNavigation(navInset, mandatory, tappable, density) ||
+            nothingToPressAtBottom(tappable, navButtons, navInset, mandatory, density)))
     if (!gesture) return safe
     if (edge) return maxOf(cutout, navButtons)
     if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&
