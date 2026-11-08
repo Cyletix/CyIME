@@ -91,9 +91,9 @@ object HandwritingContribution {
 
     fun resetUploaded(context: Context) = setUploadedLines(context, 0)
 
-    /** 自用包里「手写训练」一页两用：记住上次停在贡献题还是训练题库，下次进来接着写。 */
+    /** 自用包里「手写训练」一页两用：记住上次停在贡献题还是训练题库，下次进来接着写；第一次进来是贡献题（写完能直接上传）。 */
     fun lastOpened(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("last_opened", false)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("last_opened", true)
 
     fun setLastOpened(context: Context, contribute: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("last_opened", contribute).apply()
@@ -102,41 +102,61 @@ object HandwritingContribution {
     /** 上传结果：[count] 是这次传了几条；没有新样本时为 0。 */
     data class UploadResult(val count: Int)
 
+    /** 实际请求的地址；单元测试换成本机服务器。 */
+    internal var endpoint: String = UPLOAD_URL
+
+    /** 一次请求最多传这么多条：接收端一次最多收 1000 条，写得多的人分几次传。 */
+    internal const val UPLOAD_CHUNK_LINES = 300
+
     /**
-     * 把样本文件里还没上传过的行 gzip 后上传。在 IO 线程调用。
-     * 接收端返回 2xx 才记为已上传；失败抛异常，下次再传还是这些行。
+     * 把样本文件里还没上传过的行 gzip 后分批上传。在 IO 线程调用。
+     * 每批接收端确认后就记下已上传到哪一行；中途失败抛异常，已确认的批次不会重传，下次从没传的接着传。
      */
     fun upload(context: Context, samples: File, appVersion: String): UploadResult {
         check(uploadAvailable()) { "还不能上传" }
         check(consented(context)) { "还没同意" }
         val lines = if (samples.isFile) samples.readLines(Charsets.UTF_8).filter { it.isNotBlank() } else emptyList()
-        val done = uploadedLines(context).coerceIn(0, lines.size)
-        val fresh = lines.drop(done)
-        if (fresh.isEmpty()) return UploadResult(0)
-        val body = gzip(fresh.joinToString("\n", postfix = "\n", transform = ::licensedSample).toByteArray(Charsets.UTF_8))
+        var done = uploadedLines(context).coerceIn(0, lines.size)
+        val start = done
+        while (done < lines.size) {
+            val batch = lines.subList(done, minOf(lines.size, done + UPLOAD_CHUNK_LINES))
+            post(context, batch, appVersion)
+            done += batch.size
+            setUploadedLines(context, done)
+        }
+        return UploadResult(done - start)
+    }
+
+    private fun post(context: Context, batch: List<String>, appVersion: String) {
+        val body = gzip(batch.joinToString("\n", postfix = "\n", transform = ::licensedSample).toByteArray(Charsets.UTF_8))
         check(body.size <= MAX_UPLOAD_BYTES) { "样本太多，请先分享文件" }
-        val request = Request.Builder().url(UPLOAD_URL)
+        val request = Request.Builder().url(endpoint)
             .header("User-Agent", "CyIME/$appVersion")
             .header("X-CyIME-Writer", writerId(context))
             .header("X-CyIME-Format", "${TrainingSampleCodec.FORMAT}/${TrainingSampleCodec.VERSION}")
             .post(body.toRequestBody("application/gzip".toMediaType()))
             .build()
-        client.newCall(request).execute().use { response ->
-            val receipt = runCatching { JSONObject(response.body.string()) }.getOrNull()
-            if (!response.isSuccessful || receipt?.optBoolean("ok") != true || receipt.optInt("count", -1) != fresh.size) {
-                throw IllegalStateException(receipt?.optString("error")?.takeIf { it.isNotBlank() }
-                    ?: "上传未获确认（${response.code}）")
+        val response = try {
+            client.newCall(request).execute()
+        } catch (e: java.io.InterruptedIOException) {
+            // 魔搭创空间闲置会休眠，第一次请求要等它醒
+            throw IllegalStateException("服务器在启动，过一分钟再点上传", e)
+        }
+        response.use {
+            val receipt = runCatching { JSONObject(it.body.string()) }.getOrNull()
+            if (!it.isSuccessful || receipt?.optBoolean("ok") != true || receipt.optInt("count", -1) != batch.size) {
+                throw IllegalStateException(receipt?.optString("error")?.takeIf { e -> e.isNotBlank() }
+                    ?: "上传未获确认（${it.code}）")
             }
         }
-        setUploadedLines(context, lines.size)
-        return UploadResult(fresh.size)
     }
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            // 休眠的创空间醒来要几十秒
+            .readTimeout(90, TimeUnit.SECONDS)
             .build()
     }
 

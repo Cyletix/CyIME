@@ -3,6 +3,7 @@ package com.kingzcheung.xime.ui.render
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -62,6 +63,19 @@ class HandwritingTrainingMergeTest {
         rule.waitForIdle()
         rule.onNodeWithText("贡献手写样本").assertExists()
         rule.onNodeWithContentDescription("切换题库").assertDoesNotExist()
+    }
+
+    @Test fun contributeShowsHowToAndUploadButtonUpFront() {
+        rule.setContent { MaterialTheme { HandwritingTrainingScreen(onBack = {}, contribute = true, devTools = false) } }
+        rule.waitForIdle()
+        // 不用翻右上角菜单：顶栏下面一行说怎么写，右边就是「上传」，还没写时不能点
+        rule.onNodeWithTag("contribute-status").assertExists()
+        rule.onNodeWithText("照着上面的字写在框里", substring = true).assertExists()
+        rule.onNodeWithTag("contribute-upload").assertIsNotEnabled()
+    }
+
+    @Test fun firstOpenOfTrainingEntryLandsOnContribute() {
+        assertTrue(HandwritingContribution.lastOpened(context))
     }
 
     @Test fun bankMenuSwitchesBetweenTrainingAndContribute() {

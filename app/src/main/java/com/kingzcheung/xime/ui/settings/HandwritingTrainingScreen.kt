@@ -501,7 +501,7 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
         store.setPosition(s.bank, index)
         _state.update { it.copy(index = index) }
         if (wrapped) _events.tryEmit(TrainingEvent.Message(
-            if (contribute) "全部写完了，可以在右上角分享或上传" else "这一组写完一轮了，从头再来"))
+            if (contribute) "全部写完了，点上方「上传」交给作者" else "这一组写完一轮了，从头再来"))
     }
 
     fun importFormulaCsv(uri: Uri) {
@@ -657,9 +657,18 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
                 FileLogger.e(TRAINING_TAG, "upload failed", e)
                 _events.emit(TrainingEvent.Message("上传失败：${e.message}，可以改用分享"))
             } finally {
-                _state.update { it.copy(uploading = false) }
+                // 分批上传中途失败时，已确认的批次也算传了
+                _state.update { it.copy(uploading = false, uploaded = HandwritingContribution.uploadedLines(app)) }
             }
         }
+    }
+
+    /** 外置题库没装（题库文件不在、也没导入过公式）：菜单里标出来。 */
+    fun bankMissing(bank: TrainingBank): Boolean {
+        val asset = assetFor(bank) ?: return false
+        if (bank == TrainingBank.MathFormula && formulaBank.isNotEmpty()) return false
+        if (!assetBanks[asset].isNullOrEmpty()) return false
+        return !java.io.File(PromptBankFile.dir(getApplication()), asset.fileName).isFile
     }
 
     fun clearSamples() {
@@ -839,6 +848,7 @@ private fun HandwritingTrainingBody(
                             CompactMenuRow(
                                 label = bank.title,
                                 selected = !contribute && bank == state.bank,
+                                supportingText = if (viewModel.bankMissing(bank)) "题库没装" else null,
                                 onClick = {
                                     bankMenuOpen = false
                                     if (contribute) onSwitch(bank) else viewModel.selectBank(bank)
@@ -859,7 +869,9 @@ private fun HandwritingTrainingBody(
                 }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = if (state.prompts.isEmpty()) "已存 ${state.totalSamples}"
+                    // 贡献题的条数写在下面那一行，这里只留第几题
+                    text = if (contribute && state.prompts.isNotEmpty()) "${state.index + 1}/${state.prompts.size}"
+                    else if (state.prompts.isEmpty()) "已存 ${state.totalSamples}"
                     else "${state.index + 1}/${state.prompts.size} · 已存 ${state.totalSamples}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -869,11 +881,7 @@ private fun HandwritingTrainingBody(
                         Icon(Icons.Filled.MoreVert, contentDescription = "更多")
                     }
                     if (contribute) CompactDropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                        val pending = (state.totalSamples - state.uploaded).coerceAtLeast(0)
-                        if (HandwritingContribution.uploadAvailable()) CompactMenuRow(
-                            label = if (state.uploading) "正在上传…" else "上传($pending 条未传)", icon = Icons.Filled.CloudUpload,
-                            onClick = { moreMenu = false; withConsent { viewModel.upload() } },
-                        )
+                        // 上传在顶栏下面那一行，这里只放分享、导出和清空
                         CompactMenuRow(
                             label = "分享样本文件", icon = Icons.Filled.IosShare,
                             onClick = { moreMenu = false; withConsent { viewModel.export(share = true) } },
@@ -934,6 +942,16 @@ private fun HandwritingTrainingBody(
                 }
             }
 
+            // 贡献题：顶栏下面一行说清楚怎么写、写了多少、点哪里上传，不用翻右上角菜单
+            if (contribute) ContributeStatusRow(
+                total = state.totalSamples,
+                pending = (state.totalSamples - state.uploaded).coerceAtLeast(0),
+                uploading = state.uploading,
+                canUpload = HandwritingContribution.uploadAvailable(),
+                onUpload = { withConsent { viewModel.upload() } },
+                onShare = { withConsent { viewModel.export(share = true) } },
+            )
+
             // 题目区：长题（推导、长句）加高；提示在题目下方单独一行，不压到画板
             val prompt = state.current
             val long = prompt?.long == true
@@ -955,14 +973,15 @@ private fun HandwritingTrainingBody(
                         }) { Text("导入 CSV(file_name,LaTeX)") }
                     }
                     prompt == null && state.bank.isExternal() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("这个分类的题库文件还没放到平板上", fontSize = 16.sp)
+                        Text("这个题库没装", fontSize = 16.sp)
                         Text(
-                            "电脑上运行 tools/handwriting_training/build_banks.py --push 会自动放好，也可以手动导入",
+                            "题库太大不放进安装包。电脑上生成题库文件(.tsv)传到手机后，点下面选它；不需要的话换别的题库就行",
                             fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(6.dp))
-                        OutlinedButton(onClick = { bankLauncher.launch(arrayOf("*/*")) }) { Text("导入题库文件(.tsv)") }
+                        OutlinedButton(onClick = { bankLauncher.launch(arrayOf("*/*")) }) { Text("选择题库文件") }
                     }
                     prompt == null && state.bank == TrainingBank.Missed -> Text(
                         "还没有认错的字。写汉字时会自动识别，认错又跳过的字会放到这里",
@@ -1380,4 +1399,46 @@ private fun katexHtml(latex: String, color: String): String {
           if(document.fonts)document.fonts.ready.then(fit);
         </script></body></html>
     """.trimIndent()
+}
+
+/**
+ * 贡献题顶栏下面的一行：没写时告诉人怎么写；写了以后显示写了几条、几条没上传，右边是「上传」。
+ * 接收端不可用时右边换成「分享」（发文件给作者）。
+ */
+@Composable
+private fun ContributeStatusRow(
+    total: Int,
+    pending: Int,
+    uploading: Boolean,
+    canUpload: Boolean,
+    onUpload: () -> Unit,
+    onShare: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp).testTag("contribute-status"),
+    ) {
+        Text(
+            text = when {
+                total == 0 -> "照着上面的字写在框里，点「下一题」保存。写几题就能上传"
+                pending == 0 -> "已写 $total 条，都已上传"
+                else -> "已写 $total 条，$pending 条还没上传"
+            },
+            fontSize = 13.sp,
+            lineHeight = 17.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (canUpload) Button(
+            onClick = onUpload,
+            enabled = pending > 0 && !uploading,
+            modifier = Modifier.padding(start = 8.dp).testTag("contribute-upload"),
+        ) {
+            Icon(Icons.Filled.CloudUpload, contentDescription = null, modifier = Modifier.width(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (uploading) "上传中…" else "上传")
+        } else if (total > 0) OutlinedButton(onClick = onShare, modifier = Modifier.padding(start = 8.dp)) {
+            Text("分享")
+        }
+    }
 }
