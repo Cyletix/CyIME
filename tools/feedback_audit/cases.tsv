@@ -1,0 +1,67 @@
+id	topic	expectation	tests	probe	remaining
+k70	Redmi K70 中间退格	甲乙|丙丁按退格应成甲|丙丁；有组词时只退编码，选区及 emoji 另测。	EditorDeleteAuditTest,DeletionTargetTest,BackspaceCompositionTest,EditorReadCapabilityTest,DistanceDeleteGestureTest	-	本机实际退格方法与 Android 编辑框覆盖光标中间、两端和选区；Redmi K70 的 API 36 宿主仍未复现。
+honor	荣耀候选和设置一起失灵	候选回弹中点击、动作异常后再输入，随后打开设置及切换回来应继续响应。	CandidateTapStuckOverscrollTest,InputCommandQueueTest,KeyboardInputSessionTest	-	模型、系统版本和全窗口失去响应时的事件记录待取得。
+api	API 版本与编辑器能力	读取真实运行版本，在旧系统、拒读或重连的编辑框回退，保留当前光标。	EditorCursorTest,EditorReadCapabilityTest	api	构建版本与运行系统分开核对；厂商输入框实测缺失。
+stroke	笔画连打「笔画」	3143143115 接 12512152，连续、分词及一笔替换 * 均应出词；单字照常，另记前三笔简打。	StrokeSchemaBundleTest	stroke	全笔顺、通配及简打分别报告；反馈者未给逐键序列。
+calc	#217 计算器候选	在前后有正文的算式选结果或等式，保留两侧正文；光标移走或拒写就保留原文。	CalculatorCandidateCommitTest	-	vivo X60 长算式候选的视觉宽度尚未复核。
+deploy	部署并启用的方案和布局	在键盘运行时部署并启用另一方案，键盘面板立即能选；不切当前方案、保留原绑定。	SchemaForLayoutTest,SchemaListBlockTest	-	需要贯通部署通知和已打开的面板。
+language	语言菜单折叠	核对设置页与键盘长按弹层初始条数；展开能选末项，重进保留启用项与排序。	LanguageMenuSelectionTest,LanguageRowsTest	-	滚动选中末项不能证明初始已折叠。
+english9	独立英文九键	在英文布局列表选九键再用 43556 打 hello；中文九键原有混输须保留。	ReportedBehaviorTest.independentEnglishOffersNineKeys,SchemaForLayoutTest	-	入口成功后仍须验证英文整词。
+theme-focus	主题与外观试打后跳焦点	记录首个可见设置项、偏移和焦点，试打、收键盘、返回后均与试打前相同。	ThemeTrialAuditTest	-	在本机渲染真实主题页，系统返回手势、真实 IME 避让与焦点仍须设备验收。
+motion	动态背景放大与缩小	每帧记录尺度，所选方向一直走到周期边界，渐变回起点；平移、轮播、省电照旧。	ReportedBehaviorTest.zoomInKeepsItsDirectionUntilLoopBoundary,ReportedBehaviorTest.zoomOutKeepsItsDirectionUntilLoopBoundary,KeyboardBackgroundMotionTest	-	方向断言与旧测独立；交叠渐变还须渲染核对。
+cancel	取消键和过期联想 #209	上屏后点叉，延迟送回旧预测，候选仍空；组词、手写、英文按各自取消规则。	AssociationHideButtonTest,LatestPredictionTest,CandidateBarFeedbackTest	-	原报告设备偶发漏点待复现。
+edge-feedback	候选栏左右按钮按住反馈	开关两态；左右分别按住、移出、取消、松开，高亮退回且回调次数正确。	CandidateBarFeedbackTest.optionalHighlightShowsWhileHoldingEitherEdgeAndClearsOnCancel	-	已按压渲染，待用户感受透明度。
+cell-rank	分类词库专有词名次	同一拼音记录关、开、再关的目标名次，常用首选与个人学词都保留；同协议比较耗时。	CellWordUpdatesTest	-	词包包含词条只代表收录，缺开关成对首选与速度结果。
+game-dict	明日方舟等词库停用及移除	启用应有专有词；关闭、应用、重启、再部署后不再由该库产生，个人学词保留。	CellWordUpdatesTest,PersonalDictManagerTest	-	分别验证词包、设备上旧合并表、删除内置资源三种情况。
+accents	26 键长按拼音变音	打开选项长按 a 可选 āáǎà；普通短按只出 a，关闭选项及其他键原操作不变。	LetterLongPressMenuTest,LongPressChoiceTest	accents	开关和选项路由不证明变音表完整。
+gesture	长按、滑行、角标动作互斥	同一手势只提交一次；垂直划角标、横跨键滑词、按住选变体、取消后再打普通字。	GlideCornerHintTest,T9GlideInputTest,LongPressChoiceTest	-	实测覆盖的轨迹见用例，切布局中途及系统取消仍需复验。
+glide	滑行准确率	分语言与布局以标注轨迹比较目标词 top1、top3 及误提交；短轨迹与交叉轨迹另看。	GlideDecoderTest,T9GlideTest	-	合成轨迹可以复跑；缺经同意且有目标词的真实轨迹集。
+glide-optin	自愿上传 ModelScope	默认关闭时零上传；显式同意仅发练习轨迹和目标词；撤回后取消排队，普通正文不入样本。	-	-	缺滑行贡献端到端与假传输测试；排查不上传样本。
+glide-desktop	电脑自动处理滑行样本	离线启动、包含重复样本、断点重试后有效数据各处理一次，写出命中与去重报告。	-	-	缺滑行专用消费任务与测试数据。
+english-comment-completion	手机版 B 站评论框英文补全重复和光标跳动	输入 a 选 and、输入 t 选 the 后继续输入，句中保留两侧文字，缩写能替换原词。	EnglishCompletionEditorTest,AssociationSelectionTest,EnglishAutoSpaceTest	-	平板独立输入框可用 --input-checks completion 复测；手机版 B 站待验收。
+english-dict	导入英文词库在独立英文键盘补全	导入独有词，启用后键入前缀应可选，停用后消失；原英文补全照常。	ImportedEnglishAuditTest,CellDictionaryTest,TxtCellDictionaryTest,EnglishLiteralInputTest	-	平板隔离输入测试验证独有词启用、停用和原有补全；日常版待更新。
+apk	安装包与安装占用	分普通包和含模型包统计 ZIP 条目，区分 APK、安装和额外下载；同口径比较。	-	apk	缺同设备 Gboard 的等价测量。
+dict-formats	万象、雾凇词表导入	带调拼音及 Rime 表头、重复、无编码词分别导入；核实新增词、关闭前后及排序。	TxtCellDictionaryTest,RimeFileImportTest	-	缺指定上游词表版本与加载后质量对照。
+model	自训候选模型收益	相同语料、词库、初始学词状态，比较开关模型的逐键首选、目标名次、停顿与耗时。	-	model	重算 11 月 5 日存档的两份模型结果；仍需对用户当前模型、当前改动及分类词库的质量与速度另行比较。
+wubi	五笔拼音反查	每个内置五笔方案经软键盘输入反查前缀再输入拼音，候选标五笔码并能上屏。	-	wubi	资源声明只证明配置，尚缺软键盘输入前缀和提交结果。
+shape23	形码次选和三选（后排）	选第二、三项提交相应候选；候选不足时以及原编码键的行为保持。	-	-	待设计键位及开关。
+spanish	西班牙语语音（后排）	选择西语，识别 hola 并保持语言；无合适模型时给出提示。	SpeechLanguagesTest	-	语言边界用例不证明有可用西语识别器。
+right-close	右侧按钮改收键盘（待定）	默认仍能展开；选收键盘后，另一个可发现的入口能进入展开候选。	CandidateBarFeedbackTest	-	替代入口未定。
+caps	找不到英文句首大写	从设置搜索进入开关；开启在空框和句末后自动大写，关闭保持小写，手动 Shift 可用。	ReportedBehaviorTest.sentenceCapitalizationIsFindable,KeyboardShiftStateTest,EnglishLiteralInputTest.sentenceCapsHonorsParagraphResponsesWithoutRequestingWordCapitalization,GlidePairCorrectionTest	-	平板实际设置开关及 Android 文本框已验证；日常版待更新。
+bottom-punctuation	底排副标点固定上滑	点按输入主标点，上滑输入副标点，反转全局方向和长按模式也可上滑；关闭开关恢复原方向。	SymbolInputModeTest,QwertyRowOptionsTest	-	平板隔离窗口验证点按、上滑、长按、反向设置和逗号键分词；日常版待更新。
+symbol	符号音效振动	在符号面板点标点触发一次反馈，取消和滚动不误触，尊重音效和振动偏好。	SymbolSelectionFeedbackTest,FeedbackManagerTest	-	音频与触感在具体硬件的效果待验。
+gloss	download 后显示卸载	装有旧 v12 的候选释义中 download 是下载、uninstall 是卸载、update 是更新；简繁反查及私有覆盖分别查。	CandidateGlossaryTest	-	用户原现场未复现；需确认实际出现于释义还是下一个联想词。
+t9-compass	九键长按气泡或罗盘字母直接上屏	空闲长按 ABC 选 B，应观察正文、编码及提交次数；有待组词时单独核对气泡和罗盘。	T9LetterFlickJoinTest,T9GlideInputTest	-	现有测试含拂动与普通按键；不能推断长按两种样式的上屏结果。
+dictation-restart	听写中断或光标跳到开头	宿主重开同一输入框时，从已有听写末尾继续；用户移动光标或改动内容时保护正文。	VoiceHostRestartTest,VoiceRecognitionHandlerFinishTest	-	原反馈宿主长时间听写中断仍未真机验收。
+duck	语音压低外放音量	持续播放时冷启动开麦立即压低，模型就绪前松手、取消和热启动都恢复原档；关闭设置照常。	RecordingAudioOwnerTest,VoiceAudioFocusTest	voice	缺反馈播放器和系统音量策略的整机复现。
+glass	图片玻璃键键面相同或竖纹	同图同布局逐键比较玻璃开关和取样错位，九个键心各透出原位置，边缘仍能折射。	CustomImageGlassTest,FrostedKeyColorsTest	glass	归档只覆盖自选图片及该玻璃样式；其他样式、厂商 GPU 分开验。
+gap	底部留白横竖屏独立	从同一旧值分别调整、旋转再读、恢复一边；另一边数值与底排点击不变。	KeyboardBottomEdgeRenderTest.landscapeCalibrationChangesOnlyTheLandscapeGap,KeyboardBottomEdgeRenderTest.bottomGapCanBeRecoveredWithTheKeyboardClosed,KeyboardBottomEdgeRenderTest.aShortFixedKeyboardMovesDownWithoutShrinkingKeysAndEnterStillWorks,ResizeOpacityPanelRenderTest.draggingThePaddingHintUsesTheBottomHandleGesture,KeyboardResizeGeometryTest.fixedWidthAndPositionPreserveBottomInsetsAcrossHostHeights,ImeBottomSpaceTest,FixedKeyboardBottomInsetTest,FixedKeyboardScreenTest	-	已覆盖方向校准、系统栏与旧配置，其他窗口尺寸待验。
+shift-line	悬浮旋转时 Shift 拖线错位并显示两条	拖向字母再拖向第二候选；检查单线、落点、松手清除，普通与分体继续可选。	RotatedShiftDragTest,ShiftSlideTargetsTest	shift	旧新轨迹归档为独立显示区；用户截图转角未给。
+floating-lock	悬浮短横条锁定和解锁	短横条按满一秒锁定或解锁，提前松手退回、拖动不误锁，锁后不移动或缩放；旋转后同一入口可解锁。	FloatingRotationRenderTest,FloatingRotationTest,FloatingCornerResizeTest	-	描边方向、宽度和图标渐变由平板脚本实测。
+float-presets	多套悬浮预案（后排）	两套几何与旋转分别保存，切换、重启和旋屏后能恢复预期位置。	-	-	待定义预案与横竖屏的关系。
+clip	剪贴板长按拖动调序	把收藏跨过内置文本，重开设置及键盘后顺序相同；拖动取消、改名删除、开关和长列表仍可用。	ClipboardGroupsTest,ClipboardGroupKeepTest	clipboard	归档包含用户所指跨类型拖动，当前整机未重跑。
+pr241	#241 拼音中间编辑	移到分隔符两侧插删字母，后半段、分隔符和编辑位置应保留。	PinyinEditBufferTest	-	编辑模型外的滑动手势与宿主组合待验。
+pr238	#238 双拼锁屏恢复	同编辑框锁屏解锁保留组词，切至其他编辑框不重放旧内容。	InlineCompositionRestartTest	-	缺真正锁屏恢复的完整序列。
+pr239	#239 展开候选保持与九键滑删	刷新时留在展开页，滑删结束和取消后可正常折叠、选词。	T9GlideInputTest,ExpandedCandidatePagerTest	-	组词刷新与展开面板的集成路径另验。
+pr234	#234 逐字删除中文滑行	默认原行为，打开后逐音节回删；非滑行文本照常。	ChineseGlideDeleteHistoryTest	-	设置开关到整机输入待验。
+pr240	#240 滑动清空时跳过联想	默认先收联想；打开才清指定范围，组词状态不误删正文。	DeletionTargetTest	-	整段清空与撤销另验。
+pr232	#232 菜单就地编辑	编辑后仍可收键盘、进固定设置入口；用户可恢复原菜单。	-	-	未合并提案，需在其改动上跑验收。
+pr235	#235 滑行样式选择	原气泡仍可选，实时预览开关独立，升级保留双拼显示。	GlideCornerHintTest	-	当前分支的回归不代表提案通过审查。
+pr236	#236 撤销清空恢复组词	模拟引擎恢复失败后重试，正文只回写一次，恢复组词可选。	-	-	待提案解决部分成功时的重试。
+pr237	#237 纠错音节重排	关闭时顺序原样，开启才重排，记录同协议质量与延迟。	-	-	待提案具备双态对照。
+gh214	#214 九键 9464	滑过 9464 后分别查 xing、ying 音节和候选；点按同码作对照。	T9GlideTest	-	当前 C++ 音节表用 9464 实测同时列 xing 与 ying；从手指轨迹到面板选词仍待核。
+gh221	#221 / #222 S25 Ultra 黑底	渐变主题启毛玻璃、关底部圆角，在手势导航拍摄导航区；对照开圆角与关玻璃。	ImeBottomSpaceTest	-	内边距断言不能验证三星导航栏色彩。
+gh228	#228 横屏九键录屏	按录屏复现两处异常，记录手势、布局与目标控件；同输入在竖屏复核。	-	-	原录屏 20.9 秒在悬浮菜单，23.3 秒起键盘居中、两侧及底部变黑，28.4 秒遮挡仍在；首段键盘收起与重开的具体预期未给。
+gh229	#229 K80 Ultra 微信 14 键	在微信编辑框用同一组 14 键逐键记录编码、候选、选择及正文。	FourteenKeyInputTest,MergedLetterInputTest,InlineCompositionRestartTest	-	平板引擎已复现中间移光标出现大写原码；修后拼音完整，前缀候选保持一致。原机微信待验收。
+gh230	#230 K80 Ultra 小米备忘录 14 键	移动光标、编辑框丢失组合标记后继续打字和选词，应只替换原拼音并保留前后正文。	FourteenKeyInputTest,LostInlineSpanTest,InlineCompositionRestartTest	-	平板编辑框已复现重复，修后续打和选词只替换一份。原机备忘录待验收。
+gh249	#249 Termius SSH 中文	终端可手动切中文，普通登录密码、PIN 和其他应用相同参数的输入框仍保留密码策略。	EditorSessionInputPolicyTest,EditorInfoClassifierTest,InputPrivacyTest,TerminalEditorTest	-	平板用反馈中的窗口参数完成修前修后对照；原应用内的 SSH 会话待验收。
+gh233	#233 华为安装证书	按反馈 APK 哈希与签名、设备已有签名和安装错误码比对。	-	-	缺反馈 APK 或哈希、签名及系统错误码。
+split-v	分体布局字母 V 对齐	分别选择 S/Z 对齐及原对齐，看左右 V、上下三排和触摸落点。	-	-	缺两套对齐配置的逐键渲染断言。
+ink-symbol	手写符号后预览消失	写符号后立刻写汉字，笔迹预览和候选应可见，无须重拉键盘。	HandwritingInputSessionTest	-	需符号后第二次书写的跨面板复现。
+mode-flash	26 键切字母或数字闪屏	逐帧检查切换期间无空白背景，第一键仍能输入。	KeyboardModeNavigationTest	-	导航状态不能证明过渡帧无闪烁。
+glass-off	关玻璃时工具栏和键盘背景分割	取连续图片跨栏区，关闭玻璃后测两侧图像连续性，开启作为对照。	CustomImageGlassTest	-	需关玻璃的跨工具栏边界像素样本。
+delivery	并装输入法、覆盖日常版及升号	离线检查本轮审核入口、上次安装回执及已交付 APK 身份；本次只在电脑运行。	-	apk	当前设备留给用户，实时设备状态沿用最后回执。
+footer	悬浮键盘底部短横条与手机留白	短横条、锁和渐变的可见笔画在末排键帽下沿和卡片底边之间居中；手机底栏紧凑，底排可点、拖条可拖。	KeyboardBottomEdgeRenderTest.floatingDragBarLeavesTheBottomRowTappableAtItsLowerEdge,KeyboardBottomEdgeRenderTest.floatingDragIndicatorSitsMidwayBelowTheKeysOnTablet,FloatingCornerResizeTest,FloatingRotationTest,FloatingDockGestureTest	-	电脑检查三种主布局；另见平板独立显示区对照。
+speech-model-menu	语音模型选择菜单	模型的下载和重试在该行右侧，下载和选择独立，窄屏大字可以滚动。	SpeechModelPickerTest	-	实际模型传输沿用现有下载器。
+toolbar-width	候选栏右端对齐	手机宽度下收起与展开共享触点，宽键盘的空闲工具按用户的按钮数拉开。	CandidateBarFeedbackTest.narrowBarSharesEdgeTargetsAndWideToolbarStillSpreadsWithCustomActions	-	按键盘实际宽度核对。
+layout-menu	布局管理与键盘切换栏	已部署的布局可以按语言显示、隐藏和排序，恢复或新增布局后仍有可用入口，原方案匹配关系保留。	LayoutMenuPreferencesTest,SchemaForLayoutTest,CustomKeyboardLayoutTest,SettingsSearchTest.layoutManagementIsReachableWithThePreviousName	-	平板入口 --menu-checks layouts 从键盘齿轮操作实际管理页。

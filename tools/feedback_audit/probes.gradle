@@ -1,0 +1,15 @@
+// These acceptance probes belong only to the feedback audit. Keep normal test/build inputs unchanged.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.plugins.withId('com.android.application') {
+            project.android.sourceSets.test.java.srcDir(new File(project.rootDir, 'tools/feedback_audit/probes'))
+            project.tasks.withType(Test).configureEach {
+                if (name == 'testDebugUnitTest') {
+                    // Keep one class's Android process, DB jobs and singleton state out of the next.
+                    forkEvery = 1
+                    maxParallelForks = 1
+                }
+            }
+        }
+    }
+}
