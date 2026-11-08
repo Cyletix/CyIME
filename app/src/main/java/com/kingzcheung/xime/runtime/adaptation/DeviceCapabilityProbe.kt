@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.SystemClock
 import java.io.File
 import java.io.IOException
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** Shared static facts for first-run defaults and runtime observation; no model/UI decisions. */
 internal object DeviceCapabilityProbe {
@@ -14,7 +15,7 @@ internal object DeviceCapabilityProbe {
         val manager = safe { context.getSystemService(ActivityManager::class.java) }
         val memory = safe { manager?.let { ActivityManager.MemoryInfo().also(it::getMemoryInfo).totalMem.takeIf { bytes -> bytes > 0 } } }
         return DeviceCapabilities(
-            SystemClock.elapsedRealtime(), Build.VERSION.SDK_INT, Build.SUPPORTED_ABIS.toList(),
+            SystemClock.elapsedRealtime(), AndroidPlatform.sdk, Build.SUPPORTED_ABIS.toList(),
             safe { manager?.isLowRamDevice }, memory,
             safe { Runtime.getRuntime().availableProcessors().takeIf { it > 0 } },
             readMaxCpuKHz(File("/sys/devices/system/cpu")),

@@ -1,10 +1,10 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import android.content.Context
-import android.os.Build
 import android.util.DisplayMetrics
 import android.view.Display
 import android.view.WindowManager
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** Both service sizing and the Compose docking preview read the same physical display. */
 internal fun keyboardPhysicalMetrics(
@@ -26,7 +26,7 @@ private object KeyboardDisplayMetricsCache {
     @Synchronized
     @Suppress("DEPRECATION") // Read physical dpi only, never use full-display bounds to size the keyboard.
     fun read(context: Context, attachedDisplay: Display?, density: Float): KeyboardPhysicalMetrics? = runCatching {
-        val display = attachedDisplay ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) context.display
+        val display = attachedDisplay ?: if (AndroidPlatform.windowMetrics) context.display
             else context.getSystemService(WindowManager::class.java)?.defaultDisplay
         if (display == null || !display.isValid) return@runCatching null
         val resources = context.resources

@@ -1,6 +1,5 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import android.os.Build
 import android.util.Size
 import android.view.inputmethod.InlineSuggestion
 import android.widget.inline.InlineContentView
@@ -20,13 +19,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kingzcheung.xime.service.InlineSuggestionViews
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 @Composable
 fun InlineSuggestionView(
     suggestion: Any?,
     modifier: Modifier = Modifier,
 ) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    if (!AndroidPlatform.inlineSuggestions) return
 
     val realSuggestion = suggestion as? InlineSuggestion ?: return
     val context = LocalContext.current

@@ -114,6 +114,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -265,7 +266,7 @@ internal fun KeyboardResizeOverlay(
         val edgeExclusionHitPx = RESIZE_EDGE_HIT_DP * density.density
         val edgeExclusionHalfPx = minOf(frame.height, RESIZE_EDGE_GESTURE_EXCLUSION_DP * density.density) / 2f
         androidx.compose.runtime.DisposableEffect(hostView, frame, overlayOrigin, splitActive, editingOpacity) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            if (AndroidPlatform.gestureExclusion) {
                 val viewInWindow = IntArray(2).also { hostView.getLocationInWindow(it) }
                 val dx = overlayOrigin.x - viewInWindow[0]
                 val dy = overlayOrigin.y - viewInWindow[1]
@@ -278,7 +279,7 @@ internal fun KeyboardResizeOverlay(
                     }
             }
             onDispose {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+                if (AndroidPlatform.gestureExclusion)
                     hostView.systemGestureExclusionRects = emptyList()
             }
         }

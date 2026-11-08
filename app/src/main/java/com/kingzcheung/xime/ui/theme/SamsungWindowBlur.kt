@@ -6,6 +6,7 @@ import android.view.View
 import com.kingzcheung.xime.util.FileLogger
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** Optional One UI live-window blur. No capture, hidden-API exemption or system setting changes. */
 internal object SamsungWindowBlur {
@@ -16,7 +17,7 @@ internal object SamsungWindowBlur {
     )
 
     private val api: Api? by lazy {
-        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true) || Build.VERSION.SDK_INT < 31) null
+        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true) || !AndroidPlatform.windowBlur) null
         else runCatching {
             val info = Class.forName("android.view.SemBlurInfo")
             val builder = Class.forName("android.view.SemBlurInfo\$Builder")

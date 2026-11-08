@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.kingzcheung.xime.R
 import java.util.concurrent.Executor
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 进程内共享的 InlineSuggestion 视图缓存。
@@ -164,7 +165,7 @@ class InlineSuggestionManager(private val context: Context) {
     fun clear() {
         suggestions = emptyList()
         isAvailable = false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (AndroidPlatform.inlineSuggestions) {
             InlineSuggestionViews.releaseAll()
         }
     }

@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -24,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 data class LogViewerUiState(
     val logFiles: List<File> = emptyList(),
@@ -199,7 +199,7 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    if (AndroidPlatform.mediaStoreDownloads) {
                         val values = ContentValues().apply {
                             put(MediaStore.Downloads.DISPLAY_NAME, file.name)
                             put(MediaStore.Downloads.MIME_TYPE, "text/plain")

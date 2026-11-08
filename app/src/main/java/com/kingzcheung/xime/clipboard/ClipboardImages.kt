@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -24,6 +23,7 @@ import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * [source] is where a cached copy was read from (another app's clip, a screenshot); [sha256] is its
@@ -135,9 +135,9 @@ class ClipboardImages private constructor(private val context: Context) {
         }
     }
 
-    fun hasPhotoAccess(): Boolean = if (Build.VERSION.SDK_INT >= 33) {
+    fun hasPhotoAccess(): Boolean = if (AndroidPlatform.readMediaImages) {
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
-            (Build.VERSION.SDK_INT >= 34 && ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED)
+            (AndroidPlatform.partialPhotoAccess && ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED)
     } else ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
 
     fun enableRecentScreenshots(enabled: Boolean) {
@@ -330,7 +330,7 @@ class ClipboardImages private constructor(private val context: Context) {
 
     private fun queryRecentScreenshots(includeRecent: Boolean): List<ClipboardImage> {
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.Images.Media.RELATIVE_PATH else null
+        val pathColumn = if (AndroidPlatform.mediaStoreDownloads) MediaStore.Images.Media.RELATIVE_PATH else null
         val columns = listOfNotNull(MediaStore.Images.Media._ID, MediaStore.Images.Media.MIME_TYPE,
             MediaStore.Images.Media.DATE_ADDED, MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.BUCKET_DISPLAY_NAME, pathColumn).toTypedArray()

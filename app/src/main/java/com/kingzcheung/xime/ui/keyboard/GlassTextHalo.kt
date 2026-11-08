@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 没有键帽托着的字和图标（候选栏、工具栏、实体键盘浮条）背后垫的反色柔光托底。
@@ -35,7 +36,7 @@ internal val GLASS_HALO_CORE_RADIUS = 4.dp
 internal val GLASS_HALO_SOFT_RADIUS = 8.dp
 
 /** 托底只在 RenderEffect 可用时画（Android 12+，玻璃模糊本来也只在 12 以上）。 */
-internal fun glassHaloSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+internal fun glassHaloSupported(): Boolean = AndroidPlatform.renderEffect
 
 /**
  * 光晕颜色与文字阴影同一规则：取与文字反差更大的黑或白。

@@ -14,6 +14,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.kingzcheung.xime.util.PermissionHelper
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * Full-screen live captions for a hard-of-hearing reader: one row per speaker, newest speech at
@@ -47,7 +48,7 @@ class CaptionActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
         val radius = (glass.blurRadiusDp * resources.displayMetrics.density).toInt()
         if (radius <= 0) return
-        if (android.os.Build.VERSION.SDK_INT >= 31 && windowManager.isCrossWindowBlurEnabled) window.setBackgroundBlurRadius(radius)
+        if (AndroidPlatform.windowBlur && windowManager.isCrossWindowBlurEnabled) window.setBackgroundBlurRadius(radius)
         else if (com.kingzcheung.xime.ui.theme.SamsungWindowBlur.isAvailable)
             window.decorView.post { com.kingzcheung.xime.ui.theme.SamsungWindowBlur.apply(window.decorView, radius, 0f) }
     }

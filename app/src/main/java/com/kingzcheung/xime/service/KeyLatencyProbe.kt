@@ -1,6 +1,5 @@
 package com.kingzcheung.xime.service
 
-import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -8,6 +7,7 @@ import android.view.FrameMetrics
 import android.view.MotionEvent
 import android.view.ViewTreeObserver
 import android.view.Window
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 触摸到候选画完一帧的分段计时，默认关闭。
@@ -71,7 +71,7 @@ internal object KeyLatencyProbe {
             target.addOnFrameMetricsAvailableListener(frameListener, Handler(thread.looper))
             window = target
         }.onFailure { enabled = false; Log.w(TAG, "probe unavailable", it) }
-        Log.d(TAG, "probe on sdk=${Build.VERSION.SDK_INT}")
+        Log.d(TAG, "probe on sdk=${AndroidPlatform.sdk}")
     }
 
     private fun detach() {
@@ -88,7 +88,7 @@ internal object KeyLatencyProbe {
         val action = event.actionMasked
         if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP) return
         val received = System.nanoTime()
-        val eventNanos = if (Build.VERSION.SDK_INT >= 34) event.eventTimeNanos else event.eventTime * 1_000_000
+        val eventNanos = if (AndroidPlatform.motionEventNanos) event.eventTimeNanos else event.eventTime * 1_000_000
         synchronized(lock) {
             touchUp = action == MotionEvent.ACTION_UP
             touchEvent = eventNanos
@@ -177,7 +177,7 @@ internal object KeyLatencyProbe {
     private fun frame(metrics: FrameMetrics) {
         val vsync = metrics.getMetric(FrameMetrics.VSYNC_TIMESTAMP)
         val done = metrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP) + metrics.getMetric(FrameMetrics.TOTAL_DURATION)
-        val gpu = if (Build.VERSION.SDK_INT >= 31) metrics.getMetric(FrameMetrics.GPU_DURATION) else -1_000L
+        val gpu = if (AndroidPlatform.gpuFrameMetric) metrics.getMetric(FrameMetrics.GPU_DURATION) else -1_000L
         val lines = mutableListOf<String>()
         synchronized(lock) {
             val iterator = probes.iterator()

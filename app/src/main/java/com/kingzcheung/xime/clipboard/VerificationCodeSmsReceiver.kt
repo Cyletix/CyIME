@@ -6,7 +6,6 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.PersistableBundle
 import android.provider.Telephony
 import androidx.core.content.ContextCompat
@@ -22,10 +21,8 @@ class VerificationCodeSmsReceiver : BroadcastReceiver() {
         val body = Telephony.Sms.Intents.getMessagesFromIntent(intent).joinToString("") { it.messageBody.orEmpty() }
         val code = VerificationCodeExtractor.extract(body) ?: return
         val clip = ClipData.newPlainText(CLIP_LABEL, code)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            clip.description.extras = PersistableBundle().apply {
-                putBoolean("android.content.extra.IS_SENSITIVE", true)
-            }
+        clip.description.extras = PersistableBundle().apply {
+            putBoolean("android.content.extra.IS_SENSITIVE", true)
         }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         clipboard.setPrimaryClip(clip)

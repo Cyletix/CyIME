@@ -4,7 +4,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
@@ -14,6 +13,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 enum class ExportMode(val label: String) {
     CONFIG_ONLY("仅配置文件"),
@@ -123,7 +123,7 @@ object RimeExportManager {
 
     private fun saveToDownloads(context: Context, zipFile: File, fileName: String): Boolean {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (AndroidPlatform.mediaStoreDownloads) {
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, fileName)
                     put(MediaStore.Downloads.MIME_TYPE, "application/zip")
@@ -156,7 +156,7 @@ object RimeExportManager {
     }
 
     private fun resolveDownloadsUri(context: Context, fileName: String): Uri? {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (AndroidPlatform.mediaStoreDownloads) {
             val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
             val projection = arrayOf(MediaStore.Downloads._ID)
             val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"

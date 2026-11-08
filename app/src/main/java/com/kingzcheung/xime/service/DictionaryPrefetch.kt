@@ -3,7 +3,6 @@ package com.kingzcheung.xime.service
 import android.app.ActivityManager
 import android.content.ComponentCallbacks2
 import android.content.Context
-import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import com.kingzcheung.xime.rime.RimeEngine
@@ -12,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 词库和词组模型的自适应预读。
@@ -139,7 +139,7 @@ internal object DictionaryPrefetch {
             powerSave = power?.isPowerSaveMode == true,
             lowRamDevice = activity?.isLowRamDevice == true,
             lowMemory = memory.lowMemory,
-            thermalSevere = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            thermalSevere = AndroidPlatform.thermalStatus &&
                 (power?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_SEVERE,
         )
         if (!synchronized(policy) { policy.shouldCheck(now, conditions) }) return

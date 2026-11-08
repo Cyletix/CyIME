@@ -10,6 +10,7 @@ import androidx.core.graphics.drawable.IconCompat
 import com.kingzcheung.xime.R
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.theme.ThemeIconColors
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * The separate home-screen "字幕" icon. Off unless the user turns it on (a second icon annoys
@@ -50,7 +51,7 @@ object CaptionLauncherIcon {
         if (changes.isEmpty()) return
         // Same swap as the main icon (LauncherIcons.apply): one batch on Android 13+, so the launcher
         // treats it as a replacement; otherwise enable the new entry before disabling the old one.
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
+        if (AndroidPlatform.batchComponentState) {
             pm.setComponentEnabledSettings(changes.map { (name, state) ->
                 PackageManager.ComponentEnabledSetting(name, state, PackageManager.DONT_KILL_APP)
             })

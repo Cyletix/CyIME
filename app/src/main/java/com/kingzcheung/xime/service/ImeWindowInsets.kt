@@ -10,13 +10,14 @@ import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.doOnPreDraw
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlin.math.roundToInt
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 private const val INSETS_TAG = "ImeWindowInsets"
 
 /** 获取导航栏高度（dp）。 */
 internal fun tryGetNavBarHeightDp(context: Context, imeWindow: Window?): Int {
     return try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (AndroidPlatform.windowInsetTypes) {
             val decorView = imeWindow?.decorView
             if (decorView != null) {
                 val insets = decorView.rootWindowInsets
@@ -41,7 +42,7 @@ internal fun tryGetNavBarHeightDp(context: Context, imeWindow: Window?): Int {
 /** 获取可见导航栏高度（dp）；手势导航时只算手势条，与 [extractBottomInset] 同一规则。 */
 internal fun tryGetVisibleNavBarHeightDp(context: Context, imeWindow: Window?): Int {
     return try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (AndroidPlatform.windowInsetTypes) {
             val decorView = imeWindow?.decorView
             if (decorView != null) {
                 val insets = decorView.rootWindowInsets
@@ -64,7 +65,7 @@ internal fun tryGetVisibleNavBarHeightDp(context: Context, imeWindow: Window?): 
 /** 获取状态栏高度（dp）。 */
 internal fun tryGetStatusBarHeightDp(context: Context, imeWindow: Window?): Int {
     return try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (AndroidPlatform.windowInsetTypes) {
             val decorView = imeWindow?.decorView
             if (decorView != null) {
                 val insets = decorView.rootWindowInsets
@@ -94,7 +95,7 @@ internal fun extractBottomInset(
     insets: WindowInsets,
     imeWindow: Window? = null,
 ): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+    if (!AndroidPlatform.windowInsetTypes) {
         @Suppress("DEPRECATION")
         return insets.systemWindowInsetBottom.coerceAtLeast(0)
     }
@@ -113,7 +114,7 @@ internal fun extractBottomInset(
 
 /** 底部系统栏能不能缩到手势条：读系统导航模式、本窗口有没有系统画的输入法导航按钮。 */
 private fun gestureAwareBottom(insets: WindowInsets, imeWindow: Window?, fullPx: Int): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || imeWindow == null || fullPx <= 0) return fullPx
+    if (!AndroidPlatform.windowInsetTypes || imeWindow == null || fullPx <= 0) return fullPx
     val context = imeWindow.context
     val tappable = insets.getInsets(WindowInsets.Type.tappableElement()).bottom
     val navigationMode = readSetting { android.provider.Settings.Secure.getInt(context.contentResolver, "navigation_mode") }
@@ -253,11 +254,11 @@ internal fun View.observeKeyboardBottomInsets(window: Window?, update: (WindowIn
 internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
     edge: Boolean = SettingsPreferences.edgeToEdgeKeyboard(window.context),
     position: SettingsPreferences.KeyboardBottomPosition = SettingsPreferences.keyboardBottomPosition(window.context)): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return maxOf(normalPx,
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) insets.displayCutout?.safeInsetBottom ?: 0 else 0)
+    if (!AndroidPlatform.gestureInsets) return maxOf(normalPx,
+        insets.displayCutout?.safeInsetBottom ?: 0)
     val context = window.context
     val cutout = insets.displayCutout?.safeInsetBottom ?: 0
-    val tappable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+    val tappable = if (AndroidPlatform.windowInsetTypes)
         insets.getInsets(WindowInsets.Type.tappableElement()).bottom
     else @Suppress("DEPRECATION") insets.tappableElementInsets.bottom
     val navButtons = imeNavButtonHeightPx(window)
@@ -266,7 +267,7 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     when (position) {
         SettingsPreferences.KeyboardBottomPosition.FLUSH -> return maxOf(cutout, navButtons)
         SettingsPreferences.KeyboardBottomPosition.KEEP_BUTTONS -> {
-            val navBar = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+            val navBar = if (AndroidPlatform.windowInsetTypes) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
                 else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
             return maxOf(normalPx, controls, navBar)
         }
@@ -276,7 +277,7 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     if (controls >= normalPx && !edge) return safe
     if (context.resources.configuration.smallestScreenWidthDp >= 600) {
         // 有些平板只把任务栏报为 navigationBars；大屏本身并不代表底部有任务栏。
-        val nav = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        val nav = if (AndroidPlatform.windowInsetTypes) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
             else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
         if (nav > 0) return maxOf(nav, controls)
     }
@@ -288,12 +289,12 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
             else android.provider.Settings.Secure.getInt(resolver, key)
         }
     }
-    val mandatory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+    val mandatory = if (AndroidPlatform.windowInsetTypes)
         insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
     else @Suppress("DEPRECATION") insets.mandatorySystemGestureInsets.bottom
     // 贴底时再看系统自己的导航栏高度：有的厂商手势导航时 navigation_mode 仍写 0、自家开关也读不到，
     // 但系统的 navigation_bar_height 已换成手势条那一小条（三键时是整条 48dp），这也算手势导航（11-03「调到最低还不行」）。
-    val navInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+    val navInset = if (AndroidPlatform.windowInsetTypes) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
         else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
     val density = context.resources.displayMetrics.density
     val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null ||
@@ -319,7 +320,7 @@ internal fun checkImeWindowReachesScreenBottom(window: Window): Int {
     val location = IntArray(2)
     decor.getLocationOnScreen(location)
     val gap = imeWindowBottomGapPx(screenBottomPx(window), location[1] + decor.height)
-    if (gap > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    if (gap > 0 && AndroidPlatform.windowInsetTypes) {
         val attributes = window.attributes
         val bottom = WindowInsets.Side.BOTTOM
         if (attributes.fitInsetsSides and bottom != 0) {
@@ -336,7 +337,7 @@ internal fun imeWindowBottomGapPx(screenBottomPx: Int, windowBottomPx: Int): Int
     (screenBottomPx - windowBottomPx).takeIf { it > 1 } ?: 0
 
 private fun screenBottomPx(window: Window): Int =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) window.windowManager.currentWindowMetrics.bounds.bottom
+    if (AndroidPlatform.windowMetrics) window.windowManager.currentWindowMetrics.bounds.bottom
     else android.graphics.Point().also {
         @Suppress("DEPRECATION") window.windowManager.defaultDisplay.getRealSize(it)
     }.y
@@ -371,11 +372,11 @@ internal fun floatingMinimumInsetPx(window: Window, insets: WindowInsets, minimu
     maxOf(minimumPx, bottomGestureZonePx(window.context, insets, preferReported = true) ?: 0)
 
 private fun bottomGestureZonePx(context: Context, insets: WindowInsets, preferReported: Boolean = false): Int? {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+    if (!AndroidPlatform.gestureInsets) return null
     return try {
         val zone: Int
         val tappable: Int
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (AndroidPlatform.windowInsetTypes) {
             zone = insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
             tappable = insets.getInsets(WindowInsets.Type.tappableElement()).bottom
         } else {

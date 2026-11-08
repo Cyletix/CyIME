@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -28,6 +27,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.util.PermissionHelper
 import java.util.concurrent.Executor
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * Captions during calls (phone, WeChat voice/video). While a call is active Android gives the
@@ -78,7 +78,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
 
     override fun onServiceConnected() {
         audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (Build.VERSION.SDK_INT >= 31) {
+        if (AndroidPlatform.callAudioRoute) {
             val listener = AudioManager.OnModeChangedListener { mode -> main.post { onAudioMode(mode) } }
             audio.addOnModeChangedListener(Executor { it.run() }, listener)
             modeListener = listener
@@ -87,7 +87,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
         main.post(poll)
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         CaptionFloat.service = this
-        FileLogger.i(TAG, "connected sdk=${Build.VERSION.SDK_INT}")
+        FileLogger.i(TAG, "connected sdk=${AndroidPlatform.sdk}")
     }
 
     private fun onAudioMode(mode: Int) {
@@ -157,7 +157,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
      * the microphone would hear nothing but the person holding the phone.
      */
     private fun currentRoute(): CallRoute {
-        val type = if (Build.VERSION.SDK_INT >= 31) audio.communicationDevice?.type else null
+        val type = if (AndroidPlatform.callAudioRoute) audio.communicationDevice?.type else null
         return when (type) {
             // Some phones report the loudspeaker as SPEAKER_SAFE; only real headsets block listening.
             AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE -> CallRoute.Speaker
@@ -264,7 +264,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
     override fun onDestroy() {
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         main.removeCallbacksAndMessages(null)
-        if (Build.VERSION.SDK_INT >= 31) (modeListener as? AudioManager.OnModeChangedListener)?.let { audio.removeOnModeChangedListener(it) }
+        if (AndroidPlatform.callAudioRoute) (modeListener as? AudioManager.OnModeChangedListener)?.let { audio.removeOnModeChangedListener(it) }
         stopCaptions()
         // Switched off while floating: the captions stop with the bar.
         if (CaptionFloat.service === this) CaptionFloat.service = null

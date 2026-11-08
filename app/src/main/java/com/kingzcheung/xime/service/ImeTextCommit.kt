@@ -3,7 +3,6 @@ package com.kingzcheung.xime.service
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.rime.resolveRimeCandidateIndex
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
-import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
@@ -17,6 +16,7 @@ import java.io.File
 import java.io.FileInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 文本上屏与剪贴板提交。
@@ -115,11 +115,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 null
             )
             
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
-                InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
-            } else {
-                0
-            }
+            val flags = InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
             
             service.currentInputConnection?.commitContent(inputContentInfo, flags, null) ?: false
             
@@ -345,7 +341,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
 
     /** 把图片插入 MediaStore（Pictures/CyIME），返回系统 content URI。 */
     private fun insertImageToMediaStore(imageFile: File, mimeType: String): Uri? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (!AndroidPlatform.mediaStoreDownloads) {
             FileLogger.e(XimeInputMethodService.TAG, "MediaStore fallback requires API 29+, image commit failed")
             return null
         }
@@ -363,7 +359,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 resolver.openOutputStream(uri)?.use { output ->
                     FileInputStream(imageFile).use { input -> input.copyTo(output) }
                 } ?: return null
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (AndroidPlatform.mediaStoreDownloads) {
                     val update = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
                     resolver.update(uri, update, null, null)
                 }

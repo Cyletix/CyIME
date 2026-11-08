@@ -61,10 +61,7 @@ class XimeApplication : Application(), ImageLoaderFactory {
         }
         // Model services run in separate processes. They must not copy/deploy the
         // same Rime directory or load the keyboard/plugin runtime a second time.
-        val processName = if (android.os.Build.VERSION.SDK_INT >= 28) getProcessName()
-        else (getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager)
-            .runningAppProcesses?.firstOrNull { it.pid == android.os.Process.myPid() }?.processName
-            ?: runCatching { java.io.File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrNull()
+        val processName = getProcessName()
         if (processName != packageName) return
         SettingsPreferences.initializeIncognitoForVersion(this, BuildConfig.VERSION_CODE)
         // 先于任何下载、导入和词库准备列出上次中断的残留，后台删除。

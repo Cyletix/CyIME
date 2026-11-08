@@ -18,6 +18,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 enum class HapticMode(val value: String) {
     FollowingSystem("following_system"),
@@ -36,7 +37,7 @@ class FeedbackManager(private val context: Context) {
     private val soundIds = mutableMapOf<String, Int>()
 
     private val vibrator: Vibrator by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (AndroidPlatform.vibratorManager) {
             val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
             vibratorManager.defaultVibrator
         } else {
@@ -185,8 +186,8 @@ class FeedbackManager(private val context: Context) {
     private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     fun initialize() {
-        hasAmplitudeControl = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        hasAmplitudeControl = vibrator.hasAmplitudeControl()
+        if (AndroidPlatform.hapticQuery) {
             android.util.Log.i(
                 "FeedbackManager",
                 "haptics click=${vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK)} " +
@@ -346,7 +347,7 @@ class FeedbackManager(private val context: Context) {
         val amplitude = if (!custom) 0 else if (useLong) longPressAmplitude else pressAmplitude
         val hfc: Int = if (longPress) {
             HapticFeedbackConstants.LONG_PRESS
-        } else if (keyUp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        } else if (keyUp) {
             HapticFeedbackConstants.KEYBOARD_RELEASE
         } else if (type == KeyFeedbackType.CURSOR_STEP || type == KeyFeedbackType.HANDWRITING_ERASE) {
             HapticFeedbackConstants.TEXT_HANDLE_MOVE
@@ -368,7 +369,7 @@ class FeedbackManager(private val context: Context) {
         // 普通转子马达（如 Tab S8）：系统 KEYBOARD_TAP 只给 20 ms，马达还没转起来就停了，几乎感觉不到；
         // 改用与三星系统界面相同量级的短震（按键 45 ms、光标/抬起 30 ms、长按 70 ms）。
         // 其他厂商能调振幅的马达（自定义了振幅，或系统触感关着时的「启用」）只给十几毫秒，避免线性马达嗡嗡响。
-        if (duration == 0L && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && vibrator.hasVibrator()) {
+        if (duration == 0L && AndroidPlatform.hapticQuery && vibrator.hasVibrator()) {
             val amp = if (hasAmplitudeControl && amplitude != 0) amplitude else VibrationEffect.DEFAULT_AMPLITUDE
             vibrateTouch(VibrationEffect.createOneShot(fallbackPulseMs(samsungTuned, hasAmplitudeControl, longPress, light), amp))
             return
@@ -376,11 +377,8 @@ class FeedbackManager(private val context: Context) {
         if (duration != 0L) {
             if (hasAmplitudeControl && amplitude != 0) {
                 vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(duration)
+                vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
             }
         } else {
             view.performHapticFeedback(hfc, systemHapticFlags())
@@ -403,7 +401,7 @@ class FeedbackManager(private val context: Context) {
     }
 
     private val primitivesSupported: Boolean by lazy {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        AndroidPlatform.hapticQuery &&
             vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK)
     }
 
@@ -442,7 +440,7 @@ class FeedbackManager(private val context: Context) {
 
     /** 设备支持组合原语（线性马达）时按原语震动；振幅 0 用 [defaultScale]。不支持时返回 false 交给原路径。 */
     private fun vibratePrimitive(primitive: Int, amplitude: Int, defaultScale: Float = 1f): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        if (!AndroidPlatform.hapticQuery) return false
         if (!vibrator.areAllPrimitivesSupported(primitive)) return false
         val scale = if (amplitude != 0) (amplitude / 255f).coerceIn(0.05f, 1f) else defaultScale
         vibrateTouch(VibrationEffect.startComposition().addPrimitive(primitive, scale).compose())
@@ -451,7 +449,7 @@ class FeedbackManager(private val context: Context) {
 
     /** 不支持原语但马达确认支持预设效果（tick/click）时使用；状态未知时不用，交回系统触感。 */
     private fun vibratePredefined(effect: Int): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        if (!AndroidPlatform.hapticQuery) return false
         if (vibrator.areAllEffectsSupported(effect) != Vibrator.VIBRATION_EFFECT_SUPPORT_YES) return false
         vibrateTouch(VibrationEffect.createPredefined(effect))
         return true
@@ -459,7 +457,7 @@ class FeedbackManager(private val context: Context) {
 
     /** 跟随系统时标记为触摸反馈，随系统“触摸互动”强度；强制启用时不受系统开关影响。 */
     private fun vibrateTouch(effect: VibrationEffect) {
-        if (hapticMode == HapticMode.FollowingSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (hapticMode == HapticMode.FollowingSystem && AndroidPlatform.touchVibrationUsage) {
             vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
         } else {
             vibrator.vibrate(effect)
@@ -477,12 +475,7 @@ class FeedbackManager(private val context: Context) {
         val duration = if (custom && pressDuration != 0L) pressDuration
             else fallbackPulseMs(samsungTuned, hasAmplitudeControl, longPress = false, light = false)
         val amplitude = if (hasAmplitudeControl && pressAmp != 0) pressAmp else VibrationEffect.DEFAULT_AMPLITUDE
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(duration)
-        }
+        vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
     }
 }
 

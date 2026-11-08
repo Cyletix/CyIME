@@ -1,8 +1,8 @@
 package com.kingzcheung.xime.ui.theme
 
 import android.content.Context
-import android.os.Build
 import androidx.compose.ui.graphics.Color
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 莫奈取色（Material You 动态配色，Android 12+）：从系统壁纸调色板（system_accent/neutral 资源）
@@ -21,7 +21,7 @@ object DynamicThemes {
     const val NAME = "莫奈取色"
 
     /** 动态配色仅在 Android 12+ 可用。 */
-    fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    fun isSupported(): Boolean = AndroidPlatform.dynamicColor
 
     /**
      * 读取当前系统取色的主强调色（浅/深），用于与缓存中的动态主题对比，

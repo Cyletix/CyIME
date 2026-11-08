@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 data class KeyEffectUiState(
     val soundEnabled: Boolean = true,
@@ -47,15 +48,15 @@ class KeyEffectSettingsViewModel(application: Application) : AndroidViewModel(ap
     }
 
     private fun updateHasAmplitudeControl() {
-        val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        val vibrator = if (AndroidPlatform.vibratorManager) {
             val vm = context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
             vm.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
             context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
         }
-        val hasAmp = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()
-        val primitives = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+        val hasAmp = vibrator.hasAmplitudeControl()
+        val primitives = AndroidPlatform.hapticQuery &&
             vibrator.areAllPrimitivesSupported(android.os.VibrationEffect.Composition.PRIMITIVE_CLICK,
                 android.os.VibrationEffect.Composition.PRIMITIVE_TICK)
         _uiState.update { it.copy(hasAmplitudeControl = hasAmp, hapticPrimitives = primitives) }

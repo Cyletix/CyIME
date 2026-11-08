@@ -6,11 +6,11 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 object IconAppearance {
     const val KEY_STYLE = "cyime_icon_style"
@@ -159,7 +159,7 @@ object LauncherIcons {
         }.filter { (name, state) -> pm.getComponentEnabledSetting(name) != state }
         if (changes.isEmpty()) return
         val disabled = changes.filter { it.second == PackageManager.COMPONENT_ENABLED_STATE_DISABLED }.mapTo(HashSet()) { it.first }
-        if (Build.VERSION.SDK_INT >= 33) {
+        if (AndroidPlatform.batchComponentState) {
             pm.setComponentEnabledSettings(changes.map { (name, state) ->
                 PackageManager.ComponentEnabledSetting(name, state, PackageManager.DONT_KILL_APP)
             })

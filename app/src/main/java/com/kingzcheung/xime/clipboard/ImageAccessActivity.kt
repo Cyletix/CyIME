@@ -1,12 +1,12 @@
 package com.kingzcheung.xime.clipboard
 
 import android.Manifest
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** Permission and picker UI runs in an Activity, never steals focus inside the IME window. */
 class ImageAccessActivity : ComponentActivity() {
@@ -29,8 +29,8 @@ class ImageAccessActivity : ComponentActivity() {
         if (savedInstanceState != null) return
         if (intent.getBooleanExtra("pick_image", false)) picker.launch("image/*")
         else permission.launch(when {
-            Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
-            Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+            AndroidPlatform.partialPhotoAccess -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+            AndroidPlatform.readMediaImages -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
             else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         })
     }

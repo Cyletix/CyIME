@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.ui.theme.SamsungWindowBlur
 import kotlin.math.roundToInt
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** Edits a preview draft, never writes preferences before Apply. */
 @Composable
@@ -63,7 +64,7 @@ private fun GlassSlider(label: String, valueLabel: String, value: Float,
 
 @Composable
 private fun rememberCrossWindowBlurAvailable(): Boolean {
-    if (android.os.Build.VERSION.SDK_INT < 31) return false
+    if (!AndroidPlatform.windowBlur) return false
     val context = LocalContext.current
     val manager = remember(context) { context.getSystemService(android.view.WindowManager::class.java) }
     var available by remember(manager) { mutableStateOf(runCatching { manager?.isCrossWindowBlurEnabled == true }.getOrDefault(false)) }

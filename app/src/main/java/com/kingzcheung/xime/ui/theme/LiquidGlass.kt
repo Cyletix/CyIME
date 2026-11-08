@@ -37,6 +37,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 液态玻璃（主题与外观 › 材质效果，默认关；打开时把玻璃一起打开）。
@@ -118,7 +119,7 @@ internal fun Modifier.liquidGlassCap(cap: Modifier, radius: Dp): Modifier = comp
  * 不另存图片（直接用共用背景那张），按住时不鼓起，键盘不动就不重画。
  */
 private fun Modifier.liquidRefraction(radius: Dp): Modifier =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) liquidRefraction33(radius) else this
+    if (AndroidPlatform.runtimeShader) liquidRefraction33(radius) else this
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private fun Modifier.liquidRefraction33(radius: Dp): Modifier = composed {

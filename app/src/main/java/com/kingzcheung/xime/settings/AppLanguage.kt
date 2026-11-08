@@ -2,9 +2,9 @@ package com.kingzcheung.xime.settings
 
 import android.app.LocaleManager
 import android.content.Context
-import android.os.Build
 import android.os.LocaleList
 import java.util.Locale
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 设置页等界面文字用哪种语言（不是输入语言，输入语言见 [InputLanguage]）。
@@ -42,7 +42,7 @@ enum class AppLanguage(val tag: String, val nativeName: String) {
 
 object AppLanguages {
     /** 这台设备能不能在应用里单独选语言（Android 13 起）。 */
-    val supported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val supported: Boolean get() = AndroidPlatform.perAppLanguage
 
     fun current(context: Context): AppLanguage {
         if (!supported) return AppLanguage.SYSTEM

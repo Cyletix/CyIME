@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.database.ContentObserver
 import android.os.BatteryManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -17,6 +16,7 @@ import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** API 28 keeps thermal status unknown. Probe failures remain visible in the snapshot. */
 class AndroidRuntimeSignalSource(context: Context) : RuntimeSignalSource {
@@ -49,7 +49,7 @@ class AndroidRuntimeSignalSource(context: Context) : RuntimeSignalSource {
                 .takeIf { it.totalMem > 0 && it.availMem > 0 && it.availMem <= it.totalMem }
         } }
         val battery = read("battery") { context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }
-        val thermal = if (Build.VERSION.SDK_INT >= 29) read("thermal") { power?.let(ThermalApi::read) }
+        val thermal = if (AndroidPlatform.thermalStatus) read("thermal") { power?.let(ThermalApi::read) }
             else null
         val powerSave = read("powerSave") { power?.isPowerSaveMode }
         val animations = read("animations") { ValueAnimator.areAnimatorsEnabled() }
@@ -63,7 +63,7 @@ class AndroidRuntimeSignalSource(context: Context) : RuntimeSignalSource {
             availableMemoryBytes = memory?.availMem?.takeIf { it > 0 },
             memoryLow = memory?.lowMemory,
             animationsEnabled = animations,
-            unavailableSources = failures.toSet() + if (Build.VERSION.SDK_INT < 29) setOf("thermal:API<29") else emptySet(),
+            unavailableSources = failures.toSet() + if (!AndroidPlatform.thermalStatus) setOf("thermal:API<29") else emptySet(),
         )
     }
 
@@ -78,7 +78,7 @@ class AndroidRuntimeSignalSource(context: Context) : RuntimeSignalSource {
             }, ContextCompat.RECEIVER_NOT_EXPORTED)
             true
         } == true
-        val thermal = if (Build.VERSION.SDK_INT >= 29) read("thermalEvents") {
+        val thermal = if (AndroidPlatform.thermalStatus) read("thermalEvents") {
             power?.let { ThermalApi.subscribe(context, it, onChanged) }
         } else null
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {

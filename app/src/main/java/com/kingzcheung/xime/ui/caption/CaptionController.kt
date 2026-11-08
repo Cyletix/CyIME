@@ -29,6 +29,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.Executors
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** One speaker row on the caption page; ids come from the :asr labeler, names from the user. */
 class SpeakerUi(val id: Int, val ordinal: Int) {
@@ -114,7 +115,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
      */
     var micTaken by mutableStateOf(false); private set
     private val audioManager = app.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-    private val recordingCallback = if (android.os.Build.VERSION.SDK_INT >= 29) object : android.media.AudioManager.AudioRecordingCallback() {
+    private val recordingCallback = if (AndroidPlatform.audioRecordingCallback) object : android.media.AudioManager.AudioRecordingCallback() {
         override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
             val session = recorder.sessionId
             if (session == 0) return
@@ -484,7 +485,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         val text = transcriptText()
         if (text.isEmpty()) return null
         val bytes = text.toByteArray()
-        fun write(): String = if (android.os.Build.VERSION.SDK_INT >= 29) {
+        fun write(): String = if (AndroidPlatform.mediaStoreDownloads) {
             val uri = savedUri ?: checkNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                 android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, sessionName)
@@ -522,7 +523,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
 
     /** Earlier caption files in 下载/CyIME字幕, newest first. */
     internal fun savedCaptions(): List<SavedCaption> = runCatching {
-        if (android.os.Build.VERSION.SDK_INT >= 29) {
+        if (AndroidPlatform.mediaStoreDownloads) {
             val out = ArrayList<SavedCaption>()
             val columns = arrayOf(android.provider.MediaStore.Downloads._ID, android.provider.MediaStore.Downloads.DISPLAY_NAME,
                 android.provider.MediaStore.Downloads.DATE_MODIFIED, android.provider.MediaStore.Downloads.SIZE)
@@ -553,13 +554,11 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         if (line.speakerId == SELF_SPEAKER || line.speakerId == REPLY_SPEAKER) return
         if (!callsName(line.text, CaptionNameAlert.names(app))) return
         FileLogger.i(TAG, "name heard seg=${line.id}")
-        val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31)
+        val vibrator = if (AndroidPlatform.vibratorManager)
             (app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator
             else @Suppress("DEPRECATION") app.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
         runCatching {
-            if (android.os.Build.VERSION.SDK_INT >= 26)
-                vibrator.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 200, 400), -1))
-            else @Suppress("DEPRECATION") vibrator.vibrate(longArrayOf(0, 400, 200, 400, 200, 400), -1)
+            vibrator.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 200, 400), -1))
         }
     }
 

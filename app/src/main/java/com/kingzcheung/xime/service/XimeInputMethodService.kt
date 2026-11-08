@@ -172,6 +172,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.view.updateLayoutParams
 import java.io.File
 import java.io.FileInputStream
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 object QuickSendFormEditTextHolder {
     var editText: android.widget.EditText? = null
@@ -885,7 +886,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal val textCommit = ImeTextCommit(this)
     
-    private val inlineSuggestionManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    private val inlineSuggestionManager = if (AndroidPlatform.inlineSuggestions) {
         InlineSuggestionManager(this)
     } else null
     
@@ -1110,10 +1111,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
         }
         // 允许 IME 窗口绘制到摄像头挖孔/刘海区域（横屏时背景覆盖全屏）
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            window.window?.attributes?.layoutInDisplayCutoutMode =
-                android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
+        window.window?.attributes?.layoutInDisplayCutoutMode =
+            android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         savedStateRegistryController.performRestore(null)
         window.window?.decorView?.setViewTreeLifecycleOwner(this)
         window.window?.decorView?.setViewTreeSavedStateRegistryOwner(this)
@@ -1130,9 +1129,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         hardwareInputManager.registerInputDeviceListener(hardwareInputListener, mainHandler)
         FileLogger.i(
             TAG,
-            "Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), " +
+            "Device: ${Build.MANUFACTURER} ${Build.MODEL}, ${AndroidPlatform.versionLabel}, " +
                 "screen=${resources.displayMetrics.widthPixels}x${resources.displayMetrics.heightPixels}@${resources.displayMetrics.density}"
         )
+        // 这台设备按系统版本走哪些路（AndroidPlatform）；用户报问题时对照日志看，不再猜版本差异。
+        FileLogger.i(TAG, "Platform: ${AndroidPlatform.summary()}")
         
         feedbackManager.initialize()
         
@@ -3834,13 +3835,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         val mode = InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
         fun request(flags: Int, filtered: Boolean = false): Boolean = try {
-            if (filtered && Build.VERSION.SDK_INT >= 33) connection.requestCursorUpdates(flags,
+            if (filtered && AndroidPlatform.cursorAnchorFilter) connection.requestCursorUpdates(flags,
                 InputConnection.CURSOR_UPDATE_FILTER_INSERTION_MARKER or InputConnection.CURSOR_UPDATE_FILTER_CHARACTER_BOUNDS or
                     InputConnection.CURSOR_UPDATE_FILTER_EDITOR_BOUNDS)
             else connection.requestCursorUpdates(flags)
         } catch (_: Exception) { false }
         val acceptedMode = when {
-            Build.VERSION.SDK_INT >= 33 && request(mode, filtered = true) -> mode
+            AndroidPlatform.cursorAnchorFilter && request(mode, filtered = true) -> mode
             request(mode) -> mode
             request(InputConnection.CURSOR_UPDATE_MONITOR) -> InputConnection.CURSOR_UPDATE_MONITOR
             request(InputConnection.CURSOR_UPDATE_IMMEDIATE) -> InputConnection.CURSOR_UPDATE_IMMEDIATE
@@ -4035,15 +4036,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     androidx.core.view.WindowCompat.setDecorFitsSystemWindows(win, false)
                     win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                     win.setDimAmount(0f)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
-                    }
+                    win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                 } else if (state.isFloatingMode) {
                     win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                     win.setDimAmount(0f)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
-                    }
+                    win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                 } else {
                     // 非浮动模式：参考成熟输入法 FULL 方案的背景/高度布局。
                     // 1) edge-to-edge：窗口绘制到系统导航栏后面，键盘背景（渐变/图片）可延伸到底部；
@@ -4052,16 +4049,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     androidx.core.view.WindowCompat.setDecorFitsSystemWindows(win, false)
                     win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                     win.setDimAmount(0f)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    if (AndroidPlatform.barContrast) {
                         win.isNavigationBarContrastEnforced = SettingsPreferences.roundedKeyboardBottom(this)
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                    if (AndroidPlatform.navBarColorIgnored) {
                         // Android 15 起（targetSdk 35）这个颜色系统不再画，导航区照旧由 Compose 画；只是把键盘底色报出去，
                         // 小米「输入法全面屏优化」（含 LSP 模块开的）用它给键盘下面那条系统栏上色，不报就是系统默认色（#144）。
                         // 图片背景没有一个能对上的颜色，照旧不报。
                         win.setNavigationBarColor(if (theme.keyboardBackground?.type == "image") android.graphics.Color.TRANSPARENT
                             else bgColor.copy(alpha = 1f).toArgb())
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    } else {
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }
                 }
@@ -4070,21 +4067,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 平时输入法窗口在状态栏下面，用不上；应用切到全屏（图片预览、视频）隐藏状态栏那一下，
                 // 输入法窗口先长到屏幕顶上、状态栏还没退完，系统就在窗口顶上画一条状态栏高的深色底，直到键盘收起。
                 win.statusBarColor = android.graphics.Color.TRANSPARENT
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) win.isStatusBarContrastEnforced = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    win.decorView?.let { decor ->
-                        val controller = androidx.core.view.WindowInsetsControllerCompat(win, decor)
-                        val rounded = SettingsPreferences.roundedKeyboardBottom(this)
-                        val systemDark = (resources.configuration.uiMode and
-                            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                            android.content.res.Configuration.UI_MODE_NIGHT_YES
-                        val colors = KeysConfigHelper.getKeyboardColors()
-                        val textValue = if (isDark) colors.keyTextColorDark else colors.keyTextColor
-                        val textColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyTextColorOverride(state.themeId, isDark)
-                            ?: androidx.compose.ui.graphics.Color(if (textValue > 0xFFFFFF) textValue else (0xFF000000L or textValue))
-                        controller.isAppearanceLightNavigationBars =
-                            com.kingzcheung.xime.ui.keyboard.useDarkNavigationIcons(rounded, systemDark, textColor.luminance())
-                    }
+                if (AndroidPlatform.barContrast) win.isStatusBarContrastEnforced = false
+                win.decorView?.let { decor ->
+                    val controller = androidx.core.view.WindowInsetsControllerCompat(win, decor)
+                    val rounded = SettingsPreferences.roundedKeyboardBottom(this)
+                    val systemDark = (resources.configuration.uiMode and
+                        android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    val colors = KeysConfigHelper.getKeyboardColors()
+                    val textValue = if (isDark) colors.keyTextColorDark else colors.keyTextColor
+                    val textColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyTextColorOverride(state.themeId, isDark)
+                        ?: androidx.compose.ui.graphics.Color(if (textValue > 0xFFFFFF) textValue else (0xFF000000L or textValue))
+                    controller.isAppearanceLightNavigationBars =
+                        com.kingzcheung.xime.ui.keyboard.useDarkNavigationIcons(rounded, systemDark, textColor.luminance())
                 }
                 // setDecorFitsSystemWindows(false) 后必须重新分发 insets，
                 // 否则 onApplyWindowInsets 不会触发、底部导航栏高度检测不到。
@@ -4617,9 +4612,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val selStart = attribute.initialSelStart
         val selEnd = attribute.initialSelEnd
         val window = code.length + 1
-        val before = (if (Build.VERSION.SDK_INT >= 30) attribute.getInitialTextBeforeCursor(window, 0) else null)
+        val before = (if (AndroidPlatform.initialSurroundingText) attribute.getInitialTextBeforeCursor(window, 0) else null)
             ?: runCatching { ic.getTextBeforeCursor(window, 0) }.getOrNull()
-        val after = (if (Build.VERSION.SDK_INT >= 30) attribute.getInitialTextAfterCursor(window, 0) else null)
+        val after = (if (AndroidPlatform.initialSurroundingText) attribute.getInitialTextAfterCursor(window, 0) else null)
             ?: runCatching { ic.getTextAfterCursor(window, 0) }.getOrNull()
         val region = locateResumableComposition(code, selStart, selEnd, before, after, inlineComposition.start) {
             runCatching { ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) }.getOrNull()
@@ -4660,9 +4655,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val selStart = attribute?.initialSelStart ?: -1
         val selEnd = attribute?.initialSelEnd ?: -1
         val window = text.length + 1
-        fun before(): CharSequence? = (if (Build.VERSION.SDK_INT >= 30) attribute?.getInitialTextBeforeCursor(window, 0) else null)
+        fun before(): CharSequence? = (if (AndroidPlatform.initialSurroundingText) attribute?.getInitialTextBeforeCursor(window, 0) else null)
             ?: runCatching { ic?.getTextBeforeCursor(window, 0) }.getOrNull()
-        fun after(): CharSequence? = (if (Build.VERSION.SDK_INT >= 30) attribute?.getInitialTextAfterCursor(window, 0) else null)
+        fun after(): CharSequence? = (if (AndroidPlatform.initialSurroundingText) attribute?.getInitialTextAfterCursor(window, 0) else null)
             ?: runCatching { ic?.getTextAfterCursor(window, 0) }.getOrNull()
         val region = if (sameField && ic != null) locateDetachedComposition(text, selStart, selEnd, before(), after()) else null
         val removed = region != null && runCatching {
@@ -5013,7 +5008,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
 
     override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        if (!AndroidPlatform.inlineSuggestions) return null
         if (inlineSuggestionManager == null) return null
         updateInlineSuggestionTheme()
         val result = inlineSuggestionManager.onCreateInlineSuggestionsRequest(uiExtras)
@@ -5021,7 +5016,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        if (!AndroidPlatform.inlineSuggestions) return false
         return inlineSuggestionManager?.onInlineSuggestionsResponse(response) ?: false
     }
 

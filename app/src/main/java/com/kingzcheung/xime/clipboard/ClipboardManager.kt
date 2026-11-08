@@ -7,7 +7,6 @@ import android.content.ClipDescription
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -33,6 +32,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileInputStream
 import android.content.ClipboardManager as AndroidClipboardManager
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 data class ClipboardItem(
     val id: Long = 0,
@@ -991,7 +991,7 @@ class ClipboardManager private constructor(private val context: Context) {
 
     /** 把图片插入 MediaStore（Pictures/CyIME），返回系统 content URI。 */
     private fun insertImageToMediaStore(imageFile: File): Uri? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (!AndroidPlatform.mediaStoreDownloads) {
             Log.e(TAG, "MediaStore fallback requires API 29+, clipboard image copy failed")
             return null
         }

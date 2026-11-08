@@ -2,7 +2,6 @@ package com.kingzcheung.xime.handwriting.training
 
 import android.content.ContentValues
 import android.content.Context
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import org.json.JSONArray
@@ -12,6 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** 一个采样点：作画区局部像素坐标（左上原点，y 向下），t 为相对本样本首次落笔的毫秒数。 */
 data class TrainingPoint(val x: Float, val y: Float, val t: Long)
@@ -332,7 +332,7 @@ class TrainingSampleStore(private val context: Context, private val name: String
 
     /** 保存到公共“下载”目录，返回显示路径。 */
     fun saveToDownloads(file: File): String {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        return if (AndroidPlatform.mediaStoreDownloads) {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, file.name)
                 put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream")

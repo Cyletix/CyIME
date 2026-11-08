@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.IntOffset
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.ui.theme.SamsungWindowBlur
 import java.util.function.Consumer
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * A non-interactive blur surface behind the IME, bounded by the visible keyboard card.
@@ -125,7 +126,7 @@ internal class ImeGlassBlurWindow(
 
     /** Call after a parent-window replacement or show; repeated unchanged calls do no relayout. */
     fun refresh() {
-        if (disposed || Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !enabled || !visible || blurRadiusPx == 0) {
+        if (disposed || !AndroidPlatform.windowBlur || !enabled || !visible || blurRadiusPx == 0) {
             stopObservingAvailability()
             observeParent(null)
             removeWindow()
@@ -218,7 +219,7 @@ internal class ImeGlassBlurWindow(
         availabilityGeneration++
         blurAvailable = false
         availabilityRegistrationFailed = false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && manager != null && listener != null) {
+        if (AndroidPlatform.windowBlur && manager != null && listener != null) {
             try {
                 manager.removeCrossWindowBlurEnabledListener(listener)
             } catch (error: RuntimeException) {
@@ -331,7 +332,7 @@ internal class ImeGlassBlurWindow(
         if (previous != null) {
             if (appliedSamsungBlur) previous.window?.decorView?.let(SamsungWindowBlur::clear)
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) previous.window?.setBackgroundBlurRadius(0)
+                if (AndroidPlatform.windowBlur) previous.window?.setBackgroundBlurRadius(0)
             } catch (error: RuntimeException) {
                 FileLogger.w(TAG, "Unable to clear detached keyboard blur", error)
             }

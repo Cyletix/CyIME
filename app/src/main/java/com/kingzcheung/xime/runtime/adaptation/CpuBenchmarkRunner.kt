@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.os.PowerManager
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 什么时候跑 [CpuBenchmark]、结果存哪。
@@ -53,7 +54,7 @@ object CpuBenchmarkRunner {
         if (keyboardShown) return Skip.KEYBOARD
         val power = runCatching { context.getSystemService(PowerManager::class.java) }.getOrNull()
         if (runCatching { power?.isPowerSaveMode }.getOrNull() == true) return Skip.POWER_SAVE
-        if (Build.VERSION.SDK_INT >= 29 && power != null &&
+        if (AndroidPlatform.thermalStatus && power != null &&
             runCatching { power.currentThermalStatus }.getOrDefault(0) >= PowerManager.THERMAL_STATUS_MODERATE) return Skip.THERMAL
         return null
     }

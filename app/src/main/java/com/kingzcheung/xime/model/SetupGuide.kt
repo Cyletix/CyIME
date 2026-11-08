@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** 「按设备推荐配置」：读设备情况、照方案改设置、删掉用不到的模型。只在用户点了“按推荐设置”后改东西。 */
 object SetupGuide {
@@ -135,7 +136,7 @@ object SetupGuide {
     }
 
     private fun socName(): String? {
-        val soc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        val soc = if (AndroidPlatform.socInfo)
             listOf(Build.SOC_MANUFACTURER, Build.SOC_MODEL).filter { it.isNotBlank() && it != Build.UNKNOWN }.joinToString(" ")
         else ""
         return soc.ifBlank { Build.HARDWARE.takeIf { it.isNotBlank() && it != Build.UNKNOWN } }

@@ -72,6 +72,7 @@ import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.model.DownloadMirrors
 import com.kingzcheung.xime.update.AppUpdateCatalog
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 data class LicenseItem(
     val name: String,
@@ -84,7 +85,7 @@ object AppInfo {
     val versionCode: Int = BuildConfig.VERSION_CODE
     val gitHash: String = BuildConfig.GIT_HASH
     
-    val androidVersion: String = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+    val androidVersion: String = AndroidPlatform.versionLabel
     val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
     
     val dependencies = listOf(

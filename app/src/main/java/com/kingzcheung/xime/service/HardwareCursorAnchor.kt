@@ -2,6 +2,7 @@ package com.kingzcheung.xime.service
 
 import android.graphics.RectF
 import android.view.inputmethod.CursorAnchorInfo
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /** Bounds of the caret in screen pixels, before clipping to the IME's own viewport. */
 data class HardwareCursorAnchor(val left: Float, val top: Float, val right: Float, val bottom: Float)
@@ -56,7 +57,7 @@ internal fun resolveHardwareCursorAnchor(info: CursorAnchorInfo): HardwareCursor
 
 /** Bounds belong to the editor's coordinate system, not the IME window. */
 internal fun resolveHardwareEditorBounds(info: CursorAnchorInfo): HardwareCursorAnchor? {
-    if (android.os.Build.VERSION.SDK_INT < 33) return null
+    if (!AndroidPlatform.cursorAnchorFilter) return null
     val local = info.editorBoundsInfo?.editorBounds ?: return null
     val screen = RectF(local)
     info.matrix.mapRect(screen)

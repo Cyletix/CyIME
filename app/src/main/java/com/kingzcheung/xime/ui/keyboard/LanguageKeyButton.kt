@@ -92,6 +92,7 @@ import kotlin.math.roundToLong
 import com.kingzcheung.xime.ui.theme.cyPopupEnter
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 internal fun languageMenuSelection(
     schemas: List<SchemaInfo>,
@@ -414,7 +415,7 @@ private fun languageMenuWindowCeiling(view: android.view.View): Float {
  * 更早的系统改为菜单开着时每 200ms 查一次窗口可见性。
  */
 private fun watchWindowHidden(view: android.view.View, onHidden: () -> Unit): () -> Unit {
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+    if (AndroidPlatform.windowVisibilityListener) {
         return WindowVisibilityListenerApi34.watch(view, onHidden)
     }
     val check = object : Runnable {
@@ -443,7 +444,7 @@ private object WindowVisibilityListenerApi34 {
 private fun rememberLanguageMenuBlurAvailable(): Boolean {
     val context = LocalContext.current
     return remember(context) {
-        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && runCatching {
+        AndroidPlatform.windowBlur && runCatching {
             context.getSystemService(android.view.WindowManager::class.java)?.isCrossWindowBlurEnabled == true ||
                 com.kingzcheung.xime.ui.theme.SamsungWindowBlur.usableFor(context)
         }.getOrDefault(false)

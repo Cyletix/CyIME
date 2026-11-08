@@ -1,8 +1,8 @@
 package com.kingzcheung.xime.service
 
-import android.os.Build
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.InputConnection
+import com.kingzcheung.xime.platform.AndroidPlatform
 
 /**
  * 向输入框要一次排版，用于移光标“从中间滑到边缘走一行”：只要宽度、字号和光标，不常驻监听。
@@ -10,10 +10,10 @@ import android.view.inputmethod.InputConnection
  */
 internal fun requestLineLayout(connection: InputConnection): Boolean = runCatching {
     when {
-        Build.VERSION.SDK_INT >= 34 -> connection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE,
+        AndroidPlatform.cursorAnchorLines -> connection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE,
             InputConnection.CURSOR_UPDATE_FILTER_EDITOR_BOUNDS or InputConnection.CURSOR_UPDATE_FILTER_TEXT_APPEARANCE or
                 InputConnection.CURSOR_UPDATE_FILTER_INSERTION_MARKER or InputConnection.CURSOR_UPDATE_FILTER_VISIBLE_LINE_BOUNDS)
-        Build.VERSION.SDK_INT >= 33 -> connection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE,
+        AndroidPlatform.cursorAnchorFilter -> connection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE,
             InputConnection.CURSOR_UPDATE_FILTER_EDITOR_BOUNDS or InputConnection.CURSOR_UPDATE_FILTER_INSERTION_MARKER)
         else -> connection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE)
     }
@@ -24,9 +24,9 @@ internal fun requestLineLayout(connection: InputConnection): Boolean = runCatchi
  * 字号优先取输入框报告的字号，没有再按光标高度约 1.2 倍字号估。坐标都在输入框自己的坐标系里，比值不受缩放影响。
  */
 internal fun cursorAnchorCharsPerLine(info: CursorAnchorInfo, sample: CharSequence): Float? {
-    val editorWidth = if (Build.VERSION.SDK_INT >= 33) info.editorBoundsInfo?.editorBounds?.width()?.takeIf { it > 0f } else null
-    val lineWidth = editorWidth ?: if (Build.VERSION.SDK_INT >= 34) info.visibleLineBounds.maxOfOrNull { it.width() } else null
-    val reportedSize = if (Build.VERSION.SDK_INT >= 34) info.textAppearanceInfo?.textSize?.takeIf { it > 0f } else null
+    val editorWidth = if (AndroidPlatform.cursorAnchorFilter) info.editorBoundsInfo?.editorBounds?.width()?.takeIf { it > 0f } else null
+    val lineWidth = editorWidth ?: if (AndroidPlatform.cursorAnchorLines) info.visibleLineBounds.maxOfOrNull { it.width() } else null
+    val reportedSize = if (AndroidPlatform.cursorAnchorLines) info.textAppearanceInfo?.textSize?.takeIf { it > 0f } else null
     val markerHeight = info.insertionMarkerBottom - info.insertionMarkerTop
     val textSize = reportedSize ?: (markerHeight / 1.2f).takeIf { it.isFinite() && it > 0f }
     return estimateCharsPerLine(lineWidth ?: return null, textSize ?: return null, sample)
