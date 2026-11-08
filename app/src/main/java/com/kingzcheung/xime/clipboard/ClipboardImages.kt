@@ -311,11 +311,20 @@ class ClipboardImages private constructor(private val context: Context) {
 
     private suspend fun refreshNow() {
         mutex.withLock {
+            // 媒体/缓存文件可能已被删除；先把指向失效文件的图片记录清掉。
+            val (alive, dead) = history.partition { uriAvailable(it.uri) }
+            if (dead.isNotEmpty()) {
+                history = alive
+                dead.forEach { dismissPreview(it.uri) }
+                save()
+            }
             // Disabling the automatic feed does not discard explicitly pinned images.
             val includeRecent = recentScreenshotsEnabled()
             media = if (hasPhotoAccess()) runCatching { queryRecentScreenshots(includeRecent) }
                 .getOrElse { clipboardMediaAfterRefreshFailure(media, includeRecent, pinnedKeys(), hidden) }
                 else emptyList()
+            // 相册/截图被删后 MediaStore 可能还留着记录；打开失败的条目不再显示。
+            media = media.filter { uriAvailable(it.uri) }
             // A screenshot taken in the last minute gets the same paste hint as a copied image.
             // It is read locally only; it enters clipboard history only if the user pastes it.
             if (includeRecent) media.filter { it.uri !in hidden }.maxByOrNull { it.timestamp }
@@ -390,6 +399,27 @@ class ClipboardImages private constructor(private val context: Context) {
         return recent + fixed
     }
 
+    /** 图片 URI 是否还能打开：自家缓存查文件，content:// 交给 ContentResolver 试探。 */
+    private fun uriAvailable(uri: String): Boolean = runCatching {
+        val parsed = Uri.parse(uri)
+        if (parsed.authority == "${context.packageName}.fileprovider") {
+            val name = parsed.lastPathSegment ?: return false
+            File(directory, name).isFile
+        } else if (!hasPhotoAccess()) {
+            // 没有图片权限时无法判断 MediaStore URI 是否有效，保留记录交给权限提示。
+            true
+        } else {
+            val descriptor = context.contentResolver.openAssetFileDescriptor(parsed, "r") ?: return false
+            descriptor.use { it.length != 0L }
+        }
+    }.getOrDefault(false)
+    /** 自家 FileProvider 的图片要确认缓存文件还在；MediaStore 记录由系统删除时自然消失。 */
+    private fun imageAvailable(image: ClipboardImage): Boolean {
+        val uri = Uri.parse(image.uri)
+        if (uri.authority != "${context.packageName}.fileprovider") return true
+        val name = uri.lastPathSegment ?: return false
+        return File(directory, name).isFile
+    }
     private fun save() {
         val array = JSONArray()
         history.forEach { item ->
@@ -404,7 +434,14 @@ class ClipboardImages private constructor(private val context: Context) {
     private fun publish() {
         _recentScreenshotsEnabled.value = recentScreenshotsEnabled()
         _screenshotsNeedAccess.value = recentScreenshotsWanted() && !hasPhotoAccess()
-        _images.value = retainedClipboardImages(history, media, pinnedKeys(), hidden)
+        // 缓存文件可能被系统/用户清掉；指向缺失文件的记录直接丢弃，避免剪贴板里出现空白卡片。
+        val (kept, missing) = history.partition { imageAvailable(it) }
+        if (missing.isNotEmpty()) {
+            history = kept
+            missing.forEach { dismissPreview(it.uri) }
+            save()
+        }
+        _images.value = retainedClipboardImages(kept, media, pinnedKeys(), hidden)
         // 历史和最近截图只供手动浏览，不从列表挑一张图片反复弹出。
         previewState.expire(System.currentTimeMillis())
         val image = preview.value

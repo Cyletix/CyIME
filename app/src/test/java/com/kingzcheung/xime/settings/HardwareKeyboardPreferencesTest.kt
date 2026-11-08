@@ -14,6 +14,7 @@ class HardwareKeyboardPreferencesTest {
     private val prefs = mock<SharedPreferences>()
     private val editor = mock<SharedPreferences.Editor>()
     private val values = mutableMapOf<String, Boolean>()
+    private val floatValues = mutableMapOf<String, Float>()
 
     @Before fun setUp() {
         whenever(context.getSharedPreferences(any(), any())).thenReturn(prefs)
@@ -23,6 +24,13 @@ class HardwareKeyboardPreferencesTest {
         }
         whenever(editor.putBoolean(any(), any())).thenAnswer {
             values[it.getArgument(0)] = it.getArgument<Boolean>(1)
+            editor
+        }
+        whenever(prefs.getFloat(any(), any())).thenAnswer {
+            floatValues[it.getArgument<String>(0)] ?: it.getArgument<Float>(1)
+        }
+        whenever(editor.putFloat(any(), any())).thenAnswer {
+            floatValues[it.getArgument(0)] = it.getArgument<Float>(1)
             editor
         }
     }

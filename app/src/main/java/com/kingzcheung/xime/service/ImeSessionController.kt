@@ -602,7 +602,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
 
     /** 将方案选项状态写入 librime user.yaml（var/option/<name>）。 */
     internal fun persistSchemaOption(name: String, value: Boolean) {
-        if (service.editorInputPolicy.scoped && name == "ascii_mode") return
+        // 中/英状态只属于当前会话，不写入 user.yaml；否则下次启动会被恢复成上次的英文。
+        if (name == "ascii_mode") return
         if (RimeEngine.isInitialized()) {
             service.rimeEngine.setUserConfigBool("var/option/$name", value)
         }
@@ -622,6 +623,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         for (def in defs) {
             // 标点宽度不从 user.yaml 恢复：它的权威来源是用户的「全角／半角」选择，
             // 由 applyPunctuationWidth 统一回写（否则这里会把用户选择覆盖成旧值）。
+            if (def.name == "ascii_mode") continue
             if (isPunctuationWidthSwitch(def)) continue
             // 简繁、表情也不从 user.yaml 恢复：权威来源是设置页的开关，由下面的 applyCandidateOptions 写回。
             if (def.name in SETTING_SWITCHES || def.name == "simplification" && cangjie) continue

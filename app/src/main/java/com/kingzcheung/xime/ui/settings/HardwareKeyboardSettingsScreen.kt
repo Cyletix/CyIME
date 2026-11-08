@@ -15,12 +15,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.HardwareKeyboardPreferences
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
     var options by remember { mutableStateOf(HardwareKeyboardPreferences.read(context)) }
+    var toolbarScale by remember { mutableStateOf(options.toolbarScale) }
     fun save(key: String, value: Boolean) {
         HardwareKeyboardPreferences.set(context, key, value)
         options = HardwareKeyboardPreferences.read(context)
@@ -79,6 +81,27 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             HardwareOption("语音输入", "浮条上的麦克风入口", !options.collapseVoice,
                 lockMessage = if (sttOn) null else "「语音转文本」关着") { save("collapse_voice", !it) }
             HardwareOption("设置", "浮条上的设置入口", !options.collapseSettings) { save("collapse_settings", !it) }
+            HardwareOption("闲置半透明", "3 秒无操作后浮条变半透明，触摸恢复", options.idleFade) { save("idle_fade", it) }
+            Text("浮条大小", style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Slider(
+                    value = toolbarScale,
+                    onValueChange = {
+                        toolbarScale = it
+                        HardwareKeyboardPreferences.setFloat(context, "toolbar_scale", it)
+                    },
+                    valueRange = 1f..1.5f,
+                    // Material3 1.4 默认在轨道末端画一个“停止点”，这里去掉。
+                    track = { state ->
+                        androidx.compose.material3.SliderDefaults.Track(
+                            sliderState = state,
+                            drawStopIndicator = null,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                androidx.compose.material3.Text("${(toolbarScale * 100).roundToInt()}%", Modifier.padding(start = 12.dp))
+            }
             Text("游戏", style = MaterialTheme.typography.titleMedium)
             HardwareOption("游戏直通", "游戏类应用里不显示键盘，按键直接交给游戏；按应用声明的类别识别",
                 options.gamePassthrough) { save("game_passthrough", it) }

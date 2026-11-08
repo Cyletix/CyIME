@@ -458,6 +458,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         hardwareKeyboardDisplay = hardwareKeyboardDisplay.withConnection(hasPhysicalTextKeyboard(devices))
     }
     private val hardwareToolbarPosition = mutableStateOf(HardwareToolbarPosition())
+    /** 输入框每次重新唤起键盘时加一，浮条据此重置闲置淡出。 */
+    private val hardwareToolbarShowToken = mutableStateOf(0)
     private var hardwareViewportWidthDp = 0f
     private var hardwareViewportHeightDp = 0f
     internal fun hardwareAssociationLimit(): Int {
@@ -1305,8 +1307,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     // onStartInput 在部署进行中会跳过 schema 切换与选项恢复，
                     // 部署完成后这里补齐 UI 状态，保证键盘可用
                     withContext(Dispatchers.IO) { sessionController.restorePersistedSchemaOptions() }
-                    val ascii = editorInputPolicy.engineAsciiOverride() ?: rimeEngine.isAsciiMode()
-                    uiState.value = uiState.value.copy(isAsciiMode = ascii)
+                    // 冷启动时引擎默认可能是 ASCII；没有输入框强制要求时按中文启动。
+                    val asciiOverride = editorInputPolicy.engineAsciiOverride()
+                    rimeEngine.setOption("ascii_mode", asciiOverride ?: false)
+
+                    val ascii = asciiOverride ?: false
                     keyboardViewModel.dispatch(com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
                         ascii, rimeEngine.getCurrentSchema()))
                     updateUI()
@@ -2403,6 +2408,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
                                 onSettings = { startActivity(settingsActivityIntent(this@XimeInputMethodService)) },
+                                idleFade = state.hardwareOptions.idleFade,
+                                scale = state.hardwareOptions.toolbarScale,
+                                showToken = hardwareToolbarShowToken.value,
+                                clipboardPanel = {
+                                    com.kingzcheung.xime.ui.menubar.ClipboardView(
+                                        clipboardItems = clipboardItemsState.value.filter { it.text.isNotBlank() },
+                                        quickSendItems = quickSendItemsState.value.filter { it.text.isNotBlank() },
+                                        selectedTab = 0,
+                                        backgroundColor = cardBg,
+                                        keyTextColor = hardwarePalette.candidateText,
+                                        keyBgColor = cardBg,
+                                        viewModel = keyboardViewModel,
+                                        onSelectItem = { text -> textCommit.selectClipboardItem(text) },
+                                        onSplitWords = { _, _ -> },
+                                    )
+                                },
                                 autoCollapse = buildSet {
                                     if (state.hardwareOptions.collapseKeyboard) add("keyboard")
                                     if (state.hardwareOptions.collapseLanguage) add("language")
@@ -2412,7 +2433,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     if (state.hardwareOptions.collapseSettings) add("settings")
                                 },
                                 // 「语音转文本」关着时物理键盘工具条不放麦克风。
-                                onVoice = if (state.isSttEnabled) ({ handleHardwareTool(HardwareToolShortcut.MICROPHONE) }) else null,
+                                onVoice = if (state.isSttEnabled) ({ toggleHardwareMicrophoneInPlace() }) else null,
                                 voiceActive = state.isVoiceMode,
                                 onSwitchLanguage = { switchHardwareLanguage() },
                                 languageLabel = hardwareLanguage,
@@ -2619,8 +2640,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     // 词库部署/加载期间键盘区显示加载页（之前没传进来，加载页从不出现）。
                                     isDeploying = state.isDeploying,
                                     deploymentMessage = state.deploymentMessage,
-                                    clipboardItems = clipboardItemsState.value,
-                                    quickSendItems = quickSendItemsState.value,
+                                        clipboardItems = clipboardItemsState.value,
+                                        quickSendItems = quickSendItemsState.value,
                                     recentClipboardItems = recentClipboardItemsState.value,
                                     isVoiceMode = state.isVoiceMode,
                                     voiceSticky = state.voiceSticky,
@@ -3791,6 +3812,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        hardwareToolbarShowToken.value++
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
         // 动态背景开着才查应用类别（每个包名只查一次，见 HardwareGamePackages）。
         backgroundMotionGame.value = com.kingzcheung.xime.settings.BackgroundMotionPreferences.read(this).enabled &&
@@ -4140,6 +4162,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** 浮条上的麦克风：只切换语音会话，不展开屏幕键盘。 */
+    private fun toggleHardwareMicrophoneInPlace() {
+        if (uiState.value.isVoiceMode) {
+            endVoiceSession()
+            microphoneRestoreCompact = false
+        } else if (!uiState.value.isSttEnabled) {
+            android.widget.Toast.makeText(this, "请先在设置中启用语音输入", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            microphoneRestoreCompact = true
+            keyboardCallbacks?.onVoiceStickyToggle?.invoke()
+        }
+    }
+
     private fun showScreenKeyboardFromHardware(route: OverlayRoute? = null) {
         if (!hasHardwareKeyboard) return
         hardwareKeyboardDisplay = hardwareKeyboardDisplay.showOnScreen()
@@ -4427,9 +4462,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 秘密输入框判定（密码/终端，不含 NO_SUGGESTIONS）：英文联想/回删替换的禁用线
         editorSecret = EditorInfoClassifier.isSecretEditor(attribute)
         TerminalEditor.active = EditorInfoClassifier.isTerminalEditor(attribute)
-        return editorInputPolicy.begin(attribute, restarting, uiState.value.isAsciiMode, uiState.value.currentSchemaId,
+        val presentation = editorInputPolicy.begin(attribute, restarting, uiState.value.isAsciiMode, uiState.value.currentSchemaId,
             addressEnglish = SettingsPreferences.getPrefsPublic(this).getBoolean(
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ADDRESS_FIELDS_ENGLISH_KEY, true))
+
+        return presentation
     }
 
     private fun clearInputState() {
