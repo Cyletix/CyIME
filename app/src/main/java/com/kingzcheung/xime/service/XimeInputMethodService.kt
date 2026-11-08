@@ -335,6 +335,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private val bottomInsetPxState = mutableStateOf(0)
     private val fixedBottomInsetPxState = mutableStateOf(0)
     private val fixedMinimumInsetPxState = mutableStateOf(0)
+    private val fixedBaselineInsetPxState = mutableIntStateOf(0)
     private val floatingMinimumInsetPxState = mutableStateOf(0)
     private var hasMeasuredBottomInsets = false
 
@@ -350,16 +351,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (insets != null) hasMeasuredBottomInsets = true
         val previousSuggestion = suggestedBottomDp()
         bottomInsetPxState.value = normal
-        val minimum = if (win != null && insets != null) fixedKeyboardMinimumInsetPx(insets, win, normal) else normal
-        fixedMinimumInsetPxState.value = minimum
+        val edge = SettingsPreferences.edgeToEdgeKeyboard(this)
+        val range = if (win != null && insets != null) fixedKeyboardBottomRange(insets, win, normal, edge)
+            else FixedBottomRange(normal, normal)
+        fixedMinimumInsetPxState.value = range.minimumPx
+        fixedBaselineInsetPxState.intValue = range.baselinePx
         // 贴底只管固定键盘：悬浮键盘的最低位置照旧按系统按钮和手势区算。
         floatingMinimumInsetPxState.value = if (win != null && insets != null)
-            floatingMinimumInsetPx(win, insets, fixedKeyboardMinimumInsetPx(insets, win, normal, edge = false)) else minimum
-        fixedBottomInsetPxState.value = if (win != null && insets != null)
-            fixedKeyboardBottomInsetPx(insets, win, normal, minimum) else normal
+            floatingMinimumInsetPx(win, insets, if (edge) fixedKeyboardBottomRange(insets, win, normal, false).minimumPx
+                else range.minimumPx) else range.minimumPx
+        fixedBottomInsetPxState.value = range.insetPx(SettingsPreferences.getKeyboardBottomAdjustmentDp(this),
+            resources.displayMetrics.density)
         // 设置页的「底部留白校准」看不到输入法窗口，记下这次量到的可调低范围，调低按到下限就停。
         if (insets != null) SettingsPreferences.setKeyboardBottomLoweringLimitDp(this,
-            suggestedBottomDp() - imeBottomSpaceDp(minimum, resources.displayMetrics.density))
+            imeBottomSpaceDp(range.baselinePx, resources.displayMetrics.density) -
+                imeBottomSpaceDp(range.minimumPx, resources.displayMetrics.density))
         val state = uiState.value
         if (state.isFloatingMode && !state.showKeyboardResize && previousSuggestion != suggestedBottomDp() &&
             SettingsPreferences.getFloatingOffsetY(this, resources.configuration.screenWidthDp > resources.configuration.screenHeightDp, -1) < 0) {
@@ -964,16 +970,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (key?.startsWith(com.kingzcheung.xime.settings.HardwareKeyboardPreferences.PREFIX) == true) {
                 uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
             }
+            if (SettingsPreferences.affectsBottomCalibration(this, key)) {
+                val decor = window.window?.decorView
+                val padding = SettingsPreferences.getKeyboardBottomPaddingDp(this)
+                if (uiState.value.keyboardBottomPaddingDp != padding)
+                    uiState.value = uiState.value.copy(keyboardBottomPaddingDp = padding)
+                updateKeyboardBottomInsets(decor?.rootWindowInsets)
+                decor?.requestApplyInsets()
+            }
             when (key) {
-                SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD, SettingsPreferences.KEY_KEYBOARD_BOTTOM_PADDING_DP,
-                SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP, SettingsPreferences.KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP -> {
-                    val decor = window.window?.decorView
-                    val padding = SettingsPreferences.getKeyboardBottomPaddingDp(this@XimeInputMethodService)
-                    if (uiState.value.keyboardBottomPaddingDp != padding)
-                        uiState.value = uiState.value.copy(keyboardBottomPaddingDp = padding)
-                    updateKeyboardBottomInsets(decor?.rootWindowInsets)
-                    decor?.requestApplyInsets()
-                }
                 SettingsPreferences.KEY_INPUT_TEXT_LOCATION -> syncInlinePinyinLocation()
                 RimeConfigHelper.DEPLOYMENT_REVISION, com.kingzcheung.xime.settings.LanguagePreferences.KEY -> {
                     val languagesOnly = key == com.kingzcheung.xime.settings.LanguagePreferences.KEY
@@ -1018,7 +1023,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 // 卡片顶角由 Compose 跟着改；模糊窗的圆角要在这里重新配一次。
                 SettingsPreferences.KEY_ROUNDED_KEYBOARD_TOP, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK -> updateKeyboardGlass()
-                SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
+                SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_opacity" -> {
                     com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this@XimeInputMethodService)
                     loadDarkModePreference()
                     applyWindowBackground()
@@ -2141,13 +2146,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val activeBottomDp = keyboardBottomSpaceDp(state)
                 val minimumBottomDp = imeBottomSpaceDp(fixedMinimumInsetPxState.value, resources.displayMetrics.density)
                 val editingFixedBottom = state.showKeyboardResize && !state.isFloatingMode
-                val edgeKeyboard = SettingsPreferences.edgeToEdgeKeyboard(this@XimeInputMethodService)
-                // 调节固定键盘时底边从哪里量起（11-03「用户点到哪儿就是哪儿」）：贴底时从屏幕底边量，底边能一直拖到屏幕底边，
-                // 调低过的也从它现在真实的位置开始，确认后停在拖到的地方；不贴底时仍从系统按钮上沿量，不会拖到按钮下面。
-                val previewInsetDp = if (!editingFixedBottom) activeBottomDp else if (edgeKeyboard) 0 else minimumBottomDp
-                // 「重置」回到的位置，和确认时换算校准值的基准：贴底时是贴底位置，不贴底时是系统建议。
-                val defaultBottomPadding = if (!editingFixedBottom) 0 else if (edgeKeyboard) minimumBottomDp
-                    else (imeBottomSpaceDp(bottomInsetPxState.value, resources.displayMetrics.density) - minimumBottomDp).coerceAtLeast(0)
+                val previewInsetDp = if (editingFixedBottom) minimumBottomDp else activeBottomDp
+                val defaultBottomPadding = if (editingFixedBottom)
+                    imeBottomSpaceDp(fixedBaselineInsetPxState.intValue, resources.displayMetrics.density) - minimumBottomDp else 0
                 val geometryBottomSpace = if (state.isFloatingMode) floatingMinY else
                     state.keyboardBottomPaddingDp + activeBottomDp
                 val protectedSize = resolveKeyboardSize(screenWidthDp, effectiveScreenH, geometryBottomSpace, state)
@@ -2655,7 +2656,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             val hapticView = LocalView.current
                             val resizeControls: (@Composable () -> Unit)? = if (state.showKeyboardResize) {
                                 {
-                              var bottomEdited by remember(state.isFloatingMode) { mutableStateOf(false) }
+                              var bottomEdited by remember(state.isFloatingMode, androidx.compose.ui.platform.LocalConfiguration.current.orientation) { mutableStateOf(false) }
                               KeyboardResizeOverlay(
                                      onPreviewControlsPositioned = if (!settingsPreviewEditor) null else { r ->
                                          if (settingsResizeBounds != r) {
@@ -3996,6 +3997,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         closeClipboardSearch(openBoard = false)
         applyCompactMode()
         loadDarkModePreference()
+        window.window?.decorView?.requestApplyInsets()
         applyWindowBackground()
         requestHardwareCursorUpdates()
     }

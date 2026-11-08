@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.selection.toggleable
@@ -650,18 +651,17 @@ private fun LayoutDisplayPage(
 
 /** 普通 Activity 中的校准入口，底边手势被系统拦走时仍可点按。 */
 @Composable
-private fun FixedBottomCalibrationSettings() {
+internal fun FixedBottomCalibrationSettings() {
     val context = LocalContext.current
-    var edge by remember(context) { mutableStateOf(SettingsPreferences.edgeToEdgeKeyboard(context)) }
-    var adjustment by remember(context) { mutableIntStateOf(SettingsPreferences.getKeyboardBottomAdjustmentDp(context)) }
-    var loweringLimit by remember(context) { mutableStateOf(SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)) }
-    DisposableEffect(context) {
+    val orientation = LocalConfiguration.current.orientation
+    val direction = if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) "横屏" else "竖屏"
+    var edge by remember(context, orientation) { mutableStateOf(SettingsPreferences.edgeToEdgeKeyboard(context)) }
+    var adjustment by remember(context, orientation) { mutableIntStateOf(SettingsPreferences.getKeyboardBottomAdjustmentDp(context)) }
+    var loweringLimit by remember(context, orientation) { mutableStateOf(SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)) }
+    DisposableEffect(context, orientation) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD ||
-                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_PADDING_DP || key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP ||
-                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP ||
-                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP) {
+            if (SettingsPreferences.affectsBottomCalibration(context, key, includeMeasuredLimit = true)) {
                 edge = SettingsPreferences.edgeToEdgeKeyboard(context)
                 adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context)
                 loweringLimit = SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)
@@ -671,24 +671,23 @@ private fun FixedBottomCalibrationSettings() {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     // 调低最多到安全下限（键盘量过才知道；没量过仍按 80 dp）：到了下限按钮变灰，数字也不再往下走。
-    // 贴底时从贴底位置还能再调低 80 dp（键盘那边到 0 为止），识别不出手势导航的手机也能自己去掉底下那段。
-    val lowest = if (edge) -80 else -(loweringLimit ?: 80).coerceIn(0, 80)
+    val lowest = -(loweringLimit ?: 80)
     val value = adjustment.coerceAtLeast(lowest)
-    val reference = if (edge) "安全下限" else "系统建议"
+    val reference = if (edge) "贴底位置" else "系统建议"
     val position = when {
-        value == 0 -> if (edge) "已选安全下限" else "使用系统建议"
+        value == 0 -> if (edge) "使用贴底位置" else "使用系统建议"
         value > 0 -> "从${reference}抬高 ${value} dp"
         else -> "从${reference}调低 ${-value} dp"
     }
     SettingsSection("固定键盘") {
         SettingsToggleItem(Icons.TwoTone.Keyboard, "手势导航时键盘贴底",
-            "忽略系统给的底部边衬区，固定键盘贴到屏幕底边；三键导航和任务栏照常占位。",
+            "只有手势条时，固定键盘可贴到屏幕底边。底部有系统按钮或任务栏时，末排停在它们上方。",
             checked = edge, onCheckedChange = { SettingsPreferences.setEdgeToEdgeKeyboard(context, it) },
             lockMessage = if (android.os.Build.VERSION.SDK_INT < 29) "需要 Android 10 或以上" else null)
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(position, style = MaterialTheme.typography.titleSmall)
-            Text("固定键盘下方空白太多就调低，底排被遮住就抬高。每次 2 dp，点按即保存。",
+            Text("当前调整${direction}留白，每次 2 dp。旋转屏幕可单独调整另一个方向。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(onClick = { SettingsPreferences.setKeyboardBottomAdjustmentDp(context, (value - 2).coerceAtLeast(lowest)) },

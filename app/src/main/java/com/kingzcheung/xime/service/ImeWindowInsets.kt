@@ -244,32 +244,32 @@ internal fun View.observeKeyboardBottomInsets(window: Window?, update: (WindowIn
     }
 }
 
-/**
- * 三键、任务栏、系统绘制的 IME 按钮和底部切口决定下限，不能用手动校准覆盖。
- * [edge]（「手势导航时键盘贴底」）打开且识别到手势导航时忽略系统给输入法的底部边衬区（11-03 用户反馈
- * 「全面屏手势底下有一个高度去不掉」）：系统可能把可点区域（tappableElement）、三星「隐藏键盘」按钮都报成整条按钮框高，
- * 贴底时不再为它们留位，只留屏幕底部缺口和本窗口里系统真画出来的输入法导航按钮。三键导航和大屏任务栏照旧整条留着。
- */
-internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
-    edge: Boolean = SettingsPreferences.edgeToEdgeKeyboard(window.context)): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return maxOf(normalPx,
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) insets.displayCutout?.safeInsetBottom ?: 0 else 0)
-    val context = window.context
-    val cutout = insets.displayCutout?.safeInsetBottom ?: 0
-    val tappable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-        insets.getInsets(WindowInsets.Type.tappableElement()).bottom
-    else @Suppress("DEPRECATION") insets.tappableElementInsets.bottom
-    val navButtons = imeNavButtonHeightPx(window)
-    val controls = maxOf(cutout, tappable, navButtons)
-    val safe = maxOf(normalPx, controls)
-    if (controls >= normalPx && !edge) return safe
-    if (context.resources.configuration.smallestScreenWidthDp >= 600) {
-        // 有些平板只把任务栏报为 navigationBars；大屏本身并不代表底部有任务栏。
-        val nav = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
-            else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
-        if (nav > 0) return maxOf(nav, controls)
+/** The starting reserve and the lowest position the last row can actually reach, in this IME window. */
+internal data class FixedBottomRange(val baselinePx: Int, val minimumPx: Int) {
+    fun insetPx(adjustmentDp: Int, density: Float): Int =
+        (baselinePx + adjustmentDp.coerceAtMost(0) * density).roundToInt().coerceAtLeast(minimumPx)
+}
+
+internal fun fixedKeyboardBottomRange(insets: WindowInsets, window: Window, normalPx: Int,
+    edge: Boolean = SettingsPreferences.edgeToEdgeKeyboard(window.context)): FixedBottomRange {
+    val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) insets.displayCutout?.safeInsetBottom ?: 0 else 0
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        val bottom = maxOf(normalPx, cutout)
+        return FixedBottomRange(bottom, bottom)
     }
+    val context = window.context
     val resolver = context.contentResolver
+    val config = context.resources.configuration
+    val density = context.resources.displayMetrics.density
+    @Suppress("DEPRECATION")
+    val nav = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        else insets.systemWindowInsetBottom
+    @Suppress("DEPRECATION")
+    val tappable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.tappableElement()).bottom
+        else insets.tappableElementInsets.bottom
+    @Suppress("DEPRECATION")
+    val mandatory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
+        else insets.mandatorySystemGestureInsets.bottom
     val mode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
     val vendorGesture = vendorGestureNavigationOn(Build.MANUFACTURER) { global, key ->
         readSetting {
@@ -277,24 +277,35 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
             else android.provider.Settings.Secure.getInt(resolver, key)
         }
     }
-    val mandatory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-        insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
-    else @Suppress("DEPRECATION") insets.mandatorySystemGestureInsets.bottom
-    // 贴底时再看系统自己的导航栏高度：有的厂商手势导航时 navigation_mode 仍写 0、自家开关也读不到，
-    // 但系统的 navigation_bar_height 已换成手势条那一小条（三键时是整条 48dp），这也算手势导航（11-03「调到最低还不行」）。
-    val navInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
-        else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
-    val density = context.resources.displayMetrics.density
     val gesture = bottomGestureZoneHeightPx(mandatory, tappable, mode, vendorGesture, 0) != null ||
-        (edge && (navBarResourceShowsGestureBar(systemNavBarHeightPx(context), normalPx, density) ||
-            insetsShowGestureNavigation(navInset, mandatory, tappable, density)))
-    if (!gesture) return safe
-    if (edge) return maxOf(cutout, navButtons)
-    if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&
-        readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_gesture_hint") } != 0 &&
-        readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_button_to_hide_keyboard") } == 1
-    ) return safe
-    return controls
+        (edge && (insetsShowGestureNavigation(nav, mandatory, tappable, density) ||
+            navBarResourceShowsGestureBar(systemNavBarHeightPx(context), nav, density) && tappable < nav))
+    val physical = maxOf(cutout, imeNavButtonHeightPx(window))
+    val system = maxOf(normalPx, physical, tappable)
+    val tabletBar = config.smallestScreenWidthDp >= 600 && nav > 0 &&
+        (!gesture || tappable > 0 || nav > GESTURE_ZONE_MAX_DP * density)
+    if (tabletBar || !gesture && (!edge || mode != null || vendorGesture == false)) {
+        val protected = maxOf(system, nav)
+        return FixedBottomRange(protected, protected)
+    }
+    // One UI can draw these buttons in SystemUI, outside the IME's NavigationBarFrame.
+    // The gesture hint is a separate setting. A hidden or side navigation bar reserves no bottom space.
+    val samsung = gestureStripVerifiedVendor(Build.MANUFACTURER)
+    val hide = if (samsung) readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_button_to_hide_keyboard") } else null
+    val picker = if (samsung) readSetting { android.provider.Settings.Secure.getInt(resolver, "show_keyboard_button") } else null
+    val samsungButtons = nav > 0 && (hide == 1 || picker == 1) &&
+        (config.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE || tappable > 0)
+    if (samsungButtons) {
+        val protected = maxOf(physical, nav, tappable)
+        return FixedBottomRange(maxOf(system, protected), protected)
+    }
+    if (!edge || !gesture) return FixedBottomRange(system, maxOf(physical, tappable))
+    // Some gesture IMEs report the entire navigation frame as tappable even when empty.
+    // Start above that ambiguous strip; explicit calibration may consume it. A smaller,
+    // independently reported button area or a measured system control always stays protected.
+    val minimum = if (tappable in 1 until nav) maxOf(physical, tappable) else physical
+    val baseline = if (samsung && hide == 0 && picker == 0) minimum else maxOf(minimum, tappable)
+    return FixedBottomRange(baseline, minimum)
 }
 
 /**
@@ -330,15 +341,10 @@ private fun screenBottomPx(window: Window): Int =
         @Suppress("DEPRECATION") window.windowManager.defaultDisplay.getRealSize(it)
     }.y
 
-/** 默认采用系统建议值，手动下调只消耗建议值中可调的一段。 */
-internal fun fixedKeyboardBottomInsetPx(insets: WindowInsets, window: Window, normalPx: Int,
-    minimumPx: Int = fixedKeyboardMinimumInsetPx(insets, window, normalPx)): Int {
-    val context = window.context
-    val adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context).coerceAtMost(0)
-    // 贴底时「调低」从贴底位置再往下调，可以一直到 0（识别不出手势导航的手机也能自己去掉那段）。
-    if (SettingsPreferences.edgeToEdgeKeyboard(context))
-        return (minimumPx + adjustment * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(0)
-    return (normalPx + adjustment * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(minimumPx)
+internal fun fixedKeyboardBottomInsetPx(insets: WindowInsets, window: Window, normalPx: Int): Int {
+    val range = fixedKeyboardBottomRange(insets, window, normalPx)
+    return range.insetPx(SettingsPreferences.getKeyboardBottomAdjustmentDp(window.context),
+        window.context.resources.displayMetrics.density)
 }
 
 /**

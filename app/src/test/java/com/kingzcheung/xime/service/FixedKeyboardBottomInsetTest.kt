@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.service
 
 import android.app.Activity
+import android.content.res.Configuration
 import android.graphics.Insets
 import android.graphics.Rect
 import android.provider.Settings
@@ -34,7 +35,48 @@ class FixedKeyboardBottomInsetTest {
     private fun mode(value: Int) = Settings.Secure.putInt(activity.contentResolver, "navigation_mode", value)
 
     /** 下面多数用例测「贴底」关着时的系统建议和校准；贴底默认开另有用例。 */
-    @Before fun edgeOff() = SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
+    @Before fun edgeOff() {
+        SettingsPreferences.getPrefsPublic(activity).edit().putBoolean(SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD, false).commit()
+    }
+
+    @Test fun eachOrientationKeepsItsLegacyGapUntilEditedAndResetsIndependently() {
+        val prefs = SettingsPreferences
+        val landscape = activity.createConfigurationContext(Configuration(activity.resources.configuration).apply {
+            orientation = Configuration.ORIENTATION_LANDSCAPE
+            screenWidthDp = 800
+            screenHeightDp = 360
+        })
+        val stored = prefs.getPrefsPublic(activity)
+        stored.edit().putInt(SettingsPreferences.KEY_KEYBOARD_BOTTOM_PADDING_DP, 16)
+            .putInt(SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP, 9)
+            .putInt(SettingsPreferences.KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP, 5)
+            .putInt(SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP, 30).commit()
+        assertEquals(16, prefs.getKeyboardBottomPaddingDp(activity))
+        assertEquals(16, prefs.getKeyboardBottomPaddingDp(landscape))
+        assertEquals(null, prefs.getKeyboardBottomLoweringLimitDp(landscape))
+        prefs.setKeyboardBottomAdjustmentDp(activity, -6)
+        prefs.setKeyboardBottomLoweringLimitDp(activity, 22)
+        assertEquals(16, prefs.getKeyboardBottomAdjustmentDp(landscape))
+        assertEquals(null, prefs.getKeyboardBottomLoweringLimitDp(landscape))
+        prefs.setEdgeToEdgeKeyboard(landscape, true)
+        prefs.setKeyboardBottomAdjustmentDp(landscape, -2)
+        prefs.setKeyboardBottomLoweringLimitDp(landscape, 8)
+        assertEquals(-6, prefs.getKeyboardBottomAdjustmentDp(activity))
+        assertEquals(false, prefs.edgeToEdgeKeyboard(activity))
+        assertEquals(22, prefs.getKeyboardBottomLoweringLimitDp(activity))
+        prefs.resetKeyboardBottomCalibration(activity)
+        assertEquals(0, prefs.getKeyboardBottomAdjustmentDp(activity))
+        prefs.setEdgeToEdgeKeyboard(activity, true)
+        assertEquals(0, prefs.getKeyboardBottomAdjustmentDp(activity))
+        assertEquals(-2, prefs.getKeyboardBottomAdjustmentDp(landscape))
+        assertEquals(true, prefs.edgeToEdgeKeyboard(landscape))
+        assertEquals(8, prefs.getKeyboardBottomLoweringLimitDp(landscape))
+        prefs.setEdgeToEdgeKeyboard(landscape, false)
+        assertEquals(-9, prefs.getKeyboardBottomAdjustmentDp(landscape))
+        prefs.setKeyboardBottomPaddingDp(landscape, 12)
+        assertEquals(0, prefs.getKeyboardBottomPaddingDp(activity))
+        assertEquals(12, prefs.getKeyboardBottomPaddingDp(landscape))
+    }
 
     @Test fun edgeIsOnByDefaultAndItsLoweringIsSeparateFromTheOldCalibration() {
         ShadowBuild.setManufacturer("OPPO")
@@ -49,11 +91,11 @@ class FixedKeyboardBottomInsetTest {
         // 三键导航：贴底默认开也不动，老的调低值不会搬过来压住按钮。
         mode(0)
         assertEquals(48, measure(controls = 48))
-        // 识别不出手势导航时，贴底下还能自己调低，一直到 0。
+        // 切到三键后，即使先前保存了较大的负值，末排也不能掉到导航键下面。
         SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -30)
-        assertEquals(18, measure(controls = 48))
+        assertEquals(48, measure(controls = 48))
         SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -80)
-        assertEquals(0, measure(controls = 48))
+        assertEquals(48, measure(controls = 48))
         // 关掉贴底回到原来的校准值和下限。
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
         assertEquals(-20, SettingsPreferences.getKeyboardBottomAdjustmentDp(activity))
@@ -93,7 +135,7 @@ class FixedKeyboardBottomInsetTest {
         val insets = WindowInsets.Builder().setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, 48))
             .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
         val normal = extractBottomInset(insets, activity.window)
-        val floor = fixedKeyboardMinimumInsetPx(insets, activity.window, normal)
+        val floor = fixedKeyboardBottomRange(insets, activity.window, normal).minimumPx
         assertEquals(0, floor)
         assertEquals(18, floatingMinimumInsetPx(activity.window, insets, floor))
         assertEquals(48, SettingsPreferences.getFloatingOffsetY(activity, defaultDp = normal))
@@ -118,8 +160,11 @@ class FixedKeyboardBottomInsetTest {
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
         assertEquals(0, measure())
         assertEquals(16, measure(cutout = 16))
-        // 贴底即忽略系统给的底部边衬区：手势导航时系统报的可点区域（常是整条按钮框）不再留位（11-03）。
-        assertEquals(0, measure(controls = 20))
+        // 局部可点区域要保留；报满整条但没有可确认按钮时，用户能校准掉多算的部分。
+        assertEquals(20, measure(controls = 20))
+        assertEquals(48, measure(controls = 48))
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -80)
+        assertEquals(20, measure(controls = 20))
         assertEquals(0, measure(controls = 48))
         assertEquals(16, measure(controls = 48, cutout = 16))
         mode(0)
@@ -178,7 +223,7 @@ class FixedKeyboardBottomInsetTest {
         assertEquals(0, imeWindowBottomGapPx(screenBottomPx = 1752, windowBottomPx = 1800))
     }
 
-    @Test fun samsungHideButtonKeepsRoomUnlessEdgeIsOn() {
+    @Test fun samsungExternalButtonsStayAboveTheBottomRowWithOrWithoutTheGestureHint() {
         ShadowBuild.setManufacturer("samsung")
         mode(2)
         Settings.Global.putInt(activity.contentResolver, "navigation_bar_gesture_hint", 1)
@@ -186,6 +231,14 @@ class FixedKeyboardBottomInsetTest {
         SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -48)
         assertEquals(48, measure())
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, true)
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -80)
+        assertEquals(48, measure())
+        Settings.Global.putInt(activity.contentResolver, "navigation_bar_gesture_hint", 0)
+        assertEquals(48, measure())
+        Settings.Global.putInt(activity.contentResolver, "navigation_bar_button_to_hide_keyboard", 0)
+        Settings.Secure.putInt(activity.contentResolver, "show_keyboard_button", 1)
+        assertEquals(48, measure())
+        Settings.Secure.putInt(activity.contentResolver, "show_keyboard_button", 0)
         assertEquals(0, measure())
         mode(0)
         assertEquals(48, measure(controls = 48))
@@ -199,9 +252,9 @@ class FixedKeyboardBottomInsetTest {
             .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, 30))
             .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 18)).build()
         val normal = extractBottomInset(insets, activity.window)
-        assertEquals(0, fixedKeyboardMinimumInsetPx(insets, activity.window, normal))
+        assertEquals(30, fixedKeyboardBottomRange(insets, activity.window, normal).minimumPx)
         assertEquals(30, floatingMinimumInsetPx(activity.window, insets,
-            fixedKeyboardMinimumInsetPx(insets, activity.window, normal, edge = false)))
+            fixedKeyboardBottomRange(insets, activity.window, normal, edge = false).minimumPx))
     }
 
     @Test fun visibleAndroidNavigationFrameProtectsItsRealTopOnAGesturePhone() {
@@ -261,6 +314,8 @@ class FixedKeyboardBottomInsetTest {
                 .setTappableElementInsets(Insets.of(0, 0, 0, tappable)).build()
             return fixedKeyboardBottomInsetPx(insets, activity.window, extractBottomInset(insets, activity.window))
         }
+        assertEquals(48, measureQ(48))
+        SettingsPreferences.setKeyboardBottomAdjustmentDp(activity, -48)
         assertEquals(0, measureQ(48))
         assertEquals(0, measureQ(0))
         SettingsPreferences.setEdgeToEdgeKeyboard(activity, false)
