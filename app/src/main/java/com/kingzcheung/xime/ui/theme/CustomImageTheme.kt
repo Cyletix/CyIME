@@ -46,10 +46,13 @@ object CustomImageTheme {
 
     fun hasImage(context: Context): Boolean = imageSource(context) != null
 
-    /** 这张背景是不是用户自己选的图（按存图的文件名认）。 */
-    fun isCustomImage(background: BackgroundConfig?): Boolean =
-        background?.type == "image" && listOfNotNull(background.src, background.srcDark)
-            .any { it.removePrefix("themes/").startsWith(FILE_PREFIX) }
+    /** 这张背景是不是用户自己选的图（按存图的文件名认，允许裸文件名、`themes/…` 和 `rime/themes/…` 等路径）。 */
+    fun isCustomImage(background: BackgroundConfig?): Boolean {
+        if (background?.type != "image") return false
+        val names = listOfNotNull(background.src, background.srcDark)
+            .map { it.substringAfterLast('/').substringAfterLast('\\') }
+        return names.any { it.startsWith(FILE_PREFIX) }
+    }
 
     /** 已存的图片（themes/…），没有时为 null。 */
     fun imageSource(context: Context): String? {

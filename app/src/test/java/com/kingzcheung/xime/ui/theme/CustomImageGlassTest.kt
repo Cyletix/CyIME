@@ -21,6 +21,18 @@ class CustomImageGlassTest {
         assertTrue(used.enabled)
     }
 
+    @Test fun customImageBarePathStillKeepsItsPictureUnderGlass() {
+        val custom = BackgroundConfig(type = "image", src = "custom-keyboard-bg-1793440000000.jpg")
+        assertTrue(CustomImageTheme.isCustomImage(custom))
+        assertEquals(1f, glass.forBackground(custom).backgroundOpacity)
+    }
+
+    @Test fun customImageNestedPathStillKeepsItsPictureUnderGlass() {
+        val custom = BackgroundConfig(type = "image", src = "rime/themes/custom-keyboard-bg-1793440000000.jpg")
+        assertTrue(CustomImageTheme.isCustomImage(custom))
+        assertEquals(1f, glass.forBackground(custom).backgroundOpacity)
+    }
+
     @Test fun builtInImagesAndOtherBackgroundsStayGlass() {
         val builtIn = BackgroundConfig(type = "image", src = "themes/desert.jpg")
         assertFalse(CustomImageTheme.isCustomImage(builtIn))

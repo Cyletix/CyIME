@@ -3,7 +3,6 @@ package com.kingzcheung.xime.ui.theme
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.BitmapShader
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RuntimeShader
 import android.os.Build
@@ -34,7 +33,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import com.kingzcheung.xime.settings.SettingsPreferences
@@ -114,8 +113,8 @@ internal fun Modifier.liquidGlassCap(cap: Modifier, radius: Dp): Modifier = comp
 }
 
 /**
- * 图片背景的边缘折射：在键帽底色下面，把键盘背景图按键的位置重画一遍，只有外圈约 5dp 往里弯、带一点色散，
- * 键中间几乎不动。没有图片、背景半透明（下面已经画过一层，再画会叠深）、Android 12 及以下都不画。
+ * 图片背景的边缘折射：只在键帽外圈约 5dp 取样并弯折，保留轻微色散，键中央直接透出键盘已画好的背景。
+ * 没有图片、背景半透明（再画会叠深）、Android 12 及以下都不画。
  * 不另存图片（直接用共用背景那张），按住时不鼓起，键盘不动就不重画。
  */
 private fun Modifier.liquidRefraction(radius: Dp): Modifier =
@@ -129,26 +128,25 @@ private fun Modifier.liquidRefraction33(radius: Dp): Modifier = composed {
     val image = backdrop.image ?: return@composed this
     val shader = LiquidRefractionShader.shared ?: return@composed this
     var origin by remember { mutableStateOf<Offset?>(null) }
-    onGloballyPositioned { origin = it.positionInWindow() }.drawWithCache {
+    onGloballyPositioned { origin = it.positionInRoot() }.drawWithCache {
         val bitmap = image.asAndroidBitmap()
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val imageShader = BitmapShader(bitmap, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
-        val matrix = Matrix()
+        val imageShader = BitmapShader(bitmap, android.graphics.Shader.TileMode.DECAL, android.graphics.Shader.TileMode.DECAL)
+            .apply { setFilterMode(BitmapShader.FILTER_MODE_LINEAR) }
         onDrawBehind {
             val at = origin ?: return@onDrawBehind
             val frame = backdrop.frame
             if (frame.size.width <= 0 || frame.size.height <= 0 || bitmap.width <= 0 || bitmap.height <= 0) return@onDrawBehind
-            val offset = frame.offsetIn(at)
-            // 和 frostedGlassBackground 一样：整张图拉伸到 frame，再平移到本键的坐标。
-            matrix.setScale(frame.size.width.toFloat() / bitmap.width, frame.size.height.toFloat() / bitmap.height)
-            matrix.postTranslate(offset.x, offset.y)
-            // 动态背景：和键盘本体同一个样子动（以背景框中心缩放，再平移）。
-            backdrop.motion?.transform?.takeUnless { it.isIdentity }?.let { t ->
-                matrix.postScale(t.scale, t.scale, offset.x + frame.size.width / 2f, offset.y + frame.size.height / 2f)
-                matrix.postTranslate(t.shiftX * frame.size.width, t.shiftY * frame.size.height)
-            }
-            imageShader.setLocalMatrix(matrix)
-            LiquidRefractionShader.bind(shader, imageShader, size.width, size.height, radius.toPx(), 5f * density, 9.5f * density)
+            val offset = frame.origin + backdrop.windowToRoot - at
+            val motion = backdrop.motion?.transform ?: BackgroundMotionTransform.Identity
+            val width = frame.size.width.toFloat()
+            val height = frame.size.height.toFloat()
+            // Same centre and translation as withSharedBackdropMotion. Both the frame and the key
+            // are relative to the Compose root, including while the IME window slides into place.
+            val left = offset.x + width * ((1f - motion.scale) / 2f + motion.shiftX)
+            val top = offset.y + height * ((1f - motion.scale) / 2f + motion.shiftY)
+            LiquidRefractionShader.bind(shader, imageShader, size.width, size.height, radius.toPx(), 5f * density, 9.5f * density,
+                left, top, bitmap.width / (width * motion.scale), bitmap.height / (height * motion.scale))
             paint.shader = shader
             drawIntoCanvas { it.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint) }
             paint.shader = null
@@ -167,31 +165,41 @@ private object LiquidRefractionShader {
         uniform float radius;
         uniform float bevel;
         uniform float strength;
+        uniform float2 imageOrigin;
+        uniform float2 pixelsPerUnit;
         half4 main(float2 p) {
             float2 c = iSize * 0.5;
             float r = min(radius, min(c.x, c.y));
             float2 rel = p - c;
             float2 q = abs(rel) - c + r;
             float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-            if (d > 0.5) return half4(0.0);
+            // The unbent centre already contains the actual backdrop, including slide crossfades.
+            if (d > 0.5 || d <= -bevel) return half4(0.0);
             float2 g = (q.x > 0.0 && q.y > 0.0) ? normalize(q) : ((q.x > q.y) ? float2(1.0, 0.0) : float2(0.0, 1.0));
             float2 n = g * sign(rel);
             float e = 1.0 - clamp(-d / bevel, 0.0, 1.0);
-            float2 off = -n * (strength * e * e * e) - rel * 0.015;
-            half4 col = half4(image.eval(p + off).r, image.eval(p + off * 1.03).g, image.eval(p + off * 1.06).b, 1.0);
-            return col * half(clamp(0.5 - d, 0.0, 1.0));
+            float2 uv = (p - imageOrigin) * pixelsPerUnit;
+            float2 off = -n * (strength * e * e * e) * pixelsPerUnit;
+            half4 red = image.eval(uv + off);
+            half4 green = image.eval(uv + off * 1.03);
+            half4 blue = image.eval(uv + off * 1.06);
+            half coverage = min(red.a, min(green.a, blue.a));
+            return half4(min(half3(red.r, green.g, blue.b), half3(coverage)), coverage)
+                * half(e * clamp(0.5 - d, 0.0, 1.0));
         }
     """
 
     val shared: RuntimeShader? by lazy { try { RuntimeShader(SOURCE) } catch (_: Throwable) { null } }
 
     fun bind(shader: RuntimeShader, image: android.graphics.Shader, width: Float, height: Float,
-        radius: Float, bevel: Float, strength: Float) {
+        radius: Float, bevel: Float, strength: Float, left: Float, top: Float, pixelsPerX: Float, pixelsPerY: Float) {
         shader.setInputShader("image", image)
         shader.setFloatUniform("iSize", width, height)
         shader.setFloatUniform("radius", radius)
         shader.setFloatUniform("bevel", bevel)
         shader.setFloatUniform("strength", strength)
+        shader.setFloatUniform("imageOrigin", left, top)
+        shader.setFloatUniform("pixelsPerUnit", pixelsPerX, pixelsPerY)
     }
 }
 

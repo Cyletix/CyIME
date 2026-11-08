@@ -144,7 +144,7 @@ class RealGlassBackdropTest {
                 "fixed_width_dp$suffix" to (screenWidthDp - 16),
                 "fixed_offset_x$suffix" to 0,
                 "keyboard_height_dp$suffix" to height,
-                "keyboard_bottom_padding_dp" to 0,
+                bottomPaddingFixtureKey(landscape) to 0,
                 "keyboard_opacity$suffix" to 1f,
                 "floating_width_dp$suffix" to (screenWidthDp * .65f).roundToInt().coerceIn(200, 400),
                 "floating_height_dp$suffix" to 260,

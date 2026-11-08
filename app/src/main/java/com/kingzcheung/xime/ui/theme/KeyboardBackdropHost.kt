@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -66,6 +67,8 @@ internal data class SharedKeyboardBackdrop(
     val reportSurfaceTop: (key: Any, top: Float?) -> Unit = { _, _ -> },
     /** 动态背景（[KeyboardBackgroundMotion]）；从共用背景取图的地方都按它当前的缩放、位移画，和键盘本体一起动。 */
     val motion: KeyboardBackgroundMotion? = null,
+    /** Translate this frame's window origin to the Compose root in which its keycaps are placed. */
+    val windowToRoot: Offset = Offset.Zero,
 )
 
 /** Lowest-window-y (highest on screen) of the surfaces still attached; null when none reported. */
@@ -110,6 +113,7 @@ internal fun KeyboardBackdropHost(
     @Suppress("NAME_SHADOWING") val background = background.withCurrentSlide(motion)
     val backdropGlass = glass.forBackground(background)
     var origin by remember { mutableStateOf(Offset.Zero) }
+    var windowToRoot by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     val surfaceTops = remember { mutableStateMapOf<Any, Float>() }
     val reportSurfaceTop: (Any, Float?) -> Unit = remember(surfaceTops) {
@@ -137,11 +141,13 @@ internal fun KeyboardBackdropHost(
             windowRoot = windowRoot,
             reportSurfaceTop = reportSurfaceTop,
             motion = motion,
+            windowToRoot = windowToRoot,
         )
     } else null
     val positionModifier = if (enabled) {
         Modifier.onGloballyPositioned {
             origin = it.positionInWindow()
+            windowToRoot = it.positionInRoot() - origin
             size = it.size
         }
     } else Modifier
