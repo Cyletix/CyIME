@@ -28,6 +28,16 @@ class LayoutGestureMenuItemsTest {
         assertEquals(listOf("flick_direction_disc_v2", "flick_direction_disc"), ToolbarButton.FLICK_DISC.gestureKeys())
     }
 
+    /** 用户 11-08：中文 26 键菜单里也要有滑行开关。中文键盘上它开关「中文滑行输入」，与英文滑行各管各的。 */
+    @Test fun glideToggleOnChineseKeyboardsFollowsChineseGlide() {
+        val english = prefs.copy(glideTyping = true, chineseGlideTyping = false)
+        assertTrue(ToolbarButton.GLIDE.gestureOn(english))
+        assertEquals(false, ToolbarButton.GLIDE.gestureOn(english, chinese = true))
+        assertTrue(ToolbarButton.GLIDE.gestureOn(english.copy(glideTyping = false, chineseGlideTyping = true), chinese = true))
+        assertEquals(listOf(KeyboardInputPreferences.CHINESE_GLIDE_KEY), ToolbarButton.GLIDE.gestureKeys(chinese = true))
+        assertEquals(listOf("glide_typing_v2", "glide_typing"), ToolbarButton.GLIDE.gestureKeys())
+    }
+
     @Test fun nineKeyGlideOwnsDirectionalDragsAndRestoresPreviousFlickSetting() {
         val glide = prefs.copy(t9GlideTyping = true, cursorGesture = CursorGestureMode.NONE)
         assertEquals(false, ToolbarButton.T9_FLICK.gestureOn(glide))

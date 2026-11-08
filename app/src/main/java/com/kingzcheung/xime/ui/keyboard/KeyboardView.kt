@@ -675,6 +675,9 @@ fun KeyboardView(
         // 开无痕前先确认：菜单里一碰就开，之后复制的内容不再进剪贴板，用户不知道为什么。关掉不用确认。
         var incognitoConfirm by remember(state.inputSessionId) { mutableStateOf(false) }
         val zhuyin = state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN
+        // 中文全拼、双拼 26 键：菜单里的「滑行输入」开关的是「中文滑行输入」（其他中文键盘不滑行，不出现）。
+        val chineseGlideMenu = !state.isAsciiMode &&
+            com.kingzcheung.xime.glide.chineseGlideSupported(state.inputProfile, state.currentSchemaId)
         val traditionalSwitchApplies = !state.isAsciiMode && !state.isHandwritingMode &&
             state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
             state.inputProfile.scheme in setOf(com.kingzcheung.xime.settings.InputScheme.PINYIN,
@@ -711,10 +714,10 @@ fun KeyboardView(
                     ToolbarButton.GLIDE, ToolbarButton.T9_FLICK, ToolbarButton.FOURTEEN_SWIPE,
                     ToolbarButton.KANA_HINTS, ToolbarButton.FLICK_DISC ->
                         if (item.button.appliesTo(state.inputProfile.layout.kind) &&
-                            // 这个开关是英文滑行：只在英文 26 键、且没被「键盘滑动」占用时显示（中文滑行在设置里单独开）。
+                            // 滑行开关：英文 26 键开关英文滑行，中文全拼、双拼 26 键开关中文滑行；被「键盘滑动」占用时不出现。
                             (item.button != ToolbarButton.GLIDE ||
-                                (state.isAsciiMode && inputPreferences.cursorGesture != CursorGestureMode.KEYBOARD)))
-                            ({ item.button.flipGesture(quickContext, inputPreferences) }) else return null
+                                ((state.isAsciiMode || chineseGlideMenu) && inputPreferences.cursorGesture != CursorGestureMode.KEYBOARD)))
+                            ({ item.button.flipGesture(quickContext, inputPreferences, chineseGlideMenu) }) else return null
                     ToolbarButton.SOUND -> ({
                         val on = !(quickToggles.sound || quickToggles.vibration)
                         SettingsPreferences.setSoundEnabled(quickContext, on)
@@ -781,7 +784,7 @@ fun KeyboardView(
                 ToolbarButton.FLOATING -> state.isFloatingMode
                 ToolbarButton.GLASS -> inputPreferences.frostedGlass.enabled
                 ToolbarButton.INCOGNITO -> quickToggles.incognito
-                in ToolbarButton.LAYOUT_GESTURES -> item.button.gestureOn(inputPreferences)
+                in ToolbarButton.LAYOUT_GESTURES -> item.button.gestureOn(inputPreferences, chineseGlideMenu)
                 ToolbarButton.FULL_SHAPE -> widthSwitch?.let { it.states.getOrNull(it.currentIndex) == "全角" } == true
                 ToolbarButton.TRADITIONAL -> if (zhuyin) !inputPreferences.zhuyinSimplified else inputPreferences.traditionalOutput
                 else -> false
