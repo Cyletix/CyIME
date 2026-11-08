@@ -15,6 +15,8 @@ data class CandidateState(
     /** 刚由滑行整词上屏的词；光标仍紧跟它时，下一个点按字母先补空格。 */
     val glidedWord: String = "",
     val isShowingRecentClipboard: Boolean = false,
+    /** 显示剪贴板时 [candidates] 开头有几项是提取出来的链接、长数字（前面的短胶囊），其余是原文。 */
+    val clipboardExtractedCount: Int = 0,
     /** 当前宿主是否支持英文候选的"回删替换"（终端等受限宿主为 false，不展示英文候选）。 */
     val englishReplaceSupported: Boolean = true,
     /** 候选词变换映射（插件 candidate_transform 能力）：与 [candidates] 平行；

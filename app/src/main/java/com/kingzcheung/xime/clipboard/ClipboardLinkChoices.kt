@@ -1,28 +1,39 @@
 package com.kingzcheung.xime.clipboard
 
 /**
- * 候选栏剪贴板胶囊里，带链接的那一条后面再给「干净链接」和 B 站的 BV 号（用户 11-01：
+ * 候选栏剪贴板胶囊里，带链接的那一条再给「干净链接」和 B 站的 BV 号（用户 11-01：
  * 复制 B 站分享是「标题 + 链接」一整段，想只贴链接；链接后面一大串跟踪参数要去掉，分 P、时间留着）。
+ * 夹在文字里的长数字（手机号、单号、卡号）也单独给一项，去掉中间的空格和横线（用户 11-08）。
  *
  * 只用已经读到的文字，不多读剪贴板，不联网：b23.tv 短链接展不开，只给短链接本身。
  */
 internal object ClipboardLinkChoices {
-    /** 候选栏的一项：[text] 是显示和粘贴的文字，[source] 是它来自哪一条剪贴板记录（标记已用时用原文）。 */
-    data class Choice(val source: Int, val text: String)
+    /**
+     * 候选栏的一项：[text] 是显示和粘贴的文字，[source] 是它来自哪一条剪贴板记录（标记已用时用原文），
+     * [extracted] 为 true 是从原文里提取出来的链接、BV 号或长数字。
+     */
+    data class Choice(val source: Int, val text: String, val extracted: Boolean = false)
 
     /**
-     * 带链接的那条先给干净链接（和原文不同才给）、BV 号（B 站视频才给），原文跟在后面：
-     * 「标题 + 链接」很长，原文放前面要横滑才看得到干净链接。没有链接的照旧只有原文。
+     * 候选栏分两个胶囊（用户 11-08）：前面短的放提取出来的（所有记录的提取项按记录顺序），
+     * 后面长的放原文。顺序就是提取项在前、原文在后，点选按这个顺序的下标回到记录。
+     * 什么都提取不出来时只有原文，照旧一个胶囊。
      */
-    fun expand(texts: List<String>): List<Choice> = texts.flatMapIndexed { index, text ->
-        linkChoices(text).map { Choice(index, it) } + Choice(index, text)
-    }
+    fun expand(texts: List<String>): List<Choice> = split(texts.indices.map { index ->
+        extractedChoices(texts[index]) to texts[index]
+    })
 
-    /** 同 [expand]，但记下的密码（#95）只给原文一项，不拆链接。 */
-    fun expandItems(items: List<ClipboardItem>): List<Choice> = items.flatMapIndexed { index, item ->
-        if (item.sensitive) listOf(Choice(index, item.text))
-        else linkChoices(item.text).map { Choice(index, it) } + Choice(index, item.text)
-    }
+    /** 同 [expand]，但记下的密码（#95）只给原文一项，不拆链接、不提数字。 */
+    fun expandItems(items: List<ClipboardItem>): List<Choice> = split(items.map { item ->
+        (if (item.sensitive) emptyList() else extractedChoices(item.text)) to item.text
+    })
+
+    private fun split(rows: List<Pair<List<String>, String>>): List<Choice> =
+        rows.flatMapIndexed { index, (extracted, _) -> extracted.map { Choice(index, it, extracted = true) } } +
+            rows.mapIndexed { index, (_, text) -> Choice(index, text) }
+
+    /** 候选栏前面那个短胶囊里有几项（[expandItems] 结果开头的这些都是提取项）。 */
+    fun extractedCount(items: List<ClipboardItem>): Int = expandItems(items).count { it.extracted }
 
     /** 候选栏上显示的字：密码显示成圆点，点了照常贴原文。 */
     fun shownText(items: List<ClipboardItem>, choice: Choice): String =
@@ -30,6 +41,9 @@ internal object ClipboardLinkChoices {
 
     /** 记下的密码在剪贴板面板和候选栏上显示成这样（#95）。 */
     const val SENSITIVE_MASK = "••••••••"
+
+    /** 一条剪贴板文字能提取出来的几项：先链接（干净链接、BV 号），再长数字；不含原文本身，什么都没有时为空。 */
+    fun extractedChoices(text: String): List<String> = (linkChoices(text) + numberChoices(text)).distinct()
 
     /** 一条剪贴板文字能多给的几项（不含原文本身），没有链接时为空。 */
     fun linkChoices(text: String): List<String> {
@@ -47,6 +61,32 @@ internal object ClipboardLinkChoices {
 
     fun firstLink(text: String): String? =
         linkPattern.find(text)?.value?.replace(trailing, "")?.takeIf { it.length > 4 }
+
+    /**
+     * 长数字：至少 [MIN_NUMBER_DIGITS] 位，数字之间可以隔一个空格或横线（138 1234 5678、090-1234-5678），
+     * 开头的 + 留着。前后连着字母或数字的不算（SF1234567 这种单号不拆半截）；带小数点、千分位的金额不算；
+     * 日期（2026-11-08、2026年11月8日）和链接里的数字先去掉，免得拼成一串假号码。最多给 [MAX_NUMBERS] 个。
+     */
+    fun numberChoices(text: String): List<String> {
+        val trimmed = text.trim()
+        var rest = linkPattern.replace(text, " ")
+        rest = datePattern.replace(rest, " ")
+        return numberPattern.findAll(rest).map { match ->
+            val value = match.value
+            (if (value.startsWith('+')) "+" else "") + value.filter { it.isDigit() }
+        }.filter { number -> number.count { it.isDigit() } in MIN_NUMBER_DIGITS..MAX_NUMBER_DIGITS && number != trimmed }
+            .distinct().take(MAX_NUMBERS).toList()
+    }
+
+    private const val MIN_NUMBER_DIGITS = 7
+    private const val MAX_NUMBER_DIGITS = 30
+    private const val MAX_NUMBERS = 3
+
+    // 隔开的每段至少两位，免得「第 1 2 3 名」这类被连成一串；+ 前面不能紧贴字母数字。
+    // 整串一次吃完不回退：「12345678abc」不会退成前几位算一个号码。
+    private val numberPattern = Regex(
+        "(?<![0-9A-Za-z+])(?<![0-9][.,])(?>\\+?[0-9]+(?:[ \\-][0-9]{2,})*)(?![0-9A-Za-z])(?![.,][0-9])")
+    private val datePattern = Regex("(?<![0-9])[0-9]{4}\\s*[-/.年]\\s*[0-9]{1,2}\\s*[-/.月]\\s*[0-9]{1,2}(?![0-9])\\s*日?")
 
     private fun host(url: String): String =
         url.substringAfter("://", url).substringBefore('/').substringBefore('?').substringBefore('#')

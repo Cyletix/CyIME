@@ -225,6 +225,37 @@ class ToolbarUiTest {
         rule.runOnIdle { assertEquals(listOf(original), pasted) }
     }
 
+    @Test fun extractedLinkSitsInAShortCapsuleBeforeTheOriginalAndBothScroll() {
+        val link = "https://example.com/" + "very-long-path/".repeat(6) + "end"
+        val original = "【一段很长的分享标题】".repeat(4) + " " + link + "?utm_source=share"
+        val pasted = mutableListOf<Int>()
+        rule.setContent {
+            MaterialTheme {
+                CandidateBar(
+                    state = CandidateBarState.ClipboardDisplay(listOf(link, original), extractedCount = 1),
+                    visuals = CandidateBarVisuals(Color.White, Color.Black, Color.Gray),
+                    callbacks = CandidateBarCallbacks(onCandidateSelect = { pasted += it }),
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        val short = rule.onNodeWithTag("clipboard-extracted-pill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val long = rule.onNodeWithTag("clipboard-preview-pill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("提取胶囊在原文前面", short.right <= long.left)
+        assertTrue("提取胶囊比原文短", short.width < long.width)
+        // 点前面贴提取的（下标 0），点后面贴原文（下标 1）。
+        rule.onNodeWithTag("clipboard-preview-text:0", useUnmergedTree = true).performClick()
+        rule.onNodeWithTag("clipboard-preview-text:1", useUnmergedTree = true).performClick()
+        rule.runOnIdle { assertEquals(listOf(0, 1), pasted) }
+        for (tag in listOf("clipboard-extracted-pill", "clipboard-preview-scroll")) {
+            val scroll = rule.onNodeWithTag(tag, useUnmergedTree = true)
+            scroll.performTouchInput { swipeLeft() }
+            assertTrue("$tag 可以左右拖", scroll.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange].value() > 0f)
+        }
+        // 拖动不算点选。
+        rule.runOnIdle { assertEquals(listOf(0, 1), pasted) }
+    }
+
     @Test
     fun shortCustomizePanelScrollsToCompleteLabelsAndKeepsTheExistingSelection() {
         val plugin = ToolbarButtonItem.Plugin(

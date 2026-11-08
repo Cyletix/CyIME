@@ -93,14 +93,16 @@ class ClipboardSensitiveTest {
     }
 
     @Test fun keptPasswordsShowAsDotsOnTheCandidateBarAndPasteTheirText() {
-        val items = listOf(ClipboardItem(1, "https://example.com/a?utm_source=x 密码", sensitive = true),
+        val items = listOf(ClipboardItem(1, "https://example.com/a?utm_source=x 密码 13812345678", sensitive = true),
             ClipboardItem(2, "https://example.com/b?utm_source=x"))
         val choices = ClipboardLinkChoices.expandItems(items)
-        // The password gives only its own text (no clean link); the ordinary link still gets one.
-        assertEquals(listOf(0, 1, 1), choices.map { it.source })
-        assertEquals(listOf(ClipboardLinkChoices.SENSITIVE_MASK, "https://example.com/b", "https://example.com/b?utm_source=x"),
+        // The password gives only its own text (no clean link, no number); the ordinary link still gets one,
+        // in the short capsule in front of the originals.
+        assertEquals(listOf(1, 0, 1), choices.map { it.source })
+        assertEquals(1, ClipboardLinkChoices.extractedCount(items))
+        assertEquals(listOf("https://example.com/b", ClipboardLinkChoices.SENSITIVE_MASK, "https://example.com/b?utm_source=x"),
             choices.map { ClipboardLinkChoices.shownText(items, it) })
-        assertEquals("https://example.com/a?utm_source=x 密码", choices[0].text)
+        assertEquals("https://example.com/a?utm_source=x 密码 13812345678", choices[1].text)
     }
 
     @Test fun keptPasswordIsPastedPrivately() {

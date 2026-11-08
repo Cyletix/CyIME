@@ -444,7 +444,8 @@ fun CandidateBar(
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
-            ClipboardPreviewBar(state.candidates, protectedVisuals, callbacks, iconButtonContainer, state.image)
+            ClipboardPreviewBar(state.candidates, protectedVisuals, callbacks, iconButtonContainer, state.image,
+                extractedCount = state.extractedCount)
             return@Column
         }
 
@@ -862,8 +863,14 @@ private fun ClipboardPreviewBar(
     callbacks: CandidateBarCallbacks,
     iconButtonContainer: Color,
     image: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
+    /** [candidates] 开头这几项是提取出来的链接、长数字：单独放在前面的短胶囊，后面的长胶囊放原文（用户 11-08）。 */
+    extractedCount: Int = 0,
 ) {
     val previews = remember(candidates) { candidates.map { it.replace(Regex("[\\r\\n]+"), " ") } }
+    // 有图片时照旧只有图片那一个胶囊。
+    val splitAt = if (image != null) 0 else extractedCount.coerceIn(0, previews.size)
+    val extracted = previews.subList(0, splitAt)
+    val originals = previews.subList(splitAt, previews.size)
     val textMeasurer = rememberTextMeasurer()
     val textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = 15.sp))
     val density = LocalDensity.current
@@ -874,61 +881,87 @@ private fun ClipboardPreviewBar(
     val capsuleColor = visuals.preeditBackgroundColor.takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.surfaceContainer
     val liquidEdge = com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn()
+    val capsuleModifier = Modifier.heightIn(min = 36.dp)
+        .clip(CircleShape)
+        .background(capsuleColor)
+        // 液态玻璃：强调色描边换成按键同款细亮边。
+        .then(if (liquidEdge) Modifier.liquidGlassEdge(CAPSULE_RADIUS)
+            else Modifier.border(1.dp, visuals.accentColor.copy(alpha = 0.45f), CircleShape))
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         KeyboardBackButton({ callbacks.onDismissClipboardPreview?.invoke() },
             iconButtonContainer, visuals.textColor, label = "返回工具栏")
         BoxWithConstraints(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+            val itemGapPx = with(density) { 16.dp.roundToPx() }
+            /** 一串预览排成一行要多宽；超过 [limitPx] 或有很长的一项就按 [limitPx] 算（反正要横滑）。 */
+            fun rowTextWidth(items: List<String>, limitPx: Int): Int {
+                var width = 0
+                for ((index, preview) in items.withIndex()) {
+                    if (width >= limitPx || preview.length > 80) return limitPx
+                    val itemWidth = textMeasurer.measure(preview, style = textStyle,
+                        maxLines = 1, softWrap = false).size.width
+                    width = (width + itemWidth + if (index == 0) 0 else itemGapPx).coerceAtMost(limitPx)
+                }
+                return width
+            }
             // Reserve space for both icons and the scroll area's padding. Short previews
             // size the capsule to their text; long previews keep the full scroll viewport.
             val chromeWidth = 82.dp
-            val maxTextWidthPx = with(density) { (maxWidth - chromeWidth).coerceAtLeast(0.dp).roundToPx() }
-            var textWidthPx = if (image != null) with(density) { 64.dp.roundToPx() }.coerceAtMost(maxTextWidthPx) else 0
-            if (image == null) for ((index, preview) in previews.withIndex()) {
-                if (textWidthPx >= maxTextWidthPx || preview.length > 80) {
-                    textWidthPx = maxTextWidthPx
-                    break
-                }
-                val itemWidth = textMeasurer.measure(preview, style = textStyle,
-                    maxLines = 1, softWrap = false).size.width
-                val itemPadding = if (index == 0) 0 else with(density) { 16.dp.roundToPx() }
-                textWidthPx = (textWidthPx + itemWidth + itemPadding).coerceAtMost(maxTextWidthPx)
-            }
-            val capsuleWidth = (chromeWidth + with(density) { textWidthPx.toDp() }).coerceAtMost(maxWidth)
-            Row(
-                Modifier.width(capsuleWidth).heightIn(min = 36.dp).testTag("clipboard-preview-pill")
-                    .clip(CircleShape)
-                    .background(capsuleColor)
-                    // 液态玻璃：强调色描边换成按键同款细亮边。
-                    .then(if (liquidEdge) Modifier.liquidGlassEdge(CAPSULE_RADIUS)
-                        else Modifier.border(1.dp, visuals.accentColor.copy(alpha = 0.45f), CircleShape))
-                    .padding(start = 12.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.ContentPaste, contentDescription = null,
-                    tint = visuals.textColor, modifier = Modifier.size(18.dp))
-                if (image != null) {
-                    ClipboardImagePreview(image,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                        onPaste = { callbacks.onClipboardImageSelect?.invoke(image) })
-                } else LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll"),
-                    overscrollEffect = null) {
-                    itemsIndexed(previews) { index, preview ->
-                        // 预览可横向滚动全部内容；换行仅在显示时折成空格，粘贴仍使用原文。
-                        Text(preview, color = visuals.textColor, fontSize = 15.sp, maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.testTag("clipboard-preview-text:$index")
-                                .clickable { callbacks.onCandidateSelect(index) }
-                                .padding(vertical = verticalTextPadding, horizontal = if (index == 0) 0.dp else 8.dp))
+            val extractedChrome = 24.dp
+            val availablePx = with(density) { maxWidth.roundToPx() }
+            val capsuleGapPx = if (extracted.isEmpty()) 0 else with(density) { CLIPBOARD_CAPSULE_GAP.roundToPx() }
+            val chromePx = with(density) { chromeWidth.roundToPx() }
+            val extractedChromePx = with(density) { extractedChrome.roundToPx() }
+            val originalWantPx = chromePx + if (image != null) with(density) { 64.dp.roundToPx() }
+                .coerceAtMost((availablePx - chromePx).coerceAtLeast(0)) else rowTextWidth(originals, availablePx)
+            val extractedWantPx = if (extracted.isEmpty()) 0 else extractedChromePx + rowTextWidth(extracted, availablePx)
+            val (extractedWidthPx, originalWidthPx) = clipboardCapsuleWidths(availablePx, capsuleGapPx, extractedWantPx, originalWantPx)
+            Row(horizontalArrangement = Arrangement.spacedBy(CLIPBOARD_CAPSULE_GAP), verticalAlignment = Alignment.CenterVertically) {
+                if (extracted.isNotEmpty()) {
+                    // 前面的短胶囊：提取出来的链接、长数字，太长同样可以左右拖着看。
+                    LazyRow(capsuleModifier.width(with(density) { extractedWidthPx.toDp() })
+                        .testTag("clipboard-extracted-pill").padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically, overscrollEffect = null) {
+                        itemsIndexed(extracted) { index, preview ->
+                            Text(preview, color = visuals.accentColor, fontSize = 15.sp, maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.testTag("clipboard-preview-text:$index")
+                                    .clickable { callbacks.onCandidateSelect(index) }
+                                    .padding(vertical = verticalTextPadding, horizontal = if (index == 0) 0.dp else 8.dp))
+                        }
                     }
                 }
-                Box(Modifier.size(30.dp).clip(CircleShape)
-                    .then(if (image != null) Modifier.testTag("clipboard-image-more") else Modifier)
-                    .clickable {
-                        (callbacks.onOpenClipboard ?: if (image != null) callbacks.onExpandClipboardImages else null)?.invoke()
-                    },
-                    contentAlignment = Alignment.Center) {
-                    Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "打开剪贴板",
-                        tint = visuals.accentColor, modifier = Modifier.size(22.dp))
+                Row(
+                    capsuleModifier.width(with(density) { originalWidthPx.toDp() }).testTag("clipboard-preview-pill")
+                        .padding(start = 12.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.ContentPaste, contentDescription = null,
+                        tint = visuals.textColor, modifier = Modifier.size(18.dp))
+                    if (image != null) {
+                        ClipboardImagePreview(image,
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            onPaste = { callbacks.onClipboardImageSelect?.invoke(image) })
+                    } else LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll"),
+                        overscrollEffect = null) {
+                        itemsIndexed(originals) { index, preview ->
+                            // 预览可横向滚动全部内容；换行仅在显示时折成空格，粘贴仍使用原文。
+                            val candidateIndex = splitAt + index
+                            Text(preview, color = visuals.textColor, fontSize = 15.sp, maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.testTag("clipboard-preview-text:$candidateIndex")
+                                    .clickable { callbacks.onCandidateSelect(candidateIndex) }
+                                    .padding(vertical = verticalTextPadding, horizontal = if (index == 0) 0.dp else 8.dp))
+                        }
+                    }
+                    Box(Modifier.size(30.dp).clip(CircleShape)
+                        .then(if (image != null) Modifier.testTag("clipboard-image-more") else Modifier)
+                        .clickable {
+                            (callbacks.onOpenClipboard ?: if (image != null) callbacks.onExpandClipboardImages else null)?.invoke()
+                        },
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "打开剪贴板",
+                            tint = visuals.accentColor, modifier = Modifier.size(22.dp))
+                    }
                 }
             }
         }
@@ -942,6 +975,21 @@ private fun ClipboardPreviewBar(
             Spacer(Modifier.size(40.dp))
         }
     }
+}
+
+private val CLIPBOARD_CAPSULE_GAP = 8.dp
+
+/**
+ * 剪贴板两个胶囊各占多宽（像素）：放得下就各按内容宽；放不下时提取胶囊最多拿 40%（原文短就多给它一些），
+ * 剩下的给原文胶囊，两边内容多出来的都靠左右拖着看。没有提取项时提取胶囊为 0，原文胶囊和以前一样。
+ */
+internal fun clipboardCapsuleWidths(availablePx: Int, gapPx: Int, extractedWantPx: Int, originalWantPx: Int): Pair<Int, Int> {
+    if (extractedWantPx <= 0) return 0 to originalWantPx.coerceIn(0, availablePx.coerceAtLeast(0))
+    val room = (availablePx - gapPx).coerceAtLeast(0)
+    if (extractedWantPx + originalWantPx <= room) return extractedWantPx to originalWantPx
+    val extractedCap = maxOf((room * 0.4f).toInt(), room - originalWantPx)
+    val extracted = extractedWantPx.coerceAtMost(extractedCap)
+    return extracted to (room - extracted).coerceAtMost(originalWantPx)
 }
 
 /** Use the exact same explicit primary style for rendering and width measurement. */

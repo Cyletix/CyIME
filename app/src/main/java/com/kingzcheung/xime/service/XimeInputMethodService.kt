@@ -3731,6 +3731,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // 回到输入框（微信退出聊天再进来）第一下退格只去收起这个看不见的剪贴板，不删字（用户 11-01）。
             candidateState.value = candidateState.value.copy(
                 candidates = clipboardBarTexts(recentClipboardItemsState.value),
+                clipboardExtractedCount = com.kingzcheung.xime.clipboard.ClipboardLinkChoices.extractedCount(recentClipboardItemsState.value),
                 clipboardImage = recentImage,
                 smsVerificationCode = clipboardManager.verificationCode.value?.text,
                 candidateComments = emptyList(),
@@ -3754,6 +3755,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     rimeEngine.clearComposition()
                     candidateState.value = candidateState.value.copy(
                         candidates = clipboardBarTexts(items),
+                        clipboardExtractedCount = com.kingzcheung.xime.clipboard.ClipboardLinkChoices.extractedCount(items),
                         clipboardImage = image,
                         smsVerificationCode = clipboardManager.verificationCode.value?.text,
                         candidateComments = emptyList(),

@@ -1044,7 +1044,7 @@ fun KeyboardView(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
-                railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage,
+                railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage, cs.clipboardExtractedCount,
                 cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
                 hardwareCandidateHighlight, glossRevision, glossChinese, glossSwap,
             ) {
@@ -1080,6 +1080,7 @@ fun KeyboardView(
                         isCalculatorActive = state.isCalculatorMode,
                         smsVerificationCode = cs.smsVerificationCode,
                         clipboardImage = cs.clipboardImage,
+                        clipboardExtractedCount = cs.clipboardExtractedCount,
                         highlightIndex = if (expandedDataMode || !cs.usesT9CandidateNavigation(state.inputProfile)) 0
                             else cs.highlightedCandidateIndex,
                         hardwareHighlightIndex = hardwareCandidateHighlight,

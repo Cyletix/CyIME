@@ -31,6 +31,8 @@ sealed interface CandidateBarState {
         val candidates: List<String> = emptyList(),
         val smsVerificationCode: String? = null,
         val image: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
+        /** [candidates] 开头这几项是提取出来的链接、长数字，放在前面的短胶囊；0 时只有原文一个胶囊。 */
+        val extractedCount: Int = 0,
     ) : CandidateBarState
 
     data class Calculator(
@@ -53,6 +55,7 @@ sealed interface CandidateBarState {
             isCalculatorActive: Boolean = false,
             smsVerificationCode: String? = null,
             clipboardImage: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
+            clipboardExtractedCount: Int = 0,
             highlightIndex: Int = 0,
             hardwareHighlightIndex: Int? = null,
             associationHighlightIndex: Int? = null,
@@ -63,7 +66,8 @@ sealed interface CandidateBarState {
             val hasInput = inputText.isNotEmpty()
             return when {
                 isShowingRecentClipboard && (hasCandidates || clipboardImage != null) ->
-                    ClipboardDisplay(candidates = candidates, smsVerificationCode = smsVerificationCode, image = clipboardImage)
+                    ClipboardDisplay(candidates = candidates, smsVerificationCode = smsVerificationCode, image = clipboardImage,
+                        extractedCount = clipboardExtractedCount.coerceIn(0, candidates.size))
                 isCalculatorActive && hasCandidates ->
                     Calculator(candidates = candidates, comments = candidateComments)
                 isComposing && (hasCandidates || hasInput) ->
