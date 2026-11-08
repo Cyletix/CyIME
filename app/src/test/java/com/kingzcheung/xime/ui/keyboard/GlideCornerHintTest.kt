@@ -47,6 +47,7 @@ class GlideCornerHintTest {
     private val codes: MutableList<String> = Collections.synchronizedList(mutableListOf())
     private var schema by mutableStateOf("rime_ice")
     private var ascii by mutableStateOf(false)
+    private var boardWidth by mutableStateOf(400)
 
     private fun show(glide: Boolean = true, chinese: Boolean = true, preview: Boolean = false) {
         val app = ApplicationProvider.getApplicationContext<Application>()
@@ -58,10 +59,10 @@ class GlideCornerHintTest {
         rule.setContent {
             CompositionLocalProvider(LocalKeyboardExplicitWidth provides true, LocalKeyboardInputPreferences provides preferences) {
                 MaterialTheme {
-                    Box(Modifier.requiredSize(400.dp, 260.dp)) {
+                    Box(Modifier.requiredSize(boardWidth.dp, 260.dp)) {
                         KeyboardLayout({ typed += it }, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
                             onGlideWord = { words, _ -> codes += "en:${words.first().word}" }, onGlideCode = { codes += it }),
-                            KeyboardUiState(currentSchemaId = schema, isAsciiMode = ascii), ascii, Modifier.requiredSize(400.dp, 260.dp))
+                            KeyboardUiState(currentSchemaId = schema, isAsciiMode = ascii), ascii, Modifier.requiredSize(boardWidth.dp, 260.dp))
                     }
                 }
             }
@@ -100,13 +101,13 @@ class GlideCornerHintTest {
         return typed.toList()
     }
 
-    @Test fun glidingBoardsKeepCornerHintsAndVerticalSwipesStillType() {
+    @Test fun glidingBoardsKeepCornerHintsButNeverTypeThemOnADrag() {
         show()
         for ((id, english) in listOf("rime_ice" to false, "double_pinyin_flypy" to false, "rime_ice" to true)) {
             use(id, english)
             for (key in listOf("q", "f", "m")) {
                 assertTrue("$id english=$english $key 角标照常", hints(key).isNotEmpty())
-                assertEquals("$id english=$english $key 下拉仍出一个符号", 1, pullDown(key).size)
+                assertTrue("$id english=$english $key 滑行时不提交角标", pullDown(key).isEmpty())
             }
         }
     }
@@ -114,6 +115,7 @@ class GlideCornerHintTest {
     @Test fun cornerHintsStayWithoutGlide() {
         show(glide = false, chinese = false)
         assertTrue(hints("q").isNotEmpty())
+        assertEquals(1, pullDown("q").size)
     }
 
     @Test fun englishGlideAloneLeavesTheChineseBoardAsBefore() {
@@ -133,13 +135,14 @@ class GlideCornerHintTest {
         assertTrue("14 键不滑行，角标照旧", hints(first).isNotEmpty())
     }
 
-    private fun glide(word: String, lift: Boolean = true) {
+    private fun glide(word: String, lift: Boolean = true, pause: Long = 0) {
         val host = rule.onRoot().fetchSemanticsNode().boundsInRoot
         fun letter(char: Char) = rule.onNodeWithTag("qwerty-key:$char", true).fetchSemanticsNode().boundsInRoot.center - host.topLeft
         val path = word.map(::letter)
         rule.onRoot().performTouchInput {
             down(path.first())
             path.zipWithNext().forEach { (a, b) -> for (step in 1..6) moveTo(a + (b - a) * (step / 6f)) }
+            if (pause > 0) advanceEventTime(pause)
             if (lift) up()
         }
     }
@@ -175,5 +178,17 @@ class GlideCornerHintTest {
         rule.waitUntil(5000) { codes.isNotEmpty() }
         assertEquals(listOf("nihao"), codes.toList())
         assertEquals("滑行不出单个字母", emptyList<String>(), typed.toList())
+    }
+
+    @Test fun deShortGlideWorksOnNormalAndOneHandBoardsWithoutTypingACorner() {
+        show(glide = false, chinese = true)
+        for (width in listOf(400, 240)) {
+            rule.runOnIdle { boardWidth = width; typed.clear(); codes.clear() }
+            rule.waitForIdle()
+            glide("de")
+            rule.waitUntil(5000) { codes.isNotEmpty() }
+            assertEquals("width=$width", listOf("de"), codes.toList())
+            assertEquals("短滑行不额外输入 d 或角标", emptyList<String>(), typed.toList())
+        }
     }
 }

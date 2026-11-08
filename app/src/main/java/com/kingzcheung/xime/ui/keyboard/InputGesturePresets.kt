@@ -106,7 +106,9 @@ data class InputGestureLock(val option: Option, val lockedValue: Any, val by: St
  */
 object InputGestureLocks {
     fun of(settings: KeyboardInputPreferences): List<InputGestureLock> = buildList {
-        if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) {
+        if (settings.t9GlideTyping && settings.cursorGesture != CursorGestureMode.KEYBOARD) {
+            add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, true, "九键滑行输入"))
+        } else if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) {
             add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "按键角标的符号和数字：长按输入"))
         }
         if (settings.glideTyping) {

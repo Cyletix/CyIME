@@ -79,7 +79,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 SettingsSection(title = "滑行", content = {
                     // 「键盘滑动」移光标和滑行冲突：照常显示，被锁时置灰并写明被谁锁（见 InputGestureLocks）。
                     SettingsToggleItem(Icons.TwoTone.Gesture, "滑行输入",
-                        "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
+                        "英文 26 键手指划过字母出整词，候选栏可换成其他词；字母键向任何方向滑动都用于滑词，到相邻字母即可松手。",
                         checked = settings.glideTyping, onCheckedChange = {
                             settings = settings.copy(glideTyping = it); settings.save(context)
                         },
@@ -89,7 +89,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.GLIDE_TYPING)
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.Gesture, "中文滑行输入",
-                        "中文全拼、双拼 26 键划一个词的拼音，接着划或点按都接在后面，照常选字；竖着滑一行仍输入角标符号。",
+                        "中文全拼、双拼 26 键划一个词的拼音，接着划或点按都接在后面，照常选字；字母键向任何方向滑动都用于滑词，到相邻字母即可松手。",
                         checked = settings.chineseGlideTyping, onCheckedChange = {
                             settings = settings.copy(chineseGlideTyping = it); settings.save(context)
                         },
@@ -162,7 +162,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsSection(title = "九键手势", content = {
                         SettingsToggleItem(Icons.TwoTone.Gesture, "九键滑行输入",
-                            "一笔划过一个词的几个键，松手后按词库认出这笔划的是哪几个键，再照常选词：划 5→2→4 可以选“来”，从 9 直接划到 4 是 94，路过的键不算。",
+                            "一笔划过一个词的几个键，松手后按词库认出这笔划的是哪几个键，再照常选词：划 5→2→4 可以选“来”，从 9 直接划到 4 是 94，路过的键不算。开启后 2～9 键滑动只用于滑词。",
                             checked = settings.t9GlideTyping, onCheckedChange = {
                                 settings = settings.copy(t9GlideTyping = it); settings.save(context)
                             },
@@ -174,11 +174,11 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
                             "左、上、右、下依次输入键上的第 1～4 个字母(7、9 用到下)，点按仍是九键输入；" +
                                 "开启后长按输入数字、不再弹出字母菜单。",
-                            checked = settings.t9FlickLetters, onCheckedChange = {
+                            checked = settings.t9FlickLetters && glideLock == null, onCheckedChange = {
                                 settings = settings.copy(t9FlickLetters = it); settings.save(context)
                             },
                             // 角标“长按”时数字占了长按，拂动必须开着：锁成开，不能关。
-                            lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                            lockMessage = glideLock?.message ?: com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
                                 com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, false)
                                 ?.takeIf { settings.t9FlickLetters }?.message)
                         HorizontalDivider()

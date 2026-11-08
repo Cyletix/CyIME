@@ -528,6 +528,7 @@ fun KeyboardLayout(
         LocalHoneycombKeys provides honeycomb,
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
         LocalShiftSlideTargets provides shiftSlideTargets,
+        LocalLetterGlide provides glideEnabled,
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(uiState.themeId, uiState.isDarkTheme), specialKeyTextColor),
         LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBackgroundColor, specialKeyTextColor),

@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import com.kingzcheung.xime.glide.GlideTracker
 
+internal val LocalLetterGlide = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 /**
  * 滑行时手指走过的轨迹（键盘本地坐标）和实时预览的词，抬手即清空。
  * [gesture] 在每次确认为滑行时加一：上一笔还没算完的预览对不上就丢掉。
@@ -109,6 +111,15 @@ internal fun Modifier.glideTyping(
                 if (!tracker.claimed && event.changes.any { it.id != down.id && it.pressed }) break
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 if (!tracker.claimed && change.isConsumed) break
+                // 抬手也是最后一个轨迹点：短滑行可能在这里才到达相邻字母。
+                // 历史采样必须用各自的时刻，不能把整批都算成最后一刻。
+                change.historical.forEach { sample ->
+                    local += sample.position
+                    tracker.move(sample.position.x + origin.x, sample.position.y + origin.y, sample.uptimeMillis, change.uptimeMillis)
+                }
+                local += change.position
+                tracker.move(change.position.x + origin.x, change.position.y + origin.y, change.uptimeMillis)
+                if (tracker.abandoned) break
                 if (!change.pressed) {
                     if (tracker.claimed) {
                         change.consume()
@@ -116,11 +127,6 @@ internal fun Modifier.glideTyping(
                     }
                     break
                 }
-                (change.historical.map { it.position } + change.position).forEach { position ->
-                    local += position
-                    tracker.move(position.x + origin.x, position.y + origin.y, change.uptimeMillis)
-                }
-                if (tracker.abandoned) break
                 if (tracker.claimed) {
                     if (trail.points.isEmpty()) trail.startGesture()
                     change.consume()

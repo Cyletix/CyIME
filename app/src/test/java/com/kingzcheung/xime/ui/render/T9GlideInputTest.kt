@@ -118,7 +118,7 @@ class T9GlideInputTest {
         org.junit.Assert.assertFalse(input.contains("56"))
     }
 
-    @Test fun ordinaryFieldUsesNormalDigitQueueAndSingleKeyFlick() {
+    @Test fun ordinaryFieldUsesNormalDigitQueueWithoutAFlick() {
         show(true, inPreeditEditor = false)
         val five = centerOf("JKL"); val two = centerOf("ABC"); val four = centerOf("GHI")
         board.performTouchInput { down(five); moveTo(two); moveTo(four); up() }
@@ -129,7 +129,7 @@ class T9GlideInputTest {
             verify(controller).onDigitPressed("4")
         }
         board.performTouchInput { down(five); moveTo(five + Offset(28f, 0f)); up() }
-        verify(controller).onLetterFlicked("L")
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).onLetterFlicked("L")
     }
 
     @Test fun nineKeySettingsAreIndependentOfLetterKeyboardGlide() {

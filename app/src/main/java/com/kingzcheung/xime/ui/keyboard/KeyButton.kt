@@ -308,6 +308,7 @@ fun SwipeableKeyButton(
     swipeUpKeyLabel: String? = null,
     /** All corner-symbol keys use the same preference; dedicated icon actions are separate. */
     followSymbolSwipeDirection: Boolean = true,
+    keepSymbolSwipeOnLongPress: Boolean = false,
     /** Literal upper-hint input, independent of whether its visual hint is enabled. */
     symbolInputText: String? = null,
     onSwipe: ((String) -> Unit)? = null,
@@ -404,6 +405,8 @@ fun SwipeableKeyButton(
             letters[if (ctrlTapFraction[0] < 0.5f) 0 else 1].toString() else letters
         if (ctrlTargets?.ctrlTap(pick) != true) onClick()
     }
+    val reserveDragForGlide = (LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true) ||
+        (LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true)
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -459,7 +462,7 @@ fun SwipeableKeyButton(
         onLongPressSelect = onLongPressSelect,
         longPressTimeoutMillis = longPressTimeoutMillis,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ).withSymbolInput(symbolInputMode, symbolInputText).let {
+    ).withSymbolInput(symbolInputMode, symbolInputText, keepSymbolSwipeOnLongPress).let {
         if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
     }
     val inputActions = LocalKeyboardInputActions.current

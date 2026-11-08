@@ -28,6 +28,13 @@ class LayoutGestureMenuItemsTest {
         assertEquals(listOf("flick_direction_disc_v2", "flick_direction_disc"), ToolbarButton.FLICK_DISC.gestureKeys())
     }
 
+    @Test fun nineKeyGlideOwnsDirectionalDragsAndRestoresPreviousFlickSetting() {
+        val glide = prefs.copy(t9GlideTyping = true, cursorGesture = CursorGestureMode.NONE)
+        assertEquals(false, ToolbarButton.T9_FLICK.gestureOn(glide))
+        assertEquals("九键滑行输入", InputGestureLocks.lockFor(glide, InputGestureLock.Option.T9_FLICK_LETTERS, true)?.by)
+        assertTrue(ToolbarButton.T9_FLICK.gestureOn(glide.copy(t9GlideTyping = false)))
+    }
+
     @Test fun arrangeableTogglesInDefaultMenuBeforeArrange() {
         assertTrue(ToolbarButton.LAYOUT_GESTURES.all { it in ToolbarButton.CUSTOMIZABLE && it in ToolbarButton.TOGGLES })
         val menu = QuickActionLayout.defaultMenu(emptyList())

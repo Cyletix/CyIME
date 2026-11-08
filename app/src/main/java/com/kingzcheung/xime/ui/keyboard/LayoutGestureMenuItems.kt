@@ -20,7 +20,8 @@ internal fun ToolbarButton.appliesTo(kind: LayoutKind): Boolean = when (this) {
 
 internal fun ToolbarButton.gestureOn(prefs: KeyboardInputPreferences): Boolean = when (this) {
     ToolbarButton.GLIDE -> prefs.glideTyping
-    ToolbarButton.T9_FLICK -> prefs.t9FlickLetters
+    ToolbarButton.T9_FLICK -> prefs.t9FlickLetters &&
+        InputGestureLocks.lockFor(prefs, InputGestureLock.Option.T9_FLICK_LETTERS, true) == null
     ToolbarButton.FOURTEEN_SWIPE -> prefs.fourteenLetterSwipe
     ToolbarButton.KANA_HINTS -> prefs.kanaDirectionHints
     ToolbarButton.FLICK_DISC -> prefs.flickDirectionDisc

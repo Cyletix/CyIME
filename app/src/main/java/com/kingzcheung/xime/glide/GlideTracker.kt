@@ -4,11 +4,11 @@ import com.kingzcheung.xime.keyboard.LetterKeyRect
 import kotlin.math.abs
 
 /**
- * 判断一次触摸是不是滑行。只有确认是滑行后才接管手势，此前点按、上下滑符号、长按照常。
+ * 判断一次触摸是不是滑行。只有确认是滑行后才接管手势，静止时仍可点按、长按。
  *
  * - 必须从字母键起手；按住超过 [HOLD_MS] 才移动的留给长按，不再接管。
- * - 竖着滑一行（上下滑符号）不接管：要么经过至少三个字母键且横向跨过 [MIN_SPAN_KEYS] 个键宽
- *   或纵向跨过两行，要么两个字母键之间以横向为主、跨过 [MIN_SPAN_KEYS] 个键宽（as、we 这类相邻词）。
+ * - 距离按实际键宽高计算，单手/悬浮缩小时也不必横跨整个键。
+ * - 跨入另一字母并达到解码最短距离就接管，各方向相同。
  */
 class GlideTracker(
     private val keys: Map<Char, LetterKeyRect>,
@@ -38,19 +38,18 @@ class GlideTracker(
     fun ys(): FloatArray = pointsY.toFloatArray()
 
     /** 加入一个轨迹点；返回本次是否刚刚确认为滑行。 */
-    fun move(x: Float, y: Float, time: Long): Boolean {
+    fun move(x: Float, y: Float, time: Long, eventTime: Long = time): Boolean {
         if (abandoned) return false
         if (!moved && (abs(x - startX) > touchSlop || abs(y - startY) > touchSlop)) {
             moved = true
-            if (time - downTime > HOLD_MS && !claimed) { abandoned = true; return false }
+            // 批量历史采样到达时，长按可能已经触发；不能用较早的采样时间反过来抢走它。
+            if (eventTime - downTime > HOLD_MS && !claimed) { abandoned = true; return false }
         }
         add(x, y)
         if (claimed) return false
         val spanX = (maxX - minX) / keyWidth
         val spanY = (maxY - minY) / keyHeight
-        val horizontal = abs(x - startX) > abs(y - startY)
-        claimed = (visited.size >= 3 && (spanX >= MIN_SPAN_KEYS || spanY >= MIN_ROWS)) ||
-            (visited.size >= 2 && horizontal && spanX >= MIN_SPAN_KEYS)
+        claimed = moved && visited.size >= 2 && kotlin.math.hypot(spanX, spanY) >= MIN_SPAN_KEYS
         return claimed
     }
 
@@ -68,8 +67,8 @@ class GlideTracker(
 
     companion object {
         const val HOLD_MS = 300L
-        const val MIN_SPAN_KEYS = 0.9f
-        const val MIN_ROWS = 1.9f
+        // 不低于解码器的最短轨迹，否则接管后会吞掉没有候选的短划。
+        const val MIN_SPAN_KEYS = GlideDecoder.MIN_PATH_KEYS
     }
 }
 

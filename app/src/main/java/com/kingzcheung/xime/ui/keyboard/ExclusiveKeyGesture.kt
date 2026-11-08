@@ -89,6 +89,7 @@ internal fun letterSwipeCornerLabels(key: String): Pair<String?, String?> {
 }
 
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
+    reserveDragForGlide: Boolean = false,
     currentActions: () -> KeyGestureActions,
 ) = coroutineScope {
     val gestureScope = this
@@ -135,6 +136,8 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 if (!longPressed && (abs(dx) > viewConfiguration.touchSlop || abs(dy) > viewConfiguration.touchSlop)) {
                     moved = true
                     longPressJob?.cancel()
+                    // The layout owns this drag even if it ends too short to decode a word.
+                    if (reserveDragForGlide) break
                 }
                 val slop = viewConfiguration.touchSlop
                 // Back at the key's own centre also means the centre choice, for presses that began
