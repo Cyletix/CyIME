@@ -146,6 +146,24 @@ class OnlineSpeechApiTest {
         override fun close() { socket.close(); thread.join(2000) }
     }
 
+    @Test fun customRequestTestsUseTheSameEndpointAndResponsePathAsDictation() {
+        FakeServer {  path -> if (path == "/v1/custom") 200 to """{"data":[{"value":"测试"}]}""" else 404 to "{}" }.use { server ->
+            val config = OnlineSpeechApi.Config(server.base + "/custom", "test-key", "custom-model",
+                bodyTemplate = """{"model":"{{model}}","audio":"{{audio}}"}""", textPath = "data.0.value")
+            OnlineSpeechApi.save(app, config)
+            assertTrue(OnlineSpeechApi.test(app).startsWith("可用"))
+            val request = JSONObject(server.bodies.single())
+            assertEquals("custom-model", request.getString("model"))
+            assertTrue(request.getString("audio").startsWith("UklGR"))
+            OnlineSpeechApi.save(app, config.copy(textPath = "data.0.missing"))
+            assertTrue(OnlineSpeechApi.test(app).startsWith("不可用"))
+        }
+        FakeServer { 401 to """{"error":{"message":"denied"}}""" }.use { server ->
+            configure(server.base, "whisper-1")
+            assertTrue(OnlineSpeechApi.test(app).startsWith("不可用"))
+        }
+    }
+
     private fun configure(baseUrl: String, model: String) {
         app.getSharedPreferences("online_speech_api", 0).edit().clear().commit()
         OnlineSpeechApi.save(app, OnlineSpeechApi.Config(baseUrl, "sk-test", model))

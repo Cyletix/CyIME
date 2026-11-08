@@ -46,7 +46,19 @@ object OnlineSpeechApi {
     private const val KEY_PLUGIN_MIGRATED = "plugin_migrated"
     private const val SAMPLE_RATE = 16000
 
-    data class Config(val baseUrl: String, val apiKey: String, val model: String, val appId: String = "")
+    data class Config(val baseUrl: String, val apiKey: String, val model: String, val appId: String = "",
+        val bodyTemplate: String = "", val textPath: String = "")
+
+    data class Preset(val name: String, val url: String, val model: String)
+    val presets = listOf(
+        Preset("OpenAI", DEFAULT_BASE_URL, DEFAULT_MODEL),
+        Preset("Groq", "https://api.groq.com/openai/v1", "whisper-large-v3-turbo"),
+        Preset("硅基流动", "https://api.siliconflow.cn/v1", "FunAudioLLM/SenseVoiceSmall"),
+        Preset("小米 MiMo", "https://api.xiaomimimo.com/v1", "mimo-v2.5-asr"),
+        Preset("阿里百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen3-asr-flash"),
+        Preset("腾讯 TokenHub", "https://tokenhub.tencentmaas.com/v1/wand/asrproxy/sync_transcribe", "hy-asr-3.0-preview"),
+        Preset("火山引擎（豆包）", "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async", VolcengineSpeechApi.DEFAULT_STREAM_RESOURCE),
+    )
 
     private val client by lazy {
         OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
@@ -61,7 +73,8 @@ object OnlineSpeechApi {
         Config(it?.getString(KEY_BASE_URL, null)?.let(::cleanUrl)?.takeIf { url -> url.isNotBlank() } ?: DEFAULT_BASE_URL,
             cleanToken(it?.getString(KEY_API_KEY, "").orEmpty()),
             it?.getString(KEY_MODEL, null)?.let(::cleanToken)?.takeIf { model -> model.isNotBlank() } ?: DEFAULT_MODEL,
-            cleanToken(it?.getString(KEY_APP_ID, "").orEmpty()))
+            cleanToken(it?.getString(KEY_APP_ID, "").orEmpty()),
+            it?.getString("body_template", "").orEmpty(), it?.getString("text_path", "").orEmpty())
     }
 
     private val URL_IN_TEXT = Regex("(?i)(?:https?|wss?)://[^\\s•·，。、；;,\"'<>()（）]+")
@@ -79,6 +92,7 @@ object OnlineSpeechApi {
     fun save(context: Context, config: Config) {
         prefs(context)?.edit()?.putString(KEY_BASE_URL, config.baseUrl.trim())?.putString(KEY_API_KEY, config.apiKey.trim())
             ?.putString(KEY_MODEL, config.model.trim())?.putString(KEY_APP_ID, config.appId.trim())
+            ?.putString("body_template", config.bodyTemplate.trim())?.putString("text_path", config.textPath.trim())
             ?.remove(KEY_STATUS)?.apply()
     }
 
@@ -97,9 +111,11 @@ object OnlineSpeechApi {
     /** 用一秒静音真正调用一次转写接口：地址、密钥、模型都对才算可用。在后台线程调用。 */
     fun test(context: Context): String {
         val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val tested = config(context)
         val status = if (!isConfigured(context)) "未填写密钥"
             else transcribe(context, ByteArray(SAMPLE_RATE * 2), InputLanguage.CHINESE)
                 .fold({ "可用（$time 测试）" }, { "不可用：${it.message}（$time 测试）" })
+        if (config(context) != tested) return status(context)
         prefs(context)?.edit()?.putString(KEY_STATUS, status)?.apply()
         return status
     }
@@ -203,6 +219,9 @@ object OnlineSpeechApi {
         require(config.apiKey.isNotBlank()) { "未填写密钥" }
         // 请求头只能是英文字符；密钥里混进中文或符号时 OkHttp 会把整个密钥写进报错，这里先拦下。
         require(config.apiKey.all { it in '!'..'~' }) { "密钥里有多余的文字，请重新粘贴密钥" }
+        if (config.bodyTemplate.isNotBlank()) {
+            return@runCatching post(config.baseUrl, config, wav(pcm), language)
+        }
         if (VolcengineSpeechApi.isVolcengine(config.baseUrl)) {
             return@runCatching VolcengineSpeechApi.transcribe(client, config.baseUrl, config.appId, config.apiKey,
                 config.model, pcm, ::httpError)
@@ -234,7 +253,7 @@ object OnlineSpeechApi {
      */
     internal fun liveSession(context: Context, onPartial: (String) -> Unit): VolcengineSpeechApi.LiveSession? {
         val config = config(context)
-        if (config.apiKey.isBlank() || !config.apiKey.all { it in '!'..'~' } || !VolcengineSpeechApi.isLive(config.baseUrl)) return null
+        if (config.bodyTemplate.isNotBlank() || config.apiKey.isBlank() || !config.apiKey.all { it in '!'..'~' } || !VolcengineSpeechApi.isLive(config.baseUrl)) return null
         return VolcengineSpeechApi.LiveSession(client, config.baseUrl, config.appId, config.apiKey, config.model, ::httpError, onPartial)
     }
 
@@ -242,6 +261,15 @@ object OnlineSpeechApi {
     private fun post(url: String, config: Config, wav: ByteArray, language: InputLanguage): String {
         val chat = url.endsWith("/chat/completions")
         val body = when {
+            config.bodyTemplate.isNotBlank() -> {
+                // Replace complete JSON string values so model names and audio cannot break the JSON.
+                val body = config.bodyTemplate.replace("\"{{audio}}\"", JSONObject.quote(Base64.getEncoder().encodeToString(wav)))
+                    .replace("\"{{model}}\"", JSONObject.quote(config.model))
+                    .replace("\"{{language}}\"", JSONObject.quote(language.id))
+                require("\"{{audio}}\"" in config.bodyTemplate) { "请求体缺少 {{audio}} 字段值" }
+                require(runCatching { JSONObject(body) }.isSuccess) { "请求体不是有效的 JSON 对象" }
+                body.toRequestBody("application/json".toMediaType())
+            }
             // 语种不传：中英混说、方言都交给接口自己认。
             isTokenHub(url) -> JSONObject().put("model", config.model).put("data", Base64.getEncoder().encodeToString(wav))
                 .put("voice_encode_format", "wav").toString().toRequestBody("application/json".toMediaType())
@@ -269,6 +297,15 @@ object OnlineSpeechApi {
             }
             checkNotNull(json) { "接口返回的格式看不懂" }
             businessError(json)?.let { error(it) }
+            if (config.bodyTemplate.isNotBlank() && config.textPath.isNotBlank()) {
+                var value: Any? = json
+                for (key in config.textPath.split('.')) value = when (val obj = value) {
+                    is JSONObject -> obj.opt(key)
+                    is JSONArray -> key.toIntOrNull()?.let { obj.opt(it) }
+                    else -> null
+                }
+                return value as? String ?: error("响应中找不到指定的文字字段")
+            }
             if (chat) return (chatText(json) ?: error("接口返回的格式看不懂")).trim()
             return (extractText(json, 0) ?: if (json.optString("status") == "completed") "" else error("接口返回的格式看不懂")).trim()
         }

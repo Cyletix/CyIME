@@ -246,12 +246,17 @@ internal fun OnlineSpeechApiSection() {
     var apiKey by remember { mutableStateOf(saved.apiKey) }
     var model by remember { mutableStateOf(saved.model) }
     var appId by remember { mutableStateOf(saved.appId) }
+    var bodyTemplate by remember { mutableStateOf(saved.bodyTemplate) }
+    var textPath by remember { mutableStateOf(saved.textPath) }
+    var expanded by remember { mutableStateOf(saved.bodyTemplate.isNotBlank() || api.presets.none { it.url == saved.baseUrl && it.model == saved.model }) }
+    var menu by remember { mutableStateOf(false) }
+    var custom by remember { mutableStateOf(api.presets.none { it.url == saved.baseUrl }) }
     var status by remember { mutableStateOf(api.status(context)) }
     var testing by remember { mutableStateOf(false) }
     var configured by remember { mutableStateOf(api.isConfigured(context)) }
     var preferOnline by remember { mutableStateOf(api.isActive(context)) }
     fun save() {
-        api.save(context, com.kingzcheung.xime.speech.OnlineSpeechApi.Config(baseUrl, apiKey, model, appId))
+        api.save(context, com.kingzcheung.xime.speech.OnlineSpeechApi.Config(baseUrl, apiKey, model, appId, bodyTemplate, textPath))
         status = api.status(context)
         configured = api.isConfigured(context)
         if (!configured && preferOnline) {
@@ -263,17 +268,42 @@ internal fun OnlineSpeechApiSection() {
     val volcengine = com.kingzcheung.xime.speech.VolcengineSpeechApi.isVolcengine(baseUrl)
     SettingsSection(title = "在线语音") {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            androidx.compose.material3.OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it; save() },
+            Box {
+                androidx.compose.material3.OutlinedButton(onClick = { menu = true }, enabled = !testing) {
+                    Text(if (custom) "自定义接口" else api.presets.firstOrNull { it.url == baseUrl }?.name ?: "自定义接口")
+                }
+                androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    api.presets.forEach { preset ->
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(preset.name) }, onClick = {
+                            if (baseUrl != preset.url) { apiKey = ""; appId = "" }
+                            baseUrl = preset.url; model = preset.model; bodyTemplate = ""; textPath = ""
+                            custom = false; expanded = false; menu = false; save()
+                        })
+                    }
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("自定义接口") }, onClick = {
+                        custom = true; expanded = true; menu = false
+                    })
+                }
+            }
+            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "收起接口配置" else "修改接口配置") }
+            if (expanded) androidx.compose.material3.OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it; save() },
                 label = { Text("接口地址") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("speech-api-url"))
-            if (volcengine) androidx.compose.material3.OutlinedTextField(value = appId, onValueChange = { appId = it; save() },
+            if (volcengine && (expanded || appId.isNotBlank())) androidx.compose.material3.OutlinedTextField(value = appId, onValueChange = { appId = it; save() },
                 label = { Text("App ID") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("speech-api-app-id"))
             androidx.compose.material3.OutlinedTextField(value = apiKey, onValueChange = { apiKey = it; save() },
                 label = { Text(if (!volcengine) "API 密钥" else if (appId.isBlank()) "API Key" else "Access Token") }, singleLine = true,
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth().testTag("speech-api-key"))
-            androidx.compose.material3.OutlinedTextField(value = model, onValueChange = { model = it; save() },
+            if (expanded) androidx.compose.material3.OutlinedTextField(value = model, onValueChange = { model = it; save() },
                 label = { Text(if (volcengine) "资源 ID" else "模型") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("speech-api-model"))
+            if (expanded && !volcengine) {
+                androidx.compose.material3.OutlinedTextField(value = bodyTemplate, onValueChange = { bodyTemplate = it; save() },
+                    label = { Text("自定义 POST 请求体（可选）") }, supportingText = { Text("留空沿用服务商格式。自定义时填完整地址，JSON 可用 {{audio}}、{{model}} 和 {{language}} 作为字符串值。") },
+                    modifier = Modifier.fillMaxWidth())
+                if (bodyTemplate.isNotBlank()) androidx.compose.material3.OutlinedTextField(value = textPath, onValueChange = { textPath = it; save() },
+                    label = { Text("响应文字路径（可选）") }, placeholder = { Text("例如 data.text") }, modifier = Modifier.fillMaxWidth())
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("状态：$status", style = MaterialTheme.typography.bodyMedium,
                     color = if (status.startsWith("可用")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -284,10 +314,9 @@ internal fun OnlineSpeechApiSection() {
                         status = withContext(Dispatchers.IO) { api.test(context) }
                         testing = false
                     }
-                }, modifier = Modifier.testTag("speech-api-test")) { Text("测试") }
+                }, modifier = Modifier.testTag("speech-api-test")) { Text("检测连接") }
             }
-            Text(if (volcengine) "火山引擎：新版控制台填 API Key，App ID 留空；旧版填 App ID 和 Access Token。资源 ID 如 volc.seedasr.sauc.duration，要和控制台开通的一致。密钥只存在本机。"
-                else "OpenAI 兼容接口填到 /v1 为止，如 Groq、硅基流动、小米 MiMo(模型 mimo-v2.5-asr)；腾讯 TokenHub 填完整的 sync_transcribe 地址；火山引擎(豆包)填 wss:// 开头的地址。密钥只存在本机。",
+            Text(if (volcengine) "新版填 API Key。旧版在接口配置里填写 App ID 和 Access Token。" else "密钥保存在本机。检测连接会向所选服务发送一秒测试静音。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (configured) SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "优先使用在线语音",
