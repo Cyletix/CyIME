@@ -22,8 +22,10 @@ object CellDictionaryCatalog {
     const val BUILTIN_CATEGORY = "内置词库"
     const val AI_CATEGORY = "编程与 AI"
     // Built-ins share the big categories of the Sogou offers, so a category lists both.
+    // None is default-on since 2026-11-08 (用户反馈「默认只开一个游戏字库」): new installs start with only the
+    // main dictionary; installs that already saw 明日方舟 keep their switch (CellDictionaryStore.installBuiltin seeds once).
     val builtins = listOf(
-        BuiltinCellDictionary("builtin_arknights", "明日方舟", "电子游戏", "https://wiki.arkrec.com/", defaultOn = true),
+        BuiltinCellDictionary("builtin_arknights", "明日方舟", "电子游戏", "https://wiki.arkrec.com/"),
         // tools/dictionaries/topics/build_topic_dict.py; Chinese words with their English names and IDs.
         BuiltinCellDictionary("builtin_dota2", "Dota2", "电子游戏"),
         BuiltinCellDictionary("builtin_cs2", "CS2 / CSGO", "电子游戏"),

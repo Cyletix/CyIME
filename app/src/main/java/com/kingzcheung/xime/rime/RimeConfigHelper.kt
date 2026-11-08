@@ -274,7 +274,7 @@ object RimeConfigHelper {
         } catch (e: Exception) {
             FileLogger.e(TAG, "Failed to sync spelling patches", e)
         }
-        // 内置分类词库（如明日方舟）随 APK 更新，首次默认开启；失败不影响输入法启动。
+        // 内置分类词库（如明日方舟）随 APK 更新，新装默认都关着；失败不影响输入法启动。
         try {
             com.kingzcheung.xime.settings.CellDictionaryManager.syncBuiltins(context)
         } catch (e: Exception) {

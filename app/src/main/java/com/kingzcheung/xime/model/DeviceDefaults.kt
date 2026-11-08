@@ -32,6 +32,8 @@ object DeviceDefaults {
             val effects = DeviceKeyEffectDefaults.choose(hardware)
             editor.putString(TIER, profile.tier.name)
                 .putString(VOICE, profile.voiceModel)
+                // 新装默认连续联想（用户 11-08）；老用户没存过这项时仍按单次读，不跟着变。
+                .putBoolean(SettingsPreferences.KEY_ASSOCIATION_SINGLE_MODE, false)
                 .putBoolean(KeyEffectPreferences.GLOW, effects.glow)
                 .putBoolean(KeyEffectPreferences.ANIMATION, effects.animation)
                 .also { com.kingzcheung.xime.settings.PerformanceProfile.writeFirstRunAuto(it,

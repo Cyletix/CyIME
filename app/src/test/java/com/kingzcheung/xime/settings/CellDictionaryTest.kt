@@ -216,9 +216,28 @@ class CellDictionaryTest {
         assertEquals(setOf(entry.id), store.read().applied)
     }
 
-    @Test fun `built-in dictionary is on by default once and a user switch-off survives app updates`() {
+    @Test fun `new installs start with no built-in dictionary switched on`() {
+        assertTrue(CellDictionaryCatalog.builtins.none { it.defaultOn })
         val store = store()
         val builtin = CellDictionaryCatalog.builtins.single { it.id == "builtin_arknights" }
+        store.installBuiltin(builtin, "---\nname: cell_builtin_arknights\n...\n解手流\tjie shou liu\t1200\n")
+        assertTrue(store.read().selected.isEmpty())
+        assertTrue(store.read().applied.isEmpty())
+    }
+
+    @Test fun `an install that already has 明日方舟 on keeps it on after the default changed`() {
+        val store = store()
+        val v1 = "---\nname: cell_builtin_arknights\n...\n解手流\tjie shou liu\t1200\n"
+        // 1.12.13–1.15.68 shipped it default-on: seeded and switched on once.
+        store.installBuiltin(BuiltinCellDictionary("builtin_arknights", "明日方舟", "电子游戏", defaultOn = true), v1)
+        store.installBuiltin(CellDictionaryCatalog.builtins.single { it.id == "builtin_arknights" }, v1 + "四星队\tsi xing dui\t1200\n")
+        assertEquals(setOf("builtin_arknights"), store.read().selected)
+        assertEquals(setOf("builtin_arknights"), store.read().applied)
+    }
+
+    @Test fun `built-in dictionary is on by default once and a user switch-off survives app updates`() {
+        val store = store()
+        val builtin = BuiltinCellDictionary("builtin_arknights", "明日方舟", "电子游戏", defaultOn = true)
         val v1 = "---\nname: cell_builtin_arknights\n...\n解手流\tjie shou liu\t1200\n"
         store.installBuiltin(builtin, v1)
         assertEquals(setOf(builtin.id), store.read().selected)

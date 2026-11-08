@@ -167,6 +167,7 @@ class DeviceModelDefaultsTest {
             assertEquals(effects.animation, stores.values()[KeyEffectPreferences.ANIMATION])
             assertEquals(profile.voiceModel, AsrModelManager(context).getSelectedModelId())
             assertEquals(profile.tier.name, stores.values()[DeviceDefaults.TIER])
+            assertFalse(SettingsPreferences.isSingleAssociationMode(context))
             // A fresh install starts on 性能与省电 → 自动, so that page does not show 自定义 nobody chose.
             val performance = com.kingzcheung.xime.settings.PerformanceProfile.presets.getValue(
                 com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.classify(hardware))
@@ -211,6 +212,8 @@ class DeviceModelDefaultsTest {
             stores.values(existingStore)["legacy_marker"] = true
             DeviceDefaults.initialize(stores.context) { error("existing installation must not re-probe") }
             assertEquals("PRESERVED", stores.values()[DeviceDefaults.TIER])
+            // 老用户没碰过联想方式：仍是单次，不被新装默认改成连续。
+            assertTrue(SettingsPreferences.isSingleAssociationMode(stores.context))
             assertEquals(SpeechModelCatalog.PARAFORMER, AsrModelManager(stores.context).getSelectedModelId())
         }
         val stores = Stores()

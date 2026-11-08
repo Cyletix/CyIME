@@ -105,7 +105,7 @@ object SettingsPreferences {
     
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
-    private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
+    internal const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     /** 已删的「滑动清空时跳过联想」，只留着给 isDeleteSkipsAssociation 迁移旧值。 */
     private const val KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION = "clear_swipe_skips_association"
     private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
@@ -838,7 +838,7 @@ object SettingsPreferences {
 
     /**
      * 联想模式：false = 连续联想（联想上屏后继续推理，可连续上屏），true = 单次联想（只推理一次）。
-     * 默认单次；保留用户明确选择的连续模式。
+     * 没存过值时算单次（老用户照旧）；2026-11-08 起新装由 [com.kingzcheung.xime.model.DeviceDefaults] 写入连续。
      */
     fun isSingleAssociationMode(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_ASSOCIATION_SINGLE_MODE, true)

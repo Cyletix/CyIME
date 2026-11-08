@@ -20,7 +20,8 @@ class CellWordUpdatesTest {
         val dir = temp.newFolder()
         val schema = SchemaMeta("rime_ice", "拼音")
         File(dir, "rime_ice.schema.yaml").writeText("translator:\n  dictionary: rime_ice\n")
-        val bindings = CellDictionaryRime.prepare(dir, store, listOf(schema), store.read().applied, updates = bundled)
+        // 明日方舟 11-08 起新装不默认开，这里按用户打开它来测。
+        val bindings = CellDictionaryRime.prepare(dir, store, listOf(schema), setOf(ark.id), updates = bundled)
         val table = File(dir, "cyime_cells/cell_${ark.id}.dict.yaml").readText()
         assertTrue(bindings.isNotEmpty())
         assertEquals(1, table.lineSequence().count { it.startsWith("精一队\tjing yi dui\t") })
