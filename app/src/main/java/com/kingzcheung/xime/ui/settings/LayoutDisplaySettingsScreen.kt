@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.RadioButton
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.twotone.Dialpad
 import androidx.compose.material.icons.twotone.FormatListNumbered
@@ -50,7 +52,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.selection.toggleable
@@ -666,18 +667,21 @@ private fun LayoutDisplayPage(
 
 /** 普通 Activity 中的校准入口，底边手势被系统拦走时仍可点按。 */
 @Composable
-internal fun FixedBottomCalibrationSettings() {
+private fun FixedBottomCalibrationSettings() {
     val context = LocalContext.current
-    val orientation = LocalConfiguration.current.orientation
-    val direction = if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) "横屏" else "竖屏"
-    var edge by remember(context, orientation) { mutableStateOf(SettingsPreferences.edgeToEdgeKeyboard(context)) }
-    var adjustment by remember(context, orientation) { mutableIntStateOf(SettingsPreferences.getKeyboardBottomAdjustmentDp(context)) }
-    var loweringLimit by remember(context, orientation) { mutableStateOf(SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)) }
-    DisposableEffect(context, orientation) {
+    var edge by remember(context) { mutableStateOf(SettingsPreferences.edgeToEdgeKeyboard(context)) }
+    var bottomPosition by remember(context) { mutableStateOf(SettingsPreferences.keyboardBottomPosition(context)) }
+    var adjustment by remember(context) { mutableIntStateOf(SettingsPreferences.getKeyboardBottomAdjustmentDp(context)) }
+    var loweringLimit by remember(context) { mutableStateOf(SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)) }
+    DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (SettingsPreferences.affectsBottomCalibration(context, key, includeMeasuredLimit = true)) {
+            if (key == SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD || key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_POSITION ||
+                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_PADDING_DP || key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_DP ||
+                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_LOWERING_LIMIT_DP ||
+                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP) {
                 edge = SettingsPreferences.edgeToEdgeKeyboard(context)
+                bottomPosition = SettingsPreferences.keyboardBottomPosition(context)
                 adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context)
                 loweringLimit = SettingsPreferences.getKeyboardBottomLoweringLimitDp(context)
             }
@@ -686,23 +690,39 @@ internal fun FixedBottomCalibrationSettings() {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     // 调低最多到安全下限（键盘量过才知道；没量过仍按 80 dp）：到了下限按钮变灰，数字也不再往下走。
-    val lowest = -(loweringLimit ?: 80)
+    // 贴底时从贴底位置还能再调低 80 dp（键盘那边到 0 为止），识别不出手势导航的手机也能自己去掉底下那段。
+    // 固定的两档（贴到最底、留出导航按钮）从那一档的位置往下调，也能一直调到 0。
+    val fixedChoice = bottomPosition != SettingsPreferences.KeyboardBottomPosition.AUTO
+    val lowest = if (edge || fixedChoice) -80 else -(loweringLimit ?: 80).coerceIn(0, 80)
     val value = adjustment.coerceAtLeast(lowest)
-    val reference = if (edge) "贴底位置" else "系统建议"
+    val reference = if (fixedChoice) "「${bottomPosition.label}」的位置" else if (edge) "安全下限" else "系统建议"
     val position = when {
-        value == 0 -> if (edge) "使用贴底位置" else "使用系统建议"
+        value == 0 -> if (fixedChoice) "底部留白 0 dp" else if (edge) "已选安全下限" else "使用系统建议"
         value > 0 -> "从${reference}抬高 ${value} dp"
         else -> "从${reference}调低 ${-value} dp"
     }
     SettingsSection("固定键盘") {
-        SettingsToggleItem(Icons.TwoTone.Keyboard, "手势导航时键盘贴底",
-            "只有手势条时，固定键盘可贴到屏幕底边。底部有系统按钮或任务栏时，末排停在它们上方。",
-            checked = edge, onCheckedChange = { SettingsPreferences.setEdgeToEdgeKeyboard(context, it) },
-            lockMessage = if (android.os.Build.VERSION.SDK_INT < 29) "需要 Android 10 或以上" else null)
+        // 「底部位置」三选一（11-08）：原「手势导航时键盘贴底」开关并进来，下面的留白在所选位置上微调。
+        Column(Modifier.fillMaxWidth().settingsSearchAnchor("底部位置", bleed = 16.dp, bleedVertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text("底部位置", style = MaterialTheme.typography.titleSmall)
+            SettingsPreferences.KeyboardBottomPosition.entries.forEach { option ->
+                Row(Modifier.fillMaxWidth().clickable { SettingsPreferences.setKeyboardBottomPosition(context, option) }
+                    .testTag("bottom-position:${option.name}").padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = bottomPosition == option, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                        Text(option.description, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(position, style = MaterialTheme.typography.titleSmall)
-            Text("当前调整${direction}留白，每次 2 dp。旋转屏幕可单独调整另一个方向。",
+            Text("固定键盘下方空白太多就调低，底排被遮住就抬高。每次 2 dp，点按即保存。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(onClick = { SettingsPreferences.setKeyboardBottomAdjustmentDp(context, (value - 2).coerceAtLeast(lowest)) },
@@ -711,7 +731,7 @@ internal fun FixedBottomCalibrationSettings() {
                     enabled = value < 80) { Text("抬高") }
             }
             TextButton(onClick = { SettingsPreferences.resetKeyboardBottomCalibration(context) },
-                enabled = edge || adjustment != 0) { Text("恢复系统建议") }
+                enabled = fixedChoice || !edge || adjustment != 0) { Text("恢复默认（自动、留白 0）") }
         }
     }
 }

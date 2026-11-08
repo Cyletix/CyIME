@@ -189,7 +189,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("数字行", layouts, layoutIndex, "数字行 数字栏 一排数字 顶部数字 第五行 平板 1234567890 数字顺序 数字位置 自定义数字"),
         page("键盘尺寸与位置", layouts, SettingsRoutes.KeyboardResize, "尺寸 大小 高度 宽度 调整尺寸 键盘调节 悬浮 浮动 分体 透明度 底部留白 单手 位置 旋转"),
         page("锁定悬浮键盘位置和大小", layouts, SettingsRoutes.KeyboardResize, "固定悬浮键盘 防误拖 锁住 解锁 底部短横条 长按 宽高 四角"),
-        SettingsSearchEntry("手势导航时键盘贴底", layouts, layoutPage("bottom_gap"), "键盘底部留白 下边距 底部空白 贴到底 手势导航栏 忽略窗口边衬区 忽略系统窗口边衬区 边衬区 insets 全面屏手势 底部高度"),
+        SettingsSearchEntry("底部位置", layouts, layoutPage("bottom_gap"), "手势导航时键盘贴底 贴到最底 留出导航按钮 切换输入法按钮 收起键盘按钮 键盘底部留白 下边距 底部空白 贴到底 手势导航栏 忽略窗口边衬区 忽略系统窗口边衬区 边衬区 insets 全面屏手势 底部高度"),
         page("底部留白校准", layouts, layoutPage("bottom_gap"), "底部空白 多一行 全面屏手势 导航栏 挡住 按键重叠 底边拖不动 调低 抬高 恢复系统建议"),
         page("工具栏与菜单排列", layouts, SettingsRoutes.ToolbarArrange, "工具栏 菜单 排列 顺序 入口 图标 按钮 自定义工具栏"),
         SettingsSearchEntry("邻键纠错", chinesePath, chinese, "纠错 打错 误触 全拼 双拼 按错 相邻 26键", section = "拼音纠错"),

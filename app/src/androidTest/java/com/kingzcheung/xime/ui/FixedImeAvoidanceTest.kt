@@ -49,7 +49,7 @@ class FixedImeAvoidanceTest {
                 .putBoolean("floating_mode", false).putBoolean("floating_mode_landscape", false)
                 .putInt("keyboard_height_dp",300).putInt("keyboard_height_dp_landscape",300)
                 .putInt("fixed_width_dp",400).putInt("fixed_width_dp_landscape",400)
-                .putInt("keyboard_bottom_padding_dp_portrait",0).putInt("keyboard_bottom_padding_dp_landscape",0)
+                .putInt("keyboard_bottom_padding_dp",0).putInt("keyboard_bottom_padding_dp_landscape",0)
                 .putFloat("keyboard_opacity",1f).putFloat("keyboard_opacity_landscape",1f).commit()
             shell("ime enable ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
             shell("ime set ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")

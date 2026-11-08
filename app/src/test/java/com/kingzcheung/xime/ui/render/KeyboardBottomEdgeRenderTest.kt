@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
@@ -68,30 +69,38 @@ import kotlin.math.roundToInt
 class KeyboardBottomEdgeRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
 
-    @Test fun edgeOptionIsReachableFromSettingsSearch() {
+    @Test fun bottomPositionIsReachableFromSettingsSearch() {
         val context = rule.activity
         KeyboardThemes.initFromConfig(context)
         AppFonts.initialize(context)
-        val title = "手势导航时键盘贴底"
-        SettingsPreferences.setEdgeToEdgeKeyboard(context, false)
+        val title = "底部位置"
         SettingsSearchFocus.open(SettingsSearchIndex.first { it.title == title })
         rule.setContent { XimeTheme(darkTheme = false, themeId = "soft_blue") {
             LayoutDisplaySettingsContent(onBack = {}, initialPage = "bottom_gap")
         } }
-        val row = rule.onNodeWithTag("settings-search-anchor:$title")
-        rule.waitUntil(4_000) { row.isDisplayed() }
-        row.assertIsDisplayed().performClick()
+        val anchor = rule.onNodeWithTag("settings-search-anchor:$title")
+        rule.waitUntil(4_000) { anchor.isDisplayed() }
+        assertEquals(SettingsPreferences.KeyboardBottomPosition.AUTO, SettingsPreferences.keyboardBottomPosition(context))
+        rule.onNodeWithTag("bottom-position:FLUSH").performClick()
+        assertEquals(SettingsPreferences.KeyboardBottomPosition.FLUSH, SettingsPreferences.keyboardBottomPosition(context))
         assertTrue(SettingsPreferences.edgeToEdgeKeyboard(context))
-        save("edge-setting")
-        row.performClick()
+        save("bottom-position-setting")
+        rule.onNodeWithTag("bottom-position:KEEP_BUTTONS").performClick()
+        assertEquals(SettingsPreferences.KeyboardBottomPosition.KEEP_BUTTONS, SettingsPreferences.keyboardBottomPosition(context))
         assertEquals(false, SettingsPreferences.edgeToEdgeKeyboard(context))
     }
 
-    @Test fun bottomGapCanBeRecoveredWithTheKeyboardClosed() {
+    @Test fun anOldEdgeOffUserStartsOnKeepButtons() {
+        val context = rule.activity
+        SettingsPreferences.setEdgeToEdgeKeyboard(context, false)
+        assertEquals(SettingsPreferences.KeyboardBottomPosition.KEEP_BUTTONS, SettingsPreferences.keyboardBottomPosition(context))
+    }
+
+    @Test fun eachPositionCanBeFineTunedDownToZeroAndResetGoesBackToAuto() {
         val app = rule.activity.application
         KeyboardThemes.initFromConfig(app)
         AppFonts.initialize(app)
-        SettingsPreferences.setEdgeToEdgeKeyboard(app, false)
+        SettingsPreferences.setKeyboardBottomPosition(app, SettingsPreferences.KeyboardBottomPosition.KEEP_BUTTONS)
         SettingsPreferences.setKeyboardBottomAdjustmentDp(app, 2)
         val entry = SettingsSearchIndex.first { it.title == "底部留白校准" }
         rule.setContent {
@@ -102,59 +111,26 @@ class KeyboardBottomEdgeRenderTest {
         val section = rule.onNodeWithTag("settings-search-anchor:固定键盘")
         rule.waitUntil(4_000) { section.isDisplayed() }
         val down = rule.onNodeWithText("调低")
-        val up = rule.onNodeWithText("抬高")
-        repeat(2) { down.performTouchInput { click(center) } }
-        rule.onNodeWithText("从系统建议调低 2 dp").assertIsDisplayed()
+        rule.onNodeWithText("从「留出导航按钮」的位置抬高 2 dp").assertIsDisplayed()
+        down.performTouchInput { click(center) }
+        rule.onNodeWithText("底部留白 0 dp").assertIsDisplayed()
+        down.performTouchInput { click(center) }
+        rule.onNodeWithText("从「留出导航按钮」的位置调低 2 dp").assertIsDisplayed()
         assertEquals(-2, SettingsPreferences.getKeyboardBottomAdjustmentDp(app))
+        // 固定的两档不受键盘量到的下限限制：一直能调到底（键盘那边到 0 为止）。
+        rule.runOnIdle { SettingsPreferences.setKeyboardBottomLoweringLimitDp(app, 0) }
+        down.assertIsEnabled()
         if (System.getenv("CYIME_RENDER_OUT") != null) {
             rule.mainClock.advanceTimeBy(3_000)
             rule.waitForIdle()
             save("bottom-recovery-settings")
         }
-        repeat(2) { up.performTouchInput { click(center) } }
-        assertEquals(2, SettingsPreferences.getKeyboardBottomPaddingDp(app))
-        rule.onNodeWithTag("settings-search-anchor:手势导航时键盘贴底").performClick()
-        // 贴底另记一份调低值，从贴底位置算起；还能往下调（11-03：识别不出手势导航的手机也能自己去掉底下那段）。
-        rule.onNodeWithText("从贴底位置抬高 2 dp").assertIsDisplayed()
-        down.performTouchInput { click(center) }
-        rule.onNodeWithText("使用贴底位置").assertIsDisplayed()
-        down.performTouchInput { click(center) }
-        rule.onNodeWithText("从贴底位置调低 2 dp").assertIsDisplayed()
-        rule.runOnIdle { SettingsPreferences.setKeyboardBottomLoweringLimitDp(app, 0) }
-        down.assertIsNotEnabled()
-        up.performClick()
-        assertEquals(2, SettingsPreferences.getKeyboardBottomAdjustmentDp(app))
-        rule.onNodeWithText("恢复系统建议").performClick()
-        rule.onNodeWithText("使用系统建议").assertIsDisplayed()
-        assertEquals(false, SettingsPreferences.edgeToEdgeKeyboard(app))
+        rule.onNodeWithText("恢复默认（自动、留白 0）").performClick()
+        assertEquals(SettingsPreferences.KeyboardBottomPosition.AUTO, SettingsPreferences.keyboardBottomPosition(app))
+        assertEquals(true, SettingsPreferences.edgeToEdgeKeyboard(app))
         assertEquals(0, SettingsPreferences.getKeyboardBottomAdjustmentDp(app))
         rule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         assertEquals(null, KeyboardPanelLaunch.take())
-    }
-
-    @Test
-    @Config(qualifiers = "sw360dp-w800dp-h360dp-land-mdpi")
-    fun landscapeCalibrationChangesOnlyTheLandscapeGap() {
-        val context = rule.activity
-        val portrait = context.createConfigurationContext(android.content.res.Configuration().apply {
-            orientation = android.content.res.Configuration.ORIENTATION_PORTRAIT
-        })
-        KeyboardThemes.initFromConfig(context)
-        AppFonts.initialize(context)
-        SettingsPreferences.setKeyboardBottomPaddingDp(portrait, 32)
-        SettingsPreferences.setEdgeToEdgeKeyboard(context, false)
-        SettingsPreferences.setKeyboardBottomPaddingDp(context, 8)
-        rule.setContent { XimeTheme(darkTheme = false, themeId = "soft_blue") {
-            LayoutDisplaySettingsContent(onBack = {}, initialPage = "bottom_gap")
-        } }
-        rule.onNodeWithText("当前调整横屏留白", substring = true).assertExists()
-        rule.onNodeWithText("抬高").performClick()
-        rule.onNodeWithText("从系统建议抬高 10 dp").assertIsDisplayed()
-        save("bottom-landscape-settings")
-        assertEquals(32, SettingsPreferences.getKeyboardBottomPaddingDp(portrait))
-        rule.onNodeWithText("恢复系统建议").performClick()
-        assertEquals(0, SettingsPreferences.getKeyboardBottomPaddingDp(context))
-        assertEquals(32, SettingsPreferences.getKeyboardBottomPaddingDp(portrait))
     }
 
     @Test fun aShortFixedKeyboardMovesDownWithoutShrinkingKeysAndEnterStillWorks() {
