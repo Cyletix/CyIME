@@ -48,6 +48,8 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             CandidatePageOption("逗号和句号", ", 上一页 / . 下一页(含 < / >)", "page_comma_period", options.pageCommaPeriod) {
                 save("page_comma_period", it)
             }
+            HardwareOption("候选栏翻页箭头", "候选条两端显示上/下翻页箭头；关闭后用方向键或上面配置的按键翻页",
+                options.candidateArrows) { save("candidate_arrows", it) }
             Text("浮窗", style = MaterialTheme.typography.titleMedium)
             HardwareOption("候选跟随光标", "应用提供光标位置时生效；否则显示在底部", options.followCursor) { save("follow_cursor", it) }
             // 联想词只在「智能联想」开着时才有（PredictionManager）；关着时这项没有效果，置灰写明。
@@ -65,6 +67,16 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
                 BottomCandidatesLegend(options.bottomBar)
             }
             Text("浮条任意位置均可拖动；长按语言键选择语言。", style = MaterialTheme.typography.bodyMedium)
+            Text("浮条按钮", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.settingsSearchAnchor("浮条按钮", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
+            Text("展开屏幕键盘和语言键始终显示，其余按钮可按需要隐藏。",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HardwareOption("表情", "浮条上的表情入口", options.toolbarEmoji) { save("toolbar_emoji", it) }
+            HardwareOption("剪贴板", "浮条上的剪贴板入口", options.toolbarClipboard) { save("toolbar_clipboard", it) }
+            val sttOn = remember { com.kingzcheung.xime.settings.SettingsPreferences.isSttEnabled(context) }
+            HardwareOption("语音输入", "浮条上的麦克风入口", options.toolbarVoice,
+                lockMessage = if (sttOn) null else "「语音转文本」关着") { save("toolbar_voice", it) }
+            HardwareOption("设置", "浮条上的设置入口", options.toolbarSettings) { save("toolbar_settings", it) }
             Text("游戏", style = MaterialTheme.typography.titleMedium)
             HardwareOption("游戏直通", "游戏类应用里不显示键盘，按键直接交给游戏；按应用声明的类别识别",
                 options.gamePassthrough) { save("game_passthrough", it) }

@@ -64,4 +64,24 @@ class HardwareKeyboardPreferencesTest {
         }
         assertEquals(3, values.size)
     }
+
+    @Test fun candidateArrowsAndToolbarButtonsDefaultAndPersist() {
+        val defaults = HardwareKeyboardPreferences.read(context)
+        assertFalse(defaults.candidateArrows)
+        assertTrue(defaults.toolbarEmoji)
+        assertTrue(defaults.toolbarClipboard)
+        assertTrue(defaults.toolbarVoice)
+        assertTrue(defaults.toolbarSettings)
+
+        HardwareKeyboardPreferences.set(context, "candidate_arrows", true)
+        HardwareKeyboardPreferences.set(context, "toolbar_emoji", false)
+        HardwareKeyboardPreferences.set(context, "toolbar_settings", false)
+
+        val changed = HardwareKeyboardPreferences.read(context)
+        assertTrue(changed.candidateArrows)
+        assertFalse(changed.toolbarEmoji)
+        assertTrue(changed.toolbarClipboard)
+        assertTrue(changed.toolbarVoice)
+        assertFalse(changed.toolbarSettings)
+    }
 }

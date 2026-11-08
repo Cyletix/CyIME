@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.semantics.selected
@@ -87,6 +88,8 @@ internal fun HardwareKeyboardToolbar(
     onShowKeyboard: () -> Unit,
     onEmoji: () -> Unit,
     onClipboard: () -> Unit,
+    /** 进入 CyIME 设置页；浮条上始终保留这个入口。 */
+    onSettings: (() -> Unit)? = null,
     onSwitchLanguage: () -> Unit,
     backgroundColor: Color,
     contentColor: Color,
@@ -109,6 +112,11 @@ internal fun HardwareKeyboardToolbar(
     accentColor: Color = contentColor,
     onVoice: (() -> Unit)? = null,
     voiceActive: Boolean = false,
+    /** 浮条按钮的显示开关；展开屏幕键盘和语言键始终保留。 */
+    showEmoji: Boolean = true,
+    showClipboard: Boolean = true,
+    showVoice: Boolean = true,
+    showSettings: Boolean = true,
     /** Bottom-docked style: Samsung-like edge-to-edge strip instead of the floating long bar. */
     samsungBottomBar: Boolean = false,
     onHideKeyboard: (() -> Unit)? = null,
@@ -268,13 +276,17 @@ internal fun HardwareKeyboardToolbar(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val auxiliaryActions: @Composable () -> Unit = {
-                HardwareToolbarAction(Icons.Default.EmojiEmotions, "表情", "hardware-toolbar-emoji", protectedContentColor,
+                if (showEmoji) HardwareToolbarAction(Icons.Default.EmojiEmotions, "表情", "hardware-toolbar-emoji", protectedContentColor,
                     onClick = { moreExpanded = false; onEmoji() })
-                HardwareToolbarAction(Icons.Default.ContentPaste, "剪贴板", "hardware-toolbar-clipboard", protectedContentColor,
+                if (showClipboard) HardwareToolbarAction(Icons.Default.ContentPaste, "剪贴板", "hardware-toolbar-clipboard", protectedContentColor,
                     onClick = { moreExpanded = false; onClipboard() })
-                onVoice?.let { voice ->
+                if (showVoice) onVoice?.let { voice ->
                     HardwareToolbarAction(Icons.Default.Mic, "语音输入", "hardware-toolbar-voice", protectedContentColor,
                         active = voiceActive, onClick = { moreExpanded = false; voice() })
+                }
+                if (showSettings) onSettings?.let { settings ->
+                    HardwareToolbarAction(Icons.Default.Settings, "设置", "hardware-toolbar-settings", protectedContentColor,
+                        onClick = { moreExpanded = false; settings() })
                 }
             }
             val actions: @Composable () -> Unit = {
@@ -300,6 +312,10 @@ internal fun HardwareKeyboardToolbar(
                         else if (showCandidateContent) bottomCandidateContent?.invoke()
                     }
                     HardwareToolbarAction(Icons.Default.Keyboard, "展开屏幕键盘", "hardware-toolbar-keyboard", protectedContentColor, onClick = onShowKeyboard)
+                    if (showSettings) onSettings?.let { settings ->
+                        HardwareToolbarAction(Icons.Default.Settings, "设置", "hardware-toolbar-settings", protectedContentColor,
+                            onClick = settings)
+                    }
                     HardwareToolbarLanguageKey(protectedContentColor, languageActions, languageLabel, onSwitchLanguage,
                         capsLock = capsLock, capsColor = accentColor)
                 }

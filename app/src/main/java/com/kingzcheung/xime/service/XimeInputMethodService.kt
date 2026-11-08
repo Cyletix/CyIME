@@ -2397,6 +2397,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onShowKeyboard = { showScreenKeyboardFromHardware() },
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
+                                onSettings = { startActivity(settingsActivityIntent(this@XimeInputMethodService)) },
+                                showEmoji = state.hardwareOptions.toolbarEmoji,
+                                showClipboard = state.hardwareOptions.toolbarClipboard,
+                                showVoice = state.hardwareOptions.toolbarVoice,
+                                showSettings = state.hardwareOptions.toolbarSettings,
                                 // 「语音转文本」关着时物理键盘工具条不放麦克风。
                                 onVoice = if (state.isSttEnabled) ({ handleHardwareTool(HardwareToolShortcut.MICROPHONE) }) else null,
                                 voiceActive = state.isVoiceMode,
@@ -2433,7 +2438,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         previousHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         nextHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         showNumberLabels = !hardwareEnglish,
-                                        commentsAreGlosses = hardwareGlosses && !hardwareCandidates.association)
+                                        commentsAreGlosses = hardwareGlosses && !hardwareCandidates.association,
+                                        showPageArrows = state.hardwareOptions.candidateArrows)
                                   }
                                 },
                                 showCandidatesWhenFloating = hardwareCandidates.association && !state.hardwareOptions.associationInWindow,
@@ -5080,14 +5086,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         if (state.isCompact || state.voiceCollapsed) {
             val height = window.window?.decorView?.height ?: resources.displayMetrics.heightPixels
-            // A toolbar resting on the bottom edge (Samsung bar or the Gboard pill) is reported as
-            // occupied space, so apps lift their input field above it rather than under it.
-            val bottomReserve = hardwareToolbarBounds.value?.takeIf {
-                (state.voiceCollapsed && hardwareToolbarPosition.value.yFraction >= 1f) ||
-                    height - it.bottom <= (24 * resources.displayMetrics.density).roundToInt()
-            }?.top ?: height
-            outInsets.contentTopInsets = bottomReserve.coerceIn(0, height)
-            outInsets.visibleTopInsets = bottomReserve.coerceIn(0, height)
+            // 纯悬浮：浮条不占底部空间，应用不会因为它把输入框抬高；挡到内容时由用户拖动浮条。
+            outInsets.contentTopInsets = height
+            outInsets.visibleTopInsets = height
             outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
             outInsets.touchableRegion.setEmpty()
             // Union visible surfaces, never their bounding rectangle: the transparent
