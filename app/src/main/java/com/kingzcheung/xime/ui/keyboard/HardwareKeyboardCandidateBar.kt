@@ -271,6 +271,8 @@ internal fun HardwareCandidateRow(
     onCandidateSelect: ((Int) -> Unit)?, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?,
     showNumberLabels: Boolean = true,
     commentsAreGlosses: Boolean = false,
+    /** 候选条两端的翻页箭头；物理键盘默认不显示，用方向键或翻页键翻页。 */
+    showPageArrows: Boolean = false,
 ) {
     val protectedVisuals = visuals.withTextSurface(LocalFrostedTextSurface.current)
     val context = LocalContext.current
@@ -282,13 +284,13 @@ internal fun HardwareCandidateRow(
             highlightIndex = highlightIndex, showNumberLabels = showNumberLabels, itemSpacing = 8.dp,
             commentsAreGlosses = commentsAreGlosses,
             modifier = Modifier.weight(1f).padding(vertical = 4.dp))
-        if (candidates.isNotEmpty() && onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
+        if (showPageArrows && candidates.isNotEmpty() && onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
             KeyboardToolbarButton(onPrevious, Color.Transparent,
                 modifier = Modifier.testTag("hardware-candidate-previous")) {
                 Icon(Icons.Default.ChevronLeft, "上一候选", tint = protectedVisuals.textColor)
             }
         }
-        if (candidates.isNotEmpty() && onNext != null && (hasNextPage || highlightIndex < candidates.lastIndex)) {
+        if (showPageArrows && candidates.isNotEmpty() && onNext != null && (hasNextPage || highlightIndex < candidates.lastIndex)) {
             KeyboardToolbarButton(onNext, Color.Transparent,
                 modifier = Modifier.testTag("hardware-candidate-next")) {
                 Icon(Icons.Default.ChevronRight, "下一候选", tint = protectedVisuals.textColor)

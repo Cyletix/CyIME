@@ -173,6 +173,7 @@ internal fun ConnectedClipboardBoard(
         onSystemPaste = onSystemPaste, onShare = onImageShare, onPullRemote = onPullRemote, modifier = modifier,
         onAddPinned = onAddPinned, onEditText = onEditText, onDismissFailure = store::clearPasteFailure,
         onRecognizeDocument = onRecognizeDocument, onTranslateText = onTranslateText,
+        onImageLoadFailed = { image -> store.removeImages(setOf(image.uri)) },
         unpinnedTextTotal = unpinnedTotal, onLoadMore = { if (searchResults == null) manager.loadMoreHistory() },
         onClearUnpinned = { images ->
             // Clearing means all unfixed history in the database, not only the pages read so far.
@@ -248,6 +249,8 @@ internal fun ClipboardBoardView(
     onRecognizeDocument: (() -> Unit)? = null,
     /** 长按菜单的「翻译」；null 不显示。密码记录没有这一项。 */
     onTranslateText: ((String) -> Unit)? = null,
+    /** 缩略图彻底加载失败：自动移除该图片记录，避免空白/占位卡。 */
+    onImageLoadFailed: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
     /** Unfixed text records in the whole history; -1 when only [textItems] is known. */
     unpinnedTextTotal: Int = -1,
     onLoadMore: () -> Unit = {},
@@ -609,6 +612,7 @@ internal fun ClipboardBoardView(
                                 // Pins are one line; a recent picture keeps the bounded preview height.
                                 previewHeight = if (fixedRecords) ClipboardPinnedRowHeight
                                     else if (card is ClipboardCard.Image) pinnedHeight else null,
+                                onImageLoadFailed = onImageLoadFailed,
                                 // Lazy layout retains removed keyed items through fade-out. Keep one
                                 // grid so collapsing pins does not flash or replace recent history.
                                 modifier = Modifier.animateItem(
@@ -801,6 +805,7 @@ private fun ClipboardRecordCard(
     masked: Boolean = false,
     onClick: () -> Unit, onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onImageLoadFailed: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
@@ -847,9 +852,15 @@ private fun ClipboardRecordCard(
                     ImageRequest.Builder(context).data(card.item.uri)
                         .size(widthPx, heightPx.coerceAtLeast(1)).build()
                 }
+                var imageFailed by remember(card.item.uri) { mutableStateOf(false) }
                 AsyncImage(thumbnail, card.item.label, contentScale = ContentScale.Crop,
+                    onError = { imageFailed = true; onImageLoadFailed?.invoke(card.item) }, onSuccess = { imageFailed = false },
                     modifier = if (previewHeight == null) Modifier.fillMaxWidth().aspectRatio(ClipboardThumbnailAspectRatio)
                     else Modifier.fillMaxSize())
+                if (imageFailed) {
+                    Text("图片不可用", Modifier.align(Alignment.Center),
+                        color = colors.onSurfaceVariant, fontSize = 13.sp)
+                }
                 Canvas(Modifier.matchParentSize().testTag("clipboard-image-hatch:${card.key}")) {
                     val spacing = 36.dp.toPx()
                     var x = -size.height

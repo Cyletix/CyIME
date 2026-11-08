@@ -14,6 +14,7 @@ class HardwareKeyboardPreferencesTest {
     private val prefs = mock<SharedPreferences>()
     private val editor = mock<SharedPreferences.Editor>()
     private val values = mutableMapOf<String, Boolean>()
+    private val floatValues = mutableMapOf<String, Float>()
 
     @Before fun setUp() {
         whenever(context.getSharedPreferences(any(), any())).thenReturn(prefs)
@@ -23,6 +24,13 @@ class HardwareKeyboardPreferencesTest {
         }
         whenever(editor.putBoolean(any(), any())).thenAnswer {
             values[it.getArgument(0)] = it.getArgument<Boolean>(1)
+            editor
+        }
+        whenever(prefs.getFloat(any(), any())).thenAnswer {
+            floatValues[it.getArgument<String>(0)] ?: it.getArgument<Float>(1)
+        }
+        whenever(editor.putFloat(any(), any())).thenAnswer {
+            floatValues[it.getArgument(0)] = it.getArgument<Float>(1)
             editor
         }
     }
@@ -63,5 +71,28 @@ class HardwareKeyboardPreferencesTest {
             ), HardwareKeyboardPreferences.read(context))
         }
         assertEquals(3, values.size)
+    }
+
+    @Test fun candidateArrowsAndCollapseSwitchesDefaultAndPersist() {
+        val defaults = HardwareKeyboardPreferences.read(context)
+        assertFalse(defaults.candidateArrows)
+        assertFalse(defaults.collapseKeyboard)
+        assertFalse(defaults.collapseLanguage)
+        assertTrue(defaults.collapseEmoji)
+        assertTrue(defaults.collapseClipboard)
+        assertTrue(defaults.collapseVoice)
+        assertFalse(defaults.collapseSettings)
+
+        HardwareKeyboardPreferences.set(context, "collapse_keyboard", true)
+        HardwareKeyboardPreferences.set(context, "collapse_emoji", false)
+        HardwareKeyboardPreferences.set(context, "collapse_settings", true)
+
+        val changed = HardwareKeyboardPreferences.read(context)
+        assertTrue(changed.collapseKeyboard)
+        assertTrue(changed.collapseLanguage == false)
+        assertFalse(changed.collapseEmoji)
+        assertTrue(changed.collapseClipboard)
+        assertTrue(changed.collapseVoice)
+        assertTrue(changed.collapseSettings)
     }
 }

@@ -15,12 +15,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.HardwareKeyboardPreferences
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
     var options by remember { mutableStateOf(HardwareKeyboardPreferences.read(context)) }
+    var toolbarScale by remember { mutableStateOf(options.toolbarScale) }
     fun save(key: String, value: Boolean) {
         HardwareKeyboardPreferences.set(context, key, value)
         options = HardwareKeyboardPreferences.read(context)
@@ -48,6 +50,8 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             CandidatePageOption("逗号和句号", ", 上一页 / . 下一页(含 < / >)", "page_comma_period", options.pageCommaPeriod) {
                 save("page_comma_period", it)
             }
+            HardwareOption("候选栏翻页箭头", "候选条两端显示上/下翻页箭头；关闭后用方向键或上面配置的按键翻页",
+                options.candidateArrows) { save("candidate_arrows", it) }
             Text("浮窗", style = MaterialTheme.typography.titleMedium)
             HardwareOption("候选跟随光标", "应用提供光标位置时生效；否则显示在底部", options.followCursor) { save("follow_cursor", it) }
             // 联想词只在「智能联想」开着时才有（PredictionManager）；关着时这项没有效果，置灰写明。
@@ -65,6 +69,39 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
                 BottomCandidatesLegend(options.bottomBar)
             }
             Text("浮条任意位置均可拖动；长按语言键选择语言。", style = MaterialTheme.typography.bodyMedium)
+            Text("浮条按钮", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.settingsSearchAnchor("浮条按钮", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
+            Text("勾选 = 始终显示；不勾 = 收起时自动隐藏。展开时一律显示全部按钮，3 秒无操作自动收起。",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HardwareOption("展开屏幕键盘", "浮条上的键盘入口", !options.collapseKeyboard) { save("collapse_keyboard", !it) }
+            HardwareOption("语言键", "中/英切换", !options.collapseLanguage) { save("collapse_language", !it) }
+            HardwareOption("表情", "浮条上的表情入口", !options.collapseEmoji) { save("collapse_emoji", !it) }
+            HardwareOption("剪贴板", "浮条上的剪贴板入口", !options.collapseClipboard) { save("collapse_clipboard", !it) }
+            val sttOn = remember { com.kingzcheung.xime.settings.SettingsPreferences.isSttEnabled(context) }
+            HardwareOption("语音输入", "浮条上的麦克风入口", !options.collapseVoice,
+                lockMessage = if (sttOn) null else "「语音转文本」关着") { save("collapse_voice", !it) }
+            HardwareOption("设置", "浮条上的设置入口", !options.collapseSettings) { save("collapse_settings", !it) }
+            HardwareOption("闲置半透明", "3 秒无操作后浮条变半透明，触摸恢复", options.idleFade) { save("idle_fade", it) }
+            Text("浮条大小", style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Slider(
+                    value = toolbarScale,
+                    onValueChange = {
+                        toolbarScale = it
+                        HardwareKeyboardPreferences.setFloat(context, "toolbar_scale", it)
+                    },
+                    valueRange = 1f..1.5f,
+                    // Material3 1.4 默认在轨道末端画一个“停止点”，这里去掉。
+                    track = { state ->
+                        androidx.compose.material3.SliderDefaults.Track(
+                            sliderState = state,
+                            drawStopIndicator = null,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                androidx.compose.material3.Text("${(toolbarScale * 100).roundToInt()}%", Modifier.padding(start = 12.dp))
+            }
             Text("游戏", style = MaterialTheme.typography.titleMedium)
             HardwareOption("游戏直通", "游戏类应用里不显示键盘，按键直接交给游戏；按应用声明的类别识别",
                 options.gamePassthrough) { save("game_passthrough", it) }

@@ -59,15 +59,17 @@ internal data class HardwareToolbarGeometry(
         val yFraction = if (maxY > minY) (bounded.y - minY) / (maxY - minY)
             else fraction(previous.yFraction, 1f)
         val nearBottom = snapX && maxY > minY && maxY - bounded.y <= minOf(snapDistancePx, (maxY - minY) * 0.2f)
-        // 与 Windows 端一致：只有拖到底部中间那一点附近才贴底边；底部其余位置照常吸侧边或自由停放，
-        // 否则通栏的吸附范围伸到两侧，想停在侧边靠下时总被吸到底部中间（用户 2026-10-12 要求）。
+        // 吸侧边只在真正贴到屏幕左右边缘时生效：只留 1px 容差，其他位置一律自由停放。
+        val sideSnap = 1f
+        val toLeft = bounded.x - minX
+        val toRight = maxX - bounded.x
         val bottom = nearBottom && kotlin.math.abs(bounded.x - (minX + maxX) / 2) <= snapDistancePx
         return HardwareToolbarPosition(
             if (bottom) 0.5f else if (snapX) when {
                 maxX <= minX -> xFraction
-                bounded.x - minX <= minOf(snapDistancePx, (maxX - minX) * 0.2f) -> 0f
-                maxX - bounded.x <= minOf(snapDistancePx, (maxX - minX) * 0.2f) -> 1f
-                kotlin.math.abs(bounded.x - (minX + maxX) / 2) <= snapDistancePx / 2 -> 0.5f
+                toLeft <= sideSnap && toLeft <= toRight -> 0f
+                toRight <= sideSnap && toRight < toLeft -> 1f
+                kotlin.math.abs(bounded.x - (minX + maxX) / 2) <= sideSnap -> 0.5f
                 else -> xFraction
             } else xFraction,
             // yFraction == 1 表示贴底（isBottomDocked），不贴底时停在最底也要略小于 1。
