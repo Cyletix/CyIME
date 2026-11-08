@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 常用纠错词排第一（2026-11-05）：纠错得到的整串词比所打字母读出的词常用 50 倍以上时排第一；
- * 不到 50 倍、或所打字母读出的是整句时，所打的读法照旧第一。
+ * 常用纠错词排第一（2026-11-05，11-08 改 2000 倍）：纠错得到的整串词比所打字母读出的词常用 2000 倍以上时排第一；
+ * 不到 2000 倍、或所打字母读出的是整句时，所打的读法照旧第一。
  * Arguments: LIB USER NEIGHBORS. USER: a deployed rime_ice user directory (nothing is committed).
  * Each row: input, the expected first candidate, and why. Typed after the pause, as the keyboard shows them.
  */
@@ -22,7 +22,9 @@ public class CorrectionFirstProbe {
       String[][] cases = {
           {"chengong", "成功", "doubled g typed once; 成功 is thousands of times 陈宫"},
           {"jinian", "几年", "今年 is only 2.9 times 几年"},
-          {"aniu", "阿牛", "按钮 is not 50 times 阿牛"},
+          {"aniu", "阿牛", "按钮 is not 2000 times 阿牛"},
+          {"genshou", "跟手", "分手 is about 200 times 跟手: a correctly typed word keeps first place (2026-11-08)"},
+          {"keyifuzhi", "可以复制", "可以辅助 is only 1000 times 可以复制"},
           {"henan", "河南", "a typed word that is common itself"},
           {"jiucup", "就粗平", "a typed sentence keeps its place"},
           {"nihao", "你好", "correct spelling"},

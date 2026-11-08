@@ -338,7 +338,11 @@ class PolicyTranslation : public Translation {
     // A corrected whole word goes first when it is far more common than the typed reading's word (2026-11-05,
     // replacing the 10-21 rule that kept the typed reading first: fandu gave 贩毒 before 单独). The corrected word's
     // own frequency (its weight without the log 0.01 correction penalty per corrected syllable) must be at least
-    // 50 times the typed word's; a typed reading that is a sentence keeps its place (promoting over sentences
+    // 2000 times the typed word's (2026-11-08, was 50: genshou gave 分手 before 跟手, which is not a slip; at 50 times
+    // 18 of 3000 correctly typed dictionary words lost first place to a correction, at 2000 none, and keyifuzhi keeps
+    // 可以复制, which is just 1000 times rarer than 可以辅助). Words in the user's own dictionary are never compared:
+    // their weights are on another scale (canting gave 反映 over 餐厅 once both were learned), and a learned typed word
+    // is the user's own choice; a typed reading that is a sentence keeps its place (promoting over sentences
     // changed 35 of 3158 correctly typed comment clauses, 牛逼 → 就比), and so does a typed word read mostly
     // through initials (ld 老大, not 了; wyjyx 我研究一下, not 网易邮箱). A slip often leaves one letter read as an
     // initial, so a word with at least half of its letters fully spelled still counts as typed out. A single
@@ -363,10 +367,11 @@ class PolicyTranslation : public Translation {
           return p && !As<Sentence>(p) && p->end() == end_ && !HanCharacters(p->text()).empty() &&
                  (count = corrections(p)) > 0;
         });
-        static const double kPenalty = std::log(100.0), kMargin = std::log(50.0);
+        static const double kPenalty = std::log(100.0), kMargin = std::log(2000.0);
         if (corrected != limit && corrections(top) == 0) {
           const auto p = As<Phrase>(Candidate::GetGenuineCandidate(*corrected));
-          if (p->weight() + count * kPenalty >= top->weight() + kMargin)
+          if (top->type() != "user_phrase" && p->type() != "user_phrase" &&
+              p->weight() + count * kPenalty >= top->weight() + kMargin)
             std::rotate(head_.begin(), corrected, corrected + 1);
         }
       }

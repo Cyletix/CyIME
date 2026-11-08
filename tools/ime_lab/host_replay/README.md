@@ -163,8 +163,9 @@ loses 88 of 412 (ne → 了, neng → 冷, si → 是, zong → 中); with the f
 without fuzzy pinyin are the same as 1.15.58's for all 413 syllables.
 
 `CorrectionFirstProbe.java` (library dir, a deployed `rime_ice` user directory, the neighbour map) checks the
-2026-11-05 rule after the pause: a corrected whole word goes first when it is 50 times more common than the typed
-reading's word (chengong → 成功), not below that (jinian → 几年, aniu → 阿牛), and a typed reading that is a
+2026-11-05 rule after the pause: a corrected whole word goes first when it is 2000 times more common than the typed
+reading's word (chengong → 成功; 50 times until 2026-11-08), not below that (jinian → 几年, aniu → 阿牛,
+genshou → 跟手, not 分手; keyifuzhi → 可以复制); words the user has learned are never compared, and a typed reading that is a
 sentence keeps first place (jiucup → 就粗平), and a single syllable keeps its typed character (ao → 奥, den → 扽).
 Must-pass words included. It also checks that a shorter word breaking
 the input where the first word does comes second (kejishuip → 科技水平, 科技).
