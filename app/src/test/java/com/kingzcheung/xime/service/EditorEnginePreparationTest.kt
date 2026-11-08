@@ -80,4 +80,16 @@ class EditorEnginePreparationTest {
         assertFalse(canShowClipboardSuggestions(false, "", true))
         assertTrue(canShowClipboardSuggestions(false, "", false))
     }
+
+    @Test fun onlyAFreshCtrlVCountsAsAHardwarePaste() {
+        val v = android.view.KeyEvent.KEYCODE_V
+        assertTrue(isHardwarePasteShortcut(v, ctrl = true, alt = false, meta = false, repeatCount = 0))
+        // 按住不放的重复、Alt+V（剪贴板快捷键）、Win+V、不带 Ctrl 的 V、Ctrl+C 都不是粘贴。
+        assertFalse(isHardwarePasteShortcut(v, ctrl = true, alt = false, meta = false, repeatCount = 1))
+        assertFalse(isHardwarePasteShortcut(v, ctrl = true, alt = true, meta = false, repeatCount = 0))
+        assertFalse(isHardwarePasteShortcut(v, ctrl = false, alt = true, meta = false, repeatCount = 0))
+        assertFalse(isHardwarePasteShortcut(v, ctrl = true, alt = false, meta = true, repeatCount = 0))
+        assertFalse(isHardwarePasteShortcut(v, ctrl = false, alt = false, meta = false, repeatCount = 0))
+        assertFalse(isHardwarePasteShortcut(android.view.KeyEvent.KEYCODE_C, ctrl = true, alt = false, meta = false, repeatCount = 0))
+    }
 }

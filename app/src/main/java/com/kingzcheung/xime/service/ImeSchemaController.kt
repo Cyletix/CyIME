@@ -544,6 +544,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 service.dismissPredictionsForPaste()
                 val plain = action == "paste_plain"
                 val accepted = it.performContextMenuAction(if (plain) android.R.id.pasteAsPlainText else android.R.id.paste)
+                if (accepted) service.hideClipboardSuggestionsAfterPaste()
                 if (plain && !accepted) Toast.makeText(service, "当前输入框不支持粘贴纯文本", Toast.LENGTH_SHORT).show()
             }
             "select_begin" -> editCursor { editorCursor.beginSelection(it) }

@@ -2952,7 +2952,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         when (actionId) {
             android.R.id.undo, android.R.id.redo ->
                 editorConnection()?.let { sendUndoShortcut(it, redo = actionId == android.R.id.redo) }
-            android.R.id.paste -> if (!pasteIntoTerminal()) editorConnection()?.performContextMenuAction(actionId)
+            android.R.id.paste -> if (!pasteIntoTerminal() && editorConnection()?.performContextMenuAction(actionId) == true)
+                hideClipboardSuggestionsAfterPaste()
             else -> editorConnection()?.performContextMenuAction(actionId)
         }
     }
@@ -3316,6 +3317,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             val continuingCandidatePress = e.repeatCount > 0 && hardwareCandidateNavigationKeys.contains(keyCode)
             if ((e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) && !continuingCandidatePress && !isHardwareArrow(keyCode)) {
+                // 实体键盘 Ctrl+V 交给应用粘贴，剪贴板胶囊跟着收起；终端里 Ctrl+V 是终端自己的键，不算粘贴。
+                if (isHardwarePasteShortcut(keyCode, e.isCtrlPressed, e.isAltPressed, e.isMetaPressed, e.repeatCount) &&
+                    !isTerminalEditor()) hideClipboardSuggestionsAfterPaste()
                 return super.onKeyDown(keyCode, event)
             }
             // 按住 Shift：候选栏中英对调；Shift 加数字或空格选候选时上屏英文（只在释义词典生效时接管）。
@@ -4739,6 +4743,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (text.isNotEmpty()) {
             dismissPredictionsForPaste()
             commitPastedText(text)
+            hideClipboardSuggestionsAfterPaste()
         }
         return true
     }
@@ -5254,6 +5259,31 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         predictionManager.invalidatePendingPredictions()
         candidateState.value = candidateState.value.copy(
             associationCandidates = emptyList(), pendingEnglishText = "",
+        )
+    }
+
+    /**
+     * 用系统剪贴板粘贴过（屏幕 Ctrl+V、编辑面板或手势的粘贴、实体键盘 Ctrl+V）：候选栏的剪贴板胶囊收起，
+     * 粘贴的那条记作用过，回到这个输入框也不再出现，和点胶囊上屏一样（用户 11-08：粘贴后上面仍显示复制的内容）。
+     * 30 秒内还复制过别的、没粘的那几条照旧留在候选栏。只在主线程调用。
+     */
+    internal fun hideClipboardSuggestionsAfterPaste() {
+        val state = candidateState.value
+        if (!state.isShowingRecentClipboard) return
+        if (::clipboardManager.isInitialized) {
+            val pasted = runCatching { clipboardManager.getCurrentClipboardText() }.getOrNull()
+            when {
+                !pasted.isNullOrEmpty() -> clipboardManager.markConsumed(pasted)
+                // 剪贴板里是图片（胶囊只在图片比文字新时显示它）：粘的就是这张，下次弹出不再预览。
+                state.clipboardImage != null -> clipboardManager.images.dismissPreview(state.clipboardImage.uri)
+            }
+        }
+        candidateState.value = state.copy(
+            candidates = emptyList(),
+            candidateComments = emptyList(),
+            clipboardImage = null,
+            clipboardExtractedCount = 0,
+            isShowingRecentClipboard = false,
         )
     }
 
