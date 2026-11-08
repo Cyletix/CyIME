@@ -55,6 +55,10 @@ class ManifestParseTest {
         assertEquals("tool", config.type)
         assertEquals(com.kingzcheung.xime.plugin.core.api.ToolResult.LIVE, config.capabilities?.tool?.display)
         assertEquals("翻译", config.toolbarButtons.single().label)
+        // 离线翻译：声明了才注入 host.translate
+        assertTrue(config.capabilities?.offlineTranslate == true)
+        val other = (InstallerManager.parseManifestContent("id: x\ntype: tool") as PluginParseResult.Success).config
+        assertTrue(other.capabilities?.offlineTranslate != true)
     }
 
     @Test

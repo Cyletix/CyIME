@@ -72,6 +72,13 @@ object PluginManager {
     @Volatile
     var clipboardHostApiFactory: ((pluginId: String) -> com.kingzcheung.xime.plugin.core.lua.ClipboardHostApi)? = null
 
+    /**
+     * 宿主离线翻译 API 提供者（app 层注入，手机上的翻译模型）。
+     * 仅当插件 manifest 声明 `capabilities.offline_translate: true` 时注入。
+     */
+    @Volatile
+    var offlineTranslateHostApiFactory: ((pluginId: String) -> com.kingzcheung.xime.plugin.core.lua.OfflineTranslateHostApi)? = null
+
     private var frameworkContext: PluginFrameworkContext? = null
     private val _loadedPluginsFlow = MutableStateFlow<Map<String, LoadedPluginInfo>>(emptyMap())
     private val _pluginInstancesFlow = MutableStateFlow<Map<String, IPluginEntryClass>>(emptyMap())

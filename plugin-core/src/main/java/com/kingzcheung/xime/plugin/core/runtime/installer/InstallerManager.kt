@@ -95,7 +95,10 @@ internal data class CapabilitiesConfig(
     /** 通讯录候选（宿主读通讯录，内容不给插件）。 */
     val contacts: Boolean = false,
     /** 字幕入口（字幕在宿主里，插件只管装没装）。 */
-    val caption: Boolean = false
+    val caption: Boolean = false,
+    /** 离线翻译（注入 host.translate）。 */
+    @kotlinx.serialization.SerialName("offline_translate")
+    val offlineTranslate: Boolean = false
 )
 
 @Serializable
@@ -183,7 +186,8 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
         quickSendRead = quickSendRead,
         clipboardRead = clipboardRead,
         contacts = contacts,
-        caption = caption
+        caption = caption,
+        offlineTranslate = offlineTranslate
     )
 }
 

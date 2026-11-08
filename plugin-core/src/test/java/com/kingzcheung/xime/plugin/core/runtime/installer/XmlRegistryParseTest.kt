@@ -29,6 +29,14 @@ class XmlRegistryParseTest {
         assertEquals(0, old.clipboardSync!!.maxTextBytes)
     }
 
+    @Test
+    fun `离线翻译能力重启后还在`() {
+        val caps = XmlManager.parsePluginsXmlContent(registryXml("""{"offlineTranslate":true}""")).single().capabilities!!
+        assertTrue(caps.offlineTranslate)
+        val old = XmlManager.parsePluginsXmlContent(registryXml("""{"caption":true}""")).single().capabilities!!
+        assertTrue(!old.offlineTranslate)
+    }
+
     /** 模拟 flushToDisk 实际写出的格式：capabilities 为 escapeXml 后的 JSON。 */
     private fun registryXml(capabilitiesNode: String?): String {
         val cap = capabilitiesNode?.let { "    <capabilities>$it</capabilities>\n" } ?: ""

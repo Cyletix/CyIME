@@ -52,6 +52,7 @@ class LuaScriptRuntime(
     private val sseHostApi: com.kingzcheung.xime.plugin.core.lua.http.SseHostApi? = null,
     private val quickSendHostApi: QuickSendHostApi? = null,
     private val clipboardHostApi: ClipboardHostApi? = null,
+    private val offlineTranslateHostApi: OfflineTranslateHostApi? = null,
     private val callTimeoutMs: Long = CALL_TIMEOUT_MS,
     private val callbackTimeoutMs: Long = CALLBACK_TIMEOUT_MS,
     eventQueueCapacity: Int = 256,
@@ -257,6 +258,9 @@ class LuaScriptRuntime(
 
     /** SSE 会话 → Lua 回调表（host.http.stream 的 callbacks），会话 id 为宿主返回句柄。 */
     private val sseCallbacks = ConcurrentHashMap<Int, Map<String, LuaValue>>()
+
+    /** 离线翻译请求 → Lua 回调表（host.translate.run 的 callbacks）。 */
+    private val translateCallbacks = ConcurrentHashMap<Int, Map<String, LuaValue>>()
 
     // ---- 下行事件（manifest capabilities.events 声明后启用） ----
 
@@ -693,6 +697,11 @@ class LuaScriptRuntime(
             host.set("clipboard", buildClipboardTable())
         }
 
+        // 离线翻译（manifest offline_translate 声明后注入，未声明 host.translate 不存在）
+        if (offlineTranslateHostApi != null) {
+            host.set("translate", buildTranslateTable(offlineTranslateHostApi))
+        }
+
         return host
     }
 
@@ -722,6 +731,86 @@ class LuaScriptRuntime(
             if (text.isNullOrEmpty()) LuaValue.NIL else LuaValue.valueOf(text)
         })
         return clipboard
+    }
+
+    /**
+     * host.translate：
+     *   status(from, to) -> state, progress, sizeMb   state = ready | missing | downloading | unsupported
+     *   download(from, to) -> nil | 原因
+     *   run(text, from, to, { onDone = fn(text), onError = fn(message) }) -> id（失败 -1，原因走 onError）
+     *   cancel(id)
+     */
+    private fun buildTranslateTable(api: OfflineTranslateHostApi): LuaTable {
+        val translate = LuaTable()
+        translate.set("status", luaFunction { args ->
+            val status = api.status(args.arg1().tojstring(), args.arg(2).tojstring())
+            LuaValue.varargsOf(arrayOf(LuaValue.valueOf(status.state),
+                LuaValue.valueOf(status.progress), LuaValue.valueOf(status.sizeMb)))
+        })
+        translate.set("download", luaFunction { args ->
+            val error = api.download(args.arg1().tojstring(), args.arg(2).tojstring())
+            if (error == null) LuaValue.NIL else LuaValue.valueOf(error)
+        })
+        translate.set("run", luaFunction { args ->
+            val callbacks = args.arg(4)
+            val cb = HashMap<String, LuaValue>()
+            if (callbacks.istable()) {
+                for (name in listOf("onDone", "onError")) {
+                    val fn = callbacks.get(name)
+                    if (fn.isfunction()) cb[name] = fn
+                }
+            }
+            // 回调可能比 run 返回还早（宿主线程很快翻完）：拿到 id 之前先存着，登记后再交付
+            val gate = Any()
+            var registered = -1
+            val early = ArrayList<Pair<String, String>>()
+            val listener = object : OfflineTranslateListener {
+                override fun onDone(text: String) = deliver("onDone", text)
+                override fun onError(message: String) = deliver("onError", message)
+                private fun deliver(name: String, value: String) {
+                    val id = synchronized(gate) {
+                        if (registered < 0) { early.add(name to value); return }
+                        registered
+                    }
+                    invokeTranslateCallback(id, name, value)
+                }
+            }
+            val id = api.translate(args.arg1().tojstring(), args.arg(2).tojstring(), args.arg(3).tojstring(), listener)
+            val waiting = synchronized(gate) {
+                if (id >= 0) {
+                    translateCallbacks[id] = cb
+                    registered = id
+                }
+                early.toList().also { early.clear() }
+            }
+            // 已经回来的结果（或没排上的原因）就地交付：当前线程正在执行 Lua、已持 luaLock，
+            // 不能再经 runGuarded 排到同一个执行线程上（会等自己）
+            waiting.firstOrNull()?.let { (name, value) ->
+                if (id >= 0) translateCallbacks.remove(id)
+                cb[name]?.invoke(LuaValue.valueOf(value))
+            }
+            LuaValue.valueOf(id)
+        })
+        translate.set("cancel", luaFunction { args ->
+            val id = args.arg1().toint()
+            translateCallbacks.remove(id)
+            api.cancel(id)
+            LuaValue.NIL
+        })
+        return translate
+    }
+
+    /** 离线翻译结果 → Lua 回调（一次性：交付后移除）。 */
+    private fun invokeTranslateCallback(id: Int, name: String, text: String) {
+        val callbacks = translateCallbacks.remove(id) ?: return
+        val fn = callbacks[name] ?: return
+        try {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) { fn.invoke(LuaValue.valueOf(text)) }
+            }
+        } catch (e: Exception) {
+            api.log("host.translate.run $name 回调失败: ${e.message}")
+        }
     }
 
     private fun buildWsTable(): LuaTable {
@@ -1025,6 +1114,7 @@ class LuaScriptRuntime(
             executor.shutdownNow()
             loadedModules.clear()
             sseCallbacks.clear()
+            translateCallbacks.clear()
             wsCallbacks = null
             pluginTable = LuaValue.NIL
             loaded = false

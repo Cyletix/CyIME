@@ -175,6 +175,9 @@ class XmlManager(private val context: Application) {
             if (cap.caption) {
                 root["caption"] = true
             }
+            if (cap.offlineTranslate) {
+                root["offlineTranslate"] = true
+            }
             return com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson.encode(root) ?: ""
         }
 
@@ -228,7 +231,8 @@ class XmlManager(private val context: Application) {
                     quickSendRead = (root["quickSendRead"] as? Boolean) ?: false,
                     clipboardRead = (root["clipboardRead"] as? Boolean) ?: false,
                     contacts = (root["contacts"] as? Boolean) ?: false,
-                    caption = (root["caption"] as? Boolean) ?: false
+                    caption = (root["caption"] as? Boolean) ?: false,
+                    offlineTranslate = (root["offlineTranslate"] as? Boolean) ?: false
                 )
             }.getOrNull()
         }

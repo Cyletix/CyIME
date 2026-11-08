@@ -73,6 +73,15 @@ package com.kingzcheung.xime.plugin.core.lua.sdk
  * - `host.clipboard.get()` -> string 或 nil（当前剪贴板文本；非文本/空/无权限为 nil）
  *   未声明该能力的插件 `host.clipboard` 为 nil。
  *
+ * ### 离线翻译（可选，manifest 声明 `capabilities.offline_translate: true` 才注入）
+ * - `host.translate.status(from, to)` -> state, progress, sizeMb
+ *   state：ready（能用）/ missing（模型没下载）/ downloading（progress 0–100）/ unsupported（没有这个方向或 CPU 不支持）
+ * - `host.translate.download(from, to)` -> nil（已开始或已装好）或 string（原因）
+ * - `host.translate.run(text, from, to, { onDone = fn(text), onError = fn(message) })` -> id（失败 -1）
+ *   后台翻译，结果经回调交付；新请求会丢掉还没开始的旧请求
+ * - `host.translate.cancel(id)`：不再要这个结果
+ *   语言代码：zh、en。未声明该能力的插件 `host.translate` 为 nil。
+ *
  * ### backup 备份（manifest.type = backup，capabilities.backup 声明协议）
  * 宿主负责备份包的生成（zip）与恢复（校验落盘），插件只承载传输协议，
  * 用 `host.http` + `host.crypto` 实现，服务器配置由 getSettingsSchema 表单承载：

@@ -174,6 +174,9 @@ class PluginLifecycleManager(
                 } else null,
                 clipboardHostApi = if (plugin.capabilities?.clipboardRead == true) {
                     PluginManager.clipboardHostApiFactory?.invoke(plugin.id)
+                } else null,
+                offlineTranslateHostApi = if (plugin.capabilities?.offlineTranslate == true) {
+                    PluginManager.offlineTranslateHostApiFactory?.invoke(plugin.id)
                 } else null
             )
             // 按能力声明启用下行事件通道：未声明 events 的插件零开销、零行为变化。

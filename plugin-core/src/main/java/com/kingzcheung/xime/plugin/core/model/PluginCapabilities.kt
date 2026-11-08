@@ -37,6 +37,10 @@ data class PluginCapabilities(
     /** 字幕（manifest 声明 `caption: true`）：字幕页面、识别、下拉快捷开关和桌面图标都在宿主里，
      *  插件装上并启用才放出这些入口，停用或卸载就收起。脚本拿不到录音和字幕内容。 */
     val caption: Boolean = false,
+    /** 离线翻译（manifest 声明 `offline_translate: true`）：声明后宿主注入 `host.translate`
+     *  （查状态、下载模型、在手机上翻译）。模型在「扩展 › 模型」，装了才能用。 */
+    @kotlinx.serialization.SerialName("offline_translate")
+    val offlineTranslate: Boolean = false,
 ) {
     companion object {
         val EMPTY = PluginCapabilities()
