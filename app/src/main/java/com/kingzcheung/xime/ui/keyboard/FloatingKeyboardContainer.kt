@@ -10,8 +10,8 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,10 +52,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import com.kingzcheung.xime.settings.SettingsPreferences
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
@@ -130,8 +132,6 @@ internal fun FloatingKeyboardContainer(
     dockTarget: KeyboardDockTarget? = null,
     bottomContentPaddingDp: Int = 0,
     bottomKeyClearance: State<Float>? = null,
-    /** 底排键帽看得见的下沿以下的空白（含键帽内缩），只决定小横条的竖直位置；null 时和拖动区一样。 */
-    bottomKeyVisualClearance: State<Float>? = null,
     /** 悬浮卡片绕自身中心的旋转角（顺时针为正，-90..90）。 */
     rotationDegrees: Float = 0f,
     /** 调节界面里正在调的旋转角；非空时代替 [rotationDegrees]，只在图层里读，转动时不重组键盘。 */
@@ -149,13 +149,14 @@ internal fun FloatingKeyboardContainer(
     cornerResizeHeightOnly: Boolean = false,
     /** 点一下亮着的角标（不拖）打开完整的调节界面：透明度、悬浮、分体、旋转都在那里。 */
     onCornerTap: (() -> Unit)? = null,
-    /** 角标把手热区（窗口坐标）：露在卡片外的部分要并进输入法触摸区。角标没亮时为空表。 */
+    /** 四角把手和锁钮单独上报窗口热区，透明空白继续透传。 */
     onCornerHandlesPositioned: (List<android.graphics.Rect>) -> Unit = {},
     /** 「填满留空处」：固定卡片两侧铺了键盘背景，卡片和两侧拼成一整条（全屏手写时两侧不铺）。 */
     sidesFilled: Boolean = false,
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val footerDp = LocalConfiguration.current.floatingFooterHeightDp
     val roundedTop = rememberRoundedKeyboardTop()
     val roundedBottom = rememberRoundedKeyboardBottom()
     val fixedCardShape = keyboardPanelShape(false, roundedBottom, roundedTop)
@@ -172,6 +173,8 @@ internal fun FloatingKeyboardContainer(
     // Read here so pointer updates remeasure the card without recomposing KeyboardView.
     // Keys, toolbar and the resize frame now use the same geometry before release.
     val previewRect = previewRectState?.value
+    val geometryLocked = isFloatingMode && rememberFloatingGeometryLocked()
+    val lockedNow by rememberUpdatedState(geometryLocked)
     val hideDragBar = previewRect != null && LocalKeyboardResizeOpacityEditing.current?.value == true
 
     // 位置提示角标：切成悬浮、退出调节界面后亮一下（只有悬浮卡片画）；调节界面里有自己的边框，不亮。
@@ -265,18 +268,18 @@ internal fun FloatingKeyboardContainer(
         val normalRect = floatingCardRect(
             maxWidth.value * density.density, maxHeight.value * density.density,
             (resolvedWidthDp.takeIf { it > 0 }?.toFloat() ?: (maxWidth.value * scaleFactor)) * density.density,
-            (contentHeightDp.coerceAtLeast(1) + FLOATING_DRAG_BAR_HEIGHT_DP) * density.density,
+            (contentHeightDp.coerceAtLeast(1) + footerDp) * density.density,
             offsetX * density.density, offsetY * density.density,
             minOffsetY.coerceAtLeast(0) * density.density,
         )
         // 旋转时只守顶部条和底部拖动按钮在屏内，卡片本身不再按直角整块限位；这个角度放不下就摆正显示。
         val bottomInsetDp = minOffsetY.coerceAtLeast(0).toFloat()
         fun rotatedBounds(degrees: Float) = floatingRotatedOffsetBounds(maxWidth.value, maxHeight.value,
-            normalRect.width / density.density, normalRect.height / density.density, degrees, bottomInsetDp)
+            normalRect.width / density.density, normalRect.height / density.density, degrees, bottomInsetDp, footerDp = footerDp)
         val rotatedRect = if (previewRect != null) null else floatingRotatedCardRect(
             maxWidth.value * density.density, maxHeight.value * density.density, normalRect.width, normalRect.height,
             offsetX.toFloat(), offsetY.toFloat(), bottomInsetDp,
-            rotationDegrees.coerceIn(-FLOATING_ROTATION_MAX_DEGREES, FLOATING_ROTATION_MAX_DEGREES), density.density)
+            rotationDegrees.coerceIn(-FLOATING_ROTATION_MAX_DEGREES, FLOATING_ROTATION_MAX_DEGREES), density.density, footerDp)
         val restingRotation = if (rotatedRect != null) rotationDegrees.coerceIn(
             -FLOATING_ROTATION_MAX_DEGREES, FLOATING_ROTATION_MAX_DEGREES) else 0f
         val baseRect = rotatedRect ?: normalRect
@@ -284,21 +287,18 @@ internal fun FloatingKeyboardContainer(
         val destination = dockTarget?.takeIf { it.widthDp > 0 && it.contentHeightDp > 0 && rotatedRect == null }
             ?.rectInHost(maxWidth.value * density.density, maxHeight.value * density.density, density.density)
         // 拖角调大小时卡片直接按拖出来的矩形摆，松手后宿主保存的新尺寸接上，同一帧换回 baseRect。
-        var cornerRect by remember { mutableStateOf<ResizeRect?>(null) }
+        var cornerRect by remember(geometryLocked) { mutableStateOf<ResizeRect?>(null) }
         val cardRect = previewRect ?: cornerRect ?: baseRect
         val cardTotalHeight = with(density) { cardRect.height.toDp() }
+        val capInset = remember { mutableFloatStateOf(0f) }
         val dragAreaHeight = floatingDragAreaHeightDp(bottomContentPaddingDp,
-            bottomKeyClearance?.value ?: 0f, cardTotalHeight.value).dp
-        // 小横条放在底排键帽下沿到卡片底边的正中；拖动区仍只到键帽触摸区下沿，所以往上挪半个键帽内缩。
-        val dragIndicatorLift = bottomKeyVisualClearance?.let { visual ->
-            (floatingDragAreaHeightDp(bottomContentPaddingDp, visual.value, cardTotalHeight.value).dp - dragAreaHeight) / 2f
-        }?.coerceAtLeast(0.dp) ?: 0.dp
+            bottomKeyClearance?.value ?: 0f, cardTotalHeight.value, footerDp).dp
         val horizontalTravel = ((maxWidth.value - normalRect.width / density.density) / 2f).coerceAtLeast(0f)
         val minimumY = minOffsetY.coerceIn(0, maxHeight.value.roundToInt()).toFloat()
         val maxOffsetY = (maxHeight.value - cardTotalHeight.value).coerceAtLeast(minimumY)
         val safeOffsetY = (maxHeight.value - baseRect.bottom / density.density)
         val safeOffsetX = (baseRect.centerX / density.density - maxWidth.value / 2f)
-        val dockGesture = remember(maxWidth, cardTotalHeight, screenHeightDp, minOffsetY) { FloatingDockGesture() }
+        val dockGesture = remember(maxWidth, cardTotalHeight, screenHeightDp, minOffsetY, geometryLocked) { FloatingDockGesture() }
         var isDragging by remember(dockGesture) { mutableStateOf(false) }
         var dragX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
@@ -308,7 +308,7 @@ internal fun FloatingKeyboardContainer(
         var dragStartY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
         val dragging = isDragging
         // 固定键盘上拉刚变成悬浮：卡片跟着那根手指走（只在摆放阶段读手指位置，不重组键盘）。
-        val undockFollow = LocalKeyboardUndockFollow.current?.takeIf { previewRect == null && rotatedRect == null }
+        val undockFollow = LocalKeyboardUndockFollow.current?.takeIf { !geometryLocked && previewRect == null && rotatedRect == null }
         val followBounds = floatingViewportBounds(maxWidth.value * density.density, maxHeight.value * density.density,
             minOffsetY.coerceAtLeast(0) * density.density)
         fun followShiftPx(): Offset {
@@ -347,6 +347,10 @@ internal fun FloatingKeyboardContainer(
                 "floating-dock-preview")
         }
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
+        val context = LocalContext.current
+        var holdingFooter by remember { mutableStateOf(false) }
+        val lockProgress = floatingLockProgress(holdingFooter)
+        var suppressCornerHint by remember(highlight.epoch) { mutableStateOf(false) }
         val cardPlacement = Modifier
             .align(Alignment.TopStart)
             // 拖动位移只在摆放 lambda 里读：手指每动一下只改位置，不重组键盘。
@@ -357,8 +361,8 @@ internal fun FloatingKeyboardContainer(
             .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
         // 位置提示角标：卡片外扩一圈，跟卡片一起移动、旋转；调节界面里有自己的边框，不画。
         // 亮着（含正按着角）时四角也是调大小的把手，见下面的 cornersActive。
-        val cornersLit = highlight.lit || highlight.held
-        if (previewRect == null) Box(
+        val cornersLit = !suppressCornerHint && (highlight.lit || highlight.held)
+        if (previewRect == null && !geometryLocked && !suppressCornerHint) Box(
             Modifier.align(Alignment.TopStart)
                 .absoluteOffset {
                     val shift = liveShiftPx()
@@ -393,27 +397,39 @@ internal fun FloatingKeyboardContainer(
                     // 只有半透明时才需要离屏合成；不透明时用 Auto，少一次全卡片离屏绘制。
                     compositingStrategy = if (opacity < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }
+                .floatingLockOutline(geometryLocked, lockProgress, highlightColor)
                 .testTag("floating-keyboard-card")
         ) {
             Column {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                val dragSpace = remember { KeyDragSpace() }
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().onPlaced { dragSpace.card = it }) {
                     CompositionLocalProvider(
                         LocalDensity provides Density(density = density.density, fontScale = density.fontScale * fontScaleFactor),
                         LocalFloatingKeyboardRotation provides restingRotation,
+                        LocalKeyDragSpace provides dragSpace,
+                        LocalFloatingKeyCapInset provides capInset,
                     ) {
                         // The resize overlay owns input while the card is being measured.
                         if (previewRect != null) keyboardContent()
                         else LanguageMenuPanel { keyboardContent() }
                     }
                 }
-                Spacer(Modifier.fillMaxWidth().height(FLOATING_DRAG_BAR_HEIGHT_DP.dp)
-                    .keyboardPanelBackground(backgroundColor))
+                Spacer(Modifier.height(footerDp.dp))
             }
-            // Keep the fixed-height Spacer above: hiding the affordance must not resize the keyboard.
-            if (!hideDragBar) DragBar(
+            // Paint from the bottom row's visible cap edge. Its inset still receives key touches.
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .height((dragAreaHeight + capInset.floatValue.dp).coerceAtMost(cardTotalHeight))
+                .testTag("floating-footer").keyboardPanelBackground(backgroundColor), contentAlignment = Alignment.Center) {
+                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor)
+            }
+            if (!hideDragBar && previewRect == null) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
-                indicatorColor = dragIndicatorColor,
-                indicatorLift = dragIndicatorLift,
+                geometryLocked = geometryLocked,
+                onHolding = {
+                    holdingFooter = it
+                    if (it) suppressCornerHint = true
+                },
+                onToggle = { SettingsPreferences.setFloatingGeometryLocked(context, !lockedNow) },
                 onDragStart = {
                     dockGesture.cancel()
                     dragX = safeOffsetX
@@ -456,9 +472,11 @@ internal fun FloatingKeyboardContainer(
                 },
                 onDragCancel = {
                     dockGesture.cancel()
-                    onDrag(dragX - dragStartX, dragY - dragStartY)
+                    if (!lockedNow) {
+                        onDrag(dragX - dragStartX, dragY - dragStartY)
+                        onDragEnd()
+                    }
                     isDragging = false
-                    onDragEnd()
                 },
                 // 点一下拖动条也亮出四角角标：亮着时拖角调大小、点角打开调节界面。
                 onTap = { if (onCornerResize != null && rotatedRect == null) highlight.trigger() },
@@ -466,7 +484,7 @@ internal fun FloatingKeyboardContainer(
         }
 
         // 四角角标把手：只在角标亮着（或正拖着角）时存在，转着的卡片不调大小。
-        val cornersEnabled = onCornerResize != null && previewRect == null && rotatedRect == null && !isDragging
+        val cornersEnabled = !geometryLocked && onCornerResize != null && previewRect == null && rotatedRect == null && !isDragging
         val cornersActive = cornersEnabled && (cornersLit || cornerRect != null)
         val handleOutsidePx = FLOATING_CORNER_HANDLE_OUTSIDE_DP * density.density
         val handleInsidePx = FLOATING_CORNER_HANDLE_INSIDE_DP * density.density
@@ -535,7 +553,7 @@ internal fun FloatingKeyboardContainer(
                                     }
                                 } finally {
                                     val result = cornerRect
-                                    if (resized && result != null) currentOnCornerResize?.invoke(
+                                    if (!lockedNow && resized && result != null) currentOnCornerResize?.invoke(
                                         result.toGeometry(hostWidthPx, hostHeightPx, limits.dragBarPx, density.density))
                                     cornerRect = null
                                     highlight.held = false
@@ -546,7 +564,6 @@ internal fun FloatingKeyboardContainer(
                 )
             }
         }
-
     }
 }
 
@@ -680,8 +697,9 @@ internal const val UNDOCK_HANDLE_HEIGHT_DP = 14
 @Composable
 private fun DragBar(
     modifier: Modifier,
-    indicatorColor: Color,
-    indicatorLift: Dp = 0.dp,
+    geometryLocked: Boolean,
+    onHolding: (Boolean) -> Unit,
+    onToggle: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -697,6 +715,8 @@ private fun DragBar(
         modifier = modifier
             .fillMaxWidth()
             .testTag("floating-drag-bar")
+            .floatingFooterHold(geometryLocked, onHolding, onToggle)
+            .then(if (geometryLocked) Modifier else Modifier
             // 点一下（没拖动）：自己等按下和抬起，不要求按下没被消费，拖动手势先吃掉按下时也认得出点击；
             // 拖过了触摸阈值时拖动手势会消费移动，这里就不算点击。
             .pointerInput(Unit) {
@@ -712,18 +732,6 @@ private fun DragBar(
                     onDragEnd = { currentOnDragEnd() },
                     onDragCancel = { currentOnDragCancel() },
                 )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        // 40dp×4dp 全圆头；颜色是键盘配色里按键文字色和键盘底色各一半混出来的实色，平时和调节时相同。
-        Box(
-            modifier = Modifier
-                .offset(y = -indicatorLift)
-                .width(40.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(50))
-                .background(indicatorColor)
-                .testTag("floating-drag-indicator")
-        )
-    }
+            }),
+    )
 }

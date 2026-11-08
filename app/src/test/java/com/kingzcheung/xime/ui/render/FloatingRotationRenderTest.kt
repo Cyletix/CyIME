@@ -36,7 +36,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.kingzcheung.xime.ui.keyboard.FLOATING_DRAG_BAR_HEIGHT_DP
+import com.kingzcheung.xime.ui.keyboard.floatingFooterHeightDp
 import com.kingzcheung.xime.ui.keyboard.FLOATING_ROTATE_HANDLE_GAP_DP
 import com.kingzcheung.xime.ui.keyboard.FLOATING_ROTATE_HANDLE_SIZE_DP
 import com.kingzcheung.xime.ui.keyboard.FloatingKeyboardContainer
@@ -68,13 +68,13 @@ class FloatingRotationRenderTest {
     private val hostW = 400
     private val hostH = 600
     private val contentH = 220
-    private val cardH = contentH + FLOATING_DRAG_BAR_HEIGHT_DP
+    private val cardH = contentH + floatingFooterHeightDp(hostW)
     private var rotation by mutableFloatStateOf(0f)
     private var offsetX by mutableIntStateOf(0)
     private var offsetY by mutableIntStateOf(120)
     private var resizing by mutableStateOf(false)
     private val resizeRotation = mutableFloatStateOf(0f)
-    private var resizeRect by mutableStateOf(ResizeRect(40f, 600f - 120f - 248f, 360f, 600f - 120f))
+    private var resizeRect by mutableStateOf(ResizeRect(40f, 600f - 120f - cardH, 360f, 600f - 120f))
     private var tapped = ""
     private var confirmed = Float.NaN
 
@@ -104,16 +104,12 @@ class FloatingRotationRenderTest {
                         offsetX = offsetX, offsetY = offsetY, backgroundColor = Color(0xFFF3F4F6),
                         dragIndicatorColor = Color(0xFF8A8F98),
                         rotationDegrees = rotation,
+                        onCornerResize = { tapped = "resized" },
                         previewRectState = if (resizing) androidx.compose.runtime.rememberUpdatedState(resizeRect) else null,
                         previewRotationState = if (resizing) resizeRotation else null,
                         onDrag = { dx, dy -> offsetX += dx.toInt(); offsetY += dy.toInt() }, onDragEnd = {},
                     ) { FakeKeys() }
-                    if (resizing) CompositionLocalProvider(LocalKeyboardResizePreviewState provides preview) {
-                        KeyboardResizeOverlay(contentH, contentH, 0, true, initialWidthDp = 320,
-                            onHeightChange = {}, onBottomPaddingChange = {}, onOpacityChange = {}, onReset = {},
-                            onConfirm = { _, _, _, _ -> }, onCancel = {}, onFloatingModeChange = {},
-                            onRotationConfirm = { confirmed = it }, modifier = Modifier.fillMaxSize())
-                    }
+                    if (resizing) FloatingTestResizeEditor(preview, contentH, { confirmed = it }, { resizing = false })
                 }
             }
         }
@@ -146,6 +142,84 @@ class FloatingRotationRenderTest {
     @Test fun normalFloatingKeyboardHasNoRotateHandle() {
         show()
         assertTrue(rule.onNodeWithTag("keyboard-resize-rotate-handle").isNotDisplayedOrMissing())
+    }
+
+    @Test fun lockOnCardBlocksMovingAndEditingUntilUnlocked() {
+        val context = rule.activity
+        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        show()
+        val bar = rule.onNodeWithTag("floating-drag-bar")
+        val start = bar.fetchSemanticsNode().boundsInRoot.center
+        val host = rule.onNodeWithTag("host")
+        val local = start - host.fetchSemanticsNode().boundsInRoot.topLeft
+        val card = rule.onNodeWithTag("floating-keyboard-card")
+        val before = card.fetchSemanticsNode().boundsInRoot
+        val indicator = rule.onNodeWithTag("floating-drag-indicator")
+        rule.onNodeWithTag("floating-lock").assertDoesNotExist()
+        rule.onNodeWithTag("floating-unlock").assertDoesNotExist()
+        fun hold(ms: Long) = indicator.performTouchInput { down(center); advanceEventTime(ms); up() }
+        indicator.performTouchInput { click() }
+        val corner = rule.onNodeWithTag("floating-corner-handle-top_left")
+        corner.assertExists()
+        hold(800)
+        rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(context)) }
+        hold(1050)
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(context)) }
+        host.performTouchInput { down(local); moveTo(local + Offset(44f, -40f)); up() }
+        assertEquals(before, card.fetchSemanticsNode().boundsInRoot)
+        corner.assertDoesNotExist()
+        rule.runOnIdle { resizing = true }
+        rule.onNodeWithTag("keyboard-resize-rotate-handle").assertDoesNotExist()
+        rule.runOnIdle { resizing = false }
+        hold(850)
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(context)) }
+        hold(1050)
+        rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(context)) }
+        host.performTouchInput { down(local); moveTo(local + Offset(14f, -12f)); moveTo(local + Offset(44f, -40f)); up() }
+        assertTrue(card.fetchSemanticsNode().boundsInRoot != before)
+    }
+
+    @Test fun onlyAStationaryHoldOnThePillCanLock() {
+        show()
+        val bar = rule.onNodeWithTag("floating-drag-bar")
+        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        bar.performTouchInput { down(center + Offset(64f, 0f)); advanceEventTime(1150); up() }
+        rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(rule.activity)) }
+        bar.performTouchInput {
+            down(center)
+            moveBy(Offset(18f, -16f))
+            advanceEventTime(1150)
+            moveBy(Offset(18f, -16f))
+            up()
+        }
+        rule.runOnIdle {
+            assertTrue(!prefs.floatingGeometryLocked(rule.activity))
+            assertTrue(offsetX > 0)
+        }
+    }
+
+    @Test fun editorLockKeepsTheChosenAngleAndClosesTheEditor() {
+        resizing = true
+        resizeRotation.floatValue = 32f
+        show()
+        val bar = rule.onNodeWithTag("keyboard-resize-move-bar")
+        bar.performTouchInput { down(center); advanceEventTime(1050); up() }
+        rule.onNodeWithTag("keyboard-resize-rotate-handle").assertDoesNotExist()
+        rule.onNodeWithTag("floating-drag-bar").assertExists()
+        assertEquals(32f, confirmed, .01f)
+    }
+
+    @Test fun rotatedFooterAtExtremeOffsetsCanUnlock() {
+        rotation = -90f
+        offsetX = -400
+        offsetY = 0
+        show()
+        val bar = rule.onNodeWithTag("floating-drag-indicator")
+        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        bar.performTouchInput { down(center); advanceEventTime(1050); up() }
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(rule.activity)) }
+        bar.performTouchInput { down(center); advanceEventTime(1050); up() }
+        rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(rule.activity)) }
     }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.isNotDisplayedOrMissing(): Boolean =
@@ -214,5 +288,16 @@ class FloatingRotationRenderTest {
         File(out, "${System.getenv("CYIME_RENDER_NAME") ?: "floating-rotation"}.png").outputStream().use {
             sheet.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
+    }
+}
+
+@Composable
+internal fun FloatingTestResizeEditor(preview: KeyboardResizePreviewState, contentHeight: Int, saveAngle: (Float) -> Unit,
+    close: () -> Unit) {
+    CompositionLocalProvider(LocalKeyboardResizePreviewState provides preview) {
+        KeyboardResizeOverlay(contentHeight, contentHeight, 0, true, initialWidthDp = 320,
+            onHeightChange = {}, onBottomPaddingChange = {}, onOpacityChange = {}, onReset = {},
+            onConfirm = { _, _, _, _ -> close() }, onCancel = close, onFloatingModeChange = {},
+            onRotationConfirm = saveAngle, modifier = Modifier.fillMaxSize())
     }
 }

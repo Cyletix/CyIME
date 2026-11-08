@@ -31,7 +31,7 @@ class SchemaPanelResizeImeTest {
         val landscape = context.resources.configuration.screenWidthDp > context.resources.configuration.screenHeightDp
         val suffix = if (landscape) "_landscape" else ""
         val keys = listOf("keyboard_height_dp$suffix", "floating_mode$suffix", "toolbar_buttons", "keyboard_bottom_padding_dp")
-        val saved = keys.associateWith { prefs.all[it] }
+        val saved = (keys + bottomCalibrationFixtureKeys).associateWith { prefs.all[it] }
         lateinit var editor: EditText
         try {
             SettingsPreferences.setFloatingMode(context, false, landscape)

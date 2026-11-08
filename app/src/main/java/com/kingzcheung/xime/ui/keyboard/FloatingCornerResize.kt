@@ -63,7 +63,7 @@ internal fun floatingCornerResizeLimits(
 ): FloatingCornerResizeLimits {
     val d = density.coerceAtLeast(0.1f)
     val bounds = floatingViewportBounds(hostWidthPx, hostHeightPx, bottomInsetPx)
-    val dragBarPx = FLOATING_DRAG_BAR_HEIGHT_DP * d
+    val dragBarPx = floatingFooterHeightDp(screenShortSideDp) * d
     val availableWidthDp = (bounds.width / d).roundToInt()
     val availableHeightDp = (bounds.height / d).roundToInt()
     val widthRange = keyboardWidthBounds(screenWidthDp)

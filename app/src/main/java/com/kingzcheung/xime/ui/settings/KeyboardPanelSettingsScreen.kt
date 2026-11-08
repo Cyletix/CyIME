@@ -1,12 +1,17 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.Lock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.keyboard.KeyboardPanelLaunch
+import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.ui.keyboard.rememberFloatingGeometryLocked
 
 internal fun keyboardPanelTitle(panel: KeyboardPanelLaunch.Panel) = when (panel) {
     KeyboardPanelLaunch.Panel.RESIZE -> "键盘尺寸与位置"
@@ -16,6 +21,13 @@ internal fun keyboardPanelTitle(panel: KeyboardPanelLaunch.Panel) = when (panel)
 @Composable
 internal fun KeyboardPanelSettingsContent(panel: KeyboardPanelLaunch.Panel, onBack: () -> Unit) {
     KeyboardSettingsScaffold(keyboardPanelTitle(panel), onBack, preview = true, editPanel = panel) { modifier ->
+        if (panel == KeyboardPanelLaunch.Panel.RESIZE) {
+            val context = LocalContext.current
+            SettingsToggleItem(Icons.TwoTone.Lock, "锁定悬浮键盘位置和大小",
+                "长按底部短横条 1 秒可锁定或解锁。锁定后保持位置和大小。",
+                checked = rememberFloatingGeometryLocked(),
+                onCheckedChange = { SettingsPreferences.setFloatingGeometryLocked(context, it) })
+        }
         Text(
             when (panel) {
                 KeyboardPanelLaunch.Panel.RESIZE -> "点「调整尺寸」后，拖动边框或移动手柄。\n调好大小和透明度，点「确认」查看效果。"

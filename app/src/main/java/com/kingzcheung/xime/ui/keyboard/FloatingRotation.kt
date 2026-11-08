@@ -34,11 +34,11 @@ internal data class FloatingOffsetBounds(val minX: Float, val maxX: Float, val m
 }
 
 /** 旋转后要守住的点（相对卡片中心、未旋转）：顶部条四角、底部拖动按钮两端。 */
-private fun guardPoints(cardWidth: Float, cardHeight: Float, unit: Float): List<Pair<Float, Float>> {
+private fun guardPoints(cardWidth: Float, cardHeight: Float, unit: Float, footerDp: Int): List<Pair<Float, Float>> {
     val halfW = cardWidth / 2f
     val halfH = cardHeight / 2f
     val strip = (FLOATING_ROTATE_TOP_STRIP_DP * unit).coerceAtMost(cardHeight)
-    val pillY = halfH - (FLOATING_DRAG_BAR_HEIGHT_DP * unit / 2f).coerceAtMost(halfH)
+    val pillY = halfH - (footerDp * unit / 2f).coerceAtMost(halfH)
     val pillHalf = (FLOATING_DRAG_INDICATOR_WIDTH_DP * unit / 2f).coerceAtMost(halfW)
     return listOf(
         -halfW to -halfH, halfW to -halfH, -halfW to -halfH + strip, halfW to -halfH + strip,
@@ -58,13 +58,14 @@ internal fun floatingRotatedOffsetBounds(
     degrees: Float,
     bottomInset: Float,
     unit: Float = 1f,
+    footerDp: Int = FLOATING_DRAG_BAR_HEIGHT_DP,
 ): FloatingOffsetBounds {
     val radians = Math.toRadians(degrees.toDouble())
     val c = cos(radians).toFloat()
     val s = sin(radians).toFloat()
     var minQx = Float.MAX_VALUE; var maxQx = -Float.MAX_VALUE
     var minQy = Float.MAX_VALUE; var maxQy = -Float.MAX_VALUE
-    for ((vx, vy) in guardPoints(cardWidth, cardHeight, unit)) {
+    for ((vx, vy) in guardPoints(cardWidth, cardHeight, unit, footerDp)) {
         val qx = vx * c - vy * s
         val qy = vx * s + vy * c
         minQx = minOf(minQx, qx); maxQx = maxOf(maxQx, qx)
@@ -94,10 +95,11 @@ internal fun floatingRotatedCardRect(
     bottomInsetDp: Float,
     degrees: Float,
     density: Float,
+    footerDp: Int = FLOATING_DRAG_BAR_HEIGHT_DP,
 ): ResizeRect? {
     if (!isFloatingRotated(degrees)) return null
     val bounds = floatingRotatedOffsetBounds(hostWidthPx / density, hostHeightPx / density,
-        widthPx / density, totalHeightPx / density, degrees, bottomInsetDp)
+        widthPx / density, totalHeightPx / density, degrees, bottomInsetDp, footerDp = footerDp)
     if (!bounds.feasible) return null
     val left = (hostWidthPx / density / 2f + bounds.clampX(offsetXDp)) * density - widthPx / 2f
     val bottom = (hostHeightPx / density - bounds.clampY(offsetYDp)) * density

@@ -35,7 +35,7 @@ class RealFloatingImeTest {
         val keys = listOf("floating_mode", "floating_offset_x", "floating_offset_y",
             "keyboard_height_dp", "keyboard_bottom_padding_dp", "keyboard_opacity",
             "current_schema", "current_schema_dual")
-        val saved = keys.associateWith { prefs.all[it] }
+        val saved = (keys + bottomCalibrationFixtureKeys).associateWith { prefs.all[it] }
         val previousIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         val ime = "${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService"
         val enabledBefore = shell("ime list -s").lineSequence().any { it == ime }

@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.render
 
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsNotEnabled
 import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
@@ -382,9 +384,9 @@ class ResizeOpacityPanelRenderTest {
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 Box(Modifier.absoluteOffset(12.dp, 18.dp).size(360.dp, 420.dp)) {
-                    val bounds = ResizeRect(0f, 0f, 360f, 420f)
-                    val rect = remember { mutableStateOf(bounds.copy(top = 124f)) }
-                    val preview = KeyboardResizePreviewState(rect = rect.value, bounds = bounds,
+                    val bounds = ResizeRect(0f, 0f, 360f, 372f)
+                    val rect = remember { mutableStateOf(bounds.copy(top = 76f)) }
+                    val preview = KeyboardResizePreviewState(rect = rect.value, bounds = bounds, fixedBottomInsetDp = 48,
                         onRectChange = { rect.value = it }, bottomPaddingDp = padding.intValue,
                         onBottomPaddingChange = { padding.intValue = it })
                     CompositionLocalProvider(LocalKeyboardResizePreviewState provides preview) {
@@ -411,6 +413,8 @@ class ResizeOpacityPanelRenderTest {
             for (i in 1..12) moveTo(center + Offset(0f, i * 10f))
             up()
         }
+        rule.onNodeWithText("底部留白 48 dp").assertExists()
+        rule.onNodeWithContentDescription("减少底部留白").assertIsNotEnabled()
         rule.onNodeWithContentDescription("确认").performClick()
         rule.runOnIdle { assertEquals(0, confirmedPadding); assertEquals(260, confirmedHeight) }
         rule.onNodeWithContentDescription("重置").performClick()

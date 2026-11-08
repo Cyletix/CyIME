@@ -84,7 +84,7 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardAspectLimits
 import com.kingzcheung.xime.ui.keyboard.letterKeyboardDefaults
 import com.kingzcheung.xime.ui.keyboard.keyboardPhysicalMetrics
 import com.kingzcheung.xime.ui.keyboard.protectKeyboardSize
-import com.kingzcheung.xime.ui.keyboard.FLOATING_DRAG_BAR_HEIGHT_DP
+import com.kingzcheung.xime.ui.keyboard.floatingFooterHeightDp
 import com.kingzcheung.xime.ui.keyboard.HardwareKeyboardCandidateBar
 import com.kingzcheung.xime.ui.keyboard.HardwareKeyboardToolbar
 import com.kingzcheung.xime.ui.keyboard.HardwareToolbarPosition
@@ -407,6 +407,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     private fun allowSettingsPreviewTouch(event: android.view.MotionEvent): Boolean {
         if (!settingsPreviewEditor) return true
+        val origin = IntArray(2)
+        keyboardContainer.getLocationInWindow(origin)
+        val x = (origin[0] + event.x).toInt()
+        val y = (origin[1] + event.y).toInt()
         val bounds = when {
             settingsPreviewPanel == KeyboardPanelLaunch.Panel.RESIZE && uiState.value.showKeyboardResize -> settingsResizeBounds
             settingsPreviewPanel == KeyboardPanelLaunch.Panel.ARRANGE &&
@@ -418,9 +422,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 KeyboardPanelLaunch.typingRequested = true
             return false
         }
-        val origin = IntArray(2)
-        keyboardContainer.getLocationInWindow(origin)
-        return bounds.contains((origin[0] + event.x).toInt(), (origin[1] + event.y).toInt())
+        return bounds.contains(x, y)
     }
     internal val hasHardwareKeyboard: Boolean get() = hardwareKeyboardDisplay.connected
     private val hardwareGamePackages = HardwareGamePackages { HardwareGamePassthrough.isGame(packageManager.getApplicationInfo(it, 0)) }
@@ -933,12 +935,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             fixedWidthDp = fixedWidth, keyboardBottomPaddingDp = bottomPadding,
         ))
         val halfMargin = maxOf(0, (screenW - displaySize.width) / 2)
-        val cardH = displaySize.height + (if (isFloatingMode) FLOATING_DRAG_BAR_HEIGHT_DP else 0)
+        val cardH = displaySize.height + (if (isFloatingMode) resources.configuration.floatingFooterHeightDp else 0)
         val maxY = maxOf(minY, effectiveH - cardH)
         // 转着的卡片按旋转后的规则限位（顶部条在屏内即可）；当前屏放不下这个角度就先摆正显示，不改保存值。
         val savedRotation = SettingsPreferences.getFloatingRotation(this, isLandscape)
         val rotatedBounds = com.kingzcheung.xime.ui.keyboard.floatingRotatedOffsetBounds(screenW.toFloat(),
-            effectiveH.toFloat(), displaySize.width.toFloat(), cardH.toFloat(), savedRotation, minY.toFloat())
+            effectiveH.toFloat(), displaySize.width.toFloat(), cardH.toFloat(), savedRotation, minY.toFloat(), footerDp = resources.configuration.floatingFooterHeightDp)
             .takeIf { isFloatingMode && com.kingzcheung.xime.ui.keyboard.isFloatingRotated(savedRotation) && it.feasible }
         val clampedX = rotatedBounds?.clampX(loadedX.toFloat())?.roundToInt() ?: loadedX.coerceIn(-halfMargin, halfMargin)
         val clampedY = rotatedBounds?.clampY(loadedY.toFloat())?.roundToInt() ?: loadedY.coerceIn(minY, maxY)
@@ -2167,7 +2169,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val handwritingNormalX = if (state.isFloatingMode) state.floatingOffsetX else protectedSize.offsetX
                 val handwritingOffsetX = handwritingSize(handwritingNormalX, 0)
                 val contentBottomPaddingDp = if (handwritingExpanded || state.isFloatingMode) 0 else state.keyboardBottomPaddingDp
-                val floatingDragBarHeight = if (state.isFloatingMode && !handwritingExpanded) FLOATING_DRAG_BAR_HEIGHT_DP else 0
+                val floatingDragBarHeight = if (state.isFloatingMode && !handwritingExpanded) resources.configuration.floatingFooterHeightDp else 0
                 // Keep a floating panel's bottom in place while it grows, and reserve its drag bar.
                 val clipboardBottomSpace = if (state.isFloatingMode) {
                     state.floatingOffsetY.coerceIn(floatingMinY,
@@ -2987,7 +2989,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             ) else availableWidthDp
         // Fixed mode's configuration height already describes its usable viewport.
         // Resize overlays use a taller host, but must not change the default budget.
-        val availableHeight = (if (floating) hostHeightDp - bottomSpaceDp - FLOATING_DRAG_BAR_HEIGHT_DP
+        val availableHeight = (if (floating) hostHeightDp - bottomSpaceDp - resources.configuration.floatingFooterHeightDp
             else config.screenHeightDp - (if (reset) 0 else state.keyboardBottomPaddingDp)).coerceAtLeast(1)
         val maximumHeight = heightBounds.last.coerceAtMost(availableHeight)
         val requestedHeight = height.coerceIn(heightBounds.first.coerceAtMost(maximumHeight)..maximumHeight)
@@ -3074,7 +3076,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 fixedWidthDp = SettingsPreferences.getFixedWidthDp(this, landscape)),
             floating = true)
         return com.kingzcheung.xime.ui.keyboard.floatingCardRect(hostWidthPx, hostHeightPx, size.width * density,
-            (size.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density,
+            (size.height + resources.configuration.floatingFooterHeightDp) * density,
             SettingsPreferences.getFloatingOffsetX(this, landscape) * density,
             SettingsPreferences.getFloatingOffsetY(this, landscape, suggestedBottomDp()) * density, minBottom * density)
     }
@@ -5106,7 +5108,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         ((resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt() -
                             tryGetStatusBarHeightDp(this@XimeInputMethodService, window.window)).coerceAtLeast(1),
                     )
-                    currentEffectiveKeyboardHeight = kbH + FLOATING_DRAG_BAR_HEIGHT_DP
+                    currentEffectiveKeyboardHeight = kbH + resources.configuration.floatingFooterHeightDp
                 }
                 val density = resources.displayMetrics.density
                 val hostLocation = IntArray(2)
@@ -5132,7 +5134,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     val fallback = com.kingzcheung.xime.ui.keyboard.floatingCardRect(
                         hostWidth.toFloat(), hostHeight.toFloat(), fallbackSize.width * density,
                         (if (currentFloatingCardHeightDp > 0) currentEffectiveKeyboardHeight
-                            else fallbackSize.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density,
+                            else fallbackSize.height + resources.configuration.floatingFooterHeightDp) * density,
                         state.floatingOffsetX * density, state.floatingOffsetY * density, minimumBottom,
                     )
                     touchableRegion.set(
@@ -5147,7 +5149,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     touchableRegion.op(it.left.roundToInt(), it.top.roundToInt(),
                         it.right.roundToInt(), it.bottom.roundToInt(), android.graphics.Region.Op.DIFFERENCE)
                 }
-                // 角标亮着时四角把手露在卡片外，那几小块也收触摸；角标淡出后报空表，触摸区回到卡片本身。
+                // 锁定按钮和亮着的四角把手各自收触摸，中间的空白仍交给底下的应用。
                 floatingCornerHandleBounds.forEach { touchableRegion.op(it, android.graphics.Region.Op.UNION) }
             }
         } else {

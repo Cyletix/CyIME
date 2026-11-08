@@ -62,7 +62,7 @@ class ResizeTransactionImeTest {
 
     @Before fun startKeyboard(): Unit = runBlocking {
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        savedPrefs = savedKeys.associateWith { prefs.all[it] }
+        savedPrefs = (savedKeys + bottomCalibrationFixtureKeys).associateWith { prefs.all[it] }
         SettingsPreferences.setToolbarButtons(context, listOf("float", "schema"))
         SettingsPreferences.setSplitKeyboardEnabled(context, false)
         prefs.edit().putBoolean("landscape_layout_v2", true).apply()

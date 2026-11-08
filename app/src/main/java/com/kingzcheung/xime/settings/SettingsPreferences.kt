@@ -1284,6 +1284,11 @@ object SettingsPreferences {
     // ── 悬浮键盘设置 ──
 
     private const val KEY_FLOATING_MODE = "floating_mode"
+    internal const val KEY_FLOATING_GEOMETRY_LOCKED = "floating_geometry_locked"
+    fun floatingGeometryLocked(context: Context): Boolean = getPrefs(context).getBoolean(KEY_FLOATING_GEOMETRY_LOCKED, false)
+    fun setFloatingGeometryLocked(context: Context, locked: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_FLOATING_GEOMETRY_LOCKED, locked).apply()
+    }
     private const val KEY_FLOATING_MODE_LANDSCAPE = "floating_mode_landscape"
     private const val KEY_FLOATING_OFFSET_X = "floating_offset_x"
     private const val KEY_FLOATING_OFFSET_X_LANDSCAPE = "floating_offset_x_landscape"

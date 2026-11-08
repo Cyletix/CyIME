@@ -133,7 +133,7 @@ class RealFloatingDockGeometryTest {
                 rule.runOnUiThread {
                     ledger.expect("keyboard_opacity$suffix", 1f)
                     ledger.write(mapOf("fixed_width_dp$suffix" to width, "fixed_offset_x$suffix" to signedOffset,
-                        "keyboard_height_dp$suffix" to height, "keyboard_bottom_padding_dp" to 48,
+                        "keyboard_height_dp$suffix" to height, bottomPaddingFixtureKey(landscape) to 48,
                         "floating_width_dp$suffix" to floatWidth, "floating_height_dp$suffix" to 260,
                         "floating_offset_x$suffix" to 0, "floating_offset_y$suffix" to 112,
                         "floating_mode$suffix" to false))

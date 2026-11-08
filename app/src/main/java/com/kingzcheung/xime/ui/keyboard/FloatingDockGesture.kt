@@ -35,6 +35,11 @@ internal const val FLOATING_DOCK_DURATION_MILLIS = 300L
 internal fun floatingDockOnRelease(previewProgress: Float, onBottomEdge: Boolean, hasDestination: Boolean): Boolean =
     hasDestination && onBottomEdge && previewProgress >= 1f
 internal const val FLOATING_DRAG_BAR_HEIGHT_DP = 28
+internal fun floatingFooterHeightDp(shortSideDp: Int): Int =
+    if (shortSideDp in 1 until 600) 16 else FLOATING_DRAG_BAR_HEIGHT_DP
+
+internal val android.content.res.Configuration.floatingFooterHeightDp: Int
+    get() = floatingFooterHeightDp(minOf(screenWidthDp, screenHeightDp))
 
 /** 调节界面里固定键盘上拖变悬浮：先有 [FIXED_TO_FLOATING_DEAD_ZONE_DP] 不动的阻力，再拉 [FIXED_TO_FLOATING_PULL_DP] 才满。 */
 internal const val FIXED_TO_FLOATING_DEAD_ZONE_DP = 48f
@@ -44,8 +49,9 @@ internal fun modeSwitchPullProgress(verticalDp: Float, horizontalDp: Float = 0f)
     ((verticalDp - abs(horizontalDp) - FIXED_TO_FLOATING_DEAD_ZONE_DP) / FIXED_TO_FLOATING_PULL_DP).coerceIn(0f, 1f)
 
 /** 移动条覆盖键帽以下的完整空白，卡片本身仍只额外预留原来的 28dp。 */
-internal fun floatingDragAreaHeightDp(contentPaddingDp: Int, keyClearanceDp: Float, totalHeightDp: Float): Float =
-    (FLOATING_DRAG_BAR_HEIGHT_DP + contentPaddingDp.coerceAtLeast(0) + keyClearanceDp.coerceAtLeast(0f))
+internal fun floatingDragAreaHeightDp(contentPaddingDp: Int, keyClearanceDp: Float, totalHeightDp: Float,
+    footerDp: Int = FLOATING_DRAG_BAR_HEIGHT_DP): Float =
+    (footerDp + contentPaddingDp.coerceAtLeast(0) + keyClearanceDp.coerceAtLeast(0f))
         .coerceAtMost(totalHeightDp.coerceAtLeast(0f))
 
 /** 距离来自手指在屏幕上的净位移，即使卡片先碰到边也能识别继续往下拖。 */

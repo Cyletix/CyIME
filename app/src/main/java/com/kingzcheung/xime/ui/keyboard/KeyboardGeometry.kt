@@ -60,7 +60,7 @@ internal fun floatingResizeFloorScreenContentDp(screenShortSideDp: Int): Int =
 /** 悬浮键盘拖小的最低内容高度（见 [floatingResizeFloorScreenContentDp]）；可用高度不够时取可用高度。 */
 internal fun floatingResizeFloorContentDp(screenShortSideDp: Int, availableHeightDp: Int): Int =
     minOf(floatingResizeFloorScreenContentDp(screenShortSideDp),
-        (availableHeightDp - FLOATING_DRAG_BAR_HEIGHT_DP).coerceAtLeast(1))
+        (availableHeightDp - floatingFooterHeightDp(screenShortSideDp)).coerceAtLeast(1))
 
 /** 悬浮键盘拖小的最小宽度：最低内容高 × 1.6 取整到 10dp；可用宽度不够时取可用宽度。 */
 internal fun floatingResizeFloorWidthDp(screenShortSideDp: Int, availableWidthDp: Int): Int =

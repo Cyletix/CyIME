@@ -62,6 +62,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -170,11 +171,16 @@ internal fun KeyboardResizeOverlay(
     val adjustingOpacity = draggingOpacity || pressingOpacity
     // 调透明度不再进入单独的编辑态（返回/完成），外框和按钮留在原地；editingOpacity 只保留给旧调用方。
     val configuration = LocalConfiguration.current
+    val footerDp = configuration.floatingFooterHeightDp
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     var currentHeightDp by remember { mutableFloatStateOf(initialHeightDp.toFloat()) }
     var currentWidthDp by remember { mutableFloatStateOf(initialWidthDp.toFloat()) }
     var currentBottomPaddingDpState by remember { mutableFloatStateOf(currentBottomPaddingDp.toFloat()) }
     var floatingMode by remember(isFloatingMode) { mutableStateOf(isFloatingMode) }
+    if (floatingMode && rememberFloatingGeometryLocked()) {
+        LaunchedEffect(Unit) { onCancel() }
+        return
+    }
     var splitMode by remember(isSplitKeyboard) { mutableStateOf(isSplitKeyboard) }
     // 分体两半贴边：开启前的宽度留着，关闭分体时还原。
     var rectBeforeSplit by remember { mutableStateOf<ResizeRect?>(null) }
@@ -193,11 +199,15 @@ internal fun KeyboardResizeOverlay(
     val currentOnPaddingEdited by rememberUpdatedState(onBottomPaddingChange)
 
     var overlayOrigin by remember { mutableStateOf(Offset.Zero) }
+    var laidOutWindowHeight by remember(hostView) { mutableIntStateOf(0) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .onGloballyPositioned { overlayOrigin = it.positionInWindow() },
+            .onGloballyPositioned {
+                overlayOrigin = it.positionInWindow()
+                laidOutWindowHeight = hostView.rootView.height
+            },
     ) {
         val viewRect = viewRectOf(maxWidth.value * density.density, maxHeight.value * density.density)
         val previewState = LocalKeyboardResizePreviewState.current
@@ -212,7 +222,7 @@ internal fun KeyboardResizeOverlay(
         val frameSpanDp = (minOf(frame.width, frame.height * 1.5f) / density.density).roundToInt()
         val frameStyle = remember(frameSpanDp) { resizeFrameStyle(frameSpanDp) }
         val dragAreaHeightDp = floatingDragAreaHeightDp(previewState.bottomPaddingDp,
-            previewState.floatingBottomClearanceDp, frame.height / density.density)
+            previewState.floatingBottomClearanceDp, frame.height / density.density, footerDp)
         val dragAreaHeightPx = dragAreaHeightDp * density.density
         val currentPreviewRect by rememberUpdatedState(previewState.rect?.let { rotateRectCenter(it, gesturePivot, -rotation) })
         val currentInitialPreviewRect by rememberUpdatedState(previewState.initialRect)
@@ -222,13 +232,16 @@ internal fun KeyboardResizeOverlay(
         }
         val currentViewRect by rememberUpdatedState(viewRect)
         val currentPreviewState by rememberUpdatedState(previewState)
+        fun maximumFixedPadding(contentHeight: Float): Float {
+            val session = currentPreviewState
+            return minOf(maxOf(defaultBottomPaddingDp + 80f, session.initialBottomPaddingDp.toFloat()),
+                ((session.bounds ?: currentViewRect).height / density.density - contentHeight).coerceAtLeast(0f))
+        }
         fun adjustFixedPadding(rect: ResizeRect, previous: Float, deltaDp: Float): Pair<ResizeRect, Float> {
             val session = currentPreviewState
             val view = currentViewRect
             val contentHeight = rect.height / density.density - previous
-            val maximum = minOf(maxOf(defaultBottomPaddingDp + 80f, session.initialBottomPaddingDp.toFloat()),
-                ((session.bounds ?: view).height / density.density - contentHeight).coerceAtLeast(0f))
-            val padding = (previous + deltaDp).coerceIn(0f, maximum)
+            val padding = (previous + deltaDp).coerceIn(0f, maximumFixedPadding(contentHeight))
             val updated = fixedKeyboardRect(view.width, view.height, contentHeight * density.density,
                 padding * density.density, session.fixedBottomInsetDp * density.density,
                 rect.width, rect.centerX - view.width / 2f, density.density)
@@ -240,10 +253,10 @@ internal fun KeyboardResizeOverlay(
         // 固定键盘底边把手：手势导航时抬到系统底部手势区上面，往上拖不会触发回桌面。
         val reportedGesturePx = WindowInsets.mandatorySystemGestures.getBottom(density)
         val tappablePx = WindowInsets.tappableElement.getBottom(density)
-        val gestureZoneTopPx = remember(hostView, floatingMode, maxHeight, overlayOrigin, reportedGesturePx, tappablePx,
+        val gestureZoneTopPx = remember(hostView, floatingMode, laidOutWindowHeight, overlayOrigin, reportedGesturePx, tappablePx,
             previewState.fixedBottomInsetDp) {
-            if (floatingMode) null else (com.kingzcheung.xime.service.bottomGestureZoneTopInWindowPx(hostView)
-                ?: reportedGesturePx.takeIf { it > 0 }?.let { hostView.rootView.height - it })
+            if (floatingMode || laidOutWindowHeight <= 0) null else (com.kingzcheung.xime.service.bottomGestureZoneTopInWindowPx(hostView)
+                ?: reportedGesturePx.takeIf { it > 0 }?.let { laidOutWindowHeight - it })
                 ?.let { it - overlayOrigin.y }
         }
         val bottomHandleClearancePx = BOTTOM_HANDLE_GESTURE_CLEARANCE_DP * density.density
@@ -391,6 +404,26 @@ internal fun KeyboardResizeOverlay(
                 }
                 clipPath(hole, ClipOp.Difference) { drawRect(Color.Black.copy(alpha = 0.44f)) }
             })
+        fun confirmResize() {
+            val finalRect = currentPreviewRect ?: previewState.rect
+            if (floatingMode && finalRect != null) {
+                val geometry = finalRect.toGeometry(
+                    viewWidthPx = viewRect.width,
+                    viewHeightPx = viewRect.height,
+                    dragBarHeightPx = footerDp * density.density,
+                    density = density.density,
+                )
+                currentWidthDp = geometry.widthDp.toFloat()
+                currentHeightDp = geometry.heightDp.toFloat()
+                currentOnGeometryChange(geometry)
+            } else if (finalRect != null) {
+                currentHeightDp = finalRect.height / density.density - previewState.bottomPaddingDp
+                currentOnGeometryChange(finalRect.toGeometry(viewRect.width, viewRect.height, 0f, density.density))
+            }
+            if (splitActive) previewState.onSplitGapCommit()
+            if (floatingMode) rotationState?.let { onRotationConfirm?.invoke(it.floatValue) }
+            onConfirm(currentHeightDp.roundToInt(), previewState.bottomPaddingDp, floatingMode, opacity)
+        }
         Box(Modifier.fillMaxSize().graphicsLayer {
             rotationZ = rotation
             transformOrigin = TransformOrigin(layerPivot.x / size.width.coerceAtLeast(1f),
@@ -572,7 +605,7 @@ internal fun KeyboardResizeOverlay(
                             return@awaitEachGesture
                         }
                         val floatingHeightRange = floatingResizeHeightBounds(hostMaxHeight.value.roundToInt(), isLandscape)
-                        val dragBarDp = if (gestureFloating) FLOATING_DRAG_BAR_HEIGHT_DP else 0
+                        val dragBarDp = if (gestureFloating) footerDp else 0
                         // 手机基准下限与可用区域取小：平板横屏不允许因为"按比例算"反而比手机更小。
                         val availableWidthDp = (stableBounds.width / density.density).roundToInt()
                         val availableHeightDp = (stableBounds.height / density.density).roundToInt()
@@ -672,7 +705,7 @@ internal fun KeyboardResizeOverlay(
                                 currentOnPreviewRectChange(workingRect)
                                 if (dragEdge == ResizeHandle.NONE) dragTowardDock(workingRect, stableBounds, amount)
                                 currentWidthDp = (workingRect.width / density.density)
-                                currentHeightDp = (workingRect.height / density.density) - FLOATING_DRAG_BAR_HEIGHT_DP
+                                currentHeightDp = (workingRect.height / density.density) - footerDp
                             } else {
                                 when (dragEdge) {
                                     ResizeHandle.TOP, ResizeHandle.TOP_LEFT, ResizeHandle.TOP_RIGHT,
@@ -812,26 +845,6 @@ internal fun KeyboardResizeOverlay(
         val panelRadius = if (keyRadius > 0.dp) keyRadius + panelInset else 0.dp
         val toolShape = RoundedCornerShape(panelRadius)
         val actionShape = RoundedCornerShape(keyRadius)
-        fun confirmResize() {
-            val finalRect = currentPreviewRect ?: previewState.rect
-            if (floatingMode && finalRect != null) {
-                val geometry = finalRect.toGeometry(
-                    viewWidthPx = viewRect.width,
-                    viewHeightPx = viewRect.height,
-                    dragBarHeightPx = FLOATING_DRAG_BAR_HEIGHT_DP * density.density,
-                    density = density.density,
-                )
-                currentWidthDp = geometry.widthDp.toFloat()
-                currentHeightDp = geometry.heightDp.toFloat()
-                currentOnGeometryChange(geometry)
-            } else if (finalRect != null) {
-                currentHeightDp = finalRect.height / density.density - previewState.bottomPaddingDp
-                currentOnGeometryChange(finalRect.toGeometry(viewRect.width, viewRect.height, 0f, density.density))
-            }
-            if (splitActive) previewState.onSplitGapCommit()
-            if (floatingMode) rotationState?.let { onRotationConfirm?.invoke(it.floatValue) }
-            onConfirm(currentHeightDp.roundToInt(), previewState.bottomPaddingDp, floatingMode, opacity)
-        }
         Box(
             modifier = Modifier
                 .absoluteOffset { IntOffset(controls.left.roundToInt(), controls.top.roundToInt()) }
@@ -1020,12 +1033,12 @@ internal fun KeyboardResizeOverlay(
                             if (defaultSize != null) {
                                 val bounds = previewState.bounds ?: viewRect
                                 val width = if (splitActive) bounds.width else defaultSize.width * density.density
-                                val totalHeight = (defaultSize.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density.density
+                                val totalHeight = (defaultSize.height + footerDp) * density.density
                                 val reset = ResizeRect(bounds.centerX - width / 2f, initial.bottom - totalHeight,
                                     bounds.centerX + width / 2f, initial.bottom).coerceInside(bounds)
                                 currentOnPreviewRectChange(reset)
                                 currentWidthDp = reset.width / density.density
-                                currentHeightDp = reset.height / density.density - FLOATING_DRAG_BAR_HEIGHT_DP
+                                currentHeightDp = reset.height / density.density - footerDp
                             } else currentOnPreviewRectChange(initial)
                         } else {
                             currentBottomPaddingDpState = defaultBottomPaddingDp.toFloat()
@@ -1142,15 +1155,19 @@ internal fun KeyboardResizeOverlay(
                 // 起手被系统拦走时，仍可在键盘内部点按微调，和拖动应用同一套尺寸及安全下限。
                 Row(Modifier.background(functionColor, RoundedCornerShape(6.dp)), verticalAlignment = Alignment.CenterVertically) {
                     @Composable fun Step(icon: ImageVector, description: String, delta: Float) {
-                        Box(Modifier.size(32.dp, hintRowHeight).clickable {
+                        val padding = previewState.bottomPaddingDp
+                        val enabled = if (delta < 0f) padding > 0 else
+                            padding < maximumFixedPadding(frame.height / density.density - padding).roundToInt()
+                        Box(Modifier.size(32.dp, hintRowHeight).clickable(enabled = enabled) {
                             adjustFixedPadding(frame, previewState.bottomPaddingDp.toFloat(), delta)
                             currentPreviewState.onDragEnd()
                         }, contentAlignment = Alignment.Center) {
-                            Icon(icon, description, Modifier.size(15.dp), tint = functionTextColor)
+                            Icon(icon, description, Modifier.size(15.dp),
+                                tint = if (enabled) functionTextColor else functionTextColor.copy(alpha = 0.38f))
                         }
                     }
                     Step(Icons.Default.Remove, "减少底部留白", -2f)
-                    EdgeHint(Icons.Default.SwapVert, "底部留白 ${previewState.bottomPaddingDp} dp",
+                    EdgeHint(Icons.Default.SwapVert, "底部留白 ${previewState.fixedBottomInsetDp + previewState.bottomPaddingDp} dp",
                         Modifier.onGloballyPositioned { paddingHintCoords = it })
                     Step(Icons.Default.Add, "增加底部留白", 2f)
                 }
@@ -1267,6 +1284,11 @@ internal fun KeyboardResizeOverlay(
             }
         }
         if (!editingOpacity && !adjustingOpacity && floatingMode) {
+            var holdingFooter by remember { mutableStateOf(false) }
+            val progress = floatingLockProgress(holdingFooter)
+            Spacer(Modifier.absoluteOffset { IntOffset(frame.left.roundToInt(), frame.top.roundToInt()) }
+                .size(with(density) { frame.width.toDp() }, with(density) { frame.height.toDp() })
+                .zIndex(2f).floatingLockOutline(false, progress, accentColor))
             Box(
                 modifier = Modifier
                     .absoluteOffset {
@@ -1275,14 +1297,24 @@ internal fun KeyboardResizeOverlay(
                     .size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, dragAreaHeightDp.dp)
                     .zIndex(1f)
                     .testTag("keyboard-resize-move-bar")
-                    .semantics { contentDescription = "拖动移动键盘，不改变尺寸" }
+                    .floatingFooterHold(false, { holdingFooter = it }) {
+                        confirmResize()
+                        com.kingzcheung.xime.settings.SettingsPreferences.setFloatingGeometryLocked(hostView.context, true)
+                    }
                     .then(floatingMoveGesture),
             )
         }
-        if (!editingOpacity && !adjustingOpacity && floatingMode && rotationState != null) {
-            RotateHandle(frame, rotationState, overlayOrigin, viewRect, previewState, functionColor, functionTextColor,
-                accentColor, currentPreviewRectSink, onEnd = { currentPreviewState.onDragEnd() })
         }
+        if (!editingOpacity && !adjustingOpacity && floatingMode) {
+            val card = previewState.rect ?: frame
+            val bottomInset = viewRect.bottom - (previewState.bounds ?: viewRect).bottom
+            val viewport = floatingControlViewport(viewRect.width, viewRect.height, overlayOrigin, bottomInset)
+            val handle = rotationState?.let { floatingRotateHandleRect(card, rotation, viewport, density.density) }
+            if (rotationState != null && handle != null) {
+                RotateHandle(handle, card, rotationState, overlayOrigin, viewRect, previewState, functionColor, functionTextColor,
+                    accentColor, currentPreviewRectSink, onEnd = { currentPreviewState.onDragEnd() })
+            }
+
         }
     }
 }
@@ -1295,11 +1327,12 @@ private fun rotateRectCenter(rect: ResizeRect, pivot: Offset?, degrees: Float): 
 }
 
 /**
- * 调节界面顶边正上方的旋转手柄（顶上放不下时放在「拖动移动」右边）：按住拖动，键盘按手指绕键盘中心转过的角度旋转，
+ * 调节界面里和锁定按钮并排的旋转手柄：按住拖动，键盘按手指绕键盘中心转过的角度旋转，
  * ±90°，靠近 0°/±90° 吸附；转到放不下顶部条的角度就停住，位置按旋转规则推回屏内，转回去时回到原处。
  */
 @Composable
 private fun RotateHandle(
+    handleRect: ResizeRect,
     frame: ResizeRect,
     rotationState: MutableFloatState,
     overlayOrigin: Offset,
@@ -1312,12 +1345,7 @@ private fun RotateHandle(
     onEnd: () -> Unit,
 ) {
     val density = LocalDensity.current
-    val handleSize = FLOATING_ROTATE_HANDLE_SIZE_DP.dp
-    val handlePx = with(density) { handleSize.toPx() }
-    val gapPx = with(density) { FLOATING_ROTATE_HANDLE_GAP_DP.dp.toPx() }
-    val above = frame.top - gapPx - handlePx >= 0f
-    val handleLeft = if (above) frame.centerX - handlePx / 2f else frame.centerX + with(density) { 72.dp.toPx() }
-    val handleTop = if (above) frame.top - gapPx - handlePx else frame.top + with(density) { 42.dp.toPx() } - handlePx / 2f
+    val footerDp = LocalConfiguration.current.floatingFooterHeightDp
     var rotating by remember { mutableStateOf(false) }
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val currentFrame by rememberUpdatedState(frame)
@@ -1329,11 +1357,9 @@ private fun RotateHandle(
     val degrees = rotationState.floatValue
     Box(
         Modifier
-            .absoluteOffset { IntOffset(handleLeft.roundToInt(), handleTop.roundToInt()) }
-            .size(handleSize)
+            .atFloatingControl(handleRect, density)
             .zIndex(3f)
             .clip(CircleShape)
-            .background(if (rotating) accentColor else functionColor)
             .onGloballyPositioned { coords = it }
             .testTag("keyboard-resize-rotate-handle")
             .semantics {
@@ -1350,7 +1376,7 @@ private fun RotateHandle(
                     val d = density.density
                     val bottomInsetDp = (view.height - (currentPreview.bounds ?: view).bottom).coerceAtLeast(0f) / d
                     fun bounds(deg: Float) = floatingRotatedOffsetBounds(view.width / d, view.height / d,
-                        start.width / d, start.height / d, deg, bottomInsetDp)
+                        start.width / d, start.height / d, deg, bottomInsetDp, footerDp = footerDp)
                     fun fits(deg: Float) = !isFloatingRotated(deg) || bounds(deg).feasible
                     val centerX = currentOrigin.x + start.centerX
                     val centerY = currentOrigin.y + start.centerY
@@ -1389,12 +1415,15 @@ private fun RotateHandle(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (rotating || isFloatingRotated(degrees)) {
-            Text("${degrees.roundToInt()}°", color = if (rotating) readableOn(accentColor) else functionTextColor,
-                fontSize = 11.sp, maxLines = 1, softWrap = false)
-        } else {
-            Icon(Icons.AutoMirrored.Rounded.RotateRight, contentDescription = null,
-                tint = functionTextColor, modifier = Modifier.size(20.dp))
+        Box(Modifier.size(26.dp).graphicsLayer { rotationZ = degrees }.background((if (rotating) accentColor else functionColor)
+            .copy(alpha = if (rotating) .48f else .22f), CircleShape), contentAlignment = Alignment.Center) {
+            if (rotating || isFloatingRotated(degrees)) {
+                Text("${degrees.roundToInt()}°", color = (if (rotating) readableOn(accentColor) else functionTextColor)
+                    .copy(alpha = .82f), fontSize = 11.sp, maxLines = 1, softWrap = false)
+            } else {
+                Icon(Icons.AutoMirrored.Rounded.RotateRight, contentDescription = null,
+                    tint = functionTextColor.copy(alpha = .78f), modifier = Modifier.size(17.dp))
+            }
         }
     }
 }
