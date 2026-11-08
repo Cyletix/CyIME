@@ -79,19 +79,9 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
     // Some web editors omit ExtractedText but expose absolute selection updates and
     // surrounding text. Use those instead of sending DPAD focus-navigation events.
     private fun surroundingSnapshot(ic: InputConnection): ExtractedText? {
-        if (android.os.Build.VERSION.SDK_INT >= 31) {
-            val surrounding = runCatching { ic.getSurroundingText(4096, 4096, 0) }.getOrNull()
-            if (surrounding != null && surrounding.offset >= 0 &&
-                surrounding.selectionStart in 0..surrounding.text.length &&
-                surrounding.selectionEnd in 0..surrounding.text.length) {
-                return ExtractedText().apply {
-                    text = surrounding.text
-                    startOffset = surrounding.offset
-                    selectionStart = surrounding.selectionStart
-                    selectionEnd = surrounding.selectionEnd
-                }
-            }
-        }
+        ic.readSurroundingWindow(4096, 4096, 0)?.takeIf {
+            it.startOffset >= 0 && it.selectionStart in 0..it.text.length && it.selectionEnd in 0..it.text.length
+        }?.let { return it }
         val start = reportedStart ?: return null
         val end = reportedEnd ?: return null
         return runCatching {

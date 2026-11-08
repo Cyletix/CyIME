@@ -2083,7 +2083,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 service.commitTextAndPredict(text, isPaste = false,
                     allowPrediction = !emailSuffix && !SettingsPreferences.isSingleAssociationMode(service)).accepted
             },
-            replace = service::replaceBeforeCursor,
+            replace = { prefix, completion ->
+                if (service.uiState.value.inputTarget.isInternal) service.replaceBeforeCursor(prefix, completion)
+                else service.currentInputConnection?.commitEnglishCompletion(prefix, completion) == true
+            },
             suffix = if (autoSpace) " " else "")
         if (!accepted) return false
         associationWordAt(state, index)?.let(com.kingzcheung.xime.stats.TypingStats::onAssociationPicked)

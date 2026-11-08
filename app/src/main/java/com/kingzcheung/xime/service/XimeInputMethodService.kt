@@ -5433,7 +5433,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // Check the host's live selection and text instead of the prediction cache.
         val host = (connection as? TrackedInputConnection)?.base ?: connection
         val deleted = runCatching {
-            val surrounding = if (Build.VERSION.SDK_INT >= 31) host.getSurroundingText(limit, 0, 0) else null
+            val surrounding = host.readSurroundingWindow(limit, 0, 0)
             val before = if (surrounding != null) {
                 val end = surrounding.selectionEnd
                 if (end != surrounding.selectionStart || end !in 0..surrounding.text.length) return null
