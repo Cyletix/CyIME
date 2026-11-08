@@ -770,7 +770,9 @@ fun KeyboardView(
                 ToolbarButton.OCR -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Ocr
                 ToolbarButton.SYMBOL -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Symbol
                 ToolbarButton.SCHEMA -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.SchemaList
-                ToolbarButton.HANDWRITING_LOOKUP -> state.isHandwritingMode || viewModel.hasTemporaryHandwriting
+                // 表情、剪贴板等面板盖住手写板时只亮面板那个按钮（#185）
+                ToolbarButton.HANDWRITING_LOOKUP -> page !is KeyboardPage.Overlay &&
+                    (state.isHandwritingMode || viewModel.hasTemporaryHandwriting)
                 ToolbarButton.VOICE -> state.voiceSticky
                 ToolbarButton.SOUND -> quickToggles.sound || quickToggles.vibration
                 ToolbarButton.FLOATING -> state.isFloatingMode
