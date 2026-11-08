@@ -1016,6 +1016,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.SYMBOL_NAMES_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.GREEK_LETTERS_KEY,
+                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CYLM_LONG_ALTERNATIVE_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY -> inputCommands.submit {
                     if (sessionController.applyCandidateOptions(persist = true)) withContext(Dispatchers.Main) { updateUI() }

@@ -64,6 +64,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
                             vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer),
                             resolve(adapt));
+      cylm_long_alternative_ = t9_cylm_ && context && !t9_joint_ && context->get_option("cyime_cylm_alternative");
       // A translation is created for every key: start CyLM on it now, so it decodes while Rime makes its own
       // sentence instead of after it.
       // The replace gate loads once per model (T9CylmGate keeps the set); only when the schema names it.

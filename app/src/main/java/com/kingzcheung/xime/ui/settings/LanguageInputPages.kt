@@ -62,7 +62,17 @@ fun EnglishInputSettingsContent(onBack: () -> Unit) {
 private fun ChineseOutputSection() {
     val context = LocalContext.current
     val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
+    val hasCylm = remember(context) {
+        val dir = com.kingzcheung.xime.settings.SchemaManager.getRimeDir(context)
+        dir.resolve("cylm_model.lm").isFile && dir.resolve("cylm_lexicon.cylx").isFile
+    }
     SettingsSection(title = "中文输出") {
+        if (hasCylm) {
+            SettingsToggleItem(Icons.TwoTone.Translate, "全拼长句备选",
+                "连打六个字以上时，CyLM 可在原有整句后补一个读音相符的候选。",
+                checked = input.cylmLongAlternative, onCheckedChange = { input.copy(cylmLongAlternative = it).save(context) })
+            HorizontalDivider()
+        }
         SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
             "候选和上屏改用台湾正体(台灣、計畫、了解)；关着时仓颉也出简体，注音始终出正体。词库和学习记录不变，开启时不给中文联想。",
             checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) },

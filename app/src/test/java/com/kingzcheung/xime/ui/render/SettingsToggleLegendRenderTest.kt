@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.ui.settings.AutoSpaceLegend
@@ -46,6 +48,50 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsToggleLegendRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
+
+    @Test
+    @Config(qualifiers = "w390dp-h840dp-mdpi")
+    fun longSentenceChoiceRequiresBothFilesAndSavesTheSwitch() {
+        val context = rule.activity
+        com.kingzcheung.xime.ui.theme.KeyboardThemes.initFromConfig(context)
+        val dir = com.kingzcheung.xime.settings.SchemaManager.getRimeDir(context).apply { mkdirs() }
+        val lexicon = File(dir, "cylm_lexicon.cylx")
+        val model = File(dir, "cylm_model.lm")
+        val generation = mutableStateOf(0)
+        lexicon.createNewFile()
+        try {
+            rule.setContent {
+                XimeTheme(darkTheme = false) {
+                    androidx.compose.runtime.key(generation.value) {
+                        com.kingzcheung.xime.ui.settings.ChineseInputSettingsContent(onBack = {})
+                    }
+                }
+            }
+            val label = "全拼长句备选"
+            rule.onNodeWithText(label).assertDoesNotExist()
+            rule.runOnIdle { model.createNewFile(); generation.value++ }
+            fun enabled() = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(context).cylmLongAlternative
+            assertEquals(false, enabled())
+            rule.onNodeWithText(label).performClick()
+            rule.runOnIdle { assertEquals(true, enabled()) }
+            rule.onNodeWithText(label).performClick()
+            rule.runOnIdle { assertEquals(false, enabled()) }
+            rule.onNodeWithText(label).performClick()
+            rule.runOnIdle { assertEquals(true, enabled()); generation.value++ }
+            rule.waitForIdle()
+            System.getenv("CYIME_RENDER_OUT")?.let { path ->
+                val root = context.window.decorView
+                val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+                rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
+                File(path, "cylm-long-alternative.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            rule.onNodeWithText(label).performClick()
+            rule.runOnIdle { assertEquals(false, enabled()) }
+        } finally {
+            lexicon.delete()
+            model.delete()
+        }
+    }
 
     @Composable
     private fun AllLegends(on: Boolean) = Column(Modifier.width(390.dp).fillMaxHeight()

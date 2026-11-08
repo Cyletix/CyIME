@@ -16,8 +16,8 @@ class Sentence;
 
 // Words keep their places. With its pinyin (cylm_decode2) the sentence is one dictionary entry of
 // `language`, learned like a typed phrase; a syllable the dictionary does not know leaves it as plain
-// text that is not learned. `owner` keys one incremental CyLM session (one per translator).
-void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& input, const string& left_context,
+// text that is not learned. An optional extra long sentence requires an exact, learnable full spelling.
+void T9ApplyCylmSentence(CylmModel* model, bool offer_alternative, const string& input, const string& left_context,
                          Dictionary* dict, const Language* language, size_t start,
                          const an<PhraseSyllabifier>& syllabifier, deque<an<Sentence>>* sentences);
 

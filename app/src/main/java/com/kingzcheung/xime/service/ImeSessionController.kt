@@ -582,6 +582,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             add("emoji" to prefs.getBoolean(KeyboardInputPreferences.CANDIDATE_EMOJI_KEY, false))
             add("cyime_symbol_names" to prefs.getBoolean(KeyboardInputPreferences.SYMBOL_NAMES_KEY, false))
             add("cyime_greek_letters" to prefs.getBoolean(KeyboardInputPreferences.GREEK_LETTERS_KEY, false))
+            val cylmAlternative = prefs.getBoolean(KeyboardInputPreferences.CYLM_LONG_ALTERNATIVE_KEY, false)
+            if (persist || cylmAlternative) add("cyime_cylm_alternative" to cylmAlternative)
             add("cyime_rare_chars" to prefs.getBoolean(KeyboardInputPreferences.RARE_CHARACTERS_KEY, false))
             add("_cyime_l_letter" to lLetter)
         }

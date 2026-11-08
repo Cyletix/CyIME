@@ -265,6 +265,46 @@ bool CylmInput(const string& in, bool* digits) {
 string CylmContext(const string& left_context) {
   return !left_context.empty() && left_context[0] == '\x1e' ? left_context.substr(1) : string();
 }
+// An extra candidate must account for every typed letter and explicit syllable boundary,
+// so selecting it can consume and learn the same full-pinyin composition.
+an<Sentence> CylmSentence(const string& best_record, size_t unit, const string& text,
+                          const an<Sentence>& rime, Dictionary* dict, const Language* translator_language,
+                          size_t start, const an<PhraseSyllabifier>& syllabifier, const string* exact_input) {
+  DictEntry entry;
+  entry.text = text;
+  entry.weight = rime->weight();
+  const Language* language = nullptr;
+  if (unit != string::npos && dict) {
+    const auto end = best_record.find('\x1f', unit + 1);
+    std::istringstream pinyin(best_record.substr(unit + 1, end == string::npos ? string::npos : end - unit - 1));
+    const auto& ids = T9ScriptOptions::T9SyllableIds(dict);
+    string syllable;
+    Code code;
+    size_t key = 0;
+    while (pinyin >> syllable) {
+      if (exact_input) {
+        if (key && key < exact_input->size() && (*exact_input)[key] == '\'') ++key;
+        if (exact_input->compare(key, syllable.size(), syllable) != 0) return nullptr;
+        key += syllable.size();
+      }
+      const auto found = ids.find(syllable);
+      if (found == ids.end()) { code.clear(); break; }
+      code.push_back(found->second);
+    }
+    if (exact_input && (key != exact_input->size() || code.size() < 6)) return nullptr;
+    if (!code.empty() && code.size() == static_cast<size_t>(utf8::unchecked::distance(text.begin(), text.end()))) {
+      entry.code = code;
+      language = translator_language;
+    }
+  }
+  if (exact_input && !language) return nullptr;
+  auto sentence = New<Sentence>(language);
+  sentence->Extend(entry, rime->end() - start, rime->weight());
+  sentence->Offset(start);
+  sentence->set_syllabifier(syllabifier);
+  sentence->set_quality(rime->quality());
+  return sentence;
+}
 }  // namespace
 
 void T9CylmSetBudget(int ms) { budget_ms = std::max(1, std::min(200, ms)); }
@@ -387,10 +427,9 @@ void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_co
     CylmWorker::Instance().Prefetch(session, input, digits, CylmContext(left_context));
 }
 
-void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, const string& left_context,
+void T9ApplyCylmSentence(CylmModel* model, bool offer_alternative, const string& in, const string& left_context,
                          Dictionary* dict, const Language* translator_language, size_t start,
                          const an<PhraseSyllabifier>& syllabifier, deque<an<Sentence>>* sentences) {
-  (void)owner;
   bool digits = false;
   if (CylmSwitchedOff() || !CylmInput(in, &digits)) return;
   CylmSession* session = SessionFor(model);
@@ -422,7 +461,18 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
     if (rime_rank < 0 && one.compare(0, one.find('\x1f'), rime->text()) == 0) rime_rank = static_cast<int>(scores.size());
     scores.push_back(score_of(one));
   }
-  if (rime_rank < 0) return Stats().Add(false, false, ready, wait_ms, ms);
+  // The optional CyLM can disagree with the first choice without having enough evidence to replace it.
+  // Keep all existing sentence choices ahead of one exact long spelling. No extra decode or wait.
+  auto keep_first = [&] {
+    if (offer_alternative && !digits && rime->end() - start == in.size() && in.size() >= 6 && unit != string::npos &&
+        utf8::unchecked::distance(text.begin(), text.end()) >= 6 &&
+        std::none_of(sentences->begin(), sentences->end(), [&](const auto& s) { return s->text() == text; })) {
+      if (auto extra = CylmSentence(best_record, unit, text, rime, dict, translator_language, start, syllabifier, &in))
+        sentences->push_back(extra);
+    }
+    Stats().Add(false, false, ready, wait_ms, ms);
+  };
+  if (rime_rank < 0) return keep_first();
   {
     auto chars = [](const string& t) {
       vector<uint32_t> out;
@@ -454,7 +504,7 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
           0.067 * len / 10.0 + 0.475 * diff / std::max(1.0, len) + 0.52 * (same_len ? 1 : 0) -
           0.086 * (diff == 1 ? 1 : 0) - 0.377 * margin / std::max(1.0, diff) - 1.309;
     }
-    if (z <= 3.2) return Stats().Add(false, false, ready, wait_ms, ms);
+    if (z <= 3.2) return keep_first();
   }
   // CyLM knows nothing of what the user picked before: a Rime sentence built from a learned word (这篇 picked once,
   // then zhepianbiji) stays, or CyLM's 这片笔记 replaced it and learning never reached whole sentences.
@@ -464,31 +514,7 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
     for (const auto& part : rime->components())
       if (utf8::unchecked::distance(part.text.begin(), part.text.end()) >= 2 && !cylm_has_word(model, part.text.c_str()))
         return Stats().Add(false, false, ready, wait_ms, ms);
-  DictEntry entry;
-  entry.text = text;
-  entry.weight = rime->weight();
-  const Language* language = nullptr;
-  if (unit != string::npos && dict) {
-    const auto end = best_record.find('\x1f', unit + 1);
-    std::istringstream pinyin(best_record.substr(unit + 1, end == string::npos ? string::npos : end - unit - 1));
-    const auto& ids = T9ScriptOptions::T9SyllableIds(dict);
-    string syllable;
-    Code code;
-    while (pinyin >> syllable) {
-      const auto found = ids.find(syllable);
-      if (found == ids.end()) { code.clear(); break; }
-      code.push_back(found->second);
-    }
-    if (!code.empty() && code.size() == static_cast<size_t>(utf8::unchecked::distance(text.begin(), text.end()))) {
-      entry.code = code;
-      language = translator_language;
-    }
-  }
-  auto sentence = New<Sentence>(language);
-  sentence->Extend(entry, rime->end() - start, rime->weight());
-  sentence->Offset(start);
-  sentence->set_syllabifier(syllabifier);
-  sentence->set_quality(rime->quality());
+  auto sentence = CylmSentence(best_record, unit, text, rime, dict, translator_language, start, syllabifier, nullptr);
   sentences->front() = sentence;
   Stats().Add(true, false, ready, wait_ms, ms);
 }
