@@ -15,7 +15,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
 /**
- * 西班牙、德、法、俄、韩语：各是一种独立语言，字母逐字上屏（韩语拼音节），默认不启用，没有语音识别；
+ * 西班牙、德、法、意大利、俄、韩语：各是一种独立语言，字母逐字上屏（韩语拼音节），默认不启用，没有语音识别；
  * 补全词表在商店里下载，不进安装包。
  */
 class LetterLanguagesTest {
@@ -42,6 +42,7 @@ class LetterLanguagesTest {
         assertFalse(InputLanguage.CHINESE.typesLettersDirectly)
         assertFalse(InputLanguage.JAPANESE.typesLettersDirectly)
         assertEquals("26键", InputProfiles.resolveLayout("qwerty_german").displayName)
+        assertEquals("26键", InputProfiles.resolveLayout("qwerty_italian").displayName)
         assertEquals("ЙЦУКЕН", InputProfiles.resolveLayout("jcuken_russian").displayName)
     }
 
@@ -102,6 +103,7 @@ class LetterLanguagesTest {
             "qwerty_spanish" to mapOf("a" to "á", "e" to "é", "i" to "í", "o" to "ó", "u" to "ú", "n" to "ñ"),
             "qwerty_german" to mapOf("a" to "ä", "o" to "ö", "u" to "ü", "s" to "ß"),
             "qwerty_french" to mapOf("e" to "é", "a" to "à", "c" to "ç", "o" to "ô", "u" to "ù", "i" to "î"),
+            "qwerty_italian" to mapOf("a" to "à", "e" to "è", "i" to "ì", "o" to "ò", "u" to "ù"),
             "jcuken_russian" to mapOf("е" to "ё", "ь" to "ъ"),
             "dubeolsik_korean" to mapOf("ㄱ" to "ㄲ", "ㅂ" to "ㅃ", "ㅔ" to "ㅖ"),
         )
@@ -135,7 +137,7 @@ class LetterLanguagesTest {
 
     @Test fun `latin letters carry the english corner symbols and always offer accents`() {
         loadKeyboards()
-        for (letters in listOf(LetterLanguage.SPANISH, LetterLanguage.GERMAN, LetterLanguage.FRENCH)) {
+        for (letters in listOf(LetterLanguage.SPANISH, LetterLanguage.GERMAN, LetterLanguage.FRENCH, LetterLanguage.ITALIAN)) {
             KeysConfigHelper.setActiveKeyboardSchema(letters.schemaId)
             for (key in QwertySwipeSymbols.keys.map(Char::toString)) {
                 val gesture = KeysConfigHelper.getKeyGesture(key, false)

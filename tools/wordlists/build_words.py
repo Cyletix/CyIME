@@ -1,11 +1,11 @@
-"""Build a completion word list for a letter-by-letter language (es, de, fr, ru).
+"""Build a completion word list for a letter-by-letter language (es, de, fr, it, ru).
 
 Frequencies come from FrequencyWords (OpenSubtitles 2018, pinned commit). Subtitles carry names,
 English and typos, so only words the LibreOffice spelling dictionary accepts are kept;
 a word it only accepts capitalized (Madrid, Haus) is stored capitalized.
 
     pip install spylls
-    npm pack dictionary-de@3.0.0 && tar xzf dictionary-de-3.0.0.tgz     # es: dictionary-es@4.0.0
+    npm pack dictionary-de@3.0.0 && tar xzf dictionary-de-3.0.0.tgz     # es: dictionary-es@4.0.0, it: dictionary-it@2.0.0
     python tools/wordlists/build_words.py de package/index tools/wordlists/cyime-words-de-v1.txt
 
 Output: one word per line, most frequent first. The lists ship as market downloads, not in the APK:
@@ -25,6 +25,7 @@ LETTERS = {
     "es": "a-záéíóúüñ",
     "de": "a-zäöüß",
     "fr": "a-zàâæçéèêëîïôœùûüÿ",
+    "it": "a-zàèéìíîòóùú",
     "ru": "а-яё",
 }
 # Single letters that are words; the rest are subtitle noise.
@@ -32,6 +33,7 @@ SINGLE = {
     "es": {"a", "y", "o", "e", "u"},
     "de": set(),
     "fr": {"a", "à", "y"},
+    "it": {"a", "e", "è", "i", "o"},
     "ru": {"и", "в", "с", "к", "у", "о", "а", "я"},
 }
 

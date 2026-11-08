@@ -583,6 +583,46 @@ keyboard:
       "'": { tap: { label: ",", value: "," }, swipe_up: { label: ".", value: "." }, long_press: { display: "bubble", values: [",", ".", "'", "«", "»", "?", "!"] } }
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
+  # 意大利语：26 键（QWERTY），字母逐字上屏，补全不用打重音。长按元音出 à è é ì í ò ó ù ú。
+  # 字母键的上下角标和英文键盘同一规则，这里不配；' « » 在逗号键长按里。
+  qwerty_italian:
+    schemas: [italian]
+    button_layout: standard
+    layout:
+      rows:
+        - [q, w, e, r, t, y, u, i, o, p]
+        - [a, s, d, f, g, h, j, k, l]
+        - [z, x, c, v, b, n, m]
+    keys:
+      q: { tap: { label: "q", value: "q" } }
+      w: { tap: { label: "w", value: "w" } }
+      e: { tap: { label: "e", value: "e" }, long_press: { display: "bubble", values: ["è", "é"] } }
+      r: { tap: { label: "r", value: "r" } }
+      t: { tap: { label: "t", value: "t" } }
+      y: { tap: { label: "y", value: "y" } }
+      u: { tap: { label: "u", value: "u" }, long_press: { display: "bubble", values: ["ù", "ú"] } }
+      i: { tap: { label: "i", value: "i" }, long_press: { display: "bubble", values: ["ì", "í"] } }
+      o: { tap: { label: "o", value: "o" }, long_press: { display: "bubble", values: ["ò", "ó"] } }
+      p: { tap: { label: "p", value: "p" } }
+      a: { tap: { label: "a", value: "a" }, long_press: { display: "bubble", values: ["à"] } }
+      s: { tap: { label: "s", value: "s" } }
+      d: { tap: { label: "d", value: "d" } }
+      f: { tap: { label: "f", value: "f" } }
+      g: { tap: { label: "g", value: "g" } }
+      h: { tap: { label: "h", value: "h" } }
+      j: { tap: { label: "j", value: "j" } }
+      k: { tap: { label: "k", value: "k" } }
+      l: { tap: { label: "l", value: "l" } }
+      z: { tap: { label: "z", value: "z" } }
+      x: { tap: { label: "x", value: "x" } }
+      c: { tap: { label: "c", value: "c" } }
+      v: { tap: { label: "v", value: "v" } }
+      b: { tap: { label: "b", value: "b" } }
+      n: { tap: { label: "n", value: "n" } }
+      m: { tap: { label: "m", value: "m" } }
+      "'": { tap: { label: ",", value: "," }, swipe_up: { label: ".", value: "." }, long_press: { display: "bubble", values: [",", ".", "'", "«", "»", "?", "!"] } }
+      earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
+
   # 俄语：ЙЦУКЕН，字母逐字上屏，补全不用打 ё。长按 е 出 ё、长按 ь 出 ъ。
   # 上下角标跟着位置走：同一行同一格取 26 键那个字母的角标（第一排 й…з 是 1…0），超出 26 键的格不带。
   jcuken_russian:

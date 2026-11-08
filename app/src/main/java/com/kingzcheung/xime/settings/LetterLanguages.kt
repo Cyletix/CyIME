@@ -21,6 +21,7 @@ enum class LetterLanguage(
     GERMAN(InputLanguage.GERMAN, "german", "DE", "qwerty_german", "äöüßÄÖÜ", "words-de"),
     FRENCH(InputLanguage.FRENCH, "french", "FR", "qwerty_french",
         "àâæçéèêëîïôœùûüÿÀÂÆÇÉÈÊËÎÏÔŒÙÛÜŸ", "words-fr"),
+    ITALIAN(InputLanguage.ITALIAN, "italian", "IT", "qwerty_italian", "àèéìíòóùúÀÈÉÌÍÒÓÙÚ", "words-it"),
     RUSSIAN(InputLanguage.RUSSIAN, "russian", "RU", "jcuken_russian",
         "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ", "words-ru"),
     KOREAN(InputLanguage.KOREAN, "korean", "한", "dubeolsik_korean",

@@ -3,7 +3,7 @@ package com.kingzcheung.xime.settings
 /** Product language, never a keyboard shape or a recognizer. */
 enum class InputLanguage(val id: String, val displayName: String) {
     CHINESE("zh", "中文"), JAPANESE("ja", "日语"), ENGLISH("en", "英文"), SPANISH("es", "西班牙语"),
-    GERMAN("de", "德语"), FRENCH("fr", "法语"), RUSSIAN("ru", "俄语"), KOREAN("ko", "韩语"),
+    GERMAN("de", "德语"), FRENCH("fr", "法语"), ITALIAN("it", "意大利语"), RUSSIAN("ru", "俄语"), KOREAN("ko", "韩语"),
     UNSPECIFIED("und", "未标注语言");
 
     /** Languages typed letter by letter straight into the editor (see [LetterLanguage]), with word completions above. */
@@ -12,7 +12,7 @@ enum class InputLanguage(val id: String, val displayName: String) {
     companion object {
         /** The elder package offers only Chinese and English; see docs/development/elder-pack-spec.md. */
         val supported = if (com.kingzcheung.xime.BuildConfig.ELDER) listOf(CHINESE, ENGLISH)
-            else listOf(CHINESE, JAPANESE, ENGLISH, SPANISH, GERMAN, FRENCH, RUSSIAN, KOREAN)
+            else listOf(CHINESE, JAPANESE, ENGLISH, SPANISH, GERMAN, FRENCH, ITALIAN, RUSSIAN, KOREAN)
         /** Languages a shipped speech recognizer can transcribe. The [LetterLanguage]s have none yet. */
         val speech: List<InputLanguage> get() = supported.filter { LetterLanguage.of(it) == null }
         fun fromId(id: String): InputLanguage? = entries.firstOrNull { it.id == id }
@@ -185,7 +185,8 @@ object InputProfiles {
 
     /** Actual layout bindings win over built-in defaults, including an explicitly unbound schema. */
     fun resolveLayout(section: String?, custom: CustomKeyboardLayout? = null): InputLayout = when (section) {
-        "qwerty", "qwerty_en", "qwerty_japanese", "qwerty_spanish", "qwerty_german", "qwerty_french" ->
+        "qwerty", "qwerty_en", "qwerty_japanese", "qwerty_spanish", "qwerty_german", "qwerty_french",
+        "qwerty_italian" ->
             InputLayout(section, "26键", LayoutKind.ALPHABETIC)
         "jcuken_russian" -> InputLayout(section, "ЙЦУКЕН", LayoutKind.ALPHABETIC)
         "dubeolsik_korean" -> InputLayout(section, "두벌식", LayoutKind.ALPHABETIC)
