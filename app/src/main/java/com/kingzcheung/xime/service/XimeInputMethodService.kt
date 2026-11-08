@@ -654,6 +654,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 悬浮卡片外四角角标把手（亮着时）：露在卡片外的部分也要能按到。 */
     private var floatingCornerHandleBounds: List<android.graphics.Rect> = emptyList()
     private var fixedCardBounds: android.graphics.Rect? = null
+    /** 屏幕键盘时输入框在屏幕上的范围：弹键盘时向输入框要一次，不常驻监听。窄固定键盘据此判断有没有盖住输入框。 */
+    private var softEditorBoundsOnScreen: HardwareCursorAnchor? = null
     private var keyboardGlassCard: android.graphics.Rect? = null
     private var keyboardGlassCardOrigin: androidx.compose.ui.unit.IntOffset? = null
     /** 分体中缝（窗口坐标）：触摸区让给宿主，玻璃模糊也避开它。 */
@@ -3788,6 +3790,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         info?.let { updateEnterKeyText(it) }
         updateHardwareKeyboardConnection()
         applyCompactMode()
+        softEditorBoundsOnScreen = null
+        requestSoftEditorBounds()
         // 开车连续语音：回到刚才的应用，键盘直接是悬浮条，随后自动开麦。
         if (voicePillResumePending && !settingsPreviewEditor) {
             voicePillResumePending = false
@@ -3959,7 +3963,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }.getOrDefault("")
             com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.update(runCatching { cursorAnchorCharsPerLine(info, sample) }.getOrNull())
         }
-        if (!hasHardwareKeyboard) return
+        if (!hasHardwareKeyboard) {
+            noteSoftEditorBounds(info)
+            return
+        }
         try {
             val anchor = resolveHardwareCursorAnchor(info)
             uiState.value = uiState.value.copy(cursorAnchor = anchor, editorBounds = resolveHardwareEditorBounds(info))
@@ -3968,6 +3975,20 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
             FileLogger.e(TAG, "onUpdateCursorAnchorInfo failed", e)
         }
+    }
+
+    /** 固定键盘比窗口窄时才用得上；系统不支持输入框范围（Android 13 以下）或输入框不回就照旧避让。 */
+    private fun requestSoftEditorBounds() {
+        if (hasHardwareKeyboard || !AndroidPlatform.cursorAnchorFilter || uiState.value.isFloatingMode) return
+        currentInputConnection?.let { requestLineLayout(it) }
+    }
+
+    private fun noteSoftEditorBounds(info: CursorAnchorInfo) {
+        val bounds = runCatching { resolveHardwareEditorBounds(info) }.getOrNull()
+        if (bounds == softEditorBoundsOnScreen) return
+        softEditorBoundsOnScreen = bounds
+        // 重新上报避让：relayout 触发 traversal，onComputeInsets 按新的输入框范围算。
+        if (::keyboardContainer.isInitialized && fixedCardBounds != null) keyboardContainer.requestLayout()
     }
 
     override fun onEvaluateFullscreenMode(): Boolean {
@@ -3994,6 +4015,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         currentResolvedKeyboardSize = null
         clearHardwareSurfaceBounds()
+        softEditorBoundsOnScreen = null
         uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         updateHardwareKeyboardConnection()
         // 框架在这里用 currentInputConnection 重启输入并把它存成当前连接：给原连接，别把包装存进去。
@@ -4252,6 +4274,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // The search bar belongs to this keyboard session; leaving restores learning.
         closeClipboardSearch(openBoard = false)
         super.onFinishInputView(finishingInput)
+        softEditorBoundsOnScreen = null
         runtimeObserver?.stop()
         com.kingzcheung.xime.stats.TypingStats.flush()
         com.kingzcheung.xime.association.AssociationManager.flushLearning()
@@ -5162,10 +5185,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val topPx = if (targetHeight > 0 && targetHeight != keyboardContainer.height) {
                     ((window.window?.decorView?.height ?: resources.displayMetrics.heightPixels) - targetHeight).coerceAtLeast(0)
                 } else loc[1].coerceAtLeast(0)
-                outInsets.contentTopInsets = topPx
-                outInsets.visibleTopInsets = topPx
-                // Transparent side gutters must not swallow touches to the host app.
                 val card = fixedCardBounds
+                // 键盘比窗口窄、输入框整个在卡片左边或右边（如旁边的小窗）：没盖住它，跟悬浮键盘一样报「不占地方」，
+                // 小窗和应用都留在原处。系统只收一条顶线、不收左右范围，报了顶线就会把整屏宽度都当成被盖住。
+                val editor = softEditorBoundsOnScreen
+                val editorBeside = card != null && editor != null && !hasHardwareKeyboard && run {
+                    val decorOnScreen = IntArray(2)
+                    window.window?.decorView?.getLocationOnScreen(decorOnScreen)
+                    narrowKeyboardLeavesEditorUncovered(card.left, card.right, keyboardContainer.width,
+                        SettingsPreferences.isKeyboardBlankFilled(this),
+                        editor.left - decorOnScreen[0], editor.right - decorOnScreen[0])
+                }
+                val reportedTop = if (editorBeside)
+                    window.window?.decorView?.height ?: resources.displayMetrics.heightPixels else topPx
+                outInsets.contentTopInsets = reportedTop
+                outInsets.visibleTopInsets = reportedTop
+                // Transparent side gutters must not swallow touches to the host app.
                 val splitHole = card?.let { splitKeyboardGap.hole(it.bottom.toFloat()) }
                 if (card != null && (card.width() < keyboardContainer.width || splitHole != null)) {
                     // 透明和触摸范围不改变固定键盘的避让高度。宿主底部操作栏也必须
