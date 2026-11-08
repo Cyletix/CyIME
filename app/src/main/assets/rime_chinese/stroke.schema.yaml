@@ -10,7 +10,7 @@
 schema:
   schema_id: stroke
   name: "笔画"
-  version: "0.6-cyime1"
+  version: "0.6-cyime2"
   author:
     - 四季的風
     - 雪齋
@@ -65,6 +65,13 @@ translator:
     - xform/~//
 #   - xlit/hspnz/㇐㇑㇒㇏㇠/   # 中日韓筆畫（橫豎撇捺折）
     - xlit/hspnz/⼀⼁⼃⼂⼄/   # 康熙部首（橫豎撇點折）
+
+# 通配符跨两个字时沿用笔画方案的组词，查询器只读，不重复学习上屏文字。
+stroke_word_lookup:
+  dictionary: stroke
+  enable_user_dict: false
+  enable_completion: false
+  enable_sentence: true
 
 punctuator:
   import_preset: default
