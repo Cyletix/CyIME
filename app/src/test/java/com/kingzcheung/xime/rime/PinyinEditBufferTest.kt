@@ -80,4 +80,19 @@ class PinyinEditBufferTest {
         assertEquals("o jia ge", dropReadingKeys("yao jia ge", 2))
         assertEquals("", dropReadingKeys("xu yao", 5))
     }
+
+    @Test fun doublePinyinTapInTheInputBoxMovesTheEditCaretToThoseKeys() {
+        // 11-08: 小鹤双拼, tapping after shuang and deleting removed the last key instead.
+        val session = PinyinEditSession(1, "double_pinyin_flypy", "ulpb", "", "", "ulpb", 4, false)
+        assertEquals(2, session.editOffset("shuang pin", 6))
+        assertEquals(2, session.editOffset("shuang'pin", 7))
+        assertEquals(4, session.editOffset("shuang'pin", 10))
+        assertEquals(6, session.copy(caret = 2).inlineOffset("shuang'pin"))
+        val confirmed = PinyinEditSession(1, "double_pinyin_flypy", "nihcul", "nihc", "你好", "ul", 2, false)
+        assertEquals(0, confirmed.editOffset("你好shuang", 2))
+        assertEquals(2, confirmed.editOffset("你好shuang", 8))
+        // Full pinyin keeps its own one-to-one path; unrelated text is still rejected.
+        assertNull(PinyinEditSession(1, "rime_ice", "ulpb", "", "", "ulpb", 4, false).editOffset("shuang'pin", 6))
+        assertNull(session.editOffset("ni'hao", 2))
+    }
 }
