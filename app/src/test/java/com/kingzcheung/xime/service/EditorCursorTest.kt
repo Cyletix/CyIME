@@ -641,4 +641,70 @@ class EditorCursorTest {
             keyEvents { cursor.moveToLineBoundary(ic, true, selecting = true) }[1])
         verify(ic, never()).setSelection(any(), any())
     }
+
+    // 用户 11-08：剪贴板编辑栏（键盘自己的悬浮输入框）按上下键没反应。那里发方向键会被系统丢掉，
+    // 必须按它自己的排版直接设选区。假排版：每 4 个字一行（"abcdefghij" → abcd / efgh / ij）。
+    private val fourPerLine = object : EditorCursor.VisualLines {
+        override fun verticalTarget(offset: Int, direction: Int): Int {
+            val line = offset / 4 + direction
+            return when {
+                line < 0 -> 0
+                line > 2 -> 10
+                else -> minOf(line * 4 + offset % 4, 10)
+            }
+        }
+        override fun lineBoundary(offset: Int, toEnd: Boolean): Int {
+            val line = minOf(offset / 4, 2)
+            return if (!toEnd) line * 4 else if (line == 2) 10 else line * 4 + 3
+        }
+    }
+
+    @Test fun `internal editor up and down follow its own layout and never send keys`() {
+        val ic = editor(6, text = "abcdefghij")
+        val cursor = EditorCursor()
+        assertEquals(true, cursor.moveLine(ic, -1, multiLine = true, lines = fourPerLine))
+        verify(ic).setSelection(2, 2)
+        assertEquals(true, cursor.moveLine(ic, -1, multiLine = true, lines = fourPerLine))
+        verify(ic).setSelection(0, 0)
+        assertEquals(false, cursor.moveLine(ic, -1, multiLine = true, lines = fourPerLine))
+        cursor.moveLine(ic, 1, multiLine = true, lines = fourPerLine)
+        verify(ic).setSelection(4, 4)
+        cursor.moveLine(ic, 1, multiLine = true, lines = fourPerLine)
+        verify(ic).setSelection(8, 8)
+        cursor.moveLine(ic, 1, multiLine = true, lines = fourPerLine)
+        verify(ic).setSelection(10, 10)
+        assertEquals(false, cursor.moveLine(ic, 1, multiLine = true, lines = fourPerLine))
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `internal editor shift up and down keep the anchor`() {
+        val ic = editor(6, text = "abcdefghij")
+        val cursor = EditorCursor()
+        cursor.moveLine(ic, 1, selecting = true, multiLine = true, lines = fourPerLine)
+        verify(ic).setSelection(6, 10)
+        cursor.moveLine(ic, -1, selecting = true, multiLine = true, lines = fourPerLine)
+        cursor.moveLine(ic, -1, selecting = true, multiLine = true, lines = fourPerLine)
+        verify(ic).setSelection(2, 6)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `internal editor line start and end use visual lines without keys`() {
+        val ic = editor(6, text = "abcdefghij")
+        val cursor = EditorCursor()
+        assertEquals(true, cursor.moveToLineBoundary(ic, toEnd = true, lines = fourPerLine))
+        verify(ic).setSelection(7, 7)
+        cursor.moveToLineBoundary(ic, toEnd = false, selecting = true, lines = fourPerLine)
+        verify(ic).setSelection(4, 7)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `internal editor hardware arrows never fall back to sending keys`() {
+        val ic = editor(0, text = "abcdefghij")
+        doReturn(false).whenever(ic).setSelection(any(), any())
+        val cursor = EditorCursor()
+        for (key in listOf(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN)) {
+            cursor.movePhysical(ic, key, lines = fourPerLine)
+        }
+        verify(ic, never()).sendKeyEvent(any())
+    }
 }

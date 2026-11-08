@@ -8,6 +8,16 @@ import kotlin.math.abs
 
 /** 编辑器光标操作不经过 Rime，所有键盘布局使用相同的选择区语义。 */
 internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) {
+    /**
+     * 键盘自己的输入框（剪贴板编辑、新增固定等）按它自己的排版给出的视觉行位置，都是绝对偏移。
+     * 这些框在没有窗口焦点的键盘窗口/悬浮窗里，发方向键会被系统直接丢掉（用户 11-08：剪贴板编辑栏上下键没反应），
+     * 所以上下、行首行尾都按排版算好位置再设选区。排版还没出来时返回 null，退回按文本换行。
+     */
+    interface VisualLines {
+        fun verticalTarget(offset: Int, direction: Int): Int?
+        fun lineBoundary(offset: Int, toEnd: Boolean): Int?
+    }
+
     private companion object {
         const val PENDING_TIMEOUT_MS = 1_000L
         /** 拖动中停顿超过这么久，下一格重新读一次输入框。 */
@@ -248,14 +258,15 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
      * 读得到光标那一侧已经没有字（文首按左/上、文末按右/下）时不交，免得焦点跳出输入框。
      */
     fun movePhysical(ic: InputConnection, keyCode: Int, selecting: Boolean = false,
-        byWord: Boolean = false, toBoundary: Boolean = false): Boolean {
+        byWord: Boolean = false, toBoundary: Boolean = false, lines: VisualLines? = null): Boolean {
         val backwards = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_UP
         val horizontal = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
         val direction = if (backwards) -1 else 1
         if (!byWord && !toBoundary) {
             val moved = if (horizontal) move(ic, direction, selecting, allowKeyEventFallback = false)
-                else moveVertical(ic, direction, selecting)
-            return moved || hostArrow(ic, keyCode, backwards, selecting)
+                else moveVertical(ic, direction, selecting, lines)
+            // 键盘自己的输入框收不到方向键，交过去只会丢掉。
+            return moved || (lines == null && hostArrow(ic, keyCode, backwards, selecting))
         }
         bind(ic)
         if (!selecting) resetSelection()
@@ -338,7 +349,7 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
     }
 
     /** 只修改当前编辑器选区；不能发送 DPAD_UP/DOWN，宿主可能将它解释为焦点导航。 */
-    fun moveVertical(ic: InputConnection, rows: Int, selecting: Boolean = false): Boolean {
+    fun moveVertical(ic: InputConnection, rows: Int, selecting: Boolean = false, lines: VisualLines? = null): Boolean {
         if (rows == 0) return false
         bind(ic)
         if (!selecting) resetSelection()
@@ -347,9 +358,11 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
             val extracted = snapshot(ic) ?: return moved
             if (selecting) syncSelection(extracted)
             val position = if (selecting) active!! - extracted.startOffset else extracted.selectionEnd
-            val target = verticalTextTarget(extracted.text, position, rows.compareTo(0))
-            if (target == position) return moved
-            if (!setSelection(ic, extracted.startOffset + target, selecting)) return moved
+            val absolute = extracted.startOffset + position
+            val target = lines?.verticalTarget(absolute, rows.compareTo(0))
+                ?: (extracted.startOffset + verticalTextTarget(extracted.text, position, rows.compareTo(0)))
+            if (target == absolute) return moved
+            if (!setSelection(ic, target, selecting)) return moved
             moved = true
         }
         return moved
@@ -358,16 +371,30 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
      * 编辑面板的上下键按宿主排版的视觉行移动：多行输入框交给宿主处理方向键，
      * 单行或不明类型的输入框仍只在文本内移动。文首按上、文末按下不发送，避免焦点跳出输入框。
      */
-    fun moveLine(ic: InputConnection, direction: Int, selecting: Boolean = false, multiLine: Boolean = false): Boolean {
+    fun moveLine(ic: InputConnection, direction: Int, selecting: Boolean = false, multiLine: Boolean = false,
+        lines: VisualLines? = null): Boolean {
         if (direction == 0) return false
-        if (!multiLine) return moveVertical(ic, direction, selecting)
+        if (lines != null || !multiLine) return moveVertical(ic, direction, selecting, lines)
         val key = if (direction < 0) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN
         return sendHostMove(ic, key, selecting, guardEdge = true)
     }
 
     /** 行首/行尾按视觉行，由宿主处理 Home/End；选择时保持锚点。 */
-    fun moveToLineBoundary(ic: InputConnection, toEnd: Boolean, selecting: Boolean = false): Boolean =
-        sendHostMove(ic, if (toEnd) KeyEvent.KEYCODE_MOVE_END else KeyEvent.KEYCODE_MOVE_HOME, selecting, guardEdge = false)
+    fun moveToLineBoundary(ic: InputConnection, toEnd: Boolean, selecting: Boolean = false, lines: VisualLines? = null): Boolean {
+        if (lines == null) {
+            return sendHostMove(ic, if (toEnd) KeyEvent.KEYCODE_MOVE_END else KeyEvent.KEYCODE_MOVE_HOME, selecting, guardEdge = false)
+        }
+        bind(ic)
+        if (!selecting) resetSelection()
+        val extracted = snapshot(ic) ?: return false
+        if (selecting) syncSelection(extracted)
+        val start = extracted.startOffset + minOf(extracted.selectionStart, extracted.selectionEnd)
+        val end = extracted.startOffset + maxOf(extracted.selectionStart, extracted.selectionEnd)
+        val position = if (selecting) active!! else if (toEnd) end else start
+        val target = lines.lineBoundary(position, toEnd)
+            ?: (extracted.startOffset + paragraphBoundary(extracted.text, position - extracted.startOffset, toEnd))
+        return setSelection(ic, target, selecting)
+    }
 
     private fun sendHostMove(ic: InputConnection, key: Int, selecting: Boolean, guardEdge: Boolean): Boolean {
         bind(ic)

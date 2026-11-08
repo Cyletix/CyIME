@@ -437,8 +437,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 return@editCursor
             }
             val multiLine = editorIsMultiLine()
+            val lines = internalEditorLines()
             repeat(abs(steps).coerceAtMost(1000)) {
-                if (!editorCursor.moveLine(connection, steps.sign, selecting, multiLine)) return@editCursor
+                if (!editorCursor.moveLine(connection, steps.sign, selecting, multiLine, lines)) return@editCursor
             }
         }
 
@@ -461,7 +462,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         // 终端读不到文字，下面的文内移动永远原地不动；方向键连同 Shift/Ctrl 交给终端自己处理。
         if (!target.isInternal && service.isTerminalEditor()) return TerminalEditor.forward(ic, event)
         editorCursor.movePhysical(ic, event.keyCode, event.isShiftPressed,
-            byWord = event.isCtrlPressed, toBoundary = event.isAltPressed || event.isMetaPressed)
+            byWord = event.isCtrlPressed, toBoundary = event.isAltPressed || event.isMetaPressed,
+            lines = internalEditor?.takeIf { target.isInternal }?.let(::InternalEditorLines))
     }
 
     /**
@@ -551,13 +553,22 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 editorCursor.move(it, if (action.endsWith("left")) -1 else 1, action.startsWith("select_"))
             }
             "line_start", "line_end", "select_line_start", "select_line_end" -> editCursor {
-                editorCursor.moveToLineBoundary(it, toEnd = action.endsWith("end"), selecting = action.startsWith("select_"))
+                editorCursor.moveToLineBoundary(it, toEnd = action.endsWith("end"), selecting = action.startsWith("select_"),
+                    lines = internalEditorLines())
             }
             "arrow_up", "arrow_down", "select_arrow_up", "select_arrow_down" -> editCursor {
-                editorCursor.moveLine(it, if (action.endsWith("up")) -1 else 1, action.startsWith("select_"), editorIsMultiLine())
+                editorCursor.moveLine(it, if (action.endsWith("up")) -1 else 1, action.startsWith("select_"), editorIsMultiLine(),
+                    internalEditorLines())
             }
         }
     }
+
+    /**
+     * 键盘自己的输入框（剪贴板编辑、新增固定、剪贴板搜索）：上下、行首行尾按它自己的排版设选区。
+     * 它们在没有窗口焦点的键盘窗口/悬浮窗里，发过去的方向键会被系统丢掉；应用的输入框为 null，照旧。
+     */
+    private fun internalEditorLines(): EditorCursor.VisualLines? =
+        service.uiState.value.inputTarget.takeIf { it.isInternal }?.editText()?.let(::InternalEditorLines)
 
     /** 只有声明多行的文本框才交给宿主按视觉行移动；单行框里宿主的上下键可能移走焦点。 */
     private fun editorIsMultiLine(): Boolean {
