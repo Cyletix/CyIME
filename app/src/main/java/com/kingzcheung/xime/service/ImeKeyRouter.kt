@@ -2764,26 +2764,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val expression = service.calculatorEngine.getExpression()
             val formulaResult = service.calculatorEngine.getFormulaResult()
             if (result.isNotEmpty() && expression.isNotEmpty()) {
-                val textToCommit: String
                 // index 0: 纯结果（如 "2"）
                 // index 1: 公式结果（如 "1+1=2"）
-                textToCommit = when (index) {
+                val textToCommit = when (index) {
                     0 -> result
                     1 -> formulaResult
-                    else -> ""
+                    else -> return
                 }
-                if (textToCommit.isNotEmpty()) {
+                val displayed = service.candidateState.value.candidates
+                if (displayed == listOf(result, service.calculatorEngine.getCandidate()) &&
+                    service.editorConnection()?.commitCalculatorCandidate(expression, textToCommit) == true) {
                     service.calculatorEngine.clear()
-                    run {
-                        val ic = service.currentInputConnection
-                        if (ic != null) {
-                            // 删除输入框中已键入的表达式
-                            ic.deleteSurroundingText(expression.length, 0)
-                            // 提交选中的文本
-                            ic.commitText(textToCommit, textToCommit.length)
-                        }
-                        service.candidateState.value = CandidateState()
-                    }
+                    service.candidateState.value = CandidateState()
                 }
             }
             return
