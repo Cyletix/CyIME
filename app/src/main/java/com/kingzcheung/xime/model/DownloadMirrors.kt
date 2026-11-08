@@ -70,13 +70,19 @@ object DownloadMirrors {
                 if (url.startsWith(from)) to + url.removePrefix(from) else null
             }
         }.distinct()
+        // 国内线路里魔搭排在 hf-mirror 前面：hf-mirror 是公益镜像，大文件常被限速，魔搭快得多。
         val (domestic, global) = expanded.partition { isDomestic(it) }
+            .let { (d, g) -> d.sortedBy { !isModelScope(it) } to g }
         return if (preferDomestic) domestic + global else global + domestic
     }
 
     fun candidates(context: Context, primary: String, extra: List<String> = emptyList()): List<String> =
         candidates(primary, extra, prefersDomestic(context))
 
-    internal fun isDomestic(url: String): Boolean =
-        url.substringAfter("://").substringBefore('/').substringBefore(':').lowercase(Locale.ROOT) in domesticHosts
+    internal fun isDomestic(url: String): Boolean = host(url) in domesticHosts
+
+    private fun isModelScope(url: String): Boolean = host(url).let { it == "www.modelscope.cn" || it == "modelscope.cn" }
+
+    private fun host(url: String): String =
+        url.substringAfter("://").substringBefore('/').substringBefore(':').lowercase(Locale.ROOT)
 }

@@ -21,6 +21,24 @@ class DownloadMirrorsTest {
         assertEquals(listOf(github, modelscope), DownloadMirrors.candidates(github, listOf(modelscope), preferDomestic = false))
     }
 
+    /** hf-mirror 大文件常被限速：同一个文件魔搭也有时，国内先走魔搭；海外仍先走原站。 */
+    @Test fun chinaTriesModelScopeBeforeHfMirror() {
+        val mirror = "https://hf-mirror.com/csukuangfj/m/resolve/abc/tokens.txt"
+        val ms = "https://www.modelscope.cn/models/Cyletix/cyime-model/resolve/master/tokens.txt"
+        assertEquals(listOf(ms, mirror, hf, github), DownloadMirrors.candidates(hf, listOf(github, ms), preferDomestic = true))
+        assertEquals(listOf(hf, github, ms, mirror), DownloadMirrors.candidates(hf, listOf(github, ms), preferDomestic = false))
+    }
+
+    /** 语音模型两百多 MB，国内第一条必须是魔搭，不能只有 hf-mirror。 */
+    @Test fun voiceModelsStartFromModelScopeInChina() {
+        val voice = listOf("paraformer-zh-en-int8", "sensevoice-multilingual-int8")
+        val firsts = BuiltinModelCatalog.models.filter { it.id in voice }.flatMap { model ->
+            model.versions.flatMap { v -> v.files.map { DownloadMirrors.candidates(it.downloadUrl, it.mirrors, preferDomestic = true).first() } }
+        }
+        assertEquals(5, firsts.size)
+        assertTrue(firsts.toString(), firsts.all { it.startsWith(DownloadMirrors.CYIME_MODELSCOPE) })
+    }
+
     @Test fun blankAndDuplicateAddressesAreDropped() {
         assertEquals(listOf(github), DownloadMirrors.candidates(github, listOf("", github), preferDomestic = true))
         assertTrue(DownloadMirrors.candidates("", emptyList(), preferDomestic = true).isEmpty())
