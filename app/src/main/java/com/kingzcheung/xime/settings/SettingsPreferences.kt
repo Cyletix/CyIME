@@ -847,6 +847,13 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_ASSOCIATION_SINGLE_MODE, single).apply()
     }
 
+    fun isRestorePreviousAssociationsEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean("restore_previous_associations", false)
+
+    fun setRestorePreviousAssociationsEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean("restore_previous_associations", enabled).apply()
+    }
+
     /**
      * 退格直接删字（B站反馈 10-31，别人的需求，默认关）：联想词出现时退格直接删掉刚上屏的字、顺手收起联想，
      * 不用先按一下收起联想。关着时照旧：第一下收起联想，第二下才删字。

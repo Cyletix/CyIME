@@ -36,6 +36,51 @@ internal fun isUnicodeCodeWithDigit(input: String) = isUnicodeCodeInput(input) &
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     private val chineseGlideDeletes = ChineseGlideDeleteHistory()
 
+    private data class PreviousAssociations(
+        val words: List<String>,
+        val connection: android.view.inputmethod.InputConnection,
+        val session: Long,
+        val schema: String,
+        val before: String,
+        val after: String,
+    )
+
+    @Volatile private var previousAssociations: PreviousAssociations? = null
+
+    internal fun discardPreviousAssociations() { previousAssociations = null }
+
+    private fun capturePreviousAssociations(state: CandidateState): PreviousAssociations? {
+        if (!SettingsPreferences.isRestorePreviousAssociationsEnabled(service) ||
+            state.associationCandidates.isEmpty() || state.isDeletionRecovery || state.isDigitPhraseList ||
+            state.isShowingRecentClipboard || state.pendingEnglishText.isNotEmpty() ||
+            EmailSuffixes.isSuggestionList(state.associationCandidates)) return null
+        val connection = service.currentInputConnection ?: return null
+        val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull() ?: return null
+        val after = runCatching { connection.getTextAfterCursor(25, 0)?.toString() }.getOrNull() ?: return null
+        if (!runCatching { connection.getSelectedText(0).isNullOrEmpty() }.getOrDefault(false)) return null
+        val ui = service.uiState.value
+        return PreviousAssociations(state.associationCandidates.toList(), connection, ui.inputSessionId,
+            ui.currentSchemaId, before, after)
+    }
+
+    private fun restorePreviousAssociations(snapshot: PreviousAssociations) {
+        if (previousAssociations !== snapshot) return
+        previousAssociations = null
+        val ui = service.uiState.value
+        val current = service.candidateState.value
+        val connection = service.currentInputConnection
+        if (!SettingsPreferences.isRestorePreviousAssociationsEnabled(service) ||
+            connection !== snapshot.connection || ui.inputSessionId != snapshot.session ||
+            ui.currentSchemaId != snapshot.schema || ui.isAsciiMode || current.isComposing ||
+            current.inputText.isNotEmpty() || current.associationCandidates.isNotEmpty()) return
+        val sameContext = runCatching {
+            connection.getSelectedText(0).isNullOrEmpty() &&
+                connection.getTextBeforeCursor(25, 0)?.toString() == snapshot.before &&
+                connection.getTextAfterCursor(25, 0)?.toString() == snapshot.after
+        }.getOrDefault(false)
+        if (sameContext) service.candidateState.value = current.copy(associationCandidates = snapshot.words)
+    }
+
     private fun chineseGlideDeleteEnabled(): Boolean = SettingsPreferences.getPrefsPublic(service).getBoolean(
         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DELETE_CHINESE_GLIDE_CHARACTER_KEY, false)
 
@@ -1158,6 +1203,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (hardwareEvent == null && schemeCode == null && !mergedKey && typesEmailDomainKey(key) &&
                 withEditor { commitEmailDomainKey(if (isShifted) key.uppercase() else key) }) return@command
             // 下面会先清掉联想（含邮箱后缀）；数字键盘走计算器那条路时要知道按键前是不是正给着后缀。
+            if (key.length == 1 && key[0] in 'a'..'z' && !isShifted && !mergedKey &&
+                !service.uiState.value.isAsciiMode && service.isChineseMode &&
+                SettingsPreferences.isRestorePreviousAssociationsEnabled(service) &&
+                service.rimeEngine.compositionActiveForDeletion() == false) {
+                previousAssociations = withEditor { capturePreviousAssociations(service.candidateState.value) }
+            }
             val emailSuffixesShown = EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)
             // Most composing keys have nothing to clear. Do not make every key wait
             // for a Main round trip before it can even reach the decoder.
@@ -1678,6 +1729,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     needsUIUpdate = true
                                 } else {
                                     val committed = result.committedText
+                                    if (committed.isNotEmpty()) discardPreviousAssociations()
                                     if (state.isAsciiMode && committed.isNotEmpty() && result.inputText.isEmpty() && result.candidates.isEmpty()) {
                                         val current = candState.pendingEnglishText
                                         val newPending = current + committed
@@ -2349,7 +2401,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // Undo changes composition only; no user dictionary write.
                     }
                 }
-                sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
+                val associationsToRestore = previousAssociations.takeIf { result.inputText.isEmpty() }
+                sendTransformedResult(result) {
+                    if (associationsToRestore != null) restorePreviousAssociations(associationsToRestore)
+                    if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
+                }
             }
 
             // 3. 联想词或剪贴板：仅清空候选栏，不回删已上屏字符
@@ -2440,6 +2496,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             FileLogger.w("InputLatency", "candidate tap dropped: revision changed")
             return
         }
+        discardPreviousAssociations()
         // 展开页点选（expandedCandidate 非空）：取词/注释以展开页显示的同一份
         // 全量列表为准（所见即所得）。index 是全量索引，不得用于索引引擎当前页的
         // candidates/candidateComments——部分选拼音（SELECTION 态）或候选超页时
@@ -2671,6 +2728,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 输入框模式清 composing 区；T9 方案重置左侧候选区（其他键盘无左栏，跳过）。
      */
     private suspend fun clearInputStateForKeys() {
+        discardPreviousAssociations()
         service.predictionManager.invalidatePendingPredictions()
         service.calculatorEngine.clear()
         updateCalculatorCandidates()
