@@ -111,6 +111,10 @@ fun SettingsMainContent(
     val waitingModelBytes by com.kingzcheung.xime.model.DefaultModelInstaller.waitingForWifiBytes.collectAsState()
     val updateState by com.kingzcheung.xime.update.AppUpdater.state.collectAsState()
     LaunchedEffect(Unit) { com.kingzcheung.xime.update.AppUpdater.checkIfDue(context) }
+    var showReleaseNotesNotice by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        showReleaseNotesNotice = withContext(Dispatchers.IO) { com.kingzcheung.xime.update.ReleaseNotes.shouldPromptNow(context) }
+    }
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeBottomDp = with(density) { imeBottomPx.toDp() }
@@ -164,6 +168,18 @@ fun SettingsMainContent(
                 })
             }
             pendingUpdate(updateState)?.let { release -> item { AppUpdateHomeNotice(release, onNavigateToAbout) } }
+            if (showReleaseNotesNotice) item {
+                ReleaseNotesHomeNotice(
+                    onOpen = {
+                        showReleaseNotesNotice = false
+                        onNavigateToRoute(SettingsRoutes.ReleaseNotes)
+                    },
+                    onDismiss = {
+                        showReleaseNotesNotice = false
+                        com.kingzcheung.xime.update.ReleaseNotes.markSeen(context)
+                    },
+                )
+            }
             if (searchQuery.isNotBlank()) item {
                 SettingsSearchResults(searchQuery) { entry ->
                     if (entry.target == SEARCH_TARGET_CUSTOM_LAYOUT) {

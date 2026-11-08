@@ -1,12 +1,18 @@
 package com.kingzcheung.xime.ui.settings
 
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.twotone.NewReleases
 import androidx.compose.material.icons.twotone.SystemUpdate
 import androidx.compose.material.icons.twotone.Update
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -24,6 +31,7 @@ import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.update.AppRelease
 import com.kingzcheung.xime.update.AppUpdateState
 import com.kingzcheung.xime.update.AppUpdater
+import com.kingzcheung.xime.update.ReleaseNotes
 
 private val editionName: String get() = if (BuildConfig.BUNDLED_MODELS) "完整版" else "轻量版"
 
@@ -68,7 +76,7 @@ private fun updateStatus(state: AppUpdateState): Pair<String, SettingsStatusTone
     is AppUpdateState.Failed -> "失败" to SettingsStatusTone.WARNING
 }
 
-/** 关于页「版本更新」：手动检查更新随时可点；自动检查默认开。 */
+/** 关于页「版本更新」：手动检查更新随时可点；自动检查默认开；更新后提示更新内容默认开（自用版默认关）。 */
 @Composable
 internal fun AppUpdateSection() {
     if (!AppUpdater.supported) return
@@ -76,6 +84,7 @@ internal fun AppUpdateSection() {
     val uriHandler = LocalUriHandler.current
     val state by AppUpdater.state.collectAsState()
     var autoCheck by remember { mutableStateOf(AppUpdater.isAutoCheckEnabled(context)) }
+    var notesPrompt by remember { mutableStateOf(ReleaseNotes.isPromptEnabled(context)) }
     var meteredConfirm by remember { mutableStateOf<AppRelease?>(null) }
 
     fun startDownload(release: AppRelease) {
@@ -120,6 +129,21 @@ internal fun AppUpdateSection() {
                 AppUpdater.setAutoCheckEnabled(context, enabled)
             },
         )
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 56.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+        SettingsToggleItem(
+            icon = Icons.TwoTone.NewReleases,
+            title = "更新后提示更新内容",
+            subtitle = "更新后第一次打开设置，首页顶上提示一次，点开或关掉就不再出现",
+            checked = notesPrompt,
+            onCheckedChange = { enabled ->
+                notesPrompt = enabled
+                ReleaseNotes.setPromptEnabled(context, enabled)
+            },
+        )
     }
 
     meteredConfirm?.let { release ->
@@ -153,5 +177,27 @@ internal fun AppUpdateHomeNotice(release: AppRelease, onOpen: () -> Unit) {
             onClick = onOpen,
             showArrow = true,
         )
+    }
+}
+
+/** 更新后设置首页顶上的一次性提示：点了去「更新内容」，点 × 只关掉；两样都记成这一版已看过。 */
+@Composable
+internal fun ReleaseNotesHomeNotice(onOpen: () -> Unit, onDismiss: () -> Unit) {
+    SettingsSection(title = "更新内容") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) {
+                SettingsItem(
+                    icon = Icons.TwoTone.NewReleases,
+                    title = "已更新到 CyIME ${BuildConfig.VERSION_NAME}",
+                    subtitle = "点这里看这一版改了什么",
+                    onClick = onOpen,
+                    searchKey = "已更新提示",
+                )
+            }
+            IconButton(onClick = onDismiss, modifier = Modifier.padding(end = 4.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = "不再提示这一版",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }

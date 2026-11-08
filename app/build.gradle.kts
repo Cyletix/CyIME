@@ -30,6 +30,18 @@ val preparePluginMarket by tasks.registering(Sync::class) {
 }
 tasks.named("preBuild").configure { dependsOn(preparePluginMarket) }
 
+// 关于 › 更新内容：发 Release 用的 docs/<x.y.z>.md 一起打进安装包，看说明不联网。
+val prepareReleaseNotes by tasks.registering(Sync::class) {
+    from(rootProject.file("docs")) {
+        include("*.md")
+        eachFile { if (!name.matches(Regex("""\d+\.\d+\.\d+\.md"""))) exclude() }
+        into("release-notes")
+    }
+    includeEmptyDirs = false
+    into(layout.buildDirectory.dir("generated/release-notes-assets"))
+}
+tasks.named("preBuild").configure { dependsOn(prepareReleaseNotes) }
+
 // 获取 Git 提交哈希
 fun getGitHash(): String {
     return try {
@@ -55,6 +67,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.kingzcheung.xime"
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/plugin-market-assets").get().asFile)
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/release-notes-assets").get().asFile)
     if (providers.gradleProperty("bundleModels").orNull == "true") {
         sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/bundled-model-assets").get().asFile)
     }

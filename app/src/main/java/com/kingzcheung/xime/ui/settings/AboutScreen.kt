@@ -33,6 +33,7 @@ import androidx.compose.material.icons.twotone.BugReport
 import androidx.compose.material.icons.twotone.Code
 import androidx.compose.material.icons.twotone.Description
 import androidx.compose.material.icons.twotone.Favorite
+import androidx.compose.material.icons.twotone.NewReleases
 import androidx.compose.material.icons.twotone.PersonOutline
 import androidx.compose.material.icons.twotone.PrivacyTip
 import androidx.compose.material.icons.twotone.Storage
@@ -158,6 +159,7 @@ fun AboutContent(
     onNavigateToPrivacy: () -> Unit,
     onNavigateToLicenses: () -> Unit,
     onNavigateToCredits: () -> Unit = {},
+    onNavigateToReleaseNotes: () -> Unit = {},
     onNavigateToLogViewer: () -> Unit = {},
     onNavigateToHandwritingCapture: () -> Unit = {},
     onNavigateToStorageSpace: () -> Unit = {},
@@ -277,6 +279,17 @@ fun AboutContent(
 
             // 链接项
                 SettingsSection(title = "信息与工具") {
+                        // 安装包里带的各版发布说明，不联网。
+                        SettingsItem(
+                            icon = Icons.TwoTone.NewReleases,
+                            title = "更新内容",
+                            onClick = onNavigateToReleaseNotes
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
                         SettingsItem(
                             icon = Icons.TwoTone.Favorite,
                             title = "鸣谢",

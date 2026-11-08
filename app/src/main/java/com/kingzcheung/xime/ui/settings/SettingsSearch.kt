@@ -149,7 +149,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("备份与恢复", other, SettingsRoutes.Backup, "备份 恢复 导出 导入 本地备份 换机 迁移"),
         page("性能与省电", other, SettingsRoutes.Performance, "性能 省电 内存 卡顿 高配 中配 低配 自动 动效 炫光 语音常驻 释放 SenseVoice Paraformer"),
         page("按设备推荐配置", "配置选择", SettingsRoutes.SetupGuide, "推荐 自动 检测 手机 平板 配置 引导 向导 不会设置 不懂 省空间 删模型 体积 太大 占空间 语音模型 九键模型 怎么选 打字习惯 全拼 双拼 小鹤 自然码 微软双拼 五笔 模糊音 平翘舌 前后鼻音 字幕 桌面图标"),
-        page("关于 CyIME", system, SettingsRoutes.About, "版本 开发者 联系 许可 检查更新 最新版本 源代码"),
+        page("关于 CyIME", system, SettingsRoutes.About, "版本 开发者 联系 许可 检查更新 最新版本 源代码 更新内容"),
         // 输入 › 语言与方案
         SettingsSearchEntry("语言键切换方式", languages, "languages", "语言键 切换语言 中英切换 循环切换 指定语言 英文 地球键 点按语言键"),
         SettingsSearchEntry("繁体输出", chinesePath, chinese, "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换"),
@@ -387,6 +387,8 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("使用文档", about, SettingsRoutes.About, "说明 帮助 文档 教程 用法"),
         SettingsSearchEntry("检查更新", about, SettingsRoutes.About, "更新 升级 新版本 最新版本 下载 安装 版本号"),
         SettingsSearchEntry("自动检查更新", about, SettingsRoutes.About, "自动 更新 升级 新版本 提醒"),
+        SettingsSearchEntry("更新后提示更新内容", about, SettingsRoutes.About, "更新内容 更新日志 新功能 改了什么 公告 提示 首页"),
+        page("更新内容", about, SettingsRoutes.ReleaseNotes, "更新内容 更新日志 更新说明 发布说明 新功能 改了什么 公告 changelog"),
         page("隐私策略", about, SettingsRoutes.Privacy, "隐私 数据 联网 收集"),
         page("鸣谢", about, SettingsRoutes.Credits, "致谢 感谢 鸣谢 上游 Xime 雾凇 参考 来源 作者 credits"),
         page("开源许可证", about, SettingsRoutes.Licenses, "许可 开源 license 第三方"),
@@ -404,7 +406,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
             !(com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
     }.filter {
         // The elder package has no update entry (AppUpdater.supported).
-        com.kingzcheung.xime.update.AppUpdater.supported || it.title !in setOf("检查更新", "自动检查更新")
+        com.kingzcheung.xime.update.AppUpdater.supported || it.title !in setOf("检查更新", "自动检查更新", "更新后提示更新内容")
     }
 }
 

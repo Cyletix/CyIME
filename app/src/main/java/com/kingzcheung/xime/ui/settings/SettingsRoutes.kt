@@ -30,6 +30,7 @@ object SettingsRoutes {
     const val Privacy = "privacy"
     const val Licenses = "licenses"
     const val Credits = "credits"
+    const val ReleaseNotes = "release_notes"
     const val LogViewer = "log_viewer"
     const val HandwritingTraining = "handwriting_training"
     const val HandwritingContribute = "handwriting_contribute"
