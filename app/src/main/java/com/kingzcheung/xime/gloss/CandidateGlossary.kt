@@ -3,12 +3,14 @@ package com.kingzcheung.xime.gloss
 import android.content.Context
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import com.kingzcheung.xime.R
 import com.kingzcheung.xime.model.ModelStorage
 import com.kingzcheung.xime.settings.CandidateCommentContent
 import com.kingzcheung.xime.settings.CandidateCommentMode
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
+import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -97,7 +99,8 @@ object CandidateGlossary {
         if (current == signature || !loading.compareAndSet(false, true)) return
         thread(name = "candidate-gloss", isDaemon = true) {
             try {
-                val opened = GlossTable.open(source)
+                val corrections = context.resources.openRawResource(R.raw.candidate_gloss_corrections)
+                val opened = GlossTable.open(source, readCorrections(corrections))
                 opened.overlay = openPrivateAsset(context)
                 synchronized(composed) { composed.clear() }
                 table = opened
@@ -132,6 +135,15 @@ object CandidateGlossary {
 
     /** 词典已加载（释义模式且注释未隐藏）。 */
     val isLoaded: Boolean get() = table != null
+
+    /** 与词典生成器共用的精确词条；已下载的 v12 也在查表时应用。 */
+    internal fun readCorrections(source: InputStream): Map<String, String> =
+        source.bufferedReader().useLines { lines ->
+            lines.associate { line ->
+                val (word, gloss) = line.split('\t', limit = 2)
+                word to gloss
+            }
+        }
 
     /** 物理键盘的 Shift 正被按住；屏幕键盘看 ShiftMode.HELD。按住时候选中英对调。 */
     val physicalShiftHeld = mutableStateOf(false)
@@ -311,7 +323,11 @@ object CandidateGlossary {
 }
 
 /** 按 UTF-8 字节序排好的 `词\t释义` 行；内存映射，堆上只留每行起点。 */
-internal class GlossTable private constructor(private val buffer: ByteBuffer, private val starts: IntArray) {
+internal class GlossTable private constructor(
+    private val buffer: ByteBuffer,
+    private val starts: IntArray,
+    private val corrections: Map<String, String>,
+) {
     val size: Int get() = starts.size
 
     /** 叠在上面的私人补充包：先查它，查到 [HIDDEN] 就不显示释义。 */
@@ -320,6 +336,7 @@ internal class GlossTable private constructor(private val buffer: ByteBuffer, pr
     fun lookup(key: String): String? {
         if (key.isEmpty()) return null
         overlay?.lookup(key)?.let { return it.takeUnless { value -> value == HIDDEN } }
+        corrections[key]?.let { return it }
         val wanted = key.toByteArray(Charsets.UTF_8)
         var low = 0
         var high = starts.size - 1
@@ -364,12 +381,12 @@ internal class GlossTable private constructor(private val buffer: ByteBuffer, pr
         private const val NEWLINE = '\n'.code
         private const val COMMENT = '#'.code
 
-        fun open(file: File): GlossTable {
+        fun open(file: File, corrections: Map<String, String> = emptyMap()): GlossTable {
             val buffer = RandomAccessFile(file, "r").use { it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()) }
-            return fromBuffer(buffer)
+            return fromBuffer(buffer, corrections)
         }
 
-        fun fromBuffer(buffer: ByteBuffer): GlossTable {
+        fun fromBuffer(buffer: ByteBuffer, corrections: Map<String, String> = emptyMap()): GlossTable {
             var starts = IntArray(1 shl 16)
             var count = 0
             var lineStart = 0
@@ -389,7 +406,7 @@ internal class GlossTable private constructor(private val buffer: ByteBuffer, pr
                 }
                 lineStart = end + 1
             }
-            return GlossTable(buffer, starts.copyOf(count))
+            return GlossTable(buffer, starts.copyOf(count), corrections)
         }
     }
 }

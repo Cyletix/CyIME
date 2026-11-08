@@ -30,6 +30,7 @@ import csv
 import gzip
 import re
 import sys
+from pathlib import Path
 
 EN_WORD = re.compile(r"[A-Za-z][A-Za-z'\-]*")
 POS_PREFIX = re.compile(r"^(?:[a-z]+\.\s*)+")
@@ -487,8 +488,8 @@ def add_le_forms(entries: dict[str, str], ecdict_path: str, engine: dict[str, di
     return added
 
 
-def load_curated(path: str) -> dict[str, str]:
-    """人工表：词<TAB>英文；只有词没有英文表示不显示释义（值为空串）。"""
+def load_curated(path: str | Path) -> dict[str, str]:
+    """人工表：词<TAB>释义；只有词没有释义表示不显示（值为空串）。"""
     curated: dict[str, str] = {}
     with open(path, encoding="utf-8") as handle:
         for line in handle:
@@ -582,6 +583,9 @@ def main() -> int:
             else:
                 entries.pop(key, None)
         print(f"curated_phrases={len(curated)}", file=sys.stderr)
+    # 与旧词典在 App 内使用同一份勘误表，两种翻译方向都优先采用核实过的义项。
+    corrections = Path(__file__).resolve().parents[3] / "app/src/main/res/raw/candidate_gloss_corrections.tsv"
+    entries.update(load_curated(corrections))
     rows = sorted(((k, v) for k, v in entries.items() if "\t" not in k + v and "\n" not in k + v),
                   key=lambda item: item[0].encode("utf-8"))
     with open(args.output, "w", encoding="utf-8", newline="\n") as out:

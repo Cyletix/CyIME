@@ -5,12 +5,13 @@ import org.junit.Assert.assertNull
 import android.view.KeyEvent
 import com.kingzcheung.xime.service.shiftedCandidateOffset
 import org.junit.Test
+import java.io.File
 import java.nio.ByteBuffer
 
 class CandidateGlossaryTest {
 
     /** 与生成脚本一致：键按 UTF-8 字节序排序，开头是 # 说明行。 */
-    private fun table(vararg rows: Pair<String, String>): GlossTable {
+    private fun table(vararg rows: Pair<String, String>, corrections: Map<String, String> = emptyMap()): GlossTable {
         val body = rows.sortedWith { a, b ->
             val x = a.first.toByteArray(); val y = b.first.toByteArray()
             for (i in 0 until minOf(x.size, y.size)) {
@@ -19,7 +20,27 @@ class CandidateGlossaryTest {
             }
             x.size - y.size
         }.joinToString("") { "${it.first}\t${it.second}\n" }
-        return GlossTable.fromBuffer(ByteBuffer.wrap("# 来源与许可\n# 格式说明\n$body".toByteArray()))
+        return GlossTable.fromBuffer(ByteBuffer.wrap("# 来源与许可\n# 格式说明\n$body".toByteArray()), corrections)
+    }
+
+    @Test
+    fun `software terms override v12 in both directions and respect private choices`() {
+        val corrections = CandidateGlossary.readCorrections(
+            File("src/main/res/raw/candidate_gloss_corrections.tsv").inputStream()
+        )
+        // v12 has no entry for uninstall. These other rows are from the published table.
+        val base = table("download" to "卸载", "downloadable" to "可下载的", "下载" to "download",
+            "卸载" to "unload cargo", "卸載" to "unload cargo", corrections = corrections)
+        val words = listOf("Download", "uninstall", "Update", "downloadable", "下载", "下載", "卸载", "卸載", "更新")
+        assertEquals(listOf("下载", "卸载", "更新", "可下载的", "download", "download", "uninstall", "uninstall", "update"),
+            CandidateGlossary.annotate(base, words, emptyList()))
+        assertEquals("uninstall", CandidateGlossary.englishFor(base, "卸载"))
+        assertEquals(listOf("uninstall", "Download") to listOf("卸載", "下载"),
+            CandidateGlossary.swapped(base, listOf("卸載", "Download"), emptyList()))
+
+        base.overlay = table("download" to GlossTable.HIDDEN, "卸载" to "remove")
+        assertNull(CandidateGlossary.gloss(base, "Download"))
+        assertEquals("remove", CandidateGlossary.englishFor(base, "卸载"))
     }
 
     @Test
