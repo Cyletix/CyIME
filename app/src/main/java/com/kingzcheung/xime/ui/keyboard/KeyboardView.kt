@@ -674,11 +674,12 @@ fun KeyboardView(
         val quickToggles = rememberQuickToggleStates()
         // 开无痕前先确认：菜单里一碰就开，之后复制的内容不再进剪贴板，用户不知道为什么。关掉不用确认。
         var incognitoConfirm by remember(state.inputSessionId) { mutableStateOf(false) }
-        // 仓颉也跟着「繁体输出」出简繁（ImeKeyRouter 设 simplification），按钮同样要在。
+        val zhuyin = state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN
         val traditionalSwitchApplies = !state.isAsciiMode && !state.isHandwritingMode &&
             state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
             state.inputProfile.scheme in setOf(com.kingzcheung.xime.settings.InputScheme.PINYIN,
-                com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN, com.kingzcheung.xime.settings.InputScheme.CANGJIE)
+                com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN, com.kingzcheung.xime.settings.InputScheme.CANGJIE,
+                com.kingzcheung.xime.settings.InputScheme.ZHUYIN)
         fun quickAction(id: String): ToolbarAction? {
             val item = resolveToolbarButtonItem(id, state.toolbarPluginButtons) ?: return null
             val widthSwitch = if (state.isAsciiMode) null else state.schemaSwitches.firstOrNull { it.name == "full_shape" }
@@ -733,9 +734,10 @@ fun KeyboardView(
                     })
                     // 英文状态标点固定半角，入口不出现，避免“点了看不到变化，实际却改了状态”。
                     ToolbarButton.FULL_SHAPE -> widthSwitch?.let { sw -> { callbacks.onToggleSchemaSwitch?.invoke(sw) } } ?: return null
-                    // 繁体输出只对拼音、双拼、仓颉生效（注音本来就出正体），其余状态不出现；下一个按键起按新设置出字。
+                    // 注音的简繁选择独立于其他中文方案。
                     ToolbarButton.TRADITIONAL -> if (traditionalSwitchApplies) ({
-                        inputPreferences.copy(traditionalOutput = !inputPreferences.traditionalOutput).save(quickContext)
+                        if (zhuyin) inputPreferences.copy(zhuyinSimplified = !inputPreferences.zhuyinSimplified).save(quickContext)
+                        else inputPreferences.copy(traditionalOutput = !inputPreferences.traditionalOutput).save(quickContext)
                     }) else return null
                     // 「语音转文本」关着时麦克风入口不出现（工具栏和菜单都是），不再显示一个点了只弹提示的图标。
                     ToolbarButton.VOICE -> if (!state.isSttEnabled) return null else ({
@@ -757,7 +759,7 @@ fun KeyboardView(
                     }
                 })
             }
-            val settingsEntry = com.kingzcheung.xime.ui.settings.menuSettingsEntry(item)
+            val settingsEntry = com.kingzcheung.xime.ui.settings.menuSettingsEntry(item, state.inputProfile.scheme)
             val openSettings: (() -> Unit)? = settingsEntry?.let { entry -> {
                 toolbarFeedback()
                 com.kingzcheung.xime.ui.settings.SettingsSearchFocus.open(entry)
@@ -781,7 +783,7 @@ fun KeyboardView(
                 ToolbarButton.INCOGNITO -> quickToggles.incognito
                 in ToolbarButton.LAYOUT_GESTURES -> item.button.gestureOn(inputPreferences)
                 ToolbarButton.FULL_SHAPE -> widthSwitch?.let { it.states.getOrNull(it.currentIndex) == "全角" } == true
-                ToolbarButton.TRADITIONAL -> inputPreferences.traditionalOutput
+                ToolbarButton.TRADITIONAL -> if (zhuyin) !inputPreferences.zhuyinSimplified else inputPreferences.traditionalOutput
                 else -> false
             }) {
                 toolbarFeedback()

@@ -53,7 +53,7 @@ enum class ToolbarButton(
     // 图标随状态切换（半角月牙 / 全角满圆），见 WidthShapeIcons.kt。
     // 名称用于自定义列表；键盘上按当前状态显示“全角”或“半角”（见 [stateLabel]）。
     FULL_SHAPE("full_shape", "全角/半角", HalfWidthIcon),
-    // 繁体输出的快捷开关，与设置「语言与方案 › 繁体输出」同一个设置；只在拼音、双拼的中文键盘出现。
+    // 切换当前方案的输出字形；注音使用独立的简体设置。
     // 键盘上按当前状态显示“繁体”或“简体”（见 [stateLabel]）。
     TRADITIONAL("traditional", "简繁", Icons.TwoTone.Translate),
     // 布局手势开关：只在对应布局里出现（见 LayoutGestureMenuItems.kt），其他布局自动隐藏。

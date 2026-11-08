@@ -1,15 +1,15 @@
 # Rime schema
 # 注音（大千式），台湾朋友提的需求，默认不启用（设置 → 已安装的方案里打开）。
 # 词库沿用雾凇，拼写运算把拼音音节改写成注音、再落到大千键位（同 rime-bopomofo 的 zhuyin.yaml）；
-# 雾凇没有声调，声调键只用来分隔音节，可以不打。候选一律经 cyime_s2tw 转成台湾正体，
+# 雾凇没有声调，声调键只用来分隔音节，可以不打。候选默认经 cyime_s2tw 转成台湾正体，
 # 台湾特有词和台湾读音（垃圾 ㄌㄜˋㄙㄜˋ）在 cyime_tw 里，见 tools/zhuyin/build_cyime_tw.py。
 # 键盘见 xime.yaml 的 keyboard.zhuyin：键帽是注音符号，ImeKeyRouter 按 ZhuyinKeys 换成这里的大千键码。
 schema:
   schema_id: cyime_zhuyin
   name: 注音
-  version: "1.0"
+  version: "1.1"
   description: |
-    注音符號輸入，大千式鍵盤排列，輸出臺灣正體。
+    注音符號輸入，大千式鍵盤排列，預設輸出臺灣正體，可選簡體。
     空格鍵輸入第一聲；聲調可以省略。
 
 switches:
@@ -21,7 +21,7 @@ switches:
   - name: ascii_punct
     reset: 0
     states: [ 。，, ．， ]
-  # 注音只出繁体，不跟「繁体输出」设置走（那个开关管的是 traditionalization）。
+  # 台湾声调表按正体字查。简体输出在声调筛选之后处理。
   - name: zh_tw
     reset: 1
     states: [ 简, 繁 ]
@@ -45,10 +45,11 @@ engine:
   translators:
     - punct_translator
     - script_translator
-  # 先转正体再过候选规则：长按删掉的是屏上的正体字，按它来藏。声调表是正体字，排在转换之后。
+  # 先按正体匹配声调，再确定输出字形；候选隐藏及去重使用最后显示的字。
   filters:
     - simplifier@zh_tw
     - lua_filter@*cyime_zhuyin_tone
+    - simplifier@zhuyin_simplified
     - cyime_candidate_policy
     - uniquifier
 
@@ -124,6 +125,11 @@ t9:
 zh_tw:
   option_name: zh_tw
   opencc_config: cyime_s2tw.json
+  tips: none
+
+zhuyin_simplified:
+  option_name: zhuyin_simplified
+  opencc_config: cyime_t2s.json
   tips: none
 
 menu:

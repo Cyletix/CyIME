@@ -27,22 +27,29 @@ local function fits(cand)
   return true
 end
 
+-- 简体模式优先保留词库原词（计划 → 計畫），避免从台湾写法往返转换成「计画」。
+-- 若词库原词就是繁体，后续的简体滤镜会转换。声调筛选始终看正体候选。
+local function yield_source(cand)
+  yield(cand.type == "simplified" and cand:get_genuine() or cand)
+end
+
 return function(input, env)
+  local emit = env.engine.context:get_option("zhuyin_simplified") and yield_source or yield
   local later = {}
   local count = 0
   for cand in input:iter() do
     if count >= LIMIT then
-      for _, held in ipairs(later) do yield(held) end
+      for _, held in ipairs(later) do emit(held) end
       later = nil
-      yield(cand)
+      emit(cand)
       break
     end
     count = count + 1
-    if fits(cand) then yield(cand) else later[#later + 1] = cand end
+    if fits(cand) then emit(cand) else later[#later + 1] = cand end
   end
   if later then
-    for _, held in ipairs(later) do yield(held) end
+    for _, held in ipairs(later) do emit(held) end
   else
-    for cand in input:iter() do yield(cand) end
+    for cand in input:iter() do emit(cand) end
   end
 end

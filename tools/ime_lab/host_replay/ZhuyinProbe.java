@@ -52,6 +52,24 @@ public final class ZhuyinProbe {
         String[] snapshot = e.nativePinyinEditSnapshot();
         check(c[0] + " [" + keys + "] preedit " + snapshot[4] + " → " + c[1] + " in top " + rank + ": " + head, typed && found);
       }
+      for (String[] word : new String[][] {
+          {"ㄍㄨㄛˊ", "國", "国"}, {"ㄊㄞˊㄨㄢˉ", "台灣", "台湾"},
+          {"ㄐㄧˋㄏㄨㄚˋ", "計畫", "计划"}, {"ㄕㄨㄟˋㄈㄨˊ", "說服", "说服"},
+          {"ㄊㄡˊㄈㄚˇ", "頭髮", "头发"}
+      }) {
+        for (boolean simple : new boolean[]{true, false}) {
+          e.nativeSetInput("");
+          for (char k : keys(word[0]).toCharArray()) e.nativeProcessKey(k, 0);
+          e.nativeSetOption("zhuyin_simplified", simple);
+          String want = word[simple ? 2 : 1];
+          String[][] candidates = e.nativeInspectCandidates(10);
+          int rank = -1;
+          for (int i = 0; i < candidates.length; i++) if (want.equals(candidates[i][0])) { rank = i; break; }
+          check(word[0] + " → " + want + " candidate and commit (rank " + (rank + 1) + ")",
+              rank >= 0 && (word[0].equals("ㄍㄨㄛˊ") || rank == 0)
+              && e.nativeSelectCandidateByGlobalIndex(rank) && want.equals(e.nativeCommit()));
+        }
+      }
       // A tone only follows a syllable. A second tone right after one is not spelling either: Rime would commit the
       // composition on it, so ImeKeyRouter drops it before it reaches Rime (ZhuyinKeys.acceptsTone).
       e.nativeSetInput("");

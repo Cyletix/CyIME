@@ -74,9 +74,13 @@ private fun ChineseOutputSection() {
             HorizontalDivider()
         }
         SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
-            "候选和上屏改用台湾正体(台灣、計畫、了解)；关着时仓颉也出简体，注音始终出正体。词库和学习记录不变，开启时不给中文联想。",
+            "拼音、双拼和仓颉的候选与上屏使用繁体字。繁体模式下关闭中文联想。",
             checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.TRADITIONAL)
+        HorizontalDivider()
+        SettingsToggleItem(Icons.TwoTone.Translate, "注音输出简体",
+            "用注音打 ㄍㄨㄛˊ，开启时显示「国」，关闭时显示「國」。",
+            checked = input.zhuyinSimplified, onCheckedChange = { input.copy(zhuyinSimplified = it).save(context) })
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.FontDownload, "生僻字",
             "全拼、双拼(26 键和 14 键)和九键打一个完整拼音(chan、gui；双拼打满两个键)时，在常用字后面补上约 1.8 万个生僻字(瀺、槻)。",

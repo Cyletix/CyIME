@@ -8,6 +8,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MenuSettingsLinksTest {
+    @Test fun scriptButtonOpensTheCurrentSchemesSetting() {
+        val button = ToolbarButtonItem.Builtin(ToolbarButton.TRADITIONAL)
+        assertEquals("注音输出简体", menuSettingsEntry(button, com.kingzcheung.xime.settings.InputScheme.ZHUYIN)?.anchor)
+        assertEquals("繁体输出", menuSettingsEntry(button, com.kingzcheung.xime.settings.InputScheme.PINYIN)?.anchor)
+    }
+
     /** 菜单项长按去的设置必须真在设置搜索索引里，改了设置标题而没改这里会失败。 */
     @Test fun everyLinkResolvesToOneSetting() {
         val missing = MenuSettingsTitles.filterValues { title -> SettingsSearchIndex.none { it.title == title } }

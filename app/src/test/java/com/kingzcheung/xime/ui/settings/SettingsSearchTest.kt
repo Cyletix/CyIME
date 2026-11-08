@@ -100,6 +100,7 @@ class SettingsSearchTest {
     @Test fun traditionalCharactersFindSimplifiedSettings() {
         assertEquals(titles("繁体输出"), titles("繁體輸出"))
         assertTrue("繁体输出" in titles("繁體"))
+        assertTrue("注音输出简体" in titles("注音轉簡體"))
         assertEquals(titles("14键"), titles("十四鍵"))
         assertTrue(titles("十四鍵").isNotEmpty())
         assertTrue("卡片显示行数" in titles("剪貼板"))

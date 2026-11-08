@@ -50,6 +50,39 @@ class SettingsToggleLegendRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
 
     @Test
+    @Config(qualifiers = "zh-rCN-w360dp-h800dp-mdpi")
+    fun zhuyinScriptChoiceIsIndependentOfOtherChineseSchemes() {
+        val context = rule.activity
+        com.kingzcheung.xime.ui.theme.KeyboardThemes.initFromConfig(context)
+        fun prefs() = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(context)
+        rule.setContent {
+            XimeTheme(darkTheme = true) {
+                com.kingzcheung.xime.ui.settings.ChineseInputSettingsContent(onBack = {})
+            }
+        }
+        assertEquals(false, prefs().zhuyinSimplified)
+        rule.onNodeWithText("繁体输出").performClick()
+        assertEquals(false, prefs().zhuyinSimplified)
+        rule.onNodeWithText("注音输出简体").performClick()
+        rule.runOnIdle {
+            assertEquals(true, prefs().zhuyinSimplified)
+            assertEquals(true, prefs().traditionalOutput)
+            System.getenv("CYIME_RENDER_OUT")?.let { path ->
+                val view = context.window.decorView
+                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                view.draw(android.graphics.Canvas(bitmap))
+                File(path, "zhuyin-output.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                bitmap.recycle()
+            }
+        }
+        rule.onNodeWithText("注音输出简体").performClick()
+        rule.runOnIdle {
+            assertEquals(false, prefs().zhuyinSimplified)
+            assertEquals(true, prefs().traditionalOutput)
+        }
+    }
+
+    @Test
     @Config(qualifiers = "w390dp-h840dp-mdpi")
     fun longSentenceChoiceRequiresBothFilesAndSavesTheSwitch() {
         val context = rule.activity
