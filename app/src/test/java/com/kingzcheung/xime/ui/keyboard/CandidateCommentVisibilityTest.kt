@@ -32,4 +32,14 @@ class CandidateCommentVisibilityTest {
         assertFalse(candidateCommentsVisible(1200f, 1f, 19f, CandidateCommentMode.HIDE))
         assertFalse(candidateCommentsVisible(0f, 1f, 19f, CandidateCommentMode.AUTO))
     }
+
+    @Test fun correctionReadingsFollowTheCommentSwitch() {
+        val corrections = mapOf("你好" to "ni hao")
+        // 手机竖屏「自动」、或选了「隐藏」：纠错候选也不冒出拼音。
+        assertTrue(shownCorrections(corrections, candidateCommentsVisible(360f, 1f, 19f, CandidateCommentMode.AUTO)).isEmpty())
+        assertTrue(shownCorrections(corrections, candidateCommentsVisible(1200f, 1f, 19f, CandidateCommentMode.HIDE)).isEmpty())
+        // 注释显示时照旧标出改正后的读音。
+        assertEquals(corrections, shownCorrections(corrections, candidateCommentsVisible(360f, 1f, 19f, CandidateCommentMode.SHOW)))
+        assertEquals(corrections, shownCorrections(corrections, candidateCommentsVisible(960f, 1f, 19f, CandidateCommentMode.AUTO)))
+    }
 }

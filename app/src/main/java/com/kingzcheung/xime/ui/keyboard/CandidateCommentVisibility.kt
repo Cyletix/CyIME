@@ -39,6 +39,10 @@ internal fun candidateCommentsVisible(
     return widthDp >= 480f * textScale
 }
 
+/** 纠错标出的读音也是注释：注释不显示（隐藏，或「自动」时候选栏太窄）就不显示，免得只有纠错候选冒出拼音。 */
+internal fun shownCorrections(corrections: Map<String, String>, commentsShown: Boolean): Map<String, String> =
+    if (commentsShown) corrections else emptyMap()
+
 /** Keep the existing explicit hide preference, including changes while the IME is visible. */
 @Composable
 internal fun rememberCandidateCommentsAllowed(): CandidateCommentMode {

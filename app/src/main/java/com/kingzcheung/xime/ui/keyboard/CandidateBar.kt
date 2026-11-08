@@ -622,7 +622,7 @@ fun CandidateBar(
                             fontSize = candidateTextSize.sp,
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
-                            correction = if (state is CandidateBarState.ChineseCandidates) LocalCorrectedCandidates.current[candidate].orEmpty() else "",
+                            correction = if (showComments && state is CandidateBarState.ChineseCandidates) LocalCorrectedCandidates.current[candidate].orEmpty() else "",
                             horizontalPadding = candidateItemPadding,
                         )
                     }
@@ -1516,13 +1516,13 @@ internal fun FixedCandidateStrip(
             val right = (r - stripOriginX).coerceIn(left, constraints.maxWidth.toFloat())
             if (right - left >= 1f && left > 0f) left.toInt() to right.toInt() else null
         }
-        val shownComments = if (candidateCommentsVisible(maxWidth.value, density.fontScale,
-            fontSize.value, commentsAllowed)) comments else emptyList()
+        val commentsShown = candidateCommentsVisible(maxWidth.value, density.fontScale, fontSize.value, commentsAllowed)
+        val shownComments = if (commentsShown) comments else emptyList()
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
         // 纠错和画出来的一样算进宽度，否则放不下的最后一个候选也算「显示了」，「下一项」移到它时被栏边切掉。
-        val correctedCandidates = LocalCorrectedCandidates.current
+        val correctedCandidates = shownCorrections(LocalCorrectedCandidates.current, commentsShown)
         val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, correctedCandidates) {
             val bodyWidths = HashMap<Int, Int>()
             fun bodyWidth(index: Int): Int = bodyWidths.getOrPut(index) {
@@ -1631,6 +1631,7 @@ internal fun FixedCandidateStrip(
         if (scrollable && localGap == null) {
             ScrollableCandidateRow(candidates, all, shownComments, visuals, callbacks, fontSize, focused, showNumberLabels,
                 itemSpacing, itemPadding, visibleIndices, window.tailPadding, window.glossBodyWidthAt, window.fits, scrollKey, onUserScroll, onNearEnd,
+                corrections = correctedCandidates,
                 selectionFill = shiftDragFree && !highlightShown,
                 onFocusedBounds = { focusedBounds = it; focusedOnScreen = true },
                 onFocusedGone = { focusedOnScreen = false })
@@ -1657,7 +1658,7 @@ internal fun FixedCandidateStrip(
                     modifier = Modifier.testTag("bar-candidate:$index")
                         .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
-                    correction = if (index < candidates.size) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
+                    correction = if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "",
                     selectionFill = shiftDragFree && !highlightShown, horizontalPadding = itemPadding, fit = window.fits[index])
                 }
             }
@@ -1679,7 +1680,10 @@ private fun ScrollableCandidateRow(
     callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit, focused: Int,
     showNumberLabels: Boolean, itemSpacing: androidx.compose.ui.unit.Dp, itemPadding: androidx.compose.ui.unit.Dp,
     shown: IntRange, tailPaddingPx: Int, glossBodyWidthAt: ((Int) -> Int?)?, fits: Map<Int, CandidateFit>, scrollKey: Any?,
-    onUserScroll: (() -> Unit)?, onNearEnd: (() -> Unit)?, selectionFill: Boolean,
+    onUserScroll: (() -> Unit)?, onNearEnd: (() -> Unit)?,
+    /** 已按注释显示与否过滤过的纠错标记（注释不显示时为空）。 */
+    corrections: Map<String, String>,
+    selectionFill: Boolean,
     onFocusedBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
     onFocusedGone: () -> Unit,
 ) {
@@ -1780,7 +1784,7 @@ private fun ScrollableCandidateRow(
                 modifier = if (hidden) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier.testTag("bar-candidate:$index")
                     .then(if (index == focused) Modifier.onGloballyPositioned { onFocusedBounds(it.boundsInRoot()) } else Modifier),
                 onLongClick = if (numbered) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
-                correction = if (numbered) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
+                correction = if (numbered) corrections[all[index]].orEmpty() else "",
                 selectionFill = selectionFill,
                 interactive = !hidden, horizontalPadding = itemPadding, fit = fits[index])
         }
