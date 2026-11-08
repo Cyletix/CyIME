@@ -4,6 +4,11 @@
 -- 在栏里打字，停一下宿主就调 generate，这里流式请求用户自己的 OpenAI 兼容接口，
 -- 宿主边收边把译文写进应用输入框（manifest capabilities.tool.display: live）。
 --
+-- 离线翻译（宿主 host.translate，manifest capabilities.offline_translate）：
+--   填了 API 密钥 → 在线（同以前）；连不上接口（没网）且离线模型已下载 → 这一句改用离线。
+--   没填 API 密钥 → 离线：中文 → 英文、英文 → 中文，模型在「扩展 › 模型」或栏里「下载」。
+--   旧宿主没有 host.translate：和以前一样，只能用接口。
+--
 -- 工具面板契约（display: live）：
 --   onPanelInput(text)       栏里的字
 --   onPanelAction(actionId)  generate：翻译栏里的字（取消上一次没完的请求）；lang：换目标语言
@@ -23,11 +28,12 @@ local MAX_CHARS = 1000
 local TIMEOUT_MS = 30000
 
 -- 圆钮上依次换的目标语言（name 写进提示词，chip 画在圆钮上）
+-- code：离线翻译的语言代码（离线只有中英互译）
 local LANGS = {
-  { name = "英文", chip = "EN" },
-  { name = "日文", chip = "日" },
-  { name = "韩文", chip = "韩" },
-  { name = "简体中文", chip = "中" },
+  { name = "英文", chip = "EN", code = "en" },
+  { name = "日文", chip = "日", code = "ja" },
+  { name = "韩文", chip = "韩", code = "ko" },
+  { name = "简体中文", chip = "中", code = "zh" },
 }
 
 local SYSTEM_PROMPT = table.concat({
@@ -69,6 +75,33 @@ end
 
 local function targetLang() return LANGS[langIndex()] end
 
+local function apiKey() return trim(host.config.get(KEY_API_KEY) or "") end
+
+-- ================= 离线翻译 =================
+
+local function hasOffline() return host.translate ~= nil end
+
+-- 汉字、假名、谚文：有这些就当中文原文
+local function hasCjk(text)
+  for ch in tostring(text or ""):gmatch(UTF8_CHAR) do
+    local b1, b2 = ch:byte(1, 2)
+    if #ch == 3 and b1 >= 0xE3 and b1 <= 0xED then
+      -- U+3040–U+DFFF：假名、CJK 统一汉字、谚文（U+3000–U+303F 的中文标点不算）
+      if b1 > 0xE3 or b2 >= 0x81 then return true end
+    elseif #ch == 4 and b1 == 0xF0 and b2 >= 0xA0 then
+      return true  -- CJK 扩展 B 以后
+    end
+  end
+  return false
+end
+
+-- 当前目标语言对应的离线方向（不看原文）：译成英文 = 中→英，译成中文 = 英→中；其他语言没有离线
+local function offlineDirection()
+  local to = targetLang().code
+  if to == "en" then return "zh", "en" end
+  if to == "zh" then return "en", "zh" end
+  return nil, nil
+end
 -- 去掉模型常加的外壳：代码块、整段引号、「译文：」开头
 local QUOTES = {
   { "\"", "\"" }, { "“", "”" }, { "「", "」" }, { "『", "』" }, { "'", "'" },
@@ -167,6 +200,8 @@ local generating = false
 local notice = ""        -- 出错的原因（显示成输入栏提示）
 local sessionId = -1
 local token = nil        -- 当前请求；旧请求的回调对不上就丢掉
+local offlineId = -1     -- 当前离线翻译请求
+local offlineUsed = false -- 这一句是离线翻的（提示里标「离线」）
 
 local function fail(message)
   notice = message
@@ -176,11 +211,65 @@ end
 
 local function closeCurrent()
   token = nil
-  if sessionId >= 0 and host.http.closeStream ~= nil then
+  if sessionId >= 0 and host.http ~= nil and host.http.closeStream ~= nil then
     pcall(host.http.closeStream, sessionId)
   end
   sessionId = -1
+  if offlineId >= 0 and hasOffline() then pcall(host.translate.cancel, offlineId) end
+  offlineId = -1
   generating = false
+end
+
+-- 离线翻一句。原文已经是目标语言（译成英文却打的英文）就原样给出
+local function translateOffline(text)
+  offlineUsed = true
+  local from, to = offlineDirection()
+  if from == nil then
+    fail("离线只能中英互译，翻成" .. targetLang().name .. "要在设置里填 API")
+    return
+  end
+  if hasCjk(text) == (from ~= "zh") then
+    buffer = text
+    return
+  end
+  local state, progress, size = host.translate.status(from, to)
+  if state == "unsupported" then
+    fail("这台手机不支持离线翻译，要在设置里填 API")
+    return
+  elseif state == "missing" then
+    fail("离线翻译要先下载模型（约 " .. tostring(size) .. " MB）：点左边「下载」")
+    return
+  elseif state == "downloading" then
+    fail("离线模型下载中 " .. tostring(progress) .. "%，下完就能翻")
+    return
+  end
+  local mine = {}
+  token = mine
+  generating = true
+  local id = host.translate.run(text, from, to, {
+    onDone = function(out)
+      if token ~= mine then return end
+      buffer = out or ""
+      generating = false
+      offlineId = -1
+      if trim(buffer) == "" then fail("离线翻译没有结果") end
+    end,
+    onError = function(message)
+      if token ~= mine then return end
+      offlineId = -1
+      fail(tostring(message or "离线翻译出错"))
+    end,
+  })
+  -- 结果可能在 run 返回前就回来了（已交付就不再记 id）
+  if token == mine and generating and id ~= nil and id >= 0 then offlineId = id end
+end
+
+-- 接口连不上（没网，不是接口报错）时这一句能不能改用离线
+local function canFallBackOffline()
+  if not hasOffline() then return false end
+  local from, to = offlineDirection()
+  if from == nil then return false end
+  return host.translate.status(from, to) == "ready"
 end
 
 local function userMessage(text, lang)
@@ -247,20 +336,27 @@ local function translate(text)
   closeCurrent()
   buffer = ""
   notice = ""
+  offlineUsed = false
   if trim(text) == "" then return end
-  if trim(host.config.get(KEY_API_KEY) or "") == "" then
-    fail("还没填 API 密钥：点左边「设置」")
-    return
-  end
   if charCount(text) > MAX_CHARS then
     fail("字太多了（超过 " .. MAX_CHARS .. " 字），分几句翻")
+    return
+  end
+  if apiKey() == "" then
+    if hasOffline() then
+      translateOffline(text)
+    else
+      fail("还没填 API 密钥：点左边「设置」")
+    end
     return
   end
   if host.http.stream == nil then
     generating = true
     local content, err = requestOnce(text)
     generating = false
-    if err ~= nil then fail(err) else buffer = content end
+    if err ~= nil and err:sub(1, #"连不上接口") == "连不上接口" and canFallBackOffline() then
+      translateOffline(text)
+    elseif err ~= nil then fail(err) else buffer = content end
     return
   end
   local mine = {}
@@ -304,13 +400,24 @@ local function translate(text)
         fail(httpErrorText(status, serverMessage(rest, trim(host.config.get(KEY_API_KEY) or ""))))
         return
       end
+      -- 不是接口报错，是网络断了：离线模型在就这一句改用离线
+      if canFallBackOffline() then
+        translateOffline(text)
+        return
+      end
       fail("翻译出错：" .. tostring(message or "未知错误"))
     end,
   }, TIMEOUT_MS, "POST", body)
   if token ~= mine then return end
   if id == nil or id < 0 then
-    fail("连不上接口：" .. (host.http.lastError() or "未知错误"))
+    -- 没排上请求（多半没网）：离线模型在就改用离线；联网没授权等原因照旧提示
+    local reason = host.http.lastError() or "未知错误"
     token = nil
+    if canFallBackOffline() and not tostring(reason):find("授权", 1, true) then
+      translateOffline(text)
+      return
+    end
+    fail("连不上接口：" .. reason)
     return
   end
   sessionId = id
@@ -324,9 +431,11 @@ function plugin.getSettingsSchema()
   if trim(host.config.get(KEY_MODEL) or "") == "" then host.config.set(KEY_MODEL, DEFAULT_MODEL) end
   local names = {}
   for i, l in ipairs(LANGS) do names[i] = l.name end
-  return {
-    { key = KEY_API_KEY, label = "API 密钥", type = "secret", placeholder = "sk-…", required = true,
-      section = "接口", helpText = "只存在这台手机里，不进备份，只发给下面的接口地址" },
+  local fields = {
+    { key = KEY_API_KEY, label = "API 密钥", type = "secret", placeholder = "sk-…", required = not hasOffline(),
+      section = "接口", helpText = hasOffline()
+        and "只存在这台手机里，不进备份，只发给下面的接口地址。不填就用离线翻译（只有中英互译）"
+        or "只存在这台手机里，不进备份，只发给下面的接口地址" },
     { key = KEY_BASE_URL, label = "接口地址", type = "text", defaultValue = DEFAULT_BASE_URL, section = "接口",
       helpText = "OpenAI 兼容接口，到 /v1 为止。例：https://api.deepseek.com/v1、https://api.siliconflow.cn/v1" },
     { key = KEY_MODEL, label = "模型", type = "text", defaultValue = DEFAULT_MODEL, section = "接口",
@@ -335,6 +444,31 @@ function plugin.getSettingsSchema()
     { key = KEY_TARGET_LANG, label = "翻译成", type = "select", options = names,
       defaultValue = LANGS[1].name, section = "翻译", helpText = "翻译栏左边的圆钮也能换" },
   }
+  if hasOffline() then
+    fields[#fields + 1] = { key = "downloadOffline", label = "下载离线模型", type = "button", section = "离线翻译",
+      helpText = "中译英、英译中两个模型，共约 100 MB。没填 API 密钥、或连不上接口时用，不联网" }
+  end
+  return fields
+end
+
+-- 设置页「下载离线模型」按钮：两个方向都下（后台下载，进度在「扩展 › 模型」）
+function plugin.downloadOffline()
+  if not hasOffline() then return "这个版本没有离线翻译" end
+  local started, total = {}, 0
+  for _, pair in ipairs({ { "zh", "en", "中译英" }, { "en", "zh", "英译中" } }) do
+    local state, _, size = host.translate.status(pair[1], pair[2])
+    if state == "unsupported" then return "这台手机不支持离线翻译" end
+    if state == "missing" then
+      local err = host.translate.download(pair[1], pair[2])
+      if err ~= nil then return err end
+      started[#started + 1] = pair[3]
+      total = total + (tonumber(size) or 0)
+    elseif state == "downloading" then
+      started[#started + 1] = pair[3]
+    end
+  end
+  if #started == 0 then return nil end  -- 都已下载：显示「成功」
+  return "正在下载" .. table.concat(started, "、") .. (total > 0 and ("（约 " .. total .. " MB）") or "") .. "，进度在「扩展 › 模型」"
 end
 
 -- 设置页「测试接口」按钮：nil = 成功，字符串 = 失败原因
@@ -348,15 +482,49 @@ end
 
 -- ================= 面板 =================
 
+-- 没填 API 密钥时的栏：离线模型在就照常打字；没下载时圆钮是「下载」
+local function offlineUi()
+  local lang = targetLang()
+  local from, to = offlineDirection()
+  if from == nil then
+    return {
+      { type = "button", key = "lang", label = lang.chip },
+      { type = "text", value = notice ~= "" and notice or ("离线只能中英互译，翻成" .. lang.name .. "要在设置里填 API") },
+    }
+  end
+  local state, progress, size = host.translate.status(from, to)
+  if state == "unsupported" then
+    return {
+      { type = "button", key = "host:settings", label = "设置" },
+      { type = "text", value = "这台手机不支持离线翻译：点左边「设置」填接口" },
+    }
+  elseif state == "missing" then
+    return {
+      { type = "button", key = "download", label = "下载" },
+      { type = "text", value = notice ~= "" and notice or ("离线翻译要先下载模型（约 " .. tostring(size) .. " MB）：点左边「下载」") },
+    }
+  elseif state == "downloading" then
+    return {
+      { type = "button", key = "lang", label = lang.chip },
+      { type = "text", value = "离线模型下载中 " .. tostring(progress) .. "%，下完就能翻" },
+    }
+  end
+  return {
+    { type = "button", key = "lang", label = lang.chip },
+    { type = "text", value = notice ~= "" and notice or ("打字，停一下译成" .. lang.name .. "（离线）") },
+  }
+end
+
 local function buildUi()
-  if trim(host.config.get(KEY_API_KEY) or "") == "" then
+  if apiKey() == "" then
+    if hasOffline() then return offlineUi() end
     return {
       { type = "button", key = "host:settings", label = "设置" },
       { type = "text", value = "先填接口：点左边「设置」" },
     }
   end
   local lang = targetLang()
-  local hint = notice ~= "" and notice or ("打字，停一下译成" .. lang.name)
+  local hint = notice ~= "" and notice or ("打字，停一下译成" .. lang.name .. (offlineUsed and "（离线）" or ""))
   return {
     { type = "button", key = "lang", label = lang.chip },
     { type = "text", value = hint },
@@ -365,7 +533,8 @@ end
 
 function plugin.getPanelState(_)
   local items = {}
-  local out = generating and trim(buffer) or cleanOutput(buffer)
+  -- 离线译文不用剥外壳（那是给大模型的回答用的），原文带的引号要留着
+  local out = (generating or offlineUsed) and trim(buffer) or cleanOutput(buffer)
   if out ~= "" then items[1] = { id = "result", text = out } end
   return { items = items, loading = generating, ui = buildUi() }
 end
@@ -384,6 +553,16 @@ function plugin.onPanelAction(actionId)
     closeCurrent()
     buffer = ""
     notice = ""
+  elseif actionId == "download" and hasOffline() then
+    -- 栏里的「下载」：只下当前方向（宿主接着重新 generate，提示变成下载进度）
+    local from, to = offlineDirection()
+    closeCurrent()
+    buffer = ""
+    notice = ""
+    if from ~= nil then
+      local err = host.translate.download(from, to)
+      if err ~= nil then notice = err end
+    end
   end
 end
 
@@ -395,5 +574,6 @@ end
 
 -- 测试用（宿主不调用）
 plugin._cleanOutput = cleanOutput
+plugin._hasCjk = hasCjk
 
 return plugin
