@@ -75,14 +75,23 @@ object AssociationService {
         prefix: String,
         topK: Int
     ): List<String> {
-        // A first keystroke can precede PredictionManager's background warm-up.
-        // Await that same IO initialization so it can still produce suggestions.
-        if (!initialize(context)) {
-            Log.w(TAG, "Trie engine could not initialize for English associations")
-            return emptyList()
+        // Load the English dictionary on its first request, shared by concurrent keystrokes.
+        if (topK <= 0) return emptyList()
+        val bundled = if (initialize(context)) trieEngine?.predict(prefix, topK).orEmpty().map { it.text }
+            else emptyList()
+        val imported = withContext(Dispatchers.IO) {
+            try {
+                com.kingzcheung.xime.settings.CellDictionaryManager.store(context).englishCompletions(prefix, topK)
+            } catch (e: java.io.IOException) {
+                Log.w(TAG, "Cannot read imported English words", e)
+                emptyList()
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Invalid imported dictionary state", e)
+                emptyList()
+            }
         }
-
-        val words = trieEngine?.predict(prefix, topK).orEmpty().map { it.text }
+        val words = if (imported.isEmpty()) bundled else
+            (bundled.take(1) + imported + bundled.drop(1)).distinctBy { it.lowercase() }.take(topK)
         val table = contractions ?: return words
         return EnglishContractionCompletion.apply(prefix, words, topK) { word ->
             table.display(word).takeIf { it != word } ?: table.offer(word)

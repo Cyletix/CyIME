@@ -65,7 +65,7 @@ class TrieAssociationEngine {
     }
     
     private fun loadBinaryTrie(context: Context) {
-        val bytes = context.assets.open(BINARY_FILE).readBytes()
+        val bytes = context.assets.open(BINARY_FILE).use { it.readBytes() }
         val buffer = ByteBuffer.wrap(bytes)
         buffer.order(ByteOrder.LITTLE_ENDIAN)
         
@@ -77,9 +77,7 @@ class TrieAssociationEngine {
         require(version.toInt() == 1) { "Unsupported trie version: $version" }
         
         val nodeCount = buffer.getInt()
-        nodes = Array(nodeCount) { TrieNodeData() }
-        
-        for (i in 0 until nodeCount) {
+        nodes = Array(nodeCount) {
             val childCount = buffer.get().toInt()
             val children = ByteArray(childCount)
             val childIndices = IntArray(childCount)
@@ -101,7 +99,7 @@ class TrieAssociationEngine {
                 freq = buffer.getInt()
             }
             
-            nodes!![i] = TrieNodeData(children, childIndices, word, freq)
+            TrieNodeData(children, childIndices, word, freq)
         }
     }
     

@@ -2,6 +2,7 @@ package com.kingzcheung.xime.association
 
 import android.content.Context
 import android.util.Log
+import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,71 +13,48 @@ object AssociationManager {
     private const val TAG = "AssociationManager"
     
     @Volatile
-    private var isInitialized = false
+    private var fusionEngine: NgramFusionEngine? = null
     private val mutex = Mutex()
     private val generation = java.util.concurrent.atomic.AtomicLong()
     
-    private lateinit var fusionEngine: NgramFusionEngine
-    private var context: Context? = null
     private var learningCache: UserNgramCache? = null
     private fun learningCache(ctx: Context): UserNgramCache = synchronized(this) {
         learningCache ?: UserNgramCache(ctx.applicationContext).also { learningCache = it }
     }
     
-    suspend fun initialize(ctx: Context): Boolean = withContext(Dispatchers.IO) {
-        context = ctx.applicationContext
-        if (isInitialized) {
-            FileLogger.d(TAG, "Already initialized")
-            return@withContext true
-        }
-        
-        mutex.withLock {
-            val token = generation.get()
-            if (isInitialized) {
-                FileLogger.d(TAG, "Already initialized (in lock)")
-                return@withContext true
-            }
-            
-            try {
-                fusionEngine = NgramFusionEngine(ctx, learningCache(ctx))
-                val cacheInit = fusionEngine.initialize()
-                FileLogger.i(TAG, "NgramFusionEngine init result: $cacheInit")
-
-                if (generation.get() != token) return@withContext false
-
-                isInitialized = cacheInit
-                isInitialized
-
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
-            } catch (e: Exception) {
-                FileLogger.e(TAG, "Failed to initialize AssociationManager: ${e.message}", e)
-                false
+    suspend fun initialize(ctx: Context): Boolean {
+        val token = generation.get()
+        if (fusionEngine != null) return true
+        return withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (token != generation.get()) return@withLock false
+                if (fusionEngine != null) return@withLock true
+                if (!SettingsPreferences.isSmartPredictionEnabled(ctx)) return@withLock false
+                try {
+                    val engine = NgramFusionEngine(ctx.applicationContext, learningCache(ctx))
+                    if (!engine.initialize()) return@withLock false
+                    synchronized(this@AssociationManager) {
+                        if (token != generation.get()) return@withLock false
+                        fusionEngine = engine
+                    }
+                    true
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (e: Exception) {
+                    FileLogger.e(TAG, "Failed to initialize AssociationManager: ${e.message}", e)
+                    false
+                }
             }
         }
     }
     
     /** [afterWholeWord]: the last commit was a phrase of two or more characters; see [BaseAssociationModel.predict]. */
     suspend fun predict(contextText: String, topK: Int = 20, afterWholeWord: Boolean = false): List<AssociationCandidate> = withContext(Dispatchers.Default) {
-        if (!isInitialized) {
-            val ctx = context
-            if (ctx != null) {
-                val initSuccess = withContext(Dispatchers.IO) {
-                    initialize(ctx)
-                }
-                if (!initSuccess) {
-                    Log.e(TAG, "Initialization failed, returning empty list")
-                    return@withContext emptyList()
-                }
-            } else {
-                Log.e(TAG, "Context is null, cannot initialize")
-                return@withContext emptyList()
-            }
-        }
+        val engine = fusionEngine ?: mutex.withLock { fusionEngine } ?: return@withContext emptyList()
         
         // 联想只用内置 n-gram 联想表和个人学习（11-02 起不再用神经联想模型：离线对比几乎不加分，
         // 却要单独下载、占内存、键盘收起后重载）。
         try {
-            val fusedCandidates = fusionEngine.fuseCandidates(contextText, afterWholeWord)
+            val fusedCandidates = engine.fuseCandidates(contextText, afterWholeWord)
             
             usableCandidates(fusedCandidates).take(topK)
             
@@ -106,8 +84,7 @@ object AssociationManager {
     }
 
     fun recordInput(text: String) {
-        if (!isInitialized) return
-        fusionEngine.recordUserInput(text)
+        fusionEngine?.recordUserInput(text)
     }
     
     /** Keyboard hidden: save typed observations now (typing saves at most every 30 s). */
@@ -131,16 +108,13 @@ object AssociationManager {
         cache.importData(data, merge)
     }
     
-    fun getCacheSize(): Int {
-        return if (isInitialized) fusionEngine.getCacheSize() else 0
-    }
+    fun getCacheSize(): Int = fusionEngine?.getCacheSize() ?: 0
     
-    fun isInitialized(): Boolean = isInitialized
+    fun isInitialized(): Boolean = fusionEngine != null
     
-    fun release() {
+    @Synchronized fun release() {
         generation.incrementAndGet()
-        isInitialized = false
-        context = null
+        fusionEngine = null
     }
 
 }

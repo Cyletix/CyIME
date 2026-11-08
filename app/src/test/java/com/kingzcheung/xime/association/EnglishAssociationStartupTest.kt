@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.association
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.res.AssetManager
 import java.io.File
 import java.io.IOException
@@ -8,7 +9,10 @@ import java.io.InputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import com.kingzcheung.xime.service.PredictionManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -83,7 +87,26 @@ class EnglishAssociationStartupTest {
         assertTrue("Built-in word source should provide hello", "hello" in words)
     }
 
-    @Test fun simultaneousFirstWordsWaitForAndReuseBackgroundWarmUp() = runBlocking {
+    @Test fun keyboardStartupDoesNotOpenEnglishDictionaryUntilTheFirstCompletion() = runBlocking {
+        val bytes = bundledTrie()
+        val opens = AtomicInteger()
+        val app = context { opens.incrementAndGet(); bytes.inputStream() }
+        whenever(app.getSharedPreferences("kime_settings", Context.MODE_PRIVATE)).thenReturn(mock<SharedPreferences>())
+        val job = Job()
+        try {
+            PredictionManager(app, CoroutineScope(job), {}).initialize()
+            job.children.forEach { it.join() }
+            assertFalse(AssociationService.isTrieInitialized())
+            assertEquals(0, opens.get())
+            assertEquals("help", AssociationService.getAssociations(app, "hel", true).first())
+            assertEquals(1, opens.get())
+        } finally {
+            job.cancel()
+            com.kingzcheung.xime.plugin.ExtensionManager.release()
+        }
+    }
+
+    @Test fun simultaneousFirstWordsShareASingleDictionaryLoad() = runBlocking {
         val bytes = bundledTrie()
         val opens = AtomicInteger()
         val enteredLoad = CountDownLatch(1)
@@ -95,9 +118,9 @@ class EnglishAssociationStartupTest {
             check(finishLoad.await(5, TimeUnit.SECONDS)) { "Timed out waiting to finish test asset load" }
             bytes.inputStream()
         }
-        val warmUp = async(Dispatchers.Default) { AssociationService.initialize(context) }
+        val first = async(Dispatchers.Default) { AssociationService.getAssociations(context, "hel", true) }
         try {
-            assertTrue("Warm-up should begin loading", enteredLoad.await(5, TimeUnit.SECONDS))
+            assertTrue("First request should begin loading", enteredLoad.await(5, TimeUnit.SECONDS))
             val requests = List(8) {
                 async(Dispatchers.Default) {
                     enteredRequests.countDown()
@@ -106,7 +129,7 @@ class EnglishAssociationStartupTest {
             }
             assertTrue("First-word requests should overlap loading", enteredRequests.await(5, TimeUnit.SECONDS))
             finishLoad.countDown()
-            assertTrue(warmUp.await())
+            assertEquals("help", first.await().first())
             requests.awaitAll().forEach { words ->
                 assertEquals("First keystroke must not disappear during warm-up", "help", words.first())
                 assertTrue("hello" in words)

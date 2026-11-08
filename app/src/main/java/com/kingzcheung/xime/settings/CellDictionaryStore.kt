@@ -39,6 +39,7 @@ data class CellDictionaryState(
 class CellDictionaryStore(val directory: File) {
     companion object {
         private val lock = Any()
+        @Volatile private var englishIndex: Pair<File, List<String>>? = null
         private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
         internal fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
             .digest(bytes).joinToString("") { "%02x".format(it) }
@@ -83,6 +84,7 @@ class CellDictionaryStore(val directory: File) {
 
     private fun save(state: CellDictionaryState) {
         writeAtomic(File(directory, "state.json"), json.encodeToString(state))
+        if (englishIndex?.first == directory) englishIndex = null
     }
 
     private fun updateFile(revision: Int) = File(directory, "word-updates-$revision.json")
@@ -122,6 +124,32 @@ class CellDictionaryStore(val directory: File) {
 
     fun englishWords(id: String): List<String> = englishFile(id).takeIf { it.isFile }?.readLines()
         ?.filter { it.isNotBlank() }.orEmpty()
+
+    /** Only applied dictionaries feed the independent English keyboard. Sort once, then binary-search per key. */
+    fun englishCompletions(prefix: String, limit: Int): List<String> {
+        if (prefix.isEmpty() || limit <= 0) return emptyList()
+        val words = englishIndex?.takeIf { it.first == directory }?.second ?: synchronized(lock) {
+            englishIndex?.takeIf { it.first == directory }?.second ?: read().let { state ->
+                val active = if (state.appliedEnglish) state.applied.sorted().flatMap(::englishWords)
+                    .distinctBy { it.lowercase() }.sortedWith(String.CASE_INSENSITIVE_ORDER) else emptyList()
+                englishIndex = directory to active
+                active
+            }
+        }
+        val index = words.binarySearch(prefix, String.CASE_INSENSITIVE_ORDER)
+        val first = if (index < 0) -index - 1 else index
+        val result = ArrayList<String>()
+        for (pos in first until words.size) {
+            val word = words[pos]
+            if (!word.startsWith(prefix, ignoreCase = true) || result.size == limit) break
+            result.add(when {
+                prefix.length > 1 && prefix.all(Char::isUpperCase) -> word.uppercase()
+                prefix.first().isUpperCase() -> word.replaceFirstChar(Char::uppercaseChar)
+                else -> word
+            })
+        }
+        return result
+    }
 
     fun install(bytes: ByteArray, offer: CellDictionaryOffer? = null): InstalledCellDictionary = synchronized(lock) {
         val hash = digest(bytes)
