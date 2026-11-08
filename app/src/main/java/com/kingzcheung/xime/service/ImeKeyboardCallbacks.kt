@@ -145,7 +145,11 @@ internal fun rememberImeKeyboardCallbacks(
             onCandidateDelete = { index ->
                 service.keyRouter.deleteCandidate(index)
             },
-            onAssociationSelect = { index ->
+            onAssociationSelect = select@{ index ->
+                val candidate = service.candidateState.value
+                if (service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
+                    !candidate.isComposing && candidate.inputText.isEmpty() &&
+                    (service.inputCommands.hasPendingCommands || service.rimeEngine.compositionActiveForDeletion() != false)) return@select
                 service.feedbackManager.performKeyPressEffect(view = view)
                 service.keyRouter.selectAssociation(index)
             },

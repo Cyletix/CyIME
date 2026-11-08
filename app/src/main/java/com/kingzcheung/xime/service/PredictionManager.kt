@@ -52,6 +52,7 @@ class PredictionManager(
     val hasPendingPrediction: Boolean get() = latest.isPending
     val requestRevision: Long get() = latest.revision
     val pendingRequest: StateFlow<Long> get() = latest.pendingRequest
+    val transitionPending: StateFlow<Boolean> get() = latest.transitionPending
 
     fun invalidatePendingPredictions(): Boolean = latest.invalidate()
 

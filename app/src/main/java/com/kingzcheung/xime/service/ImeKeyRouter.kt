@@ -578,6 +578,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      */
     private fun sendTransformedResult(
         result: com.kingzcheung.xime.rime.RimeProcessResult,
+        clearPreviousAssociation: Boolean = false,
         afterUpdate: (suspend () -> Unit)? = null,
     ) {
         // 日语罗马音的显示归一化收口在 updateUIWithResult（刷新路径同样生效），此处不再单独加工
@@ -589,6 +590,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         KeyLatencyProbe.posted(result.inputText.length)
         publishUi {
             if (!service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) return@publishUi
+            if (clearPreviousAssociation) service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
             service.sessionController.updateUIWithResult(
                 transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
                 transformed?.actions ?: emptyList()
@@ -1158,7 +1160,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (hardwareEvent == null && schemeCode == null && !mergedKey && typesEmailDomainKey(key) &&
                 withEditor { commitEmailDomainKey(if (isShifted) key.uppercase() else key) }) return@command
             // 下面会先清掉联想（含邮箱后缀）；数字键盘走计算器那条路时要知道按键前是不是正给着后缀。
-            val emailSuffixesShown = EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)
+            val priorCandidates = service.candidateState.value
+            val emailSuffixesShown = EmailSuffixes.isSuggestionList(priorCandidates.associationCandidates)
+            // Keep the old frame until the first double-pinyin result can replace it in one UI update.
+            val deferAssociationClear = hardwareEvent == null && !isShifted && !mergedKey && !service.uiState.value.isAsciiMode &&
+                service.uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
+                key.length == 1 && key[0] in 'a'..'z' && !priorCandidates.isComposing && priorCandidates.inputText.isEmpty() &&
+                priorCandidates.associationCandidates.isNotEmpty() && !emailSuffixesShown &&
+                !priorCandidates.isShowingRecentClipboard && !priorCandidates.isDigitPhraseList
             // Most composing keys have nothing to clear. Do not make every key wait
             // for a Main round trip before it can even reach the decoder.
             if (key.length == 1) {
@@ -1166,7 +1175,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 // Also invalidate not-yet-started prediction callbacks. Checking only
                 // isPending would let a previous commit post a prediction after this key.
                 service.predictionManager.invalidatePendingPredictions()
-                if (hadPendingPrediction || service.candidateState.value.associationCandidates.isNotEmpty()) {
+                if (!deferAssociationClear && (hadPendingPrediction || service.candidateState.value.associationCandidates.isNotEmpty())) {
                     withEditor {
                         service.predictionManager.invalidatePendingPredictions()
                         service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
@@ -1692,7 +1701,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         if (committed.isNotEmpty()) {
                                             withEditor { service.commitText(committed) }
                                         }
-                                        sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
+                                        sendTransformedResult(result, clearPreviousAssociation = deferAssociationClear) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                     }
                                 }
                             } else {
@@ -1783,7 +1792,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             candidates = filteredTexts,
                             candidateComments = filteredComments,
                             isComposing = capturedInputText.isNotEmpty(),
-                            associationCandidates = if (secret || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty())) emptyList() else service.candidateState.value.associationCandidates,
+                            associationCandidates = if (deferAssociationClear || secret || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty())) emptyList() else service.candidateState.value.associationCandidates,
                             isShowingRecentClipboard = false,
                             hasNextPage = capturedHasNext,
                             hasPrevPage = capturedHasPrev,
