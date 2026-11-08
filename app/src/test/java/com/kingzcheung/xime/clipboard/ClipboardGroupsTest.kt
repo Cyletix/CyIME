@@ -30,6 +30,22 @@ class ClipboardGroupsTest {
         assertTrue(clipboardMatches(text(1, "https://example.com"), ClipboardTab.Category(ClipboardFilter.LINK), state))
     }
 
+    @Test fun mixedOrderSurvivesHidingRenamingAndMembershipChanges() {
+        val moved = state.reordered(listOf("ALL", "group:g2", "IMAGE", "group:g2", "missing", "group:g1"))
+        assertEquals(listOf("ALL", "group:g2", "IMAGE", "group:g1", "TEXT", "LINK", "ADDRESS", "PHONE", "EMAIL"),
+            clipboardTabs(moved).map { it.key })
+        assertEquals(listOf(work, phrases), moved.groups)
+        assertEquals(state.members, moved.members)
+        val hidden = moved.withHidden(ClipboardFilter.IMAGE, true).renamed("g2", "项目")
+        assertEquals("项目", clipboardTabs(hidden)[1].label)
+        assertEquals("group:g1", clipboardTabs(hidden)[2].key)
+        assertEquals("IMAGE", clipboardTabs(hidden.withHidden(ClipboardFilter.IMAGE, false))[2].key)
+        val changed = hidden.withoutGroup("g1").withGroup(ClipboardGroup("g3", "家人"))
+        assertFalse("group:g1" in changed.tabOrder)
+        assertEquals("group:g3", clipboardTabs(changed).last().key)
+        assertEquals("g2", changed.members["image:content://a"])
+    }
+
     @Test fun swipeAndResolveCrossFromCategoriesIntoGroups() {
         val tabs = clipboardTabs(state)
         val image = ClipboardTab.Category(ClipboardFilter.IMAGE)

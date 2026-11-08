@@ -1,6 +1,16 @@
 package com.kingzcheung.xime.ui.render
 
 import android.content.Context
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import com.kingzcheung.xime.ui.theme.XimeTheme
+import com.kingzcheung.xime.ui.settings.ClipboardGroupSettingsContent
+import androidx.compose.ui.test.onNodeWithText
+import com.kingzcheung.xime.clipboard.clipboardTabs
+import com.kingzcheung.xime.clipboard.ClipboardGroupStore
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithContentDescription
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -63,6 +73,48 @@ class ClipboardGroupRenderTest {
         hidden = setOf(ClipboardFilter.EMAIL),
     )
 
+    @Test fun dragGroupAheadOfTextThenRenameAndDeleteByButton() {
+        val store = ClipboardGroupStore.getInstance(rule.activity)
+        store.add("收藏", listOf("text:7"))
+        val id = store.state.value.groups.single().id
+        rule.setContent { XimeTheme(darkTheme = true) { ClipboardGroupSettingsContent(onBack = {}) } }
+        val from = rule.onNodeWithTag("clipboard-order:group:$id").fetchSemanticsNode().boundsInRoot.center
+        val to = rule.onNodeWithTag("clipboard-order:TEXT").fetchSemanticsNode().boundsInRoot.center
+        rule.onRoot().performTouchInput {
+            down(from)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 50)
+            for (i in 1..12) moveTo(from + (to - from) * (i / 12f))
+            up()
+        }
+        rule.waitForIdle()
+        assertEquals(listOf("ALL", "group:$id", "TEXT"), clipboardTabs(store.state.value).take(3).map { it.key })
+        rule.onNodeWithContentDescription("改名").performClick()
+        rule.onNodeWithTag("clipboard-group-name").performTextReplacement("常用")
+        rule.onNodeWithTag("clipboard-group-name-save").performClick()
+        assertEquals("常用", clipboardTabs(store.state.value)[1].label)
+        assertEquals(id, store.state.value.members["text:7"])
+        rule.onNodeWithContentDescription("删除").performClick()
+        rule.onNodeWithText("取消").performClick()
+        assertEquals(id, store.state.value.groups.single().id)
+        rule.onNodeWithContentDescription("删除").performClick()
+        rule.onNodeWithTag("clipboard-group-delete-confirm").performClick()
+        rule.waitForIdle()
+        assertEquals("TEXT", clipboardTabs(store.state.value)[1].key)
+    }
+
+    @Test fun boardShowsAnInterleavedGroupAheadOfBuiltInFilters() {
+        KeyboardThemes.initFromConfig(rule.activity)
+        val moved = groups.reordered(listOf("group:g2", "IMAGE", "TEXT", "group:g1"))
+        rule.setContent { ClipboardGroupTestBoard(800, text, pins, moved, "ALL") }
+        val centers = listOf("ALL", "group:g2", "IMAGE", "TEXT", "group:g1").map {
+            rule.onNodeWithTag("clipboard-filter:$it").fetchSemanticsNode().boundsInRoot.center.x
+        }
+        assertTrue(centers.zipWithNext().all { (a, b) -> a < b })
+        rule.onNodeWithTag("clipboard-filter:group:g2").performClick()
+        rule.onNodeWithTag("clipboard-card:text:3").assertExists()
+        rule.onNodeWithTag("clipboard-card:text:1").assertDoesNotExist()
+    }
+
     @Test fun renderGroups() {
         val out = System.getenv("CYIME_RENDER_OUT")
         assumeTrue(!out.isNullOrEmpty())
@@ -110,13 +162,7 @@ class ClipboardGroupRenderTest {
         CompositionLocalProvider(LocalKeyboardInputPreferences provides
             KeyboardInputPreferences(frostedGlass = FrostedGlassConfig.defaults(dark, enabled = glass))) {
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
-                ClipboardBoardView(text, emptyList(), false, false, pins, false, null,
-                    onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {},
-                    onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {}, onRemove = {},
-                    onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
-                    onPullRemote = null, onAddPinned = {}, onEditText = { _, _, _ -> },
-                    groups = groups, initialTabKey = tab, onManageGroups = {},
-                    modifier = Modifier.width(width.dp).height(220.dp))
+                ClipboardGroupTestBoard(width, text, pins, groups, tab)
             }
         }
     }
@@ -128,4 +174,15 @@ class ClipboardGroupRenderTest {
         rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+}
+
+@androidx.compose.runtime.Composable
+internal fun ClipboardGroupTestBoard(width: Int, text: List<ClipboardItem>, pins: Set<String>, groups: ClipboardGroupState, tab: String) {
+    ClipboardBoardView(text, emptyList(), false, false, pins, false, null,
+        onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {},
+        onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {}, onRemove = {},
+        onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
+        onPullRemote = null, onAddPinned = {}, onEditText = { _, _, _ -> },
+        groups = groups, initialTabKey = tab, onManageGroups = {},
+        modifier = Modifier.width(width.dp).height(220.dp))
 }

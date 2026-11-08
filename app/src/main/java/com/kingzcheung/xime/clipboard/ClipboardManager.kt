@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -538,7 +539,10 @@ class ClipboardManager private constructor(private val context: Context) {
             // Before anything clears or expires history: records in a group are marked as kept.
             val groups = ClipboardGroupStore.getInstance(context)
             syncGroupedRecords(groups.state.value, boardPrefs)
-            scope.launch { groups.state.collect { syncGroupedRecords(it, boardPrefs) } }
+            scope.launch {
+                // Sorting or hiding tabs leaves membership intact, so the history needs no database write.
+                groups.state.distinctUntilChangedBy { it.members }.collect { syncGroupedRecords(it, boardPrefs) }
+            }
             // Duplicates saved before copies were merged (user 10-30): removed once; new copies merge as they come.
             if (!prefs.getBoolean(KEY_HISTORY_DEDUPED, false)) {
                 runCatching { dao.deleteDuplicateHistory() }

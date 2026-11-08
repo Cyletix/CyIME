@@ -11,6 +11,7 @@ data class ClipboardGroupState(
     val groups: List<ClipboardGroup> = emptyList(),
     val members: Map<String, String> = emptyMap(),
     val hidden: Set<ClipboardFilter> = emptySet(),
+    val tabOrder: List<String> = emptyList(),
 ) {
     fun groupOf(key: String): ClipboardGroup? = members[key]?.let { id -> groups.firstOrNull { it.id == id } }
     fun count(groupId: String): Int = members.values.count { it == groupId }
@@ -18,16 +19,33 @@ data class ClipboardGroupState(
     fun withGroup(group: ClipboardGroup) = copy(groups = groups + group)
     fun renamed(id: String, name: String) = copy(groups = groups.map { if (it.id == id) it.copy(name = name) else it })
     /** The records stay in the clipboard (in 全部); only the group goes. */
-    fun withoutGroup(id: String) = copy(groups = groups.filterNot { it.id == id }, members = members.filterValues { it != id })
+    fun withoutGroup(id: String) = copy(groups = groups.filterNot { it.id == id }, members = members.filterValues { it != id },
+        tabOrder = tabOrder - "group:$id")
     /** Null [groupId] takes the records out of their group. */
     fun assigned(keys: Collection<String>, groupId: String?) = copy(members =
         if (groupId == null || groups.none { it.id == groupId }) members - keys.toSet()
         else members + keys.associateWith { groupId })
     fun withHidden(filter: ClipboardFilter, hide: Boolean) = copy(hidden =
         if (filter == ClipboardFilter.ALL) hidden else if (hide) hidden + filter else hidden - filter)
+
+    /** Resolve by stable keys, retaining hidden categories and appending new groups or categories. */
+    internal fun sortableTabs(order: List<String> = tabOrder): List<ClipboardTab> {
+        val remaining = linkedMapOf<String, ClipboardTab>()
+        ClipboardFilter.entries.filterNot { it == ClipboardFilter.ALL }.forEach { remaining[it.name] = ClipboardTab.Category(it) }
+        groups.forEach { group -> ClipboardTab.Group(group).let { remaining[it.key] = it } }
+        return buildList {
+            order.forEach { remaining.remove(it)?.let(::add) }
+            addAll(remaining.values)
+        }
+    }
+
+    internal fun reordered(order: List<String>): ClipboardGroupState {
+        val tabs = sortableTabs(order)
+        return copy(tabOrder = tabs.map { it.key }, groups = tabs.filterIsInstance<ClipboardTab.Group>().map { it.group })
+    }
 }
 
-/** One tab of the board: a built-in category, or one of the user's groups (after the categories). */
+/** One tab of the board: a built-in category or one of the user's groups. */
 sealed interface ClipboardTab {
     val key: String
     val label: String
@@ -41,10 +59,11 @@ sealed interface ClipboardTab {
     }
 }
 
-/** 全部 is always there, the other categories unless hidden, then the user's groups. */
+/** 全部 stays first. Settings and the board use the same order, including after hide / show. */
 internal fun clipboardTabs(state: ClipboardGroupState): List<ClipboardTab> =
-    ClipboardFilter.entries.filter { it == ClipboardFilter.ALL || it !in state.hidden }.map { ClipboardTab.Category(it) } +
-        state.groups.map { ClipboardTab.Group(it) }
+    listOf(ClipboardTab.Category(ClipboardFilter.ALL)) + state.sortableTabs().filterNot {
+        it is ClipboardTab.Category && it.filter in state.hidden
+    }
 
 internal fun clipboardMatches(card: ClipboardCard, tab: ClipboardTab, state: ClipboardGroupState): Boolean = when (tab) {
     is ClipboardTab.Category -> clipboardMatches(card, tab.filter)

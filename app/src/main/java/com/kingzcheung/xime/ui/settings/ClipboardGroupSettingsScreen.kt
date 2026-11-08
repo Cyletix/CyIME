@@ -5,14 +5,15 @@ import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -58,12 +62,15 @@ import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.clipboard.ClipboardFilter
 import com.kingzcheung.xime.clipboard.ClipboardGroup
 import com.kingzcheung.xime.clipboard.ClipboardGroupStore
+import com.kingzcheung.xime.clipboard.ClipboardTab
 import com.kingzcheung.xime.clipboard.clipboardGroupNameError
+import com.kingzcheung.xime.ui.menubar.dragOrderItem
+import com.kingzcheung.xime.ui.menubar.rememberDragOrder
+import com.kingzcheung.xime.ui.theme.MaterialLevel
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
 
-/**
- * 剪贴板分组：自带分类（按内容自动归类）和自己建的分组（常用语、工作……）在同一张卡片里，顺序和剪贴板分类栏一样：
- * 自带分类在前，自己建的分组接在后面，最后是「新建分组」。放进分组的记录不固定，不会排到最前面，也不会被清空。
- */
+/** 设置页可以混排自带分类和自建分组；「全部」固定在键盘首位，「新建分组」是列表末尾的操作。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
@@ -83,6 +90,9 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
     // Name dialog: null closed; a group being renamed, or a new one (id "").
     var naming by remember { mutableStateOf<ClipboardGroup?>(null) }
     var deleting by remember { mutableStateOf<ClipboardGroup?>(null) }
+    val tabs = remember(state.groups, state.tabOrder) { state.sortableTabs().associateBy { it.key } }
+    val dragOrder = rememberDragOrder(tabs.keys.toList(), store::setTabOrder)
+    val rows = dragOrder.order.mapNotNull(tabs::get)
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
@@ -100,37 +110,43 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).settingsVerticalScroll(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column {
-                // One list in tab order: the built-in categories, the user's groups, then 新建分组.
-                SettingsSection(title = "分组", content = {
-                    ClipboardFilter.entries.filter { it != ClipboardFilter.ALL }.forEach { filter ->
-                        SettingsToggleItem(
-                            icon = filter.icon(),
-                            title = filter.label,
-                            subtitle = filter.description(),
-                            checked = filter !in state.hidden,
-                            onCheckedChange = { store.setHidden(filter, !it) },
-                        )
+        Box(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).clipToBounds()) {
+            ClipboardGroupBackground(dragOrder.list)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().settingsGutterScroll(dragOrder.list),
+                state = dragOrder.list,
+                contentPadding = keyboardPreviewContentPadding(bottom = 24.dp),
+            ) {
+                item(key = "heading") {
+                    Text("分组", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.settingsSearchAnchor("分组").padding(bottom = 8.dp))
+                }
+                itemsIndexed(rows, key = { _, tab -> tab.key }) { index, tab ->
+                    ClipboardSettingsRow(first = index == 0, last = false, lifted = dragOrder.dragging == tab.key,
+                        modifier = dragOrderItem(dragOrder, tab.key).testTag("clipboard-order:${tab.key}")) {
+                        when (tab) {
+                            is ClipboardTab.Category -> SettingsToggleItem(
+                                icon = tab.filter.icon(), title = tab.label, subtitle = tab.filter.description(),
+                                checked = tab.filter !in state.hidden,
+                                onCheckedChange = { if (dragOrder.dragging == null) store.setHidden(tab.filter, !it) },
+                            )
+                            is ClipboardTab.Group -> ClipboardGroupRow(tab.label, "${state.count(tab.group.id)} 条",
+                                Modifier.testTag("clipboard-group-row:${tab.group.id}"),
+                                onRename = { if (dragOrder.dragging == null) naming = tab.group },
+                                onDelete = { if (dragOrder.dragging == null) deleting = tab.group })
+                        }
                     }
-                    state.groups.forEach { group ->
-                        ClipboardGroupRow(group.name, "${state.count(group.id)} 条",
-                            Modifier.testTag("clipboard-group-row:${group.id}"),
-                            onRename = { naming = group }, onDelete = { deleting = group })
+                }
+                item(key = "add") {
+                    ClipboardSettingsRow(first = false, last = true) {
+                        SettingsItem(icon = Icons.TwoTone.CreateNewFolder, title = "新建分组",
+                            subtitle = "比如常用语、工作、家人", onClick = { naming = ClipboardGroup("", "") })
                     }
-                    SettingsItem(
-                        icon = Icons.TwoTone.CreateNewFolder,
-                        title = "新建分组",
-                        subtitle = "比如常用语、工作、家人",
-                        onClick = { naming = ClipboardGroup("", "") },
-                    )
-                })
-                SettingsNote("长按剪贴板记录，选「分组」放入。关掉的分类不在分类栏显示，记录仍在「全部」里。")
+                }
+                item(key = "note") {
+                    SettingsNote("长按分组上下拖动，调整键盘分类栏的顺序。长按剪贴板记录，选「分组」放入。关掉的分类不在分类栏显示，记录仍在「全部」里。")
+                }
             }
-            Spacer(Modifier.height(8.dp))
         }
     }
     naming?.let { group ->
@@ -157,6 +173,31 @@ fun ClipboardGroupSettingsContent(onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } },
         )
     }
+}
+
+/** 整张卡片共用原来的底色和材质；拖动及滚动时不在每行重复画玻璃高光和边框。 */
+@Composable
+private fun ClipboardGroupBackground(list: LazyListState) {
+    Spacer(Modifier.layout { measurable, constraints ->
+        val info = list.layoutInfo
+        val visible = info.visibleItemsInfo
+        val radius = 12.dp.roundToPx()
+        val top = visible.firstOrNull { it.key == "heading" }?.let { it.offset + it.size } ?: -radius
+        val bottom = visible.firstOrNull { it.key == "add" }?.let { it.offset + it.size }
+            ?: visible.firstOrNull { it.key == "note" }?.offset ?: (constraints.maxHeight + radius)
+        val card = measurable.measure(Constraints.fixed(constraints.maxWidth, (bottom - top).coerceAtLeast(0)))
+        layout(constraints.maxWidth, constraints.maxHeight) { if (visible.isNotEmpty()) card.place(0, top) }
+    }.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)
+        .visualMaterial(VisualStyles.current, 12.dp, MaterialLevel.RAISED))
+}
+
+@Composable
+private fun ClipboardSettingsRow(first: Boolean, last: Boolean, modifier: Modifier = Modifier,
+    lifted: Boolean = false, content: @Composable () -> Unit) {
+    val top = if (first || lifted) 12.dp else 0.dp
+    val bottom = if (last || lifted) 12.dp else 0.dp
+    Box(modifier.fillMaxWidth().clip(RoundedCornerShape(top, top, bottom, bottom))
+        .then(if (lifted) Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier)) { content() }
 }
 
 /**

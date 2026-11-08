@@ -29,18 +29,20 @@ class ClipboardGroupStore private constructor(context: Context) {
         val groups = ClipboardGroupCodec.decodeGroups(prefs.getString(KEY_GROUPS, null))
         return ClipboardGroupState(groups,
             ClipboardGroupCodec.decodeMembers(prefs.getStringSet(KEY_MEMBERS, null), groups),
-            ClipboardGroupCodec.decodeHidden(prefs.getStringSet(KEY_HIDDEN, null)))
+            ClipboardGroupCodec.decodeHidden(prefs.getStringSet(KEY_HIDDEN, null)),
+            prefs.getString(KEY_TAB_ORDER, null)?.lines().orEmpty())
     }
 
     @Synchronized private fun update(change: (ClipboardGroupState) -> ClipboardGroupState) {
         val previous = _state.value
         val next = change(previous)
         if (next == previous) return
-        prefs.edit()
-            .putString(KEY_GROUPS, ClipboardGroupCodec.encodeGroups(next.groups))
-            .putStringSet(KEY_MEMBERS, ClipboardGroupCodec.encodeMembers(next.members))
-            .putStringSet(KEY_HIDDEN, next.hidden.mapTo(mutableSetOf()) { it.name })
-            .apply()
+        val editor = prefs.edit()
+        if (next.groups != previous.groups) editor.putString(KEY_GROUPS, ClipboardGroupCodec.encodeGroups(next.groups))
+        if (next.members != previous.members) editor.putStringSet(KEY_MEMBERS, ClipboardGroupCodec.encodeMembers(next.members))
+        if (next.hidden != previous.hidden) editor.putStringSet(KEY_HIDDEN, next.hidden.mapTo(mutableSetOf()) { it.name })
+        if (next.tabOrder != previous.tabOrder) editor.putString(KEY_TAB_ORDER, next.tabOrder.joinToString("\n"))
+        editor.apply()
         _state.value = next
     }
 
@@ -82,6 +84,8 @@ class ClipboardGroupStore private constructor(context: Context) {
     }
 
     fun setHidden(filter: ClipboardFilter, hide: Boolean) = update { it.withHidden(filter, hide) }
+
+    fun setTabOrder(keys: List<String>) = update { it.reordered(keys) }
 
     fun setAddTarget(groupId: String?) {
         addTarget = groupId?.let { it to System.currentTimeMillis() }
@@ -126,6 +130,7 @@ class ClipboardGroupStore private constructor(context: Context) {
         private const val KEY_GROUPS = "groups"
         private const val KEY_MEMBERS = "group_members"
         private const val KEY_HIDDEN = "hidden_categories"
+        private const val KEY_TAB_ORDER = "tab_order"
         private const val FORM_LIFETIME_MS = 10 * 60_000L
         /** Settings opens at once; an entry the page never took (it failed to open) must not stick. */
         private const val KEYBOARD_ENTRY_MS = 60_000L
