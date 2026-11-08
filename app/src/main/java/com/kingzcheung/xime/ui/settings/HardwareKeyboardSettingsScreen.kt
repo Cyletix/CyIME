@@ -69,14 +69,16 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             Text("浮条任意位置均可拖动；长按语言键选择语言。", style = MaterialTheme.typography.bodyMedium)
             Text("浮条按钮", style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.settingsSearchAnchor("浮条按钮", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
-            Text("展开屏幕键盘和语言键始终显示，其余按钮可按需要隐藏。",
+            Text("勾选 = 始终显示；不勾 = 收起时自动隐藏。展开时一律显示全部按钮，3 秒无操作自动收起。",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            HardwareOption("表情", "浮条上的表情入口", options.toolbarEmoji) { save("toolbar_emoji", it) }
-            HardwareOption("剪贴板", "浮条上的剪贴板入口", options.toolbarClipboard) { save("toolbar_clipboard", it) }
+            HardwareOption("展开屏幕键盘", "浮条上的键盘入口", !options.collapseKeyboard) { save("collapse_keyboard", !it) }
+            HardwareOption("语言键", "中/英切换", !options.collapseLanguage) { save("collapse_language", !it) }
+            HardwareOption("表情", "浮条上的表情入口", !options.collapseEmoji) { save("collapse_emoji", !it) }
+            HardwareOption("剪贴板", "浮条上的剪贴板入口", !options.collapseClipboard) { save("collapse_clipboard", !it) }
             val sttOn = remember { com.kingzcheung.xime.settings.SettingsPreferences.isSttEnabled(context) }
-            HardwareOption("语音输入", "浮条上的麦克风入口", options.toolbarVoice,
-                lockMessage = if (sttOn) null else "「语音转文本」关着") { save("toolbar_voice", it) }
-            HardwareOption("设置", "浮条上的设置入口", options.toolbarSettings) { save("toolbar_settings", it) }
+            HardwareOption("语音输入", "浮条上的麦克风入口", !options.collapseVoice,
+                lockMessage = if (sttOn) null else "「语音转文本」关着") { save("collapse_voice", !it) }
+            HardwareOption("设置", "浮条上的设置入口", !options.collapseSettings) { save("collapse_settings", !it) }
             Text("游戏", style = MaterialTheme.typography.titleMedium)
             HardwareOption("游戏直通", "游戏类应用里不显示键盘，按键直接交给游戏；按应用声明的类别识别",
                 options.gamePassthrough) { save("game_passthrough", it) }

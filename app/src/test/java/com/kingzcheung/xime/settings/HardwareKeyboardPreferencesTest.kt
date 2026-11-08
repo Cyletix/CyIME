@@ -65,23 +65,26 @@ class HardwareKeyboardPreferencesTest {
         assertEquals(3, values.size)
     }
 
-    @Test fun candidateArrowsAndToolbarButtonsDefaultAndPersist() {
+    @Test fun candidateArrowsAndCollapseSwitchesDefaultAndPersist() {
         val defaults = HardwareKeyboardPreferences.read(context)
         assertFalse(defaults.candidateArrows)
-        assertTrue(defaults.toolbarEmoji)
-        assertTrue(defaults.toolbarClipboard)
-        assertTrue(defaults.toolbarVoice)
-        assertTrue(defaults.toolbarSettings)
+        assertFalse(defaults.collapseKeyboard)
+        assertFalse(defaults.collapseLanguage)
+        assertTrue(defaults.collapseEmoji)
+        assertTrue(defaults.collapseClipboard)
+        assertTrue(defaults.collapseVoice)
+        assertFalse(defaults.collapseSettings)
 
-        HardwareKeyboardPreferences.set(context, "candidate_arrows", true)
-        HardwareKeyboardPreferences.set(context, "toolbar_emoji", false)
-        HardwareKeyboardPreferences.set(context, "toolbar_settings", false)
+        HardwareKeyboardPreferences.set(context, "collapse_keyboard", true)
+        HardwareKeyboardPreferences.set(context, "collapse_emoji", false)
+        HardwareKeyboardPreferences.set(context, "collapse_settings", true)
 
         val changed = HardwareKeyboardPreferences.read(context)
-        assertTrue(changed.candidateArrows)
-        assertFalse(changed.toolbarEmoji)
-        assertTrue(changed.toolbarClipboard)
-        assertTrue(changed.toolbarVoice)
-        assertFalse(changed.toolbarSettings)
+        assertTrue(changed.collapseKeyboard)
+        assertTrue(changed.collapseLanguage == false)
+        assertFalse(changed.collapseEmoji)
+        assertTrue(changed.collapseClipboard)
+        assertTrue(changed.collapseVoice)
+        assertTrue(changed.collapseSettings)
     }
 }

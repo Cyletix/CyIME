@@ -24,7 +24,9 @@ class HardwareToolbarGeometryTest {
 
     @Test fun releaseOnlySnapsNearEdgesOrCenterAndKeepsFreeTravel() {
         val geometry = hardwareToolbarGeometry(900, 600, 232, 56, 8)
-        for ((fraction, dock) in listOf(0.03f to 0f, 0.24f to 0.24f, 0.49f to 0.5f, 0.7f to 0.7f, 0.76f to 0.76f, 0.98f to 1f)) {
+        // 侧边吸附只认真正贴边（1px 容差）；其他位置一律自由停放。
+        for ((fraction, dock) in listOf(0f to 0f, 0.05f to 0.05f, 0.24f to 0.24f,
+                0.5f to 0.5f, 0.55f to 0.55f, 0.98f to 0.98f, 1f to 1f)) {
             val offset = geometry.offset(HardwareToolbarPosition(fraction, 0.35f))
             val result = geometry.positionAt(offset.x, offset.y, HardwareToolbarPosition())
             assertEquals(dock, result.xFraction, 0.0001f)

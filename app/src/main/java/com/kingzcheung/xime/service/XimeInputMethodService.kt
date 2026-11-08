@@ -1094,6 +1094,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onCreate() {
         super.onCreate()
+        // 恢复上次停放位置；没存过时贴边停靠默认在底部，否则悬浮在屏幕中间偏下。
+        hardwareToolbarPosition.value =
+            com.kingzcheung.xime.settings.HardwareKeyboardPreferences.readToolbarPosition(this)
+                ?: com.kingzcheung.xime.ui.keyboard.HardwareToolbarPosition(0.5f,
+                    if (com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this).dockAtEdge) 1f else 0.35f)
         if (BuildConfig.DEV_TOOLS) EnterProbe.service = java.lang.ref.WeakReference(this)
         com.kingzcheung.xime.stats.TypingStats.init(this)
         com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter = handwritingGlassRegionReporter
@@ -2398,10 +2403,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
                                 onSettings = { startActivity(settingsActivityIntent(this@XimeInputMethodService)) },
-                                showEmoji = state.hardwareOptions.toolbarEmoji,
-                                showClipboard = state.hardwareOptions.toolbarClipboard,
-                                showVoice = state.hardwareOptions.toolbarVoice,
-                                showSettings = state.hardwareOptions.toolbarSettings,
+                                autoCollapse = buildSet {
+                                    if (state.hardwareOptions.collapseKeyboard) add("keyboard")
+                                    if (state.hardwareOptions.collapseLanguage) add("language")
+                                    if (state.hardwareOptions.collapseEmoji) add("emoji")
+                                    if (state.hardwareOptions.collapseClipboard) add("clipboard")
+                                    if (state.hardwareOptions.collapseVoice) add("voice")
+                                    if (state.hardwareOptions.collapseSettings) add("settings")
+                                },
                                 // 「语音转文本」关着时物理键盘工具条不放麦克风。
                                 onVoice = if (state.isSttEnabled) ({ handleHardwareTool(HardwareToolShortcut.MICROPHONE) }) else null,
                                 voiceActive = state.isVoiceMode,
@@ -2446,7 +2455,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 candidatesPending = !hardwareEnglish && pendingPrediction != 0L,
                                 contentColor = hardwarePalette.candidateText,
                                 position = position,
-                                onPositionChange = { hardwareToolbarPosition.value = it },
+                                onPositionChange = { hardwareToolbarPosition.value = it; com.kingzcheung.xime.settings.HardwareKeyboardPreferences.setToolbarPosition(this@XimeInputMethodService, it) },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },
                             )
                           }
@@ -2503,7 +2512,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },
                                 position = hardwareToolbarPosition.value,
-                                onPositionChange = { hardwareToolbarPosition.value = it },
+                                onPositionChange = { hardwareToolbarPosition.value = it; com.kingzcheung.xime.settings.HardwareKeyboardPreferences.setToolbarPosition(this@XimeInputMethodService, it) },
                                 dockAtEdge = state.hardwareOptions.dockAtEdge,
                             )
                           }

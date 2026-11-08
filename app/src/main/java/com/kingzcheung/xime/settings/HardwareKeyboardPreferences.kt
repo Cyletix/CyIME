@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.settings
 
 import android.content.Context
+import com.kingzcheung.xime.ui.keyboard.HardwareToolbarPosition
 
 data class HardwareKeyboardOptions(
     val ctrlSpace: Boolean = true,
@@ -15,11 +16,13 @@ data class HardwareKeyboardOptions(
     val bottomBar: Boolean = false,
     /** 候选条两端的翻页箭头；关闭时仍可用方向键和「候选翻页」里配置的按键翻页。默认关。 */
     val candidateArrows: Boolean = false,
-    /** 浮条上显示哪些按钮；展开键盘和语言键始终保留。 */
-    val toolbarEmoji: Boolean = true,
-    val toolbarClipboard: Boolean = true,
-    val toolbarVoice: Boolean = true,
-    val toolbarSettings: Boolean = true,
+    /** 浮条按钮：勾上 = 收起时隐藏；不勾 = 收起时也显示。展开时一律显示全部。 */
+    val collapseKeyboard: Boolean = false,
+    val collapseLanguage: Boolean = false,
+    val collapseEmoji: Boolean = true,
+    val collapseClipboard: Boolean = true,
+    val collapseVoice: Boolean = true,
+    val collapseSettings: Boolean = false,
     /** 联想词也显示在跟随光标的候选浮窗里（和打字候选同一个位置）；关闭时联想在工具条上。默认关。 */
     val associationInWindow: Boolean = false,
     /** 游戏直通：游戏类应用里不显示工具条，实体按键直接交给游戏。默认关。 */
@@ -41,10 +44,12 @@ object HardwareKeyboardPreferences {
             pageCommaPeriod = p.getBoolean(PREFIX + "page_comma_period", true),
             bottomBar = p.getBoolean(PREFIX + "bottom_bar", false),
             candidateArrows = p.getBoolean(PREFIX + "candidate_arrows", false),
-            toolbarEmoji = p.getBoolean(PREFIX + "toolbar_emoji", true),
-            toolbarClipboard = p.getBoolean(PREFIX + "toolbar_clipboard", true),
-            toolbarVoice = p.getBoolean(PREFIX + "toolbar_voice", true),
-            toolbarSettings = p.getBoolean(PREFIX + "toolbar_settings", true),
+            collapseKeyboard = p.getBoolean(PREFIX + "collapse_keyboard", false),
+            collapseLanguage = p.getBoolean(PREFIX + "collapse_language", false),
+            collapseEmoji = p.getBoolean(PREFIX + "collapse_emoji", true),
+            collapseClipboard = p.getBoolean(PREFIX + "collapse_clipboard", true),
+            collapseVoice = p.getBoolean(PREFIX + "collapse_voice", true),
+            collapseSettings = p.getBoolean(PREFIX + "collapse_settings", false),
             associationInWindow = p.getBoolean(PREFIX + "association_in_window", false),
             gamePassthrough = p.getBoolean(PREFIX + "game_passthrough", false),
         )
@@ -52,8 +57,25 @@ object HardwareKeyboardPreferences {
     fun set(context: Context, key: String, enabled: Boolean) {
         require(key in setOf("ctrl_space", "shift_tap", "follow_cursor", "avoid_editor", "dock_edge",
             "page_minus_equals", "page_brackets", "page_comma_period", "bottom_bar", "association_in_window",
-            "game_passthrough", "candidate_arrows", "toolbar_emoji", "toolbar_clipboard", "toolbar_voice",
-            "toolbar_settings"))
+            "game_passthrough", "candidate_arrows", "collapse_keyboard", "collapse_language", "collapse_emoji",
+            "collapse_clipboard", "collapse_voice", "collapse_settings"))
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(PREFIX + key, enabled).apply()
+    }
+
+    /** 上次停放位置；没存过时返回 null，由调用方决定默认形态。 */
+    internal fun readToolbarPosition(context: Context): HardwareToolbarPosition? {
+        val p = SettingsPreferences.getPrefsPublic(context)
+        val x = p.getFloat(PREFIX + "toolbar_x", Float.NaN)
+        val y = p.getFloat(PREFIX + "toolbar_y", Float.NaN)
+        return if (x.isFinite() && y.isFinite()) {
+            HardwareToolbarPosition(x.coerceIn(0f, 1f), y.coerceIn(0f, 1f))
+        } else null
+    }
+
+    internal fun setToolbarPosition(context: Context, position: HardwareToolbarPosition) {
+        SettingsPreferences.getPrefsPublic(context).edit()
+            .putFloat(PREFIX + "toolbar_x", position.xFraction)
+            .putFloat(PREFIX + "toolbar_y", position.yFraction)
+            .apply()
     }
 }
