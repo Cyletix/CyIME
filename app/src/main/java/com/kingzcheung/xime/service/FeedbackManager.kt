@@ -50,6 +50,8 @@ class FeedbackManager(private val context: Context) {
 
     private val samsungTuned = isSamsungTuned(Build.MANUFACTURER)
 
+    private val bypassSystemKeyHaptic = bypassesSystemKeyHaptic(Build.MANUFACTURER)
+
     private val feedbackScope = CoroutineScope(Dispatchers.Default)
 
     private var soundEnabled = true
@@ -101,14 +103,21 @@ class FeedbackManager(private val context: Context) {
         fun isSamsungTuned(manufacturer: String?): Boolean = manufacturer.equals("samsung", ignoreCase = true)
 
         /**
+         * 不交给系统按键触感（KEYBOARD_TAP）的机型：三星按实测自己震；华为（鸿蒙 4.x）有用户反馈 10-30 改走系统触感后
+         * 打字不震（未真机确认），退回改动前的自己震（原语 / 预设 / 短脉冲）。
+         */
+        fun bypassesSystemKeyHaptic(manufacturer: String?): Boolean =
+            isSamsungTuned(manufacturer) || manufacturer.equals("huawei", ignoreCase = true)
+
+        /**
          * 非三星机型在没自定义时长、振幅时直接用系统按键触感（View.performHapticFeedback）：
          * 小米澎湃OS、Pixel 等由系统映射到厂商调校的短促点击，和自带输入法、微信输入法同一条路。
          * 「启用」模式下本机支持原语时仍按原语（设置页的振幅滑条要起作用），系统触感关着时也不走这条（系统会不震）。
          */
         fun prefersSystemHaptic(
-            samsungTuned: Boolean, custom: Boolean, duration: Long, amplitude: Int,
+            bypassSystem: Boolean, custom: Boolean, duration: Long, amplitude: Int,
             primitivesSupported: Boolean, systemHapticEnabled: Boolean
-        ): Boolean = !samsungTuned && duration == 0L && amplitude == 0 && systemHapticEnabled &&
+        ): Boolean = !bypassSystem && duration == 0L && amplitude == 0 && systemHapticEnabled &&
             (!custom || !primitivesSupported)
 
         /** 删除音连发时只保留最新一层；其他按键音照常可以重叠。 */
@@ -356,9 +365,9 @@ class FeedbackManager(private val context: Context) {
         }
 
         val light = keyUp || hfc == HapticFeedbackConstants.TEXT_HANDLE_MOVE
-        if (prefersSystemHaptic(samsungTuned, custom, duration, amplitude, primitivesSupported, systemEnabled)) {
-            view.performHapticFeedback(hfc, systemHapticFlags())
-            return
+        if (prefersSystemHaptic(bypassSystemKeyHaptic, custom, duration, amplitude, primitivesSupported, systemEnabled)) {
+            if (view.performHapticFeedback(hfc, systemHapticFlags())) return
+            // 系统没接（返回 false：厂商没映射这种触感、视图已脱离窗口等）时往下自己震，不让这一下没反馈。
         }
         // 线性马达优先：按下和长按是满强度 click，抬起/光标是稍轻的 tick；
         // 时长由马达决定，振幅设置只调强弱。三星上系统默认时不再交给 KEYBOARD_TAP（偏重）。

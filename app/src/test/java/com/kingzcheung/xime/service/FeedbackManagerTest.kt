@@ -129,6 +129,16 @@ class FeedbackManagerTest {
         org.junit.Assert.assertFalse(FeedbackManager.isSamsungTuned(null))
     }
 
+    @Test fun `samsung and huawei skip the system key haptic`() {
+        org.junit.Assert.assertTrue(FeedbackManager.bypassesSystemKeyHaptic("samsung"))
+        org.junit.Assert.assertTrue(FeedbackManager.bypassesSystemKeyHaptic("HUAWEI"))
+        org.junit.Assert.assertTrue(FeedbackManager.bypassesSystemKeyHaptic("huawei"))
+        org.junit.Assert.assertFalse(FeedbackManager.bypassesSystemKeyHaptic("Xiaomi"))
+        org.junit.Assert.assertFalse(FeedbackManager.bypassesSystemKeyHaptic("HONOR"))
+        org.junit.Assert.assertFalse(FeedbackManager.bypassesSystemKeyHaptic("Google"))
+        org.junit.Assert.assertFalse(FeedbackManager.bypassesSystemKeyHaptic(null))
+    }
+
     @Test fun `other vendors follow the system key haptic unless the user tuned it`() {
         fun prefers(samsung: Boolean = false, custom: Boolean = false, duration: Long = 0L, amplitude: Int = 0,
                     primitives: Boolean = false, systemOn: Boolean = true) =
