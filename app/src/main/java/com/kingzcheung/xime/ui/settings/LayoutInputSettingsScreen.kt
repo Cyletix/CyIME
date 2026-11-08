@@ -143,16 +143,22 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             settings = settings.copy(qwertyPeriodKey = it); settings.save(context)
                         })
                     HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.Gesture, "底排标点固定上滑",
+                        "在空格两侧的逗号或句号键上滑，输入右上角的符号。关闭后跟随全局角标设置。",
+                        checked = settings.bottomPunctuationSwipeUp, onCheckedChange = {
+                            settings = settings.copy(bottomPunctuationSwipeUp = it); settings.save(context)
+                        })
+                    HorizontalDivider()
                     // 逗号键分词（默认关）：下角标的方向跟「反转上下滑方向」走，说明照实际方向写。
                     SettingsToggleItem(Icons.TwoTone.ContentCut, "逗号键分词",
                         "中文全拼、双拼的 26 键和 14 键：逗号键左下角加 '(只开句号键时在句号键上)，" +
-                            "打拼音时${if (settings.reverseSymbolSwipe) "下滑" else "上滑"}插入分词(xi'an)，F 键角标的 ' 也一样；" +
+                            "打拼音时${if (settings.bottomPunctuationSwipeUp || settings.reverseSymbolSwipe) "下滑" else "上滑"}插入分词(xi'an)，F 键的 ' 仍跟随字母键手势；" +
                             "没在打拼音时输入 '。九键照旧用 1 键分词。",
                         checked = settings.syllableSplitKey, onCheckedChange = {
                             settings = settings.copy(syllableSplitKey = it); settings.save(context)
                         })
                     SyllableSplitKeyLegend(settings.syllableSplitKey, settings.qwertyCommaKey, settings.qwertyPeriodKey,
-                        settings.reverseSymbolSwipe)
+                        settings.bottomPunctuationSwipeUp || settings.reverseSymbolSwipe)
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.ContentCut, "Shift 键分词",
                         "中文全拼、双拼的 26 键和 14 键：打拼音时 Shift 键写「分词」，点一下插入分词(xi'an)；" +

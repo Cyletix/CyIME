@@ -1029,7 +1029,8 @@ fun KeyboardLayout(
                         CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
                         SwipeableKeyButton(
                             layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
-                            followSymbolSwipeDirection = true,
+                            followSymbolSwipeDirection = !keyLabelPrefs.bottomPunctuationSwipeUp,
+                            keepSymbolSwipeOnLongPress = keyLabelPrefs.bottomPunctuationSwipeUp,
                             text = key.primary,
                             onClick = { commitPunctuation(key.primary) },
                             backgroundColor = keyBackgroundColor,
@@ -1038,7 +1039,7 @@ fun KeyboardLayout(
                             swipeText = key.alternate.ifEmpty { null },
                             symbolInputText = key.alternate.ifEmpty { null },
                             onSwipe = if (key.alternate.isEmpty()) null else { _ -> commitPunctuation(key.alternate) },
-                            // 下角标和字母键一样：默认上滑，反转后下滑；打拼音时分词，否则上屏 '。
+                            // 分词占另一个方向；固定上滑副标点时，分词始终下滑。
                             swipeDownText = if (split) SYLLABLE_SEPARATOR else null,
                             swipeDownKeyLabel = if (split && swipeDownHintsEnabled) SYLLABLE_SEPARATOR else null,
                             onSwipeDown = if (split) { _ -> onKeyPress(SYLLABLE_SEPARATOR) } else null,
@@ -1388,7 +1389,7 @@ fun KeyboardLayout(
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
                                 modifier = Modifier.weight(bottom.enter).testTag("qwerty-enter-key")
-                                    .onGloballyPositioned { enterBounds = it.boundsInRoot() },
+                                    .onGloballyPositioned { enterBounds = dragSpace.bounds(it) },
                                 onPress = { onKeyPressDown?.invoke("enter") },
                                 onRelease = { onKeyRelease?.invoke("enter") },
                                 shadowEnabled = shadowEnabled,
@@ -1401,7 +1402,7 @@ fun KeyboardLayout(
 
             }
 
-        ShiftSlideLine(shiftSlideTargets, { keyboardBounds.topLeft },
+        ShiftSlideLine(shiftSlideTargets, { shiftSlideTargets.keyboardBounds.topLeft },
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
 
         // 语音模式中央麦克风图标
@@ -1747,6 +1748,7 @@ internal fun ShiftCapsKeyButton(
     var isPressed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val targets = LocalShiftSlideTargets.current
+    val dragSpace = LocalKeyDragSpace.current
     // 在这里读「是否在打拼音」，变化时只重组 Shift 键。
     val splitLabel = composingSplit?.invoke() == true
     val currentSplit by rememberUpdatedState(composingSplit)
@@ -1799,7 +1801,7 @@ internal fun ShiftCapsKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .testTag("shift-key")
-            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .onGloballyPositioned { bounds = Rect(dragSpace.point(it), it.size.toSize()) }
             .pointerInput(viewModel, targets) {
                 var lastTap = Long.MIN_VALUE
                 awaitEachGesture {

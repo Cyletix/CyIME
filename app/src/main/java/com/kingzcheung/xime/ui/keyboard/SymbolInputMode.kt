@@ -33,13 +33,13 @@ internal fun RepeatingKeyActions.withSymbolSwipeDirection(reverse: Boolean): Rep
 internal fun symbolInputValue(value: String?, action: GestureAction?): String? =
     value?.takeIf { it.isNotBlank() && (action == null || action == GestureAction.COMMIT) }
 
-internal fun KeyGestureActions.withSymbolInput(mode: SymbolInputMode, symbol: String?): KeyGestureActions {
+internal fun KeyGestureActions.withSymbolInput(mode: SymbolInputMode, symbol: String?, keepSwipe: Boolean = false): KeyGestureActions {
     if (mode != SymbolInputMode.LONG_PRESS || symbol.isNullOrBlank() || onUp == null ||
         onLongPress != null || longPressDrawableIds.isNotEmpty()) return this
     val commitSymbol = onUp
     return copy(
-        onUp = null,
-        blockUpSwipe = true,
+        onUp = if (keepSwipe) onUp else null,
+        blockUpSwipe = !keepSwipe,
         longPressTimeoutMillis = 300L,
         // The timeout callback commits once; no release-time menu may commit a second value.
         longPressItems = emptyList(),
