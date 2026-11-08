@@ -1184,7 +1184,7 @@ private fun Modifier.glassStripBoost(alpha: Float): Modifier {
 /** 非聚焦窗口提供真实触控区域，点击编码不会抢走宿主编辑框焦点。 */
 @Composable
 private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?, bubbleColor: Color,
-    /** 编码刚清空、窗口还没拆：气泡画成全透明，不能点，也不再垫模糊（见 [PreeditBubbleHost]）。 */
+    /** 编码刚清空、窗口还没拆：气泡画成全透明，不能点，模糊也同时调成全透明（见 [PreeditBubbleHost]）。 */
     hidden: Boolean = false) {
     val density = LocalDensity.current
     // 放大后的候选栏里 dp 变大了，按屏宽限宽要换回同样的像素宽度。
@@ -1218,11 +1218,11 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         }
     }
     val glass = LocalKeyboardInputPreferences.current.frostedGlass.normalized()
-    if (!hidden && glass.enabled && glass.blurRadiusDp >= 1f) {
+    if (glass.enabled && glass.blurRadiusDp >= 1f) {
         // 气泡内容最少 44dp 高、上下各留 6dp，真正的底色块在中间，圆角 4dp（见下面 PreeditLabel）。
         val inset = with(density) { 6.dp.roundToPx() }
         PreeditBubbleBlur(bubbleBounds.value?.let { IntRect(it.left, it.top + inset, it.right, it.bottom - inset) },
-            glass.blurRadiusDp, with(density) { 4.dp.toPx() })
+            glass.blurRadiusDp, with(density) { 4.dp.toPx() }, hidden)
     }
     Popup(popupPositionProvider = positionProvider,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
@@ -1275,9 +1275,16 @@ internal fun preeditBubbleColor(surface: Color, key: Color, blurBehind: Boolean,
 
 internal const val PREEDIT_BUBBLE_GLASS_ALPHA = 0.9f
 
+/**
+ * 编码清空、气泡变透明的那几帧里模糊窗口的透明度。模糊也是单独的小窗口，原来这一刻就拆掉，
+ * 系统拿它最后一帧放退出动画，模糊比拼音晚一拍才没（用户 11-08 转来的反馈）。现在同一帧调成全透明，
+ * 跟气泡窗口一起拆，退出动画播的也是空白。
+ */
+internal fun preeditBubbleBlurAlpha(hidden: Boolean): Float = if (hidden) 0f else 1f
+
 /** 拼音气泡下面的实时模糊：和键盘卡片的玻璃同一种子窗口，放在输入法窗口下面，只模糊气泡那一块应用画面。 */
 @Composable
-private fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadiusPx: Float) {
+private fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadiusPx: Float, hidden: Boolean = false) {
     val view = LocalView.current
     val context = LocalContext.current
     // 模糊半径按屏幕真实密度算，和键盘卡片那块一样；候选栏放大只放大气泡，不改模糊强度。
@@ -1290,6 +1297,7 @@ private fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadiu
         onDispose { blur.dispose() }
     }
     SideEffect {
+        blur.setOpacity(preeditBubbleBlurAlpha(hidden))
         blur.configure(true, radiusPx, cornerRadiusPx)
         blur.setRegion(region?.let { android.graphics.Rect(it.left, it.top, it.right, it.bottom) })
     }
