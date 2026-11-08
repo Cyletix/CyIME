@@ -129,6 +129,8 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
                     if (result.parseFailures.isNotEmpty()) append("\n" + result.parseFailures.joinToString("\n"))
                     if (result.unresolvedDeps.isNotEmpty())
                         append("\n请补齐方案引用的文件：" + result.unresolvedDeps.joinToString("、"))
+                    if (result.keptExistingFiles.isNotEmpty())
+                        append("\n保留了已有的 " + result.keptExistingFiles.joinToString("、") + "，没有覆盖，要换请单独导入这个文件")
                 })
                 result.conflicts.isNotEmpty() -> {
                     conflictItem = item

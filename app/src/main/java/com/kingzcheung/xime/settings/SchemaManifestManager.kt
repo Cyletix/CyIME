@@ -191,10 +191,15 @@ object SchemaManifestManager {
         return hash
     }
 
-    /** 仅发布已验证的暂存文件。失败时恢复原文件、清单和注册表。调用方持有 packageMutex。 */
+    /**
+     * 仅发布已验证的暂存文件。失败时恢复原文件、清单和注册表。调用方持有 packageMutex。
+     * [overwriteUserConfig]：用户自己导入的包（非市场）里带的个人配置照样覆盖已有文件，
+     * 和单文件导入一致；市场包更新不动用户已有的个人配置。
+     */
     internal suspend fun installStagedFiles(
         context: Context, schemeId: String, displayName: String, version: String,
         fromMarket: Boolean, staged: File, targets: List<String>,
+        overwriteUserConfig: Boolean = false,
     ): List<String> {
         val rimeDir = SchemaManager.getRimeDir(context)
         val registryBefore = loadRegistry(context).toString()
@@ -208,7 +213,8 @@ object SchemaManifestManager {
                 if (isProtectedSystemFile(name)) continue
                 val source = safeTarget(staged, name)
                 val dest = safeTarget(rimeDir, name)
-                if (!source.isFile || (isUserDataFile(name) && dest.exists())) continue
+                if (!source.isFile) continue
+                if (isUserDataFile(name) && dest.exists() && !(overwriteUserConfig && isImportableUserConfig(name))) continue
                 val previousHash = if (dest.isFile) keepVersion(context, dest) else null
                 priorFiles[name] = previousHash
                 if (previousHash != null) {
@@ -635,6 +641,13 @@ object SchemaManifestManager {
         if (relPath.startsWith("azookey/")) return true
         return false
     }
+
+    /**
+     * 用户主动导入时可以覆盖的个人配置：方案补丁 *.custom.yaml（含 xime.custom.yaml 键盘/皮肤配置）和 themes/ 背景图。
+     * default.custom.yaml 记着启用的方案列表，不随压缩包覆盖；学习记录、installation.yaml、编译产物一律不覆盖。
+     */
+    internal fun isImportableUserConfig(relPath: String): Boolean =
+        (relPath.endsWith(".custom.yaml") && relPath != "default.custom.yaml") || relPath.startsWith("themes/")
 
     internal val bundledAssetRoots = listOf("rime", "rime_chinese", "rime_japanese", "rime_letters", "rime_ice")
 

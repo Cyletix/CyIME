@@ -102,6 +102,8 @@ object ImportManager {
                 if (install.parseFailures.isNotEmpty()) append("\n" + install.parseFailures.joinToString("\n"))
                 if (install.unresolvedDeps.isNotEmpty())
                     append("\n请补齐方案引用的文件：" + install.unresolvedDeps.joinToString("、"))
+                if (install.keptExistingFiles.isNotEmpty())
+                    append("\n保留了已有的 " + install.keptExistingFiles.joinToString("、") + "，没有覆盖，要换请单独导入这个文件")
             })
             install.conflicts.isNotEmpty() -> ImportResult.Content(true, installedDirect = false,
                 pendingPackageId = packageId, pendingName = title,

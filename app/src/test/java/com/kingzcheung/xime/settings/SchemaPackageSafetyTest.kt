@@ -256,4 +256,40 @@ class SchemaPackageSafetyTest {
         assertNotNull(SchemaManifestManager.loadManifest(context, "builtin"))
     }
 
+    private fun zipPackage(id: String, vararg files: Pair<String, String>) {
+        val market = SchemaManager.getMarketDir(context, id).apply { mkdirs() }
+        java.util.zip.ZipOutputStream(File(market, "$id.zip").outputStream()).use { zip ->
+            for ((name, text) in files) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name)); zip.write(text.toByteArray()); zip.closeEntry()
+            }
+        }
+    }
+
+    @Test fun reimportedZipReplacesKeyboardConfigLikeSingleFileImport() = runBlocking {
+        val schema = "double_pinyin_luan17.schema.yaml" to "schema:\n  schema_id: double_pinyin_luan17\n  name: Luan17"
+        write("default.custom.yaml", "patch:\n  schema_list: [{schema: rime_ice}]")
+        zipPackage("import_1", schema, "xime.custom.yaml" to "skin: v1")
+        assertTrue(SchemaManager.installPackageFromMarketDir(context, "import_1", "first", switchEnabled = false).success)
+        assertEquals("skin: v1", File(rime, "xime.custom.yaml").readText())
+        zipPackage("import_2", schema, "xime.custom.yaml" to "skin: v2", "themes/bg.png" to "new image",
+            "default.custom.yaml" to "patch:\n  schema_list: []")
+        write("themes/bg.png", "old image")
+        val second = SchemaManager.installPackageFromMarketDir(context, "import_2", "second", switchEnabled = false)
+        assertTrue(second.failureReason, second.success)
+        assertEquals("skin: v2", File(rime, "xime.custom.yaml").readText())
+        assertEquals("new image", File(rime, "themes/bg.png").readText())
+        // 启用方案列表不随压缩包覆盖，但要告诉用户没覆盖。
+        assertTrue(File(rime, "default.custom.yaml").readText().contains("rime_ice"))
+        assertEquals(listOf("default.custom.yaml"), second.keptExistingFiles)
+        // 卸载任一导入包都不删个人配置。
+        assertTrue(uninstall("import_2").success)
+        assertEquals("skin: v2", File(rime, "xime.custom.yaml").readText())
+    }
+
+    @Test fun marketUpdateKeepsUserKeyboardConfig() {
+        write("xime.custom.yaml", "my skin")
+        val installed = install("marketA", "xime.custom.yaml" to "market skin", "a.dict.yaml" to "dict")
+        assertEquals("my skin", File(rime, "xime.custom.yaml").readText())
+        assertEquals(listOf("a.dict.yaml"), installed)
+    }
 }

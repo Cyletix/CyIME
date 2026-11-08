@@ -257,6 +257,8 @@ object SchemaManager {
         val failureReason: String? = null,
         val parseFailures: List<String> = emptyList(),
         val resourcesOnly: Boolean = false,
+        /** 包里有、但因为是已有的个人配置而保留原文件没覆盖的文件，要告诉用户。 */
+        val keptExistingFiles: List<String> = emptyList(),
     )
 
     /**
@@ -342,9 +344,16 @@ object SchemaManager {
                     unreadableFiles.any { File(getRimeDir(context), it).exists() })) {
                 return@withContext InstallFromDirResult(false, failureReason = parseFailures.joinToString("\n"))
             }
-            SchemaManifestManager.installStagedFiles(
-                context, packageId, displayName, version, fromMarket, staged, targetFiles - unreadableFiles.toSet(),
+            val installTargets = targetFiles - unreadableFiles.toSet()
+            val installedFiles = SchemaManifestManager.installStagedFiles(
+                context, packageId, displayName, version, fromMarket, staged, installTargets,
+                overwriteUserConfig = !fromMarket,
             )
+            val keptExisting = installTargets.distinct().filter { name ->
+                name !in installedFiles && !SchemaManifestManager.isProtectedSystemFile(name) &&
+                    File(staged, name).isFile && File(getRimeDir(context), name).exists()
+            }
+            if (keptExisting.isNotEmpty()) FileLogger.i(TAG, "installPackageFromMarketDir: kept existing $keptExisting")
 
             val after = discoverSchemas(context).map { it.schemaId }.toSet()
             val newIds = (after - before).toList()
@@ -385,7 +394,7 @@ object SchemaManager {
 
             FileLogger.i(TAG, "installPackageFromMarketDir: success for $packageId, firstSchema=$firstSchema")
             InstallFromDirResult(success = true, newSchemaIds = newIds, unresolvedDeps = unresolved,
-                parseFailures = parseFailures, resourcesOnly = definitions.isEmpty())
+                parseFailures = parseFailures, resourcesOnly = definitions.isEmpty(), keptExistingFiles = keptExisting)
         } catch (e: Exception) {
             FileLogger.e(TAG, "installPackageFromMarketDir: UNCAUGHT exception for $packageId", e)
             return@withContext InstallFromDirResult(success = false, failureReason = "安装异常: ${e.message}")
