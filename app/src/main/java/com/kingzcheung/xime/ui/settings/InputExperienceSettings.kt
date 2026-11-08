@@ -77,6 +77,8 @@ internal fun InputExperienceSettings(
                 val corner = com.kingzcheung.xime.ui.keyboard.CornerInputChoice.of(settings)
                 // 26 键滑行开着时角标的滑动输入用不了：两张「滑动」卡置灰，下面写明是哪个滑行锁的，点名字跳过去关掉。
                 val glideLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.glideCornerLock(settings)
+                // 图例跟上面两个角标提示开关走（用户 11-08）：关掉的角标不画、不列。
+                val hints = com.kingzcheung.xime.ui.keyboard.rememberSwipeHintsEnabled()
                 Row(Modifier.fillMaxWidth().choiceCardRowHeight(176.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.entries.forEach { choice ->
                         IllustratedChoiceCard(choice.label, corner == choice,
@@ -85,10 +87,12 @@ internal fun InputExperienceSettings(
                             modifier = Modifier.weight(1f).then(if (choice == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE)
                                 Modifier.settingsSearchAnchor("长按弹出字母气泡") else Modifier),
                             tag = "corner-input:${choice.name}", titleMaxLines = 2, illustrationPadding = 2.dp) {
-                            CornerInputIllustration(choice, settings.reverseSymbolSwipe)
+                            CornerInputIllustration(choice, settings.reverseSymbolSwipe, hints.up, hints.down)
                         }
                     }
                 }
+                // 说明跟选中的方式和角标提示开关走（用户 11-08）：方向已画在卡片里，这里只补卡片表达不了的。
+                val hiddenNote = if (hints.up && hints.down) "" else "关掉提示的角标键上不显示，手势照样输入。"
                 Text(when (corner) {
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE -> "滑动时键内预览，松手输入。"
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE ->
@@ -96,7 +100,7 @@ internal fun InputExperienceSettings(
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS ->
                         "按住 ${symbolLongPressLabel(settings.symbolLongPressSeconds)} 秒立刻输入上方角标，不用松手；气泡显示输入的角标，松手消失。" +
                             "九键长按出数字，选字母改用拂动。西班牙语的元音和 n 长按仍出 á é ñ，它们的上角标改用滑动。"
-                }, style = MaterialTheme.typography.bodySmall)
+                } + hiddenNote, style = MaterialTheme.typography.bodySmall)
                 glideLock?.let { SettingsLockNote("${it.message}：字母键的滑动都用来滑词，角标改为长按输入") }
                 // 只在「长按输入」（含被滑行锁成长按）时有用，这时才显示（用户 11-08：关闭角标滑动后要能调长按时间）。
                 if (corner == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS) {
