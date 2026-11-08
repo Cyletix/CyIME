@@ -229,12 +229,17 @@ editor:
 
 # Whole English words from the bundled melt_eng sources, indexed by T9 digits.
 # Native table candidates retain their original casing and global selection index.
+# 中英混合词（B站、T恤、A股，雾凇 26 键的 cn_en 表，字母 + 全拼）也在这张表里，按英文词一样排、一样学。
 t9_english:
   dictionary: cyime_t9_english
   enable_completion: false
   enable_sentence: false
   enable_user_dict: true
   initial_quality: 0.2
+  # 四个键以上的整词和中英混合词（B站）：这里给的分高于单字，保证进入候选规则（cyime_candidate_policy）排的前 64 个，
+  # 再由它放到所有拼全了的中文候选后面，最早第 6 位。选过的词照常按用户词频往前排。2026-11-08 以前排在全部中文后面
+  # （九键 shit 第 87、14 键 B站 第 118），等于打不出来。三个键以下的纯英文词不变。
+  exact_quality: 1.01
   comment_format: []
   # 英文词后接剩余数字（steam42 这类）会挤掉中文候选，默认不生成。
   digit_suffixes: false

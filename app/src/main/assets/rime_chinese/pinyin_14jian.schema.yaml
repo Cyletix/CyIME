@@ -235,12 +235,17 @@ t9:
   merged_tail_word_margin: 3.0
 
 # 英文词（同九键英文词表，按 14 键合并键编码）：整词排在中文后，按到第 4 个键起再给出最多 3 个开头相符的词。
+# 中英混合词（B站、T恤）也在这张表里。选过的词和九键一样按用户词频学习（2026-11-08 以前 14 键英文不学习）。
 k14_english:
   dictionary: cyime_k14_english
   enable_completion: false
   enable_sentence: false
-  enable_user_dict: false
+  enable_user_dict: true
   initial_quality: -1
+  # 四个键以上的整词和中英混合词（B站）：这里给的分高于单字，保证进入候选规则（cyime_candidate_policy）排的前 64 个，
+  # 再由它放到所有拼全了的中文候选后面，最早第 6 位。选过的词照常按用户词频往前排。2026-11-08 以前排在全部中文后面
+  # （九键 shit 第 87、14 键 B站 第 118），等于打不出来。三个键以下的纯英文词不变。
+  exact_quality: 1.01
   comment_format: []
   completion_limit: 3
   completion_keys: "QETUOADGJZCBlm"

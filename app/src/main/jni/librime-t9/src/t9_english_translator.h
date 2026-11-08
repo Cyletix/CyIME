@@ -14,6 +14,7 @@ class T9EnglishTranslator : public TableTranslator {
       ticket.schema->config()->GetBool(name_space_ + "/digit_suffixes", &digit_suffixes_);
       ticket.schema->config()->GetInt(name_space_ + "/completion_limit", &completion_limit_);
       ticket.schema->config()->GetString(name_space_ + "/completion_keys", &completion_keys_);
+      ticket.schema->config()->GetDouble(name_space_ + "/exact_quality", &exact_quality_);
     }
   }
   an<Translation> Query(const string& input, const Segment& segment) override;
@@ -25,6 +26,8 @@ class T9EnglishTranslator : public TableTranslator {
   int completion_limit_ = 0;
   // Keys that may start a completion: nine-key digits, or the 14-key keys (QETUOADGJZCBlm).
   string completion_keys_ = "23456789";
+  // Quality of a whole word not learned yet (exact match of every key); unset keeps initial_quality.
+  double exact_quality_ = -1e10;
 };
 }  // namespace rime
 #endif

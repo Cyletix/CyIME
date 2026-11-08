@@ -6,12 +6,26 @@
 
 namespace rime {
 namespace {
+// Four keys or more, or a mixed word (B站, T恤): shorter English words (go, the, she) stay after the Chinese
+// candidates, where every common 2–3-key Chinese prefix would otherwise show one.
+bool T9EnglishSlotted(const Phrase& phrase) {
+  const string& text = phrase.text();
+  return phrase.end() - phrase.start() >= 4 ||
+         std::any_of(text.begin(), text.end(), [](char c) { return static_cast<unsigned char>(c) >= 0x80; });
+}
 class EnglishLearningTranslation : public CacheTranslation {
  public:
-  explicit EnglishLearningTranslation(an<Translation> source) : CacheTranslation(source) {}
+  EnglishLearningTranslation(an<Translation> source, double exact_quality)
+      : CacheTranslation(source), exact_quality_(exact_quality) {}
   an<Candidate> Peek() override {
     auto candidate = CacheTranslation::Peek();
     auto phrase = As<Phrase>(candidate);
+    if (phrase && exact_quality_ > -1e9 && phrase->entry().commit_count <= 0 &&
+        (phrase->type() == "table" || phrase->type() == "user_table") && T9EnglishSlotted(*phrase)) {
+      // exact_quality: a whole word not learned yet comes right after the fully spelled Chinese words, among
+      // the candidates cyime_candidate_policy places (candidate_policy.cc); completions keep theirs.
+      phrase->set_quality(exact_quality_);
+    }
     if (phrase && phrase->type() == "user_table" && phrase->entry().commit_count > 0) {
       // Learned whole words have full coverage, just like exact Chinese phrases.
       // Keep Rime's frequency/recency probability: repeated choices progressively
@@ -20,10 +34,26 @@ class EnglishLearningTranslation : public CacheTranslation {
     }
     return candidate;
   }
+
+ private:
+  double exact_quality_;
 };
 }  // namespace
 an<Translation> T9EnglishTranslator::Query(const string& input, const Segment& segment) {
-  an<Translation> exact = New<EnglishLearningTranslation>(TableTranslator::Query(input, segment));
+  an<Translation> exact = New<EnglishLearningTranslation>(TableTranslator::Query(input, segment), exact_quality_);
+  if (exact_quality_ > -1e9 && exact && !exact->exhausted()) {
+    // Rime merges translations by the quality of each one's next candidate, so a lower-quality word ahead of a
+    // slotted one (bit before A股 for 248) kept that one after every Chinese candidate: order the whole words by
+    // quality first (only exact matches of the typed keys, a handful).
+    vector<an<Candidate>> words;
+    for (; words.size() < 64 && !exact->exhausted(); exact->Next()) words.push_back(exact->Peek());
+    std::stable_sort(words.begin(), words.end(), [](const an<Candidate>& a, const an<Candidate>& b) {
+      return a->quality() > b->quality();
+    });
+    auto sorted = New<FifoTranslation>();
+    for (const auto& word : words) sorted->Append(word);
+    exact = exact->exhausted() ? an<Translation>(sorted) : an<Translation>(sorted + exact);
+  }
   // CyIME: a few common words starting with the typed keys, after the whole words: English typed
   // half way shows up as on 26 keys. From 4 keys on, so short inputs stay Chinese.
   if (completion_limit_ > 0 && input.size() >= 4 && input.size() <= 32 &&

@@ -27,7 +27,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("cyletix10Preset", 1)
     inputs.property("colemakPreset", 1)
     inputs.property("typewisePreset", 1)
-    inputs.property("t9EnglishIndex", 9)
+    inputs.property("t9EnglishIndex", 10)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 3)
     inputs.property("idleSpellingEdits", 3)
@@ -270,9 +270,13 @@ val prepareChineseDictionaries by tasks.registering {
                             // an existing word's spelling when its upstream code is an abbreviation.
                             // en_ext is upstream's curated internet/brand list (ChatGPT, Minecraft); from the
                             // full word list keep common words and two-letter capitals (QQ, AI, PC).
+                            // The rest of the full list (fuck, shit…: 26 keys type every one of them) at the lowest
+                            // weight, from four letters up so short codes stay Chinese; before, 九键/14 键 could not
+                            // type them at all.
                             val weight = commonEnglish[fields[0].lowercase(java.util.Locale.ROOT)]
                                 ?: fields.getOrNull(2)?.toIntOrNull()?.takeIf { source == "en_ext" && it > 0 }
                                 ?: 1000.takeIf { source == "en_ext" || fields[0].matches(Regex("[A-Z]{2}")) }
+                                ?: 1.takeIf { fields[0].count { it in 'A'..'Z' || it in 'a'..'z' } >= 4 }
                                 ?: return@forEach
                             for (spelling in listOf(fields[1], fields[0]).distinct()) {
                                 if (spelling.length !in 2..64 || !spelling.all { it.code in 32..126 }) continue
@@ -292,6 +296,21 @@ val prepareChineseDictionaries by tasks.registering {
                         }
                     }
                 }
+            }
+        }
+        // Mixed Latin + Chinese words (B站, T恤, A股, 卡拉OK) from upstream's 26-key cn_en table (letters + full pinyin),
+        // encoded the same way, so 九键 and 14 键 type them like English words and learn them the same way.
+        File(root, "en_dicts/cn_en.txt").useLines { lines ->
+            lines.forEach { line ->
+                if (line.startsWith("#")) return@forEach
+                val fields = line.split('\t')
+                if (fields.size < 2 || fields[0].isBlank() || fields[1].length !in 2..64 ||
+                    !fields[1].all { it in 'A'..'Z' || it in 'a'..'z' }) return@forEach
+                val letters = fields[1].lowercase(java.util.Locale.ROOT)
+                val code = letters.map { digits[it - 'a'] }.joinToString("")
+                english.putIfAbsent(fields[0] + "\t" + code, fields[0] + "\t" + code + "\t1000")
+                val code14 = letters.map { keys14[it - 'a'] }.joinToString("")
+                english14.putIfAbsent(fields[0] + "\t" + code14, fields[0] + "\t" + code14 + "\t1000")
             }
         }
         File(root, "cyime_t9_english.dict.yaml").writeText(
