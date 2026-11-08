@@ -1,5 +1,6 @@
 #include "t9_filter.h"
 
+#include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <vector>
@@ -147,6 +148,36 @@ static std::vector<InputPart> SplitPreedit(const std::string& preedit) {
 // ── ConvertPreedit 算法 ──
 // 移植自 T9PreeditConverter.kt 的 convertT9PreeditToPinyin()
 
+// A run of two or more keys may span several syllables of the candidate: its preedit keeps the raw keys when
+// it comes from a phrase looked up by keys (e.g. 你好吗 after picking ni: "ni'42662"). Each syllable takes
+// its full keys, or a prefix of them when typed short (963 = w m d); the syllables are joined by a space like
+// Rime's own preedit. Before 2026-11-08 the run took only one syllable: "nihaoma" without separators, and
+// "ni hao" for ni'42662 with the last syllable gone. [reserve] syllables stay for the parts after the run; the
+// last run must use up the reading. False when the keys and the reading don't line up (the old rule applies).
+static bool SpellDigitRun(const std::string& digits, const std::vector<std::string>& pinyin, size_t pi,
+                          size_t reserve, std::vector<std::string>* pieces, size_t* next, int* budget) {
+    if (pieces->size() > 64 || --*budget < 0) return false;
+    if (digits.empty()) {
+        const size_t left = pinyin.size() - pi;
+        if (reserve == 0 ? left != 0 : left < reserve) return false;
+        *next = pi;
+        return true;
+    }
+    if (pi >= pinyin.size() || pinyin.size() - pi <= reserve) return false;
+    std::string py = pinyin[pi];
+    for (auto& c : py) c = static_cast<char>(tolower(c));
+    const std::string code = T9PinyinMap::Instance().PinyinToDigitCode(py).value_or("");
+    if (code.empty() || code.size() != py.size()) return false;
+    for (size_t take = std::min(code.size(), digits.size()); take > 0; --take) {
+        if (digits.compare(0, take, code, 0, take) != 0) continue;
+        // One physical key represents one letter, never the digraph zh/ch/sh.
+        pieces->push_back(take == code.size() ? py : py.substr(0, take));
+        if (SpellDigitRun(digits.substr(take), pinyin, pi + 1, reserve, pieces, next, budget)) return true;
+        pieces->pop_back();
+    }
+    return false;
+}
+
 std::string T9ConvertPreedit(const std::string& preedit,
                                const std::string& comment) {
     if (preedit.empty() || comment.empty()) return preedit;
@@ -186,7 +217,19 @@ std::string T9ConvertPreedit(const std::string& preedit,
         if (part.is_separator) {
             part.text = " ";
         } else if (part.is_all_digits) {
-            if (pi < pinyin_parts.size()) {
+            size_t reserve = 0;
+            for (size_t j = i + 1; j < input_parts.size(); ++j)
+                if (!input_parts[j].is_separator && !input_parts[j].is_chinese) ++reserve;
+            std::vector<std::string> pieces;
+            size_t next = pi;
+            int budget = 4096;
+            if (part.text.size() >= 2 &&
+                SpellDigitRun(part.text, pinyin_parts, pi, reserve, &pieces, &next, &budget) && pieces.size() >= 2) {
+                std::string spelled;
+                for (const auto& piece : pieces) spelled += (spelled.empty() ? "" : " ") + piece;
+                part.text = spelled;
+                pi = next;
+            } else if (pi < pinyin_parts.size()) {
                 const std::string& py = pinyin_parts[pi];
                 bool single_segment_multiple_pinyins =
                     (input_parts.size() == 1 && pinyin_parts.size() > 1);
@@ -257,7 +300,11 @@ std::string T9ConvertPreedit(const std::string& preedit,
 std::string T9ConvertCandidatePreedit(const std::string& preedit,
                                       const std::string& comment,
                                       const std::string& candidate_text) {
-    if (comment.empty() || comment[0] == '~') {
+    // A comment without letters is no reading either: a word from the English list carries its keys
+    // (fuck: 3825). Shown as typed keys, the code bar kept the previous key's reading once such a word came
+    // first (2026-11-08, learned B站 / fuck).
+    if (comment.empty() || comment[0] == '~' ||
+        std::none_of(comment.begin(), comment.end(), [](unsigned char c) { return std::isalpha(c); })) {
         return candidate_text;
     }
     return T9ConvertPreedit(preedit, comment);

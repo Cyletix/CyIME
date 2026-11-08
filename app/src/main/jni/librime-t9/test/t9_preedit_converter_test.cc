@@ -2,6 +2,7 @@
 //
 // 对应 Kotlin T9PreeditConverter.kt 的 convertT9PreeditToPinyin()
 // 覆盖场景：常规多音节、末尾简拼、单段多音节、中文混合、空 comment
+// 一段按键跨几个音节时逐个音节显示、用空格分开（2026-11-08 起；以前连写）
 #include <gtest/gtest.h>
 
 #include "t9_filter.h"            // T9ConvertPreedit / T9ConvertCandidatePreedit
@@ -13,13 +14,13 @@ using rime::T9ConvertCandidatePreedit;
 // ── 常规场景 ──
 
 TEST(T9PreeditConverterTest, RegularMultiSyllable) {
-    // "54482" + "ji gua" → "jigua"
-    EXPECT_EQ(T9ConvertPreedit("54482", "ji gua"), "jigua");
+    // "54482" + "ji gua" → "ji gua"（音节之间有分隔，2026-11-08 以前连写成 jigua）
+    EXPECT_EQ(T9ConvertPreedit("54482", "ji gua"), "ji gua");
 }
 
 TEST(T9PreeditConverterTest, RegularThreeSyllable) {
-    // "5482" + "ji hua" → "jihua"
-    EXPECT_EQ(T9ConvertPreedit("5482", "ji hua"), "jihua");
+    // "5482" + "ji hua" → "j hua"（四个键：j 是打短的 ji）
+    EXPECT_EQ(T9ConvertPreedit("5482", "ji hua"), "j hua");
 }
 
 TEST(T9PreeditConverterTest, SeparatorInPreedit) {
@@ -61,8 +62,8 @@ TEST(T9PreeditConverterTest, LastSingleDigitAfterSeparator) {
 // ── 单段多音节 ──
 
 TEST(T9PreeditConverterTest, SingleSegmentMultiplePinyins) {
-    // "564" + "le ming" → "leming"
-    EXPECT_EQ(T9ConvertPreedit("564", "le ming"), "leming");
+    // "564" + "le ming" → "l mi"（三个键各对一个字母）
+    EXPECT_EQ(T9ConvertPreedit("564", "le ming"), "l mi");
 }
 
 // ── 中文混合 ──
@@ -106,8 +107,36 @@ TEST(T9PreeditConverterTest, EnglishUnitySuffixCommentUsesCandidateText) {
 
 TEST(T9PreeditConverterTest, ChinesePinyinCommentStillConverts) {
     // 中文九键候选带拼音注释 → 仍走数字→拼音转换，行为不变
-    EXPECT_EQ(T9ConvertCandidatePreedit("54482", "ji gua", "计划"), "jigua");
+    EXPECT_EQ(T9ConvertCandidatePreedit("54482", "ji gua", "计划"), "ji gua");
     EXPECT_EQ(T9ConvertCandidatePreedit("5", "le", "了"), "l");
+}
+
+// 2026-11-08「九键拼音分词没显示分词符，最后一个没有分词显示」：按键原样的 preedit（按键查到的词、选过左侧拼音后的
+// 剩余部分）里一段数字跨几个音节时，以前只取一个音节：整段连写成 nihaoma，ni'42662 只剩 ni hao，最后一个音节没了。
+TEST(T9PreeditConverterTest, KeyRunSpanningSyllablesShowsEverySyllable) {
+    EXPECT_EQ(T9ConvertPreedit("6442662", "ni hao ma"), "ni hao ma");
+    EXPECT_EQ(T9ConvertPreedit("ni'42662", "ni hao ma"), "ni hao ma");
+    EXPECT_EQ(T9ConvertPreedit("ni'hao'6262", "ni hao ma ma"), "ni hao ma ma");
+    EXPECT_EQ(T9ConvertPreedit("64426 62", "ni hao ma"), "ni hao ma");
+    // 打短的音节照按的键显示：963 我们的 = w m d，9366 怎么 = zen m。
+    EXPECT_EQ(T9ConvertPreedit("963", "wo men de"), "w m d");
+    EXPECT_EQ(T9ConvertPreedit("9366", "zen me"), "zen m");
+    EXPECT_EQ(T9ConvertPreedit("94324364", "zhe cheng"), "zhe cheng");
+}
+
+TEST(T9PreeditConverterTest, KeyRunRulesThatAlreadyWorkStayTheSame) {
+    EXPECT_EQ(T9ConvertPreedit("644 26", "ni hao"), "ni hao");
+    EXPECT_EQ(T9ConvertPreedit("644 26 62", "ni hao ma"), "ni hao ma");
+    EXPECT_EQ(T9ConvertPreedit("ni'hao'6", "ni hao ma"), "ni hao m");
+    // 两个键对两个打短的音节。按键和读音对不上时照旧（整段一个时连写）。
+    EXPECT_EQ(T9ConvertPreedit("64", "ni hao"), "n h");
+    EXPECT_EQ(T9ConvertPreedit("22", "ni hao"), "nihao");
+}
+
+// 英文表里的词注释是按键本身（fuck: 3825），不是拼音：排第一时编码显示这个词，不再停在上一键的拼音。
+TEST(T9PreeditConverterTest, EnglishKeysCommentUsesCandidateText) {
+    EXPECT_EQ(T9ConvertCandidatePreedit("3825", "3825", "fuck"), "fuck");
+    EXPECT_EQ(T9ConvertCandidatePreedit("29426", "29426", "B站"), "B站");
 }
 
 TEST(T9PreeditConverterTest, NoDigits) {
@@ -123,11 +152,11 @@ TEST(T9PreeditConverterTest, CommentWhitespaceOnly) {
 
 TEST(T9PreeditConverterTest, UppercaseComment) {
     // comment 中的拼音大写时，转换结果应小写
-    EXPECT_EQ(T9ConvertPreedit("54482", "JI GUA"), "jigua");
+    EXPECT_EQ(T9ConvertPreedit("54482", "JI GUA"), "ji gua");
 }
 
 TEST(T9PreeditConverterTest, MixedCaseComment) {
-    EXPECT_EQ(T9ConvertPreedit("54482", "Ji Gua"), "jigua");
+    EXPECT_EQ(T9ConvertPreedit("54482", "Ji Gua"), "ji gua");
 }
 
 // ── 带声调 comment（带声调方案场景）──
@@ -135,13 +164,13 @@ TEST(T9PreeditConverterTest, MixedCaseComment) {
 // 不依赖逐字节 ASCII 过滤（避免 jī→j、huà→hu 的 bug）。
 
 TEST(T9PreeditConverterTest, TonedCommentRegular) {
-    // "54482" + "jī huà" → "jihua"（声调字符归一化后与无声调一致）
-    EXPECT_EQ(T9ConvertPreedit("54482", "jī huà"), "jihua");
+    // "54482" + "jī huà" → "ji hua"（声调字符归一化后与无声调一致）
+    EXPECT_EQ(T9ConvertPreedit("54482", "jī huà"), "ji hua");
 }
 
 TEST(T9PreeditConverterTest, TonedCommentThreeSyllable) {
-    // "5482" + "jī huà" → "jihua"
-    EXPECT_EQ(T9ConvertPreedit("5482", "jī huà"), "jihua");
+    // "5482" + "jī huà" → "j hua"
+    EXPECT_EQ(T9ConvertPreedit("5482", "jī huà"), "j hua");
 }
 
 TEST(T9PreeditConverterTest, TonedCommentAllTones) {
@@ -173,20 +202,20 @@ TEST(T9PreeditConverterTest, TonedCommentSingleDigitJianpin) {
 }
 
 TEST(T9PreeditConverterTest, TonedCommentSingleSegmentMulti) {
-    // "54482" + "jī huà" → "jihua"（单段多音节，合并输出）
-    // 验证 NormalizePinyinComment 替代逐字节过滤后单段多音节分支仍能正确拼接
-    EXPECT_EQ(T9ConvertPreedit("54482", "jī huà"), "jihua");
+    // "54482" + "jī huà" → "ji hua"（单段多音节，按音节分开）
+    // 验证 NormalizePinyinComment 替代逐字节过滤后单段多音节仍能正确拼出
+    EXPECT_EQ(T9ConvertPreedit("54482", "jī huà"), "ji hua");
 }
 
 TEST(T9PreeditConverterTest, TonedCommentMixedCase) {
     // 大写声调 comment → 归一化后小写
-    EXPECT_EQ(T9ConvertPreedit("54482", "JĪ HUÀ"), "jihua");
+    EXPECT_EQ(T9ConvertPreedit("54482", "JĪ HUÀ"), "ji hua");
 }
 
 TEST(T9PreeditConverterTest, TonedCommentPreserveExisting) {
     // 有声调 comment 已有的无声调场景不受影响（回归）
-    EXPECT_EQ(T9ConvertPreedit("54482", "ji gua"), "jigua");
-    EXPECT_EQ(T9ConvertPreedit("54482", "ji hua"), "jihua");
+    EXPECT_EQ(T9ConvertPreedit("54482", "ji gua"), "ji gua");
+    EXPECT_EQ(T9ConvertPreedit("54482", "ji hua"), "ji hua");
     EXPECT_EQ(T9ConvertPreedit("5", "le"), "l");
     EXPECT_EQ(T9ConvertPreedit("9", "zhong"), "z");
 }
