@@ -1178,3 +1178,6 @@ user-zhichuan	26	woyongzhizhechengleyigezhichuan	我用纸折成了一个纸船	
 user-baomao	26	baomaodeshaonian	抱猫的少年	1	user	2026-11-06	Q 群：曾出「豹猫的少年」(抱猫不在词库)
 user-zhichuan-zhi	26	zhichuanyijian	只穿一件	1	found	2026-11-06	同上反例：「只穿」本身不受影响
 user-baomao-bao	26	baomao	豹猫	3	found	2026-11-06	同上反例：单打 baomao 时「豹猫」还在前三 (抱猫/豹猫没有上下文可分，句子里按词频取抱猫)
+user-gulaorou	26	boluogulaorou	菠萝咕咾肉	1	user	2026-11-08	Q 群 2：咾 只在生僻字里，咕咾肉 成不了词；补 咾 咕咾肉 菠萝咕咾肉
+user-gulaorou-word	26	gulaorou	咕咾肉	1	user	2026-11-08	同上
+user-gulaorou-lao	26	lao	!咾	1	found	2026-11-08	同上反例：单打 lao 首选不能是 咾

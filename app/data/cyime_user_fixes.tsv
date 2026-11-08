@@ -23,3 +23,8 @@
 折成	zhe cheng	50000
 折纸船	zhe zhi chuan	3000
 抱猫	bao mao	3000
+# Q 群 2 (2026-11-08): 咾 came only with 生僻字 on, so 咕咾肉 / 菠萝咕咾肉 could not be typed as words or learned.
+# 古老肉 (15) is the common misspelling; 咕咾肉 goes above it. 咾 alone stays low, after the common lao characters.
+咾	lao	50
+咕咾肉	gu lao rou	1000
+菠萝咕咾肉	bo luo gu lao rou	500
