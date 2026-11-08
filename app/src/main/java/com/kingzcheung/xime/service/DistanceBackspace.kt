@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.service
 
 import android.icu.text.BreakIterator
-import android.os.Build
 import android.text.Spanned
 import android.text.SpannedString
 import android.view.inputmethod.ExtractedTextRequest
@@ -91,10 +90,8 @@ internal class DistanceBackspace private constructor(
                     // A full window may stop short of the real end; its last grapheme may be cut.
                     afterEnd - start >= afterLimit)
             }
-            if (Build.VERSION.SDK_INT >= 31) {
-                ic.getSurroundingText(BEFORE, afterLimit, InputConnection.GET_TEXT_WITH_STYLES)?.let {
-                    if (it.offset >= 0) return window(it.text, it.offset, it.selectionStart, it.selectionEnd)
-                }
+            ic.readSurroundingWindow(BEFORE, afterLimit, InputConnection.GET_TEXT_WITH_STYLES)?.let {
+                if (it.startOffset >= 0) return window(it.text, it.startOffset, it.selectionStart, it.selectionEnd)
             }
             val extracted = ic.getExtractedText(ExtractedTextRequest().apply {
                 hintMaxChars = BEFORE + afterLimit

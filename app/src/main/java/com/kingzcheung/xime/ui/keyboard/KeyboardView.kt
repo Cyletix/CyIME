@@ -1128,6 +1128,9 @@ fun KeyboardView(
                         viewModel.setCandidatePageExpanded(false)
                         if (showHandwritingCandidates) {
                             clearHandwriting()
+                        } else if (candidateBarState is CandidateBarState.AssociationOnly &&
+                            cs.pendingEnglishText.isEmpty() && callbacks.onClearAssociation != null) {
+                            callbacks.onClearAssociation.invoke()
                         } else {
                             callbacks.onKeyPress("clear_composition", false)
                         }

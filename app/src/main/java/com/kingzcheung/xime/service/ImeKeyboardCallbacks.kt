@@ -150,6 +150,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyRouter.selectAssociation(index)
             },
             onClearAssociation = {
+                service.predictionManager.invalidatePendingPredictions()
                 // 清空英文联想候选，并结束英文输入态：pendingEnglish 清空后，
                 // 后续刷新不再触发联想异步回填（否则"清了又冒出来"，见
                 // ImeSessionController/updateUIWithResult 的在途回填校验）。

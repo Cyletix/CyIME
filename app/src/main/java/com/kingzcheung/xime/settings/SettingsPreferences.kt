@@ -441,6 +441,8 @@ object SettingsPreferences {
     const val KEY_CANDIDATE_COMMENT_CONTENT = "candidate_comment_content"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
     const val KEY_ASSOCIATION_CANCEL_CROSS = "association_cancel_cross"
+    const val KEY_HANDWRITING_WUBI_HINTS = "handwriting_wubi_hints"
+    const val KEY_CANDIDATE_PRESS_HIGHLIGHT = "candidate_press_highlight"
     const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     const val KEY_SHOW_PREEDIT_PREVIEW = "show_preedit_preview"
     const val KEY_INLINE_PREEDIT_PREVIEW = "inline_preedit_preview"

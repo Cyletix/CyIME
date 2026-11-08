@@ -111,13 +111,6 @@ class PredictionManager(
         
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val trieInit = AssociationService.initialize(context)
-                if (trieInit) {
-                    FileLogger.i(TAG, "Trie association service initialized")
-                } else {
-                    FileLogger.w(TAG, "Trie association service initialization failed")
-                }
-                
                 if (!ExtensionManager.isInitialized()) {
                     FileLogger.d(TAG, "ExtensionManager not initialized, initializing...")
                     ExtensionManager.initialize(context)

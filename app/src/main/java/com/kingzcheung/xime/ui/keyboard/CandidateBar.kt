@@ -261,6 +261,10 @@ fun CandidateBar(
     var associationCancelCross by remember(preferences) {
         mutableStateOf(SettingsPreferences.isAssociationCancelCross(context))
     }
+    var pressHighlight by remember(preferences) {
+        mutableStateOf(preferences.getBoolean(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT, false))
+    }
+    val edgePressedFill = if (pressHighlight) protectedVisuals.textColor.copy(alpha = 0.34f) else iconButtonContainer
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON || key == null) {
@@ -268,6 +272,9 @@ fun CandidateBar(
             }
             if (key == SettingsPreferences.KEY_ASSOCIATION_CANCEL_CROSS || key == null) {
                 associationCancelCross = SettingsPreferences.isAssociationCancelCross(context)
+            }
+            if (key == SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT || key == null) {
+                pressHighlight = preferences.getBoolean(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT, false)
             }
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
@@ -465,6 +472,12 @@ fun CandidateBar(
         }
         // 同心：胶囊圆角 = 键盘卡片圆角 - 胶囊离栏边的距离（上下各 6dp），和卡片四角同心。
         val edgeCorner = if (edgeStyle == EdgeButtonStyle.CONCENTRIC) FloatingKeyboardCardCorner - 6.dp else null
+        // 窄键盘两端锚定在候选箭头的中心，中间工具均分余宽。宽键盘的所有工具仍各占完整一格。
+        val toolbarSlot = when {
+            state !is CandidateBarState.Idle || idleToolbarCell == null -> null
+            toolbarRowWidth < 600.dp -> edgeSlot ?: 40.dp
+            else -> idleToolbarCell
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -472,7 +485,7 @@ fun CandidateBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (showCompositionCancel && closesAssociation && associationCancelCross) {
-                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer,
+                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
                     modifier = Modifier.testTag("association-cancel-cross"), restingFill = edgeButtonFill,
                     slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
                     Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
@@ -480,7 +493,7 @@ fun CandidateBar(
                 }
                 Spacer(Modifier.width(4.dp))
             } else if (showCompositionCancel) {
-                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor,
+                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill, protectedVisuals.textColor,
                     label = if (closesAssociation) "关闭联想" else "取消输入",
                     modifier = if (closesAssociation) Modifier.testTag("association-cancel") else Modifier,
                     restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
@@ -725,7 +738,7 @@ fun CandidateBar(
             if (state !is CandidateBarState.Idle && (candidatePageExpanded || hasAnyMore)) {
                 val action = if (candidatePageExpanded) callbacks.onBack else callbacks.onShowMoreCandidates
                 action?.let {
-                    CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor,
+                    CandidateExpansionButton(it, edgePressedFill, protectedVisuals.accentColor,
                         expanded = candidatePageExpanded, rotation = expansionRotation, restingFill = edgeButtonFill,
                         slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                 }

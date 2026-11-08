@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
@@ -68,6 +69,7 @@ class CandidateBarFeedbackTest {
         KeyboardThemes.initFromConfig(context)
         SettingsPreferences.getPrefsPublic(context).edit()
             .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON)
+            .remove(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT)
             .remove(SettingsPreferences.KEY_ASSOCIATION_CANCEL_CROSS)
             .remove(SettingsPreferences.KEY_WIDE_CANDIDATE_SPACING).commit()
     }
@@ -78,10 +80,10 @@ class CandidateBarFeedbackTest {
 
     @androidx.compose.runtime.Composable
     private fun Bar(state: CandidateBarState, theme: String = "soft_blue", dark: Boolean = false, glass: Boolean = false,
-                    onCancel: () -> Unit = {}) {
+                    onCancel: () -> Unit = {}, widthDp: Int = 400, actions: Int = 7) {
         val palette = resolveKeyboardPalette(theme, dark)
         val config = FrostedGlassConfig.defaults(dark, enabled = glass)
-        Box(Modifier.width(400.dp).height(44.dp)
+        Box(Modifier.width(widthDp.dp).height(44.dp)
             .then(if (glass) Modifier.background(Brush.linearGradient(
                 listOf(Color(0xFF2E7D32), Color(0xFFF9A825), Color(0xFFC62828), Color(0xFF1565C0)))) else Modifier)
             .keyboardBackground(KeyboardThemes.getRenderingScheme(theme).keyboardBackground, dark, palette.background, config)) {
@@ -89,7 +91,7 @@ class CandidateBarFeedbackTest {
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config)) {
                 CandidateBar(
                     state = state,
-                    toolbarActions = toolbarActions(),
+                    toolbarActions = toolbarActions().take(actions),
                     visuals = CandidateBarVisuals(Color.Transparent, palette.candidateText,
                         if (dark) Color(0xFF3C4043) else Color(0xFFDADCE0), palette.accent, palette.selectedText, dark, palette.key),
                     callbacks = CandidateBarCallbacks(onCandidateSelect = {}, onCancelInput = onCancel, onShowMoreCandidates = {},
@@ -103,11 +105,65 @@ class CandidateBarFeedbackTest {
 
     private fun count(description: String) =
         rule.onAllNodesWithContentDescription(description, useUnmergedTree = true).fetchSemanticsNodes().size
+
+    @Test fun optionalHighlightShowsWhileHoldingEitherEdgeAndClearsOnCancel() {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        assertFalse(prefs.getBoolean(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT, false))
+        prefs.edit().putBoolean(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT, true).commit()
+        SettingsPreferences.setAssociationCancelCross(context, true)
+        var clicks = 0
+        rule.setContent { Bar(association, onCancel = { clicks++ }) }
+        val root = rule.activity.window.decorView
+        for (tag in listOf("association-cancel-cross", "candidate-expansion")) {
+            val node = rule.onNodeWithTag(tag, useUnmergedTree = true)
+            val rect = node.fetchSemanticsNode().boundsInWindow
+            fun image(phase: String): Bitmap = rule.runOnIdle {
+                val bmp = Bitmap.createBitmap(rect.width.toInt(), rect.height.toInt(), Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(bmp)
+                canvas.translate(-rect.left, -rect.top)
+                root.draw(canvas)
+                System.getenv("CYIME_RENDER_OUT")?.let { out ->
+                    File(out, "$tag-$phase.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                }
+                bmp
+            }
+            val resting = image("resting")
+            node.performTouchInput { down(center) }
+            rule.mainClock.advanceTimeBy(300)
+            assertFalse("$tag should highlight", resting.sameAs(image("pressed")))
+            node.performTouchInput { cancel() }
+            rule.mainClock.advanceTimeBy(400)
+            assertTrue("$tag should return to rest", resting.sameAs(image("cancelled")))
+        }
+        assertEquals(0, clicks)
+    }
     private fun countTag(tag: String) = rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().size
 
     private fun bounds(tag: String) = rule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
     private fun cancelBounds(description: String = "取消输入") =
         rule.onNodeWithContentDescription(description, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+
+    @Test fun narrowBarSharesEdgeTargetsAndWideToolbarStillSpreadsWithCustomActions() {
+        val width = androidx.compose.runtime.mutableIntStateOf(360)
+        val state = androidx.compose.runtime.mutableStateOf<CandidateBarState>(CandidateBarState.Idle)
+        val actions = androidx.compose.runtime.mutableIntStateOf(2)
+        rule.setContent { Bar(state.value, widthDp = width.intValue, actions = actions.intValue) }
+        for (available in listOf(320, 390, 840)) for (count in listOf(2, 7)) {
+            rule.runOnIdle { width.intValue = available; actions.intValue = count; state.value = CandidateBarState.Idle }
+            val hide = bounds("toolbar-hide")
+            val toolbarWidth = hide.right - bounds("toolbar-leading").left
+            rule.runOnIdle { state.value = composing }
+            val expand = bounds("candidate-expansion")
+            if (available < 600) {
+                assertEquals(hide.center.x, expand.center.x, 1f)
+                assertEquals(hide.center.y, expand.center.y, 1f)
+            } else {
+                val slot = (toolbarWidth - 8f * rule.density.density) / (count + 2)
+                assertEquals(slot, hide.width, 1f)
+                assertTrue("候选区不为宽工具格留白", expand.width < hide.width)
+            }
+        }
+    }
 
     @Test fun associationShowsCloseOnTheLeftAndExpandOnTheRight() {
         var cancelled = 0

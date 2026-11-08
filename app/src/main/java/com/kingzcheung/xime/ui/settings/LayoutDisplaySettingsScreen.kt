@@ -456,6 +456,14 @@ private fun LayoutDisplayPage(
                             Switch(checked = associationCancelCross, onCheckedChange = null)
                         }
                     }
+                    val pressPrefs = remember(context) { SettingsPreferences.getPrefsPublic(context) }
+                    var pressHighlight by remember { mutableStateOf(
+                        pressPrefs.getBoolean(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT, false)) }
+                    SettingsToggleItem(Icons.TwoTone.FormatColorFill, "候选栏按钮按压高亮",
+                        "按住取消键或展开箭头时，加深浅色底板或提亮深色底板。", pressHighlight, {
+                            pressHighlight = it
+                            pressPrefs.edit().putBoolean(SettingsPreferences.KEY_CANDIDATE_PRESS_HIGHLIGHT, it).apply()
+                        })
                 })
             }
             if (page == "candidates") item {
