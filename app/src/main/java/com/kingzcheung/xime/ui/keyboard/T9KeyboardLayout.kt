@@ -215,6 +215,8 @@ private fun T9KeyboardSwipeOverlay(
 ) {
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val dragSpace = LocalKeyDragSpace.current
+    var dragArea by remember { mutableStateOf(Rect.Zero) }
     val input = LocalKeyboardInputPreferences.current
     val glide = input.t9GlideTyping && input.cursorGesture != CursorGestureMode.KEYBOARD
     val glideKeys = remember(glide, controller, uiState.inputProfile) { if (glide) mutableMapOf<Char, Rect>() else null }
@@ -285,6 +287,7 @@ private fun T9KeyboardSwipeOverlay(
             }
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
+                dragArea = dragSpace.bounds(coordinates)
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp)) {
         KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
@@ -321,7 +324,7 @@ private fun T9KeyboardSwipeOverlay(
                         compactMode = true,
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
-                        dragArea = { keyboardBounds },
+                        dragArea = { dragArea },
                         ctrlTargets = ctrlTargets,
                     )
                 }
@@ -338,7 +341,7 @@ private fun T9KeyboardSwipeOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
-                        .padding(bottom = 8.dp),
+                        .padding(bottom = KeyboardGridBottomMargin),
                 ) {
                     T9KeyboardContent(
                         onKeyPress = onKeyPress,
@@ -358,15 +361,15 @@ private fun T9KeyboardSwipeOverlay(
                         compactMode = false,
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
-                        dragArea = { keyboardBounds },
+                        dragArea = { dragArea },
                         ctrlTargets = ctrlTargets,
                     )
                 }
             }
         }
-        CandidateDragLine(CandidateDropTargets.shared, { keyboardBounds.topLeft },
+        CandidateDragLine(CandidateDropTargets.shared, { dragArea.topLeft },
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
-        ShiftSlideLine(ctrlTargets, { keyboardBounds.topLeft },
+        ShiftSlideLine(ctrlTargets, { dragArea.topLeft },
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
         if (glide) GlideTrailOverlay(trail, accentColor, Modifier.matchParentSize())
     }
@@ -451,6 +454,7 @@ private fun T9KeyboardContent(
     // 九键字母跟「键帽字母大小写」走，和 26/14 键同一条规则（用户 11-05：选小写九键仍是 ABC）。只改显示。
     val upperLetters = letterLabelsUppercase(LocalKeyboardInputPreferences.current, uiState.isAsciiMode, uiState.inputProfile)
     val density = LocalDensity.current
+    val dragSpace = LocalKeyDragSpace.current
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val candidateShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, keyBackgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) {
@@ -472,7 +476,7 @@ private fun T9KeyboardContent(
         modifier = Modifier
             .fillMaxSize()
             // 按住 !@# 拖出这块键区松手不发快捷键。
-            .onGloballyPositioned { ctrlTargets.keyboardBounds = it.boundsInRoot() },
+            .onGloballyPositioned { ctrlTargets.keyboardBounds = dragSpace.bounds(it) },
         horizontalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         // ── 第1列：左侧候选区（拼音候选项） ──
@@ -832,7 +836,7 @@ private fun T9KeyboardContent(
                 textColor = specialKeyTextColor,
                 modifier = Modifier.weight(1f).testTag("t9-enter-key")
                     .onGloballyPositioned {
-                        enterBounds = it.boundsInRoot()
+                        enterBounds = dragSpace.bounds(it)
                         ctrlTargets.putEnter(enterTargetId, enterBounds)
                     },
                 onPress = { onKeyPressDown?.invoke("enter") },

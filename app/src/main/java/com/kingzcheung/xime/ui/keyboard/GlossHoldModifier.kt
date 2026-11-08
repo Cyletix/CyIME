@@ -83,6 +83,7 @@ internal fun Modifier.dragToCandidate(
 ): Modifier = if (!enabled) this else composed {
     val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val currentArea by rememberUpdatedState(area)
+    val dragSpace = LocalKeyDragSpace.current
     val currentFraction by rememberUpdatedState(fraction)
     onGloballyPositioned { coordinates[0] = it }.pointerInput(targets) {
         awaitEachGesture {
@@ -100,10 +101,10 @@ internal fun Modifier.dragToCandidate(
                         continue
                     }
                     change.consume()
-                    val point = layout.localToRoot(change.position)
+                    val point = dragSpace.point(layout, change.position)
                     val target = targets.at(point)
                     swap.value = target != null
-                    targets.dragLine = layout.localToRoot(Offset(size.width / 2f, size.height / 2f)) to point
+                    targets.dragLine = dragSpace.point(layout, Offset(size.width / 2f, size.height / 2f)) to point
                     targets.hoveredBounds = target?.first
                     if (!change.pressed) {
                         target?.second?.invoke()

@@ -19,7 +19,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -49,13 +49,14 @@ internal fun Modifier.ctrlSymbolKeyGesture(
     onPressedChange: (Boolean) -> Unit,
 ): Modifier = composed {
     var bounds by remember { mutableStateOf(Rect.Zero) }
+    val dragSpace = LocalKeyDragSpace.current
     val hold by rememberUpdatedState(holdMillis)
     val down by rememberUpdatedState(onPressDown)
     val open by rememberUpdatedState(onOpenSymbols)
     val shortcut by rememberUpdatedState(onShortcut)
     val pressed by rememberUpdatedState(onPressedChange)
     val scope = rememberCoroutineScope()
-    onGloballyPositioned { bounds = it.boundsInRoot() }.pointerInput(targets) {
+    onGloballyPositioned { bounds = Rect(dragSpace.point(it), it.size.toSize()) }.pointerInput(targets) {
         awaitEachGesture {
             // 先于键帽自己的手势拿到按下（Initial），键帽只负责画。
             val first = awaitFirstDown(pass = PointerEventPass.Initial)

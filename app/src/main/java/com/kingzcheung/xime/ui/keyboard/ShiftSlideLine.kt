@@ -2,13 +2,27 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+
+/** Pointer, target cells and both halves of the line share the floating card's axes. */
+internal class KeyDragSpace {
+    var card: LayoutCoordinates? = null
+    fun point(node: LayoutCoordinates, local: Offset = Offset.Zero): Offset =
+        card?.takeIf { it.isAttached }?.localPositionOf(node, local) ?: node.localToRoot(local)
+    fun bounds(node: LayoutCoordinates) =
+        card?.takeIf { it.isAttached }?.localBoundingBoxOf(node) ?: node.boundsInRoot()
+}
+
+internal val LocalKeyDragSpace = staticCompositionLocalOf { KeyDragSpace() }
 
 /** Pointer state is read only while drawing; no animation clock or pointer handler. */
 @Composable

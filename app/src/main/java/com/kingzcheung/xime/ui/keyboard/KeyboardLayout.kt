@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -267,6 +268,7 @@ fun KeyboardLayout(
         SplitKeyboardGeometry.splitStraddlingPairs(keyRows[2], letterSideKeyWeight),
     ) + keyRows.drop(3) else keyRows
     val shiftSlideTargets = remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() }
+    val dragSpace = LocalKeyDragSpace.current
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     // 14 键按住 Shift 拖动时，双字母键拆回单字母键，键帽显示手指实际停的那个字母；松开 Shift 恢复（用户 10-21）。
     // 按住符号键当 Ctrl 时同样拆开，每个字母各显示自己的快捷键（用户 10-24）；和键面一起等按满时限或拖出才拆，点一下开符号不闪（10-31）。
@@ -541,7 +543,7 @@ fun KeyboardLayout(
         modifier = bodyModifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
-                shiftSlideTargets.keyboardBounds = keyboardBounds
+                shiftSlideTargets.keyboardBounds = dragSpace.bounds(coordinates)
             }
             .glideTyping(glideEnabled, geometry, { keyboardBounds.topLeft }, glideTrail, onGlideTrace, onGlideProgress)
 

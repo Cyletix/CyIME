@@ -72,7 +72,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.layout.boundsInRoot
@@ -407,7 +406,8 @@ fun CandidateBar(
     var barOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var barTopInWindow by remember { mutableStateOf<Float?>(null) }
     // 根布局坐标：Shift 拖线和候选位置都用这个坐标系。
-    var barRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    val dragSpace = LocalKeyDragSpace.current
+    var barDragOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     SideEffect { splitGap?.reportBarTop(if (splitGapX != null) barTopInWindow else null) }
     DisposableEffect(splitGap) { onDispose { splitGap?.reportBarTop(null) } }
 
@@ -420,9 +420,9 @@ fun CandidateBar(
             .onGloballyPositioned {
                 barOrigin = it.positionInWindow()
                 barTopInWindow = barOrigin.y
-                barRootOrigin = it.positionInRoot()
+                barDragOrigin = dragSpace.point(it)
             }
-            .shiftDragOverlay({ barRootOrigin }, protectedVisuals.accentColor)
+            .shiftDragOverlay({ barDragOrigin }, protectedVisuals.accentColor)
             .clipSplitGapColumn(splitGapX, splitGap) { barOrigin }
             .background(if (glassEnabled) Color.Transparent else protectedVisuals.backgroundColor)
             .then(if (stripBoost > 0f) Modifier.glassStripBoost(stripBoost) else Modifier)
@@ -459,7 +459,6 @@ fun CandidateBar(
             // 悬浮小窗里格子随宽度收窄（最窄 36dp），图标都留在面板内，不再横向溢出压住边框。
             maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + fixed).coerceAtLeast(1), 36.dp)
         } else null
-        val toolbarSlot = idleToolbarCell.takeIf { state is CandidateBarState.Idle }
         // 打字时两端「<」「^」用和空闲工具栏同样宽的格子：宽屏下同样变成胶囊（用户 10-20）。
         val edgeStyle = LocalEdgeButtonStyle.current
         val edgeSlot = if (edgeStyle == EdgeButtonStyle.CIRCLE || toolbarRowWidth <= 0.dp) null else {
@@ -1012,13 +1011,14 @@ fun CandidateItem(
 ) {
     // 登记位置给 Shift 拖动：从 Shift 拖到这里松手，按住 Shift 选它（释义模式上屏英文）。
     val dropId = remember { Any() }
+    val dragSpace = LocalKeyDragSpace.current
     val currentClick by rememberUpdatedState(onClick)
     DisposableEffect(dropId) { onDispose { CandidateDropTargets.shared.remove(dropId) } }
     if (!interactive) SideEffect { CandidateDropTargets.shared.remove(dropId) }
     Row(
         modifier = modifier
             .then(if (interactive) Modifier.onGloballyPositioned {
-                CandidateDropTargets.shared.put(dropId, it.boundsInRoot()) { currentClick() } } else Modifier)
+                CandidateDropTargets.shared.put(dropId, dragSpace.bounds(it)) { currentClick() } } else Modifier)
             .height(if (fit?.twoLines == true) maxOf(candidateItemHeight(fontSize), CANDIDATE_TWO_LINE_HEIGHT)
                 else candidateItemHeight(fontSize))
             .clip(RoundedCornerShape(5.dp))
@@ -1858,8 +1858,10 @@ private fun Modifier.shiftDragOverlay(rootOrigin: () -> androidx.compose.ui.geom
                 androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
         }
         drops.dragLine?.let { (from, to) ->
-            drawLine(accent, from - origin, to - origin, strokeWidth = 6.dp.toPx(),
-                cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            clipRect {
+                drawLine(accent, from - origin, to - origin, strokeWidth = 6.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            }
         }
     }
 }
