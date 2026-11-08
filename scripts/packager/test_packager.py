@@ -1,8 +1,12 @@
 """Offline tests for the packager core: python -B scripts/packager/test_packager.py"""
 from pathlib import Path
+from hashlib import sha256
+from io import BytesIO
+import json
 import sys
 import tempfile
 import unittest
+from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cyime_packager as cp  # noqa: E402
@@ -52,6 +56,49 @@ class VersionTest(unittest.TestCase):
             cp.ad.write_json(root / ".gradle/packager/state.json", {"outputs": {"20261136": {"share": "aa"}}})
             self.assertFalse(cp.needs_bump(root, "share"))   # same options again: keep the version
             self.assertTrue(cp.needs_bump(root, "mine"))     # different content: new version
+
+
+class PackagedInputDataTest(unittest.TestCase):
+    def inspect(self, extra=None):
+        base = b"shared association table"
+        entries = {
+            "assets/association/lccc-base-v1.bin": base,
+            "assets/association/lccc-base-v1.manifest.json":
+                json.dumps({"sha256": sha256(base).hexdigest(), "source": ["fixture corpus"]}),
+            "assets/cell_dictionaries/cell_builtin_test.dict.yaml": b"words",
+        }
+        entries.update(extra or {})
+        data = BytesIO()
+        with ZipFile(data, "w") as archive:
+            for name, value in entries.items():
+                archive.writestr(name, value)
+        with ZipFile(data) as archive:
+            return cp.inspect_input_data(archive)
+
+    def test_light_and_private_presets_must_match_actual_files(self):
+        light = self.inspect()
+        model, gloss = b"model", b"gloss"
+        hashes = (sha256(model).hexdigest(), sha256(gloss).hexdigest())
+        private = self.inspect({"assets/rime_chinese/t9_ngram.lm": model, "assets/gloss/cyime_gloss-private.tsv": gloss})
+        cp.check_input_data(light, None, None)
+        cp.check_input_data(private, *hashes)
+        self.assertEqual(private["associationSources"], ["fixture corpus"])
+        self.assertEqual(private["builtinCellDictionaries"], ["cell_builtin_test.dict.yaml"])
+        for actual, expected in ((light, hashes), (private, (None, None)), (private, (hashes[0], "wrong"))):
+            with self.assertRaises(cp.DeliveryError):
+                cp.check_input_data(actual, *expected)
+
+    def test_wrong_public_table_and_bundled_device_learning_are_rejected(self):
+        for entry in ("assets/association/lccc-base-v1.bin", "assets/user_ngram_cache.json",
+                      "assets/example.learning.json", "assets/learning-profiles/active.json"):
+            with self.subTest(entry=entry), self.assertRaises(cp.DeliveryError):
+                cp.check_input_data(self.inspect({entry: b"unexpected"}), None, None)
+
+    def test_cylm_is_checked_even_when_private_gloss_is_permitted(self):
+        data = self.inspect({"assets/rime_chinese/cylm_model": b"private"})
+        cp.check_input_data(data, None, None, {"cylm_model": sha256(b"private").hexdigest()})
+        with self.assertRaises(cp.DeliveryError):
+            cp.check_input_data(data, None, None)
 
 
 class StagingTest(unittest.TestCase):

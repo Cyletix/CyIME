@@ -207,6 +207,48 @@ def offline_catalog(root: Path = ROOT) -> list[dict]:
 RATIO = {"onnx": 0.90, "t9": 0.552, "dict": 0.4}
 
 
+def inspect_input_data(archive) -> dict:
+    """Read the finished APK. A selected model in a preset does not establish what was delivered."""
+    names = set(archive.namelist())
+    def asset_hash(name):
+        if name not in names:
+            return None
+        with archive.open(name) as stream:
+            sha = hashlib.sha256()
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                sha.update(block)
+            return sha.hexdigest()
+    base = "assets/association/lccc-base-v1.bin"
+    manifest = "assets/association/lccc-base-v1.manifest.json"
+    meta = json.loads(archive.read(manifest)) if manifest in names else {}
+    return {
+        "t9Sha256": asset_hash("assets/rime_chinese/t9_ngram.lm"),
+        "privateGlossSha256": asset_hash("assets/gloss/cyime_gloss-private.tsv"),
+        "cylmSha256": {n.rsplit("/", 1)[-1]: asset_hash(n) for n in sorted(names)
+                       if n.startswith("assets/rime_chinese/cylm_") and not n.endswith("/")},
+        "associationSha256": asset_hash(base),
+        "associationManifestSha256": meta.get("sha256"),
+        "associationSources": meta.get("source", []),
+        "builtinCellDictionaries": sorted(n.split("/")[-1] for n in names
+                                         if n.startswith("assets/cell_dictionaries/") and n.endswith(".dict.yaml")),
+        "learningFiles": sorted(n for n in names if n.startswith("assets/") and
+                                (n.endswith(("/user_ngram_cache.json", ".learning.json")) or "/learning-profiles/" in n)),
+    }
+
+
+def check_input_data(data, t9_sha, gloss_sha, cylm=None):
+    if data["t9Sha256"] != t9_sha:
+        raise DeliveryError("包内九键模型与选择的文件不一致。")
+    if data["privateGlossSha256"] != gloss_sha:
+        raise DeliveryError("包内私人释义与所选配置不一致。")
+    if data["cylmSha256"] != (cylm or {}):
+        raise DeliveryError("包内 CyLM 选词模型与所选配置不一致。")
+    if not data["associationSha256"] or data["associationSha256"] != data["associationManifestSha256"]:
+        raise DeliveryError("包内中文联想表缺失或与联想表清单不一致。")
+    if data["learningFiles"]:
+        raise DeliveryError("安装包中发现本应存放在设备上的个人学习文件。")
+
+
 def size_estimate(root: Path = ROOT) -> dict:
     """Bytes inside the newest built APK, split so the GUI can add the parts it selects."""
     import zipfile
@@ -693,6 +735,9 @@ class Packager(ad.Delivery):
         import zipfile
         with zipfile.ZipFile(path) as apk:
             names = apk.namelist()
+            data = inspect_input_data(apk)
+            check_input_data(data, self.staging.sha256 if self.model else None,
+                             self.gloss_staging.sha256 if self.gloss else None, self.cylm_staging.sha256)
             # Text assets that could point at a gloss file: catalogs, manifests, yaml/json/tsv/txt under assets.
             texts = {n: apk.read(n) for n in names
                      if n.startswith("assets/") and n.rsplit(".", 1)[-1] in ("json", "yaml", "yml", "txt", "tsv", "md", "list")
@@ -717,6 +762,14 @@ class Packager(ad.Delivery):
             if problems:
                 raise DeliveryError(f"安装包不符合 docs/development/{spec}：" + "；".join(problems))
             say("[VERIFY] " + ok)
+
+        receipt_path = self.receipt_path(self.edition)
+        receipt = ad.read_json(receipt_path)
+        receipt["inputData"] = data
+        ad.write_json(receipt_path, receipt)
+        say(f"[VERIFY] 九键模型：{self.model.name if self.model else '无'}；私人释义：{'有' if self.gloss else '无'}；"
+            f"中文联想：公共基础表，分类词库 {len(data['builtinCellDictionaries'])} 个。"
+            "本机学习和导入的个人联想方案保存在设备上，可在「智能联想 › 用户学习数据」看实际条数。")
 
     def push_banks(self) -> str:
         """Copy the external handwriting-training banks to this device. Never fails the install:
@@ -1085,6 +1138,8 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("info", help="以 JSON 列出版本、设备、九键模型、内置词库、预设")
 
+    inspect = sub.add_parser("inspect-apk", help="读取既有 APK 内的词库和联想数据，不构建、不安装")
+    inspect.add_argument("apk", type=Path)
     b = sub.add_parser("build", help="构建（并安装/发布）")
     b.add_argument("--preset", help="先套用 config.json 里的预设，再用下面的参数覆盖")
     t = b.add_mutually_exclusive_group()
@@ -1092,7 +1147,7 @@ def main(argv=None) -> int:
     t.add_argument("--debug", dest="build_type", action="store_const", const="debug", help="调试版")
     o = b.add_mutually_exclusive_group()
     o.add_argument("--offline-models", dest="offline_models", action="store_true", default=None,
-                   help="带离线模型（手写、联想、语音），即完整版")
+                   help="带可选离线模型（手写、语音等）；公共联想表也在轻量包中")
     o.add_argument("--no-offline-models", dest="offline_models", action="store_false")
     b.add_argument("--offline-model", dest="offline_ids", action="append", default=[], metavar="ID",
                    help="只放这些离线模型（可重复，ID 见 info 的 offline）；不写则放全部")
@@ -1137,6 +1192,13 @@ def main(argv=None) -> int:
     u.add_argument("--dry-run", action="store_true")
     a = parser.parse_args(argv)
     try:
+        if a.command == "inspect-apk":
+            import zipfile
+            if not zipfile.is_zipfile(a.apk):
+                raise DeliveryError("请选择有效的 APK 文件。")
+            with zipfile.ZipFile(a.apk) as archive:
+                print(json.dumps(inspect_input_data(archive), ensure_ascii=False, indent=2))
+            return 0
         if a.command == "info":
             print(json.dumps(info(), ensure_ascii=False, indent=2))
             return 0

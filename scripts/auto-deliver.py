@@ -482,6 +482,10 @@ class Delivery:
         previous_parts = tuple(map(int, previous.split(".")))
         if self.code < previous_code or (self.code == previous_code and self.version != previous):
             raise DeliveryError(f"Last delivered version is {previous}/{previous_code}; versionCode must advance for a new version.")
+        # One local delivery was mislabeled 1.16.0. Keep its receipt and its consumed code.
+        if ((previous_code, previous, self.code, self.version) == (20261419, "1.16.0", 20261420, "1.15.67")
+                and not self.o.publish and self.version not in versions.values()):
+            return
         if self.code > previous_code and current_parts <= previous_parts:
             raise DeliveryError(f"Version {previous} was already delivered. Advance versionName for the next delivery "
                                 "(PATCH for fixes, MINOR for new functionality); GitHub publication is not the boundary.")
