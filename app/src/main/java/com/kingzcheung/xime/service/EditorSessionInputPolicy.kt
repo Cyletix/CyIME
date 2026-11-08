@@ -57,6 +57,7 @@ internal data class EditorFieldPolicy(
         fun from(info: EditorInfo?): EditorFieldPolicy {
             val type = info?.inputType ?: InputType.TYPE_NULL
             val policy = fromInputType(type)
+            if (policy.kind == Kind.PASSWORD && EditorInfoClassifier.isTerminalEditor(info)) return EditorFieldPolicy()
             if (info == null || policy.kind != Kind.ADDRESS ||
                 type and InputType.TYPE_MASK_VARIATION != InputType.TYPE_TEXT_VARIATION_URI) return policy
 

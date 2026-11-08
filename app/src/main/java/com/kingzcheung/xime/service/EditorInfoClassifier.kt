@@ -77,8 +77,18 @@ internal object EditorInfoClassifier {
      * 这类宿主不是文本编辑器：读不到光标前后的文字、不认选区和组合区，只收按键和直接上屏的文字
      * （Android 文档对 TYPE_NULL 的说明：输入法应退到“只发按键”的模式）。
      */
-    fun isTerminalEditor(info: EditorInfo?): Boolean =
-        info != null && info.inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL
+    fun isTerminalEditor(info: EditorInfo?): Boolean {
+        if (info == null) return false
+        if (info.inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL) return true
+        // Termius 5.9's SSH session uses a visible-password editor with no extract UI or enter action.
+        // Its login fields and other apps' password fields use the normal password policy.
+        val terminalFlags = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_ENTER_ACTION
+        return info.packageName == "com.server.auditor.ssh.client" &&
+            info.inputType and (InputType.TYPE_MASK_CLASS or InputType.TYPE_MASK_VARIATION) ==
+                (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) &&
+            info.imeOptions and EditorInfo.IME_MASK_ACTION == EditorInfo.IME_ACTION_NONE &&
+            info.imeOptions and terminalFlags == terminalFlags
+    }
 
     /**
      * 数字类输入框（包含数字密码、电话、日期时间）：适合自动弹出数字键盘。

@@ -6,6 +6,28 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class EditorSessionInputPolicyTest {
+    @Test fun termiusShellCanComposeChineseWhileItsCredentialsStillUsePasswordPolicy() {
+        fun field(app: String, type: Int, options: Int) = EditorInfo().apply {
+            packageName = app
+            inputType = type
+            imeOptions = options
+        }
+        val termius = "com.server.auditor.ssh.client"
+        val shell = field(termius, 0x91, 0x50000001)
+        val session = EditorSessionInputPolicy()
+        assertFalse(session.begin(shell, false, false, "rime_ice").isAsciiMode)
+        assertTrue(session.choose(false))
+        assertFalse(session.directInput)
+        assertTrue(EditorInfoClassifier.isTerminalEditor(shell))
+        assertTrue(EditorInfoClassifier.isSecretEditor(shell))
+        assertTrue(com.kingzcheung.xime.settings.IncognitoState.isSensitiveEditor(shell))
+        for (password in listOf(field(termius, 0x81, 0x50000001), field(termius, 0x91, EditorInfo.IME_ACTION_DONE),
+            field("other.editor", 0x91, 0x50000001), field(termius, 0x12, 0x50000001))) {
+            assertFalse(EditorInfoClassifier.isTerminalEditor(password))
+            assertTrue(session.begin(password, false, false, "rime_ice").isAsciiMode)
+            assertFalse(session.choose(false))
+        }
+    }
     private fun editor(type: Int, id: Int = 1) = EditorInfo().apply {
         inputType = type
         fieldId = id
