@@ -261,7 +261,8 @@ private fun T9KeyboardSwipeOverlay(
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys) {
     Box(
         modifier = modifier
-            .t9GlideTyping(glideKeys, trail, { keyboardBounds.topLeft }, callbacks.inputAdmissionTicket) { xs, ys ->
+            // 键位与轨迹原点同用键盘卡片坐标：旋转的悬浮键盘滑行落在手指下的键（未旋转时与 boundsInRoot 相同）。
+            .t9GlideTyping(glideKeys, trail, { dragArea.topLeft }, callbacks.inputAdmissionTicket) { xs, ys ->
                 val keys = glideKeys?.mapValues { (_, rect) ->
                     com.kingzcheung.xime.keyboard.LetterKeyRect(rect.left, rect.top, rect.width, rect.height)
                 } ?: return@t9GlideTyping
@@ -899,6 +900,7 @@ private fun T9DigitKey(
     // 九键拂动：左上右下依次为各字母，点按仍是九键输入，数字（原上滑动作）改为长按。
     val flick = inputPreferences.t9FlickLetters && currentOnLongPressSelect != null
     val glideKeys = LocalT9GlideKeys.current
+    val dragSpace = LocalKeyDragSpace.current
 
     SwipeableKeyButton(
         text = t9LetterLabel(letters, uppercaseLetters),
@@ -907,7 +909,7 @@ private fun T9DigitKey(
         textColor = textColor,
         fontSize = fontSize,
         modifier = if (glideKeys == null) modifier else modifier.onGloballyPositioned {
-            glideKeys[digit.single()] = it.boundsInRoot()
+            glideKeys[digit.single()] = dragSpace.bounds(it)
         },
         onPress = { currentOnPress?.invoke() },
         // 长按弹字母气泡和 26/14 键共用“长按弹出字母气泡”开关，默认关（用户 10-21）；拂动模式长按出数字，不受影响。

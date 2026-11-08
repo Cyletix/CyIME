@@ -545,7 +545,8 @@ fun KeyboardLayout(
                 keyboardBounds = coordinates.boundsInRoot()
                 shiftSlideTargets.keyboardBounds = dragSpace.bounds(coordinates)
             }
-            .glideTyping(glideEnabled, geometry, { keyboardBounds.topLeft }, glideTrail, onGlideTrace, onGlideProgress)
+            // 轨迹原点与键位同用键盘卡片坐标（未旋转时与 boundsInRoot 相同），旋转的悬浮键盘滑行落在手指下的键。
+            .glideTyping(glideEnabled, geometry, { shiftSlideTargets.keyboardBounds.topLeft }, glideTrail, onGlideTrace, onGlideProgress)
 
     ) {
         KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBgColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)

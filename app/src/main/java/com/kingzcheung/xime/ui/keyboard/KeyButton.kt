@@ -595,7 +595,8 @@ fun SwipeableKeyButton(
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
                 if (shiftTargets != null) dragBounds = if (dragSpace.card == null) buttonBounds else dragSpace.bounds(coordinates)
-                letterGeometry?.place(text, buttonBounds)
+                // 滑行的键位与轨迹同在键盘卡片坐标里：悬浮键盘旋转后 boundsInRoot 是斜放键的外接框，滑行会落到别的键。
+                letterGeometry?.place(text, if (dragSpace.card == null) buttonBounds else dragSpace.bounds(coordinates))
             }
             .padding(scaledKeyVisualPadding())
             .then(if (hexagonal) Modifier.honeycombCap() else Modifier)
