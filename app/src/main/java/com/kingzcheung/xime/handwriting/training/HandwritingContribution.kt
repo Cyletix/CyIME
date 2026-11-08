@@ -25,15 +25,20 @@ object HandwritingContribution {
     const val STORE_NAME = "handwriting_contribute"
 
     /**
-     * 接收上传的地址。还没建好接收端时为空，页面上只有「分享」。
-     * 接收端只收 [TrainingSampleCodec.FORMAT] 格式、gzip 后不超过 [MAX_UPLOAD_BYTES] 的 JSONL。
+     * 手写、词库与滑行练习共用的魔搭创空间接收端，按请求头区分格式。
+     * 手写按 [TrainingSampleCodec.FORMAT] 发送，gzip 后不超过 [MAX_UPLOAD_BYTES]。
      */
-    const val UPLOAD_URL = ""
+    const val UPLOAD_URL = "https://cyletix-cyime-contribute.ms.show/upload"
 
     const val MAX_UPLOAD_BYTES = 8L * 1024 * 1024
 
-    const val CONSENT_TEXT = "写的字只用于训练 CyIME 手写模型，训练出的模型会随 CyIME 公开发布。" +
-        "样本只包含这一页写的笔迹、题目、App 版本和手机型号，不包含你平时打的字。"
+    const val LICENSE = "CC0-1.0"
+    const val LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/deed.zh-hans"
+    const val CONSENT_TEXT = "分享或上传的是贡献页选定的手写样本，包括题目、笔迹与时间、画布、识别结果（如有）、随机书写人编号、机型和应用版本。上传由魔搭接收，日常输入不会随样本发送。"
+    const val LICENSE_TEXT = "我有权贡献这些样本，同意按 CC0 1.0 将其贡献至公共领域。样本可公开，任何人可复制、修改、再发布或商用。已经授予的许可无法撤回。"
+
+    internal fun licensedSample(line: String): String =
+        JSONObject(line).put("license", LICENSE).toString()
 
     private const val ASSET = "handwriting/contribute_prompts.tsv"
     private const val PREFS = "handwriting_contribute"
@@ -70,10 +75,10 @@ object HandwritingContribution {
     }
 
     fun consented(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("consent", false)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("accepted_license", null) == LICENSE
 
     fun setConsented(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("consent", true).apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("accepted_license", LICENSE).apply()
     }
 
     /** 上次上传时样本文件已有的行数：再上传只传新写的。 */
@@ -108,7 +113,7 @@ object HandwritingContribution {
         val done = uploadedLines(context).coerceIn(0, lines.size)
         val fresh = lines.drop(done)
         if (fresh.isEmpty()) return UploadResult(0)
-        val body = gzip(fresh.joinToString("\n", postfix = "\n").toByteArray(Charsets.UTF_8))
+        val body = gzip(fresh.joinToString("\n", postfix = "\n", transform = ::licensedSample).toByteArray(Charsets.UTF_8))
         check(body.size <= MAX_UPLOAD_BYTES) { "样本太多，请先分享文件" }
         val request = Request.Builder().url(UPLOAD_URL)
             .header("User-Agent", "CyIME/$appVersion")
@@ -117,9 +122,10 @@ object HandwritingContribution {
             .post(body.toRequestBody("application/gzip".toMediaType()))
             .build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                val message = runCatching { JSONObject(response.body.string()).optString("error") }.getOrNull()
-                throw IllegalStateException(message?.ifEmpty { null } ?: "服务器返回 ${response.code}")
+            val receipt = runCatching { JSONObject(response.body.string()) }.getOrNull()
+            if (!response.isSuccessful || receipt?.optBoolean("ok") != true || receipt.optInt("count", -1) != fresh.size) {
+                throw IllegalStateException(receipt?.optString("error")?.takeIf { it.isNotBlank() }
+                    ?: "上传未获确认（${response.code}）")
             }
         }
         setUploadedLines(context, lines.size)

@@ -619,7 +619,7 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             try {
                 val app = getApplication<android.app.Application>()
-                val file = withContext(Dispatchers.IO) { store.snapshotForExport() }
+                val file = withContext(Dispatchers.IO) { store.snapshotForExport(licensedShare = contribute && share) }
                 if (file == null) {
                     _events.emit(TrainingEvent.Message("还没有样本"))
                     return@launch
@@ -735,6 +735,7 @@ private fun HandwritingTrainingBody(
     var textDraft by rememberSaveable { mutableStateOf("") }
     // 贡献样本：第一次分享或上传前先同意用途；同意后接着做刚才点的那件事
     var consentFor by remember { mutableStateOf<(() -> Unit)?>(null) }
+    LaunchedEffect(contribute) { if (contribute && !HandwritingContribution.consented(context)) consentFor = {} }
     fun withConsent(action: () -> Unit) {
         if (!contribute || HandwritingContribution.consented(context)) action() else consentFor = action
     }
@@ -1295,19 +1296,11 @@ private fun HandwritingTrainingBody(
     }
 
     consentFor?.let { pending ->
-        AlertDialog(
-            onDismissRequest = { consentFor = null },
-            title = { Text("样本用途") },
-            text = { Text(HandwritingContribution.CONSENT_TEXT) },
-            confirmButton = {
-                TextButton(onClick = {
-                    HandwritingContribution.setConsented(context)
-                    consentFor = null
-                    pending()
-                }) { Text("同意") }
-            },
-            dismissButton = { TextButton(onClick = { consentFor = null }) { Text("取消") } },
-        )
+        SampleLicenseDialog(HandwritingContribution.CONSENT_TEXT, onDismiss = { consentFor = null }) {
+            HandwritingContribution.setConsented(context)
+            consentFor = null
+            pending()
+        }
     }
 
     if (confirmClear) {

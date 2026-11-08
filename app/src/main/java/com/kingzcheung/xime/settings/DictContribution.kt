@@ -35,7 +35,7 @@ object DictContribution {
     const val MAX_UPLOAD_BYTES = 1L * 1024 * 1024
 
     const val CONSENT_TEXT = "这些词只用于改进 CyIME 词库，整理出的词库会随 CyIME 公开发布。" +
-        "文件只有上面勾选的词、拼音和次数，没有整句、数字、你自己加的短语和设备信息。"
+        "发送前可逐词取消。魔搭接收勾选的词、拼音、次数、方案、应用版本及独立随机编号；原始贡献按此用途处理，公开的是汇总后的词库。"
 
     private const val PREFS = "dict_contribute"
     private const val DIR = "dict_contribute"
@@ -112,9 +112,10 @@ object DictContribution {
             .post(body.toRequestBody("application/gzip".toMediaType()))
             .build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                val message = runCatching { JSONObject(response.body.string()).optString("error") }.getOrNull()
-                throw IllegalStateException(message?.ifEmpty { null } ?: "服务器返回 ${response.code}")
+            val receipt = runCatching { JSONObject(response.body.string()) }.getOrNull()
+            if (!response.isSuccessful || receipt?.optBoolean("ok") != true || receipt.optInt("count", 0) < 1) {
+                throw IllegalStateException(receipt?.optString("error")?.takeIf { it.isNotBlank() }
+                    ?: "上传未获确认（${response.code}）")
             }
         }
     }

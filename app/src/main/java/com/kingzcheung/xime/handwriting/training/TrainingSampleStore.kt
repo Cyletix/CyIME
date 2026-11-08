@@ -313,12 +313,21 @@ class TrainingSampleStore(private val context: Context, private val name: String
         set(value) = prefs.edit().putString("type", value.id).apply()
 
     /** 复制样本到导出文件（app 私有 exports/），返回该文件；无样本时返回 null。 */
-    fun snapshotForExport(): File? {
+    fun snapshotForExport(licensedShare: Boolean = false): File? {
         if (!samplesFile.exists() || samplesFile.length() == 0L) return null
         val exportDir = File(context.filesDir, "exports").apply { mkdirs() }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val prefix = if (name == "handwriting_training") "cyime_handwriting_training" else "cyime_$name"
-        return File(exportDir, "${prefix}_$stamp.jsonl").also { samplesFile.copyTo(it, overwrite = true) }
+        return File(exportDir, "${prefix}_$stamp.jsonl").also { export ->
+            if (licensedShare && name == HandwritingContribution.STORE_NAME) {
+                check(HandwritingContribution.consented(context))
+                export.bufferedWriter().use { writer ->
+                    samplesFile.forEachLine { line ->
+                        if (line.isNotBlank()) writer.appendLine(HandwritingContribution.licensedSample(line))
+                    }
+                }
+            } else samplesFile.copyTo(export, overwrite = true)
+        }
     }
 
     /** 保存到公共“下载”目录，返回显示路径。 */

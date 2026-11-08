@@ -113,6 +113,8 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         lockMessage = "需先打开「滑行输入」或「中文滑行输入」"
                             .takeIf { !settings.glidePreview && !settings.glideTyping && !settings.chineseGlideTyping },
                         costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.GLIDE_PREVIEW)
+                    HorizontalDivider()
+                    GlidePracticeItem(nine = false)
                 })
                 SettingsSection(title = "按键排列与分词", content = {
                     QwertyStaggerSettings(settings) { settings = it; it.save(context) }
@@ -171,6 +173,10 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 ?.takeIf { !settings.t9GlideTyping }?.message,
                             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.T9_GLIDE)
                         HorizontalDivider()
+                        GlidePracticeItem(nine = true)
+                        HorizontalDivider()
+                        val glideLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                            com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, true)
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
                             "左、上、右、下依次输入键上的第 1～4 个字母(7、9 用到下)，点按仍是九键输入；" +
                                 "开启后长按输入数字、不再弹出字母菜单。",
