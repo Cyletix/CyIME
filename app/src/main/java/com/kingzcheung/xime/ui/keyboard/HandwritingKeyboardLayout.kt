@@ -306,7 +306,7 @@ fun HandwritingKeyboardLayout(
 
     // Keep QWERTY's content edges and bottom inset, with five handwriting rows.
     BoxWithConstraints(bodyModifier.fillMaxSize().testTag("handwriting-panel")
-        .padding(bottom = (8 + bottomPaddingDp).dp)) {
+        .padding(bottom = KeyboardGridBottomMargin + bottomPaddingDp.dp)) {
         // Fullscreen applies to ink only. Keep the footer in the user's normal keyboard bounds.
         val controlsWidth = if (expanded && expandedControlsWidthDp > 0)
             (expandedControlsWidthDp.dp - normalControlGutter.dp * 2).coerceIn(1.dp, maxWidth.coerceAtLeast(1.dp)) else maxWidth

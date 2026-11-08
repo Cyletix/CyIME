@@ -194,7 +194,7 @@ fun CandidatePage(
                 // 叠两层时玻璃中间厚、上面候选栏和两侧薄，像单独一条模糊条（用户 11-03）。
                 CandidatePageContent(state.copy(bottomPaddingDp = 0), callbacks,
                     body.padding(start = (qwerty?.innerInsetDp ?: 0f).dp,
-                        end = (qwerty?.innerInsetDp ?: 0f).dp, bottom = 8.dp), pageScrollEvents, onHapticFeedback,
+                        end = (qwerty?.innerInsetDp ?: 0f).dp, bottom = KeyboardGridBottomMargin), pageScrollEvents, onHapticFeedback,
                     paintBackground = false)
             }
         }

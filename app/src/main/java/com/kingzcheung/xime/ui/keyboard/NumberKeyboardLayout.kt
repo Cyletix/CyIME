@@ -149,7 +149,7 @@ fun NumberKeyboardLayout(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = KeyboardGridBottomMargin),
             ) {
                 NumberRows(
                     onKeyPress = onKeyPress,

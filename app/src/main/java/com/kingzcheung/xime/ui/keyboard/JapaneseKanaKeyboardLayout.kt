@@ -59,7 +59,7 @@ fun JapaneseKanaKeyboardLayout(
     isFloatingMode: Boolean = false,
     numberMode: Boolean = false,
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = bottomPaddingDp.dp,
+    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = bottomPaddingDp.dp, gridBottomMargin = 0.dp,
         policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true,
         growthSpacing = keySpacingX?.value to keySpacingY?.value) { bodyModifier ->
     CompositionLocalProvider(

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isDisplayed
@@ -114,17 +115,46 @@ class KeyboardBottomEdgeRenderTest {
         assertEquals(2, SettingsPreferences.getKeyboardBottomPaddingDp(app))
         rule.onNodeWithTag("settings-search-anchor:手势导航时键盘贴底").performClick()
         // 贴底另记一份调低值，从贴底位置算起；还能往下调（11-03：识别不出手势导航的手机也能自己去掉底下那段）。
-        rule.onNodeWithText("从安全下限抬高 2 dp").assertIsDisplayed()
+        rule.onNodeWithText("从贴底位置抬高 2 dp").assertIsDisplayed()
         down.performTouchInput { click(center) }
-        rule.onNodeWithText("已选安全下限").assertIsDisplayed()
+        rule.onNodeWithText("使用贴底位置").assertIsDisplayed()
         down.performTouchInput { click(center) }
-        rule.onNodeWithText("从安全下限调低 2 dp").assertIsDisplayed()
+        rule.onNodeWithText("从贴底位置调低 2 dp").assertIsDisplayed()
+        rule.runOnIdle { SettingsPreferences.setKeyboardBottomLoweringLimitDp(app, 0) }
+        down.assertIsNotEnabled()
+        up.performClick()
+        assertEquals(2, SettingsPreferences.getKeyboardBottomAdjustmentDp(app))
         rule.onNodeWithText("恢复系统建议").performClick()
         rule.onNodeWithText("使用系统建议").assertIsDisplayed()
         assertEquals(false, SettingsPreferences.edgeToEdgeKeyboard(app))
         assertEquals(0, SettingsPreferences.getKeyboardBottomAdjustmentDp(app))
         rule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         assertEquals(null, KeyboardPanelLaunch.take())
+    }
+
+    @Test
+    @Config(qualifiers = "sw360dp-w800dp-h360dp-land-mdpi")
+    fun landscapeCalibrationChangesOnlyTheLandscapeGap() {
+        val context = rule.activity
+        val portrait = context.createConfigurationContext(android.content.res.Configuration().apply {
+            orientation = android.content.res.Configuration.ORIENTATION_PORTRAIT
+        })
+        KeyboardThemes.initFromConfig(context)
+        AppFonts.initialize(context)
+        SettingsPreferences.setKeyboardBottomPaddingDp(portrait, 32)
+        SettingsPreferences.setEdgeToEdgeKeyboard(context, false)
+        SettingsPreferences.setKeyboardBottomPaddingDp(context, 8)
+        rule.setContent { XimeTheme(darkTheme = false, themeId = "soft_blue") {
+            LayoutDisplaySettingsContent(onBack = {}, initialPage = "bottom_gap")
+        } }
+        rule.onNodeWithText("当前调整横屏留白", substring = true).assertExists()
+        rule.onNodeWithText("抬高").performClick()
+        rule.onNodeWithText("从系统建议抬高 10 dp").assertIsDisplayed()
+        save("bottom-landscape-settings")
+        assertEquals(32, SettingsPreferences.getKeyboardBottomPaddingDp(portrait))
+        rule.onNodeWithText("恢复系统建议").performClick()
+        assertEquals(0, SettingsPreferences.getKeyboardBottomPaddingDp(context))
+        assertEquals(32, SettingsPreferences.getKeyboardBottomPaddingDp(portrait))
     }
 
     @Test fun aShortFixedKeyboardMovesDownWithoutShrinkingKeysAndEnterStillWorks() {
@@ -234,7 +264,7 @@ class KeyboardBottomEdgeRenderTest {
             val bounds = key.fetchSemanticsNode().boundsInRoot
             val bar = rule.onNodeWithTag("floating-drag-bar", true).fetchSemanticsNode().boundsInRoot
             assertTrue("$id key=$bounds drag=$bar", bounds.bottom <= bar.top + 1f)
-            assertDragIndicatorCentered(id)
+            assertDragIndicatorCentered(id, 16)
             if (tag == "qwerty-enter-key") {
                 pressed.clear()
                 key.performTouchInput { click(Offset(center.x, height - 2f)) }
@@ -250,7 +280,7 @@ class KeyboardBottomEdgeRenderTest {
         save("floating-bottom-hit-areas", "float-host")
     }
 
-    /** 平板尺寸的悬浮键盘：小横条同样在底排键帽下沿和卡片底边正中（11-03 平板实测低了约 5dp）。 */
+    /** 平板尺寸的悬浮键盘：保留原有底栏高度，短横条与底栏中心重合。 */
     @Config(qualifiers = "sw800dp-w1280dp-h800dp-mdpi")
     @Test fun floatingDragIndicatorSitsMidwayBelowTheKeysOnTablet() {
         val app = rule.activity.application
@@ -275,38 +305,25 @@ class KeyboardBottomEdgeRenderTest {
                 viewModel.dispatch(KeyboardDispatchAction.InputSessionStarted(false, id))
                 schema.value = id
             }
-            assertDragIndicatorCentered(id)
+            assertDragIndicatorCentered(id, 28)
         }
         save("floating-drag-indicator-tablet", "float-host")
     }
 
-    /**
-     * 小横条竖直方向在「底排键帽看得见的下沿」和卡片底边的正中，左右在卡片中线上。
-     * 键帽下沿按像素找：在卡片左侧 12% 处（底排最左的键上，避开中间的小横条）从卡片底往上找第一处不是底色的像素。
-     */
-    private fun assertDragIndicatorCentered(id: String) {
-        rule.waitForIdle()
-        val card = rule.onNodeWithTag("floating-keyboard-card", true).fetchSemanticsNode().boundsInWindow
+    /** The colored footer is a separate painted surface from the keyboard row above it. */
+    private fun assertDragIndicatorCentered(id: String, expectedHeightDp: Int) {
+        val footer = rule.onNodeWithTag("floating-footer", true).fetchSemanticsNode().boundsInWindow
         val indicator = rule.onNodeWithTag("floating-drag-indicator", true).fetchSemanticsNode().boundsInWindow
-        val root = rule.activity.window.decorView
-        val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
-        rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
-        val x = (card.left + card.width * 0.12f).roundToInt()
-        val startY = (card.bottom - 3f).roundToInt()
-        val background = bitmap.getPixel(x, startY)
-        fun differs(c: Int): Boolean {
-            val d = kotlin.math.abs(android.graphics.Color.red(c) - android.graphics.Color.red(background)) +
-                kotlin.math.abs(android.graphics.Color.green(c) - android.graphics.Color.green(background)) +
-                kotlin.math.abs(android.graphics.Color.blue(c) - android.graphics.Color.blue(background))
-            return d > 36
-        }
-        var y = startY
-        while (y > card.top.roundToInt() && !differs(bitmap.getPixel(x, y))) y--
-        val capBottom = y + 1f
-        assertTrue("$id no keycap found above the drag bar, card=$card", capBottom > card.top + 1f)
-        val expected = (capBottom + card.bottom) / 2f
-        assertEquals("$id indicator=$indicator capBottom=$capBottom card=$card", expected, indicator.center.y, 1.5f)
-        assertEquals("$id indicator=$indicator card=$card", card.center.x, indicator.center.x, 1f)
+        val card = rule.onNodeWithTag("floating-keyboard-card", true).fetchSemanticsNode().boundsInWindow
+        val hit = rule.onNodeWithTag("floating-drag-bar", true).fetchSemanticsNode().boundsInWindow
+        assertTrue("$id footer includes row clearance", footer.height >= with(rule.density) { expectedHeightDp.dp.toPx() })
+        val keyTag = if (id == "t9_pinyin") "t9-enter-key" else "qwerty-enter-key"
+        val key = rule.onNodeWithTag(keyTag, true).fetchSemanticsNode().boundsInWindow
+        assertTrue("$id lower key=$key painted footer=$footer", footer.top <= key.bottom && footer.top > key.center.y)
+        assertEquals("$id footer bottom", card.bottom, footer.bottom, 1f)
+        assertEquals("$id indicator centre x", card.center.x, indicator.center.x, 1f)
+        assertEquals("$id indicator centre y", footer.center.y, indicator.center.y, 1f)
+        assertTrue("$id drag starts below the last key", hit.top >= key.bottom - 1f && hit.top <= indicator.center.y)
     }
 
     private fun save(name: String, tag: String? = null) {
@@ -318,6 +335,7 @@ class KeyboardBottomEdgeRenderTest {
             val r = rule.onNodeWithTag(it).fetchSemanticsNode().boundsInWindow
             Bitmap.createBitmap(bitmap, r.left.roundToInt(), r.top.roundToInt(), r.width.roundToInt(), r.height.roundToInt())
         } ?: bitmap
+        File(dir).mkdirs()
         File(dir, "$name.png").outputStream().use { visible.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

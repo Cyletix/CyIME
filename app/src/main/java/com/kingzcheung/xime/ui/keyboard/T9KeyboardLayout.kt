@@ -304,7 +304,7 @@ private fun T9KeyboardSwipeOverlay(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = 8.dp),
+                        .padding(bottom = KeyboardGridBottomMargin),
                 ) {
                     T9KeyboardContent(
                         onKeyPress = onKeyPress,
