@@ -4,8 +4,9 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
+import com.kingzcheung.xime.platform.AndroidPlatform
+import com.kingzcheung.xime.platform.DeviceVendor
 import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.*
@@ -46,9 +47,8 @@ internal data class SetupStatus(
  * 「选择输入法」框可能一个输入法都不列，只剩「取消」（OriginOS 6 用户反馈，CyIME 已启用）。
  * 这类系统上第 3 步改为先去系统输入法设置里选默认输入法，返回 null 表示系统选择框可用、保持原样。
  */
-internal fun imePickerFallbackHint(manufacturer: String, brand: String): String? {
-    val vivo = listOf(manufacturer, brand).any { it.equals("vivo", true) || it.equals("iqoo", true) }
-    return if (vivo) "vivo / iQOO(OriginOS)的输入法选择框可能是空的。请点下面按钮打开系统输入法设置，" +
+internal fun imePickerFallbackHint(vendor: DeviceVendor): String? {
+    return if (vendor == DeviceVendor.VIVO) "vivo / iQOO(OriginOS)的输入法选择框可能是空的。请点下面按钮打开系统输入法设置，" +
         "在「默认输入法」(或「当前输入法」)里选 CyIME；如果打开的页面里没有，就进" +
         "「设置 → 系统管理(或更多设置)→ 语言与输入法 → 默认输入法」，也可以在设置顶部搜索「默认输入法」。"
     else null
@@ -75,7 +75,7 @@ fun SetupWizardScreen(
     var attempt by remember { mutableIntStateOf(0) }
     // 后台线程写的重试原因单独放一个状态：status 由主线程每 500ms 整体改写，混写会互相覆盖。
     var preparationDetail by remember { mutableStateOf<String?>(null) }
-    val pickerFallbackHint = remember { imePickerFallbackHint(Build.MANUFACTURER.orEmpty(), Build.BRAND.orEmpty()) }
+    val pickerFallbackHint = remember { imePickerFallbackHint(AndroidPlatform.vendor) }
 
     fun refreshImeState() {
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager

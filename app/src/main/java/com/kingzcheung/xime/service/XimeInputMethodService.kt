@@ -1132,7 +1132,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         hardwareInputManager.registerInputDeviceListener(hardwareInputListener, mainHandler)
         FileLogger.i(
             TAG,
-            "Device: ${Build.MANUFACTURER} ${Build.MODEL}, ${AndroidPlatform.versionLabel}, " +
+            "Device: ${AndroidPlatform.deviceLabel}, ${AndroidPlatform.versionLabel}, " +
                 "screen=${resources.displayMetrics.widthPixels}x${resources.displayMetrics.heightPixels}@${resources.displayMetrics.density}"
         )
         // 这台设备按系统版本走哪些路（AndroidPlatform）；用户报问题时对照日志看，不再猜版本差异。

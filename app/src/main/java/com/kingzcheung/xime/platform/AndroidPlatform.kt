@@ -92,6 +92,26 @@ object AndroidPlatform {
     /** 这台设备走哪些路（[PlatformFeature.summary]），键盘启动时写进日志。 */
     fun summary(): String = PlatformFeature.summary(sdk)
 
+    /**
+     * 厂商原名（如 "samsung"）。只有这里读 `Build.MANUFACTURER`。
+     * 每次现读（只是读个静态字段）：测试里按用例换厂商（ShadowBuild.setManufacturer）要能生效。
+     */
+    val manufacturer: String get() = Build.MANUFACTURER.orEmpty()
+
+    /** 厂商归类，各处的厂商适配按它判断。只有这里读 `Build.BRAND`。每次现算，理由同上。 */
+    val vendor: DeviceVendor get() = DeviceVendor.of(manufacturer, Build.BRAND)
+
+    /** 「samsung SM-X710」，关于页、日志里统一这样写。 */
+    val deviceLabel: String get() = "$manufacturer ${Build.MODEL}"
+
+    /**
+     * 每个日志文件开头写的两行：版本、机型、厂商归类、系统版本和系统编译号，以及本机走哪些路。
+     * 公开版也写（只有设备信息，没有用户输入的文字），用户分享日志时一眼看出是什么手机、什么系统。
+     */
+    fun diagnosticHeader(appVersion: String): String =
+        "Device: CyIME $appVersion | $deviceLabel | 厂商：${vendor.name.lowercase()} | $versionLabel | " +
+            "系统编译号：${Build.DISPLAY.orEmpty()}\nPlatform: ${summary()}"
+
     // —— 键盘窗口与底边 ——
     @get:ChecksSdkIntAtLeast(api = Build.VERSION_CODES.Q)
     val gestureInsets: Boolean = has(PlatformFeature.GESTURE_INSETS)

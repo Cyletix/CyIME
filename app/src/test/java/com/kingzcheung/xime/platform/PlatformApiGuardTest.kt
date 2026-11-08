@@ -28,4 +28,18 @@ class PlatformApiGuardTest {
             }.toList()
         assertTrue("改用 AndroidPlatform 的能力判断：\n" + offenders.joinToString("\n"), offenders.isEmpty())
     }
+
+    /** 厂商也只在 [AndroidPlatform] 读一次，别处用 `AndroidPlatform.vendor`（[DeviceVendor]）判断。 */
+    @Test
+    fun onlyAndroidPlatformReadsTheManufacturer() {
+        val raw = Regex("""\bBuild\.(MANUFACTURER|BRAND)\b""")
+        val offenders = root.walkTopDown()
+            .filter { it.isFile && (it.extension == "kt" || it.extension == "java") && it.canonicalFile != owner }
+            .flatMap { file ->
+                file.readLines().mapIndexedNotNull { index, line ->
+                    if (raw.containsMatchIn(line.substringBefore("//"))) "${file.relativeTo(root)}:${index + 1}: ${line.trim()}" else null
+                }
+            }.toList()
+        assertTrue("改用 AndroidPlatform.vendor / deviceLabel：\n" + offenders.joinToString("\n"), offenders.isEmpty())
+    }
 }

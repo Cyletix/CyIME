@@ -1,6 +1,5 @@
 package com.kingzcheung.xime.ui.settings
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -86,7 +85,7 @@ object AppInfo {
     val gitHash: String = BuildConfig.GIT_HASH
     
     val androidVersion: String = AndroidPlatform.versionLabel
-    val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
+    val deviceModel: String = AndroidPlatform.deviceLabel
     
     val dependencies = listOf(
         LicenseItem(

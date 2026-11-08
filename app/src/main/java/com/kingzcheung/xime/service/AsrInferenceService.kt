@@ -170,7 +170,7 @@ class AsrInferenceService : Service() {
                 val recorder = if (saveTuningAudio) SpeechTuningRecorder(
                     java.io.File(getExternalFilesDir(null) ?: filesDir, "speech_tuning"), mapOf(
                         "mode" to selection.mode, "language" to (language?.id ?: ""),
-                        "device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+                        "device" to com.kingzcheung.xime.platform.AndroidPlatform.deviceLabel,
                         "app_version" to com.kingzcheung.xime.BuildConfig.VERSION_NAME,
                         "whole_sentence" to wholeSentence,
                         "finalizer" to (selection.finalizerDir?.name ?: ""),

@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.service
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import android.view.Window
 import android.view.WindowInsets
@@ -11,6 +10,7 @@ import androidx.core.view.doOnPreDraw
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlin.math.roundToInt
 import com.kingzcheung.xime.platform.AndroidPlatform
+import com.kingzcheung.xime.platform.DeviceVendor
 
 private const val INSETS_TAG = "ImeWindowInsets"
 
@@ -129,7 +129,7 @@ private fun gestureAwareBottom(insets: WindowInsets, imeWindow: Window?, fullPx:
     // 平板手势导航时任务栏在键盘下面画返回/切换输入法按钮，整条留着（未在平板上核对前不缩）。
     val taskbarScreen = context.resources.configuration.smallestScreenWidthDp >= 600
     // 只有核对过的厂商才缩：vivo 等手势导航时也在键盘下面画「切换输入法」按钮，缩了会压在按钮上。
-    val unverifiedVendor = !gestureStripVerifiedVendor(Build.MANUFACTURER)
+    val unverifiedVendor = !gestureStripVerifiedVendor(AndroidPlatform.vendor)
     val pick = imeBottomInsetPx(fullPx, tappable, navigationMode,
         imeNavButtons = taskbarScreen || unverifiedVendor || hideKeyboardButton || imeNavButtonHeightPx(imeWindow) > 0,
         gestureBarPx = gestureBarHeightPx(context, hintHidden = gestureHint == 0))
@@ -144,8 +144,8 @@ private fun gestureAwareBottom(insets: WindowInsets, imeWindow: Window?, fullPx:
  * 「手势提示」「隐藏键盘按钮」设置判断）。其他厂商（如 vivo 在键盘下面画「切换输入法」按钮）
  * 照 1.15.17 以前整条留着，不让最下一排压住系统按钮。
  */
-internal fun gestureStripVerifiedVendor(manufacturer: String?): Boolean =
-    manufacturer.equals("samsung", ignoreCase = true)
+internal fun gestureStripVerifiedVendor(vendor: DeviceVendor): Boolean =
+    vendor == DeviceVendor.SAMSUNG
 
 /** 手势导航时键盘下面最多留多高（dp）：手势条本身。 */
 internal const val GESTURE_BAR_MAX_DP = 24
@@ -292,7 +292,7 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     }
     val resolver = context.contentResolver
     val mode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
-    val vendorGesture = vendorGestureNavigationOn(Build.MANUFACTURER) { global, key ->
+    val vendorGesture = vendorGestureNavigationOn(AndroidPlatform.vendor) { global, key ->
         readSetting {
             if (global) android.provider.Settings.Global.getInt(resolver, key)
             else android.provider.Settings.Secure.getInt(resolver, key)
@@ -312,7 +312,7 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
             nothingToPressAtBottom(tappable, navButtons, navInset, mandatory, density)))
     if (!gesture) return safe
     if (edge) return maxOf(cutout, navButtons)
-    if (gestureStripVerifiedVendor(Build.MANUFACTURER) &&
+    if (gestureStripVerifiedVendor(AndroidPlatform.vendor) &&
         readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_gesture_hint") } != 0 &&
         readSetting { android.provider.Settings.Global.getInt(resolver, "navigation_bar_button_to_hide_keyboard") } == 1
     ) return safe
@@ -398,7 +398,7 @@ private fun bottomGestureZonePx(context: Context, insets: WindowInsets, preferRe
         if (preferReported && zone > 0) return zone
         val resolver = context.contentResolver
         val navigationMode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
-        val vendorGesture = vendorGestureNavigationOn(Build.MANUFACTURER) { global, key ->
+        val vendorGesture = vendorGestureNavigationOn(AndroidPlatform.vendor) { global, key ->
             readSetting {
                 if (global) android.provider.Settings.Global.getInt(resolver, key)
                 else android.provider.Settings.Secure.getInt(resolver, key)
@@ -434,17 +434,17 @@ internal fun bottomGestureZoneHeightPx(
  * 华为/荣耀 secure_gesture_navigation（Secure）、三星 navigation_bar_gesture_while_hidden（Global）；值非 0 即手势。
  */
 internal fun vendorGestureNavigationOn(
-    manufacturer: String?,
+    vendor: DeviceVendor,
     read: (global: Boolean, key: String) -> Int?,
 ): Boolean? {
-    val (global, key) = when (manufacturer?.lowercase()) {
-        "xiaomi", "redmi", "poco" -> true to "force_fsg_nav_bar"
-        "vivo", "iqoo" -> false to "navigation_gesture_on"
-        "oppo", "oneplus", "realme" -> false to "hide_navigationbar_enable"
-        "huawei", "honor" -> false to "secure_gesture_navigation"
+    val (global, key) = when (vendor) {
+        DeviceVendor.XIAOMI -> true to "force_fsg_nav_bar"
+        DeviceVendor.VIVO -> false to "navigation_gesture_on"
+        DeviceVendor.OPPO -> false to "hide_navigationbar_enable"
+        DeviceVendor.HUAWEI, DeviceVendor.HONOR -> false to "secure_gesture_navigation"
         // 三星「滑动手势」：One UI 的 navigation_bar_gesture_while_hidden（Global），三键导航时为 0。
-        "samsung" -> true to "navigation_bar_gesture_while_hidden"
-        else -> return null
+        DeviceVendor.SAMSUNG -> true to "navigation_bar_gesture_while_hidden"
+        DeviceVendor.OTHER -> return null
     }
     return read(global, key)?.let { it != 0 }
 }

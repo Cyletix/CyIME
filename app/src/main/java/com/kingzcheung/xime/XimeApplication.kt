@@ -48,6 +48,9 @@ class XimeApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
 
+        FileLogger.fileHeader = com.kingzcheung.xime.platform.AndroidPlatform.diagnosticHeader(
+            "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+        )
         FileLogger.init(this)
         // 语音、联想、文字识别进程也记崩溃：以前只有主进程登记，模型进程闪退时日志里什么都没有。
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()

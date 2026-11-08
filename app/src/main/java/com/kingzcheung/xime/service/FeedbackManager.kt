@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
-import android.os.Build
 import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -19,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import com.kingzcheung.xime.platform.AndroidPlatform
+import com.kingzcheung.xime.platform.DeviceVendor
 
 enum class HapticMode(val value: String) {
     FollowingSystem("following_system"),
@@ -48,9 +48,9 @@ class FeedbackManager(private val context: Context) {
 
     private var hasAmplitudeControl = false
 
-    private val samsungTuned = isSamsungTuned(Build.MANUFACTURER)
+    private val samsungTuned = isSamsungTuned(AndroidPlatform.vendor)
 
-    private val bypassSystemKeyHaptic = bypassesSystemKeyHaptic(Build.MANUFACTURER)
+    private val bypassSystemKeyHaptic = bypassesSystemKeyHaptic(AndroidPlatform.vendor)
 
     private val feedbackScope = CoroutineScope(Dispatchers.Default)
 
@@ -100,14 +100,14 @@ class FeedbackManager(private val context: Context) {
             else linearMotorDurationMs(longPress, light)
 
         /** 按键触感按三星实测调过（原语 click/tick、转子马达 45 ms）；其他厂商默认交给系统按键触感。 */
-        fun isSamsungTuned(manufacturer: String?): Boolean = manufacturer.equals("samsung", ignoreCase = true)
+        fun isSamsungTuned(vendor: DeviceVendor): Boolean = vendor == DeviceVendor.SAMSUNG
 
         /**
          * 不交给系统按键触感（KEYBOARD_TAP）的机型：三星按实测自己震；华为（鸿蒙 4.x）有用户反馈 10-30 改走系统触感后
          * 打字不震（未真机确认），退回改动前的自己震（原语 / 预设 / 短脉冲）。
          */
-        fun bypassesSystemKeyHaptic(manufacturer: String?): Boolean =
-            isSamsungTuned(manufacturer) || manufacturer.equals("huawei", ignoreCase = true)
+        fun bypassesSystemKeyHaptic(vendor: DeviceVendor): Boolean =
+            isSamsungTuned(vendor) || vendor == DeviceVendor.HUAWEI
 
         /**
          * 非三星机型在没自定义时长、振幅时直接用系统按键触感（View.performHapticFeedback）：

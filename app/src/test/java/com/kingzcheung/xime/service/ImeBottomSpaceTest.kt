@@ -2,6 +2,7 @@ package com.kingzcheung.xime.service
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.kingzcheung.xime.platform.DeviceVendor
 
 class ImeBottomSpaceTest {
     @Test fun navigationAndTaskbarKeepTheirFullHeight() {
@@ -37,10 +38,10 @@ class ImeBottomSpaceTest {
     }
     // vivo 手势导航时键盘下面有「切换输入法」按钮（10-31 用户反馈压住了）：只有三星缩到手势条。
     @Test fun onlyVerifiedVendorsShrinkToTheGestureBar() {
-        assertEquals(true, gestureStripVerifiedVendor("samsung"))
-        assertEquals(true, gestureStripVerifiedVendor("Samsung"))
+        assertEquals(true, gestureStripVerifiedVendor(DeviceVendor.of("samsung")))
+        assertEquals(true, gestureStripVerifiedVendor(DeviceVendor.of("Samsung")))
         for (vendor in listOf("vivo", "Xiaomi", "OPPO", "HONOR", "HUAWEI", "Google", "", null)) {
-            assertEquals(vendor.toString(), false, gestureStripVerifiedVendor(vendor))
+            assertEquals(vendor.toString(), false, gestureStripVerifiedVendor(DeviceVendor.of(vendor)))
         }
     }
     @Test fun noSystemBarStaysZero() {
@@ -75,16 +76,16 @@ class ImeBottomSpaceTest {
             (true to "navigation_bar_gesture_while_hidden") to 1,
         )
         val read: (Boolean, String) -> Int? = { global, key -> settings[global to key] }
-        assertEquals(true, vendorGestureNavigationOn("Xiaomi", read))
-        assertEquals(true, vendorGestureNavigationOn("vivo", read))
-        assertEquals(false, vendorGestureNavigationOn("OPPO", read))
-        assertEquals(true, vendorGestureNavigationOn("HONOR", read))
-        assertEquals(true, vendorGestureNavigationOn("samsung", read))
+        assertEquals(true, vendorGestureNavigationOn(DeviceVendor.of("Xiaomi"), read))
+        assertEquals(true, vendorGestureNavigationOn(DeviceVendor.of("vivo"), read))
+        assertEquals(false, vendorGestureNavigationOn(DeviceVendor.of("OPPO"), read))
+        assertEquals(true, vendorGestureNavigationOn(DeviceVendor.of("HONOR"), read))
+        assertEquals(true, vendorGestureNavigationOn(DeviceVendor.of("samsung"), read))
         // 平板实测：三键导航时三星这项为 0。
-        assertEquals(false, vendorGestureNavigationOn("samsung") { global, key ->
+        assertEquals(false, vendorGestureNavigationOn(DeviceVendor.of("samsung")) { global, key ->
             if (global && key == "navigation_bar_gesture_while_hidden") 0 else null })
-        assertEquals(null, vendorGestureNavigationOn("Google", read))
-        assertEquals(null, vendorGestureNavigationOn(null, read))
-        assertEquals(null, vendorGestureNavigationOn("vivo") { _, _ -> null })
+        assertEquals(null, vendorGestureNavigationOn(DeviceVendor.of("Google"), read))
+        assertEquals(null, vendorGestureNavigationOn(DeviceVendor.of(null), read))
+        assertEquals(null, vendorGestureNavigationOn(DeviceVendor.of("vivo")) { _, _ -> null })
     }
 }

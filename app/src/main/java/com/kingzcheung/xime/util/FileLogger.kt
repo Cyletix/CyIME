@@ -29,6 +29,13 @@ object FileLogger {
     private var processSuffix = ""
     private var openedDay: LocalDate? = null
 
+    /**
+     * 每次打开日志文件（进程启动、跨天、写满换文件）先写的几行设备信息，在 [init] 前设置。
+     * 不受调试日志开关限制，公开版也写；只能放设备和版本信息，不能放用户输入的文字。
+     */
+    @Volatile
+    var fileHeader: String = ""
+
     /** 调试日志总开关：同时控制 v/d/i 级 logcat 和文件日志。
      * 默认关闭；仅 Debug 构建可启用，警告/错误始终保留。 */
     @Volatile
@@ -88,7 +95,14 @@ object FileLogger {
         }
         
         writer?.close()
-        writer = BufferedWriter(FileWriter(logFile, true))
+        writer = BufferedWriter(FileWriter(logFile, true)).also { w ->
+            val header = fileHeader
+            if (header.isNotEmpty()) {
+                val timestamp = dateFormat.format(LocalDateTime.now())
+                header.lineSequence().forEach { w.write("$timestamp [I] $TAG: $it\n") }
+                w.flush()
+            }
+        }
         openedDay = day
     }
 
