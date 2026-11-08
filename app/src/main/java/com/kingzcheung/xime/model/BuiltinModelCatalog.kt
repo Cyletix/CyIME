@@ -92,15 +92,15 @@ object BuiltinModelCatalog {
                 )))),
         // 英译中：Firefox「Release」版 models/en-zh/llmaat_finetune10M_qe8_f2_ByQcSxGXQRqGi-UTxYE43g，源、目标各一个词表。
         ModelInfo("translate-en-zh", "离线翻译 · 英译中", "翻译插件没填 API 时，在手机上把英文翻成中文，不联网。Mozilla Firefox 的翻译模型。", ModelCategory.OTHER,
-            versions = listOf(ModelVersion(version = "v1", size = "47.6 MB",
+            versions = listOf(ModelVersion(version = "v1", size = "48.7 MB",
                 files = listOf(
-                    ModelFile("model.enzh.intgemm.alphas.bin", RELEASE + "translate-en-zh-v1-model.enzh.intgemm.alphas.bin", "4e5accc141373565ddc8fa1565bceaa8d0c3482a82cab8131c719ebcc6c2157c", 43849787L,
+                    ModelFile("model.enzh.intgemm.alphas.bin", RELEASE + "translate-en-zh-v1-model.enzh.intgemm.alphas.bin", "ce4486f728641a36269a245248dcb53405e76d96d9eba68dcb4172f29521e092", 42992955L,
                         mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-model.enzh.intgemm.alphas.bin")),
                     ModelFile("srcvocab.enzh.spm", RELEASE + "translate-en-zh-v1-srcvocab.enzh.spm", "bd9b65504acc6d9726dd281f7defc2adb7c2c22d0688fe2f84697de25197c8c5", 806952L,
                         mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-srcvocab.enzh.spm")),
                     ModelFile("trgvocab.enzh.spm", RELEASE + "translate-en-zh-v1-trgvocab.enzh.spm", "aded6993c36e440284d11cec3f6b8aef9c0e43188a772d80be342a713adf223d", 772004L,
                         mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-trgvocab.enzh.spm")),
-                    ModelFile("lex.50.50.enzh.s2t.bin", RELEASE + "translate-en-zh-v1-lex.50.50.enzh.s2t.bin", "8575d8daa10e2dbff316dcdf8e1ce475357bcc2c92bdc63b736a2d5add22f681", 4485184L,
+                    ModelFile("lex.50.50.enzh.s2t.bin", RELEASE + "translate-en-zh-v1-lex.50.50.enzh.s2t.bin", "4a5e5827788060f1d718a8132b69440929387514a045796e9b77f935db68c055", 6506248L,
                         mirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "translate-en-zh-v1-lex.50.50.enzh.s2t.bin")),
                 )))),
         // 字母逐字上屏的语言（LetterLanguage）的补全词表：不进安装包，开启语言时下载。
