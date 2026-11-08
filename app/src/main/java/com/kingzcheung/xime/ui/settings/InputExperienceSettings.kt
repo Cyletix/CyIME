@@ -237,7 +237,7 @@ internal fun InputExperienceSettings(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("删字后给同音字", style = MaterialTheme.typography.titleSmall)
-                        Text("退格删掉一个字后，候选栏放回这个字和它的同音字，删错或打错了点一下改过来。",
+                        Text("退格删字后，候选栏显示删掉的字和它的同音字(点一下上屏)。",
                             style = MaterialTheme.typography.bodySmall)
                         PerformanceCostNote(com.kingzcheung.xime.settings.PerformanceCosts.Item.DELETE_RECOVERY)
                     }

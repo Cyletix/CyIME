@@ -536,14 +536,14 @@ internal fun ClearBeforeCursorLegend(on: Boolean, reversed: Boolean) {
         after = { LegendBox("", if (on) "世界" else "") })
 }
 
-/** 退格直接删字：上屏后候选栏出了联想词，第一下退格是删字还是先收起联想。 */
+/** 退格直接删字：上屏后候选栏出了联想词，第一下退格是删字还是只去掉联想词。 */
 @Composable
 internal fun DeleteSkipsAssociationLegend(on: Boolean) {
     SettingsStepLegend("delete-skips-association-legend", "退格",
         before = { LegendBox("你好"); LegendChip("联想", "世界 朋友") },
         after = {
             LegendBox(if (on) "你" else "你好")
-            if (!on) LegendNote("只收起了联想")
+            if (!on) LegendNote("只去掉了联想词")
         })
 }
 
