@@ -12,8 +12,8 @@ import java.security.MessageDigest
 // .codex-artifacts/offline-translate/libs. Otherwise it is downloaded from Release `models` / ModelScope.
 // Empty map = no library yet: the APK builds without it (offline translation unsupported everywhere).
 val offlineTranslateLibraryHashes = mapOf<String, String>(
-    // "arm64-v8a" to "<sha256 printed by build-android.sh>",
-    // "x86_64" to "<sha256>",
+    "arm64-v8a" to "fbc9172835c1d860f146685d1e77b79e11cc2e4f2aa6c027a9e8023c88a23f55",
+    "x86_64" to "78f1b569ce0d59628a4482059dc4b8cb1714ae86bbb50ecf9833110ec3286ae4",
 )
 val offlineTranslateLibraryRoot = layout.buildDirectory.dir("generated/translate-jniLibs")
 fun offlineTranslateSha256(file: File): String {
