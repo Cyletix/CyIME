@@ -7,8 +7,11 @@ import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.text.InputType
 import android.view.inputmethod.InputMethodManager
+import android.view.inspector.WindowInspector
 import android.widget.EditText
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
@@ -21,6 +24,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
+import com.kingzcheung.xime.service.XimeInputMethodService
 import com.kingzcheung.xime.settings.InputModes
 import com.kingzcheung.xime.settings.SettingsPreferences
 import androidx.compose.ui.semantics.SemanticsActions
@@ -111,12 +115,15 @@ class PreeditEditorImeTest {
     @Suppress("DEPRECATION") // Android still exposes this application's own running services.
     private fun stopKeyboardService() {
         val activityManager = context.getSystemService(ActivityManager::class.java)
-        val waitForEngineDestroy = RimeEngine.isInitialized() &&
-            activityManager.getRunningServices(Int.MAX_VALUE).any { it.service == imeComponent }
+        // The engine stays resident when Android destroys the IME. Wait for the service that
+        // owns the Compose window to finish, so a test cannot reuse the old recomposer.
+        val oldService = if (android.os.Build.VERSION.SDK_INT >= 29) rule.runOnUiThread {
+            WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull { it.findViewTreeLifecycleOwner() as? XimeInputMethodService }
+        } else null
         shell("ime disable $imeId")
         rule.waitUntil(10_000) {
             activityManager.getRunningServices(Int.MAX_VALUE).none { it.service == imeComponent } &&
-                (!waitForEngineDestroy || !RimeEngine.isInitialized())
+                (oldService == null || oldService.lifecycle.currentState == Lifecycle.State.DESTROYED)
         }
         // Service removal and delivery of onDestroy happen on different threads. Drain Main
         // before initializing Rime again or allowing this test's recomposer to be disposed.
@@ -192,6 +199,60 @@ class PreeditEditorImeTest {
         }
     }
     private fun setPrefix() = rule.runOnUiThread { editor.setText("前文"); editor.setSelection(editor.length()) }
+
+    @Test fun backspaceHonorsMiddleCaretAndSelectionInCommittedText() {
+        rule.runOnUiThread { editor.setText("甲乙丙丁"); editor.setSelection(2) }
+        val backspace = rule.onNodeWithContentDescription("删除", useUnmergedTree = true)
+        backspace.performTouchInput { click() }
+        rule.waitUntil(5000) { text() == "甲丙丁" }
+        rule.runOnUiThread { assertEquals(1, editor.selectionStart); editor.setSelection(0, 2) }
+        backspace.performTouchInput { click() }
+        rule.waitUntil(5000) { text() == "丁" }
+        rule.runOnUiThread { assertEquals(0, editor.selectionEnd) }
+    }
+
+    @Test fun inlinePinyinBackspaceAndInsertionPreserveBothSidesOfTheCaret() {
+        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
+        chooseMode("rime_ice")
+        setPrefix()
+        "nihao".forEach { tap(it.toString()) }
+        rule.waitUntil(5000) { engine.getInput() == "nihao" && text().startsWith("前文ni") }
+        rule.runOnUiThread { editor.setSelection("前文ni".length) }
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().getOrNull(1) == "2" }
+        rule.onNodeWithContentDescription("删除", useUnmergedTree = true).performTouchInput { click() }
+        rule.waitUntil(5000) { engine.getInput().replace("'", "") == "nhao" }
+        tap("i")
+        rule.waitUntil(5000) { engine.getInput().replace("'", "") == "nihao" }
+        rule.runOnUiThread { assertEquals("前文ni".length, editor.selectionEnd) }
+        rule.onNodeWithText("你好").performTouchInput { click() }
+        assertSettled("前文你好")
+    }
+
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 29)
+    @Test fun doublePinyinCandidateSurvivesScreenOffInSameEditor() {
+        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
+        rule.runOnUiThread {
+            WindowInspector.getGlobalWindowViews().firstNotNullOf { it.findViewTreeLifecycleOwner() as? XimeInputMethodService }
+                .schemaController.switchSchema("double_pinyin_flypy")
+        }
+        rule.waitUntil(10000) { engine.getCurrentSchema() == "double_pinyin_flypy" && !engine.isAsciiMode() }
+        setPrefix()
+        "nihk".forEach { tap(it.toString()) }
+        rule.waitUntil(5000) { engine.getCandidates().contains("你好") && text().length > 2 }
+        val power = context.getSystemService(android.os.PowerManager::class.java)
+        try {
+            shell("input keyevent KEYCODE_SLEEP")
+            rule.waitUntil(5000) { !power.isInteractive }
+        } finally {
+            shell("input keyevent KEYCODE_WAKEUP")
+            shell("wm dismiss-keyguard")
+        }
+        rule.waitUntil(10000) { editor.hasWindowFocus() }
+        rule.runOnUiThread { inputMethodManager.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT) }
+        rule.waitUntil(10000) { rule.onAllNodesWithText("你好").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("你好").performTouchInput { click() }
+        assertSettled("前文你好")
+    }
     private fun screenshot(name: String) {
         val dir = File(context.getExternalFilesDir(null), "preedit-editor").apply { mkdirs() }
         instrumentation.uiAutomation.takeScreenshot().also { image ->

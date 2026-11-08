@@ -29,8 +29,8 @@ class PinyinDeletionWorkflowTest {
     @Test fun deletingAndClearingCompositionNeverLeavesStaleLettersOrDeletesDocument(): Unit = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val saved = listOf("floating_mode", "keyboard_height_dp", "keyboard_bottom_padding_dp",
-            "current_schema", "current_schema_dual", "neighbor_correction").associateWith { prefs.all[it] }
+        val saved = (bottomCalibrationFixtureKeys + listOf("floating_mode", "keyboard_height_dp", "keyboard_bottom_padding_dp",
+            "current_schema", "current_schema_dual", "neighbor_correction")).associateWith { prefs.all[it] }
         val previousIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         val ime = "${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService"
         val wasEnabled = shell("ime list -s").lineSequence().any { it == ime }

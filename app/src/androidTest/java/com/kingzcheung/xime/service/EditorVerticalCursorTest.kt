@@ -2,6 +2,8 @@ package com.kingzcheung.xime.service
 
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
+import android.view.inputmethod.SurroundingText
 import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.size
@@ -15,6 +17,33 @@ import org.junit.Test
 
 class EditorVerticalCursorTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 31)
+    @Test fun slidingDeleteUsesLiveCaretEvenWhenTheEditorRejectsSurroundingText() {
+        lateinit var editor: EditText
+        rule.setContent { AndroidView(factory = { EditText(it).also { field -> editor = field } }) }
+        rule.runOnUiThread {
+            editor.requestFocus()
+            val connection = checkNotNull(editor.onCreateInputConnection(EditorInfo()))
+            val partialEditor = object : InputConnectionWrapper(connection, false) {
+                override fun getSurroundingText(beforeLength: Int, afterLength: Int, flags: Int): SurroundingText? =
+                    throw UnsupportedOperationException()
+            }
+            for (ic in listOf(connection, partialEditor)) {
+                editor.setText("甲😀乙尾")
+                editor.setSelection(3)
+                val drag = checkNotNull(DistanceBackspace.open(ic))
+                assertTrue(drag.move(1))
+                assertEquals("甲乙尾", editor.text.toString())
+                assertEquals(1, editor.selectionEnd)
+                assertTrue(drag.move(0))
+                assertEquals("甲😀乙尾", editor.text.toString())
+                editor.setSelection(editor.length())
+                assertFalse(drag.move(1))
+                assertEquals("甲😀乙尾", editor.text.toString())
+            }
+        }
+    }
     @Test fun explicitLinesMoveVerticallyWithoutLosingEditorFocus() {
         lateinit var editor: EditText
         lateinit var connection: InputConnection
