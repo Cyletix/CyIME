@@ -106,6 +106,7 @@ object SettingsPreferences {
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
+    /** 已删的「滑动清空时跳过联想」，只留着给 isDeleteSkipsAssociation 迁移旧值。 */
     private const val KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION = "clear_swipe_skips_association"
     private const val KEY_DELETE_SKIPS_ASSOCIATION = "delete_skips_association"
     private const val KEY_DELETE_RECOVERY = "delete_recovery_candidates"
@@ -848,18 +849,23 @@ object SettingsPreferences {
     }
 
     /**
-     * 退格直接删字（B站反馈 10-31，别人的需求，默认关）：联想词出现时退格直接删掉刚上屏的字、顺手收起联想，
-     * 不用先按一下收起联想。关着时照旧：第一下收起联想，第二下才删字。
+     * 退格直接删字（B站反馈 10-31，别人的需求，默认关）：联想词出现时退格直接删掉刚上屏的字、顺手去掉联想词，
+     * 滑动清空也直接按已选范围清正文。关着时照旧：第一下只去掉联想词，第二下才删字或清空。
+     *
+     * 原「滑动清空时跳过联想」（默认关）11-08 被用户删掉，并进这一项：旧值是开的，第一次读时把这一项打开，
+     * 并删掉旧键，之后只看这一项。没开过旧项的人不受影响，默认值不变。
      */
-    fun clearSwipeSkipsAssociation(context: Context): Boolean =
-        getPrefs(context).getBoolean(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION, false)
-
-    fun setClearSwipeSkipsAssociation(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION, enabled).apply()
+    fun isDeleteSkipsAssociation(context: Context): Boolean {
+        val prefs = getPrefs(context)
+        if (prefs.contains(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION)) {
+            val oldOn = prefs.getBoolean(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION, false)
+            val edit = prefs.edit().remove(KEY_CLEAR_SWIPE_SKIPS_ASSOCIATION)
+            if (oldOn) edit.putBoolean(KEY_DELETE_SKIPS_ASSOCIATION, true)
+            edit.apply()
+            if (oldOn) return true
+        }
+        return prefs.getBoolean(KEY_DELETE_SKIPS_ASSOCIATION, false)
     }
-
-    fun isDeleteSkipsAssociation(context: Context): Boolean =
-        getPrefs(context).getBoolean(KEY_DELETE_SKIPS_ASSOCIATION, false)
 
     fun setDeleteSkipsAssociation(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_DELETE_SKIPS_ASSOCIATION, enabled).apply()

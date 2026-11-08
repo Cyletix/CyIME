@@ -231,7 +231,6 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("删除键单独反向", gestures, gesturePage, "删除键 反向 反转 对调 上滑 下滑 清空 撤回 撤销 方向", section = "删除键"),
         SettingsSearchEntry("清空滑动距离", gestures, gesturePage, "删除键 清空 撤回 撤销 上滑 下滑 距离 灵敏度 滑不到 屏幕边缘", section = "删除键"),
         SettingsSearchEntry("打字中清空整个输入框", gestures, gesturePage, "清空 删除键 上滑 拼音 候选 输入框 全部 一次 跳过候选", section = "删除键"),
-        SettingsSearchEntry("滑动清空时跳过联想", gestures, gesturePage, "清空 正文 上滑 删除键 联想", section = "删除键"),
         SettingsSearchEntry("只清空光标前的内容", gestures, gesturePage, "清空 删除键 上滑 下滑 光标前 光标后 保留 部分 一半", section = "删除键"),
         SettingsSearchEntry("长按语言键切换输入法", gestures, gesturePage, "语言键 地球键 长按 切换输入法 选择输入法 其他输入法 系统输入法 KeePassDX 密码键盘", section = "时长与距离"),
         SettingsSearchEntry("长按语言键弹出列表", gestures, gesturePage, "语言键 切换语言 长按 时长 语言列表 秒", section = "时长与距离"),
@@ -313,7 +312,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 智能 › 智能联想
         SettingsSearchEntry("启用智能联想", prediction, SettingsRoutes.SmartPrediction, "联想 开关 预测 基础联想"),
         SettingsSearchEntry("空格上屏联想候选", prediction, SettingsRoutes.SmartPrediction, "空格 联想 上屏", section = "功能开关"),
-        SettingsSearchEntry("退格直接删字", gestures, gesturePage, "退格 删除 删除键 删字 联想 收起联想 按两下", section = "删除键"),
+        SettingsSearchEntry("退格直接删字", gestures, gesturePage, "退格 删除 删除键 删字 联想 收起联想 按两下 清空 正文 上滑 下滑 滑动清空时跳过联想 跳过联想", section = "删除键"),
         SettingsSearchEntry("删字后给同音字", gestures, gesturePage, "退格 删除 删除键 删错 恢复 撤销 同音字 纠错", section = "删除键"),
         SettingsSearchEntry("连续联想", prediction, SettingsRoutes.SmartPrediction, "连续 联想 推理", section = "功能开关"),
         SettingsSearchEntry("单次联想", prediction, SettingsRoutes.SmartPrediction, "单次 联想 停止", section = "功能开关"),

@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.foundation.layout.*
@@ -210,13 +209,7 @@ internal fun InputExperienceSettings(
                 ClearBeforeCursorLegend(settings.clearBeforeCursorOnly, settings.deleteSwipeReversed)
             }
             // 下面两项存在 SettingsPreferences（原在「智能联想 › 联想行为」），值不变，只是换了地方。
-            var clearSkipsAssociation by remember { mutableStateOf(SettingsPreferences.clearSwipeSkipsAssociation(context)) }
-            divider()
-            SettingsToggleItem(Icons.AutoMirrored.Filled.Backspace, "滑动清空时跳过联想",
-                "只剩联想词时，一次清空手势就按已选范围删除正文。关闭时先收起联想。", clearSkipsAssociation, {
-                    clearSkipsAssociation = it
-                    SettingsPreferences.setClearSwipeSkipsAssociation(context, it)
-                })
+            // 原「滑动清空时跳过联想」（11-08 用户删掉）并进「退格直接删字」：一个开关同时管退格和滑动清空，旧值由 SettingsPreferences 迁过来。
             var deleteSkipsAssociation by remember { mutableStateOf(SettingsPreferences.isDeleteSkipsAssociation(context)) }
             var deleteRecovery by remember { mutableStateOf(SettingsPreferences.isDeleteRecovery(context)) }
             val predictionOn = remember { SettingsPreferences.isSmartPredictionEnabled(context) }
@@ -226,7 +219,8 @@ internal fun InputExperienceSettings(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("退格直接删字", style = MaterialTheme.typography.titleSmall)
-                        Text("候选栏有联想词时，第一下退格就删字，不用先收起联想。", style = MaterialTheme.typography.bodySmall)
+                        Text("有联想词时，退格直接删字，${clearSwipe}清空直接清正文；关掉时第一下只去掉联想词。",
+                            style = MaterialTheme.typography.bodySmall)
                         if (!predictionOn) Text("「智能联想」关着，没有联想词，这项不起作用。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

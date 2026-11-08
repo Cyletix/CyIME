@@ -1229,7 +1229,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 「只清空光标前的内容」（默认关）：清输入框时光标后的字留着。
                     val beforeOnly = clearPrefs.getBoolean(
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
-                    val skipAssociation = SettingsPreferences.clearSwipeSkipsAssociation(service)
+                    // 「退格直接删字」同时管滑动清空（原「滑动清空时跳过联想」11-08 并入）。
+                    val skipAssociation = SettingsPreferences.isDeleteSkipsAssociation(service)
                     val scope = ClearAllScope.of(hasInputState(candState, includeAssociation = !skipAssociation), wholeField)
                     // 清的是焦点所在的框：键盘自己的输入框（新增固定等）有焦点时清它，不清后面应用的框。
                     service.lastClearedTarget = service.uiState.value.inputTarget
