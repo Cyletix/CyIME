@@ -734,65 +734,7 @@ internal fun KeyboardAppearanceSettings() {
                 SettingsSection(title = "角标与气泡", content = {
                     // 11-01：去掉和「双拼键位提示」的互锁和「和角标一起显示」开关；都开着时键面自动分层（KeyButton 的 dpWithCorners）。
                     val keyPrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
-                    var swipeUpEnabled by remember {
-                        mutableStateOf(SettingsPreferences.isSwipeUpHintsEnabled(context))
-                    }
-                    Row(
-                        modifier = Modifier.settingsSearchAnchor("上方角标提示")
-                            .fillMaxWidth()
-                            .toggleable(value = swipeUpEnabled, role = Role.Switch) {
-                                swipeUpEnabled = it
-                                SettingsPreferences.setSwipeUpHintsEnabled(context, it)
-                            }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "上方角标提示",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "按键右上角的小符号",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(checked = swipeUpEnabled, onCheckedChange = null)
-                    }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    var swipeDownEnabled by remember {
-                        mutableStateOf(SettingsPreferences.isSwipeDownHintsEnabled(context))
-                    }
-                    Row(
-                        modifier = Modifier.settingsSearchAnchor("下方角标提示")
-                            .fillMaxWidth()
-                            .toggleable(value = swipeDownEnabled, role = Role.Switch) {
-                                swipeDownEnabled = it
-                                SettingsPreferences.setSwipeDownHintsEnabled(context, it)
-                            }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "下方角标提示",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "按键左下角的小符号",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(checked = swipeDownEnabled, onCheckedChange = null)
-                    }
+                    CornerHintVisibilitySettings(Modifier.padding(16.dp))
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 16.dp),
                         thickness = 0.5.dp,
@@ -853,7 +795,7 @@ internal fun KeyboardAppearanceSettings() {
                             modifier = Modifier.testTag("corner-hint-opacity")
                         )
                         // 图例：上面三个开关和这里的不透明度一起实时变化；怎么输入角标在「按键与手势」。
-                        KeyFaceHintsLegend(swipeUpEnabled, swipeDownEnabled, keyPrefs.doublePinyinKeyHints, cornerOpacity)
+                        KeyFaceHintsLegend(keyPrefs.swipeUpHints, keyPrefs.swipeDownHints, keyPrefs.doublePinyinKeyHints, cornerOpacity)
                         SettingsNote("角标怎么输入(滑动还是长按)在「按键与手势 › 按键角标的符号和数字」",
                             jumps = listOf("按键与手势 › 按键角标的符号和数字"))
                     }

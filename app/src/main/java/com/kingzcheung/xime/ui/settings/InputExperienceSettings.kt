@@ -68,6 +68,8 @@ internal fun InputExperienceSettings(
             @Composable fun divider() { if (!first) HorizontalDivider(); first = false }
             if (InputExperiencePart.SYMBOLS in parts) {
             divider()
+            CornerHintVisibilitySettings()
+            HorizontalDivider()
             // 原「角标输入方式」两张卡和「长按弹出字母气泡」开关合成三选一（11-01）：两者互锁，管的都是长按字母键做什么。
             Column(Modifier.settingsSearchAnchor("按键角标的符号和数字", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
@@ -78,7 +80,7 @@ internal fun InputExperienceSettings(
                             onClick = { settings = choice.applyTo(settings); settings.save(context) },
                             modifier = Modifier.weight(1f).then(if (choice == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE)
                                 Modifier.settingsSearchAnchor("长按弹出字母气泡") else Modifier),
-                            tag = "corner-input:${choice.name}", titleMaxLines = 2) {
+                            tag = "corner-input:${choice.name}", titleMaxLines = 2, illustrationPadding = 2.dp) {
                             CornerInputIllustration(choice, settings.reverseSymbolSwipe)
                         }
                     }

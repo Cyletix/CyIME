@@ -100,6 +100,8 @@ internal fun IllustratedChoiceCard(
     enabled: Boolean = true,
     /** 标题最多几行；名字长（如「Rain75 紫薇轴」）时设 2，窄屏也显示完整。 */
     titleMaxLines: Int = 1,
+    /** 三列角标卡在窄屏上收紧留白，给手势和符号留够宽度。 */
+    illustrationPadding: Dp = 8.dp,
     illustration: @Composable ColumnScope.() -> Unit,
 ) {
     val primary = MaterialTheme.colorScheme.primary
@@ -117,8 +119,8 @@ internal fun IllustratedChoiceCard(
         ) {
             LegendKeyboardColors {
                 Column(
-                    Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp),
+                    Modifier.fillMaxSize().padding(illustrationPadding).clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant).padding(illustrationPadding),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                     content = illustration,
@@ -152,10 +154,10 @@ private fun MiniKey(main: String, top: String?, bottom: String?, highlight: Colo
 
 @Composable
 private fun GestureLine(gesture: String, symbol: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(gesture, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        Text("  →  ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(symbol, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Text("→", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(symbol, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
