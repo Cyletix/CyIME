@@ -2,934 +2,934 @@
 # 词表由 CyletixCode 整理，读音按 rime-ice 校对。
 ---
 name: cell_builtin_anime
-version: "1"
+version: "2"
 sort: by_weight
 use_preset_vocabulary: false
 ...
-火影忍者	huo ying ren zhe	600
-火影忍者疾风传	huo ying ren zhe ji feng zhuan	600
-博人传	bo ren zhuan	600
-航海王	hang hai wang	600
-千年血战篇	qian nian xue zhan pian	600
-龙珠超	long zhu chao	600
-龙珠改	long zhu gai	600
-妖精的尾巴	yao jing de wei ba	600
-幽游白书	you you bai shu	600
-美食的俘虏	mei shi de fu lu	600
-黑色四叶草	hei se si ye cao	600
-黑色五叶草	hei se wu ye cao	600
-我的英雄学院	wo de ying xiong xue yuan	600
-鬼灭之刃	gui mie zhi ren	600
-无限列车篇	wu xian lie che pian	600
-游郭篇	you guo pian	600
-锻刀村篇	duan dao cun pian	600
-柱训练篇	zhu xun lian pian	600
-咒术回战	zhou shu hui zhan	600
-怀玉玉折	huai yu yu zhe	600
-涩谷事变	se gu shi bian	600
-电锯人	dian ju ren	600
-链锯人	lian ju ren	600
-间谍过家家	jian die guo jia jia	600
-葬送的芙莉莲	zang song de fu li lian	600
-药屋少女的呢喃	yao wu shao nv de ni nan	600
-迷宫饭	mi gong fan	600
-我推的孩子	wo tui de hai zi	600
-蓝色监狱	lan se jian yu	600
-排球少年	pai qiu shao nian	600
-黑子的篮球	hei zi de lan qiu	600
-新网球王子	xin wang qiu wang zi	600
-钻石王牌	zuan shi wang pai	600
-强风吹拂	qiang feng chui fu	600
-飙速宅男	biao su zhai nan	600
-第一神拳	di yi shen quan	600
+火影忍者	huo ying ren zhe	1200
+火影忍者疾风传	huo ying ren zhe ji feng zhuan	1200
+博人传	bo ren zhuan	1200
+航海王	hang hai wang	1200
+千年血战篇	qian nian xue zhan pian	1200
+龙珠超	long zhu chao	1200
+龙珠改	long zhu gai	1200
+妖精的尾巴	yao jing de wei ba	1200
+幽游白书	you you bai shu	1200
+美食的俘虏	mei shi de fu lu	1200
+黑色四叶草	hei se si ye cao	1200
+黑色五叶草	hei se wu ye cao	1200
+我的英雄学院	wo de ying xiong xue yuan	1200
+鬼灭之刃	gui mie zhi ren	1200
+无限列车篇	wu xian lie che pian	1200
+游郭篇	you guo pian	1200
+锻刀村篇	duan dao cun pian	1200
+柱训练篇	zhu xun lian pian	1200
+咒术回战	zhou shu hui zhan	1200
+怀玉玉折	huai yu yu zhe	1200
+涩谷事变	se gu shi bian	1200
+电锯人	dian ju ren	1200
+链锯人	lian ju ren	1200
+间谍过家家	jian die guo jia jia	1200
+葬送的芙莉莲	zang song de fu li lian	1200
+药屋少女的呢喃	yao wu shao nv de ni nan	1200
+迷宫饭	mi gong fan	1200
+我推的孩子	wo tui de hai zi	1200
+蓝色监狱	lan se jian yu	1200
+排球少年	pai qiu shao nian	1200
+黑子的篮球	hei zi de lan qiu	1200
+新网球王子	xin wang qiu wang zi	1200
+钻石王牌	zuan shi wang pai	1200
+强风吹拂	qiang feng chui fu	1200
+飙速宅男	biao su zhai nan	1200
+第一神拳	di yi shen quan	1200
 刃牙	ren ya	600
-拳愿阿修罗	quan yuan a xiu luo	600
-名侦探柯南	ming zhen tan ke nan	600
-魔术快斗	mo shu kuai dou	600
-金田一少年事件簿	jin tian yi shao nian shi jian bu	600
-半妖的夜叉姬	ban yao de ye cha ji	600
-乱马二分之一	luan ma er fen zhi yi	600
-福星小子	fu xing xiao zi	600
-相聚一刻	xiang ju yi ke	600
-境界之轮回	jing jie zhi lun hui	600
-哆啦美	duo la mei	600
-宝可梦	bao ke meng	600
-精灵宝可梦	jing ling bao ke meng	600
-宠物小精灵	chong wu xiao jing ling	600
-数码宝贝	shu ma bao bei	600
-数码暴龙	shu ma bao long	600
-百变小樱	bai bian xiao ying	600
-魔卡少女樱	mo ka shao nv ying	600
-透明牌篇	tou ming pai pian	600
-圣斗士星矢	sheng dou shi xing shi	600
-冥王神话	ming wang shen hua	600
-北斗神拳	bei dou shen quan	600
-猫眼三姐妹	mao yan san jie mei	600
-通灵王	tong ling wang	600
-驱魔少年	qu mo shao nian	600
-格雷少年	ge lei shao nian	600
-青之驱魔师	qing zhi qu mo shi	600
-噬魂师	shi hun shi	600
-炎炎消防队	yan yan xiao fang dui	600
-钢之炼金术师	gang zhi lian jin shu shi	600
-死亡笔记	si wang bi ji	600
-爆漫王	bao man wang	600
-食梦者	shi meng zhe	600
-约定的梦幻岛	yue ding de meng huan dao	600
-石纪元	shi ji yuan	600
-新石纪	xin shi ji	600
-齐木楠雄的灾难	qi mu nan xiong de zai nan	600
-暗杀教室	an sha jiao shi	600
-三年级五班	san nian ji wu ban	600
-恶魔奶爸	e mo nai ba	600
-滑头鬼之孙	hua tou gui zhi sun	600
-浪客剑心	lang ke jian xin	600
-烙印勇士	lao yin yong shi	600
-寄生兽	ji sheng shou	600
-杀戮都市	sha lu du shi	600
-东京食尸鬼	dong jing shi shi gui	600
-一拳超人	yi quan chao ren	600
-灵能百分百	ling neng bai fen bai	600
-路人超能百	lu ren chao neng bai	600
-新世纪福音战士	xin shi ji fu yin zhan shi	600
-福音战士	fu yin zhan shi	600
-天元突破	tian yuan tu po	600
-红莲螺岩	hong lian luo yan	600
-斩服少女	zhan fu shao nv	600
-双斩少女	shuang zhan shao nv	600
-小魔女学园	xiao mo nv xue yuan	600
-普罗米亚	pu luo mi ya	600
-赛博朋克边缘行者	sai bo peng ke bian yuan xing zhe	600
-边缘行者	bian yuan xing zhe	600
-机动战士高达	ji dong zhan shi gao da	600
-高达种子	gao da zhong zi	600
-高达独角兽	gao da du jiao shou	600
-铁血的奥尔芬斯	tie xue de ao er fen si	600
-水星的魔女	shui xing de mo nv	600
-闪光的哈萨维	shan guang de ha sa wei	600
-逆袭的夏亚	ni xi de xia ya	600
-超时空要塞	chao shi kong yao sai	600
-太空堡垒	tai kong bao lei	600
-全金属狂潮	quan jin shu kuang chao	600
-反叛的鲁路修	fan pan de lu lu xiu	600
-叛逆的鲁鲁修	pan ni de lu lu xiu	600
-罪恶王冠	zui e wang guan	600
-甲铁城的卡巴内瑞	jia tie cheng de ka ba nei rui	600
-心理测量者	xin li ce liang zhe	600
-攻壳机动队	gong qiao ji dong dui	600
-混沌武士	hun dun wu shi	600
-星际牛仔	xing ji niu zai	600
-威席史坦毕特	wei xi shi tan bi te	600
-黑礁	hei jiao	600
-皇家国教骑士团	huang jia guo jiao qi shi tuan	600
-地狱之歌	di yu zhi ge	600
-漂流武士	piao liu wu shi	600
-命运之夜	ming yun zhi ye	600
-命运零点	ming yun ling dian	600
-命运冠位指定	ming yun guan wei zhi ding	600
-无限剑制	wu xian jian zhi	600
-天之杯	tian zhi bei	600
-空之境界	kong zhi jing jie	600
-月姬	yue ji	600
-魔法使之夜	mo fa shi zhi ye	600
-刀剑神域	dao jian shen yu	600
-序列之争	xu lie zhi zheng	600
-加速世界	jia su shi jie	600
-魔法禁书目录	mo fa jin shu mu lu	600
+拳愿阿修罗	quan yuan a xiu luo	1200
+名侦探柯南	ming zhen tan ke nan	1200
+魔术快斗	mo shu kuai dou	1200
+金田一少年事件簿	jin tian yi shao nian shi jian bu	1200
+半妖的夜叉姬	ban yao de ye cha ji	1200
+乱马二分之一	luan ma er fen zhi yi	1200
+福星小子	fu xing xiao zi	1200
+相聚一刻	xiang ju yi ke	1200
+境界之轮回	jing jie zhi lun hui	1200
+哆啦美	duo la mei	1200
+宝可梦	bao ke meng	1200
+精灵宝可梦	jing ling bao ke meng	1200
+宠物小精灵	chong wu xiao jing ling	1200
+数码宝贝	shu ma bao bei	1200
+数码暴龙	shu ma bao long	1200
+百变小樱	bai bian xiao ying	1200
+魔卡少女樱	mo ka shao nv ying	1200
+透明牌篇	tou ming pai pian	1200
+圣斗士星矢	sheng dou shi xing shi	1200
+冥王神话	ming wang shen hua	1200
+北斗神拳	bei dou shen quan	1200
+猫眼三姐妹	mao yan san jie mei	1200
+通灵王	tong ling wang	1200
+驱魔少年	qu mo shao nian	1200
+格雷少年	ge lei shao nian	1200
+青之驱魔师	qing zhi qu mo shi	1200
+噬魂师	shi hun shi	1200
+炎炎消防队	yan yan xiao fang dui	1200
+钢之炼金术师	gang zhi lian jin shu shi	1200
+死亡笔记	si wang bi ji	1200
+爆漫王	bao man wang	1200
+食梦者	shi meng zhe	1200
+约定的梦幻岛	yue ding de meng huan dao	1200
+石纪元	shi ji yuan	3326
+新石纪	xin shi ji	1200
+齐木楠雄的灾难	qi mu nan xiong de zai nan	1200
+暗杀教室	an sha jiao shi	1200
+三年级五班	san nian ji wu ban	1200
+恶魔奶爸	e mo nai ba	1200
+滑头鬼之孙	hua tou gui zhi sun	1200
+浪客剑心	lang ke jian xin	1200
+烙印勇士	lao yin yong shi	1200
+寄生兽	ji sheng shou	1200
+杀戮都市	sha lu du shi	1200
+东京食尸鬼	dong jing shi shi gui	1200
+一拳超人	yi quan chao ren	1200
+灵能百分百	ling neng bai fen bai	1200
+路人超能百	lu ren chao neng bai	1200
+新世纪福音战士	xin shi ji fu yin zhan shi	1200
+福音战士	fu yin zhan shi	1200
+天元突破	tian yuan tu po	1200
+红莲螺岩	hong lian luo yan	1200
+斩服少女	zhan fu shao nv	1200
+双斩少女	shuang zhan shao nv	1200
+小魔女学园	xiao mo nv xue yuan	1200
+普罗米亚	pu luo mi ya	1200
+赛博朋克边缘行者	sai bo peng ke bian yuan xing zhe	1200
+边缘行者	bian yuan xing zhe	1200
+机动战士高达	ji dong zhan shi gao da	1200
+高达种子	gao da zhong zi	1200
+高达独角兽	gao da du jiao shou	1200
+铁血的奥尔芬斯	tie xue de ao er fen si	1200
+水星的魔女	shui xing de mo nv	1200
+闪光的哈萨维	shan guang de ha sa wei	1200
+逆袭的夏亚	ni xi de xia ya	1200
+超时空要塞	chao shi kong yao sai	1200
+太空堡垒	tai kong bao lei	1200
+全金属狂潮	quan jin shu kuang chao	1200
+反叛的鲁路修	fan pan de lu lu xiu	1200
+叛逆的鲁鲁修	pan ni de lu lu xiu	1200
+罪恶王冠	zui e wang guan	1200
+甲铁城的卡巴内瑞	jia tie cheng de ka ba nei rui	1200
+心理测量者	xin li ce liang zhe	1200
+攻壳机动队	gong qiao ji dong dui	1200
+混沌武士	hun dun wu shi	1200
+星际牛仔	xing ji niu zai	1200
+威席史坦毕特	wei xi shi tan bi te	1200
+黑礁	hei jiao	5061
+皇家国教骑士团	huang jia guo jiao qi shi tuan	1200
+地狱之歌	di yu zhi ge	1200
+漂流武士	piao liu wu shi	1200
+命运之夜	ming yun zhi ye	1200
+命运零点	ming yun ling dian	1200
+命运冠位指定	ming yun guan wei zhi ding	1200
+无限剑制	wu xian jian zhi	1200
+天之杯	tian zhi bei	1200
+空之境界	kong zhi jing jie	1200
+月姬	yue ji	3655
+魔法使之夜	mo fa shi zhi ye	1200
+刀剑神域	dao jian shen yu	1200
+序列之争	xu lie zhi zheng	1200
+加速世界	jia su shi jie	1200
+魔法禁书目录	mo fa jin shu mu lu	1200
 魔禁	mo jin	600
-某科学的超电磁炮	mou ke xue de chao dian ci pao	600
-超电磁炮	chao dian ci pao	600
-灼眼的夏娜	zhuo yan de xia na	600
-零之使魔	ling zhi shi mo	600
-旋风管家	xuan feng guan jia	600
-龙与虎	long yu hu	600
-逢坂大河	feng ban da he	600
-凉宫春日的忧郁	liang gong chun ri de you yu	600
-凉宫春日的消失	liang gong chun ri de xiao shi	600
-轻音少女	qing yin shao nv	600
-吹响吧上低音号	chui xiang ba shang di yin hao	600
+某科学的超电磁炮	mou ke xue de chao dian ci pao	1200
+超电磁炮	chao dian ci pao	1200
+灼眼的夏娜	zhuo yan de xia na	1200
+零之使魔	ling zhi shi mo	1200
+旋风管家	xuan feng guan jia	1200
+龙与虎	long yu hu	1200
+逢坂大河	feng ban da he	1200
+凉宫春日的忧郁	liang gong chun ri de you yu	1200
+凉宫春日的消失	liang gong chun ri de xiao shi	1200
+轻音少女	qing yin shao nv	1200
+吹响吧上低音号	chui xiang ba shang di yin hao	1200
 京吹	jing chui	600
-莉兹与青鸟	li zi yu qing niao	600
-紫罗兰永恒花园	zi luo lan yong heng hua yuan	600
-境界的彼方	jing jie de bi fang	600
-中二病也要谈恋爱	zhong er bing ye yao tan lian ai	600
-玉子市场	yu zi shi chang	600
-玉子爱情故事	yu zi ai qing gu shi	600
-小林家的龙女仆	xiao lin jia de long nv pu	600
-甘城光辉游乐园	gan cheng guang hui you le yuan	600
-声之形	sheng zhi xing	600
+莉兹与青鸟	li zi yu qing niao	1200
+紫罗兰永恒花园	zi luo lan yong heng hua yuan	1200
+境界的彼方	jing jie de bi fang	1200
+中二病也要谈恋爱	zhong er bing ye yao tan lian ai	1200
+玉子市场	yu zi shi chang	1200
+玉子爱情故事	yu zi ai qing gu shi	1200
+小林家的龙女仆	xiao lin jia de long nv pu	1200
+甘城光辉游乐园	gan cheng guang hui you le yuan	1200
+声之形	sheng zhi xing	1200
 弦音	xian yin	600
-无彩限的怪灵世界	wu cai xian de guai ling shi jie	600
-团子大家族	tuan zi da jia zu	600
-雪之少女	xue zhi shao nv	600
-天使的心跳	tian shi de xin tiao	600
-来自风平浪静的明天	lai zi feng ping lang jing de ming tian	600
-花开伊吕波	hua kai yi lv bo	600
-白箱	bai xiang	600
-赛马娘	sai ma niang	600
-真实之泪	zhen shi zhi lei	600
-未闻花名	wei wen hua ming	600
-那朵花	na duo hua	600
-四月是你的谎言	si yue shi ni de huang yan	600
-天气之子	tian qi zhi zi	600
-铃芽之旅	ling ya zhi lv	600
-秒速五厘米	miao su wu li mi	600
-言叶之庭	yan ye zhi ting	600
-云之彼端约定的地方	yun zhi bi duan yue ding de di fang	600
-穿越时空的少女	chuan yue shi kong de shao nv	600
-夏日大作战	xia ri da zuo zhan	600
-狼的孩子雨和雪	lang de hai zi yu he xue	600
-怪物之子	guai wu zhi zi	600
-未来的未来	wei lai de wei lai	600
-龙与雀斑公主	long yu que ban gong zhu	600
-千与千寻	qian yu qian xun	600
-哈尔的移动城堡	ha er de yi dong cheng bao	600
-魔法公主	mo fa gong zhu	600
-风之谷	feng zhi gu	600
-魔女宅急便	mo nv zhai ji bian	600
-崖上的波妞	ya shang de bo niu	600
-悬崖上的金鱼姬	xuan ya shang de jin yu ji	600
-猫的报恩	mao de bao en	600
-借东西的小人阿莉埃蒂	jie dong xi de xiao ren a li ai di	600
-萤火虫之墓	ying huo chong zhi mu	600
-辉夜姬物语	hui ye ji wu yu	600
-苍鹭与少年	cang lu yu shao nian	600
-你想活出怎样的人生	ni xiang huo chu zen yang de ren sheng	600
-盗梦侦探	dao meng zhen tan	600
-未麻的部屋	wei ma de bu wu	600
-千年女优	qian nian nv you	600
-东京教父	dong jing jiao fu	600
-妄想代理人	wang xiang dai li ren	600
-阿基拉	a ji la	600
-大友克洋	da you ke yang	600
-回忆三部曲	hui yi san bu qu	600
-蒸汽男孩	zheng qi nan hai	600
-命运石之门	ming yun shi zhi men	600
-石头门	shi tou men	600
-混沌之子	hun dun zhi zi	600
-机器人笔记	ji qi ren bi ji	600
-魔法少女小圆	mo fa shao nv xiao yuan	600
-叛逆的物语	pan ni de wu yu	600
-物语系列	wu yu xi lie	600
-化物语	hua wu yu	600
-伪物语	wei wu yu	600
-伤物语	shang wu yu	600
-终物语	zhong wu yu	600
-绝望先生	jue wang xian sheng	600
-荒川爆笑团	huang chuan bao xiao tuan	600
+无彩限的怪灵世界	wu cai xian de guai ling shi jie	1200
+团子大家族	tuan zi da jia zu	1200
+雪之少女	xue zhi shao nv	1200
+天使的心跳	tian shi de xin tiao	1200
+来自风平浪静的明天	lai zi feng ping lang jing de ming tian	1200
+花开伊吕波	hua kai yi lv bo	1200
+白箱	bai xiang	1605
+赛马娘	sai ma niang	1200
+真实之泪	zhen shi zhi lei	1200
+未闻花名	wei wen hua ming	1200
+那朵花	na duo hua	1200
+四月是你的谎言	si yue shi ni de huang yan	1200
+天气之子	tian qi zhi zi	1200
+铃芽之旅	ling ya zhi lv	1200
+秒速五厘米	miao su wu li mi	1200
+言叶之庭	yan ye zhi ting	1200
+云之彼端约定的地方	yun zhi bi duan yue ding de di fang	1200
+穿越时空的少女	chuan yue shi kong de shao nv	1200
+夏日大作战	xia ri da zuo zhan	1200
+狼的孩子雨和雪	lang de hai zi yu he xue	1200
+怪物之子	guai wu zhi zi	1200
+未来的未来	wei lai de wei lai	1200
+龙与雀斑公主	long yu que ban gong zhu	1200
+千与千寻	qian yu qian xun	1200
+哈尔的移动城堡	ha er de yi dong cheng bao	1200
+魔法公主	mo fa gong zhu	1200
+风之谷	feng zhi gu	1200
+魔女宅急便	mo nv zhai ji bian	1200
+崖上的波妞	ya shang de bo niu	1200
+悬崖上的金鱼姬	xuan ya shang de jin yu ji	1200
+猫的报恩	mao de bao en	1200
+借东西的小人阿莉埃蒂	jie dong xi de xiao ren a li ai di	1200
+萤火虫之墓	ying huo chong zhi mu	1200
+辉夜姬物语	hui ye ji wu yu	1200
+苍鹭与少年	cang lu yu shao nian	1200
+你想活出怎样的人生	ni xiang huo chu zen yang de ren sheng	1200
+盗梦侦探	dao meng zhen tan	1200
+未麻的部屋	wei ma de bu wu	1200
+千年女优	qian nian nv you	1200
+东京教父	dong jing jiao fu	1200
+妄想代理人	wang xiang dai li ren	1200
+阿基拉	a ji la	1200
+大友克洋	da you ke yang	1200
+回忆三部曲	hui yi san bu qu	1200
+蒸汽男孩	zheng qi nan hai	1200
+命运石之门	ming yun shi zhi men	1200
+石头门	shi tou men	1200
+混沌之子	hun dun zhi zi	1200
+机器人笔记	ji qi ren bi ji	1200
+魔法少女小圆	mo fa shao nv xiao yuan	1200
+叛逆的物语	pan ni de wu yu	1200
+物语系列	wu yu xi lie	1200
+化物语	hua wu yu	1200
+伪物语	wei wu yu	1200
+伤物语	shang wu yu	1200
+终物语	zhong wu yu	1200
+绝望先生	jue wang xian sheng	1200
+荒川爆笑团	huang chuan bao xiao tuan	1200
 伪恋	wei lian	600
-三月的狮子	san yue de shi zi	600
-蜂蜜与四叶草	feng mi yu si ye cao	600
-无头骑士异闻录	wu tou qi shi yi wen lu	600
-永生之酒	yong sheng zhi jiu	600
-夏目友人帐	xia mu you ren zhang	600
-萤火之森	ying huo zhi sen	600
-虫师	chong shi	600
-怪化猫	guai hua mao	600
-地狱少女	di yu shao nv	600
-黑执事	hei zhi shi	600
-潘多拉之心	pan duo la zhi xin	600
-瓦尼塔斯的笔记	wa ni ta si de bi ji	600
-樱兰高校男公关部	ying lan gao xiao nan gong guan bu	600
-会长是女仆大人	hui zhang shi nv pu da ren	600
-好想告诉你	hao xiang gao su ni	600
-元气少女缘结神	yuan qi shao nv yuan jie shen	600
-吸血鬼骑士	xi xue gui qi shi	600
-晨曦公主	chen xi gong zhu	600
-赤发白雪姬	chi fa bai xue ji	600
-月刊少女野崎君	yue kan shao nv ye qi jun	600
-辉夜大小姐想让我告白	hui ye da xiao jie xiang rang wo gao bai	600
-辉夜大小姐	hui ye da xiao jie	600
-堀与宫村	ku yu gong cun	600
-更衣人偶坠入爱河	geng yi ren ou zhui ru ai he	600
-青春猪头少年	qing chun zhu tou shao nian	600
+三月的狮子	san yue de shi zi	1200
+蜂蜜与四叶草	feng mi yu si ye cao	1200
+无头骑士异闻录	wu tou qi shi yi wen lu	1200
+永生之酒	yong sheng zhi jiu	1200
+夏目友人帐	xia mu you ren zhang	1200
+萤火之森	ying huo zhi sen	1200
+虫师	chong shi	17340
+怪化猫	guai hua mao	1200
+地狱少女	di yu shao nv	1200
+黑执事	hei zhi shi	1200
+潘多拉之心	pan duo la zhi xin	1200
+瓦尼塔斯的笔记	wa ni ta si de bi ji	1200
+樱兰高校男公关部	ying lan gao xiao nan gong guan bu	1200
+会长是女仆大人	hui zhang shi nv pu da ren	1200
+好想告诉你	hao xiang gao su ni	1200
+元气少女缘结神	yuan qi shao nv yuan jie shen	1200
+吸血鬼骑士	xi xue gui qi shi	1200
+晨曦公主	chen xi gong zhu	1200
+赤发白雪姬	chi fa bai xue ji	1200
+月刊少女野崎君	yue kan shao nv ye qi jun	1200
+辉夜大小姐想让我告白	hui ye da xiao jie xiang rang wo gao bai	1200
+辉夜大小姐	hui ye da xiao jie	1200
+堀与宫村	ku yu gong cun	1200
+更衣人偶坠入爱河	geng yi ren ou zhui ru ai he	1200
+青春猪头少年	qing chun zhu tou shao nian	1200
 春物	chun wu	600
-我的青春恋爱物语	wo de qing chun lian ai wu yu	600
-路人女主的养成方法	lu ren nv zhu de yang cheng fang fa	600
-路人女主	lu ren nv zhu	600
-五等分的新娘	wu deng fen de xin niang	600
-五等分的花嫁	wu deng fen de hua jia	600
-租借女友	zu jie nv you	600
-古见同学有交流障碍症	gu jian tong xue you jiao liu zhang ai zheng	600
-高木同学	gao mu tong xue	600
-擅长捉弄的高木同学	shan chang zhuo nong de gao mu tong xue	600
-我心里危险的东西	wo xin li wei xian de dong xi	600
-败犬女主太多了	bai quan nv zhu tai duo le	600
-不时用俄语小声说真心话	bu shi yong e yu xiao sheng shuo zhen xin hua	600
-碧蓝之海	bi lan zhi hai	600
-男子高中生的日常	nan zi gao zhong sheng de ri chang	600
-女高中生的虚度日常	nv gao zhong sheng de xu du ri chang	600
-笨女孩	ben nv hai	600
-徒然喜欢你	tu ran xi huan ni	600
-阿兹漫画大王	a zi man hua da wang	600
-悠哉日常大王	you zai ri chang da wang	600
+我的青春恋爱物语	wo de qing chun lian ai wu yu	1200
+路人女主的养成方法	lu ren nv zhu de yang cheng fang fa	1200
+路人女主	lu ren nv zhu	1200
+五等分的新娘	wu deng fen de xin niang	1200
+五等分的花嫁	wu deng fen de hua jia	1200
+租借女友	zu jie nv you	1200
+古见同学有交流障碍症	gu jian tong xue you jiao liu zhang ai zheng	1200
+高木同学	gao mu tong xue	1200
+擅长捉弄的高木同学	shan chang zhuo nong de gao mu tong xue	1200
+我心里危险的东西	wo xin li wei xian de dong xi	1200
+败犬女主太多了	bai quan nv zhu tai duo le	1200
+不时用俄语小声说真心话	bu shi yong e yu xiao sheng shuo zhen xin hua	1200
+碧蓝之海	bi lan zhi hai	1200
+男子高中生的日常	nan zi gao zhong sheng de ri chang	1200
+女高中生的虚度日常	nv gao zhong sheng de xu du ri chang	1200
+笨女孩	ben nv hai	1200
+徒然喜欢你	tu ran xi huan ni	1200
+阿兹漫画大王	a zi man hua da wang	1200
+悠哉日常大王	you zai ri chang da wang	1200
 点兔	dian tu	600
-请问您今天要来点兔子吗	qing wen nin jin tian yao lai dian tu zi ma	600
-黄金拼图	huang jin pin tu	600
-摇曳露营	yao ye lu ying	600
-摇曳百合	yao ye bai he	600
-孤独摇滚	gu du yao gun	600
-波奇酱	bo qi jiang	600
-战姬绝唱	zhan ji jue chang	600
-少女歌剧	shao nv ge ju	600
-偶像大师	ou xiang da shi	600
-灰姑娘女孩	hui gu niang nv hai	600
-学园偶像祭	xue yuan ou xiang ji	600
-少女与战车	shao nv yu zhan che	600
-舰队收藏	jian dui shou cang	600
-碧蓝航线	bi lan hang xian	600
-蔚蓝档案	wei lan dang an	600
-明日方舟	ming ri fang zhou	600
-崩坏三	beng huai san	600
-星穹铁道	xing qiong tie dao	600
-从零开始的异世界生活	cong ling kai shi de yi shi jie sheng huo	600
-为美好的世界献上祝福	wei mei hao de shi jie xian shang zhu fu	600
-无职转生	wu zhi zhuan sheng	600
-转生史莱姆	zhuan sheng shi lai mu	600
-盾之勇者成名录	dun zhi yong zhe cheng ming lu	600
-不死者之王	bu si zhe zhi wang	600
+请问您今天要来点兔子吗	qing wen nin jin tian yao lai dian tu zi ma	1200
+黄金拼图	huang jin pin tu	1200
+摇曳露营	yao ye lu ying	1200
+摇曳百合	yao ye bai he	1200
+孤独摇滚	gu du yao gun	1200
+波奇酱	bo qi jiang	1200
+战姬绝唱	zhan ji jue chang	1200
+少女歌剧	shao nv ge ju	1200
+偶像大师	ou xiang da shi	1200
+灰姑娘女孩	hui gu niang nv hai	1200
+学园偶像祭	xue yuan ou xiang ji	1200
+少女与战车	shao nv yu zhan che	1200
+舰队收藏	jian dui shou cang	1200
+碧蓝航线	bi lan hang xian	1200
+蔚蓝档案	wei lan dang an	1200
+明日方舟	ming ri fang zhou	1200
+崩坏三	beng huai san	1200
+星穹铁道	xing qiong tie dao	1200
+从零开始的异世界生活	cong ling kai shi de yi shi jie sheng huo	1200
+为美好的世界献上祝福	wei mei hao de shi jie xian shang zhu fu	1200
+无职转生	wu zhi zhuan sheng	1200
+转生史莱姆	zhuan sheng shi lai mu	1200
+盾之勇者成名录	dun zhi yong zhe cheng ming lu	1200
+不死者之王	bu si zhe zhi wang	1200
 骨王	gu wang	600
-幼女战记	you nv zhan ji	600
-记录的地平线	ji lu de di ping xian	600
-灰与幻想的格林姆迦尔	hui yu huan xiang de ge lin mu jia er	600
-慎重勇者	shen zhong yong zhe	600
-暗影大人	an ying da ren	600
-想要成为影之实力者	xiang yao cheng wei ying zhi shi li zhe	600
-转生王女与天才千金	zhuan sheng wang nv yu tian cai qian jin	600
-恶役千金	e yi qian jin	600
-乙女游戏	yi nv you xi	600
-哥布林杀手	ge bu lin sha shou	600
-在地下城寻求邂逅	zai di xia cheng xun qiu xie hou	600
+幼女战记	you nv zhan ji	1200
+记录的地平线	ji lu de di ping xian	1200
+灰与幻想的格林姆迦尔	hui yu huan xiang de ge lin mu jia er	1200
+慎重勇者	shen zhong yong zhe	1200
+暗影大人	an ying da ren	1200
+想要成为影之实力者	xiang yao cheng wei ying zhi shi li zhe	1200
+转生王女与天才千金	zhuan sheng wang nv yu tian cai qian jin	1200
+恶役千金	e yi qian jin	1200
+乙女游戏	yi nv you xi	1200
+哥布林杀手	ge bu lin sha shou	1200
+在地下城寻求邂逅	zai di xia cheng xun qiu xie hou	1200
 地错	di cuo	600
-斩赤红之瞳	zhan chi hong zhi tong	600
-寄生兽生命的准则	ji sheng shou sheng ming de zhun ze	600
-未来日记	wei lai ri ji	600
-寒蝉鸣泣之时	han chan ming qi zhi shi	600
-海猫鸣泣之时	hai mao ming qi zhi shi	600
-学园孤岛	xue yuan gu dao	600
-来自深渊	lai zi shen yuan	600
-少女终末旅行	shao nv zhong mo lv xing	600
-奇巧计程车	qi qiao ji cheng che	600
-宝石之国	bao shi zhi guo	600
-动物狂想曲	dong wu kuang xiang qu	600
-夏日重现	xia ri chong xian	600
-天国大魔境	tian guo da mo jing	600
-异度侵入	yi du qin ru	600
-奇蛋物语	qi dan wu yu	600
-莉可丽丝	li ke li si	600
-国王排名	guo wang pai ming	600
-黄金神威	huang jin shen wei	600
-海盗战记	hai dao zhan ji	600
-冰海战记	bing hai zhan ji	600
-浪客行	lang ke xing	600
-灌篮高手全国大赛	guan lan gao shou quan guo da sai	600
-二十世纪少年	er shi shi ji shao nian	600
-四叠半神话大系	si die ban shen hua da xi	600
-春宵苦短少女前进吧	chun xiao ku duan shao nv qian jin ba	600
-恶魔人	e mo ren	600
-犬王	quan wang	600
-别对映像研出手	bie dui ying xiang yan chu shou	600
-交响情人梦	jiao xiang qing ren meng	600
-昭和元禄落语心中	zhao he yuan lu luo yu xin zhong	600
-宇宙兄弟	yu zhou xiong di	600
-银之匙	yin zhi chi	600
-百姓贵族	bai xing gui zu	600
-食戟之灵	shi ji zhi ling	600
-中华小当家	zhong hua xiao dang jia	600
-厨神小当家	chu shen xiao dang jia	600
-黄金大镖客	huang jin da biao ke	600
-奇妙冒险	qi miao mao xian	600
-幻影之血	huan ying zhi xue	600
-战斗潮流	zhan dou chao liu	600
-星尘斗士	xing chen dou shi	600
-不灭钻石	bu mie zuan shi	600
-黄金之风	huang jin zhi feng	600
-石之海	shi zhi hai	600
-飙马野郎	biao ma ye lang	600
-福音新剧场版	fu yin xin ju chang ban	600
-头文字	tou wen zi	600
-湾岸午夜	wan an wu ye	600
-高智能方程式	gao zhi neng fang cheng shi	600
-四驱兄弟	si qu xiong di	600
-魔神英雄传	mo shen ying xiong zhuan	600
-神龙斗士	shen long dou shi	600
-光能使者	guang neng shi zhe	600
-魔动王	mo dong wang	600
-数码宝贝大冒险	shu ma bao bei da mao xian	600
-百兽王	bai shou wang	600
-铁臂阿童木	tie bi a tong mu	600
-森林大帝	sen lin da di	600
-火之鸟	huo zhi niao	600
-怪医黑杰克	guai yi hei jie ke	600
-三眼神童	san yan shen tong	600
-银河铁道九九九	yin he tie dao jiu jiu jiu	600
-宇宙战舰大和号	yu zhou zhan jian da he hao	600
-科学小飞侠	ke xue xiao fei xia	600
-聪明的一休	cong ming de yi xiu	600
-咪咪流浪记	mi mi liu lang ji	600
-樱桃小丸子	ying tao xiao wan zi	600
-海螺小姐	hai luo xiao jie	600
-我们这一家	wo men zhe yi jia	600
-忍者乱太郎	ren zhe luan tai lang	600
-笑园漫画大王	xiao yuan man hua da wang	600
-热带雨林的爆笑生活	re dai yu lin de bao xiao sheng huo	600
-乌龙派出所	wu long pai chu suo	600
-金肉人	jin rou ren	600
-魁男塾	kui nan shu	600
-通灵童子	tong ling tong zi	600
-烈火之炎	lie huo zhi yan	600
+斩赤红之瞳	zhan chi hong zhi tong	1200
+寄生兽生命的准则	ji sheng shou sheng ming de zhun ze	1200
+未来日记	wei lai ri ji	1200
+寒蝉鸣泣之时	han chan ming qi zhi shi	1200
+海猫鸣泣之时	hai mao ming qi zhi shi	1200
+学园孤岛	xue yuan gu dao	1200
+来自深渊	lai zi shen yuan	1200
+少女终末旅行	shao nv zhong mo lv xing	1200
+奇巧计程车	qi qiao ji cheng che	1200
+宝石之国	bao shi zhi guo	1200
+动物狂想曲	dong wu kuang xiang qu	1200
+夏日重现	xia ri chong xian	1200
+天国大魔境	tian guo da mo jing	1200
+异度侵入	yi du qin ru	1200
+奇蛋物语	qi dan wu yu	1200
+莉可丽丝	li ke li si	1200
+国王排名	guo wang pai ming	1200
+黄金神威	huang jin shen wei	1200
+海盗战记	hai dao zhan ji	1200
+冰海战记	bing hai zhan ji	1200
+浪客行	lang ke xing	1200
+灌篮高手全国大赛	guan lan gao shou quan guo da sai	1200
+二十世纪少年	er shi shi ji shao nian	1200
+四叠半神话大系	si die ban shen hua da xi	1200
+春宵苦短少女前进吧	chun xiao ku duan shao nv qian jin ba	1200
+恶魔人	e mo ren	1200
+犬王	quan wang	12740
+别对映像研出手	bie dui ying xiang yan chu shou	1200
+交响情人梦	jiao xiang qing ren meng	1200
+昭和元禄落语心中	zhao he yuan lu luo yu xin zhong	1200
+宇宙兄弟	yu zhou xiong di	1200
+银之匙	yin zhi chi	1200
+百姓贵族	bai xing gui zu	1200
+食戟之灵	shi ji zhi ling	1200
+中华小当家	zhong hua xiao dang jia	1200
+厨神小当家	chu shen xiao dang jia	1200
+黄金大镖客	huang jin da biao ke	1200
+奇妙冒险	qi miao mao xian	1200
+幻影之血	huan ying zhi xue	1200
+战斗潮流	zhan dou chao liu	1200
+星尘斗士	xing chen dou shi	1200
+不灭钻石	bu mie zuan shi	1200
+黄金之风	huang jin zhi feng	1200
+石之海	shi zhi hai	1200
+飙马野郎	biao ma ye lang	1200
+福音新剧场版	fu yin xin ju chang ban	1200
+头文字	tou wen zi	1200
+湾岸午夜	wan an wu ye	1200
+高智能方程式	gao zhi neng fang cheng shi	1200
+四驱兄弟	si qu xiong di	1200
+魔神英雄传	mo shen ying xiong zhuan	1200
+神龙斗士	shen long dou shi	1200
+光能使者	guang neng shi zhe	1200
+魔动王	mo dong wang	1200
+数码宝贝大冒险	shu ma bao bei da mao xian	1200
+百兽王	bai shou wang	1200
+铁臂阿童木	tie bi a tong mu	1200
+森林大帝	sen lin da di	1200
+火之鸟	huo zhi niao	1200
+怪医黑杰克	guai yi hei jie ke	1200
+三眼神童	san yan shen tong	1200
+银河铁道九九九	yin he tie dao jiu jiu jiu	1200
+宇宙战舰大和号	yu zhou zhan jian da he hao	1200
+科学小飞侠	ke xue xiao fei xia	1200
+聪明的一休	cong ming de yi xiu	1200
+咪咪流浪记	mi mi liu lang ji	1200
+樱桃小丸子	ying tao xiao wan zi	1200
+海螺小姐	hai luo xiao jie	1200
+我们这一家	wo men zhe yi jia	1200
+忍者乱太郎	ren zhe luan tai lang	1200
+笑园漫画大王	xiao yuan man hua da wang	1200
+热带雨林的爆笑生活	re dai yu lin de bao xiao sheng huo	1200
+乌龙派出所	wu long pai chu suo	1200
+金肉人	jin rou ren	1200
+魁男塾	kui nan shu	1200
+通灵童子	tong ling tong zi	1200
+烈火之炎	lie huo zhi yan	1200
 魔笛	mo di	600
-七大罪	qi da zui	600
-默示录的四骑士	mo shi lu de si qi shi	600
-入间同学入魔了	ru jian tong xue ru mo le	600
-齐木楠雄	qi mu nan xiong	600
-坂本日常	ban ben ri chang	600
-怪兽八号	guai shou ba hao	600
-胆大党	dan da dang	600
-超自然武装当哒当	chao zi ran wu zhuang dang da dang	600
-地关于地球的运动	di guan yu di qiu de yun dong	600
-青之箱	qing zhi xiang	600
-鹿乃子乃子虎视眈眈	lu nai zi nai zi hu shi dan dan	600
-少女乐队的呐喊	shao nv yue dui de na han	600
-夜晚的水母不会游泳	ye wan de shui mu bu hui you yong	600
-吹响上低音号	chui xiang shang di yin hao	600
-无头骑士	wu tou qi shi	600
-工作细胞	gong zuo xi bao	600
-兽娘动物园	shou niang dong wu yuan	600
-小邪神飞踢	xiao xie shen fei ti	600
-迦希女王不会放弃	jia xi nv wang bu hui fang qi	600
-街角魔族	jie jiao mo zu	600
-向山进发	xiang shan jin fa	600
-芳文社	fang wen she	600
-漫画时光	man hua shi guang	600
-干物妹小埋	gan wu mei xiao mai	600
-政宗君的复仇	zheng zong jun de fu chou	600
-妄想学生会	wang xiang xue sheng hui	600
-碧蓝幻想	bi lan huan xiang	600
-公主连结	gong zhu lian jie	600
-刀剑乱舞	dao jian luan wu	600
-文豪野犬	wen hao ye quan	600
-血界战线	xue jie zhan xian	600
-交响诗篇	jiao xiang shi pian	600
+七大罪	qi da zui	1200
+默示录的四骑士	mo shi lu de si qi shi	1200
+入间同学入魔了	ru jian tong xue ru mo le	1200
+齐木楠雄	qi mu nan xiong	1200
+坂本日常	ban ben ri chang	1200
+怪兽八号	guai shou ba hao	1200
+胆大党	dan da dang	1200
+超自然武装当哒当	chao zi ran wu zhuang dang da dang	1200
+地关于地球的运动	di guan yu di qiu de yun dong	1200
+青之箱	qing zhi xiang	1200
+鹿乃子乃子虎视眈眈	lu nai zi nai zi hu shi dan dan	1200
+少女乐队的呐喊	shao nv yue dui de na han	1200
+夜晚的水母不会游泳	ye wan de shui mu bu hui you yong	1200
+吹响上低音号	chui xiang shang di yin hao	1200
+无头骑士	wu tou qi shi	1200
+工作细胞	gong zuo xi bao	1200
+兽娘动物园	shou niang dong wu yuan	1200
+小邪神飞踢	xiao xie shen fei ti	1200
+迦希女王不会放弃	jia xi nv wang bu hui fang qi	1200
+街角魔族	jie jiao mo zu	1200
+向山进发	xiang shan jin fa	1200
+芳文社	fang wen she	1200
+漫画时光	man hua shi guang	1200
+干物妹小埋	gan wu mei xiao mai	1200
+政宗君的复仇	zheng zong jun de fu chou	1200
+妄想学生会	wang xiang xue sheng hui	1200
+碧蓝幻想	bi lan huan xiang	1200
+公主连结	gong zhu lian jie	1200
+刀剑乱舞	dao jian luan wu	1200
+文豪野犬	wen hao ye quan	1200
+血界战线	xue jie zhan xian	1200
+交响诗篇	jiao xiang shi pian	1200
 狼雨	lang yu	600
-黑之契约者	hei zhi qi yue zhe	600
-噬魂师诺特	shi hun shi nuo te	600
-野良神	ye liang shen	600
-流浪神差	liu lang shen chai	600
-赤发白雪	chi fa bai xue	600
-绝园的暴风雨	jue yuan de bao feng yu	600
-樱兰高校	ying lan gao xiao	600
-太空丹迪	tai kong dan di	600
+黑之契约者	hei zhi qi yue zhe	1200
+噬魂师诺特	shi hun shi nuo te	1200
+野良神	ye liang shen	1200
+流浪神差	liu lang shen chai	1200
+赤发白雪	chi fa bai xue	1200
+绝园的暴风雨	jue yuan de bao feng yu	1200
+樱兰高校	ying lan gao xiao	1200
+太空丹迪	tai kong dan di	1200
 灵能	ling neng	600
-我的英雄	wo de ying xiong	600
-无限滑板	wu xian hua ban	600
-卡罗尔与星期二	ka luo er yu xing qi er	600
-机动警察	ji dong jing cha	600
-银河英雄传说	yin he ying xiong chuan shuo	600
-银英传	yin ying zhuan	600
-亚尔斯兰战记	ya er si lan zhan ji	600
-十二国记	shi er guo ji	600
-彩云国物语	cai yun guo wu yu	600
-不思议游戏	bu si yi you xi	600
-魔卡少女	mo ka shao nv	600
-翼年代记	yi nian dai ji	600
-四月一日灵异事件簿	si yue yi ri ling yi shi jian bu	600
-人形电脑天使心	ren xing dian nao tian shi xin	600
-东京巴比伦	dong jing ba bi lun	600
+我的英雄	wo de ying xiong	1200
+无限滑板	wu xian hua ban	1200
+卡罗尔与星期二	ka luo er yu xing qi er	1200
+机动警察	ji dong jing cha	1200
+银河英雄传说	yin he ying xiong chuan shuo	1200
+银英传	yin ying zhuan	1200
+亚尔斯兰战记	ya er si lan zhan ji	1200
+十二国记	shi er guo ji	1200
+彩云国物语	cai yun guo wu yu	1200
+不思议游戏	bu si yi you xi	1200
+魔卡少女	mo ka shao nv	1200
+翼年代记	yi nian dai ji	1200
+四月一日灵异事件簿	si yue yi ri ling yi shi jian bu	1200
+人形电脑天使心	ren xing dian nao tian shi xin	1200
+东京巴比伦	dong jing ba bi lun	1200
 圣传	sheng zhuan	600
-魔法骑士	mo fa qi shi	600
-守护甜心	shou hu tian xin	600
-蔷薇少女	qiang wei shao nv	600
-光之美少女	guang zhi mei shao nv	600
-数码暴龙机	shu ma bao long ji	600
-爆旋陀螺	bao xuan tuo luo	600
-陀螺战士	tuo luo zhan shi	600
-弹珠警察	dan zhu jing cha	600
-铁胆火车侠	tie dan huo che xia	600
-中华一番	zhong hua yi fan	600
-日式面包王	ri shi mian bao wang	600
-烘焙王	hong bei wang	600
-将太的寿司	jiang tai de shou si	600
-孤独的美食家	gu du de mei shi jia	600
-深夜食堂	shen ye shi tang	600
-卫宫家今天的饭	wei gong jia jin tian de fan	600
-异世界食堂	yi shi jie shi tang	600
-葬送芙莉莲	zang song fu li lian	600
-药屋少女	yao wu shao nv	600
-香格里拉边境	xiang ge li la bian jing	600
-独自升级	du zi sheng ji	600
-我独自升级	wo du zi sheng ji	600
-肌肉魔法使	ji rou mo fa shi	600
-物理魔法使马修	wu li mo fa shi ma xiu	600
-不死不幸	bu si bu xing	600
-夜樱家的大作战	ye ying jia de da zuo zhan	600
-擅长逃跑的殿下	shan chang tao pao de dian xia	600
-失忆投捕	shi yi tou bu	600
-防风少年	fang feng shao nian	600
-排球少年垃圾场决战	pai qiu shao nian la ji chang jue zhan	600
-间谍过家家代号白	jian die guo jia jia dai hao bai	600
-机动战士高达种子自由	ji dong zhan shi gao da zhong zi zi you	600
-鬼灭之刃无限城篇	gui mie zhi ren wu xian cheng pian	600
-电锯人蕾塞篇	dian ju ren lei sai pian	600
-魔法少女小圆回天	mo fa shao nv xiao yuan hui tian	600
-怪化猫唐伞	guai hua mao tang san	600
-再见绘梨	zai jian hui li	600
-炎拳	yan quan	600
-地狱乐	di yu le	600
-跃动青春	yue dong qing chun	600
-芙莉莲	fu li lian	600
+魔法骑士	mo fa qi shi	1200
+守护甜心	shou hu tian xin	1200
+蔷薇少女	qiang wei shao nv	1200
+光之美少女	guang zhi mei shao nv	1200
+数码暴龙机	shu ma bao long ji	1200
+爆旋陀螺	bao xuan tuo luo	1200
+陀螺战士	tuo luo zhan shi	1200
+弹珠警察	dan zhu jing cha	1200
+铁胆火车侠	tie dan huo che xia	1200
+中华一番	zhong hua yi fan	1200
+日式面包王	ri shi mian bao wang	1200
+烘焙王	hong bei wang	1200
+将太的寿司	jiang tai de shou si	1200
+孤独的美食家	gu du de mei shi jia	1200
+深夜食堂	shen ye shi tang	1200
+卫宫家今天的饭	wei gong jia jin tian de fan	1200
+异世界食堂	yi shi jie shi tang	1200
+葬送芙莉莲	zang song fu li lian	1200
+药屋少女	yao wu shao nv	1200
+香格里拉边境	xiang ge li la bian jing	1200
+独自升级	du zi sheng ji	1200
+我独自升级	wo du zi sheng ji	1200
+肌肉魔法使	ji rou mo fa shi	1200
+物理魔法使马修	wu li mo fa shi ma xiu	1200
+不死不幸	bu si bu xing	1200
+夜樱家的大作战	ye ying jia de da zuo zhan	1200
+擅长逃跑的殿下	shan chang tao pao de dian xia	1200
+失忆投捕	shi yi tou bu	1200
+防风少年	fang feng shao nian	1200
+排球少年垃圾场决战	pai qiu shao nian la ji chang jue zhan	1200
+间谍过家家代号白	jian die guo jia jia dai hao bai	1200
+机动战士高达种子自由	ji dong zhan shi gao da zhong zi zi you	1200
+鬼灭之刃无限城篇	gui mie zhi ren wu xian cheng pian	1200
+电锯人蕾塞篇	dian ju ren lei sai pian	1200
+魔法少女小圆回天	mo fa shao nv xiao yuan hui tian	1200
+怪化猫唐伞	guai hua mao tang san	1200
+再见绘梨	zai jian hui li	1200
+炎拳	yan quan	5137
+地狱乐	di yu le	1200
+跃动青春	yue dong qing chun	1200
+芙莉莲	fu li lian	1200
 咒回	zhou hui	600
 鬼灭	gui mie	600
-巨人的进击	ju ren de jin ji	600
-死火海	si huo hai	600
-民工漫	min gong man	600
-三大漫	san da man	600
-周刊少年跳跃	zhou kan shao nian tiao yue	600
-少年跳跃	shao nian tiao yue	600
-周刊少年星期天	zhou kan shao nian xing qi tian	600
-周刊少年杂志	zhou kan shao nian za zhi	600
-电击文库	dian ji wen ku	600
-角川文库	jiao chuan wen ku	600
-轻小说	qing xiao shuo	600
-视觉小说	shi jue xiao shuo	600
-电子小说	dian zi xiao shuo	600
-文字冒险游戏	wen zi mao xian you xi	600
-白色相簿	bai se xiang bu	600
-命运石之门零	ming yun shi zhi men ling	600
-传颂之物	chuan song zhi wu	600
-秋之回忆	qiu zhi hui yi	600
-寒蝉鸣泣之时业	han chan ming qi zhi shi ye	600
-寒蝉鸣泣之时卒	han chan ming qi zhi shi zu	600
-夏日口袋	xia ri kou dai	600
-星之梦	xing zhi meng	600
-智代后记	zhi dai hou ji	600
-小小克星	xiao xiao ke xing	600
-成神之日	cheng shen zhi ri	600
-炽焰天穹	chi yan tian qiong	600
-红烧天堂	hong shao tian tang	600
-魔法少女奈叶	mo fa shao nv nai ye	600
-结城友奈是勇者	jie cheng you nai shi yong zhe	600
-魔法纪录	mo fa ji lu	600
-战翼的希格德莉法	zhan yi de xi ge de li fa	600
-强袭魔女	qiang xi mo nv	600
+巨人的进击	ju ren de jin ji	1200
+死火海	si huo hai	1200
+民工漫	min gong man	1200
+三大漫	san da man	1200
+周刊少年跳跃	zhou kan shao nian tiao yue	1200
+少年跳跃	shao nian tiao yue	1200
+周刊少年星期天	zhou kan shao nian xing qi tian	1200
+周刊少年杂志	zhou kan shao nian za zhi	1200
+电击文库	dian ji wen ku	1200
+角川文库	jiao chuan wen ku	1200
+轻小说	qing xiao shuo	1200
+视觉小说	shi jue xiao shuo	1200
+电子小说	dian zi xiao shuo	1200
+文字冒险游戏	wen zi mao xian you xi	1200
+白色相簿	bai se xiang bu	1200
+命运石之门零	ming yun shi zhi men ling	1200
+传颂之物	chuan song zhi wu	1200
+秋之回忆	qiu zhi hui yi	1200
+寒蝉鸣泣之时业	han chan ming qi zhi shi ye	1200
+寒蝉鸣泣之时卒	han chan ming qi zhi shi zu	1200
+夏日口袋	xia ri kou dai	1200
+星之梦	xing zhi meng	1200
+智代后记	zhi dai hou ji	1200
+小小克星	xiao xiao ke xing	1200
+成神之日	cheng shen zhi ri	1200
+炽焰天穹	chi yan tian qiong	1200
+红烧天堂	hong shao tian tang	1200
+魔法少女奈叶	mo fa shao nv nai ye	1200
+结城友奈是勇者	jie cheng you nai shi yong zhe	1200
+魔法纪录	mo fa ji lu	1200
+战翼的希格德莉法	zhan yi de xi ge de li fa	1200
+强袭魔女	qiang xi mo nv	1200
 舰娘	jian niang	600
 马娘	ma niang	600
 刀男	dao nan	600
 舟游	zhou you	600
 崩铁	beng tie	600
-绝区零	jue qu ling	600
+绝区零	jue qu ling	1200
 鸣潮	ming chao	600
-闪耀暖暖	shan yao nuan nuan	600
-奇迹暖暖	qi ji nuan nuan	600
-恋与制作人	lian yu zhi zuo ren	600
-光与夜之恋	guang yu ye zhi lian	600
-未定事件簿	wei ding shi jian bu	600
-时空中的绘旅人	shi kong zhong de hui lv ren	600
-恋与深空	lian yu shen kong	600
-偶像梦幻祭	ou xiang meng huan ji	600
-世界计划	shi jie ji hua	600
-邦邦	bang bang	600
-少女乐团派对	shao nv yue tuan pai dui	600
-拉拉人	la la ren	600
-虹咲学园	hong xiao xue yuan	600
-莲之空女学院	lian zhi kong nv xue yuan	600
-学园偶像大师	xue yuan ou xiang da shi	600
-闪耀色彩	shan yao se cai	600
-百万现场	bai wan xian chang	600
-灰姑娘星光舞台	hui gu niang xing guang wu tai	600
-赛马娘芦毛灰姑娘	sai ma niang lu mao hui gu niang	600
-福音战士新剧场版序	fu yin zhan shi xin ju chang ban xu	600
-福音战士新剧场版破	fu yin zhan shi xin ju chang ban po	600
-福音战士新剧场版急	fu yin zhan shi xin ju chang ban ji	600
-福音战士新剧场版终	fu yin zhan shi xin ju chang ban zhong	600
-真心为你	zhen xin wei ni	600
-死与新生	si yu xin sheng	600
-哪吒之魔童降世	ne zha zhi mo tong jiang shi	600
-哪吒之魔童闹海	ne zha zhi mo tong nao hai	600
-魔童降世	mo tong jiang shi	600
-西游记之大圣归来	xi you ji zhi da sheng gui lai	600
-大圣归来	da sheng gui lai	600
-白蛇缘起	bai she yuan qi	600
-白蛇二青蛇劫起	bai she er qing she jie qi	600
-白蛇浮生	bai she fu sheng	600
-新神榜哪吒重生	xin shen bang ne zha chong sheng	600
-新神榜杨戬	xin shen bang yang jian	600
-长安三万里	chang an san wan li	600
-姜子牙	jiang zi ya	600
-大鱼海棠	da yu hai tang	600
-大护法	da hu fa	600
-妙先生	miao xian sheng	600
-罗小黑战记	luo xiao hei zhan ji	600
-罗小黑	luo xiao hei	600
-雾山五行	wu shan wu xing	600
-大理寺日志	da li si ri zhi	600
-雄狮少年	xiong shi shao nian	600
-中国奇谭	zhong guo qi tan	600
-小妖怪的夏天	xiao yao guai de xia tian	600
-茶啊二中	cha a er zhong	600
-落凡尘	luo fan chen	600
-伞少女	san shao nv	600
-哪吒闹海	ne zha nao hai	600
-金猴降妖	jin hou xiang yao	600
-九色鹿	jiu se lu	600
-骄傲的将军	jiao ao de jiang jun	600
-小蝌蚪找妈妈	xiao ke dou zhao ma ma	600
-牧笛	mu di	600
-山水情	shan shui qing	600
-金刚葫芦娃	jin gang hu lu wa	600
-舒克和贝塔	shu ke he bei ta	600
-魔方大厦	mo fang da sha	600
-邋遢大王奇遇记	la ta da wang qi yu ji	600
-雪孩子	xue hai zi	600
-阿凡提的故事	a fan ti de gu shi	600
-神笔马良	shen bi ma liang	600
-大耳朵图图	da er duo tu tu	600
-大头儿子和小头爸爸	da tou er zi he xiao tou ba ba	600
-海尔兄弟	hai er xiong di	600
-哪吒传奇	ne zha chuan qi	600
-小鲤鱼历险记	xiao li yu li xian ji	600
-围棋少年	wei qi shao nian	600
-神厨小福贵	shen chu xiao fu gui	600
-虹猫蓝兔七侠传	hong mao lan tu qi xia zhuan	600
-虹猫蓝兔	hong mao lan tu	600
-蓝猫淘气三千问	lan mao tao qi san qian wen	600
-神兵小将	shen bing xiao jiang	600
-果宝特攻	guo bao te gong	600
-洛洛历险记	luo luo li xian ji	600
-百变机兽	bai bian ji shou	600
-超兽武装	chao shou wu zhuang	600
-猪猪侠	zhu zhu xia	600
-宇宙星神	yu zhou xing shen	600
-铁甲威虫	tie jia wei chong	600
-火力少年王	huo li shao nian wang	600
-巴啦啦小魔仙	ba la la xiao mo xian	600
-铠甲勇士	kai jia yong shi	600
-巨神战击队	ju shen zhan ji dui	600
-战斗王之飓风战魂	zhan dou wang zhi ju feng zhan hun	600
-喜羊羊与灰太狼	xi yang yang yu hui tai lang	600
-喜羊羊	xi yang yang	600
-筐出胜利	kuang chu sheng li	600
-熊出没	xiong chu mo	600
-开心超人	kai xin chao ren	600
-开心宝贝	kai xin bao bei	600
-甜心格格	tian xin ge ge	600
-精灵梦叶罗丽	jing ling meng ye luo li	600
-叶罗丽	ye luo li	600
-秦时明月	qin shi ming yue	600
-百步飞剑	bai bu fei jian	600
-夜尽天明	ye jin tian ming	600
-沧海横流	cang hai heng liu	600
-天行九歌	tian xing jiu ge	600
-武庚纪	wu geng ji	600
-西行纪	xi xing ji	600
-画江湖之不良人	hua jiang hu zhi bu liang ren	600
-不良人	bu liang ren	600
-画江湖之灵主	hua jiang hu zhi ling zhu	600
-画江湖之杯莫停	hua jiang hu zhi bei mo ting	600
-画江湖之换世门生	hua jiang hu zhi huan shi men sheng	600
+闪耀暖暖	shan yao nuan nuan	1200
+奇迹暖暖	qi ji nuan nuan	1200
+恋与制作人	lian yu zhi zuo ren	1200
+光与夜之恋	guang yu ye zhi lian	1200
+未定事件簿	wei ding shi jian bu	1200
+时空中的绘旅人	shi kong zhong de hui lv ren	1200
+恋与深空	lian yu shen kong	1200
+偶像梦幻祭	ou xiang meng huan ji	1200
+世界计划	shi jie ji hua	1200
+邦邦	bang bang	26462
+少女乐团派对	shao nv yue tuan pai dui	1200
+拉拉人	la la ren	1200
+虹咲学园	hong xiao xue yuan	1200
+莲之空女学院	lian zhi kong nv xue yuan	1200
+学园偶像大师	xue yuan ou xiang da shi	1200
+闪耀色彩	shan yao se cai	1200
+百万现场	bai wan xian chang	1200
+灰姑娘星光舞台	hui gu niang xing guang wu tai	1200
+赛马娘芦毛灰姑娘	sai ma niang lu mao hui gu niang	1200
+福音战士新剧场版序	fu yin zhan shi xin ju chang ban xu	1200
+福音战士新剧场版破	fu yin zhan shi xin ju chang ban po	1200
+福音战士新剧场版急	fu yin zhan shi xin ju chang ban ji	1200
+福音战士新剧场版终	fu yin zhan shi xin ju chang ban zhong	1200
+真心为你	zhen xin wei ni	1200
+死与新生	si yu xin sheng	1200
+哪吒之魔童降世	ne zha zhi mo tong jiang shi	1200
+哪吒之魔童闹海	ne zha zhi mo tong nao hai	1200
+魔童降世	mo tong jiang shi	1200
+西游记之大圣归来	xi you ji zhi da sheng gui lai	1200
+大圣归来	da sheng gui lai	1200
+白蛇缘起	bai she yuan qi	1200
+白蛇二青蛇劫起	bai she er qing she jie qi	1200
+白蛇浮生	bai she fu sheng	1200
+新神榜哪吒重生	xin shen bang ne zha chong sheng	1200
+新神榜杨戬	xin shen bang yang jian	1200
+长安三万里	chang an san wan li	1200
+姜子牙	jiang zi ya	1200
+大鱼海棠	da yu hai tang	1200
+大护法	da hu fa	1200
+妙先生	miao xian sheng	1200
+罗小黑战记	luo xiao hei zhan ji	1200
+罗小黑	luo xiao hei	1200
+雾山五行	wu shan wu xing	1200
+大理寺日志	da li si ri zhi	1200
+雄狮少年	xiong shi shao nian	1200
+中国奇谭	zhong guo qi tan	1200
+小妖怪的夏天	xiao yao guai de xia tian	1200
+茶啊二中	cha a er zhong	1200
+落凡尘	luo fan chen	1200
+伞少女	san shao nv	1200
+哪吒闹海	ne zha nao hai	1200
+金猴降妖	jin hou xiang yao	1200
+九色鹿	jiu se lu	1200
+骄傲的将军	jiao ao de jiang jun	1200
+小蝌蚪找妈妈	xiao ke dou zhao ma ma	1200
+牧笛	mu di	29183
+山水情	shan shui qing	1200
+金刚葫芦娃	jin gang hu lu wa	1200
+舒克和贝塔	shu ke he bei ta	1200
+魔方大厦	mo fang da sha	1200
+邋遢大王奇遇记	la ta da wang qi yu ji	1200
+雪孩子	xue hai zi	1200
+阿凡提的故事	a fan ti de gu shi	1200
+神笔马良	shen bi ma liang	1200
+大耳朵图图	da er duo tu tu	1200
+大头儿子和小头爸爸	da tou er zi he xiao tou ba ba	1200
+海尔兄弟	hai er xiong di	1200
+哪吒传奇	ne zha chuan qi	1200
+小鲤鱼历险记	xiao li yu li xian ji	1200
+围棋少年	wei qi shao nian	1200
+神厨小福贵	shen chu xiao fu gui	1200
+虹猫蓝兔七侠传	hong mao lan tu qi xia zhuan	1200
+虹猫蓝兔	hong mao lan tu	1200
+蓝猫淘气三千问	lan mao tao qi san qian wen	1200
+神兵小将	shen bing xiao jiang	1200
+果宝特攻	guo bao te gong	1200
+洛洛历险记	luo luo li xian ji	1200
+百变机兽	bai bian ji shou	1200
+超兽武装	chao shou wu zhuang	1200
+猪猪侠	zhu zhu xia	1200
+宇宙星神	yu zhou xing shen	1200
+铁甲威虫	tie jia wei chong	1200
+火力少年王	huo li shao nian wang	1200
+巴啦啦小魔仙	ba la la xiao mo xian	1200
+铠甲勇士	kai jia yong shi	1200
+巨神战击队	ju shen zhan ji dui	1200
+战斗王之飓风战魂	zhan dou wang zhi ju feng zhan hun	1200
+喜羊羊与灰太狼	xi yang yang yu hui tai lang	1200
+喜羊羊	xi yang yang	8305
+筐出胜利	kuang chu sheng li	1200
+熊出没	xiong chu mo	1200
+开心超人	kai xin chao ren	1200
+开心宝贝	kai xin bao bei	1200
+甜心格格	tian xin ge ge	1200
+精灵梦叶罗丽	jing ling meng ye luo li	1200
+叶罗丽	ye luo li	1200
+秦时明月	qin shi ming yue	1200
+百步飞剑	bai bu fei jian	1200
+夜尽天明	ye jin tian ming	1200
+沧海横流	cang hai heng liu	1200
+天行九歌	tian xing jiu ge	1200
+武庚纪	wu geng ji	1200
+西行纪	xi xing ji	1200
+画江湖之不良人	hua jiang hu zhi bu liang ren	1200
+不良人	bu liang ren	1200
+画江湖之灵主	hua jiang hu zhi ling zhu	1200
+画江湖之杯莫停	hua jiang hu zhi bei mo ting	1200
+画江湖之换世门生	hua jiang hu zhi huan shi men sheng	1200
 侠岚	xia lan	600
-风语咒	feng yu zhou	600
-眷思量	juan si liang	600
-少年歌行	shao nian ge xing	600
-少年白马醉春风	shao nian bai ma zui chun feng	600
-暗河传	an he zhuan	600
-狐妖小红娘	hu yao xiao hong niang	600
-王权富贵	wang quan fu gui	600
-月红篇	yue hong pian	600
-竹业篇	zhu ye pian	600
-刺客伍六七	ci ke wu liu qi	600
-伍六七	wu liu qi	600
-玄武国篇	xuan wu guo pian	600
-镇魂街	zhen hun jie	600
-十万个冷笑话	shi wan ge leng xiao hua	600
-罗小黑战记众生之门	luo xiao hei zhan ji zhong sheng zhi men	600
+风语咒	feng yu zhou	1200
+眷思量	juan si liang	1200
+少年歌行	shao nian ge xing	1200
+少年白马醉春风	shao nian bai ma zui chun feng	1200
+暗河传	an he zhuan	1200
+狐妖小红娘	hu yao xiao hong niang	1200
+王权富贵	wang quan fu gui	1200
+月红篇	yue hong pian	1200
+竹业篇	zhu ye pian	1200
+刺客伍六七	ci ke wu liu qi	1200
+伍六七	wu liu qi	1200
+玄武国篇	xuan wu guo pian	1200
+镇魂街	zhen hun jie	1200
+十万个冷笑话	shi wan ge leng xiao hua	1200
+罗小黑战记众生之门	luo xiao hei zhan ji zhong sheng zhi men	1200
 尸兄	shi xiong	600
-我叫白小飞	wo jiao bai xiao fei	600
-中国惊奇先生	zhong guo jing qi xian sheng	600
-妖怪名单	yao guai ming dan	600
+我叫白小飞	wo jiao bai xiao fei	1200
+中国惊奇先生	zhong guo jing qi xian sheng	1200
+妖怪名单	yao guai ming dan	1200
 雏蜂	chu feng	600
 端脑	duan nao	600
-非人哉	fei ren zai	600
-有兽焉	you shou yan	600
-万圣街	wan sheng jie	600
-请吃红小豆吧	qing chi hong xiao dou ba	600
-那年那兔那些事儿	na nian na tu na xie shi er	600
-纳米核心	na mi he xin	600
-超神学院	chao shen xue yuan	600
-雄兵连	xiong bing lian	600
-星游记	xing you ji	600
-凸变英雄	tu bian ying xiong	600
-李献计历险记	li xian ji li xian ji	600
-时光代理人	shi guang dai li ren	600
-魔道祖师	mo dao zu shi	600
-穿书自救指南	chuan shu zi jiu zhi nan	600
-人渣反派自救系统	ren zha fan pai zi jiu xi tong	600
-百妖谱	bai yao pu	600
-汉化日记	han hua ri ji	600
-仙王的日常生活	xian wang de ri chang sheng huo	600
-王令	wang ling	600
-大王饶命	da wang rao ming	600
-开局一座山	kai ju yi zuo shan	600
-全职高手	quan zhi gao shou	600
-全职法师	quan zhi fa shi	600
-斗罗大陆	dou luo da lu	600
-绝世唐门	jue shi tang men	600
-斗破苍穹	dou po cang qiong	600
-三年之约	san nian zhi yue	600
-吞噬星空	tun shi xing kong	600
-凡人修仙传	fan ren xiu xian zhuan	600
-仙逆	xian ni	600
-一念永恒	yi nian yong heng	600
-神印王座	shen yin wang zuo	600
-沧元图	cang yuan tu	600
+非人哉	fei ren zai	1200
+有兽焉	you shou yan	1200
+万圣街	wan sheng jie	1200
+请吃红小豆吧	qing chi hong xiao dou ba	1200
+那年那兔那些事儿	na nian na tu na xie shi er	1200
+纳米核心	na mi he xin	1200
+超神学院	chao shen xue yuan	1200
+雄兵连	xiong bing lian	1200
+星游记	xing you ji	1200
+凸变英雄	tu bian ying xiong	1200
+李献计历险记	li xian ji li xian ji	1200
+时光代理人	shi guang dai li ren	1200
+魔道祖师	mo dao zu shi	1200
+穿书自救指南	chuan shu zi jiu zhi nan	1200
+人渣反派自救系统	ren zha fan pai zi jiu xi tong	1200
+百妖谱	bai yao pu	1200
+汉化日记	han hua ri ji	1200
+仙王的日常生活	xian wang de ri chang sheng huo	1200
+王令	wang ling	3244
+大王饶命	da wang rao ming	1200
+开局一座山	kai ju yi zuo shan	1200
+全职高手	quan zhi gao shou	1200
+全职法师	quan zhi fa shi	1200
+斗罗大陆	dou luo da lu	1200
+绝世唐门	jue shi tang men	1200
+斗破苍穹	dou po cang qiong	1200
+三年之约	san nian zhi yue	1200
+吞噬星空	tun shi xing kong	1200
+凡人修仙传	fan ren xiu xian zhuan	1200
+仙逆	xian ni	718
+一念永恒	yi nian yong heng	1200
+神印王座	shen yin wang zuo	1200
+沧元图	cang yuan tu	1200
 剑来	jian lai	600
 诛仙	zhu xian	600
-雪中悍刀行	xue zhong han dao xing	600
-武动乾坤	wu dong qian kun	600
-大主宰	da zhu zai	600
+雪中悍刀行	xue zhong han dao xing	1200
+武动乾坤	wu dong qian kun	1200
+大主宰	da zhu zai	1200
 元尊	yuan zun	600
-星辰变	xing chen bian	600
-雪鹰领主	xue ying ling zhu	600
-师兄啊师兄	shi xiong a shi xiong	600
+星辰变	xing chen bian	1200
+雪鹰领主	xue ying ling zhu	1200
+师兄啊师兄	shi xiong a shi xiong	1200
 斩神	zhan shen	600
-我在精神病院学斩神	wo zai jing shen bing yuan xue zhan shen	600
-道诡异仙	dao gui yi xian	600
-诡秘之主	gui mi zhi zhu	600
+我在精神病院学斩神	wo zai jing shen bing yuan xue zhan shen	1200
+道诡异仙	dao gui yi xian	1200
+诡秘之主	gui mi zhi zhu	1200
 灵笼	ling long	600
-枕刀歌	zhen dao ge	600
+枕刀歌	zhen dao ge	1200
 镖人	biao ren	600
-偷星九月天	tou xing jiu yue tian	600
-暴走邻家	bao zou lin jia	600
-斗罗大陆漫画	dou luo da lu man hua	600
-爆笑校园	bao xiao xiao yuan	600
-三毛流浪记	san mao liu lang ji	600
-丰子恺漫画	feng zi kai man hua	600
-知音漫客	zhi yin man ke	600
-飒漫画	sa man hua	600
-漫画世界	man hua shi jie	600
-漫画派对	man hua pai dui	600
-龙漫少年星期天	long man shao nian xing qi tian	600
-有妖气	you yao qi	600
-快看漫画	kuai kan man hua	600
-腾讯动漫	teng xun dong man	600
-哔哩哔哩漫画	bi li bi li man hua	600
-双月之城	shuang yue zhi cheng	600
+偷星九月天	tou xing jiu yue tian	1200
+暴走邻家	bao zou lin jia	1200
+斗罗大陆漫画	dou luo da lu man hua	1200
+爆笑校园	bao xiao xiao yuan	1200
+三毛流浪记	san mao liu lang ji	1200
+丰子恺漫画	feng zi kai man hua	1200
+知音漫客	zhi yin man ke	1200
+飒漫画	sa man hua	1200
+漫画世界	man hua shi jie	1200
+漫画派对	man hua pai dui	1200
+龙漫少年星期天	long man shao nian xing qi tian	1200
+有妖气	you yao qi	1200
+快看漫画	kuai kan man hua	1200
+腾讯动漫	teng xun dong man	1200
+哔哩哔哩漫画	bi li bi li man hua	1200
+双月之城	shuang yue zhi cheng	1200
 魁拔	kui ba	600
-疯味英雄	feng wei ying xiong	600
-幻镜诺德琳	huan jing nuo de lin	600
-我叫哀木涕	wo jiao ai mu ti	600
-山口山战记	shan kou shan zhan ji	600
-啦啦啦德玛西亚	la la la de ma xi ya	600
-王牌御史	wang pai yu shi	600
-从前有座灵剑山	cong qian you zuo ling jian shan	600
-灵域	ling yu	600
-择天记	ze tian ji	600
-万古仙穹	wan gu xian qiong	600
-通灵妃	tong ling fei	600
-少年锦衣卫	shao nian jin yi wei	600
-四海鲸骑	si hai jing qi	600
-观海策	guan hai ce	600
-墓王之王	mu wang zhi wang	600
+疯味英雄	feng wei ying xiong	1200
+幻镜诺德琳	huan jing nuo de lin	1200
+我叫哀木涕	wo jiao ai mu ti	1200
+山口山战记	shan kou shan zhan ji	1200
+啦啦啦德玛西亚	la la la de ma xi ya	1200
+王牌御史	wang pai yu shi	1200
+从前有座灵剑山	cong qian you zuo ling jian shan	1200
+灵域	ling yu	2295
+择天记	ze tian ji	1200
+万古仙穹	wan gu xian qiong	1200
+通灵妃	tong ling fei	1200
+少年锦衣卫	shao nian jin yi wei	1200
+四海鲸骑	si hai jing qi	1200
+观海策	guan hai ce	1200
+墓王之王	mu wang zhi wang	1200
 元龙	yuan long	600
-紫川	zi chuan	600
+紫川	zi chuan	3787
 神墓	shen mu	600
-火凤燎原	huo feng liao yuan	600
-龙虎门	long hu men	600
-中华英雄	zhong hua ying xiong	600
-天子传奇	tian zi chuan qi	600
-神兵玄奇	shen bing xuan qi	600
+火凤燎原	huo feng liao yuan	1200
+龙虎门	long hu men	1200
+中华英雄	zhong hua ying xiong	1200
+天子传奇	tian zi chuan qi	1200
+神兵玄奇	shen bing xuan qi	1200
 海虎	hai hu	600
 武神	wu shen	600
-麦兜故事	mai dou gu shi	600
-麦兜响当当	mai dou xiang dang dang	600
-麦兜当当伴我心	mai dou dang dang ban wo xin	600
-乌龙院四格漫画	wu long yuan si ge man hua	600
-涩女郎	se nv lang	600
-饮食男女	yin shi nan nv	600
-一点即通	yi dian ji tong	600
-扳手少年	ban shou shao nian	600
-星轨是天空的道路	xing gui shi tian kong de dao lu	600
-长歌行漫画	chang ge xing man hua	600
-一品芝麻狐	yi pin zhi ma hu	600
-大理寺少卿游	da li si shao qing you	600
-镖人动画	biao ren dong hua	600
-谷围南亭	gu wei nan ting	600
-恶魔总裁	e mo zong cai	600
-快把我哥带走	kuai ba wo ge dai zou	600
-头条都是他	tou tiao dou shi ta	600
-南号尚风	nan hao shang feng	600
-从你的名字开始	cong ni de ming zi kai shi	600
-一品仙狐	yi pin xian hu	600
-虎鹤妖师录	hu he yao shi lu	600
-山海际会	shan hai ji hui	600
-定海浮生录	ding hai fu sheng lu	600
-天宝伏妖录	tian bao fu yao lu	600
-山河剑心	shan he jian xin	600
-历师	li shi	600
-两不疑	liang bu yi	600
-识夜描银	shi ye miao yin	600
-猫之茗	mao zhi ming	600
-通职者	tong zhi zhe	600
-星武神诀	xing wu shen jue	600
-万界神主	wan jie shen zhu	600
-妖神记	yao shen ji	600
-百炼成神	bai lian cheng shen	600
-逆天邪神	ni tian xie shen	600
-修罗武神	xiu luo wu shen	600
-绝世武魂	jue shi wu hun	600
-灵剑尊	ling jian zun	600
-武神主宰	wu shen zhu zai	600
-万界仙踪	wan jie xian zong	600
-万界独尊	wan jie du zun	600
-完美世界石昊	wan mei shi jie shi hao	600
-斗破苍穹萧炎	dou po cang qiong xiao yan	600
-斗罗大陆唐三	dou luo da lu tang san	600
-凡人修仙传韩立	fan ren xiu xian zhuan han li	600
-仙逆王林	xian ni wang lin	600
-遮天叶凡	zhe tian ye fan	600
-吞噬星空罗峰	tun shi xing kong luo feng	600
-全职高手叶修	quan zhi gao shou ye xiu	600
-一人之下冯宝宝	yi ren zhi xia feng bao bao	600
-一人之下张楚岚	yi ren zhi xia zhang chu lan	600
-狐妖小红娘涂山苏苏	hu yao xiao hong niang tu shan su su	600
-狐妖小红娘白月初	hu yao xiao hong niang bai yue chu	600
-刺客伍六七梅花十三	ci ke wu liu qi mei hua shi san	600
-魔道祖师魏无羡	mo dao zu shi wei wu xian	600
-魔道祖师蓝忘机	mo dao zu shi lan wang ji	600
-天官赐福谢怜	tian guan ci fu xie lian	600
-天官赐福花城	tian guan ci fu hua cheng	600
-时光代理人程小时	shi guang dai li ren cheng xiao shi	600
-时光代理人陆光	shi guang dai li ren lu guang	600
-秦时明月盖聂	qin shi ming yue ge nie	600
-秦时明月卫庄	qin shi ming yue wei zhuang	600
-秦时明月荆天明	qin shi ming yue jing tian ming	600
-天行九歌韩非	tian xing jiu ge han fei	600
-不良人李星云	bu liang ren li xing yun	600
-不良人袁天罡	bu liang ren yuan tian gang	600
-少年歌行萧瑟	shao nian ge xing xiao se	600
-少年歌行无心	shao nian ge xing wu xin	600
-少年歌行雷无桀	shao nian ge xing lei wu jie	600
-剑来陈平安	jian lai chen ping an	600
-诡秘之主克莱恩	gui mi zhi zhu ke lai en	600
-灵笼马克	ling long ma ke	600
-灵笼白月魁	ling long bai yue kui	600
-罗小黑无限	luo xiao hei wu xian	600
-非人哉九月	fei ren zai jiu yue	600
-非人哉敖烈	fei ren zai ao lie	600
-非人哉哪吒	fei ren zai ne zha	600
-非人哉杨戬	fei ren zai yang jian	600
-非人哉观音	fei ren zai guan yin	600
-有兽焉四不像	you shou yan si bu xiang	600
-有兽焉皮皮	you shou yan pi pi	600
-有兽焉天禄	you shou yan tian lu	600
-有兽焉辟邪	you shou yan bi xie	600
-喜羊羊美羊羊	xi yang yang mei yang yang	600
-懒羊羊	lan yang yang	600
-沸羊羊	fei yang yang	600
-慢羊羊	man yang yang	600
-暖羊羊	nuan yang yang	600
-灰太狼	hui tai lang	600
-红太狼	hong tai lang	600
-小灰灰	xiao hui hui	600
-潇洒哥	xiao sa ge	600
-黑大帅	hei da shuai	600
-光头强	guang tou qiang	600
-吉吉国王	ji ji guo wang	600
-大耳朵图图胡图图	da er duo tu tu hu tu tu	600
-图图妈	tu tu ma	600
-牛爷爷	niu ye ye	600
-健康哥哥	jian kang ge ge	600
-虹猫	hong mao	600
+麦兜故事	mai dou gu shi	1200
+麦兜响当当	mai dou xiang dang dang	1200
+麦兜当当伴我心	mai dou dang dang ban wo xin	1200
+乌龙院四格漫画	wu long yuan si ge man hua	1200
+涩女郎	se nv lang	1200
+饮食男女	yin shi nan nv	1200
+一点即通	yi dian ji tong	1200
+扳手少年	ban shou shao nian	1200
+星轨是天空的道路	xing gui shi tian kong de dao lu	1200
+长歌行漫画	chang ge xing man hua	1200
+一品芝麻狐	yi pin zhi ma hu	1200
+大理寺少卿游	da li si shao qing you	1200
+镖人动画	biao ren dong hua	1200
+谷围南亭	gu wei nan ting	1200
+恶魔总裁	e mo zong cai	1200
+快把我哥带走	kuai ba wo ge dai zou	1200
+头条都是他	tou tiao dou shi ta	1200
+南号尚风	nan hao shang feng	1200
+从你的名字开始	cong ni de ming zi kai shi	1200
+一品仙狐	yi pin xian hu	1200
+虎鹤妖师录	hu he yao shi lu	1200
+山海际会	shan hai ji hui	1200
+定海浮生录	ding hai fu sheng lu	1200
+天宝伏妖录	tian bao fu yao lu	1200
+山河剑心	shan he jian xin	1200
+历师	li shi	25456
+两不疑	liang bu yi	1200
+识夜描银	shi ye miao yin	1200
+猫之茗	mao zhi ming	1200
+通职者	tong zhi zhe	6313
+星武神诀	xing wu shen jue	1200
+万界神主	wan jie shen zhu	1200
+妖神记	yao shen ji	1200
+百炼成神	bai lian cheng shen	1200
+逆天邪神	ni tian xie shen	1200
+修罗武神	xiu luo wu shen	1200
+绝世武魂	jue shi wu hun	1200
+灵剑尊	ling jian zun	1200
+武神主宰	wu shen zhu zai	1200
+万界仙踪	wan jie xian zong	1200
+万界独尊	wan jie du zun	1200
+完美世界石昊	wan mei shi jie shi hao	1200
+斗破苍穹萧炎	dou po cang qiong xiao yan	1200
+斗罗大陆唐三	dou luo da lu tang san	1200
+凡人修仙传韩立	fan ren xiu xian zhuan han li	1200
+仙逆王林	xian ni wang lin	1200
+遮天叶凡	zhe tian ye fan	1200
+吞噬星空罗峰	tun shi xing kong luo feng	1200
+全职高手叶修	quan zhi gao shou ye xiu	1200
+一人之下冯宝宝	yi ren zhi xia feng bao bao	1200
+一人之下张楚岚	yi ren zhi xia zhang chu lan	1200
+狐妖小红娘涂山苏苏	hu yao xiao hong niang tu shan su su	1200
+狐妖小红娘白月初	hu yao xiao hong niang bai yue chu	1200
+刺客伍六七梅花十三	ci ke wu liu qi mei hua shi san	1200
+魔道祖师魏无羡	mo dao zu shi wei wu xian	1200
+魔道祖师蓝忘机	mo dao zu shi lan wang ji	1200
+天官赐福谢怜	tian guan ci fu xie lian	1200
+天官赐福花城	tian guan ci fu hua cheng	1200
+时光代理人程小时	shi guang dai li ren cheng xiao shi	1200
+时光代理人陆光	shi guang dai li ren lu guang	1200
+秦时明月盖聂	qin shi ming yue ge nie	1200
+秦时明月卫庄	qin shi ming yue wei zhuang	1200
+秦时明月荆天明	qin shi ming yue jing tian ming	1200
+天行九歌韩非	tian xing jiu ge han fei	1200
+不良人李星云	bu liang ren li xing yun	1200
+不良人袁天罡	bu liang ren yuan tian gang	1200
+少年歌行萧瑟	shao nian ge xing xiao se	1200
+少年歌行无心	shao nian ge xing wu xin	1200
+少年歌行雷无桀	shao nian ge xing lei wu jie	1200
+剑来陈平安	jian lai chen ping an	1200
+诡秘之主克莱恩	gui mi zhi zhu ke lai en	1200
+灵笼马克	ling long ma ke	1200
+灵笼白月魁	ling long bai yue kui	1200
+罗小黑无限	luo xiao hei wu xian	1200
+非人哉九月	fei ren zai jiu yue	1200
+非人哉敖烈	fei ren zai ao lie	1200
+非人哉哪吒	fei ren zai ne zha	1200
+非人哉杨戬	fei ren zai yang jian	1200
+非人哉观音	fei ren zai guan yin	1200
+有兽焉四不像	you shou yan si bu xiang	1200
+有兽焉皮皮	you shou yan pi pi	1200
+有兽焉天禄	you shou yan tian lu	1200
+有兽焉辟邪	you shou yan bi xie	1200
+喜羊羊美羊羊	xi yang yang mei yang yang	1200
+懒羊羊	lan yang yang	15536
+沸羊羊	fei yang yang	1200
+慢羊羊	man yang yang	1200
+暖羊羊	nuan yang yang	9204
+灰太狼	hui tai lang	1200
+红太狼	hong tai lang	1200
+小灰灰	xiao hui hui	1200
+潇洒哥	xiao sa ge	1200
+黑大帅	hei da shuai	1200
+光头强	guang tou qiang	1200
+吉吉国王	ji ji guo wang	1200
+大耳朵图图胡图图	da er duo tu tu hu tu tu	1200
+图图妈	tu tu ma	1200
+牛爷爷	niu ye ye	1200
+健康哥哥	jian kang ge ge	1200
+虹猫	hong mao	4312
 蓝兔	lan tu	600
-莎丽	sha li	600
-黑心虎	hei xin hu	600
-黑小虎	hei xiao hu	600
-马三娘	ma san niang	600
-猪无戒	zhu wu jie	600
-牛旋风	niu xuan feng	600
-超人强	chao ren qiang	600
+莎丽	sha li	2270
+黑心虎	hei xin hu	1200
+黑小虎	hei xiao hu	1200
+马三娘	ma san niang	1200
+猪无戒	zhu wu jie	1200
+牛旋风	niu xuan feng	1200
+超人强	chao ren qiang	1200
 波比	bo bi	600
-小呆呆	xiao dai dai	600
-迷糊老师	mi hu lao shi	600
-陆小果	lu xiao guo	600
-橙留香	cheng liu xiang	600
-菠萝吹雪	bo luo chui xue	600
-上官子怡	shang guan zi yi	600
-梨花诗	li hua shi	600
-花如意	hua ru yi	600
-东方铁心	dong fang tie xin	600
-南宫问天	nan gong wen tian	600
-北冥雪	bei ming xue	600
-天晶兽	tian jing shou	600
-火麟飞	huo lin fei	600
-苗条俊	miao tiao jun	600
-天羽	tian yu	600
+小呆呆	xiao dai dai	1200
+迷糊老师	mi hu lao shi	1200
+陆小果	lu xiao guo	1200
+橙留香	cheng liu xiang	1200
+菠萝吹雪	bo luo chui xue	1200
+上官子怡	shang guan zi yi	1200
+梨花诗	li hua shi	1200
+花如意	hua ru yi	1200
+东方铁心	dong fang tie xin	1200
+南宫问天	nan gong wen tian	1200
+北冥雪	bei ming xue	1200
+天晶兽	tian jing shou	1200
+火麟飞	huo lin fei	1200
+苗条俊	miao tiao jun	1200
+天羽	tian yu	6790
 龙戬	long jian	600
 泰雷	tai lei	600
-夜凌云	ye ling yun	600
+夜凌云	ye ling yun	1200
 风耀	feng yao	600
-冥王超兽	ming wang chao shou	600
+冥王超兽	ming wang chao shou	1200
 雪皇	xue huang	600
-玄易子	xuan yi zi	600
-狮王	shi wang	600
-鲸鲨王	jing sha wang	600
+玄易子	xuan yi zi	1200
+狮王	shi wang	1623
+鲸鲨王	jing sha wang	1200
 鬼谷	gui gu	600
-力元霸	li yuan ba	600
-猛虎王	meng hu wang	600
-狂野猩	kuang ye xing	600
-暴龙神	bao long shen	600
-金铁兽	jin tie shou	600
-蓝毒兽	lan du shou	600
-银铁兽	yin tie shou	600
-绿豹兽	lv bao shou	600
-紫龙兽	zi long shou	600
-炎龙侠	yan long xia	600
-风鹰侠	feng ying xia	600
-黑犀侠	hei xi xia	600
-雪獒侠	xue ao xia	600
-地虎侠	di hu xia	600
-帝皇侠	di huang xia	600
-刑天铠甲	xing tian kai jia	600
-飞影铠甲	fei ying kai jia	600
-金刚铠甲	jin gang kai jia	600
-修罗铠甲	xiu luo kai jia	600
-拿瓦铠甲	na wa kai jia	600
-雅塔莱斯	ya ta lai si	600
-凌美琪	ling mei qi	600
-凌美雪	ling mei xue	600
+力元霸	li yuan ba	1200
+猛虎王	meng hu wang	1200
+狂野猩	kuang ye xing	1200
+暴龙神	bao long shen	1200
+金铁兽	jin tie shou	1200
+蓝毒兽	lan du shou	1200
+银铁兽	yin tie shou	1200
+绿豹兽	lv bao shou	1200
+紫龙兽	zi long shou	1200
+炎龙侠	yan long xia	1200
+风鹰侠	feng ying xia	1200
+黑犀侠	hei xi xia	1200
+雪獒侠	xue ao xia	1200
+地虎侠	di hu xia	1200
+帝皇侠	di huang xia	1200
+刑天铠甲	xing tian kai jia	1200
+飞影铠甲	fei ying kai jia	1200
+金刚铠甲	jin gang kai jia	1200
+修罗铠甲	xiu luo kai jia	1200
+拿瓦铠甲	na wa kai jia	1200
+雅塔莱斯	ya ta lai si	1200
+凌美琪	ling mei qi	1200
+凌美雪	ling mei xue	1200
 小蓝	xiao lan	600
-游乐王子	you le wang zi	600
-严莉莉	yan li li	600
-黑魔仙小月	hei mo xian xiao yue	600
-魔仙女王	mo xian nv wang	600
+游乐王子	you le wang zi	1200
+严莉莉	yan li li	1200
+黑魔仙小月	hei mo xian xiao yue	1200
+魔仙女王	mo xian nv wang	1200
 雨娃	yu wa	600
-摸仙堡	mo xian bao	600
-开心超人宅博士	kai xin chao ren zhai bo shi	600
-甜心超人	tian xin chao ren	600
-花心超人	hua xin chao ren	600
-粗心超人	cu xin chao ren	600
-小心超人	xiao xin chao ren	600
+摸仙堡	mo xian bao	1200
+开心超人宅博士	kai xin chao ren zhai bo shi	1200
+甜心超人	tian xin chao ren	1200
+花心超人	hua xin chao ren	1200
+粗心超人	cu xin chao ren	1200
+小心超人	xiao xin chao ren	1200
 伽罗	jia luo	600
-大大怪	da da guai	600
-小小怪	xiao xiao guai	600
+大大怪	da da guai	1200
+小小怪	xiao xiao guai	1200
 王默	wang mo	600
-陈思思	chen si si	600
+陈思思	chen si si	1200
 罗丽	luo li	600
-冰公主	bing gong zhu	600
-水王子	shui wang zi	600
+冰公主	bing gong zhu	1200
+水王子	shui wang zi	1200
 庞尊	pang zun	600
-白光莹	bai guang ying	600
-金王子	jin wang zi	600
-辛灵	xin ling	600
-曼多拉	man duo la	600
+白光莹	bai guang ying	1200
+金王子	jin wang zi	1200
+辛灵	xin ling	3909
+曼多拉	man duo la	1200
 齐娜	qi na	600
 菲灵	fei ling	600
-高泰明	gao tai ming	600
+高泰明	gao tai ming	1200
 颜爵	yan jue	600
-毒夕绯	du xi fei	600
-时希	shi xi	600
-黎灰	li hui	600
-火领主	huo ling zhu	600
-梦公主	meng gong zhu	600
+毒夕绯	du xi fei	1200
+时希	shi xi	3767
+黎灰	li hui	18235
+火领主	huo ling zhu	1200
+梦公主	meng gong zhu	1200
 乐音	yue yin	600
-世王	shi wang	600
+世王	shi wang	1623

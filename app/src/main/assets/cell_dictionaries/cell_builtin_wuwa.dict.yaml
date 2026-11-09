@@ -2,416 +2,416 @@
 # 词表由 CyletixCode 整理，读音按 rime-ice 校对。
 ---
 name: cell_builtin_wuwa
-version: "1"
+version: "2"
 sort: by_weight
 use_preset_vocabulary: false
 ...
-秧秧	yang yang	600
+秧秧	yang yang	19482
 炽霞	chi xia	600
-白芷	bai zhi	600
-莫特斐	mo te fei	600
-凌阳	ling yang	600
+白芷	bai zhi	1911
+莫特斐	mo te fei	1200
+凌阳	ling yang	14208
 丹瑾	dan jin	600
-卡卡罗	ka ka luo	600
-鉴心	jian xin	600
+卡卡罗	ka ka luo	1200
+鉴心	jian xin	89653
 安可	an ke	600
-维里奈	wei li nai	600
-桃祈	tao qi	600
+维里奈	wei li nai	1200
+桃祈	tao qi	6218
 渊武	yuan wu	600
 散华	san hua	600
-忌炎	ji yan	600
+忌炎	ji yan	10016
 吟霖	yin lin	600
-今汐	jin xi	600
-长离	chang li	600
-相里要	xiang li yao	600
+今汐	jin xi	1628
+长离	chang li	10316
+相里要	xiang li yao	1200
 釉瑚	you hu	600
-守岸人	shou an ren	600
-珂莱塔	ke lai ta	600
+守岸人	shou an ren	1200
+珂莱塔	ke lai ta	1200
 赞妮	zan ni	600
 夏空	xia kong	600
-卡提希娅	ka ti xi ya	600
+卡提希娅	ka ti xi ya	1200
 露帕	lu pa	600
-弗洛洛	fu luo luo	600
-坎特蕾拉	kan te lei la	600
+弗洛洛	fu luo luo	1200
+坎特蕾拉	kan te lei la	1200
 尤诺	you nuo	600
-嘉贝莉娜	jia bei li na	600
+嘉贝莉娜	jia bei li na	1200
 千咲	qian xiao	600
-卜灵	bu ling	600
-仇远	qiu yuan	600
-灯灯	deng deng	600
-爱弥斯	ai mi si	600
-达妮娅	da ni ya	600
+卜灵	bu ling	4936
+仇远	qiu yuan	5856
+灯灯	deng deng	2005
+爱弥斯	ai mi si	1200
+达妮娅	da ni ya	1200
 绯雪	fei xue	600
 景燃	jing ran	600
-洛瑟菈	luo se la	600
+洛瑟菈	luo se la	1200
 琳奈	lin nai	600
-清宵	qing xiao	600
-西格莉卡	xi ge li ka	600
-穗穗	sui sui	600
+清宵	qing xiao	2536
+西格莉卡	xi ge li ka	1200
+穗穗	sui sui	15173
 锁暝	suo ming	600
-哥舒临	ge shu lin	600
+哥舒临	ge shu lin	1200
 今州	jin zhou	600
-今州城	jin zhou cheng	600
+今州城	jin zhou cheng	1200
 瑝珑	huang long	600
-黎那汐塔	li na xi ta	600
-拉古那	la gu na	600
-拉古那城	la gu na cheng	600
-七丘	qi qiu	600
-拉海洛	la hai luo	600
-归墟港市	gui xu gang shi	600
-苇原	wei yuan	600
-阿维纽林	a wei niu lin	600
-云陵谷	yun ling gu	600
-中曲台地	zhong qu tai di	600
-无光之森	wu guang zhi sen	600
-浮光林	fu guang lin	600
-荒石高地	huang shi gao di	600
-虎口矿场	hu kou kuang chang	600
-怨鸟泽	yuan niao ze	600
-玄方城	xuan fang cheng	600
-玄方地界	xuan fang di jie	600
+黎那汐塔	li na xi ta	1200
+拉古那	la gu na	1200
+拉古那城	la gu na cheng	1200
+七丘	qi qiu	40250
+拉海洛	la hai luo	1200
+归墟港市	gui xu gang shi	1200
+苇原	wei yuan	4288
+阿维纽林	a wei niu lin	1200
+云陵谷	yun ling gu	1200
+中曲台地	zhong qu tai di	1200
+无光之森	wu guang zhi sen	1200
+浮光林	fu guang lin	1200
+荒石高地	huang shi gao di	1200
+虎口矿场	hu kou kuang chang	1200
+怨鸟泽	yuan niao ze	1200
+玄方城	xuan fang cheng	1200
+玄方地界	xuan fang di jie	1200
 明庭	ming ting	600
-方擎西峰	fang qing xi feng	600
-玄幽东岳	xuan you dong yue	600
-下层金库	xia ceng jin ku	600
-联运椎骨	lian yun chui gu	600
-天槎太空站	tian cha tai kong zhan	600
-穗波市	sui bo shi	600
-星炬学院	xing ju xue yuan	600
-引日殿	yin ri dian	600
-水星天	shui xing tian	600
-水星天教堂	shui xing tian jiao tang	600
-埃弗拉德金库	ai fu la de jin ku	600
-隐海试验场	yin hai shi yan chang	600
-索拉里斯	suo la li si	600
-索拉里斯星	suo la li si xing	600
-索诺拉	suo nuo la	600
-新联邦	xin lian bang	600
-黑海岸	hei hai an	600
-天空海	tian kong hai	600
-心域	xin yu	600
-彼世	bi shi	600
-荒芜乡	huang wu xiang	600
-渊城	yuan cheng	600
+方擎西峰	fang qing xi feng	1200
+玄幽东岳	xuan you dong yue	1200
+下层金库	xia ceng jin ku	1200
+联运椎骨	lian yun chui gu	1200
+天槎太空站	tian cha tai kong zhan	1200
+穗波市	sui bo shi	1200
+星炬学院	xing ju xue yuan	1200
+引日殿	yin ri dian	1200
+水星天	shui xing tian	1200
+水星天教堂	shui xing tian jiao tang	1200
+埃弗拉德金库	ai fu la de jin ku	1200
+隐海试验场	yin hai shi yan chang	1200
+索拉里斯	suo la li si	1200
+索拉里斯星	suo la li si xing	1200
+索诺拉	suo nuo la	1200
+新联邦	xin lian bang	1200
+黑海岸	hei hai an	1200
+天空海	tian kong hai	1200
+心域	xin yu	12146
+彼世	bi shi	144708
+荒芜乡	huang wu xiang	1200
+渊城	yuan cheng	1127
 梦州	meng zhou	600
-罗伊冰原	luo yi bing yuan	600
-波蒂维诺堡	bo di wei nuo bao	600
-法比亚纳	fa bi ya na	600
-华胥研究所	hua xu yan jiu suo	600
-华胥	hua xu	600
+罗伊冰原	luo yi bing yuan	1200
+波蒂维诺堡	bo di wei nuo bao	1200
+法比亚纳	fa bi ya na	1200
+华胥研究所	hua xu yan jiu suo	1200
+华胥	hua xu	3129
 夜归	ye gui	600
-夜归军	ye gui jun	600
-治安署	zhi an shu	600
-巡宁所	xun ning suo	600
+夜归军	ye gui jun	1200
+治安署	zhi an shu	1200
+巡宁所	xun ning suo	1200
 巡尉	xun wei	600
 令尹	ling yin	600
-军策府	jun ce fu	600
-外事府	wai shi fu	600
-定玄卫	ding xuan wei	600
-寻幽客	xun you ke	600
-归魂互助会	gui hun hu zhu hui	600
-愚人剧团	yu ren ju tuan	600
-残星会	can xing hui	600
-后玄三骑	hou xuan san qi	600
-后玄骑使	hou xuan qi shi	600
-埃弗拉德银行	ai fu la de yin hang	600
+军策府	jun ce fu	1200
+外事府	wai shi fu	1200
+定玄卫	ding xuan wei	1200
+寻幽客	xun you ke	1200
+归魂互助会	gui hun hu zhu hui	1200
+愚人剧团	yu ren ju tuan	1200
+残星会	can xing hui	1200
+后玄三骑	hou xuan san qi	1200
+后玄骑使	hou xuan qi shi	1200
+埃弗拉德银行	ai fu la de yin hang	1200
 岁主	sui zhu	600
-镇抚司	zhen fu si	600
-诫令院	jie ling yuan	600
-昭明商会	zhao ming shang hui	600
-莫塔里家族	mo ta li jia zu	600
-翡萨烈家族	fei sa lie jia zu	600
-西尔瓦家	xi er wa jia	600
-罗伊族	luo yi zu	600
-深空联合	shen kong lian he	600
-泰缇斯系统	tai ti si xi tong	600
-凝夜白霜	ning ye bai shuang	600
-熔山裂谷	rong shan lie gu	600
-彻空冥雷	che kong ming lei	600
-啸谷长风	xiao gu chang feng	600
-浮星祛暗	fu xing qu an	600
-沉日劫明	chen ri jie ming	600
-隐世回光	yin shi hui guang	600
-轻云出月	qing yun chu yue	600
-不绝余音	bu jue yu yin	600
-凌冽决断之心	ling lie jue duan zhi xin	600
-幽夜隐匿之帷	you ye yin ni zhi wei	600
-高天共奏之曲	gao tian gong zou zhi qu	600
-此间永驻之光	ci jian yong zhu zhi guang	600
-流云逝尽之空	liu yun shi jin zhi kong	600
+镇抚司	zhen fu si	1200
+诫令院	jie ling yuan	1200
+昭明商会	zhao ming shang hui	1200
+莫塔里家族	mo ta li jia zu	1200
+翡萨烈家族	fei sa lie jia zu	1200
+西尔瓦家	xi er wa jia	1200
+罗伊族	luo yi zu	1200
+深空联合	shen kong lian he	1200
+泰缇斯系统	tai ti si xi tong	1200
+凝夜白霜	ning ye bai shuang	1200
+熔山裂谷	rong shan lie gu	1200
+彻空冥雷	che kong ming lei	1200
+啸谷长风	xiao gu chang feng	1200
+浮星祛暗	fu xing qu an	1200
+沉日劫明	chen ri jie ming	1200
+隐世回光	yin shi hui guang	1200
+轻云出月	qing yun chu yue	1200
+不绝余音	bu jue yu yin	1200
+凌冽决断之心	ling lie jue duan zhi xin	1200
+幽夜隐匿之帷	you ye yin ni zhi wei	1200
+高天共奏之曲	gao tian gong zou zhi qu	1200
+此间永驻之光	ci jian yong zhu zhi guang	1200
+流云逝尽之空	liu yun shi jin zhi kong	1200
 声骸	sheng hai	600
-声骸技能	sheng hai ji neng	600
-声骸套装	sheng hai tao zhuang	600
-声骸编号	sheng hai bian hao	600
-声骸级别	sheng hai ji bie	600
-声骸经验	sheng hai jing yan	600
-数据坞	shu ju wu	600
-声匣	sheng xia	600
+声骸技能	sheng hai ji neng	1200
+声骸套装	sheng hai tao zhuang	1200
+声骸编号	sheng hai bian hao	1200
+声骸级别	sheng hai ji bie	1200
+声骸经验	sheng hai jing yan	1200
+数据坞	shu ju wu	1200
+声匣	sheng xia	29992
 残响	can xiang	600
 残象	can xiang	600
-盘古终端	pan gu zhong duan	600
-海蚀现象	hai shi xian xiang	600
+盘古终端	pan gu zhong duan	1200
+海蚀现象	hai shi xian xiang	1200
 声核	sheng he	600
-声之领域	sheng zhi ling yu	600
-凝素领域	ning su ling yu	600
-怒涛级	nu tao ji	600
-梦魇残象	meng yan can xiang	600
-灾厄梦魇	zai e meng yan	600
-梦魇烬枢	meng yan jin shu	600
+声之领域	sheng zhi ling yu	1200
+凝素领域	ning su ling yu	1200
+怒涛级	nu tao ji	1200
+梦魇残象	meng yan can xiang	1200
+灾厄梦魇	zai e meng yan	1200
+梦魇烬枢	meng yan jin shu	1200
 声痕	sheng hen	600
-拉贝尔曲线	la bei er qu xian	600
-回音能量	hui yin neng liang	600
-回音频段	hui yin pin duan	600
+拉贝尔曲线	la bei er qu xian	1200
+回音能量	hui yin neng liang	1200
+回音频段	hui yin pin duan	1200
 谐振	xie zhen	600
 同奏	tong zou	600
-声骸融合	sheng hai rong he	600
-声骸调律	sheng hai tiao lv	600
-调律者	tiao lv zhe	600
-聚爆	ju bao	600
-虚湮	xu yan	600
-虚湮效应	xu yan xiao ying	600
-白昼之脊	bai zhou zhi ji	600
-不屈命定之冠	bu qu ming ding zhi guan	600
-裁竹	cai zhu	600
-永远的启明星	yong yuan de qi ming xing	600
-赝作的矮星	yan zuo de ai xing	600
+声骸融合	sheng hai rong he	1200
+声骸调律	sheng hai tiao lv	1200
+调律者	tiao lv zhe	1200
+聚爆	ju bao	851
+虚湮	xu yan	2306
+虚湮效应	xu yan xiao ying	1200
+白昼之脊	bai zhou zhi ji	1200
+不屈命定之冠	bu qu ming ding zhi guan	1200
+裁竹	cai zhu	3254
+永远的启明星	yong yuan de qi ming xing	1200
+赝作的矮星	yan zuo de ai xing	1200
 存帧	cun zhen	600
 灼霜	zhuo shuang	600
 云琅	yun lang	600
 昙切	tan qie	600
-镭射切变	lei she qie bian	600
-幽冥的忘忧章	you ming de wang you zhang	600
-光影双生	guang ying shuang sheng	600
-万物持存的注释	wan wu chi cun de zhu shi	600
-相位涟漪	xiang wei lian yi	600
-脉冲协臂	mai chong xie bi	600
-源能机锋	yuan neng ji feng	600
-昭日译注	zhao ri yi zhu	600
-蜃影	shen ying	600
-溢彩萤辉	yi cai ying hui	600
-宙算仪轨	zhou suan yi gui	600
-死与舞	si yu wu	600
-千般渡	qian ban du	600
-驭冕铸雷之权	yu mian zhu lei zhi quan	600
+镭射切变	lei she qie bian	1200
+幽冥的忘忧章	you ming de wang you zhang	1200
+光影双生	guang ying shuang sheng	1200
+万物持存的注释	wan wu chi cun de zhu shi	1200
+相位涟漪	xiang wei lian yi	1200
+脉冲协臂	mai chong xie bi	1200
+源能机锋	yuan neng ji feng	1200
+昭日译注	zhao ri yi zhu	1200
+蜃影	shen ying	4252
+溢彩萤辉	yi cai ying hui	1200
+宙算仪轨	zhou suan yi gui	1200
+死与舞	si yu wu	1200
+千般渡	qian ban du	1200
+驭冕铸雷之权	yu mian zhu lei zhi quan	1200
 焰痕	yan hen	600
-星序协响	xing xu xie xiang	600
-千古洑流	qian gu fu liu	600
-时和岁稔	shi he sui ren	600
-赫奕流明	he yi liu ming	600
-焰光裁定	yan guang cai ding	600
-浩境粼光	hao jing lin guang	600
-停驻之烟	ting zhu zhi yan	600
-诸方玄枢	zhu fang xuan shu	600
-掣傀之手	che kui zhi shou	600
-迅刀	xun dao	600
-长刃	chang ren	600
+星序协响	xing xu xie xiang	1200
+千古洑流	qian gu fu liu	1200
+时和岁稔	shi he sui ren	1200
+赫奕流明	he yi liu ming	1200
+焰光裁定	yan guang cai ding	1200
+浩境粼光	hao jing lin guang	1200
+停驻之烟	ting zhu zhi yan	1200
+诸方玄枢	zhu fang xuan shu	1200
+掣傀之手	che kui zhi shou	1200
+迅刀	xun dao	3179
+长刃	chang ren	2269
 佩枪	pei qiang	600
 臂铠	bi kai	600
-音感仪	yin gan yi	600
-武器类型	wu qi lei xing	600
+音感仪	yin gan yi	1200
+武器类型	wu qi lei xing	1200
 专武	zhuan wu	600
-武器精炼	wu qi jing lian	600
-武器突破	wu qi tu po	600
-无冠者	wu guan zhe	600
-鸣钟之龟	ming zhong zhi gui	600
-无常凶鹭	wu chang xiong lu	600
-朔雷之鳞	shuo lei zhi lin	600
-飞廉之猩	fei lian zhi xing	600
-燎照之骑	liao zhao zhi qi	600
-辉萤军势	hui ying jun shi	600
-云闪之鳞	yun shan zhi lin	600
-无归的谬误	wu gui de miu wu	600
-叹息古龙	tan xi gu long	600
-异构武装	yi gou wu zhuang	600
-无妄者	wu wang zhe	600
-伪作的神王	wei zuo de shen wang	600
-天傀劫煞	tian kui jie sha	600
-无铭探索者	wu ming tan suo zhe	600
-海维夏	hai wei xia	600
-炉芯机骸	lu xin ji hai	600
-芙露德莉斯	fu lu de li si	600
-辛吉勒姆	xin ji lei mu	600
-千傀重楼	qian kui chong lou	600
-天演溯心	tian yan su xin	600
-单翼偏振体	dan yi pian zhen ti	600
-叠翼偏振体	die yi pian zhen ti	600
-多翼偏振体	duo yi pian zhen ti	600
-残翼偏振体	can yi pian zhen ti	600
-奇美拉	qi mei la	600
-山猫妖	shan mao yao	600
-虚诞虫	xu dan chong	600
-白色守门人	bai se shou men ren	600
-精英残象	jing ying can xiang	600
-世界首领	shi jie shou ling	600
-无音区	wu yin qu	600
+武器精炼	wu qi jing lian	1200
+武器突破	wu qi tu po	1200
+无冠者	wu guan zhe	1200
+鸣钟之龟	ming zhong zhi gui	1200
+无常凶鹭	wu chang xiong lu	1200
+朔雷之鳞	shuo lei zhi lin	1200
+飞廉之猩	fei lian zhi xing	1200
+燎照之骑	liao zhao zhi qi	1200
+辉萤军势	hui ying jun shi	1200
+云闪之鳞	yun shan zhi lin	1200
+无归的谬误	wu gui de miu wu	1200
+叹息古龙	tan xi gu long	1200
+异构武装	yi gou wu zhuang	1200
+无妄者	wu wang zhe	1200
+伪作的神王	wei zuo de shen wang	1200
+天傀劫煞	tian kui jie sha	1200
+无铭探索者	wu ming tan suo zhe	1200
+海维夏	hai wei xia	1200
+炉芯机骸	lu xin ji hai	1200
+芙露德莉斯	fu lu de li si	1200
+辛吉勒姆	xin ji lei mu	1200
+千傀重楼	qian kui chong lou	1200
+天演溯心	tian yan su xin	1200
+单翼偏振体	dan yi pian zhen ti	1200
+叠翼偏振体	die yi pian zhen ti	1200
+多翼偏振体	duo yi pian zhen ti	1200
+残翼偏振体	can yi pian zhen ti	1200
+奇美拉	qi mei la	1200
+山猫妖	shan mao yao	1200
+虚诞虫	xu dan chong	1200
+白色守门人	bai se shou men ren	1200
+精英残象	jing ying can xiang	1200
+世界首领	shi jie shou ling	1200
+无音区	wu yin qu	1200
 周本	zhou ben	600
-大角斗赛	da jue dou sai	600
-低频聚方声核	di pin ju fang sheng he	600
-中频聚方声核	zhong pin ju fang sheng he	600
-全频聚方声核	quan pin ju fang sheng he	600
-低频锐棱声核	di pin rui leng sheng he	600
-中频锐棱声核	zhong pin rui leng sheng he	600
-全频锐棱声核	quan pin rui leng sheng he	600
-低频隧花声核	di pin sui hua sheng he	600
-中频隧花声核	zhong pin sui hua sheng he	600
-全频隧花声核	quan pin sui hua sheng he	600
-低频啸叫声核	di pin xiao jiao sheng he	600
-中频啸叫声核	zhong pin xiao jiao sheng he	600
-低频潮蚀帆核	di pin chao shi fan he	600
-中频潮蚀帆核	zhong pin chao shi fan he	600
-全频潮蚀帆核	quan pin chao shi fan he	600
-低频机傀枢芯	di pin ji kui shu xin	600
-中频机傀枢芯	zhong pin ji kui shu xin	600
-全频机傀枢芯	quan pin ji kui shu xin	600
-低频海蚀碎晶	di pin hai shi sui jing	600
-中频海蚀碎晶	zhong pin hai shi sui jing	600
-全频海蚀碎晶	quan pin hai shi sui jing	600
-怒号声核	nu hao sheng he	600
-共鸣促剂	gong ming cu ji	600
-密音筒	mi yin tong	600
-能源核心	neng yuan he xin	600
-天辉琉璃之心	tian hui liu li zhi xin	600
-忆中沉金	yi zhong chen jin	600
-孤焰酬义	gu yan chou yi	600
-呼啸岩拳	hu xiao yan quan	600
-惰性金属液滴	duo xing jin shu ye di	600
-完整隧体绳链	wan zheng sui ti sheng lian	600
-微损隧体绳链	wei sun sui ti sheng lian	600
-残旧隧体绳链	can jiu sui ti sheng lian	600
-破损隧体绳链	po sun sui ti sheng lian	600
-拉贝尔磁带	la bei er ci dai	600
-结晶单质	jie jing dan zhi	600
-结晶溶剂	jie jing rong ji	600
-结晶波片	jie jing bo pian	600
-浮金波纹	fu jin bo wen	600
-铸潮波纹	zhu chao bo wen	600
-余波珊瑚	yu bo shan hu	600
-幻梦珊瑚	huan meng shan hu	600
-残振珊瑚	can zhen shan hu	600
-盐海珀	yan hai po	600
-木纹残片	mu wen can pian	600
-引日透镜	yin ri tou jing	600
-调频仪	tiao pin yi	600
+大角斗赛	da jue dou sai	1200
+低频聚方声核	di pin ju fang sheng he	1200
+中频聚方声核	zhong pin ju fang sheng he	1200
+全频聚方声核	quan pin ju fang sheng he	1200
+低频锐棱声核	di pin rui leng sheng he	1200
+中频锐棱声核	zhong pin rui leng sheng he	1200
+全频锐棱声核	quan pin rui leng sheng he	1200
+低频隧花声核	di pin sui hua sheng he	1200
+中频隧花声核	zhong pin sui hua sheng he	1200
+全频隧花声核	quan pin sui hua sheng he	1200
+低频啸叫声核	di pin xiao jiao sheng he	1200
+中频啸叫声核	zhong pin xiao jiao sheng he	1200
+低频潮蚀帆核	di pin chao shi fan he	1200
+中频潮蚀帆核	zhong pin chao shi fan he	1200
+全频潮蚀帆核	quan pin chao shi fan he	1200
+低频机傀枢芯	di pin ji kui shu xin	1200
+中频机傀枢芯	zhong pin ji kui shu xin	1200
+全频机傀枢芯	quan pin ji kui shu xin	1200
+低频海蚀碎晶	di pin hai shi sui jing	1200
+中频海蚀碎晶	zhong pin hai shi sui jing	1200
+全频海蚀碎晶	quan pin hai shi sui jing	1200
+怒号声核	nu hao sheng he	1200
+共鸣促剂	gong ming cu ji	1200
+密音筒	mi yin tong	1200
+能源核心	neng yuan he xin	1200
+天辉琉璃之心	tian hui liu li zhi xin	1200
+忆中沉金	yi zhong chen jin	1200
+孤焰酬义	gu yan chou yi	1200
+呼啸岩拳	hu xiao yan quan	1200
+惰性金属液滴	duo xing jin shu ye di	1200
+完整隧体绳链	wan zheng sui ti sheng lian	1200
+微损隧体绳链	wei sun sui ti sheng lian	1200
+残旧隧体绳链	can jiu sui ti sheng lian	1200
+破损隧体绳链	po sun sui ti sheng lian	1200
+拉贝尔磁带	la bei er ci dai	1200
+结晶单质	jie jing dan zhi	1200
+结晶溶剂	jie jing rong ji	1200
+结晶波片	jie jing bo pian	1200
+浮金波纹	fu jin bo wen	1200
+铸潮波纹	zhu chao bo wen	1200
+余波珊瑚	yu bo shan hu	1200
+幻梦珊瑚	huan meng shan hu	1200
+残振珊瑚	can zhen shan hu	1200
+盐海珀	yan hai po	1200
+木纹残片	mu wen can pian	1200
+引日透镜	yin ri tou jing	1200
+调频仪	tiao pin yi	1200
 星声	xing sheng	600
-贝币	bei bi	600
-浮金波荡	fu jin bo dang	600
+贝币	bei bi	2987
+浮金波荡	fu jin bo dang	1200
 鸣潮	ming chao	600
-库洛游戏	ku luo you xi	600
-共鸣者	gong ming zhe	600
-共鸣技能	gong ming ji neng	600
-共鸣回路	gong ming hui lu	600
-共鸣解放	gong ming jie fang	600
-共鸣链	gong ming lian	600
-共鸣效率	gong ming xiao lv	600
-共鸣属性	gong ming shu xing	600
-共鸣能量	gong ming neng liang	600
-共鸣技能伤害	gong ming ji neng shang hai	600
-二次共鸣	er ci gong ming	600
-变奏技能	bian zou ji neng	600
-延奏技能	yan zou ji neng	600
-快速协奏	kuai su xie zou	600
-偏谐值	pian xie zhi	600
-偏谐值累积效率	pian xie zhi lei ji xiao lv	600
-常态攻击	chang tai gong ji	600
-普攻伤害	pu gong shang hai	600
-重击伤害	zhong ji shang hai	600
-空中攻击	kong zhong gong ji	600
-极限闪避	ji xian shan bi	600
-闪避反击	shan bi fan ji	600
-弹刀	tan dao	600
-协同攻击	xie tong gong ji	600
-抗打断	kang da duan	600
-伤害加深	shang hai jia shen	600
-伤害加成	shang hai jia cheng	600
-暴击率	bao ji lv	600
-暴击伤害	bao ji shang hai	600
-爆伤	bao shang	600
-气动伤害	qi dong shang hai	600
-冷凝伤害	leng ning shang hai	600
-导电伤害	dao dian shang hai	600
-热熔伤害	re rong shang hai	600
-湮灭伤害	yan mie shang hai	600
-衍射伤害	yan she shang hai	600
-属性伤害	shu xing shang hai	600
-属性抗性	shu xing kang xing	600
-共鸣解放伤害	gong ming jie fang shang hai	600
-共鸣解放充能	gong ming jie fang chong neng	600
-声骸技能伤害	sheng hai ji neng shang hai	600
-声骸技能伤害加深	sheng hai ji neng shang hai jia shen	600
-气动伤害加深	qi dong shang hai jia shen	600
-冷凝伤害加深	leng ning shang hai jia shen	600
-导电伤害加深	dao dian shang hai jia shen	600
-热熔伤害加深	re rong shang hai jia shen	600
-湮灭伤害加深	yan mie shang hai jia shen	600
-衍射伤害加深	yan she shang hai jia shen	600
-协同攻击伤害加深	xie tong gong ji shang hai jia shen	600
-普攻伤害加深	pu gong shang hai jia shen	600
-重击伤害加深	zhong ji shang hai jia shen	600
-易伤	yi shang	600
-减益	jian yi	600
+库洛游戏	ku luo you xi	1200
+共鸣者	gong ming zhe	1200
+共鸣技能	gong ming ji neng	1200
+共鸣回路	gong ming hui lu	1200
+共鸣解放	gong ming jie fang	1200
+共鸣链	gong ming lian	1200
+共鸣效率	gong ming xiao lv	1200
+共鸣属性	gong ming shu xing	1200
+共鸣能量	gong ming neng liang	1200
+共鸣技能伤害	gong ming ji neng shang hai	1200
+二次共鸣	er ci gong ming	1200
+变奏技能	bian zou ji neng	1200
+延奏技能	yan zou ji neng	1200
+快速协奏	kuai su xie zou	1200
+偏谐值	pian xie zhi	1200
+偏谐值累积效率	pian xie zhi lei ji xiao lv	1200
+常态攻击	chang tai gong ji	1200
+普攻伤害	pu gong shang hai	1200
+重击伤害	zhong ji shang hai	1200
+空中攻击	kong zhong gong ji	1200
+极限闪避	ji xian shan bi	1200
+闪避反击	shan bi fan ji	1200
+弹刀	tan dao	5682
+协同攻击	xie tong gong ji	1200
+抗打断	kang da duan	1200
+伤害加深	shang hai jia shen	1200
+伤害加成	shang hai jia cheng	1200
+暴击率	bao ji lv	1200
+暴击伤害	bao ji shang hai	1200
+爆伤	bao shang	12248
+气动伤害	qi dong shang hai	1200
+冷凝伤害	leng ning shang hai	1200
+导电伤害	dao dian shang hai	1200
+热熔伤害	re rong shang hai	1200
+湮灭伤害	yan mie shang hai	1200
+衍射伤害	yan she shang hai	1200
+属性伤害	shu xing shang hai	1200
+属性抗性	shu xing kang xing	1200
+共鸣解放伤害	gong ming jie fang shang hai	1200
+共鸣解放充能	gong ming jie fang chong neng	1200
+声骸技能伤害	sheng hai ji neng shang hai	1200
+声骸技能伤害加深	sheng hai ji neng shang hai jia shen	1200
+气动伤害加深	qi dong shang hai jia shen	1200
+冷凝伤害加深	leng ning shang hai jia shen	1200
+导电伤害加深	dao dian shang hai jia shen	1200
+热熔伤害加深	re rong shang hai jia shen	1200
+湮灭伤害加深	yan mie shang hai jia shen	1200
+衍射伤害加深	yan she shang hai jia shen	1200
+协同攻击伤害加深	xie tong gong ji shang hai jia shen	1200
+普攻伤害加深	pu gong shang hai jia shen	1200
+重击伤害加深	zhong ji shang hai jia shen	1200
+易伤	yi shang	30502
+减益	jian yi	39176
 连携	lian xie	600
-战斗定位	zhan dou ding wei	600
-角色定位	jue se ding wei	600
-主力输出	zhu li shu chu	600
-强度榜	qiang du bang	600
-节奏榜	jie zou bang	600
-主词条	zhu ci tiao	600
-副词条	fu ci tiao	600
-技能升级	ji neng sheng ji	600
-唤取	huan qu	600
-角色唤取	jue se huan qu	600
-武器唤取	wu qi huan qu	600
-角色活动唤取	jue se huo dong huan qu	600
-武器活动唤取	wu qi huo dong huan qu	600
-常驻唤取	chang zhu huan qu	600
-限定唤取	xian ding huan qu	600
-新手唤取	xin shou huan qu	600
-大保底	da bao di	600
-小保底	xiao bao di	600
+战斗定位	zhan dou ding wei	1200
+角色定位	jue se ding wei	1200
+主力输出	zhu li shu chu	1200
+强度榜	qiang du bang	1200
+节奏榜	jie zou bang	1200
+主词条	zhu ci tiao	1200
+副词条	fu ci tiao	1200
+技能升级	ji neng sheng ji	1200
+唤取	huan qu	2300
+角色唤取	jue se huan qu	1200
+武器唤取	wu qi huan qu	1200
+角色活动唤取	jue se huo dong huan qu	1200
+武器活动唤取	wu qi huo dong huan qu	1200
+常驻唤取	chang zhu huan qu	1200
+限定唤取	xian ding huan qu	1200
+新手唤取	xin shou huan qu	1200
+大保底	da bao di	1200
+小保底	xiao bao di	1200
 单抽	dan chou	600
 抽卡	chou ka	600
-角色池	jue se chi	600
-武器池	wu qi chi	600
-常驻池	chang zhu chi	600
-限定池	xian ding chi	600
-兑换码	dui huan ma	600
-国际服	guo ji fu	600
-探索度	tan suo du	600
+角色池	jue se chi	1200
+武器池	wu qi chi	1200
+常驻池	chang zhu chi	1200
+限定池	xian ding chi	1200
+兑换码	dui huan ma	1200
+国际服	guo ji fu	1200
+探索度	tan suo du	1200
 信标	xin biao	600
-共鸣信标	gong ming xin biao	600
-每日任务	mei ri ren wu	600
-奇谭任务	qi tan ren wu	600
-异闻任务	yi wen ren wu	600
-潮汐任务	chao xi ren wu	600
-联觉等级	lian jue deng ji	600
-联觉经验	lian jue jing yan	600
-调试经验	tiao shi jing yan	600
-世界等级	shi jie deng ji	600
+共鸣信标	gong ming xin biao	1200
+每日任务	mei ri ren wu	1200
+奇谭任务	qi tan ren wu	1200
+异闻任务	yi wen ren wu	1200
+潮汐任务	chao xi ren wu	1200
+联觉等级	lian jue deng ji	1200
+联觉经验	lian jue jing yan	1200
+调试经验	tiao shi jing yan	1200
+世界等级	shi jie deng ji	1200
 配队	pei dui	600
 深塔	shen ta	600
-逆境深塔	ni jing shen ta	600
-装扮橱窗	zhuang ban chu chuang	600
+逆境深塔	ni jing shen ta	1200
+装扮橱窗	zhuang ban chu chuang	1200
 二创	er chuang	600
-汐宝	xi bao	600
+汐宝	xi bao	3997
 岸宝	an bao	600
 椿宝	chun bao	600
 秧宝	yang bao	600
-卡师傅	ka shi fu	600
-老忌	lao ji	600
-忌炎将军	ji yan jiang jun	600
-今汐大人	jin xi da ren	600
-御三家	yu san jia	600
-版本之子	ban ben zhi zi	600
-数值怪	shu zhi guai	600
-人权卡	ren quan ka	600
+卡师傅	ka shi fu	1200
+老忌	lao ji	11959
+忌炎将军	ji yan jiang jun	1200
+今汐大人	jin xi da ren	1200
+御三家	yu san jia	1200
+版本之子	ban ben zhi zi	1200
+数值怪	shu zhi guai	1200
+人权卡	ren quan ka	1200
 氪佬	ke lao	600
-云玩家	yun wan jia	600
+云玩家	yun wan jia	1200
 欧皇	ou huang	600
 满命	man ming	600
 零命	ling ming	600
-满链	man lian	600
-强度党	qiang du dang	600
-外观党	wai guan dang	600
-收集党	shou ji dang	600
+满链	man lian	51964
+强度党	qiang du dang	1200
+外观党	wai guan dang	1200
+收集党	shou ji dang	1200
 月卡	yue ka	600
-白嫖党	bai piao dang	600
+白嫖党	bai piao dang	1200

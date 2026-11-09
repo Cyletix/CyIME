@@ -2,167 +2,167 @@
 # 词表由 CyletixCode 整理，读音按 rime-ice 校对。
 ---
 name: cell_builtin_onmyoji
-version: "1"
+version: "2"
 sort: by_weight
 use_preset_vocabulary: false
 ...
-大天狗	da tian gou	600
-茨木童子	ci mu tong zi	600
-酒吞童子	jiu tun tong zi	600
-玉藻前	yu zao qian	600
-荒川之主	huang chuan zhi zhu	600
-阎魔	yan mo	600
-两面佛	liang mian fo	600
-小鹿男	xiao lu nan	600
-青行灯	qing xing deng	600
-妖刀姬	yao dao ji	600
-一目连	yi mu lian	600
-花鸟卷	hua niao juan	600
-辉夜姬	hui ye ji	600
-彼岸花	bi an hua	600
-雪童子	xue tong zi	600
-面灵气	mian ling qi	600
-御馔津	yu zhuan jin	600
-白藏主	bai zang zhu	600
+大天狗	da tian gou	1200
+茨木童子	ci mu tong zi	1200
+酒吞童子	jiu tun tong zi	1200
+玉藻前	yu zao qian	1200
+荒川之主	huang chuan zhi zhu	1200
+阎魔	yan mo	19036
+两面佛	liang mian fo	1200
+小鹿男	xiao lu nan	1200
+青行灯	qing xing deng	1200
+妖刀姬	yao dao ji	1200
+一目连	yi mu lian	1200
+花鸟卷	hua niao juan	1200
+辉夜姬	hui ye ji	1200
+彼岸花	bi an hua	1200
+雪童子	xue tong zi	1200
+面灵气	mian ling qi	1200
+御馔津	yu zhuan jin	1200
+白藏主	bai zang zhu	1200
 鬼切	gui qie	600
-不知火	bu zhi huo	600
-八岐大蛇	ba qi da she	600
-泷夜叉姬	long ye cha ji	600
-云外镜	yun wai jing	600
-铃鹿御前	ling lu yu qian	600
-缘结神	yuan jie shen	600
-鬼童丸	gui tong wan	600
-千姬	qian ji	600
-紧那罗	jin na luo	600
-食灵	shi ling	600
-饭笥	fan si	600
-须佐之男	xu zuo zhi nan	600
-不见岳	bu jian yue	600
-寻香行	xun xiang xing	600
+不知火	bu zhi huo	1200
+八岐大蛇	ba qi da she	1200
+泷夜叉姬	long ye cha ji	1200
+云外镜	yun wai jing	1200
+铃鹿御前	ling lu yu qian	1200
+缘结神	yuan jie shen	1200
+鬼童丸	gui tong wan	1200
+千姬	qian ji	1092
+紧那罗	jin na luo	1200
+食灵	shi ling	9488
+饭笥	fan si	12500
+须佐之男	xu zuo zhi nan	1200
+不见岳	bu jian yue	1200
+寻香行	xun xiang xing	1200
 天照	tian zhao	600
-月读	yue du	600
-伊邪那美	yi xie na mei	600
-言灵	yan ling	600
-大岳丸	da yue wan	600
-少羽大天狗	shao yu da tian gou	600
-炼狱茨木童子	lian yu ci mu tong zi	600
-稻荷神御馔津	dao he shen yu zhuan jin	600
-苍风一目连	cang feng yi mu lian	600
-赤影妖刀姬	chi ying yao dao ji	600
-缚骨清姬	fu gu qing ji	600
-天剑韧心鬼切	tian jian ren xin gui qie	600
-骁浪荒川之主	xiao lang huang chuan zhi zhu	600
-烬天玉藻前	jin tian yu zao qian	600
-鬼王酒吞童子	gui wang jiu tun tong zi	600
-浮世青行灯	fu shi qing xing deng	600
-夜溟彼岸花	ye ming bi an hua	600
-待宵姑获鸟	dai xiao gu huo niao	600
-蝉冰雪女	chan bing xue nv	600
-梦寻山兔	meng xun shan tu	600
-心狩鬼女红叶	xin shou gui nv hong ye	600
-因幡辉夜姬	yin fan hui ye ji	600
-绘世花鸟卷	hui shi hua niao juan	600
-麓铭大岳丸	lu ming da yue wan	600
-神堕八岐大蛇	shen duo ba qi da she	600
-初翎山风	chu ling shan feng	600
-纺愿缘结神	fang yuan yuan jie shen	600
-神启荒	shen qi huang	600
-本真三尾狐	ben zhen san wei hu	600
-御怨般若	yu yuan bo re	600
-卖药郎	mai yao lang	600
+月读	yue du	11728
+伊邪那美	yi xie na mei	1200
+言灵	yan ling	1249
+大岳丸	da yue wan	1200
+少羽大天狗	shao yu da tian gou	1200
+炼狱茨木童子	lian yu ci mu tong zi	1200
+稻荷神御馔津	dao he shen yu zhuan jin	1200
+苍风一目连	cang feng yi mu lian	1200
+赤影妖刀姬	chi ying yao dao ji	1200
+缚骨清姬	fu gu qing ji	1200
+天剑韧心鬼切	tian jian ren xin gui qie	1200
+骁浪荒川之主	xiao lang huang chuan zhi zhu	1200
+烬天玉藻前	jin tian yu zao qian	1200
+鬼王酒吞童子	gui wang jiu tun tong zi	1200
+浮世青行灯	fu shi qing xing deng	1200
+夜溟彼岸花	ye ming bi an hua	1200
+待宵姑获鸟	dai xiao gu huo niao	1200
+蝉冰雪女	chan bing xue nv	1200
+梦寻山兔	meng xun shan tu	1200
+心狩鬼女红叶	xin shou gui nv hong ye	1200
+因幡辉夜姬	yin fan hui ye ji	1200
+绘世花鸟卷	hui shi hua niao juan	1200
+麓铭大岳丸	lu ming da yue wan	1200
+神堕八岐大蛇	shen duo ba qi da she	1200
+初翎山风	chu ling shan feng	1200
+纺愿缘结神	fang yuan yuan jie shen	1200
+神启荒	shen qi huang	1200
+本真三尾狐	ben zhen san wei hu	1200
+御怨般若	yu yuan bo re	1200
+卖药郎	mai yao lang	1200
 桔梗	jie geng	600
-杀生丸	sha sheng wan	600
-朽木露琪亚	xiu mu lu qi ya	600
-黑崎一护	hei qi yi hu	600
-阿散井恋次	a san jing lian ci	600
-灶门炭治郎	zao men tan zhi lang	600
-灶门祢豆子	zao men mi dou zi	600
-我妻善逸	wo qi shan yi	600
-嘴平伊之助	zui ping yi zhi zhu	600
-姑获鸟	gu huo niao	600
-鬼女红叶	gui nv hong ye	600
-清姬	qing ji	600
+杀生丸	sha sheng wan	1200
+朽木露琪亚	xiu mu lu qi ya	1200
+黑崎一护	hei qi yi hu	1200
+阿散井恋次	a san jing lian ci	1200
+灶门炭治郎	zao men tan zhi lang	1200
+灶门祢豆子	zao men mi dou zi	1200
+我妻善逸	wo qi shan yi	1200
+嘴平伊之助	zui ping yi zhi zhu	1200
+姑获鸟	gu huo niao	1200
+鬼女红叶	gui nv hong ye	1200
+清姬	qing ji	3473
 镰鼬	lian you	600
 山兔	shan tu	600
-座敷童子	zuo fu tong zi	600
+座敷童子	zuo fu tong zi	1200
 萤草	ying cao	600
-椒图	jiao tu	600
-惠比寿	hui bi shou	600
-桃花妖	tao hua yao	600
-樱花妖	ying hua yao	600
-凤凰火	feng huang huo	600
-食梦貘	shi meng mo	600
-跳跳哥哥	tiao tiao ge ge	600
-跳跳妹妹	tiao tiao mei mei	600
-跳跳弟弟	tiao tiao di di	600
+椒图	jiao tu	1933
+惠比寿	hui bi shou	1200
+桃花妖	tao hua yao	1200
+樱花妖	ying hua yao	1200
+凤凰火	feng huang huo	1200
+食梦貘	shi meng mo	1200
+跳跳哥哥	tiao tiao ge ge	1200
+跳跳妹妹	tiao tiao mei mei	1200
+跳跳弟弟	tiao tiao di di	1200
 河童	he tong	600
-鲤鱼精	li yu jing	600
-海坊主	hai fang zhu	600
+鲤鱼精	li yu jing	1200
+海坊主	hai fang zhu	1200
 首无	shou wu	600
-武士之灵	wu shi zhi ling	600
-唐纸伞妖	tang zhi san yao	600
-天邪鬼赤	tian xie gui chi	600
-天邪鬼绿	tian xie gui lv	600
-天邪鬼黄	tian xie gui huang	600
-天邪鬼青	tian xie gui qing	600
+武士之灵	wu shi zhi ling	1200
+唐纸伞妖	tang zhi san yao	1200
+天邪鬼赤	tian xie gui chi	1200
+天邪鬼绿	tian xie gui lv	1200
+天邪鬼黄	tian xie gui huang	1200
+天邪鬼青	tian xie gui qing	1200
 赤舌	chi she	600
-独眼小僧	du yan xiao seng	600
-提灯小僧	ti deng xiao seng	600
-鸦天狗	ya tian gou	600
+独眼小僧	du yan xiao seng	1200
+提灯小僧	ti deng xiao seng	1200
+鸦天狗	ya tian gou	1200
 山童	shan tong	600
-九命猫	jiu ming mao	600
-三尾狐	san wei hu	600
-二口女	er kou nv	600
+九命猫	jiu ming mao	1200
+三尾狐	san wei hu	1200
+二口女	er kou nv	1200
 骨女	gu nv	600
-烟烟罗	yan yan luo	600
-丑时之女	chou shi zhi nv	600
+烟烟罗	yan yan luo	1200
+丑时之女	chou shi zhi nv	1200
 铁鼠	tie shu	600
-巫蛊师	wu gu shi	600
-盗墓小鬼	dao mu xiao gui	600
-寄生魂	ji sheng hun	600
-古笼火	gu long huo	600
-灯笼鬼	deng long gui	600
-兵俑	bing yong	600
-食发鬼	shi fa gui	600
+巫蛊师	wu gu shi	1200
+盗墓小鬼	dao mu xiao gui	1200
+寄生魂	ji sheng hun	1200
+古笼火	gu long huo	1200
+灯笼鬼	deng long gui	1200
+兵俑	bing yong	1156
+食发鬼	shi fa gui	1200
 犬神	quan shen	600
-雨女	yu nv	600
-管狐	guan hu	600
-蝴蝶精	hu die jing	600
+雨女	yu nv	1085
+管狐	guan hu	2850
+蝴蝶精	hu die jing	1200
 童男	tong nan	600
 童女	tong nv	600
-垢尝	gou chang	600
-人面树	ren mian shu	600
-於菊虫	yu ju chong	600
-虫师	chong shi	600
-以津真天	yi jin zhen tian	600
+垢尝	gou chang	2827
+人面树	ren mian shu	1200
+於菊虫	yu ju chong	1200
+虫师	chong shi	17340
+以津真天	yi jin zhen tian	1200
 猫又	mao you	600
-金鱼姬	jin yu ji	600
-白童子	bai tong zi	600
-黑童子	hei tong zi	600
-鬼使黑	gui shi hei	600
-鬼使白	gui shi bai	600
-络新妇	luo xin fu	600
-吸血姬	xi xue ji	600
-青坊主	qing fang zhu	600
-万年竹	wan nian zhu	600
+金鱼姬	jin yu ji	1200
+白童子	bai tong zi	1200
+黑童子	hei tong zi	1200
+鬼使黑	gui shi hei	1200
+鬼使白	gui shi bai	1200
+络新妇	luo xin fu	1200
+吸血姬	xi xue ji	1200
+青坊主	qing fang zhu	1200
+万年竹	wan nian zhu	1200
 蟹姬	xie ji	600
-久次良	jiu ci liang	600
-海忍	hai ren	600
-纸舞	zhi wu	600
+久次良	jiu ci liang	1200
+海忍	hai ren	5475
+纸舞	zhi wu	79305
 影鳄	ying e	600
-入内雀	ru nei que	600
-灵海蝶	ling hai die	600
-粉婆婆	fen po po	600
-天井下	tian jing xia	600
-青蛙瓷器	qing wa ci qi	600
+入内雀	ru nei que	1200
+灵海蝶	ling hai die	1200
+粉婆婆	fen po po	1200
+天井下	tian jing xia	1200
+青蛙瓷器	qing wa ci qi	1200
 辉夜	hui ye	600
 灯姐	deng jie	600
 鸟姐	niao jie	600
 草爹	cao die	600
 座敷	zuo fu	600
-阿离	a li	600
+阿离	a li	6757
 铃鹿	ling lu	600
-帝释	di shi	600
+帝释	di shi	39935
 缘结	yuan jie	600
 鬼童	gui tong	600
 泷夜	long ye	600
@@ -171,189 +171,189 @@ use_preset_vocabulary: false
 那美	na mei	600
 神荒	shen huang	600
 寻香	xun xiang	600
-麓铭	lu ming	600
-少羽	shao yu	600
+麓铭	lu ming	1309
+少羽	shao yu	1716
 稻荷	dao he	600
 苍风	cang feng	600
 赤影	chi ying	600
-缚骨	fu gu	600
-骁浪	xiao lang	600
+缚骨	fu gu	930
+骁浪	xiao lang	6280
 烬天	jin tian	600
-浮世	fu shi	600
+浮世	fu shi	49025
 夜溟	ye ming	600
 待宵	dai xiao	600
 蝉冰	chan bing	600
 梦寻	meng xun	600
-心狩	xin shou	600
+心狩	xin shou	7125
 因幡	yin fan	600
-绘世	hui shi	600
-纺愿	fang yuan	600
+绘世	hui shi	79226
+纺愿	fang yuan	6892
 神堕	shen duo	600
-御怨	yu yuan	600
+御怨	yu yuan	3237
 初翎	chu ling	600
 荒川	huang chuan	600
-破势	po shi	600
+破势	po shi	22051
 狂骨	kuang gu	600
 针女	zhen nv	600
 网切	wang qie	600
 蚌精	bang jing	600
-地藏像	di zang xiang	600
-被服	bei fu	600
+地藏像	di zang xiang	1200
+被服	bei fu	5532
 火灵	huo ling	600
 反枕	fan zhen	600
-日女巳时	ri nv si shi	600
-雪幽魂	xue you hun	600
-魅妖	mei yao	600
+日女巳时	ri nv si shi	1200
+雪幽魂	xue you hun	1200
+魅妖	mei yao	743
 钟灵	zhong ling	600
 薙魂	ti hun	600
 木魅	mu mei	600
-涅槃之火	nie pan zhi huo	600
-镇墓兽	zhen mu shou	600
-伤魂鸟	shang hun niao	600
-阴摩罗	yin mo luo	600
+涅槃之火	nie pan zhi huo	1200
+镇墓兽	zhen mu shou	1200
+伤魂鸟	shang hun niao	1200
+阴摩罗	yin mo luo	1200
 鸣屋	ming wu	600
-骰子鬼	tou zi gui	600
-青女房	qing nv fang	600
-兵主部	bing zhu bu	600
-遗念火	yi nian huo	600
+骰子鬼	tou zi gui	1200
+青女房	qing nv fang	1200
+兵主部	bing zhu bu	3659
+遗念火	yi nian huo	1200
 涂佛	tu fu	600
-幽谷响	you gu xiang	600
+幽谷响	you gu xiang	1200
 恶楼	e lou	600
-蜃气楼	shen qi lou	600
-飞缘魔	fei yuan mo	600
-土蜘蛛	tu zhi zhu	600
-荒骷髅	huang ku lou	600
-地震鲶	di zhen nian	600
-鬼灵歌伎	gui ling ge ji	600
-魍魉之匣	wang liang zhi xia	600
+蜃气楼	shen qi lou	1200
+飞缘魔	fei yuan mo	1200
+土蜘蛛	tu zhi zhu	1200
+荒骷髅	huang ku lou	1200
+地震鲶	di zhen nian	1200
+鬼灵歌伎	gui ling ge ji	1200
+魍魉之匣	wang liang zhi xia	1200
 地藏	di zang	600
 日女	ri nv	600
-神乐	shen le	600
-源博雅	yuan bo ya	600
-八百比丘尼	ba bai bi qiu ni	600
-黑晴明	hei qing ming	600
-安倍晴明	an bei qing ming	600
-源赖光	yuan lai guang	600
-结界突破	jie jie tu po	600
-逢魔之时	feng mo zhi shi	600
+神乐	shen le	3248
+源博雅	yuan bo ya	1200
+八百比丘尼	ba bai bi qiu ni	1200
+黑晴明	hei qing ming	1200
+安倍晴明	an bei qing ming	1200
+源赖光	yuan lai guang	1200
+结界突破	jie jie tu po	1200
+逢魔之时	feng mo zhi shi	1200
 蓝票	lan piao	600
-六星	liu xing	600
-秘闻副本	mi wen fu ben	600
-御灵	yu ling	600
-百鬼夜行	bai gui ye xing	600
-式神录	shi shen lu	600
+六星	liu xing	77510
+秘闻副本	mi wen fu ben	1200
+御灵	yu ling	2607
+百鬼夜行	bai gui ye xing	1200
+式神录	shi shen lu	1200
 单抽	dan chou	600
-结界卡	jie jie ka	600
-阴界之门	yin jie zhi men	600
-业原火	ye yuan huo	600
+结界卡	jie jie ka	1200
+阴界之门	yin jie zhi men	1200
+业原火	ye yuan huo	1200
 真蛇	zhen she	600
-地域鬼王	di yu gui wang	600
-秘魂屋	mi hun wu	600
-皮肤屋	pi fu wu	600
-友情点	you qing dian	600
-黑达摩	hei da mo	600
-白达摩	bai da mo	600
-红达摩	hong da mo	600
-蓝达摩	lan da mo	600
-御魂副本	yu hun fu ben	600
-觉醒副本	jue xing fu ben	600
-御灵副本	yu ling fu ben	600
-石距	shi ju	600
-年兽	nian shou	600
-斗技场	dou ji chang	600
-逢魔	feng mo	600
-自动战斗	zi dong zhan dou	600
-效果命中	xiao guo ming zhong	600
-效果抵抗	xiao guo di kang	600
-暴击伤害	bao ji shang hai	600
-御魂属性	yu hun shu xing	600
-副属性	fu shu xing	600
-升技能	sheng ji neng	600
-行动条	xing dong tiao	600
-减益	jian yi	600
+地域鬼王	di yu gui wang	1200
+秘魂屋	mi hun wu	1200
+皮肤屋	pi fu wu	1200
+友情点	you qing dian	1200
+黑达摩	hei da mo	1200
+白达摩	bai da mo	1200
+红达摩	hong da mo	1200
+蓝达摩	lan da mo	1200
+御魂副本	yu hun fu ben	1200
+觉醒副本	jue xing fu ben	1200
+御灵副本	yu ling fu ben	1200
+石距	shi ju	5379
+年兽	nian shou	2016
+斗技场	dou ji chang	1200
+逢魔	feng mo	1716
+自动战斗	zi dong zhan dou	1200
+效果命中	xiao guo ming zhong	1200
+效果抵抗	xiao guo di kang	1200
+暴击伤害	bao ji shang hai	1200
+御魂属性	yu hun shu xing	1200
+副属性	fu shu xing	1200
+升技能	sheng ji neng	1200
+行动条	xing dong tiao	1200
+减益	jian yi	39176
 协战	xie zhan	600
 溅射	jian she	600
-真实伤害	zhen shi shang hai	600
-无视防御	wu shi fang yu	600
+真实伤害	zhen shi shang hai	1200
+无视防御	wu shi fang yu	1200
 增伤	zeng shang	600
 推条	tui tiao	600
-供火	gong huo	600
+供火	gong huo	2555
 断火	duan huo	600
-鬼火条	gui huo tiao	600
+鬼火条	gui huo tiao	1200
 配队	pei dui	600
-御魂搭配	yu hun da pei	600
-御魂方案	yu hun fang an	600
-御魂强化	yu hun qiang hua	600
-六星御魂	liu xing yu hun	600
-五星御魂	wu xing yu hun	600
-四星御魂	si xing yu hun	600
-突破券	tu po quan	600
-挑战券	tiao zhan quan	600
-体力药	ti li yao	600
+御魂搭配	yu hun da pei	1200
+御魂方案	yu hun fang an	1200
+御魂强化	yu hun qiang hua	1200
+六星御魂	liu xing yu hun	1200
+五星御魂	wu xing yu hun	1200
+四星御魂	si xing yu hun	1200
+突破券	tu po quan	1200
+挑战券	tiao zhan quan	1200
+体力药	ti li yao	1200
 樱饼	ying bing	600
-经验加成	jing yan jia cheng	600
-金币加成	jin bi jia cheng	600
-掉落加成	diao luo jia cheng	600
-勾玉商店	gou yu shang dian	600
-神秘商店	shen mi shang dian	600
-町中	ting zhong	600
-阴阳寮	yin yang liao	600
+经验加成	jing yan jia cheng	1200
+金币加成	jin bi jia cheng	1200
+掉落加成	diao luo jia cheng	1200
+勾玉商店	gou yu shang dian	1200
+神秘商店	shen mi shang dian	1200
+町中	ting zhong	9006
+阴阳寮	yin yang liao	1200
 寮办	liao ban	600
-寮勋章	liao xun zhang	600
-寮任务	liao ren wu	600
-寮突破	liao tu po	600
-狩猎战	shou lie zhan	600
-结界卡合成	jie jie ka he cheng	600
-伞室内	san shi nei	600
-每日任务	mei ri ren wu	600
-周常任务	zhou chang ren wu	600
-成就任务	cheng jiu ren wu	600
-悬赏封印	xuan shang feng yin	600
-式神委派	shi shen wei pai	600
-百鬼弈	bai gui yi	600
-协同斗技	xie tong dou ji	600
-为崽而战	wei zai er zhan	600
+寮勋章	liao xun zhang	1200
+寮任务	liao ren wu	1200
+寮突破	liao tu po	1200
+狩猎战	shou lie zhan	1200
+结界卡合成	jie jie ka he cheng	1200
+伞室内	san shi nei	1200
+每日任务	mei ri ren wu	1200
+周常任务	zhou chang ren wu	1200
+成就任务	cheng jiu ren wu	1200
+悬赏封印	xuan shang feng yin	1200
+式神委派	shi shen wei pai	1200
+百鬼弈	bai gui yi	1200
+协同斗技	xie tong dou ji	1200
+为崽而战	wei zai er zhan	1200
 崽战	zai zhan	600
-平安奇谭	ping an qi tan	600
-超鬼王	chao gui wang	600
-花合战	hua he zhan	600
-神龛兑换	shen kan dui huan	600
+平安奇谭	ping an qi tan	1200
+超鬼王	chao gui wang	1200
+花合战	hua he zhan	1200
+神龛兑换	shen kan dui huan	1200
 御札	yu zha	600
-金御札	jin yu zha	600
-皮肤券	pi fu quan	600
-皮肤商店	pi fu shang dian	600
-荣誉商店	rong yu shang dian	600
-勋章商店	xun zhang shang dian	600
-友情商店	you qing shang dian	600
-神秘符咒	shen mi fu zhou	600
-现世符咒	xian shi fu zhou	600
-现世召唤	xian shi zhao huan	600
-业火轮	ye huo lun	600
-风转符	feng zhuan fu	600
-水灵鲤	shui ling li	600
-天雷鼓	tian lei gu	600
-御行达摩	yu xing da mo	600
-奉为达摩	feng wei da mo	600
-招福达摩	zhao fu da mo	600
-大吉达摩	da ji da mo	600
-日轮之陨	ri lun zhi yun	600
-永生之海	yong sheng zhi hai	600
-觉醒材料	jue xing cai liao	600
+金御札	jin yu zha	1200
+皮肤券	pi fu quan	1200
+皮肤商店	pi fu shang dian	1200
+荣誉商店	rong yu shang dian	1200
+勋章商店	xun zhang shang dian	1200
+友情商店	you qing shang dian	1200
+神秘符咒	shen mi fu zhou	1200
+现世符咒	xian shi fu zhou	1200
+现世召唤	xian shi zhao huan	1200
+业火轮	ye huo lun	1200
+风转符	feng zhuan fu	1200
+水灵鲤	shui ling li	1200
+天雷鼓	tian lei gu	1200
+御行达摩	yu xing da mo	1200
+奉为达摩	feng wei da mo	1200
+招福达摩	zhao fu da mo	1200
+大吉达摩	da ji da mo	1200
+日轮之陨	ri lun zhi yun	1200
+永生之海	yong sheng zhi hai	1200
+觉醒材料	jue xing cai liao	1200
 巨佬	ju lao	600
 肝帝	gan di	600
 氪佬	ke lao	600
-白嫖党	bai piao dang	600
-重氪	zhong ke	600
-月卡党	yue ka dang	600
+白嫖党	bai piao dang	1200
+重氪	zhong ke	1875
+月卡党	yue ka dang	1200
 欧皇	ou huang	600
-老玩家	lao wan jia	600
-回归玩家	hui gui wan jia	600
+老玩家	lao wan jia	1200
+回归玩家	hui gui wan jia	1200
 回坑	hui keng	600
 速刷	su shua	600
-狗粮队长	gou liang dui zhang	600
-带狗粮	dai gou liang	600
-刷狗粮	shua gou liang	600
-头像框	tou xiang kuang	600
+狗粮队长	gou liang dui zhang	1200
+带狗粮	dai gou liang	1200
+刷狗粮	shua gou liang	1200
+头像框	tou xiang kuang	1200
 月卡	yue ka	600
 黑蛋	hei dan	600
 白蛋	bai dan	600
@@ -361,8 +361,8 @@ use_preset_vocabulary: false
 双拉	shuang la	600
 肉队	rou dui	600
 速控	su kong	600
-反击队	fan ji dui	600
-控制队	kong zhi dui	600
+反击队	fan ji dui	1200
+控制队	kong zhi dui	1200
 双狗	shuang gou	600
 双吞	shuang tun	600
 双蛇	shuang she	600

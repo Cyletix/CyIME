@@ -71,6 +71,9 @@ def main():
         f.write(f"---\nname: {name}\nversion: \"1\"\nsort: by_weight\nuse_preset_vocabulary: false\n...\n")
         for text, code in entries.items():
             f.write(f"{text}\t{code}\t{WEIGHT}\n")
+    # 不停在固定 600：按同码竞争词排到日常首选后面（rank_cell_dict.py，2 字词第 2 位，3 字以上 ≥1200）。
+    from rank_cell_dict import load_competitors, rank
+    rank(out / f"{name}.dict.yaml", load_competitors(args.rime_ice))
     english_file = out / f"{name}.en.txt"
     if english:
         english_file.write_text("\n".join(english) + "\n", encoding="utf-8", newline="\n")
