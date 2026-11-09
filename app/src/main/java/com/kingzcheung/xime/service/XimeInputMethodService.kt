@@ -4547,6 +4547,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             candidates = emptyList(),
             candidateComments = emptyList(),
             inputText = "",
+            // 编码也清掉：留着的话九键下一串借它当编码显示（11-10 录屏：英文 stamping 挂在九键气泡上不走）。
+            preeditText = "",
             isComposing = false,
             isShowingRecentClipboard = false,
             associationCandidates = emptyList(),
