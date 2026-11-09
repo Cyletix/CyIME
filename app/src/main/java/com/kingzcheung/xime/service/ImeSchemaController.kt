@@ -652,7 +652,11 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         model.enterTemporaryHandwriting()
     }
 
-    internal fun switchSchema(schemaId: String) {
+    /**
+     * [stayInHandwriting]：手写开着时换方案，新语言能手写就留在手写（换语言的老规矩）；
+     * 从布局选择里点了布局时为 false，回到所选键盘（平板复现：手写时点 26 键仍停在手写）。
+     */
+    internal fun switchSchema(schemaId: String, stayInHandwriting: Boolean = true) {
         if (service.editorInputPolicy.locksNativeInput) return
         if (schemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH) {
             service.keyRouter.postRimeJob {
@@ -664,7 +668,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 service.editorInputPolicy.choose(true, engineSchema)
                 service.sessionController.persistSchemaOption("ascii_mode", true)
                 withContext(Dispatchers.Main) {
-                    val keepHandwriting = handwritingOpen()
+                    val keepHandwriting = stayInHandwriting && handwritingOpen()
                     com.kingzcheung.xime.handwriting.HandwritingEngine.release()
                     service.keyboardViewModel.discardTemporaryHandwriting()
                     service.keyboardViewModel.asciiStateMachine.reset()
@@ -721,7 +725,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 service.editorInputPolicy.choose(false, schemaId)
                 service.sessionController.persistSchemaOption("ascii_mode", false)
                 withContext(Dispatchers.Main) {
-                    val keepHandwriting = handwritingOpen()
+                    val keepHandwriting = stayInHandwriting && handwritingOpen()
                     com.kingzcheung.xime.handwriting.HandwritingEngine.release()
                     val model = service.keyboardViewModel
                     model.discardTemporaryHandwriting()

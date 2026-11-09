@@ -2038,6 +2038,10 @@ fun KeyboardView(
                             callbacks.onSwitchSchema?.invoke(schemaId)
                             viewModel.closeOverlay()
                         },
+                        onSelectLayout = { schemaId ->
+                            (callbacks.onSwitchSchemaForLayout ?: callbacks.onSwitchSchema)?.invoke(schemaId)
+                            viewModel.closeOverlay()
+                        },
                         modifier = panelMaterial.fillMaxSize().padding(bottom = renderedBottomPaddingDp.dp)
                     )
                     is OverlayRoute.Clipboard -> ClipboardView(

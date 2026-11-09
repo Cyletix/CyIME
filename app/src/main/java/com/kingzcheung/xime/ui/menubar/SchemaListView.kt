@@ -28,6 +28,8 @@ fun SchemaListView(
     backgroundColor: Color, accentColor: Color, keyTextColor: Color, keyBgColor: Color,
     onSelectSchema: (String) -> Unit,
     modifier: Modifier = Modifier, availableSchemas: List<SchemaInfo> = schemas,
+    /** 点了布局（不是方案）：手写开着时要回到所选的键盘布局。 */
+    onSelectLayout: (String) -> Unit = onSelectSchema,
 ) {
     val context = LocalContext.current
     val all = InputModes.available((schemas + availableSchemas).distinctBy { it.schemaId })
@@ -90,7 +92,7 @@ fun SchemaListView(
                             android.widget.Toast.LENGTH_LONG).show()
                     }
                     LetterLayouts.selectFor(context, switch.entry, id)
-                    onSelectSchema(switch.entry.schemaId)
+                    onSelectLayout(switch.entry.schemaId)
                 }
             }
             HorizontalDivider(Modifier.padding(vertical = 2.dp), color = keyTextColor.copy(alpha = .15f))

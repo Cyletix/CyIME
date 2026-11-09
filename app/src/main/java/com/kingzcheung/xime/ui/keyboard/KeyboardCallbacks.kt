@@ -83,6 +83,8 @@ data class KeyboardCallbacks(
     val onSettings: (() -> Unit)? = null,
     val onSettingsPage: ((String) -> Unit)? = null,
     val onSwitchSchema: ((String) -> Unit)? = null,
+    /** 在「布局」一排点了布局：和 [onSwitchSchema] 一样换方案，但开着手写时回到键盘，不再重开手写。 */
+    val onSwitchSchemaForLayout: ((String) -> Unit)? = null,
     val onHandwritingExpand: ((Boolean) -> Unit)? = null,
     val onHandwritingToggle: (() -> Unit)? = null,
     val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
