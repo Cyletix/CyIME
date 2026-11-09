@@ -155,6 +155,15 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        // 离线构建类型：initWith(release)，由 src/offline 的 manifest 叠加层移除 INTERNET 权限。
+        // 产物（assembleOffline）供高敏感环境使用：系统层面禁止一切联网，模型/词库下载、
+        // 扩展商店、检查更新、在线语音、样本贡献、剪贴板同步在该构建中均不可用，
+        // 需配合完整版离线模型内置包。现有 assembleDebug/assembleRelease 任务不受影响。
+        create("offline") {
+            initWith(getByName("release"))
+            // :plugin-core 等 library 模块只有 debug/release，offline 变体回落到 release。
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

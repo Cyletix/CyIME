@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- offline 构建类型专用：从合并后的 manifest 移除 INTERNET 权限，
+     由系统层面禁止该构建类型任何联网外传。模型/词库下载、扩展商店、
+     检查更新、在线语音、样本贡献、剪贴板同步等网络功能在此构建中一律不可用。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+</manifest>

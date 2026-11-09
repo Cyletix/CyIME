@@ -104,9 +104,14 @@ git submodule update --init --recursive
 # 调试包 / 发布包
 ./gradlew assembleDebug
 ./gradlew assembleRelease
+
+# 离线包（高敏感环境）：同发布包，但移除 INTERNET 权限，系统层面禁止联网
+./gradlew assembleOffline
 ```
 
 需要 JDK 17 和 NDK `29.0.14206865`。构建时会联网下载雾凇拼音、日语词库、笔画、仓颉码表和 sherpa-onnx 运行库，按记录的 SHA-256 校验后打进安装包。日常出包用仓库根目录的 `packager.cmd`（双击打开图形界面，带参数是命令行），预设见 `scripts/packager/config.json`；版本规则见 [打包与版本规则](docs/packaging.md)。
+
+离线包 `assembleOffline` 在发布包基础上经 `app/src/offline/AndroidManifest.xml` 移除 `INTERNET` 权限，安装后由系统禁止一切联网：模型/词库下载、扩展商店、检查更新、在线语音、样本贡献、剪贴板同步均不可用，请配合完整版离线模型内置包使用，适合高敏感环境。
 
 技术栈：Kotlin · Jetpack Compose · Material 3 · librime（JNI / C++）· ONNX Runtime · sherpa-onnx · OpenCV
 
