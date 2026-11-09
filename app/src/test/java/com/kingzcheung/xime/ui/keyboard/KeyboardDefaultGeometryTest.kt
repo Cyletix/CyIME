@@ -269,4 +269,14 @@ class KeyboardDefaultGeometryTest {
             }
         }
     }
+
+    @Test fun spanishTenColumnRowsUseLetterDefaults() {
+        // GitHub #266：第二行多一个 ñ 的西班牙语键盘也按 10 列字母键盘给默认尺寸。
+        val spanish = listOf("qwertyuiop".map(Char::toString), "asdfghjklñ".map(Char::toString), "zxcvbnm".map(Char::toString))
+        assertTrue(tenColumnLetterRows(spanish))
+        // 11 列（俄语）、非字母键、不是三行的照旧不算。
+        assertFalse(tenColumnLetterRows(listOf("йцукенгшщзх".map(Char::toString), "фывапролджэ".map(Char::toString), "ячсмитьбю".map(Char::toString))))
+        assertFalse(tenColumnLetterRows(listOf("1234567890".map(Char::toString), "asdfghjkl".map(Char::toString), "zxcvbnm".map(Char::toString))))
+        assertFalse(tenColumnLetterRows(spanish.take(2)))
+    }
 }

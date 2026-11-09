@@ -28,11 +28,19 @@ internal fun letterKeyboardDefaults(
     val schemaId = (profile.engineProfile as? EngineProfile.Rime)?.schemaId.orEmpty()
     val custom = KeysConfigHelper.letterLayout(schemaId, isAsciiMode)
     val rows = custom?.typingRows() ?: KeysConfigHelper.getKeyRows(schemaId, isAsciiMode)
-    if (standardLetterRowGeometry(rows, 1f, custom != null, false) == null) return null
+    if (standardLetterRowGeometry(rows, 1f, custom != null, false) == null && !tenColumnLetterRows(rows)) return null
     val (x, y) = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
     val pitch = physicalMetrics?.dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM)
     return LetterKeyboardDefaults(availableHeightDp, x, y, floating, pitch, maximumHeightDp)
 }
+
+/**
+ * 多出一两个本语言字母的 10 列字母键盘（西班牙语第二行加 ñ）：不是标准 26 键，但默认尺寸同样按 10 列算。
+ * 以前只认 a–z，西班牙语走了通用比例上限，折叠屏张开后键盘不跟着变宽，英文却会（GitHub #266）。
+ */
+internal fun tenColumnLetterRows(rows: List<List<String>>): Boolean =
+    rows.size == 3 && rows[0].size == 10 &&
+        rows.all { row -> row.size <= 10 && row.all { it.length == 1 && it[0].isLetter() } }
 
 /** 默认字母键帽最多能比方形宽几倍, 按可用高度连续变化 (用户 11-05: 手机横屏铺满, 平板不变)。
  * 可用高度 ≤ [DEFAULT_WIDE_CAP_FULL_HEIGHT_DP] (手机横屏) 允许 [DEFAULT_WIDE_CAP_ASPECT] 倍,
