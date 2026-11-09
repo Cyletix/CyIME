@@ -160,29 +160,42 @@ internal fun GlideTrailOverlay(trail: GlideTrail, color: Color, modifier: Modifi
 }
 
 /**
- * 滑行实时预览（「滑行时实时显示词」）：手指上方一个小气泡，写着现在抬手会出的词（中文是拼音）；
- * 手指在最上面一行、上方放不下时放到手指下方。颜色与按键上滑气泡相同。
+ * 滑行实时预览（「滑行时实时显示词」）：写着现在抬手会出的词（中文是拼音），颜色与按键上滑气泡相同。
+ * 用户 11-09：原来跟着手指放在键盘中间，被手指和轨迹挡住看不见；现在固定在键盘上方正中（候选栏那一带），
+ * 和 Gboard 一样，手指在哪都挡不住。单独的不接收触摸的小窗，键盘卡片的裁切挡不住它。
  */
 @Composable
 internal fun GlidePreviewBubble(trail: GlideTrail, background: Color, textColor: Color, modifier: Modifier = Modifier) {
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    var width by remember { mutableStateOf(0) }
     val text = trail.preview
-    val finger = trail.points.lastOrNull()
-    if (text.isEmpty() || finger == null) return
-    Box(modifier.onSizeChanged { width = it.width }) {
-        Text(text, color = textColor, fontSize = 18.sp, maxLines = 1,
-            modifier = Modifier
-                .offset {
-                    val above = finger.y - 56.dp.toPx() - size.height / 2f
-                    val y = if (above >= 0f) above else finger.y + 32.dp.toPx()
-                    val x = (finger.x - size.width / 2f).coerceIn(0f, (width - size.width).coerceAtLeast(0).toFloat())
-                    IntOffset(x.roundToInt(), y.roundToInt())
-                }
-                .onSizeChanged { size = it }
-                .testTag("glide-preview")
-                .shadow(3.dp, RoundedCornerShape(50))
-                .background(background, RoundedCornerShape(50))
-                .padding(horizontal = 14.dp, vertical = 6.dp))
+    if (text.isEmpty() || trail.points.isEmpty()) return
+    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { GLIDE_PREVIEW_GAP.roundToPx() }
+    val provider = remember(gap) {
+        object : androidx.compose.ui.window.PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: androidx.compose.ui.unit.IntRect, windowSize: IntSize,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection, popupContentSize: IntSize): IntOffset =
+                glidePreviewPosition(anchorBounds, windowSize, popupContentSize, gap)
+        }
+    }
+    Box(modifier) {
+        androidx.compose.ui.window.Popup(popupPositionProvider = provider, properties = DisplayOnlyPopupProperties) {
+            // 外面留一圈给阴影，小窗只有内容那么大。
+            Box(Modifier.padding(4.dp)) {
+                Text(text, color = textColor, fontSize = 18.sp, maxLines = 1,
+                    modifier = Modifier
+                        .testTag("glide-preview")
+                        .shadow(3.dp, RoundedCornerShape(50))
+                        .background(background, RoundedCornerShape(50))
+                        .padding(horizontal = 14.dp, vertical = 6.dp))
+            }
+        }
     }
 }
+
+/** 预览底边离键盘顶边多远。 */
+internal val GLIDE_PREVIEW_GAP = 6.dp
+
+/** 预览小窗放在键盘（[anchor]）上方正中；上面没地方时贴窗口顶，左右不出窗口。 */
+internal fun glidePreviewPosition(anchor: androidx.compose.ui.unit.IntRect, window: IntSize, popup: IntSize, gap: Int): IntOffset = IntOffset(
+    (anchor.left + (anchor.width - popup.width) / 2).coerceIn(0, (window.width - popup.width).coerceAtLeast(0)),
+    (anchor.top - gap - popup.height).coerceIn(0, (window.height - popup.height).coerceAtLeast(0)),
+)

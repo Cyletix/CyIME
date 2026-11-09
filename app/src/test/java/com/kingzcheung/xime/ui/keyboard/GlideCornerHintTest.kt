@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -158,7 +159,8 @@ class GlideCornerHintTest {
         rule.waitUntil(5000) { previewText() != null }
         rule.waitUntil(5000) { previewText() == "ni hao" }
         assertTrue("还没抬手，不上屏", codes.isEmpty())
-        rule.onRoot().performTouchInput { up() }
+        // 预览是单独的小窗（另一个根），抬手要落在键盘那个根上。
+        rule.onAllNodes(isRoot())[0].performTouchInput { up() }
         rule.waitUntil(5000) { codes.isNotEmpty() }
         assertEquals(listOf("nihao"), codes.toList())
         rule.waitForIdle()
