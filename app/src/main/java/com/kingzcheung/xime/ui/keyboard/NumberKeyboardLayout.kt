@@ -100,6 +100,7 @@ fun NumberKeyboardLayout(
                 keySpacingY = keySpacingY,
                 isFloatingMode = isFloatingMode,
                 numberMode = true,
+                enterKeyText = enterKeyText,
             )
         }
         return
