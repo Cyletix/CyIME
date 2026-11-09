@@ -144,10 +144,15 @@ class FloatingRotationRenderTest {
         assertTrue(rule.onNodeWithTag("keyboard-resize-rotate-handle").isNotDisplayedOrMissing())
     }
 
-    @Test fun lockOnCardBlocksMovingAndEditingUntilUnlocked() {
+    /** 用户 11-08：锁定在调节界面旋转手柄旁的按钮；锁定后不能移动缩放，底部小锁长按 0.5 秒解锁，没到时间松手不解锁。 */
+    @Test fun lockButtonBlocksMovingAndEditingUntilTheSmallLockIsHeld() {
         val context = rule.activity
         val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        resizing = true
         show()
+        rule.onNodeWithTag("keyboard-resize-lock-button").performClick()
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(context)) }
+        rule.onNodeWithTag("keyboard-resize-rotate-handle").assertDoesNotExist()
         val bar = rule.onNodeWithTag("floating-drag-bar")
         val start = bar.fetchSemanticsNode().boundsInRoot.center
         val host = rule.onNodeWithTag("host")
@@ -155,55 +160,46 @@ class FloatingRotationRenderTest {
         val card = rule.onNodeWithTag("floating-keyboard-card")
         val before = card.fetchSemanticsNode().boundsInRoot
         val indicator = rule.onNodeWithTag("floating-drag-indicator")
-        rule.onNodeWithTag("floating-lock").assertDoesNotExist()
-        rule.onNodeWithTag("floating-unlock").assertDoesNotExist()
         fun hold(ms: Long) = indicator.performTouchInput { down(center); advanceEventTime(ms); up() }
-        indicator.performTouchInput { click() }
-        val corner = rule.onNodeWithTag("floating-corner-handle-top_left")
-        corner.assertExists()
-        hold(800)
-        rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(context)) }
-        hold(1050)
-        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(context)) }
         host.performTouchInput { down(local); moveTo(local + Offset(44f, -40f)); up() }
         assertEquals(before, card.fetchSemanticsNode().boundsInRoot)
-        corner.assertDoesNotExist()
-        rule.runOnIdle { resizing = true }
-        rule.onNodeWithTag("keyboard-resize-rotate-handle").assertDoesNotExist()
-        rule.runOnIdle { resizing = false }
-        hold(850)
+        rule.onNodeWithTag("floating-corner-handle-top_left").assertDoesNotExist()
+        hold(350)
         rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(context)) }
-        hold(1050)
+        hold(560)
         rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(context)) }
         host.performTouchInput { down(local); moveTo(local + Offset(14f, -12f)); moveTo(local + Offset(44f, -40f)); up() }
         assertTrue(card.fetchSemanticsNode().boundsInRoot != before)
     }
 
-    @Test fun onlyAStationaryHoldOnThePillCanLock() {
+    @Test fun holdingTheBarWhenUnlockedNoLongerLocks() {
+        show()
+        val indicator = rule.onNodeWithTag("floating-drag-indicator")
+        indicator.performTouchInput { down(center); advanceEventTime(1150); up() }
+        rule.runOnIdle { assertTrue(!com.kingzcheung.xime.settings.SettingsPreferences.floatingGeometryLocked(rule.activity)) }
+    }
+
+    @Test fun onlyAStationaryHoldOnTheSmallLockUnlocks() {
+        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        prefs.setFloatingGeometryLocked(rule.activity, true)
         show()
         val bar = rule.onNodeWithTag("floating-drag-bar")
-        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
-        bar.performTouchInput { down(center + Offset(64f, 0f)); advanceEventTime(1150); up() }
-        rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(rule.activity)) }
+        bar.performTouchInput { down(center + Offset(64f, 0f)); advanceEventTime(700); up() }
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(rule.activity)) }
         bar.performTouchInput {
             down(center)
             moveBy(Offset(18f, -16f))
-            advanceEventTime(1150)
-            moveBy(Offset(18f, -16f))
+            advanceEventTime(700)
             up()
         }
-        rule.runOnIdle {
-            assertTrue(!prefs.floatingGeometryLocked(rule.activity))
-            assertTrue(offsetX > 0)
-        }
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(rule.activity)) }
     }
 
     @Test fun editorLockKeepsTheChosenAngleAndClosesTheEditor() {
         resizing = true
         resizeRotation.floatValue = 32f
         show()
-        val bar = rule.onNodeWithTag("keyboard-resize-move-bar")
-        bar.performTouchInput { down(center); advanceEventTime(1050); up() }
+        rule.onNodeWithTag("keyboard-resize-lock-button").performClick()
         rule.onNodeWithTag("keyboard-resize-rotate-handle").assertDoesNotExist()
         rule.onNodeWithTag("floating-drag-bar").assertExists()
         assertEquals(32f, confirmed, .01f)
@@ -213,13 +209,26 @@ class FloatingRotationRenderTest {
         rotation = -90f
         offsetX = -400
         offsetY = 0
+        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        prefs.setFloatingGeometryLocked(rule.activity, true)
         show()
         val bar = rule.onNodeWithTag("floating-drag-indicator")
-        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
-        bar.performTouchInput { down(center); advanceEventTime(1050); up() }
-        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(rule.activity)) }
-        bar.performTouchInput { down(center); advanceEventTime(1050); up() }
+        bar.performTouchInput { down(center); advanceEventTime(560); up() }
         rule.runOnIdle { assertTrue(!prefs.floatingGeometryLocked(rule.activity)) }
+    }
+
+    /** 上方放不下时，旋转手柄和锁定按钮一起挪到卡片下方，锁定按钮在旋转手柄右边。 */
+    @Test fun controlsMoveBelowWhenTheTopIsOffScreen() {
+        val viewport = ResizeRect(0f, 0f, 400f, 600f)
+        val card = ResizeRect(40f, 10f, 360f, 300f)
+        val rotate = com.kingzcheung.xime.ui.keyboard.floatingRotateHandleRect(card, 0f, viewport, 1f)
+        val lock = com.kingzcheung.xime.ui.keyboard.floatingRotateHandleRect(card, 0f, viewport, 1f, slot = 1)
+        assertTrue(rotate.top >= card.bottom)
+        assertEquals(rotate.top, lock.top, .01f)
+        assertTrue(lock.left > rotate.right)
+        val high = ResizeRect(40f, 200f, 360f, 480f)
+        val above = com.kingzcheung.xime.ui.keyboard.floatingRotateHandleRect(high, 0f, viewport, 1f)
+        assertTrue(above.bottom <= high.top)
     }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.isNotDisplayedOrMissing(): Boolean =

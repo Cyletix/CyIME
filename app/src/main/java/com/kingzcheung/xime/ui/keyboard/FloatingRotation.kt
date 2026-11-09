@@ -11,6 +11,8 @@ internal const val FLOATING_ROTATION_SNAP_DEGREES = 4f
 /** 调节界面里键盘顶边正上方居中的旋转手柄。 */
 internal const val FLOATING_ROTATE_HANDLE_SIZE_DP = 36
 internal const val FLOATING_ROTATE_HANDLE_GAP_DP = 10
+/** 旋转手柄、锁定按钮平时的不透明度：淡一些，不挡后面的内容（用户 11-08）；按着旋转时全亮。 */
+internal const val FLOATING_CONTROL_ALPHA = 0.6f
 /** 旋转后必须完整留在屏内的顶部条（工具栏/候选栏）。 */
 internal const val FLOATING_ROTATE_TOP_STRIP_DP = 44
 /** 底部拖动条中间的拖动按钮宽度，旋转后它必须留在屏内。 */

@@ -397,7 +397,7 @@ internal fun FloatingKeyboardContainer(
                     // 只有半透明时才需要离屏合成；不透明时用 Auto，少一次全卡片离屏绘制。
                     compositingStrategy = if (opacity < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }
-                .floatingLockOutline(geometryLocked, lockProgress, highlightColor)
+                .floatingLockOutline(geometryLocked, highlightColor)
                 .testTag("floating-keyboard-card")
         ) {
             Column {
@@ -420,7 +420,7 @@ internal fun FloatingKeyboardContainer(
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .height((dragAreaHeight + capInset.floatValue.dp).coerceAtMost(cardTotalHeight))
                 .testTag("floating-footer").keyboardPanelBackground(backgroundColor), contentAlignment = Alignment.Center) {
-                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor)
+                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor, lockProgress)
             }
             if (!hideDragBar && previewRect == null) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),

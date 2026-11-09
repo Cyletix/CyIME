@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.VerticalSplit
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -1285,11 +1286,6 @@ internal fun KeyboardResizeOverlay(
             }
         }
         if (!editingOpacity && !adjustingOpacity && floatingMode) {
-            var holdingFooter by remember { mutableStateOf(false) }
-            val progress = floatingLockProgress(holdingFooter)
-            Spacer(Modifier.absoluteOffset { IntOffset(frame.left.roundToInt(), frame.top.roundToInt()) }
-                .size(with(density) { frame.width.toDp() }, with(density) { frame.height.toDp() })
-                .zIndex(2f).floatingLockOutline(false, progress, accentColor))
             Box(
                 modifier = Modifier
                     .absoluteOffset {
@@ -1298,10 +1294,6 @@ internal fun KeyboardResizeOverlay(
                     .size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, dragAreaHeightDp.dp)
                     .zIndex(1f)
                     .testTag("keyboard-resize-move-bar")
-                    .floatingFooterHold(false, { holdingFooter = it }) {
-                        confirmResize()
-                        com.kingzcheung.xime.settings.SettingsPreferences.setFloatingGeometryLocked(hostView.context, true)
-                    }
                     .then(floatingMoveGesture),
             )
         }
@@ -1314,6 +1306,12 @@ internal fun KeyboardResizeOverlay(
             if (rotationState != null && handle != null) {
                 RotateHandle(handle, card, rotationState, overlayOrigin, viewRect, previewState, functionColor, functionTextColor,
                     accentColor, currentPreviewRectSink, onEnd = { currentPreviewState.onDragEnd() })
+            }
+            // 锁定按钮挨在旋转手柄右边（用户 11-08）：点一下按现在的样子确认并锁住，关掉调节界面。
+            FloatingLockButton(floatingRotateHandleRect(card, rotation, viewport, density.density, slot = 1),
+                functionColor, functionTextColor) {
+                confirmResize()
+                com.kingzcheung.xime.settings.SettingsPreferences.setFloatingGeometryLocked(hostView.context, true)
             }
 
         }
@@ -1416,7 +1414,8 @@ private fun RotateHandle(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(26.dp).graphicsLayer { rotationZ = degrees }.background((if (rotating) accentColor else functionColor)
+        Box(Modifier.size(26.dp).graphicsLayer { rotationZ = degrees; alpha = if (rotating) 1f else FLOATING_CONTROL_ALPHA }
+            .background((if (rotating) accentColor else functionColor)
             .copy(alpha = if (rotating) .48f else .22f), CircleShape), contentAlignment = Alignment.Center) {
             if (rotating || isFloatingRotated(degrees)) {
                 Text("${degrees.roundToInt()}°", color = (if (rotating) readableOn(accentColor) else functionTextColor)
@@ -1425,6 +1424,28 @@ private fun RotateHandle(
                 Icon(Icons.AutoMirrored.Rounded.RotateRight, contentDescription = null,
                     tint = functionTextColor.copy(alpha = .78f), modifier = Modifier.size(17.dp))
             }
+        }
+    }
+}
+
+/** 调节界面里旋转手柄旁的锁定按钮：和旋转手柄同样大小、同样淡。 */
+@Composable
+private fun FloatingLockButton(rect: ResizeRect, functionColor: Color, functionTextColor: Color, onLock: () -> Unit) {
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .atFloatingControl(rect, density)
+            .zIndex(3f)
+            .clip(CircleShape)
+            .testTag("keyboard-resize-lock-button")
+            .semantics { contentDescription = "锁定悬浮键盘位置和大小" }
+            .clickable(onClick = onLock),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(26.dp).graphicsLayer { alpha = FLOATING_CONTROL_ALPHA }
+            .background(functionColor.copy(alpha = .22f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = functionTextColor.copy(alpha = .78f),
+                modifier = Modifier.size(15.dp))
         }
     }
 }
