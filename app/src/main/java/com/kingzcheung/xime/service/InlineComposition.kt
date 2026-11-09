@@ -101,3 +101,14 @@ internal fun locateResumableComposition(
     if (text.isNullOrEmpty()) null
     else extracted()?.let { (content, contentStart) -> locateFrozenCompositionAt(text, start, content, contentStart) }
 } else locateDetachedComposition(text, selStart, selEnd, before, after)
+
+/**
+ * 宿主报来的组合区还在（[candidatesStart] < [candidatesEnd]），选区却整个或部分落在它外面：
+ * 用户把光标点到了编码以外。光标在编码两头（紧挨着）仍算在里面。
+ */
+internal fun inlineCaretOutsideSpan(selStart: Int, selEnd: Int, candidatesStart: Int, candidatesEnd: Int): Boolean {
+    if (selStart < 0 || selEnd < 0 || candidatesStart < 0 || candidatesEnd <= candidatesStart) return false
+    val from = minOf(selStart, selEnd)
+    val to = maxOf(selStart, selEnd)
+    return from < candidatesStart || to > candidatesEnd
+}

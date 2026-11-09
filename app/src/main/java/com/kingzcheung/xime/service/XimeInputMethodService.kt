@@ -3909,6 +3909,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         value != null && value.selectionStart == value.selectionEnd && value.startOffset + value.selectionStart == selection
     } == true
 
+    /**
+     * 拼音写在输入框里、正在组词时，用户把光标点到（或选中到）编码以外：宿主报的组合区还在，光标不在里面。
+     * 宿主可能晚送一条更早的选区，所以再问一次输入框现在的选区，对得上才算。日语读音、键盘自己的输入框、
+     * 语音、密码框不管；编码显示在候选栏时光标本来就不影响组词。
+     */
+    private fun caretLeftInlineComposition(selStart: Int, selEnd: Int, candidatesStart: Int, candidatesEnd: Int): Boolean {
+        val state = uiState.value
+        if (!inlineComposition.active || inlineComposition.text.isNullOrEmpty() || !candidateState.value.isComposing ||
+            state.inputTarget.isInternal || state.isVoiceMode || isSecretEditor() || schemaController.japaneseReadingOnScreen() ||
+            TerminalEditor.inputTextLocation(this) != SettingsPreferences.INPUT_TEXT_INPUT_BOX) return false
+        if (!inlineCaretOutsideSpan(selStart, selEnd, candidatesStart, candidatesEnd)) return false
+        val value = currentInputConnection?.let { connection ->
+            runCatching { connection.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) }.getOrNull()
+        } ?: return false
+        return value.startOffset + value.selectionStart == selStart && value.startOffset + value.selectionEnd == selEnd
+    }
+
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
@@ -3921,6 +3938,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             inlineComposition.restoreLostSpan(currentInputConnection, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         else null
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
+        if (restored == null && caretLeftInlineComposition(newSelStart, newSelEnd, candidatesStart, candidatesEnd))
+            keyRouter.finishCompositionAfterCaretLeft()
         val hostCaret = if (newSelStart >= 0 && newSelStart == newSelEnd) newSelStart else -1
         if (hostCaret != voiceHostCaret) { voiceHostCaretBefore = voiceHostCaret; voiceHostCaret = hostCaret }
         if (restored != null || oldSelStart != newSelStart || oldSelEnd != newSelEnd) {

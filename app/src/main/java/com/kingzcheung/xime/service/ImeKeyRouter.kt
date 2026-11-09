@@ -2681,13 +2681,23 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.rimeEngine.endQueuedComposition(isT9Schema(service.uiState.value.currentSchemaId))
 
     /**
+     * 拼音写在输入框里时，用户把光标点到了编码以外（11-08 红米 K70 反馈：光标挪到中间按删除，删的是末尾）。
+     * 原来组词照旧，下一下删除删的是末尾编码的字母，再写回编码时光标被拉回末尾。
+     * 这里结束组词：编码字母原样留在输入框里成为普通文字（不替用户删掉看得见的字），候选和引擎清空，
+     * 之后的按键作用在新光标处。排进输入队列，和按键保持先后。
+     */
+    internal fun finishCompositionAfterCaretLeft() {
+        postRimeJob("caret_left_composition") { clearInputStateForKeys(keepInlineText = true) }
+    }
+
+    /**
      * 清空输入态（预编辑/候选/联想/partial 累积/计算器），不动已上屏文本。
      * 供 clear_composition 与 clear_all 输入态分支共用。
      *
      * 显式清 preeditText（与提交路径"残留根治"一致），不依赖 updateUI 自愈；
      * 输入框模式清 composing 区；T9 方案重置左侧候选区（其他键盘无左栏，跳过）。
      */
-    private suspend fun clearInputStateForKeys() {
+    private suspend fun clearInputStateForKeys(keepInlineText: Boolean = false) {
         service.predictionManager.invalidatePendingPredictions()
         service.calculatorEngine.clear()
         updateCalculatorCandidates()
@@ -2712,7 +2722,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (TerminalEditor.inputTextLocation(service) ==
             SettingsPreferences.INPUT_TEXT_INPUT_BOX
         ) {
-            withEditor { service.endComposingInputBox() }
+            withEditor { if (keepInlineText) service.finishComposingInputBoxKeepingText() else service.endComposingInputBox() }
         }
         if (isT9Schema(service.uiState.value.currentSchemaId)) {
             withEditor {
