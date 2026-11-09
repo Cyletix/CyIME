@@ -4275,6 +4275,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         if (!lockCompositionSuspended) discardInlinePinyinBeforeFrameworkFinish()
         super.onFinishInput()
+        // 离开输入框：之后在网页等处复制的不算密码框里复制的（用户 11-09）。
+        privacy.endEditor()
         if (::clipboardManager.isInitialized) clipboardManager.images.dismissPresentedPreview()
         runtimeObserver?.stop()
         inlineSuggestionManager?.clear()

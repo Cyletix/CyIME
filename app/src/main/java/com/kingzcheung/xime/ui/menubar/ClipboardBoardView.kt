@@ -291,6 +291,7 @@ internal fun ClipboardBoardView(
     onFormOpen: (ClipboardTab, Boolean) -> Unit = { _, _ -> },
 ) {
     val colors = MaterialTheme.colorScheme
+    val appContext = LocalContext.current.applicationContext
     val tabs = remember(groups) { clipboardTabs(groups) }
     var chosenTab by remember(initialImages) { mutableStateOf<ClipboardTab>(
         tabs.firstOrNull { it.key == initialTabKey }
@@ -660,6 +661,11 @@ internal fun ClipboardBoardView(
                     add(LongPressMenuEntry(if (shown) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         if (shown) "隐藏" else "显示", tag = "clipboard-item-reveal") {
                         revealed = if (shown) revealed - card.key else revealed + card.key
+                    })
+                    // Ordinary text hidden by mistake (user 11-09): back to an ordinary record, kept past the hour.
+                    add(LongPressMenuEntry(Icons.Default.NoEncryption, "不是密码", tag = "clipboard-item-not-password") {
+                        revealed = revealed - card.key
+                        ClipboardManager.getInstance(appContext).markNotSensitive(card.item.id, card.item.text)
                     })
                 } else if (card is ClipboardCard.Text) {
                     add(LongPressMenuEntry(Icons.Default.ContentCut, "分词") { onSplit(card.item.text, card.item.id) })

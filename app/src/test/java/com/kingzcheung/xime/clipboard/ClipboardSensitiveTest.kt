@@ -72,9 +72,10 @@ class ClipboardSensitiveTest {
         dao.setSensitive(fixed, true)
         dao.deleteSensitiveBefore(now - hour)
         assertEquals(setOf("新密码", "普通旧记录", "固定的密码"), all().map { it.text }.toSet())
-        // Turning the switch off removes every kept password that is not fixed.
+        // 「不是密码」: ordinary text hidden by mistake becomes an ordinary record and outlives the hour.
+        dao.setSensitive(all().single { it.text == "新密码" }.id, false)
         dao.deleteSensitiveBefore(Long.MAX_VALUE)
-        assertEquals(setOf("普通旧记录", "固定的密码"), all().map { it.text }.toSet())
+        assertEquals(setOf("新密码", "普通旧记录", "固定的密码"), all().map { it.text }.toSet())
     }
 
     @Test fun latestCopyDecidesWhetherAnUnfixedRecordIsHidden() = runBlocking {

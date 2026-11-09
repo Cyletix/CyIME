@@ -179,7 +179,12 @@ class ClipboardManager private constructor(private val context: Context) {
         }
     }
 
-    private fun readClipboard(retries: Int = 3) {
+    /**
+     * [live]: read the moment the copy was made (the listener and its retries). Only then can the open
+     * password field be where it was copied; a read when the keyboard opens or the board opens
+     * catches a copy made elsewhere earlier, and the field opened now says nothing about it.
+     */
+    private fun readClipboard(retries: Int = 3, live: Boolean = true) {
         try {
             val clipData = androidClipboardManager.primaryClip
             if (clipData != null && clipData.itemCount > 0) {
@@ -189,7 +194,7 @@ class ClipboardManager private constructor(private val context: Context) {
                     item.text ?: item.uri?.toString() ?: item.intent?.toUri(0))
                 val sensitive = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true
                 val manualIncognito = com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(context)
-                val privacy = clipPrivacy(sensitive, com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor,
+                val privacy = clipPrivacy(sensitive, live && com.kingzcheung.xime.settings.IncognitoState.passwordField,
                     manualIncognito || com.kingzcheung.xime.settings.IncognitoState.manual ||
                         com.kingzcheung.xime.settings.IncognitoState.clipboardSearch,
                     com.kingzcheung.xime.settings.SettingsPreferences.isClipboardSensitiveCaptureEnabled(context))
@@ -269,7 +274,7 @@ class ClipboardManager private constructor(private val context: Context) {
                 }
             }
             if (retries > 0) {
-                Handler(Looper.getMainLooper()).postDelayed({ readClipboard(retries - 1) }, 100L)
+                Handler(Looper.getMainLooper()).postDelayed({ readClipboard(retries - 1, live) }, 100L)
             } else {
                 Log.w(TAG, "Failed to read clipboard after all retries")
             }
@@ -354,7 +359,7 @@ class ClipboardManager private constructor(private val context: Context) {
                 missed = timestamp >= listeningSince)
         ) {
             openTries++
-            readClipboard(retries = 0)
+            readClipboard(retries = 0, live = false)
         }
     }
 
@@ -764,11 +769,13 @@ class ClipboardManager private constructor(private val context: Context) {
         }
     }
 
-    /** 「记录密码等敏感内容」 turned off: every kept password that is not fixed goes at once. */
-    fun deleteSensitive() {
+    /** 长按「不是密码」：这条按普通记录显示、能搜，不再 1 小时后删除（用户 11-09：普通网页文字被当成密码）。 */
+    fun markNotSensitive(id: Long, text: String) {
         scope.launch {
-            runCatching { dao.deleteSensitiveBefore(Long.MAX_VALUE) }
-                .onFailure { Log.e(TAG, "Could not delete kept passwords", it) }
+            runCatching {
+                dao.setSensitive(id, false)
+                dao.setSearchKey(id, searchKey(text))
+            }.onFailure { Log.e(TAG, "Could not unmark a kept password", it) }
         }
     }
 

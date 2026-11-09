@@ -11,6 +11,7 @@ import org.junit.Test
 
 class InputPrivacyTest {
     private val saved = Triple(IncognitoState.manual, IncognitoState.sensitiveEditor, IncognitoState.clipboardSearch)
+    private val savedPasswordField = IncognitoState.passwordField
     private val engine = mutableListOf<Boolean>()
     private val privacy = InputPrivacy { engine += it }.also {
         it.loadManual(false)
@@ -22,6 +23,7 @@ class InputPrivacyTest {
         IncognitoState.manual = saved.first
         IncognitoState.sensitiveEditor = saved.second
         IncognitoState.clipboardSearch = saved.third
+        IncognitoState.passwordField = savedPasswordField
     }
 
     private fun field(inputType: Int, imeOptions: Int = 0) =
@@ -76,5 +78,24 @@ class InputPrivacyTest {
         assertTrue(engine.isEmpty())
         privacy.beginEditor(field(text))
         assertEquals(listOf(true), engine)
+    }
+
+    /** 用户 11-09：网页上复制的普通文字被当成密码。剪贴板只认开着的藏字密码框。 */
+    @Test fun clipboardCountsOnlyAnOpenHiddenPasswordField() {
+        privacy.beginEditor(field(text, EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
+        assertTrue(IncognitoState.active)
+        assertFalse(IncognitoState.passwordField)
+        privacy.beginEditor(field(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD))
+        assertFalse(IncognitoState.passwordField)
+        privacy.beginEditor(field(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD))
+        assertTrue(IncognitoState.passwordField)
+        privacy.beginEditor(field(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD))
+        assertTrue(IncognitoState.passwordField)
+        privacy.beginEditor(field(password))
+        assertTrue(IncognitoState.passwordField)
+        // Leaving the field: a copy made on a web page afterwards is not from a password field.
+        privacy.endEditor()
+        assertFalse(IncognitoState.passwordField)
+        assertTrue(IncognitoState.active)
     }
 }

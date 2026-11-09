@@ -8,12 +8,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 
 /**
  * 「记录密码等敏感内容」(#95)：默认关。密码管理器复制的密码系统标成敏感，键盘一律不记；
- * 打开后记进剪贴板历史，但显示成圆点、1 小时后删除、不同步不导出。打开要确认，关掉马上删掉已记的（固定的留着）。
+ * 打开后记进剪贴板历史，但显示成圆点、1 小时后删除、不同步不导出。打开要确认。
+ * 关掉只是不再记新的，已经记下的不马上删（用户 11-09：普通网页文字被误当成密码，一关就全删了），照旧 1 小时后删。
  */
 @Composable
 internal fun ClipboardSensitiveSetting() {
@@ -25,7 +25,6 @@ internal fun ClipboardSensitiveSetting() {
         else {
             enabled = false
             SettingsPreferences.setClipboardSensitiveCaptureEnabled(context, false)
-            ClipboardManager.getInstance(context).deleteSensitive()
         }
     }
     if (confirming) AlertDialog(
@@ -45,7 +44,7 @@ internal fun ClipboardSensitiveSetting() {
 internal fun ClipboardSensitiveSettingCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
     SettingsSection(title = "敏感内容", content = {
         SettingsToggleItem(Icons.TwoTone.Lock, "记录密码等敏感内容",
-            "密码管理器和密码框里复制的内容也记进剪贴板，显示成圆点，1 小时后自动删除，不同步、不导出。无痕开着时不记。",
+            "密码管理器和密码框里复制的内容也记进剪贴板，显示成圆点，1 小时后自动删除，不同步、不导出。无痕开着时不记。圆点的记录长按选「不是密码」恢复成普通记录。",
             enabled, onToggle)
     })
 }
