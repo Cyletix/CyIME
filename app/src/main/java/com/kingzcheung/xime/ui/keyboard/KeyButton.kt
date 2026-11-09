@@ -508,7 +508,10 @@ fun SwipeableKeyButton(
                     discLabels[KanaFlickDirection.DOWN] != preview.text) KanaFlickDirection.UP else KanaFlickDirection.DOWN
         }
     } ?: KanaFlickDirection.TAP
-    if (discKey) LaunchedEffect(isPressed) {
+    // 「长按输入」时按住就是要长按出角标：方向盘不再按住 180 毫秒就弹，免得按下去先冒出方向盘再换成角标气泡；
+    // 拂出去时照样出方向盘（用户 11-09：按下时不出气泡，到点输入时才出，松手消失）。
+    val holdCommitsSymbol = gestureActions.longPressBubbleText != null
+    if (discKey && !holdCommitsSymbol) LaunchedEffect(isPressed) {
         if (isPressed) {
             delay(FLICK_DISC_HOLD_MS)
             discRevealed = true

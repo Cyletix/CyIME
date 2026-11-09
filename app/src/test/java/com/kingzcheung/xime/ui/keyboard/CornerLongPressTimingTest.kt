@@ -122,9 +122,11 @@ class CornerLongPressTimingTest {
     }
 
     private fun popup() = rule.onNodeWithTag("key-choice-popup", useUnmergedTree = true)
+    /** 14 键、九键拂动的方向盘（默认开）：按住不动时也算气泡，到点前不能弹（用户 11-09）。 */
+    private fun disc() = rule.onNodeWithTag("letter-flick-preview", useUnmergedTree = true)
 
     /**
-     * 按住 [key]：到点前不出字、没有气泡；到点时（手还按着）恰好输入 [expected] 一次、气泡出来；
+     * 按住 [key]：到点前不出字、没有气泡（也没有方向盘）；到点时（手还按着）恰好输入 [expected] 一次、气泡出来；
      * 松手后不再多出字，气泡消失。按压气泡保持默认关，证明长按的气泡不靠它。
      */
     private fun holdAndCheck(id: String, key: SemanticsNodeInteraction, expected: String?, output: () -> List<String>) {
@@ -134,9 +136,11 @@ class CornerLongPressTimingTest {
         rule.mainClock.advanceTimeBy((delaySeconds * 1000).toLong() - 100)
         assertEquals("$id 没到设定时长不能出字", before, output().size)
         popup().assertDoesNotExist()
+        disc().assertDoesNotExist()
         rule.mainClock.advanceTimeBy(200)
         assertEquals("$id 到点立刻输入（还没松手）", listOfNotNull(expected), output().drop(before))
         popup().assertExists("$id 长按到点后应显示输入的角标")
+        disc().assertDoesNotExist()
         key.performTouchInput { up() }
         rule.mainClock.advanceTimeBy(100)
         rule.mainClock.autoAdvance = true
