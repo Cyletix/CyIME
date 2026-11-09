@@ -42,7 +42,7 @@ internal fun commitAssociationSelection(
     return when {
         pending.isEmpty() -> commit(word)
         // The original word is already in the editor; only the suffix is new.
-        hasOriginal && index == 0 -> suffix.isEmpty() || commit(suffix)
+        hasOriginal && index == 0 -> suffix.isEmpty() || replace(pending, pending + suffix)
         !state.englishReplaceSupported -> false
         else -> replace(pending, word + suffix) // Stale cursor context must never append the whole word.
     }

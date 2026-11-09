@@ -53,6 +53,23 @@ class EnglishCompletionEditorTest {
         assertEquals(6, editor.selectionEnd)
     }
 
+    @Test fun autoSpaceOnOriginalWordRequiresThePrefixAtTheCurrentCaret() {
+        val host = editor.onCreateInputConnection(EditorInfo())!!
+        val state = CandidateState(pendingEnglishText = "a", associationCandidates = listOf("and"))
+        fun pick() = commitAssociationSelection(state, 0, { host.commitText(it, 1) },
+            host::commitEnglishCompletion, suffix = " ")
+        editor.setText("前a后")
+        editor.setSelection(0)
+        assertFalse(pick())
+        editor.setSelection(1, 2)
+        assertFalse(pick())
+        assertEquals("前a后", editor.text.toString())
+        editor.setSelection(2)
+        assertTrue(pick())
+        assertEquals("前a 后", editor.text.toString())
+        assertEquals(3, editor.selectionEnd)
+    }
+
     @Test fun movedCaretSelectionAndRejectedWritePreserveTheDraft() {
         editor.setText("at")
         val attempts = mutableListOf<String>()
