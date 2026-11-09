@@ -125,6 +125,14 @@ internal fun cpuLine(measurement: CpuMeasurement?, skipped: CpuBenchmarkRunner.S
     }
 }
 
+/** 点「重测」没测成时弹的一句（#268：以前没测成只是副标题不变，像点了没反应）。 */
+internal fun cpuSkipToast(skipped: CpuBenchmarkRunner.Skip): String = when (skipped) {
+    CpuBenchmarkRunner.Skip.KEYBOARD -> "键盘开着，收起键盘再点重测"
+    CpuBenchmarkRunner.Skip.POWER_SAVE -> "省电模式开着，测出来会偏低，关掉后再点重测"
+    CpuBenchmarkRunner.Skip.THERMAL -> "设备过热，系统在降频，凉下来再点重测"
+    CpuBenchmarkRunner.Skip.UNSUPPORTED -> "本机测不了 CPU"
+}
+
 private val ladder = listOf(PerformanceTier.LOW, PerformanceTier.MEDIUM, PerformanceTier.HIGH)
 
 /**
@@ -160,12 +168,13 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
         cpuRunning = true
         scope.launch {
             val outcome = withContext(Dispatchers.Default) {
-                val result = if (force) CpuBenchmarkRunner.run(context) else CpuBenchmarkRunner.ensure(context)
+                val result = if (force) CpuBenchmarkRunner.run(context, manual = true) else CpuBenchmarkRunner.ensure(context)
                 // 还在「自动」且实测定出了新档就改套那档；手动选的档、自定义不动。
                 if (result is CpuBenchmarkRunner.Outcome.Measured) PerformanceProfile.onCpuMeasured(context)
                 result
             }
             cpuSkipped = (outcome as? CpuBenchmarkRunner.Outcome.Skipped)?.reason
+            if (force) cpuSkipped?.let { android.widget.Toast.makeText(context, cpuSkipToast(it), android.widget.Toast.LENGTH_SHORT).show() }
             device = DeviceCapabilityProbe.read(context)
             cpuRunning = false
             refresh()

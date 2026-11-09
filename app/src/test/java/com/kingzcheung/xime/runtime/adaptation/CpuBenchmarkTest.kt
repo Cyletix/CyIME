@@ -43,4 +43,13 @@ class CpuBenchmarkTest {
         assertEquals("", CpuBenchmark.cpuList(0))
         assertEquals("63", CpuBenchmark.cpuList(Long.MIN_VALUE))
     }
+
+    // #268：凉着也一直报「中度」的机型，点「重测」要能测；自动测仍从中度起不测，严重时都不测。
+    @Test fun `manual retest runs at moderate thermal status but not at severe`() {
+        assertFalse(CpuBenchmarkRunner.thermalBlocks(android.os.PowerManager.THERMAL_STATUS_LIGHT, manual = false))
+        assertTrue(CpuBenchmarkRunner.thermalBlocks(android.os.PowerManager.THERMAL_STATUS_MODERATE, manual = false))
+        assertFalse(CpuBenchmarkRunner.thermalBlocks(android.os.PowerManager.THERMAL_STATUS_MODERATE, manual = true))
+        assertTrue(CpuBenchmarkRunner.thermalBlocks(android.os.PowerManager.THERMAL_STATUS_SEVERE, manual = true))
+        assertTrue(CpuBenchmarkRunner.thermalBlocks(android.os.PowerManager.THERMAL_STATUS_CRITICAL, manual = true))
+    }
 }
