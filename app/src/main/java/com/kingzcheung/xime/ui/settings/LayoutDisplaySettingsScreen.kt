@@ -251,6 +251,13 @@ private fun LayoutDisplayPage(
                         )
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    // 数字键盘左栏（用户 11-09）：进「按键符号 → 数字侧栏」改字、加减格子、调顺序。
+                    SettingsItem(Icons.TwoTone.EmojiSymbols, "左栏符号",
+                        "数字键盘左侧一列，默认 + - * /。可改字、加减、调顺序，多于 4 个时上下滑。",
+                        onClick = { com.kingzcheung.xime.ui.keyboard.openSideSymbolEditor(context,
+                            com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.NUMBER) },
+                        showArrow = true, searchKey = "数字键盘左栏符号")
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     // 数字行（默认关）：点开关打开，点这一行进「按键符号 → 数字行」改键和顺序。
                     val numberRow = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().numberRow
                     SettingsToggleItem(Icons.TwoTone.FormatListNumbered, "数字行",
