@@ -72,9 +72,9 @@ private suspend fun uploadPractice(context: Context, samples: List<String>) {
 }
 
 @Composable
-internal fun GlidePracticeItem(nine: Boolean) {
+internal fun GlidePracticeItem(nine: Boolean, title: String = "滑行练习与贡献") {
     var open by remember { mutableStateOf(false) }
-    SettingsItem(Icons.TwoTone.Gesture, "滑行练习与贡献", "按题目滑词，可自愿上传轨迹来改进识别。", { open = true }, showArrow = true)
+    SettingsItem(Icons.TwoTone.Gesture, title, "按题目滑词，可自愿上传轨迹来改进识别。", { open = true }, showArrow = true)
     if (open) GlidePracticeDialog(nine, { open = false })
 }
 

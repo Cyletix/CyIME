@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.RadioButton
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.twotone.Dialpad
+import androidx.compose.material.icons.twotone.Gesture
 import androidx.compose.material.icons.twotone.FormatListNumbered
 import androidx.compose.material.icons.twotone.FormatColorFill
 import androidx.compose.material.icons.twotone.AspectRatio
@@ -60,11 +61,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.SettingsPreferences
 
-/** 「键盘布局」里各布局一行的图标：26 键用键盘，九键与 14 键用拨号盘。 */
+/** 「键盘布局」里各布局一行的图标：26 键用键盘，九键与 14 键用拨号盘，滑行输入用手势。 */
 private val LayoutInputCategory.icon: androidx.compose.ui.graphics.vector.ImageVector
     get() = when (this) {
         LayoutInputCategory.Qwerty -> Icons.TwoTone.Keyboard
         LayoutInputCategory.Nine -> Icons.TwoTone.Dialpad
+        LayoutInputCategory.Glide -> Icons.TwoTone.Gesture
     }
 
 @OptIn(ExperimentalMaterial3Api::class)

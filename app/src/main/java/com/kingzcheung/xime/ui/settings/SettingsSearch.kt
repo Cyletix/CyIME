@@ -106,6 +106,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
     val layouts = "$input › 键盘布局"
     val qwertyPath = "$layouts › 26 键"
     val ninePath = "$layouts › 九键与 14 键"
+    val glidePath = "$layouts › 滑行输入"
     val gestures = "$input › 按键与手势"
     val hardware = "$input › 物理键盘"
     val theme = "$look › 主题与外观"
@@ -124,6 +125,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
     val about = "$system › 关于 CyIME"
     val qwerty = LayoutInputCategory.Qwerty.route
     val nine = LayoutInputCategory.Nine.route
+    val glide = LayoutInputCategory.Glide.route
     val layoutIndex = SettingsRoutes.LayoutDisplay
     val gesturePage = layoutPage("gestures")
     val candidatePage = layoutPage("candidates")
@@ -172,8 +174,10 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("双拼简拼", "$languages › 双拼方案", SettingsRoutes.DoublePinyin, "简拼 双拼简拼 首字母 声母 缩写 只打声母 全拼简拼 小鹤 自然码 微软双拼 zgrm", section = "通用"),
         SettingsSearchEntry("编码显示双拼键", "$languages › 双拼方案", SettingsRoutes.DoublePinyin, "编码 显示 双拼键 原始按键 按键 字母 全拼 拼音 ul pb 小鹤 九键", section = "通用"),
         // 输入 › 键盘布局
-        page("26 键", layouts, qwerty, "26键 全键盘 全拼 qwerty 中英混输 滑行输入"),
+        page("26 键", layouts, qwerty, "26键 全键盘 全拼 qwerty 中英混输"),
         page("九键与 14 键", layouts, nine, "九键 9键 14键 拂动 假名 触发距离"),
+        // 英文、中文、九键滑行 11-09 合到一页（原来分在 26 键、九键两页）。
+        page("滑行输入", layouts, glide, "滑行 划词 滑动输入 手势输入 swype 英文滑行 中文滑行 九键滑行 26键 九键"),
         SettingsSearchEntry("布局管理", layouts, SEARCH_TARGET_CUSTOM_LAYOUT, "自定义布局 自定义按键布局 切换栏 隐藏布局 布局排序 新建布局 复制 编辑按键排列", anchor = null),
         SettingsSearchEntry("按键符号", layouts, layoutIndex, "角标 符号编辑 字母键符号 上下角标 下滑符号 14键符号 自定义布局符号 侧栏 笔画 短语 常用符号栏 手写符号 数字行 滑动动作 zxcv 撤销 剪切 复制 粘贴 全选 段首 段尾"),
         SettingsSearchEntry("标点上屏首选", layouts, layoutIndex, "标点 逗号 句号 问号 首选 第一个候选 上屏 候选上屏 打逗号 选词 搜狗"),
@@ -202,10 +206,11 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("九键按数字也模糊", chinesePath, chinese, "九键模糊音 九宫格模糊音 九键 模糊音 数字 直接模糊 平翘舌 前后鼻音 性能 卡顿", section = "模糊音"),
         SettingsSearchEntry("模糊音也用于双拼", chinesePath, chinese, "双拼模糊音 双拼 模糊音 小鹤 自然码 in ing 前后鼻音", section = "模糊音"),
         SettingsSearchEntry("模糊音", chinesePath, chinese, "模糊音 模糊 平翘舌 前后鼻音 z zh c ch s sh n l f h r an ang en eng in ing 分不清 口音 方言 九键模糊音 九宫格 14键模糊音 14 键 双拼"),
-        SettingsSearchEntry("滑行输入", qwertyPath, qwerty, "滑行 划词 滑动输入 手势输入 英文 整词 swype"),
-        SettingsSearchEntry("中文滑行输入", qwertyPath, qwerty, "滑行 划词 中文滑行 拼音滑行 双拼滑行 手势输入 swype"),
-        SettingsSearchEntry("逐字删除中文滑行", qwertyPath, qwerty, "滑行 划词 删除 退格 拼音 音节 中文"),
-        SettingsSearchEntry("滑行时实时显示词", qwertyPath, qwerty, "滑行 实时 预览 显示 抬手 gboard 划词 swype"),
+        SettingsSearchEntry("英文滑行", glidePath, glide, "滑行 划词 滑动输入 手势输入 英文 整词 26键 swype 滑行输入"),
+        SettingsSearchEntry("中文滑行", glidePath, glide, "滑行 划词 中文滑行 拼音滑行 双拼滑行 手势输入 26键 swype 中文滑行输入"),
+        SettingsSearchEntry("九键滑行", glidePath, glide, "九宫格 九鍵 九键 滑行 连划 滑动拼音 连续输入 手势 九键滑行输入"),
+        SettingsSearchEntry("逐字删除中文滑行", glidePath, glide, "滑行 划词 删除 退格 拼音 音节 中文"),
+        SettingsSearchEntry("滑行时实时显示词", glidePath, glide, "滑行 实时 预览 显示 抬手 gboard 划词 swype"),
         SettingsSearchEntry("三行字母错位", qwertyPath, qwerty, "错位 排布 实体键盘 对齐 手机排布 字母行 偏移"),
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),
         SettingsSearchEntry("空格左侧逗号键", qwertyPath, qwerty, "逗号 空格 加宽 标点"),
@@ -217,7 +222,6 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长音键", qwertyPath, qwerty, "长音 ー 伸ばし棒 日语 日文 罗马字 L 键 Shift 大写键 コーヒー"),
         SettingsSearchEntry("拖到候选选词的距离", ninePath, nine, "九键 0键 零键 拖动 拖拽 托转 选词 候选 距离 阈值 Shift 百分比 拖线"),
         SettingsSearchEntry("拂动选字母", ninePath, nine, "九键 拂动 滑动 长按 数字 字母 字母菜单 上下左右"),
-        SettingsSearchEntry("九键滑行输入", ninePath, nine, "九宫格 九鍵 滑行 连划 滑动拼音 连续输入 手势"),
         SettingsSearchEntry("左右滑动选字母", ninePath, nine, "14键 双字母键 滑动 选字母 小鹤 双拼 左滑 右滑 自建 合并 18键"),
         SettingsSearchEntry("滑动触发距离", ninePath, nine, "距离 灵敏度 误触 拂动 滑动 假名 dp"),
         SettingsSearchEntry("拂动时显示方向圆盘", ninePath, nine, "圆盘 方向 箭头 拂动 提示 假名 日语"),

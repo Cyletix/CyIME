@@ -41,7 +41,7 @@ class LayoutGestureMenuItemsTest {
     @Test fun nineKeyGlideOwnsDirectionalDragsAndRestoresPreviousFlickSetting() {
         val glide = prefs.copy(t9GlideTyping = true, cursorGesture = CursorGestureMode.NONE)
         assertEquals(false, ToolbarButton.T9_FLICK.gestureOn(glide))
-        assertEquals("九键滑行输入", InputGestureLocks.lockFor(glide, InputGestureLock.Option.T9_FLICK_LETTERS, true)?.by)
+        assertEquals("九键滑行", InputGestureLocks.lockFor(glide, InputGestureLock.Option.T9_FLICK_LETTERS, true)?.by)
         assertTrue(ToolbarButton.T9_FLICK.gestureOn(glide.copy(t9GlideTyping = false)))
     }
 

@@ -134,8 +134,8 @@ class T9GlideInputTest {
 
     @Test fun nineKeySettingsAreIndependentOfLetterKeyboardGlide() {
         rule.setContent { com.kingzcheung.xime.ui.settings.LayoutInputSettingsContent(
-            com.kingzcheung.xime.ui.settings.LayoutInputCategory.Nine, onBack = {}) }
-        val row = rule.onNodeWithText("九键滑行输入", useUnmergedTree = true).performScrollTo()
+            com.kingzcheung.xime.ui.settings.LayoutInputCategory.Glide, onBack = {}) }
+        val row = rule.onNodeWithText("九键滑行", useUnmergedTree = true).performScrollTo()
         org.junit.Assert.assertFalse(KeyboardInputPreferences.read(rule.activity).t9GlideTyping)
         row.performTouchInput { click() }
         rule.runOnIdle {
