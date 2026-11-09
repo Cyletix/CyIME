@@ -1210,6 +1210,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val quiet = languagesOnly && RimeEngine.isInitialized() && SettingsPreferences.isDeploymentDone(this)
         val startedAt = android.os.SystemClock.elapsedRealtime()
         val engineResident = RimeEngine.isInitialized()
+        // 上一个服务已经把方案切好的会话（换输入法再切回、系统重建服务）：之后没部署、没换会话就不再重切。
+        val liveSchemaGeneration = rimeEngine.liveSchemaGeneration()
         inputReadiness.deployment(true)
         Log.d(TAG, "initRimeEngine: Starting initialization...")
         
@@ -1278,6 +1280,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     android.widget.Toast.LENGTH_LONG
                                 ).show()
                             }
+                        }
+                        savedSchema in availableSchemas && savedSchema == currentSchema && liveSchemaGeneration != null &&
+                            rimeEngine.liveSchemaGeneration() == liveSchemaGeneration -> {
+                            // 会话还是上次完整切好方案的那个（期间没部署、没新建会话）：重切同一方案只会重建翻译器和词典，
+                            // 内存紧时要 20 多秒，键盘一直显示「正在加载词库」（平板 11-05..11-08，用户 11-09）。
+                            withContext(Dispatchers.IO) { schemaController.applyPageSizeSetting(savedSchema) }
+                            FileLogger.w(TAG, "initRimeEngine: kept live schema $savedSchema")
                         }
                         savedSchema in availableSchemas -> {
                             // 即使 savedSchema == currentSchema 也要调用 switchSchema，

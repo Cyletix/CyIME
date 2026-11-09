@@ -159,6 +159,23 @@ class RimeEngine {
     @Volatile
     private var isInitialized = false
     private val initLock = Any()
+
+    /**
+     * 会话被换掉（新建会话、部署、维护后重载、初始化/销毁）就加一。[schemaAppliedGeneration] 等于它，
+     * 说明眼下这个会话已经完整切过一次方案、之后没被换过：输入法服务重建时不必再切一遍同一方案。
+     * 重切同一方案会重建翻译器和词典，内存紧、页缓存被回收时要 20 多秒（平板 11-05..11-08 日志）。
+     */
+    private val sessionGeneration = java.util.concurrent.atomic.AtomicLong(0L)
+    @Volatile private var schemaAppliedGeneration = -1L
+    private fun sessionReplaced() { sessionGeneration.incrementAndGet() }
+
+    /** 当前会话已完整切过方案时返回它的代号；没有会话、或会话之后被换过时返回 null。 */
+    internal fun liveSchemaGeneration(): Long? {
+        val generation = sessionGeneration.get()
+        return generation.takeIf { isInitialized && nativeHasSession() && schemaAppliedGeneration == it }
+    }
+
+    private fun createSession(): Boolean = nativeCreateSession().also { if (it) sessionReplaced() }
     @Volatile
     private var userDataDir: String = ""
     private var sharedDataDir: String = ""
@@ -265,6 +282,7 @@ class RimeEngine {
                         notifyDeploymentStatus(true, "正在加载输入法引擎...")
                         nativeInitialize(userDataDir, sharedDataDir)
                         mergedAlphabet = null
+                        sessionReplaced()
                         isInitialized = true
 
                         // 部署后主动触发：为已部署目录中所有 T9 方案打九键特有补丁
@@ -307,7 +325,7 @@ class RimeEngine {
             waited = 0L
             while (waited < timeoutMs) {
                 if (!nativeHasSession()) {
-                    nativeCreateSession()
+                    createSession()
                 }
                 if (getAvailableSchemas().isNotEmpty()) {
                     return true
@@ -343,7 +361,7 @@ class RimeEngine {
     fun processKey(keycode: Int, mask: Int): Boolean {
         if (!isInitialized) return false
         return tryMutating(false) {
-            if (!nativeHasSession() && !nativeCreateSession()) return@tryMutating false
+            if (!nativeHasSession() && !createSession()) return@tryMutating false
             enforceAsciiWidth()
             nativeProcessKey(keycode, mask)
         }
@@ -352,7 +370,7 @@ class RimeEngine {
     fun processKeyAndGetResult(keycode: Int, mask: Int): RimeProcessResult {
         if (!isInitialized) return RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)
         return tryMutating(RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)) {
-            if (!nativeHasSession() && !nativeCreateSession())
+            if (!nativeHasSession() && !createSession())
                 return@tryMutating RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)
             enforceAsciiWidth()
             withDisplayPreedit(nativeProcessKeyAndGetResult(keycode, mask))
@@ -652,7 +670,7 @@ class RimeEngine {
     fun setInput(input: String): Boolean {
         if (!isInitialized) return false
         return tryMutating(false) {
-            if (!nativeHasSession() && !nativeCreateSession()) return@tryMutating false
+            if (!nativeHasSession() && !createSession()) return@tryMutating false
             val japanese = !nativeIsAsciiMode() && com.kingzcheung.xime.settings.InputProfiles
                 .describe(nativeGetCurrentSchema().orEmpty()).capabilities.japaneseConversion
             nativeSetInput(if (japanese) canonicalJapaneseRomaji(input) else input)
@@ -874,14 +892,14 @@ class RimeEngine {
         // 用户显式切换操作：阻塞等待锁（部署/维护持锁时排队，完成后自动切换），
         // 不静默失败；调用方保证不在主线程执行（ImeKeyRouter 的 key-process 线程）。
         return mutateLocked {
-            if (!nativeHasSession() && !nativeCreateSession()) return@mutateLocked false
+            if (!nativeHasSession() && !createSession()) return@mutateLocked false
             nativeToggleAsciiMode().also { enforceAsciiWidth() }
         }
     }
 
     fun isAsciiMode(): Boolean {
         return tryLocked(false) {
-            if (!nativeHasSession() && !nativeCreateSession()) return@tryLocked false
+            if (!nativeHasSession() && !createSession()) return@tryLocked false
             nativeIsAsciiMode()
         }
     }
@@ -943,6 +961,7 @@ class RimeEngine {
             mergedEditReading = null
             val switched = nativeSwitchSchema(schemaId)
             mergedAlphabet = null
+            if (switched) schemaAppliedGeneration = sessionGeneration.get()
             if (switched) mergedSpellerAlphabet()
             if (!switched) {
                 // 常见于方案未部署（不在 schema_list，如老版本升级残留）：
@@ -964,12 +983,15 @@ class RimeEngine {
         mergedAlphabet = null
         phraseReadings = null
         mergedEditReading = null
-        current.isNotEmpty() && nativeSwitchSchema(current)
+        (current.isNotEmpty() && nativeSwitchSchema(current)).also {
+            if (it) schemaAppliedGeneration = sessionGeneration.get()
+        }
     }
 
     fun startMaintenance(full: Boolean): Boolean {
         if (!isInitialized) return false
         mutateLocked {
+            sessionReplaced()
             return nativeStartMaintenance(full)
         }
     }
@@ -981,7 +1003,7 @@ class RimeEngine {
             // 部署时 librime 才会编译对应的 user_<schemaId>.table.bin。
             // 幂等：补丁已就位时 native 侧直接 skip，开销极小。
             ensureT9SchemaPatchesForDeployedSchemas(userDataDir)
-            return nativeDeploy()
+            try { return nativeDeploy() } finally { sessionReplaced() }
         }
     }
 
@@ -1005,7 +1027,7 @@ class RimeEngine {
             nativeUpdateLastBuildTime()
             // Existing sessions retain compiled ConfigData through strong references.
             // New files alone do not refresh their translators or candidate caches.
-            return nativeReloadSessionAfterMaintenance()
+            try { return nativeReloadSessionAfterMaintenance() } finally { sessionReplaced() }
         }
     }
 
@@ -1142,6 +1164,7 @@ class RimeEngine {
         if (isInitialized) {
             mutateLocked {
                 nativeDestroy()
+                sessionReplaced()
                 isInitialized = false
             }
         }
@@ -1156,6 +1179,7 @@ class RimeEngine {
         if (restart) {
             notifyDeploymentStatus(true, "正在恢复备份…")
             nativeDestroy()
+            sessionReplaced()
             isInitialized = false
             candidateRevision.incrementAndGet()
         }
@@ -1181,7 +1205,7 @@ class RimeEngine {
     fun t9SelectCandidate(pinyin: String, text: String?, textLength: Int): Boolean {
         if (!isInitialized) return false
         return tryMutating(false) {
-            if (!nativeHasSession() && !nativeCreateSession()) return@tryMutating false
+            if (!nativeHasSession() && !createSession()) return@tryMutating false
             nativeT9SelectCandidate(pinyin, text, textLength)
         }
     }
@@ -1190,7 +1214,7 @@ class RimeEngine {
     private fun t9DictOp(text: String, pinyin: String, memorize: Boolean): Boolean {
         if (!isInitialized || text.isEmpty() || pinyin.isEmpty()) return false
         return tryMutating(false) {
-            if (!nativeHasSession() && !nativeCreateSession()) return@tryMutating false
+            if (!nativeHasSession() && !createSession()) return@tryMutating false
             if (memorize) nativeT9Memorize(text, pinyin) else nativeT9Forget(text, pinyin)
         }
     }
@@ -1318,7 +1342,7 @@ class RimeEngine {
     fun t9SelectPinyinDirect(pinyin: String, digitLength: Int): Boolean {
         if (!isInitialized) return false
         return tryMutating(false) {
-            if (!nativeHasSession() && !nativeCreateSession()) return@tryMutating false
+            if (!nativeHasSession() && !createSession()) return@tryMutating false
             nativeT9SelectPinyinDirect(pinyin, digitLength)
         }
     }
@@ -1647,7 +1671,7 @@ class RimeEngine {
 
     fun deploySchema(schemaId: String): Boolean {
         if (!isInitialized) return false
-        return nativeDeploySchema(schemaId)
+        try { return nativeDeploySchema(schemaId) } finally { sessionReplaced() }
     }
 
     fun updateLastBuildTime() {
