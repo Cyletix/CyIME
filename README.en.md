@@ -92,9 +92,14 @@ git submodule update --init --recursive
 # Debug / release
 ./gradlew assembleDebug
 ./gradlew assembleRelease
+
+# Offline build (high-sensitivity environments): same as release, but without the INTERNET permission
+./gradlew assembleOffline
 ```
 
 Needs JDK 17 and NDK `29.0.14206865`. The build downloads rime-ice, the Japanese dictionaries, the stroke and Cangjie tables and the sherpa-onnx runtime, checks them against recorded SHA-256 digests and packs them into the APK. Day-to-day packages are built with `packager.cmd` in the repo root (double-click for the GUI, or pass arguments); presets are in `scripts/packager/config.json`, version rules in [docs/packaging.md](docs/packaging.md) (Chinese).
+
+The offline build `assembleOffline` adds `app/src/offline/AndroidManifest.xml` on top of release to remove the `INTERNET` permission, so the OS forbids all network access: model/dictionary downloads, the extension store, update checks, online speech, sample contribution and clipboard sync are unavailable. Pair it with the full offline-model package; suited to high-sensitivity environments.
 
 Tech stack: Kotlin · Jetpack Compose · Material 3 · librime (JNI / C++) · ONNX Runtime · sherpa-onnx · OpenCV
 
