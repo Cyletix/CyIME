@@ -308,6 +308,7 @@ fun SwipeableKeyButton(
     swipeUpKeyLabel: String? = null,
     /** All corner-symbol keys use the same preference; dedicated icon actions are separate. */
     followSymbolSwipeDirection: Boolean = true,
+    /** 角标固定上滑且长按也输入（「底排标点固定上滑」）；不跟全局「长按输入/滑动输入」走。 */
     keepSymbolSwipeOnLongPress: Boolean = false,
     /** Literal upper-hint input, independent of whether its visual hint is enabled. */
     symbolInputText: String? = null,
@@ -476,7 +477,8 @@ fun SwipeableKeyButton(
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
     ).withSymbolInput(
         // 26 键滑行开着时字母键的滑动给了滑行，角标改由长按输入（设置页同样锁在「长按输入」）。
-        if (letterGlideOwnsDrag) SymbolInputMode.LONG_PRESS else symbolInputMode,
+        // 底排标点固定上滑（空格两侧标点、数字键盘点键）：上滑和长按都输入角标（用户 11-09：键在底边，长按更顺手）。
+        if (letterGlideOwnsDrag || keepSymbolSwipeOnLongPress) SymbolInputMode.LONG_PRESS else symbolInputMode,
         symbolInputText, keepSymbolSwipeOnLongPress, inputPreferences.symbolLongPressMs).let {
         if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
     }

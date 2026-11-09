@@ -259,9 +259,15 @@ private fun NumberRows(
                 modifier = Modifier.weight(3.4f - 2 * modeWeight).testTag("number-zero"), onPress = { onKeyPressDown?.invoke("0") },
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
-            KeyButton(text = ".", onClick = { onKeyPress(".") },
+            // 点键上角标「:」（用户 11-09：IP 后面接端口 192.168.1.1:8080）。和空格两侧标点键同一个「底排标点固定上滑」：
+            // 开着时上滑或长按输入，不随「反转上下滑方向」变成下滑（键在屏幕底边，往下滑不出去）。
+            val bottomSwipeUp = LocalKeyboardInputPreferences.current.bottomPunctuationSwipeUp
+            SwipeableKeyButton(text = ".", onClick = { onKeyPress(".") },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                modifier = Modifier.weight(0.8f), onPress = { onKeyPressDown?.invoke(".") },
+                modifier = Modifier.weight(0.8f).testTag("number-dot-key"), onPress = { onKeyPressDown?.invoke(".") },
+                swipeText = NUMBER_DOT_ALTERNATE, symbolInputText = NUMBER_DOT_ALTERNATE,
+                onSwipe = { onKeyPress(NUMBER_DOT_ALTERNATE) }, onSwipeStateChange = onSwipeStateChange,
+                followSymbolSwipeDirection = !bottomSwipeUp, keepSymbolSwipeOnLongPress = bottomSwipeUp,
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
             ActionKeyButton(text = enterKeyText, onClick = { onKeyPress("enter") },
@@ -272,6 +278,9 @@ private fun NumberRows(
         }
     }
 }
+
+/** 数字键盘点键的上角标：IP 地址后接端口用。 */
+internal const val NUMBER_DOT_ALTERNATE = ":"
 
 /**
  * 数字键盘左栏：整列一个键帽（圆角、阴影画在外框上，和九键左栏一样），一屏四格，

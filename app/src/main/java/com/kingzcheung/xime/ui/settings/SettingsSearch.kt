@@ -217,7 +217,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),
         SettingsSearchEntry("空格左侧逗号键", qwertyPath, qwerty, "逗号 空格 加宽 标点"),
         SettingsSearchEntry("英文句首自动大写", qwertyPath, qwerty, "英文键盘 首字母大写 首句大写 句首大写 自动大写"),
-        SettingsSearchEntry("底排标点固定上滑", qwertyPath, qwerty, "逗号 句号 半角 点号 向上拖 上拉 符号 屏幕边缘"),
+        SettingsSearchEntry("底排标点固定上滑", qwertyPath, qwerty, "逗号 句号 半角 点号 向上拖 上拉 长按 符号 屏幕边缘 数字键盘 点键 冒号 端口 IP"),
         SettingsSearchEntry("空格右侧句号键", qwertyPath, qwerty, "句号 空格 标点"),
         SettingsSearchEntry("逗号键分词", qwertyPath, qwerty, "分词 分词键 隔音符 分隔符 单引号 撇号 音节 西安 xian 逗号"),
         SettingsSearchEntry("Shift 键分词", qwertyPath, qwerty, "分词 分词键 隔音符 分隔符 Shift 大小写 大写键 音节 西安 xian"),

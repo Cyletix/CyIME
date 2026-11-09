@@ -107,7 +107,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         })
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.Gesture, "底排标点固定上滑",
-                        "在空格两侧的逗号或句号键上滑，输入右上角的符号。关闭后跟随全局角标设置。",
+                        "空格两侧的逗号、句号键和数字键盘的点键：上滑或长按输入右上角的符号。关闭后跟随全局角标设置。",
                         checked = settings.bottomPunctuationSwipeUp, onCheckedChange = {
                             settings = settings.copy(bottomPunctuationSwipeUp = it); settings.save(context)
                         })
