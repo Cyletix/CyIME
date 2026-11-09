@@ -353,6 +353,9 @@ fun KeyboardView(
             imageSlot = backgroundImageSlot)
         .splitGapCutout(splitKeyboardGap)
     val panelMaterial = Modifier.inheritKeyboardBackground(!state.handwritingExpanded)
+    // 面板透出键盘本身的背景时（玻璃，或图片、渐变主题），面板下面的按键要挖掉；见 panelSeesKeyboardBackground。
+    val panelsSeeKeyboardBackground = panelSeesKeyboardBackground(inputPreferences.frostedGlass.enabled,
+        themeScheme.keyboardBackground)
     // 全屏手写时表情、编辑(方向)等面板回到平时键盘的大小（11-05），不再铺满整个屏幕。
     val handwritingOverlaySlot = handwritingPanelSlot(state.handwritingExpanded, state.handwritingNormalHeightDp,
         state.handwritingControlsWidthDp, state.handwritingControlsOffsetX, state.keyboardWidthDp, state.keyboardHeightDp)
@@ -1528,7 +1531,7 @@ fun KeyboardView(
             }
             Column(Modifier.clipboardUnderlaySize(clipboardPanel, state.keyboardHeightDp).fillMaxSize()
                 .cySwapFadeIn(underlaySwapKey, instantKey = listOf(state.isAsciiMode, state.inputProfile.language))
-                .excludeRevealedKeyboardPanels(inputPreferences.frostedGlass.enabled, candidateReveal, overlayReveal).then(
+                .excludeRevealedKeyboardPanels(panelsSeeKeyboardBackground, candidateReveal, overlayReveal).then(
                 if (candidatePageExpanded || overlayVisible) Modifier.clearAndSetSemantics {} else Modifier
             // 全屏手写开着工具面板时书写区仍露在面板上方，照旧不动它。
             ).blockCoveredKeyboardTouches((candidatePageExpanded || overlayVisible) && !state.handwritingExpanded)) {
@@ -1848,7 +1851,7 @@ fun KeyboardView(
             KeyboardPanelReveal(
                 candidatePageExpanded,
                 Modifier.matchParentSize()
-                    .excludeRevealedKeyboardPanels(inputPreferences.frostedGlass.enabled, overlayReveal)
+                    .excludeRevealedKeyboardPanels(panelsSeeKeyboardBackground, overlayReveal)
                     .then(if (overlayVisible) Modifier.clearAndSetSemantics {} else Modifier),
                 revealState = candidateReveal,
             ) {
