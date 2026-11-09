@@ -20,12 +20,14 @@ import java.io.IOException
 
 class InputProfileTest {
     @Test fun `builtin alphabetic layout identifiers never leak into display names`() {
-        for (section in listOf("qwerty", "qwerty_en", "qwerty_japanese")) {
+        for (section in listOf("qwerty", "qwerty_japanese")) {
             val layout = InputProfiles.resolveLayout(section)
             assertEquals(section, layout.id)
             assertEquals("26键", layout.displayName)
             assertEquals(LayoutKind.ALPHABETIC, layout.kind)
         }
+        // 英文单词方案绑在英文键盘上，和英文直接输入是同一个 26 键（布局栏不出两个「26键」）。
+        assertEquals(InputLayout.QWERTY, InputProfiles.resolveLayout("qwerty_en"))
     }
     @get:Rule val temporary = TemporaryFolder()
     @Before fun initialBindings() { resetBindings() }

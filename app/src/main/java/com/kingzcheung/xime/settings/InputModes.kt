@@ -5,10 +5,15 @@ import android.content.Context
 /** Legacy backend-entry ordering/storage. Product semantics live in [InputProfile]. */
 object InputModes {
     const val ENGLISH = "__xime_english"
+    /**
+     * 英文单词方案（Rime 方案 cyime_english，默认不启用）：字母先进组字区，从候选里选词上屏，
+     * 编码编辑、候选、编码位置都和拼音一样；[ENGLISH] 是逐字直接上屏，两者并存，在「语言与方案」的英文里选。
+     */
+    const val ENGLISH_WORDS = "cyime_english"
     const val ORDER_KEY = "input_mode_order"
     private const val LANGUAGE_ORDER_KEY = "input_language_order"
     /** 字母排列（QWJRTK、Cyletix10、Colemak、Typewise、自定义布局）不在这里：没排过序时它们排在各语言最后。 */
-    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH) + LetterLanguage.schemaIds
+    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, ENGLISH_WORDS) + LetterLanguage.schemaIds
 
     /** Languages without a saved position: Chinese, then English, then the rest (Japanese never jumps ahead of English). */
     private val defaultLanguageOrder: List<InputLanguage>

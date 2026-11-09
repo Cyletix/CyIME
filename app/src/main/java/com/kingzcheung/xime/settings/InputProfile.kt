@@ -26,7 +26,9 @@ enum class InputScheme(val id: String, val displayName: String) {
     PINYIN("pinyin", "拼音"), DOUBLE_PINYIN("double_pinyin", "双拼"),
     WUBI("wubi", "五笔"), WUBI_PINYIN("wubi_pinyin", "五笔拼音混输"), STROKE("stroke", "笔画"),
     ROMAJI("romaji", "罗马字"), KANA("kana", "假名"), DIRECT("direct", "直接输入"),
-    EXTERNAL("external", "自定义编码"), ZHUYIN("zhuyin", "注音"), CANGJIE("cangjie", "仓颉");
+    EXTERNAL("external", "自定义编码"), ZHUYIN("zhuyin", "注音"), CANGJIE("cangjie", "仓颉"),
+    /** 英文整词：字母先进组字区，从候选里选词上屏（[InputModes.ENGLISH_WORDS]）；[DIRECT] 是逐字直接上屏。 */
+    WORDS("words", "单词");
 
     companion object { fun fromId(id: String): InputScheme? = entries.firstOrNull { it.id == id } }
 }
@@ -56,7 +58,10 @@ sealed interface EngineProfile {
 
 /** Capabilities describe backend semantics, not guessed substrings in a schema ID. */
 data class InputCapabilities(
+    /** 组字区里的编码可以挪光标改（拼音、双拼，以及英文单词方案的字母）。 */
     val editablePinyin: Boolean = false,
+    /** 编码分大小写（英文单词方案打 Hello 出 Hello）：改编码时不能把字母转成小写。 */
+    val caseSensitiveCode: Boolean = false,
     val kanaCase: Boolean = false,
     val japaneseConversion: Boolean = false,
 )
@@ -71,6 +76,9 @@ data class InputProfile(
 ) {
     val summary: String get() = if (mode == InputMode.HANDWRITING) "手写" else
         "${scheme.displayName} · ${layout.displayName}"
+
+    /** 字母逐字直接上屏、补全另给（英文直接输入、西班牙语等）；英文单词方案走 Rime 组字，不算。 */
+    val typesLettersDirectly: Boolean get() = language.typesLettersDirectly && scheme == InputScheme.DIRECT
 
     /** Entering handwriting retains language and the keyboard scheme to return to. */
     fun handwriting(): InputProfile = copy(layout = InputLayout.HANDWRITING,
@@ -91,6 +99,7 @@ object InputProfiles {
         InputScheme.ROMAJI -> "romaji"
         InputScheme.KANA -> "かな"
         InputScheme.DIRECT -> "abc"
+        InputScheme.WORDS -> "word"
         InputScheme.STROKE -> "一丨丿丶乛"
         InputScheme.WUBI, InputScheme.WUBI_PINYIN -> "字根编码"
         InputScheme.EXTERNAL -> "自定义编码"
@@ -130,7 +139,8 @@ object InputProfiles {
     }
 
     private fun capabilities(scheme: InputScheme) = InputCapabilities(
-        editablePinyin = scheme == InputScheme.PINYIN || scheme == InputScheme.DOUBLE_PINYIN,
+        editablePinyin = scheme == InputScheme.PINYIN || scheme == InputScheme.DOUBLE_PINYIN || scheme == InputScheme.WORDS,
+        caseSensitiveCode = scheme == InputScheme.WORDS,
         kanaCase = scheme == InputScheme.ROMAJI,
         japaneseConversion = scheme == InputScheme.ROMAJI || scheme == InputScheme.KANA,
     )
@@ -138,6 +148,7 @@ object InputProfiles {
     private fun describeBackend(id: String): InputProfile {
         val inputScheme = when {
             id == InputModes.ENGLISH || LetterLanguage.ofSchema(id) != null -> InputScheme.DIRECT
+            id == InputModes.ENGLISH_WORDS -> InputScheme.WORDS
             id in pinyinIds || CustomKeyboardLayouts.isCustom(id) -> InputScheme.PINYIN
             id in doublePinyinIds || DoublePinyinSchemes.isGenerated(id) -> InputScheme.DOUBLE_PINYIN
             id in wubiIds -> InputScheme.WUBI
@@ -150,7 +161,7 @@ object InputProfiles {
             else -> InputScheme.EXTERNAL
         }
         val inputLanguage = when {
-            id == InputModes.ENGLISH -> InputLanguage.ENGLISH
+            id == InputModes.ENGLISH || id == InputModes.ENGLISH_WORDS -> InputLanguage.ENGLISH
             LetterLanguage.ofSchema(id) != null -> LetterLanguage.ofSchema(id)!!.language
             inputScheme in setOf(InputScheme.ROMAJI, InputScheme.KANA) -> InputLanguage.JAPANESE
             inputScheme in setOf(InputScheme.PINYIN, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI,
@@ -177,7 +188,7 @@ object InputProfiles {
     internal fun customLayout(layout: CustomKeyboardLayout) = InputLayout(layout.id, layout.name,
         if (layout.mergedGroups.isEmpty()) LayoutKind.ALPHABETIC else LayoutKind.MERGED)
 
-    /** English direct input and Japanese romaji type on the letter arrangement chosen for their language. */
+    /** English (direct and words) and Japanese romaji type on the letter arrangement chosen for their language. */
     fun arranged(profile: InputProfile): InputProfile {
         if (profile.layout.kind != LayoutKind.ALPHABETIC || !LetterLayouts.appliesTo(profile.language, profile.scheme)) return profile
         return LetterLayouts.chosen(profile.language)?.let { profile.copy(layout = customLayout(it)) } ?: profile
@@ -185,9 +196,11 @@ object InputProfiles {
 
     /** Actual layout bindings win over built-in defaults, including an explicitly unbound schema. */
     fun resolveLayout(section: String?, custom: CustomKeyboardLayout? = null): InputLayout = when (section) {
-        "qwerty", "qwerty_en", "qwerty_japanese", "qwerty_spanish", "qwerty_german", "qwerty_french",
+        "qwerty", "qwerty_japanese", "qwerty_spanish", "qwerty_german", "qwerty_french",
         "qwerty_italian" ->
             InputLayout(section, "26键", LayoutKind.ALPHABETIC)
+        // 英文单词方案用英文键盘的键帽和角标，和英文直接输入是同一个 26 键：布局栏里不出两个「26键」。
+        "qwerty_en" -> InputLayout.QWERTY
         "jcuken_russian" -> InputLayout(section, "ЙЦУКЕН", LayoutKind.ALPHABETIC)
         "dubeolsik_korean" -> InputLayout(section, "두벌식", LayoutKind.ALPHABETIC)
         // 仓颉只是键帽换成字根，仍是中文的 26 键：同一个布局，方案行里与拼音、双拼、五笔并列。

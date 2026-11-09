@@ -70,6 +70,13 @@ internal object PinyinEditBuffer {
     fun normalized(text: String): String = text.lowercase().replace('ü', 'v')
         .replace(' ', '\'').filter { it in 'a'..'z' || it == '\'' }
 
+    /** 编码分大小写的方案（英文单词，打 Hello 出 Hello）留着大写字母，别的同 [normalized]。 */
+    fun normalized(text: String, keepCase: Boolean): String = if (!keepCase) normalized(text)
+        else text.replace(' ', '\'').filter { it in 'a'..'z' || it in 'A'..'Z' || it == '\'' }
+
+    fun keepsCase(schema: String): Boolean =
+        com.kingzcheung.xime.settings.InputProfiles.describe(schema).capabilities.caseSensitiveCode
+
     fun mergeSeparators(text: String, caret: Int): Pair<String, Int> {
         val result = StringBuilder()
         var newCaret = 0

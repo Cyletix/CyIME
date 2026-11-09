@@ -18,6 +18,67 @@ fun chineseSha(file: File): String {
     }
     return md.digest().joinToString("") { "%02x".format(it) }
 }
+/** cyime_english.dict.yaml: english.txt frequency order, rime-ice spellings for the rest (see the call site). */
+fun cyimeEnglishWords(englishTxt: List<String>, rimeIceLines: List<String>, contractionLines: List<String>): String {
+    val wordPattern = Regex("[A-Za-z][A-Za-z']*")
+    val literal = mutableListOf<String>()
+    var body = false
+    for (line in rimeIceLines) {
+        if (line.startsWith("---")) body = false
+        if (line.trim() == "...") { body = true; continue }
+        if (!body || line.startsWith("#")) continue
+        val fields = line.split('\t')
+        if (fields.size < 2) continue
+        val text = fields[0]
+        // Only literal spellings: Jan -> January and similar aliases are for Chinese mixed input.
+        if (text.length in 1..40 && wordPattern.matches(text) &&
+            fields[1].lowercase(java.util.Locale.ROOT).filter { it in 'a'..'z' } ==
+            text.lowercase(java.util.Locale.ROOT).filter { it in 'a'..'z' }) literal += text
+    }
+    val spelled = literal.toSet()
+    val rows = linkedMapOf<String, Int>()
+    fun add(text: String, weight: Int) {
+        val code = text.lowercase(java.util.Locale.ROOT)
+        for (c in listOf(code, code.replace("'", "")).distinct()) {
+            if (c.isEmpty() || c.first() !in 'a'..'z') continue
+            rows.merge(text + "\t" + c, weight, ::maxOf)
+        }
+    }
+    // english.txt spells contractions without the apostrophe (dont, im). As in the direct-input completions
+    // (EnglishContractionCompletion.kt) the contraction takes that rank; spellings that are words themselves
+    // (its, well, cant) keep it and the contraction follows right after.
+    val plainWords = setOf("its", "were", "well", "ill", "hell", "shell", "id", "wed", "shed", "lets", "cant", "wont")
+    val contractions = contractionLines.filter { it.isNotBlank() && !it.startsWith("#") }.map { it.trim().split(Regex("\\s+")) }
+        .filter { it.size >= 2 }.associate { it[0] to (it[1] to it.getOrNull(2)?.toIntOrNull()) }
+    fun contraction(form: String) = if (form.startsWith("i'")) "I" + form.drop(1) else form
+    val words = englishTxt.map { it.trim() }.filter { wordPattern.matches(it) }
+    val ranked = words.mapTo(mutableSetOf()) { it.lowercase(java.util.Locale.ROOT) }
+    for ((plain, entry) in contractions) {
+        val rank = entry.second
+        if (plain !in ranked && rank != null) add(contraction(entry.first), maxOf(1, 10000 - rank))
+    }
+    words.withIndex().forEach { (index, word) ->
+        val lower = word.lowercase(java.util.Locale.ROOT)
+        val weight = maxOf(1, 10000 - index)
+        contractions[lower]?.let { (form, _) ->
+            if (lower in plainWords) { add(lower, weight); add(contraction(form), maxOf(1, weight - 1)) }
+            else add(contraction(form), weight)
+            return@forEach
+        }
+        val text = when {
+            lower == "i" -> "I"
+            lower in spelled -> lower
+            else -> listOf(lower.replaceFirstChar { it.uppercaseChar() }, lower.uppercase(java.util.Locale.ROOT))
+                .firstOrNull { it in spelled } ?: lower
+        }
+        add(text, weight)
+    }
+    literal.forEach { add(it, 1) }
+    return "# Generated from bundled english.txt (order) and rime-ice en_dicts (spellings); licenses retained alongside sources.\n" +
+        "---\nname: cyime_english\nversion: \"1\"\nsort: by_weight\n...\n" +
+        rows.entries.joinToString("\n", postfix = "\n") { (key, weight) -> key + "\t" + weight }
+}
+
 val prepareChineseDictionaries by tasks.registering {
     group = "build setup"
     inputs.property("revision", chineseRevision)
@@ -46,6 +107,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("unicodeCodes", 2)
     inputs.property("doublePinyinSentences", 1)
     inputs.property("shortcutOrder", 1)
+    inputs.property("englishWordsDictionary", 1)
+    inputs.file(file("src/main/assets/english_contractions.txt"))
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -321,6 +384,16 @@ val prepareChineseDictionaries by tasks.registering {
             "# Generated from bundled rime-ice en_dicts; licenses retained alongside sources.\n" +
             "---\nname: cyime_k14_english\nversion: \"1\"\nsort: by_weight\n...\n" +
             english14.values.joinToString("\n", postfix = "\n"))
+        // English words scheme (assets/rime_chinese/cyime_english.schema.yaml): letters compose first and the
+        // word is chosen from candidates, like pinyin. The bundled frequency-ordered english.txt gives the common
+        // words their order (rank 1 weighs 10000), spelled the way rime-ice spells them where it only has a
+        // capitalised form (i -> I, january -> January); every other literal rime-ice word (letters and
+        // apostrophes only, no abbreviation aliases) follows at weight 1. Codes are lowercase; contractions
+        // also get their code without the apostrophe (dont -> don't). Capitals are derived in the schema.
+        File(root, "cyime_english.dict.yaml").writeText(cyimeEnglishWords(
+            file("src/main/assets/english.txt").readLines(),
+            listOf("en_ext", "en").flatMap { File(root, "en_dicts/$it.dict.yaml").readLines() },
+            file("src/main/assets/english_contractions.txt").readLines()))
 
         // Same engine, dictionary and options as Chinese26; only the keyboard arrangement differs.
         // A sentence-final particle (吧, 呗, 呢…, app/data/sentence_final_particles.txt) is penalised as the first

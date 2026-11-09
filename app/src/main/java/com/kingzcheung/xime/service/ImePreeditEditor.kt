@@ -33,7 +33,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
             val t9 = isT9Schema(state.currentSchemaId)
             val rawText = if (t9) snapshot.getOrNull(4).orEmpty() else input.drop(confirmed)
-            val normalized = PinyinEditBuffer.normalized(rawText)
+            val normalized = PinyinEditBuffer.normalized(rawText, PinyinEditBuffer.keepsCase(state.currentSchemaId))
             val unsupportedCode = rawText.any { it !in 'a'..'z' && it !in 'A'..'Z' && it != '\'' && !it.isWhitespace() && it != 'ü' }
             val prefix = if (t9) service.t9PartialSegments.joinToString("") { it.text }
                 else snapshot.getOrNull(3).orEmpty()
@@ -93,7 +93,8 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 val edited = multiTap.press(text, caret, letters, eventTime)
                 text = edited.first; caret = edited.second
             } else if (replacement != null) {
-                text = if (session.isT9) PinyinEditBuffer.normalizedT9(replacement) else PinyinEditBuffer.normalized(replacement)
+                text = if (session.isT9) PinyinEditBuffer.normalizedT9(replacement)
+                    else PinyinEditBuffer.normalized(replacement, PinyinEditBuffer.keepsCase(session.schemaId))
                 caret = text.length
             } else if (key?.startsWith("preedit_cursor:") == true) {
                 val movement = key.substringAfter(":")
@@ -109,7 +110,9 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             } else if (key == "delete") {
                 if (caret > 0) { text = text.removeRange(caret - 1, caret); caret-- }
             } else if (key != null) {
-                val insertion = if (session.isT9 && key == "1") "'" else key.lowercase()
+                // 英文单词方案的编码分大小写：Shift 打的大写字母原样插进去。
+                val insertion = if (session.isT9 && key == "1") "'"
+                    else if (PinyinEditBuffer.keepsCase(session.schemaId)) key else key.lowercase()
                 text = text.take(caret) + insertion + text.drop(caret)
                 caret += insertion.length
             }

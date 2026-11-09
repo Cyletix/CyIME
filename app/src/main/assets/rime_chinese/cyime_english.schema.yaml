@@ -1,0 +1,145 @@
+# CyIME 英文单词：字母先进组字区，从候选里选词上屏，和拼音一样（挪光标改编码、编码显示位置、候选栏都照中文）。
+# 与「英文 · 直接输入」（母语方案的 ascii 模式，逐字上屏）并存，默认不启用，在「语言与方案」的英文里选。
+# 词典 cyime_english 由构建生成（app/build-logic/tasks-chinese.gradle.kts）：随包 english.txt 的常用词按词频排，
+# 其余拼写来自雾凇 en_dicts（Aaron、iPhone 等大小写照原样）。
+schema:
+  schema_id: cyime_english
+  name: 英文单词
+  version: "1"
+  author:
+    - Cyletix
+  description: |
+    英文 26 键：字母先进组字区，候选给出整词和补全；空格上屏首选，回车上屏所打字母。
+  language: en
+  input_scheme: words
+
+switches:
+  - name: ascii_mode
+    states: [ 词, ABC ]
+    reset: 0
+
+engine:
+  processors:
+    - ascii_composer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  # 不用 recognizer：默认的 uppercase 规则会把大写开头的输入当原文，Hello 就出不了候选。
+  segmentors:
+    - ascii_segmentor
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  # 整词在前（translator，品质高），补全在后（completion）；两个翻译器共用一个用户词典，选过的词往前排。
+  translators:
+    - punct_translator
+    - table_translator
+    - table_translator@completion
+  filters:
+    - lua_filter@*cyime_en_memory
+    - lua_filter@*cyime_english_words
+    - uniquifier
+
+speller:
+  # 撇号算字母（don't、I'm 是一个词），但不能起头：单打的 ' 是标点。
+  alphabet: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'"
+  initials: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  # 没有音节分隔：空格是选首选（speller 本来不收空格）。
+  delimiter: " "
+  algebra:
+    # 词典编码都是小写；打首字母大写（Hello）和全大写（HELLO）也查得到，候选的大小写由 cyime_english_words.lua 跟着改。
+    - derive/^(.)/\U$1/
+    - derive/^.+$/\U$0/
+
+translator:
+  dictionary: cyime_english
+  enable_completion: false
+  enable_sentence: false
+  enable_user_dict: true
+  enable_encoder: false
+  encode_commit_history: false
+  initial_quality: 2
+
+completion:
+  dictionary: cyime_english
+  enable_completion: true
+  enable_sentence: false
+  enable_user_dict: true
+  enable_encoder: false
+  encode_commit_history: false
+  initial_quality: 0
+
+key_binder:
+  import_preset: default
+
+# 英文标点一律半角：组字中打标点先上屏首选再出标点，和中文一样。
+punctuator:
+  full_shape:
+    ",": ","
+    ".": "."
+    "?": "?"
+    "!": "!"
+    ":": ":"
+    ";": ";"
+    "'": "'"
+    "\"": "\""
+    "(": "("
+    ")": ")"
+    "[": "["
+    "]": "]"
+    "{": "{"
+    "}": "}"
+    "<": "<"
+    ">": ">"
+    "-": "-"
+    "_": "_"
+    "+": "+"
+    "=": "="
+    "*": "*"
+    "/": "/"
+    "\\": "\\"
+    "|": "|"
+    "@": "@"
+    "#": "#"
+    "$": "$"
+    "%": "%"
+    "^": "^"
+    "&": "&"
+    "~": "~"
+    "`": "`"
+  half_shape:
+    ",": ","
+    ".": "."
+    "?": "?"
+    "!": "!"
+    ":": ":"
+    ";": ";"
+    "'": "'"
+    "\"": "\""
+    "(": "("
+    ")": ")"
+    "[": "["
+    "]": "]"
+    "{": "{"
+    "}": "}"
+    "<": "<"
+    ">": ">"
+    "-": "-"
+    "_": "_"
+    "+": "+"
+    "=": "="
+    "*": "*"
+    "/": "/"
+    "\\": "\\"
+    "|": "|"
+    "@": "@"
+    "#": "#"
+    "$": "$"
+    "%": "%"
+    "^": "^"
+    "&": "&"
+    "~": "~"
+    "`": "`"

@@ -66,33 +66,50 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             service.keyboardViewModel.enterTemporaryHandwriting()
     }
 
+    /** 进英文之前的语言：在英文单词方案上按语言键回到这里（[com.kingzcheung.xime.settings.EnglishSchemes.nativeLanguage]）。 */
+    private var nativeBeforeEnglish: InputLanguage? = null
+
+    /** [englishProfile]：这一次切到英文用的方案（菜单点了「直接输入」），null 按「语言与方案」里选的。 */
     internal suspend fun switchInputMethod(targetLanguage: InputLanguage? = null,
         useLanguageKeyPreference: Boolean = false,
-        languageSwitchMode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null): Boolean {
+        languageSwitchMode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null,
+        englishProfile: String? = null): Boolean {
         if (service.editorInputPolicy.locksNativeInput) return false
         val fromLanguage = currentLanguage()
         val currentSchema = service.rimeEngine.getCurrentSchema()
-        val nativeLanguage = InputModes.languageOf(currentSchema, service.uiState.value.schemas)
+        val schemaLanguage = InputModes.languageOf(currentSchema, service.uiState.value.schemas)
         val entries = InputModes.available(service.uiState.value.schemas)
         val enabled = LanguagePreferences.enabled(service)
-        val available = (entries.filter { it.profile.mode == InputMode.KEYBOARD }.map { it.profile.language } +
-            listOfNotNull(nativeLanguage.takeIf { currentSchema.isNotBlank() })).filter { it in enabled }.toSet()
+        val keyboardLanguages = entries.filter { it.profile.mode == InputMode.KEYBOARD }.map { it.profile.language }
+            .filter { it in enabled }.toSet()
+        // 英文单词方案本身就是英文：母语取进英文之前的语言，语言键才回得去。
+        val nativeLanguage = com.kingzcheung.xime.settings.EnglishSchemes.nativeLanguage(schemaLanguage,
+            nativeBeforeEnglish, InputModes.languageOrder(service), keyboardLanguages)
+        val available = (keyboardLanguages + listOfNotNull(nativeLanguage.takeIf { currentSchema.isNotBlank() && it in enabled })).toSet()
         // Schema-options retain explicit ASCII behavior. The language key reads its preference;
         // physical shortcuts may override this one request without changing that preference.
         val target = targetLanguage ?: if (useLanguageKeyPreference)
             LanguageSwitchPreferences.target(fromLanguage, nativeLanguage, LanguageSwitchPreferences.forRequest(
                 LanguageSwitchPreferences.read(service), languageSwitchMode),
                 InputModes.languageOrder(service), available)
-        else if (service.rimeEngine.isAsciiMode()) nativeLanguage else InputLanguage.ENGLISH
+        else if (service.rimeEngine.isAsciiMode() || schemaLanguage == InputLanguage.ENGLISH) nativeLanguage else InputLanguage.ENGLISH
         if (target == null || target !in available) return false
-        val targetSchema = if (target == InputLanguage.ENGLISH) currentSchema else {
-            val localChoice = service.editorInputPolicy.schemaOverride?.takeIf { id ->
-                entries.any { it.schemaId == id && it.profile.language == target }
-            }
+        val localChoice = service.editorInputPolicy.schemaOverride?.takeIf { id ->
+            entries.any { it.schemaId == id && it.profile.language == target }
+        }
+        // 英文：选了单词方案就换到它；直接输入在母语方案上开 ascii（在单词方案上先回母语方案）。
+        val englishTarget = if (target != InputLanguage.ENGLISH) null else {
+            val nativeSchema = InputProfileSelection.preferred(entries, nativeLanguage,
+                InputModes.selectedProfiles(service)[nativeLanguage] ?: InputModes.rememberedModes(service, entries)[nativeLanguage])?.schemaId
+            com.kingzcheung.xime.settings.EnglishSchemes.target(entries,
+                englishProfile ?: localChoice ?: InputModes.selectedProfiles(service)[InputLanguage.ENGLISH],
+                currentSchema, nativeSchema) ?: return false
+        }
+        val targetSchema = englishTarget?.schemaId ?: run {
             val selected = localChoice ?: InputModes.selectedProfiles(service)[target]
                 ?: InputModes.rememberedModes(service, entries)[target]
             InputProfileSelection.preferred(entries, target, selected, currentSchema)?.schemaId
-                ?: currentSchema.takeIf { nativeLanguage == target }
+                ?: currentSchema.takeIf { schemaLanguage == target }
                 ?: return false
         }
         val changesSchema = targetSchema != currentSchema
@@ -130,6 +147,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         if (fromLanguage != InputLanguage.ENGLISH && !service.editorInputPolicy.scoped) {
             InputModes.rememberMode(service, currentSchema, nativeLanguage)
         }
+        if (fromLanguage != InputLanguage.ENGLISH && target == InputLanguage.ENGLISH) nativeBeforeEnglish = fromLanguage
         if (changesSchema) {
             applyPageSizeSetting(targetSchema)
             if (!service.rimeEngine.switchSchema(targetSchema)) {
@@ -139,7 +157,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 return false
             }
         }
-        val targetAscii = target == InputLanguage.ENGLISH
+        val targetAscii = englishTarget?.asciiMode == true
         if (service.rimeEngine.isAsciiMode() != targetAscii && !service.rimeEngine.toggleAsciiMode()) {
             FileLogger.e(XimeInputMethodService.TAG, "switchInputMethod: engine unavailable")
             withContext(Dispatchers.Main) { Toast.makeText(service, "输入法引擎不可用，请稍后再试", Toast.LENGTH_SHORT).show() }
@@ -638,7 +656,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         if (service.editorInputPolicy.locksNativeInput) return
         if (schemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH) {
             service.keyRouter.postRimeJob {
-                if (!service.rimeEngine.isAsciiMode() && !switchInputMethod(targetLanguage = InputLanguage.ENGLISH)) return@postRimeJob
+                // 点的是「英文 · 直接输入」：记下这个选择，之后语言键切英文也用直接输入（不是单词方案）。
+                if (!service.editorInputPolicy.scoped) InputModes.selectProfile(service, InputModes.ENGLISH, InputLanguage.ENGLISH)
+                if (!service.rimeEngine.isAsciiMode() && !switchInputMethod(targetLanguage = InputLanguage.ENGLISH,
+                        englishProfile = InputModes.ENGLISH)) return@postRimeJob
                 val engineSchema = service.rimeEngine.getCurrentSchema()
                 service.editorInputPolicy.choose(true, engineSchema)
                 service.sessionController.persistSchemaOption("ascii_mode", true)

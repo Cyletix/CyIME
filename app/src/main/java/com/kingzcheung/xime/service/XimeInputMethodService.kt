@@ -2322,7 +2322,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 Modifier.keyboardBackground(rootTheme.keyboardBackground, isDark, cardBg,
                                     frostedGlass = glass, translucentSurface = true)
                             }
-                            val hardwareEnglish = !hardwareExample && (state.isAsciiMode || state.inputProfile.language.typesLettersDirectly)
+                            val hardwareEnglish = !hardwareExample && (state.isAsciiMode || state.inputProfile.typesLettersDirectly)
                             val pendingPrediction by predictionManager.pendingRequest.collectAsState()
                             // The toolbar numbers 10 candidates; a longer engine page is shown in windows of 10.
                             // 候选只在实体键盘浮条这里读；放在外层会让每次候选变化都重组整个键盘。
@@ -2816,7 +2816,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onPreviewArrangePositioned = if (!settingsPreviewEditor) null else { r -> settingsArrangeBounds = r },
                                 hardwareKeyboardConnected = hasHardwareKeyboard,
                                 hardwareCandidateHighlight = if (hasHardwareKeyboard) keyRouter.hardwareCandidateSelection(
-                                    candidateState.value, state.isAsciiMode || state.inputProfile.language.typesLettersDirectly,
+                                    candidateState.value, state.isAsciiMode || state.inputProfile.typesLettersDirectly,
                                     predictionManager.hasPendingPrediction) else null,
                                 inputSessionManagedByHost = true,
                                 resizeOverlay = resizeControls,
@@ -4626,7 +4626,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val caret = snapshot[1].toIntOrNull() ?: return
         val confirmed = snapshot[2].toIntOrNull()?.coerceIn(0, input.length) ?: return
         if (caret !in confirmed until input.length) return
-        val raw = com.kingzcheung.xime.rime.PinyinEditBuffer.normalized(input.drop(confirmed))
+        val raw = com.kingzcheung.xime.rime.PinyinEditBuffer.normalized(input.drop(confirmed),
+            com.kingzcheung.xime.rime.PinyinEditBuffer.keepsCase(schema))
         val prefix = snapshot[3]
         val groups = if (uiState.value.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
             com.kingzcheung.xime.rime.merged14Groups else com.kingzcheung.xime.settings.CustomKeyboardLayouts.forSchema(schema)?.mergedGroups.orEmpty()
