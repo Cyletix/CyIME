@@ -1133,7 +1133,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // A large value: only the service was recreated, and the resident engine needs no reload.
         FileLogger.i(TAG, "XimeInputMethodService created processAgeMs=" +
             (android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis()) +
-            " engineResident=${RimeEngine.isInitialized()}")
+            " engineResident=${RimeEngine.isInitialized()}" +
+            // 非 0：手机「应用双开/分身/工作资料」里的输入法，是另一份数据、另一套词库编译。
+            " user=${android.os.Process.myUid() / 100_000}")
         hardwareInputManager.registerInputDeviceListener(hardwareInputListener, mainHandler)
         FileLogger.i(
             TAG,

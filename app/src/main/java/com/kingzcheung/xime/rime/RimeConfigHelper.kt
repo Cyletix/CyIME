@@ -71,9 +71,14 @@ object RimeConfigHelper {
     suspend fun prepareEngine(context: Context): Boolean = preparationMutex.withLock {
         if (readyInProcess(context)) return@withLock true
         preparedInProcess = false
+        // 每步用时进共享日志：用户报「键盘加载半分钟」时一眼看出慢在拷资源、起引擎还是重新编译。
+        val t0 = android.os.SystemClock.elapsedRealtime()
         val (user, shared) = initializeRimeDataAsync(context)
+        val t1 = android.os.SystemClock.elapsedRealtime()
         RimeEngine.getInstance().initialize(user, shared)
+        val t2 = android.os.SystemClock.elapsedRealtime()
         val usable = ensureDeployment(context) || (retryWithoutCellEnglish(context) && ensureDeployment(context))
+        FileLogger.i(TAG, "prepareEngine: data=${t1 - t0}ms init=${t2 - t1}ms deploy=${android.os.SystemClock.elapsedRealtime() - t2}ms usable=$usable")
         preparedInProcess = usable
         usable
     }
@@ -315,19 +320,24 @@ object RimeConfigHelper {
                 SettingsPreferences.setDeploymentHash(context, "")
                 FileLogger.w(TAG, "Rebuilding damaged Rime cache: ${damaged.joinToString()}")
             }
+            val hashStartedAt = android.os.SystemClock.elapsedRealtime()
             val currentHash = computeDeploymentHash(context)
-            if (damaged.isEmpty() && currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && deploymentUsable(context)) {
+            val storedHash = SettingsPreferences.getDeploymentHash(context)
+            val hashMs = android.os.SystemClock.elapsedRealtime() - hashStartedAt
+            if (damaged.isEmpty() && currentHash.isNotEmpty() && currentHash == storedHash && deploymentUsable(context)) {
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
             }
-            Log.i(TAG, "Deployment hash mismatch or missing")
+            // 进共享日志：每次冷启动都走到这里（哈希每次都变）就是「每次开键盘都要等半分钟」。
+            FileLogger.w(TAG, "Deployment hash ${if (storedHash.isEmpty()) "missing" else if (currentHash == storedHash) "same, build unusable" else "changed"}" +
+                " damaged=${damaged.size} hashMs=$hashMs")
             val buildExists = buildDir.exists() && buildDir.listFiles()?.isNotEmpty() == true
             val engine = RimeEngine.getInstance()
             val deployed: Boolean
             if (buildExists && damaged.isEmpty()) {
                 // build 已就位但配置有变化：增量维护，只编译变更的 schema/dict，
                 // 避免 custom.yaml 补丁等小幅改动触发 60MB 词库全量重编译（持锁 30s+）。
-                Log.i(TAG, "Build exists, running incremental maintenance")
+                FileLogger.i(TAG, "Build exists, running incremental maintenance")
                 if (engine.deployIncremental()) {
                     deployed = true
                 } else {
