@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.zIndex
 
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -343,8 +344,9 @@ internal fun FloatingKeyboardContainer(
             val liveRect = liveShiftPx().let { normalRect.translated(it.x, it.y) }
             val shown = ResizeRect(between(liveRect.left, destination.left), between(liveRect.top, destination.top),
                 between(liveRect.right, destination.right), between(liveRect.bottom, destination.bottom))
-            KeyboardModeMorphOutline(Modifier.align(Alignment.TopStart), shown, progress, fixedCardShape, progress >= 1f,
-                "floating-dock-preview")
+            // 画在卡片上面（和调节界面里一样）：压在卡片底下时被不透明的卡片挡住大半，看着像没有动画。
+            KeyboardModeMorphOutline(Modifier.align(Alignment.TopStart).zIndex(1f), shown, progress, fixedCardShape,
+                progress >= 1f, "floating-dock-preview")
         }
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
         val context = LocalContext.current
