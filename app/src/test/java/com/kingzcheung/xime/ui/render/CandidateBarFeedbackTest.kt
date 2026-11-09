@@ -148,17 +148,21 @@ class CandidateBarFeedbackTest {
         val state = androidx.compose.runtime.mutableStateOf<CandidateBarState>(CandidateBarState.Idle)
         val actions = androidx.compose.runtime.mutableIntStateOf(2)
         rule.setContent { Bar(state.value, widthDp = width.intValue, actions = actions.intValue) }
-        for (available in listOf(320, 390, 840)) for (count in listOf(2, 7)) {
+        for (available in listOf(320, 390, 720, 960)) for (count in listOf(2, 7)) {
             rule.runOnIdle { width.intValue = available; actions.intValue = count; state.value = CandidateBarState.Idle }
             val hide = bounds("toolbar-hide")
             val toolbarWidth = hide.right - bounds("toolbar-leading").left
             rule.runOnIdle { state.value = composing }
             val expand = bounds("candidate-expansion")
+            val slot = (toolbarWidth - 8f * rule.density.density) / (count + 2)
             if (available < 600) {
                 assertEquals(hide.center.x, expand.center.x, 1f)
                 assertEquals(hide.center.y, expand.center.y, 1f)
+            } else if (available < 840) {
+                // 过渡段：收起键比展开键宽、比等分格窄，随宽度逐渐拉成胶囊。
+                assertTrue("收起键开始拉长: ${hide.width} > ${expand.width}", hide.width > expand.width + 1f)
+                assertTrue("还没到整格: ${hide.width} < $slot", hide.width < slot - 1f)
             } else {
-                val slot = (toolbarWidth - 8f * rule.density.density) / (count + 2)
                 assertEquals(slot, hide.width, 1f)
                 assertTrue("候选区不为宽工具格留白", expand.width < hide.width)
             }

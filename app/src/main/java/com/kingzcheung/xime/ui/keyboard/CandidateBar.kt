@@ -473,10 +473,14 @@ fun CandidateBar(
         // 同心：胶囊圆角 = 键盘卡片圆角 - 胶囊离栏边的距离（上下各 6dp），和卡片四角同心。
         val edgeCorner = if (edgeStyle == EdgeButtonStyle.CONCENTRIC) FloatingKeyboardCardCorner - 6.dp else null
         // 窄键盘两端锚定在候选箭头的中心，中间工具均分余宽。宽键盘的所有工具仍各占完整一格。
+        // 两者之间不再在 600dp 一步跳变：收起键从展开键的圆按宽度逐渐拉成等分格胶囊（用户 11-09，#263）。
         val toolbarSlot = when {
             state !is CandidateBarState.Idle || idleToolbarCell == null -> null
-            toolbarRowWidth < 600.dp -> edgeSlot ?: 40.dp
-            else -> idleToolbarCell
+            else -> {
+                val blend = ((toolbarRowWidth - TOOLBAR_SLOT_BLEND_START) /
+                    (TOOLBAR_SLOT_BLEND_FULL - TOOLBAR_SLOT_BLEND_START)).coerceIn(0f, 1f)
+                androidx.compose.ui.unit.lerp(edgeSlot ?: 40.dp, idleToolbarCell, blend)
+            }
         }
         Row(
             modifier = Modifier
@@ -1969,6 +1973,10 @@ private fun Modifier.shiftDragOverlay(rootOrigin: () -> androidx.compose.ui.geom
 /** 候选栏两端按钮从圆开始拉长成胶囊的候选栏宽度，和拉到最宽 52dp 的宽度。 */
 private val EDGE_STRETCH_START = 940.dp
 private val EDGE_STRETCH_FULL = 1400.dp
+
+/** 空闲时收起键从「和展开键同形同位」开始过渡的候选栏宽度，和过渡到等分格胶囊的宽度。 */
+private val TOOLBAR_SLOT_BLEND_START = 600.dp
+private val TOOLBAR_SLOT_BLEND_FULL = 840.dp
 
 /**
  * 拼音里的编辑光标“|”用主题强调色加粗画，和拼音字母区分开（用户 10-21）。其余文字照旧。
