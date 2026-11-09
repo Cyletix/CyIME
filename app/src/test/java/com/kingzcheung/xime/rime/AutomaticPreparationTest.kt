@@ -41,6 +41,19 @@ class AutomaticPreparationTest {
         retryPreparation(messages::add, {}, preparing = { "正在准备日语输入，请稍候…" }) { true }
         assertEquals(listOf("正在准备日语输入，请稍候…"), messages)
     }
+    @Test fun unreadablePackageSaysReinstallInsteadOfABlankLine() = runBlocking {
+        // GitHub #283：系统读安装包抛出的 IOException 没有说明，原来提示只剩「3 秒后自动重试，无需操作」。
+        val assetRead = java.io.IOException("").apply {
+            stackTrace = arrayOf(StackTraceElement("android.content.res.AssetManager", "nativeAssetRead", null, -2))
+        }
+        val messages = mutableListOf<String>()
+        var tries = 0
+        retryPreparation(messages::add, {}) { if (++tries == 1) throw assetRead else true }
+        assertTrue(messages.any { it.startsWith(UNREADABLE_PACKAGE) && "无需操作" !in it })
+        // 其它没有说明的异常至少说出是哪一类，不再显示空行。
+        assertEquals("准备失败（IOException）", preparationFailureText(java.io.IOException("")))
+        assertEquals("部署失败", preparationFailureText(IllegalStateException("部署失败")))
+    }
     @Test fun cancellationDoesNotRetryOrPretendReady() = runBlocking {
         var waits = 0
         try {
