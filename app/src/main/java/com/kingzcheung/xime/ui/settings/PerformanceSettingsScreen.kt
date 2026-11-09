@@ -108,7 +108,8 @@ private fun msText(ns: Long) = "%.1f ms".format(ns / 1_000_000.0)
  * 「CPU 实测」那一行的说明：测出来的耗时，分档线定了时前面写算力够哪一档。
  * 没测成写原因；以前测过、这次重测没测成，保留上次的数，后面写这次为什么没测。
  */
-internal fun cpuLine(measurement: CpuMeasurement?, skipped: CpuBenchmarkRunner.Skip?, running: Boolean): String {
+internal fun cpuLine(measurement: CpuMeasurement?, skipped: CpuBenchmarkRunner.Skip?, running: Boolean,
+    retested: Boolean = false): String {
     val why = when (skipped) {
         CpuBenchmarkRunner.Skip.KEYBOARD -> "键盘开着"
         CpuBenchmarkRunner.Skip.POWER_SAVE -> "省电模式开着"
@@ -120,7 +121,7 @@ internal fun cpuLine(measurement: CpuMeasurement?, skipped: CpuBenchmarkRunner.S
         running -> "测试中…"
         measurement != null -> listOfNotNull(PerformanceTiers.cpuTier(measurement)?.let { tierNames.getValue(it) },
             "单线程 ${msText(measurement.singleNs)}", "双线程 ${msText(measurement.dualNs)}",
-            why?.let { "没重测：$it" }).joinToString(" · ")
+            why?.let { "没重测：$it" } ?: "刚重测".takeIf { retested }).joinToString(" · ")
         else -> "未测" + (why?.let { "：$it" } ?: "")
     }
 }
@@ -132,6 +133,8 @@ internal fun cpuSkipToast(skipped: CpuBenchmarkRunner.Skip): String = when (skip
     CpuBenchmarkRunner.Skip.THERMAL -> "设备过热，系统在降频，凉下来再点重测"
     CpuBenchmarkRunner.Skip.UNSUPPORTED -> "本机测不了 CPU"
 }
+
+private const val CPU_RUNNING_MIN_MS = 800L
 
 private val ladder = listOf(PerformanceTier.LOW, PerformanceTier.MEDIUM, PerformanceTier.HIGH)
 
@@ -156,6 +159,8 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
     // CPU 实测：没测过就在打开这页时测一次（后台线程，约 0.3～2 秒；键盘开着、省电、发热时不测）。
     var cpuRunning by remember { mutableStateOf(device.cpu == null) }
     var cpuSkipped by remember { mutableStateOf<CpuBenchmarkRunner.Skip?>(null) }
+    // 点「重测」测完后写「刚重测」：测得快、数又差不多时，看起来像没反应（GitHub #268）。
+    var cpuRetested by remember { mutableStateOf(false) }
     // 语音关着时不开麦，模型不加载：两个语音滑条不显示，常驻的语音模型也不算开销（存的值不变）。
     val speech = remember { SettingsPreferences.isSttEnabled(context) }
     val current = PerformanceProfile.matching(settings)
@@ -166,15 +171,20 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
     fun refresh() { settings = PerformanceProfile.read(context); auto = PerformanceProfile.isAuto(context); version++ }
     fun measureCpu(force: Boolean) {
         cpuRunning = true
+        cpuRetested = false
         scope.launch {
+            val started = android.os.SystemClock.uptimeMillis()
             val outcome = withContext(Dispatchers.Default) {
                 val result = if (force) CpuBenchmarkRunner.run(context, manual = true) else CpuBenchmarkRunner.ensure(context)
                 // 还在「自动」且实测定出了新档就改套那档；手动选的档、自定义不动。
                 if (result is CpuBenchmarkRunner.Outcome.Measured) PerformanceProfile.onCpuMeasured(context)
                 result
             }
+            // 「测试中…」至少停留一下，不然一闪而过看不到。
+            kotlinx.coroutines.delay((CPU_RUNNING_MIN_MS - (android.os.SystemClock.uptimeMillis() - started)).coerceAtLeast(0L))
             cpuSkipped = (outcome as? CpuBenchmarkRunner.Outcome.Skipped)?.reason
             if (force) cpuSkipped?.let { android.widget.Toast.makeText(context, cpuSkipToast(it), android.widget.Toast.LENGTH_SHORT).show() }
+            cpuRetested = force && outcome is CpuBenchmarkRunner.Outcome.Measured
             device = DeviceCapabilityProbe.read(context)
             cpuRunning = false
             refresh()
@@ -269,7 +279,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit, onOpenSetupGuide: (() -> Unit
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     // 「自动」按这个定算力档；主频、核数只在顶上显示，不算分。点一下重测（刚玩完游戏发热时测低了可以再测）。
                     SettingsItem(icon = Icons.TwoTone.Speed, title = "CPU 实测",
-                        subtitle = cpuLine(device.cpu, cpuSkipped, cpuRunning),
+                        subtitle = cpuLine(device.cpu, cpuSkipped, cpuRunning, cpuRetested),
                         status = if (cpuRunning) null else "重测",
                         onClick = { if (!cpuRunning) measureCpu(force = true) })
                 }
