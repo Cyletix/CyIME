@@ -41,9 +41,22 @@ import kotlinx.coroutines.flow.first
 /**
  * 动态背景这一帧的样子：先以背景框中心放大 [scale] 倍（≥ 1），再平移 [shiftX]、[shiftY]（框宽、框高的比例）。
  * |shift| ≤ (scale − 1) / 2 时图片始终盖满原来的框，四边不会露出底色。
+ *
+ * [fadeTo] 不为空时，同一张图再按 [fadeTo] 的样子画一层，不透明度 [fadeAlpha]（0～1）盖在上面：
+ * 放大、缩小走到头后用它渐变回起点，不再倒着放回去（用户 11-08：放大和缩小来回交替，看起来是一样的）。
  */
-internal data class BackgroundMotionTransform(val scale: Float, val shiftX: Float, val shiftY: Float) {
-    val isIdentity: Boolean get() = scale == 1f && shiftX == 0f && shiftY == 0f
+internal data class BackgroundMotionTransform(
+    val scale: Float,
+    val shiftX: Float,
+    val shiftY: Float,
+    val fadeTo: BackgroundMotionTransform? = null,
+    val fadeAlpha: Float = 0f,
+) {
+    val isIdentity: Boolean get() = scale == 1f && shiftX == 0f && shiftY == 0f && (fadeTo == null || fadeAlpha <= 0f)
+
+    /** 画面上占多数的那一层（渐变过半后是 [fadeTo]）：只能画一层的地方（按键边缘折射）用它。 */
+    val dominant: BackgroundMotionTransform
+        get() = if (fadeTo != null && fadeAlpha >= .5f) fadeTo else copy(fadeTo = null, fadeAlpha = 0f)
 
     companion object {
         val Identity = BackgroundMotionTransform(1f, 0f, 0f)
@@ -53,8 +66,8 @@ internal data class BackgroundMotionTransform(val scale: Float, val shiftX: Floa
 /**
  * 动态背景的轨迹，只和走过的时间有关（键盘收起时时间停住，再弹出接着走，不跳）。
  *
- * - 放大：一段 [shotMs] 从原样慢慢放大到 [MAX_SCALE]，再用半段时间缓回原样。
- * - 缩小：反过来，从放大慢慢退回原样，再缓回放大。
+ * - 放大：一段 [shotMs] 从原样慢慢放大到 [MAX_SCALE]，停在那里用 [RETURN_FADE_MS] 渐变回原样（不倒着缩回去）。
+ * - 缩小：从放大慢慢退回原样，再渐变回放大的样子，接着往下缩。
  * - 平移：保持放大，从左慢慢移到右，再从右移回左。
  * - 轮换：放大并移向左边 → 平移到右边 → 缩回原样，三段首尾相接，不回跳。
  * 每段两头都缓入缓出。
@@ -67,11 +80,14 @@ internal object BackgroundMotionPath {
     /** 最多每秒 20 帧：放大 12% 走 18 秒，每帧不到半个像素，再多帧也看不出更顺，只多耗电。 */
     const val FRAME_INTERVAL_MS = 50L
 
+    /** 放大、缩小走到头后渐变回起点的时长，和轮播换图的淡入一样长。 */
+    const val RETURN_FADE_MS = 800L
+
     /** 一圈多长：走完回到开头的样子。轮播在每圈结束时换下一张。 */
     fun cycleMs(effect: BackgroundMotionEffect, shotMs: Long): Long {
         val shot = shotMs.coerceAtLeast(1L)
         return when (effect) {
-            BackgroundMotionEffect.ZOOM_IN, BackgroundMotionEffect.ZOOM_OUT -> shot + (shot / 2).coerceAtLeast(1L)
+            BackgroundMotionEffect.ZOOM_IN, BackgroundMotionEffect.ZOOM_OUT -> shot + RETURN_FADE_MS
             BackgroundMotionEffect.PAN -> 2 * shot
             BackgroundMotionEffect.CYCLE -> 3 * shot
         }
@@ -105,11 +121,11 @@ internal object BackgroundMotionPath {
     }
 
     private fun zoom(elapsed: Long, shot: Long, from: Float, to: Float): BackgroundMotionTransform {
-        // 缓回用半段时间：再快就看得出是在倒回去，每帧也会超过一个像素。
-        val back = (shot / 2).coerceAtLeast(1L)
-        val t = elapsed % (shot + back)
-        val scale = if (t < shot) lerp(from, to, ease(t, shot)) else lerp(to, from, ease(t - shot, back))
-        return BackgroundMotionTransform(scale, 0f, 0f)
+        val t = elapsed % (shot + RETURN_FADE_MS)
+        if (t < shot) return BackgroundMotionTransform(lerp(from, to, ease(t, shot)), 0f, 0f)
+        // 走到头：停在终点，起点的样子在上面淡入；这一圈结束时正好盖满，下一圈从起点接着走，看不出接缝。
+        return BackgroundMotionTransform(to, 0f, 0f, fadeTo = BackgroundMotionTransform(from, 0f, 0f),
+            fadeAlpha = ease(t - shot, RETURN_FADE_MS))
     }
 
     private fun ease(t: Long, duration: Long): Float {
@@ -221,9 +237,21 @@ internal fun BackgroundConfig?.withSlide(slide: String?): BackgroundConfig? =
 /** 按 [transform] 画 [frame] 里的背景图：不在独立图层里的背景（导航条、两侧留空、玻璃共用背景）用这个。 */
 internal inline fun DrawScope.withBackgroundMotion(transform: BackgroundMotionTransform?, frame: Rect, block: DrawScope.() -> Unit) {
     if (transform == null || transform.isIdentity) { block(); return }
+    withMotionPose(transform, frame, block)
+    // 渐变回起点：起点的样子单独一层按 fadeAlpha 盖上去。
+    val fadeTo = transform.fadeTo ?: return
+    if (transform.fadeAlpha <= 0f) return
+    val paint = androidx.compose.ui.graphics.Paint().apply { alpha = transform.fadeAlpha.coerceIn(0f, 1f) }
+    drawContext.canvas.saveLayer(Rect(androidx.compose.ui.geometry.Offset.Zero, size), paint)
+    try { withMotionPose(fadeTo, frame, block) } finally { drawContext.canvas.restore() }
+}
+
+@PublishedApi
+internal inline fun DrawScope.withMotionPose(pose: BackgroundMotionTransform, frame: Rect, block: DrawScope.() -> Unit) {
+    if (pose.scale == 1f && pose.shiftX == 0f && pose.shiftY == 0f) { block(); return }
     withTransform({
-        translate(transform.shiftX * frame.width, transform.shiftY * frame.height)
-        scale(transform.scale, transform.scale, pivot = frame.center)
+        translate(pose.shiftX * frame.width, pose.shiftY * frame.height)
+        scale(pose.scale, pose.scale, pivot = frame.center)
     }, block)
 }
 
