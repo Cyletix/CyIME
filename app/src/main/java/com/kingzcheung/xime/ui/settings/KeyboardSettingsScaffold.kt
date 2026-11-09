@@ -45,6 +45,12 @@ import com.kingzcheung.xime.keyboard.KeyboardPanelLaunch
  */
 internal val LocalKeyboardPreviewInset = compositionLocalOf { 0.dp }
 
+/**
+ * 试打框是否开着。列表页据此在打开时记住滚动位置，关掉后放回去（11-08 反馈：主题与外观页试打后返回，
+ * 位置跳到下面约一屏。关试打框时焦点落到下面的设置项上，列表跟着滚过去了）。
+ */
+internal val LocalTypingTrialOpen = compositionLocalOf { false }
+
 /** 悬浮「显示键盘」按钮离页面底边的距离。 */
 internal val SHOW_KEYBOARD_BUTTON_MARGIN = 12.dp
 
@@ -207,7 +213,7 @@ internal fun KeyboardSettingsScaffold(
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
             .then(if (preview && !visible) Modifier.imePadding() else Modifier)) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
-              CompositionLocalProvider(LocalKeyboardPreviewInset provides listEndInset) {
+              CompositionLocalProvider(LocalKeyboardPreviewInset provides listEndInset, LocalTypingTrialOpen provides typing) {
                 if (editPanel == null) content(Modifier.fillMaxSize())
                 else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = listEndInset)) {
                     content(Modifier.fillMaxWidth())

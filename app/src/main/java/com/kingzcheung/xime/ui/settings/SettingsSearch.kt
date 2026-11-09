@@ -694,6 +694,7 @@ internal fun rememberSettingsSearchListState(): LazyListState = rememberLazyList
 /** 已有自己 [LazyListState] 的页面（如可拖动排序的语言列表）直接调这个。 */
 @Composable
 internal fun SettingsSearchAutoScroll(state: LazyListState) {
+    TypingTrialKeepsPosition(state)
     val request = SettingsSearchFocus.request
     LaunchedEffect(request) {
         val r = request ?: return@LaunchedEffect
@@ -701,6 +702,35 @@ internal fun SettingsSearchAutoScroll(state: LazyListState) {
         while (SettingsSearchFocus.isLive(r) && !SettingsSearchFocus.anyShown(r) && state.canScrollForward) {
             state.scrollBy(state.layoutInfo.viewportSize.height * 0.8f)
             withFrameNanos { }
+        }
+    }
+}
+
+/** 试打框关掉后，列表还要被焦点、键盘收起推着动这么久；这段时间里位置一变就放回去。 */
+internal const val TYPING_TRIAL_RESTORE_MS = 800L
+
+/**
+ * 打开试打框时记住列表位置，关掉后放回去。关试打框那一下焦点会落到下面的设置项上，列表跟着滚过去，
+ * 看起来就是返回后跳到了下面（11-08 反馈，主题与外观页）。只在关掉后的一小段时间里纠正，不影响之后的正常滚动。
+ */
+@Composable
+internal fun TypingTrialKeepsPosition(state: LazyListState) {
+    val open = LocalTypingTrialOpen.current
+    var saved by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(open) {
+        if (open) {
+            saved = state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+            return@LaunchedEffect
+        }
+        val (index, offset) = saved ?: return@LaunchedEffect
+        saved = null
+        val start = withFrameNanos { it }
+        var now = start
+        while (now - start < TYPING_TRIAL_RESTORE_MS * 1_000_000) {
+            if (state.firstVisibleItemIndex != index || state.firstVisibleItemScrollOffset != offset) {
+                state.scrollToItem(index, offset)
+            }
+            now = withFrameNanos { it }
         }
     }
 }
