@@ -192,7 +192,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("数字出短语", layouts, layoutIndex, "数字 短语 我的短语 自定义短语 邮箱 网址 号码 数字串 数字键盘 候选"),
         SettingsSearchEntry("联想常用数字", layouts, layoutIndex, "数字 常用数字 号码 电话 联想 学习 数字键盘 候选"),
         SettingsSearchEntry("数字行", layouts, layoutIndex, "数字行 数字栏 一排数字 顶部数字 第五行 平板 1234567890 数字顺序 数字位置 自定义数字"),
-        page("键盘尺寸与位置", layouts, SettingsRoutes.KeyboardResize, "尺寸 大小 高度 宽度 调整尺寸 键盘调节 悬浮 浮动 分体 透明度 底部留白 单手 位置 旋转"),
+        page("键盘尺寸与位置", layouts, SettingsRoutes.KeyboardResize, "尺寸 大小 高度 宽度 调整尺寸 键盘调节 悬浮 浮动 分体 透明度 底部留白 单手 单手模式 位置 旋转"),
         page("锁定悬浮键盘位置和大小", layouts, SettingsRoutes.KeyboardResize, "固定悬浮键盘 防误拖 锁住 解锁 底部短横条 底部小锁 长按 宽高 四角"),
         SettingsSearchEntry("底部位置", layouts, layoutPage("bottom_gap"), "手势导航时键盘贴底 贴到最底 留出导航按钮 切换输入法按钮 收起键盘按钮 键盘底部留白 下边距 底部空白 贴到底 手势导航栏 忽略窗口边衬区 忽略系统窗口边衬区 边衬区 insets 全面屏手势 底部高度"),
         page("底部留白校准", layouts, layoutPage("bottom_gap"), "底部空白 多一行 全面屏手势 导航栏 挡住 按键重叠 底边拖不动 调低 抬高 恢复系统建议"),
@@ -285,8 +285,9 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 外观 › 候选词
         SettingsSearchEntry("候选字大小", candidates, candidatePage, "候选 字号 字体大小 文字大小"),
         SettingsSearchEntry("候选词间距加宽", candidates, candidatePage, "候选 间距 间隔 太挤 密度 单字 宽松 分隔线 竖线"),
-        SettingsSearchEntry("候选栏取消按钮", candidates, candidatePage, "取消 左箭头 取消输入"),
-        SettingsSearchEntry("联想关闭键用叉号", candidates, candidatePage, "联想 关闭联想 关闭键 叉 叉号 圆叉 左箭头"),
+        // 11-09 反馈：有人按「取消候选按钮」「关闭候选按钮」找，记不住「候选栏」在前。
+        SettingsSearchEntry("候选栏取消按钮", candidates, candidatePage, "取消 左箭头 取消输入 取消候选 关闭候选 取消候选按钮 关闭候选按钮 候选时取消按钮 关闭按钮 返回按钮 返回键 退出输入 取消联想 关闭联想"),
+        SettingsSearchEntry("联想关闭键用叉号", candidates, candidatePage, "联想 关闭联想 取消联想 关闭键 关闭按钮 叉 叉号 圆叉 左箭头"),
         SettingsSearchEntry("候选栏按钮按压高亮", candidates, candidatePage, "按住 反馈 取消键 关闭 展开箭头"),
         SettingsSearchEntry("候选注释", candidates, candidatePage, "注释 显示 自动 隐藏 候选显示"),
         SettingsSearchEntry("候选注释内容", candidates, candidatePage, "注释 拼音 释义 翻译 编码 中英 英文意思 词典 英文 单词 英文单词 选英文 出英文 上屏英文 打英文 中译英 下一项 长按下一项 shift"),
