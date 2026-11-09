@@ -863,6 +863,7 @@ class VoiceRecognitionHandlerFinishTest {
         onPartial("你好")
         editor.append("你好") // 重启时框架把组合区定成了正文
         hostRestartsField(caret = 0)
+        whenever(mockInputConnection.setComposingRegion(0, 2)).thenReturn(true)
         assertTrue(handler.continueAfterHostRestart(listOf(0, 2)))
         verify(mockInputConnection).setSelection(2, 2)
         verify(mockInputConnection).setComposingRegion(0, 2)

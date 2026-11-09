@@ -569,25 +569,13 @@ class VoiceRecognitionHandler(
         if (!::speechRecognitionManager.isInitialized || inputSession == null || sessionAbandoned || finishing ||
             suppressDuplicateFinal || remoteSink != null || TerminalEditor.active) return false
         val ic = getInputConnection() ?: return false
-        val extracted = runCatching { ic.getExtractedText(ExtractedTextRequest(), 0) }.getOrNull() ?: return false
-        val text = extracted.text ?: return false
-        if (extracted.startOffset < 0 || extracted.selectionStart < 0 || extracted.selectionEnd < 0) return false
         // 按住说话的临时结果在组合区里：重启时框架把它定成了正文，要重新标回组合区，否则下一次临时结果会重复写一遍。
         val composing = !toolbarSession && lastPartialText.isNotEmpty()
         val tail = if (composing) lastPartialText else recentDictation.takeIf { it.isNotBlank() }?.takeLast(8).orEmpty()
         val candidates = listOfNotNull(dictationCaret.takeIf { toolbarSession }) + hostCarets
-        val at = voiceResumeCaret(text, extracted.startOffset, candidates, tail) ?: return false
-        val caretStart = extracted.startOffset + extracted.selectionStart
-        val caretEnd = extracted.startOffset + extracted.selectionEnd
-        val moved = runCatching {
-            ic.beginBatchEdit()
-            try {
-                if (caretStart != at || caretEnd != at) ic.setSelection(at, at)
-                if (composing) { onComposingWritten(); ic.setComposingRegion(at - lastPartialText.length, at) }
-            } finally { ic.endBatchEdit() }
-        }.isSuccess
-        if (!moved) return false
-        FileLogger.w(TAG, "host restarted the field during dictation: resumed at=$at caret=$caretStart/$caretEnd " +
+        val at = ic.restoreDictationPosition(candidates, tail, composing) ?: return false
+        if (composing) onComposingWritten()
+        FileLogger.w(TAG, "host restarted the field during dictation: resumed at=$at " +
             "toolbar=$toolbarSession composing=$composing")
         inputSession = getState().inputSessionId
         return true

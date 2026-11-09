@@ -3646,6 +3646,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 不算换输入框，听写接着写（见 VoiceRecognitionHandler.continueAfterHostRestart）。
         val voiceThroughRestart = restarting && (uiState.value.isVoiceMode || voiceRecordingStarted) &&
             !attribute?.packageName.isNullOrEmpty() && attribute?.packageName == lastEditorIdentity?.first &&
+            attribute?.fieldId == lastEditorIdentity?.second &&
             !EditorInfoClassifier.isSecretEditor(attribute)
         val hostCaretsBeforeRestart = listOf(voiceHostCaret, voiceHostCaretBefore)
         lastEditorIdentity = identity

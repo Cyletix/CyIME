@@ -1,5 +1,9 @@
 package com.kingzcheung.xime.service
 
+import android.view.inputmethod.ExtractedText
+import android.view.inputmethod.ExtractedTextRequest
+import android.view.inputmethod.InputConnection
+
 /**
  * 输入框再次请求弹出键盘（用户点了输入框）时，语音悬浮条是否换回完整键盘。
  * 输入法自己请求弹出悬浮条的那次、旋转屏幕重建都不算用户请求。
@@ -79,4 +83,33 @@ internal fun voiceResumeCaret(text: CharSequence, startOffset: Int, candidates: 
         if (if (tail.isEmpty()) index == text.length else text.subSequence(0, index).endsWith(tail)) return at
     }
     return null
+}
+
+/** A restarting editor can refuse the cursor move, or acknowledge it without applying it. */
+internal fun InputConnection.restoreDictationPosition(
+    candidates: List<Int>, tail: String, composing: Boolean,
+): Int? {
+    fun snapshot(): ExtractedText? {
+        fun ExtractedText.valid() = startOffset >= 0 && text != null &&
+            selectionStart in 0..text.length && selectionEnd in 0..text.length
+        return runCatching { getExtractedText(ExtractedTextRequest(), 0) }.getOrNull()?.takeIf { it.valid() }
+            ?: readSurroundingWindow(2048, 2048, 0)?.takeIf { tail.isNotEmpty() && it.valid() }
+    }
+    return try {
+        val initial = snapshot() ?: return null
+        if (initial.selectionStart != initial.selectionEnd) return null
+        val at = voiceResumeCaret(initial.text, initial.startOffset, candidates, tail) ?: return null
+        val caret = initial.startOffset + initial.selectionEnd
+        if (caret != at) {
+            // The observed reset puts the caret at zero. Respect a user's move elsewhere.
+            if (caret != 0 || !setSelection(at, at)) return null
+            val updated = snapshot() ?: return null
+            if (updated.selectionStart != updated.selectionEnd || updated.startOffset + updated.selectionEnd != at ||
+                voiceResumeCaret(updated.text, updated.startOffset, listOf(at), tail) == null) return null
+        }
+        if (composing && !setComposingRegion(at - tail.length, at)) return null
+        at
+    } catch (_: RuntimeException) {
+        null // The activity may close the editor while reconnecting.
+    }
 }
