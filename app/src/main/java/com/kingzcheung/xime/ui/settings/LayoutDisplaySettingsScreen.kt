@@ -22,6 +22,7 @@ import androidx.compose.material.icons.twotone.DataObject
 import androidx.compose.material.icons.twotone.Spellcheck
 import androidx.compose.material.icons.twotone.EmojiSymbols
 import androidx.compose.material.icons.twotone.DashboardCustomize
+import androidx.compose.material.icons.twotone.ScreenRotation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.twotone.Send
@@ -129,6 +130,15 @@ private fun LayoutDisplayPage(
                     SettingsItem(Icons.TwoTone.DashboardCustomize, "布局管理", "显示或排列切换栏里的布局，编辑自定义按键排列",
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
                         showArrow = true)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    var perOrientation by remember {
+                        mutableStateOf(com.kingzcheung.xime.settings.OrientationLayouts.isEnabled(context))
+                    }
+                    SettingsToggleItem(Icons.TwoTone.ScreenRotation, "横竖屏分开记布局",
+                        "横屏、竖屏各记一个布局 (如横屏 26 键、竖屏九键)，在哪个方向选的就记到哪个方向，转屏后自动换。关闭时横竖屏用同一个布局。",
+                        checked = perOrientation, onCheckedChange = {
+                            perOrientation = it; com.kingzcheung.xime.settings.OrientationLayouts.setEnabled(context, it)
+                        })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingsItem(Icons.TwoTone.EmojiSymbols, "按键符号", "每个键滑出的符号，侧栏和数字行放什么",
                         onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
