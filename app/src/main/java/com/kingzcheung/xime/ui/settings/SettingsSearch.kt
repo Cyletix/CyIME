@@ -246,7 +246,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 输入 › 物理键盘
         SettingsSearchEntry("Ctrl + 空格", hardware, SettingsRoutes.HardwareKeyboard, "ctrl 空格 语言切换 快捷键 循环切换"),
         SettingsSearchEntry("单独轻按 Shift", hardware, SettingsRoutes.HardwareKeyboard, "shift 中英切换 快捷键 语言切换"),
-        SettingsSearchEntry("工具快捷键", hardware, SettingsRoutes.HardwareKeyboard, "快捷键 ctrl alt 标点 剪贴板 语音 alt+v alt+h"),
+        SettingsSearchEntry("工具快捷键", hardware, SettingsRoutes.HardwareKeyboard, "快捷键 ctrl alt 标点 剪贴板 语音 alt+v alt+h 关闭快捷键 快捷键冲突"),
         SettingsSearchEntry("候选翻页", hardware, SettingsRoutes.HardwareKeyboard, "翻页 上一页 下一页 减号 等号 中括号 逗号 句号"),
         SettingsSearchEntry("候选跟随光标", hardware, SettingsRoutes.HardwareKeyboard, "候选 跟随 光标 浮窗 浮条 位置"),
         SettingsSearchEntry("联想也显示在候选窗", hardware, SettingsRoutes.HardwareKeyboard, "联想 候选 位置 浮窗 工具条 跳 换位置 便携键盘 蓝牙键盘"),

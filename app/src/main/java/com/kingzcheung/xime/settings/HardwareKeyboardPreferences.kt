@@ -17,6 +17,8 @@ data class HardwareKeyboardOptions(
     val associationInWindow: Boolean = false,
     /** 游戏直通：游戏类应用里不显示工具条，实体按键直接交给游戏。默认关。 */
     val gamePassthrough: Boolean = false,
+    /** 工具快捷键（Ctrl+. / Ctrl+回车 / Alt+V / Alt+H）。关掉后这些组合键交给应用。默认开。 */
+    val toolShortcuts: Boolean = true,
 )
 
 object HardwareKeyboardPreferences {
@@ -35,12 +37,13 @@ object HardwareKeyboardPreferences {
             bottomBar = p.getBoolean(PREFIX + "bottom_bar", false),
             associationInWindow = p.getBoolean(PREFIX + "association_in_window", false),
             gamePassthrough = p.getBoolean(PREFIX + "game_passthrough", false),
+            toolShortcuts = p.getBoolean(PREFIX + "tool_shortcuts", true),
         )
     }
     fun set(context: Context, key: String, enabled: Boolean) {
         require(key in setOf("ctrl_space", "shift_tap", "follow_cursor", "avoid_editor", "dock_edge",
             "page_minus_equals", "page_brackets", "page_comma_period", "bottom_bar", "association_in_window",
-            "game_passthrough"))
+            "game_passthrough", "tool_shortcuts"))
         SettingsPreferences.getPrefsPublic(context).edit().putBoolean(PREFIX + key, enabled).apply()
     }
 }

@@ -51,6 +51,14 @@ class HardwareKeyboardPreferencesTest {
         assertEquals(HardwareKeyboardOptions(), HardwareKeyboardPreferences.read(context))
     }
 
+    @Test fun toolShortcutsAreOnByDefaultAndPersist() {
+        assertTrue(HardwareKeyboardPreferences.read(context).toolShortcuts)
+        HardwareKeyboardPreferences.set(context, "tool_shortcuts", false)
+        assertEquals(HardwareKeyboardOptions(toolShortcuts = false), HardwareKeyboardPreferences.read(context))
+        HardwareKeyboardPreferences.set(context, "tool_shortcuts", true)
+        assertEquals(HardwareKeyboardOptions(), HardwareKeyboardPreferences.read(context))
+    }
+
     @Test fun eachPagingChoicePersistsIndependentlyAndDoesNotChangeShortcuts() {
         for (mask in 0..7) {
             HardwareKeyboardPreferences.set(context, "page_minus_equals", mask and 1 != 0)

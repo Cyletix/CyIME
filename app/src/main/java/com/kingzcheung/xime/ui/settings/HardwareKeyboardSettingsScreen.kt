@@ -34,6 +34,7 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             HardwareOption("单独轻按 Shift", "当前非英语语言与英语互切；半秒内松开，与其他按键组合时不切换", options.shiftTap) { save("shift_tap", it) }
             Text("工具快捷键", style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.settingsSearchAnchor("工具快捷键", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
+            HardwareOption("Ctrl / Alt 组合键", "关闭后下面这些组合键交给应用", options.toolShortcuts) { save("tool_shortcuts", it) }
             Text("Ctrl + .：切换中英文标点(英文模式固定半角)。\nCtrl + 回车：发送。\nAlt + V：打开或关闭剪贴板，方向键选择，回车粘贴并关闭，Esc 取消。\nAlt + H：开始或停止语音输入。", style = MaterialTheme.typography.bodyMedium)
             Text("候选翻页", style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.settingsSearchAnchor("候选翻页", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())

@@ -53,6 +53,16 @@ class HardwareLanguageShortcutsTest {
         assertFalse(s.up(KEYCODE_SHIFT_LEFT, 100, false, options).switchLanguage)
     }
 
+    @Test fun toolShortcutsOffLeavesTheChordsToTheApp() {
+        val off = options.copy(toolShortcuts = false)
+        assertEquals(HardwareShortcutResult(), down(KEYCODE_PERIOD, ctrl = true, settings = off))
+        assertEquals(HardwareShortcutResult(), down(KEYCODE_V, alt = true, settings = off))
+        assertEquals(HardwareShortcutResult(), down(KEYCODE_H, alt = true, settings = off))
+        assertFalse(s.up(KEYCODE_V, 100, false, off).consume)
+        // 语言切换不受这个开关影响。
+        assertTrue(down(KEYCODE_SPACE, ctrl = true, settings = off).switchLanguage)
+    }
+
     @Test fun toolShortcutsFireOnceAndConsumeReleaseRegardlessOfModifierOrder() {
         for ((key, tool) in listOf(KEYCODE_PERIOD to HardwareToolShortcut.PUNCTUATION,
                 KEYCODE_V to HardwareToolShortcut.CLIPBOARD, KEYCODE_H to HardwareToolShortcut.MICROPHONE)) {

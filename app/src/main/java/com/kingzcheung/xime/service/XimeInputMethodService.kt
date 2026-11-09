@@ -3309,7 +3309,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             shortcut.tool?.let { handleHardwareTool(it) }
             if (shortcut.consume) return true
             // 实体键盘 Ctrl+回车：和屏幕上按住 !@# 点回车同一条规则，发送（终端照旧交给终端）。
-            if ((keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) && e.isCtrlPressed &&
+            // 属于「工具快捷键」，关掉后交给应用。
+            if (uiState.value.hardwareOptions.toolShortcuts &&
+                (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) && e.isCtrlPressed &&
                 !e.isAltPressed && !e.isMetaPressed && !e.isShiftPressed && !isTerminalEditor()) {
                 if (e.repeatCount == 0) ctrlEnter()
                 ctrlEnterKeys += keyCode

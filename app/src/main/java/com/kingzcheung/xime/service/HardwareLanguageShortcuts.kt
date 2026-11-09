@@ -26,7 +26,7 @@ internal class HardwareLanguageShortcuts {
         val isShift = key == KeyEvent.KEYCODE_SHIFT_LEFT || key == KeyEvent.KEYCODE_SHIFT_RIGHT
         if (shift != null && (!isShift || shift != key)) shiftUsed = true
         if (key in held) return HardwareShortcutResult(consume = true)
-        val tool = if (!meta && !shifted) when {
+        val tool = if (options.toolShortcuts && !meta && !shifted) when {
             ctrl && !alt && key == KeyEvent.KEYCODE_PERIOD -> HardwareToolShortcut.PUNCTUATION
             alt && !ctrl && key == KeyEvent.KEYCODE_V -> HardwareToolShortcut.CLIPBOARD
             alt && !ctrl && key == KeyEvent.KEYCODE_H -> HardwareToolShortcut.MICROPHONE
