@@ -515,6 +515,21 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
+    /**
+     * 编辑面板的「复制」。先交给应用；应用不接复制菜单（有的应用自己画的编辑器，选区是应用自己选的，
+     * 剪切能用、复制没反应，用户 11-09 转述 MT 管理器）时，键盘把选中的字写进系统剪贴板。
+     */
+    private fun copySelection(connection: InputConnection) {
+        if (connection.performContextMenuAction(android.R.id.copy)) return
+        // 密码框不让复制是应用有意的，键盘不替它复制。
+        if (com.kingzcheung.xime.settings.IncognitoState.passwordField) return
+        val selected = connection.getSelectedText(InputConnection.GET_TEXT_WITH_STYLES)?.takeIf { it.isNotEmpty() } ?: return
+        runCatching {
+            val clipboard = service.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, selected))
+        }.onFailure { Log.w("ImeSchemaController", "Could not copy the selection", it) }
+    }
+
     // 编辑面板的所有动作与选择、移光标同一个按键队列、同一个输入框，按点的顺序执行（审计 F05：
     // 以前全选/复制/剪切/粘贴/撤销直接作用于当前连接，排在前面的扩选还没执行就剪了旧选区）。
     internal fun handleToolbarEditingAction(action: String) {
@@ -538,7 +553,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             // Shift+回车：换行，不管应用把回车设成什么（见 EnterKeyAction.shiftEnter）。
             "newline" -> editCursor { service.keyRouter.performIdleEnter(it, shift = true) }
             "select_all" -> editCursor { selectAllGuard.selectAll(it) }
-            "copy" -> editCursor { it.performContextMenuAction(android.R.id.copy) }
+            "copy" -> editCursor { copySelection(it) }
             "cut" -> editCursor { it.performContextMenuAction(android.R.id.cut) }
             "paste", "paste_plain" -> editCursor {
                 service.dismissPredictionsForPaste()
