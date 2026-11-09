@@ -376,6 +376,19 @@ class PolicyTranslation : public Translation {
         }
       }
     }
+    // 2026-11-09「打完前面有 B站，顿一下被挤到后面」: the readings added after a pause (omission, swapped letters)
+    // never push down a 26-key mixed word whose code is the whole typed input (bzhan B站, txu T恤): it keeps its
+    // place among the first ten and the added readings go before or after it. Chinese words, learned ones too, still
+    // make room as before (most typed words are learned, so they would keep every correction off the first page).
+    std::vector<std::pair<size_t, an<Candidate>>> kept;
+    if (!numeric && (omission || edits)) {
+      for (size_t i = 2; i < std::min<size_t>(10, head_.size()); ++i) {
+        const auto p = As<Phrase>(Candidate::GetGenuineCandidate(head_[i]));
+        if (p && p->language() && head_[i]->start() == 0 && head_[i]->end() == end_ && p->type() != "completion" &&
+            (p->language()->name() == "cyime_cn_en" || p->language()->name() == "en_dicts/cn_en"))
+          kept.emplace_back(i, head_[i]);
+      }
+    }
     size_t inserted = 0;
     if (omission && head_.size() >= 2) {
       Segment segment(0, input.size());
@@ -435,6 +448,11 @@ class PolicyTranslation : public Translation {
             edit, "cyime_spelling_edit", edit->text(), numeric ? edit->comment() : "纠错", false));
         omission_inserted = true;
       }
+    }
+    for (const auto& [index, cand] : kept) {
+      const auto now = std::find(head_.begin(), head_.end(), cand);
+      if (now != head_.end() && static_cast<size_t>(now - head_.begin()) > index)
+        std::rotate(head_.begin() + index, now, now + 1);
     }
     if (particles) particles->Promote(input, particle_start, head_, hidden, seen_);
     Advance();
