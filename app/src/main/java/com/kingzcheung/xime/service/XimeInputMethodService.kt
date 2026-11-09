@@ -989,6 +989,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 SettingsPreferences.KEY_INPUT_TEXT_LOCATION -> syncInlinePinyinLocation()
                 RimeConfigHelper.DEPLOYMENT_REVISION, com.kingzcheung.xime.settings.LanguagePreferences.KEY -> {
                     val languagesOnly = key == com.kingzcheung.xime.settings.LanguagePreferences.KEY
+                    // 进共享日志：键盘用着用着突然「正在加载词库」，看是哪项设置变化引起的重新准备。
+                    FileLogger.w(TAG, "initRimeEngine requested by $key")
                     val pending = rimeInitializationJob
                     if (pending?.isActive == true) {
                         pending.invokeOnCompletion { serviceScope.launch { initRimeEngine(languagesOnly) } }
@@ -1131,7 +1133,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         FileLogger.init(this)
         // processAgeMs near 0: the process was started for this keyboard (killed while hidden, a cold load).
         // A large value: only the service was recreated, and the resident engine needs no reload.
-        FileLogger.i(TAG, "XimeInputMethodService created processAgeMs=" +
+        FileLogger.w(TAG, "XimeInputMethodService created processAgeMs=" +
             (android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis()) +
             " engineResident=${RimeEngine.isInitialized()}" +
             // 非 0：手机「应用双开/分身/工作资料」里的输入法，是另一份数据、另一套词库编译。
@@ -1323,7 +1325,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         EditorInputPreparation(this@XimeInputMethodService).schedule(false,
                             EditorInfoClassifier.isNumberEditor(it))
                     }
-                    FileLogger.i(TAG, "initRimeEngine: ready in ${android.os.SystemClock.elapsedRealtime() - startedAt} ms " +
+                    FileLogger.w(TAG, "initRimeEngine: ready in ${android.os.SystemClock.elapsedRealtime() - startedAt} ms " +
                         "engineResident=$engineResident")
                 }
             } catch (e: Exception) {
