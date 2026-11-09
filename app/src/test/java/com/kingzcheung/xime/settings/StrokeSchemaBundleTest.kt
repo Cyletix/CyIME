@@ -38,7 +38,7 @@ class StrokeSchemaBundleTest {
     @Test
     fun `lua modules named by the schema are bundled`() {
         val modules = Regex("""lua_(?:translator|filter)@\*(\w+)""").findAll(schema).map { it.groupValues[1] }.toList()
-        assertEquals(listOf("cyime_stroke_wildcard", "cyime_stroke_rank"), modules)
+        assertEquals(listOf("cyime_stroke_wildcard", "cyime_stroke_phrase", "cyime_stroke_rank"), modules)
         for (module in modules) repoFile("src/main/assets/rime_chinese/lua/$module.lua")
     }
 
@@ -54,5 +54,29 @@ class StrokeSchemaBundleTest {
         assertTrue(weights.getValue("们") > weights.getValue("們"))
         // 部首、笔画符号与汉字同形，不进码表。
         assertTrue("⼀" !in weights && "㇀" !in weights)
+    }
+
+    @Test
+    fun `phrase table for split input is compiled through a hidden dependency`() {
+        // 用分词键隔开、每个字只打头几笔时出词：词表靠 stroke_phrase 依赖方案编译，不进语言菜单。
+        assertTrue(Regex("""(?m)^  dependencies:\n    - stroke_phrase$""").containsMatchIn(schema))
+        val helper = repoFile("src/main/assets/rime_chinese/stroke_phrase.schema.yaml").readText()
+        assertTrue(helper.contains("dictionary: stroke_phrase"))
+        assertTrue(helper.contains("enable_user_dict: false"))
+        assertTrue("stroke_phrase" in CyimeInputDefaults.dependencies)
+    }
+
+    @Test
+    fun `generated phrase table codes each word by the first stroke of every character`() {
+        val rows = repoFile("build/generated/stroke-assets/rime_chinese/stroke_phrase.dict.yaml").readLines()
+            .dropWhile { it.trim() != "..." }.drop(1).map { it.split('\t') }.filter { it.size == 3 }
+        val codes = rows.groupBy({ it[0] }, { it[1] })
+        assertTrue(codes.size > 100000)
+        // 明 丨、目 丨、张 乛、胆 丿；哈 丨、中 丨、国 丨。
+        assertEquals(listOf("sszp"), codes["明目张胆"])
+        assertEquals(listOf("ss"), codes["哈哈"])
+        assertTrue(rows.all { it[1].length == it[0].length && it[1].all { c -> c in "hspnz" } })
+        // 只收两到四字的词。
+        assertTrue(rows.all { it[0].length in 2..4 })
     }
 }

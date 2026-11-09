@@ -4,13 +4,16 @@
 # 源自 rime/rime-stroke（LGPL-3.0）1e8fff9b9494ddec23b0cbc526bcfd8171a6fd48 的 stroke.schema.yaml。
 # CyIME 适配：名称用简体；去掉依赖 luna_pinyin 的拼音反查（CyIME 不带 luna_pinyin，笔画键盘也打不出 `）；
 # 候选页数沿用全局设置；* 作通配符代替一笔（lua/cyime_stroke_wildcard.lua）；
-# 没打完的常用字按字频排在生僻字前面（lua/cyime_stroke_rank.lua）。
+# 没打完的常用字按字频排在生僻字前面（lua/cyime_stroke_rank.lua）；
+# 用分词键隔开、每个字只打头几笔时按词表出词（lua/cyime_stroke_phrase.lua，词表 stroke_phrase 构建时生成）。
 # 码表 stroke.dict.yaml 由 app/build-logic/tasks-stroke.gradle.kts 构建时下载并按常用字频重排。
 
 schema:
   schema_id: stroke
   name: "笔画"
-  version: "0.6-cyime2"
+  version: "0.6-cyime3"
+  dependencies:
+    - stroke_phrase
   author:
     - 四季的風
     - 雪齋
@@ -49,6 +52,7 @@ engine:
     - punct_translator
     - table_translator
     - lua_translator@*cyime_stroke_wildcard
+    - lua_translator@*cyime_stroke_phrase
   filters:
     - lua_filter@*cyime_stroke_rank
 

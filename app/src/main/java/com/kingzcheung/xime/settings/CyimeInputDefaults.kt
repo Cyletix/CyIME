@@ -20,7 +20,7 @@ object CyimeInputDefaults {
      */
     val shapeAndStroke = listOf("wubi86", "wubi98", "cyime_cangjie", "cyime_quick", "stroke", "cyime_zhuyin")
     val dependencies = setOf("cyime_t9_english", "cyime_k14_english", "cyime_omission", "cyime_letter_swap",
-        "cyime_digit_edit", "cyime_digit_tap", "melt_eng", "radical_pinyin", "numbers", "handwriting")
+        "cyime_digit_edit", "cyime_digit_tap", "melt_eng", "radical_pinyin", "numbers", "handwriting", "stroke_phrase")
 
     /**
      * 方案 × 布局的组合配置：所需的方案和布局都启用时自动启用，不作为独立条目单独开关。

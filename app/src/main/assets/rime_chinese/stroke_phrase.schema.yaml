@@ -1,0 +1,18 @@
+# Internal compilation dependency, not a user-visible input mode.
+# 笔画方案分词打词的词表（stroke_phrase.dict.yaml，构建时生成）靠这个方案编译；只由 lua/cyime_stroke_phrase.lua 查。
+schema:
+  schema_id: stroke_phrase
+  name: 笔画词表依赖
+  version: "1"
+engine:
+  processors: [speller, selector, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [table_translator]
+speller:
+  alphabet: "hspnz"
+  algebra: []
+translator:
+  dictionary: stroke_phrase
+  enable_completion: false
+  enable_user_dict: false
+  enable_sentence: false
