@@ -431,7 +431,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 游戏直通生效中：键盘不显示，实体按键不经过 CyIME（见 [HardwareGamePassthrough]）。 */
     private val hardwareGamePassthrough: Boolean get() = HardwareGamePassthrough.active(
         uiState.value.hardwareOptions.gamePassthrough, hasHardwareKeyboard,
-        hardwareGamePackages.isGame(currentInputEditorInfo?.packageName))
+        hardwareGamePackages.isGame(currentInputEditorInfo?.packageName)) && !gameShowExplicit
+    /**
+     * 游戏直通开着时应用显式要键盘（showSoftInput 带 SHOW_EXPLICIT，如启动器自己的「调用输入法」键，#157）：
+     * 这一次照常显示键盘、按键照常经过 CyIME；键盘收起或离开输入框后恢复直通。点输入框的普通请求仍不弹。
+     */
+    private var gameShowExplicit = false
     private val hardwareInputManager by lazy { getSystemService(android.hardware.input.InputManager::class.java) }
     private val hardwareInputListener = object : android.hardware.input.InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = refresh()
@@ -4010,6 +4015,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        if (hardwareGamePassthrough && flags and android.view.inputmethod.InputMethod.SHOW_EXPLICIT != 0) {
+            gameShowExplicit = true
+            debugLog("Game passthrough: explicit show request package=${currentInputEditorInfo?.packageName}")
+        }
         if (hardwareGamePassthrough) {
             debugLog("Game passthrough: keyboard stays hidden package=${currentInputEditorInfo?.packageName}")
             voicePillSelfShow = false
@@ -4229,6 +4238,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         EnterKeyAction.label(editorInfo.imeOptions, appSend = SettingsPreferences.isEnterSendsEnabled(this))
 
     override fun onFinishInput() {
+        gameShowExplicit = false
         suspendCompositionForScreenOff()
         // 离开后的最后一帧仍不可输入，下一次 onStartInput 按新编辑器恢复正常行为。
         settingsPreviewPanel = null
@@ -4277,6 +4287,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        gameShowExplicit = false
         suspendCompositionForScreenOff()
         KeyboardPanelLaunch.previewVisible = false
         DictionaryPrefetch.onHide()
@@ -4309,6 +4320,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        gameShowExplicit = false
         com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = false
         backgroundMotionWindowShown.value = false
         imeWindowShown = false
