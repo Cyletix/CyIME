@@ -477,6 +477,9 @@ object HandwritingTemplates {
      * 汉字手写模型换了（训练页开关个人模型）：假名特征就是这个模型的输出，旧特征对不上。
      * 内置模板下次按新模型重新准备；自己的假名模板清掉，训练样本下次打开日语手写时按新模型补回。
      */
+    /** 汉字手写模型自动换了新版本：内置假名模板按新模型重算；自己写的模板保留，不删。 */
+    fun onBaseModelUpdated(): Unit = synchronized(this) { defaults.remove(Script.KANA) }
+
     fun onRecognizerChanged(context: Context): Unit = synchronized(this) {
         defaults.remove(Script.KANA)
         cache.remove(Script.KANA)

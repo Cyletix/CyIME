@@ -28,7 +28,10 @@ object ModelManager {
         val guard = installGuards.getOrPut(id) { ModelInstallGuard() }
         val generation = guard.currentGeneration()
         downloadLocks.getOrPut(id) { Mutex() }.withLock {
-            if (isModelDownloaded(context, model)) return@withLock
+            // 已装着同一版或更新的版本就不动；装着旧版时换成安装包里的新版（自动更新从安装包取回也走这里）。
+            ModelStorage.migrateLegacyForModel(context, id)
+            val installed = installedVersionOf(context, model)
+            if (installed != null && !ModelAutoUpdater.isNewer(model, target, installed)) return@withLock
             val root = ModelStorage.getModelsRoot(context).apply { mkdirs() }
             val staging = File(root, ".bundle-$id-${java.util.UUID.randomUUID()}").apply { mkdirs() }
             _downloadStates.update { it + (id to ModelDownloadState.Downloading(0f, 0, -1)) }

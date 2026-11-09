@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.twotone.Update
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -79,6 +80,7 @@ fun ModelLocalContent(
     }
 
     var pendingDelete by remember { mutableStateOf<ModelItemState?>(null) }
+    var autoUpdate by remember { mutableStateOf(com.kingzcheung.xime.model.ModelAutoUpdater.isEnabled(context)) }
 
     pendingDelete?.let { model ->
         ModelDeleteDialog(
@@ -134,7 +136,7 @@ fun ModelLocalContent(
                     if (builtinOcr) BuiltinOcrModelRow()
                     localModels.forEachIndexed { index, item ->
                         if (builtinOcr || index > 0) ModelRowDivider()
-                        ModelLocalRow(item = item, onDelete = { pendingDelete = item })
+                        ModelLocalRow(item = item, autoUpdate = autoUpdate, onDelete = { pendingDelete = item })
                     }
                     if (localModels.isEmpty() && uiState.isLoading) {
                         ModelRowDivider()
@@ -142,6 +144,20 @@ fun ModelLocalContent(
                     }
                     ModelRowDivider()
                     ModelSectionNote("本地模型在手机上运行，会占用 CPU、增加耗电，可能让手机发热。")
+                }
+            }
+            item(key = "model-auto-update") {
+                SettingsSection(title = "自动更新") {
+                    SettingsToggleItem(
+                        icon = Icons.TwoTone.Update,
+                        title = "自动更新模型",
+                        subtitle = "已装的模型有新版本时，连着 Wi-Fi 在后台下载，核对无误再替换；失败保留原模型",
+                        checked = autoUpdate,
+                        onCheckedChange = { enabled ->
+                            autoUpdate = enabled
+                            com.kingzcheung.xime.model.ModelAutoUpdater.setEnabled(context, enabled)
+                        },
+                    )
                 }
             }
             item(key = "model-source") {
@@ -280,15 +296,20 @@ private fun BuiltinOcrModelRow() {
 @Composable
 private fun ModelLocalRow(
     item: ModelItemState,
+    autoUpdate: Boolean,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val updateNote = remember(item.model.id, item.installedVersion, autoUpdate) {
+        com.kingzcheung.xime.model.ModelAutoUpdater.updateNote(context, item.model, item.installedVersion)
+    }
     val detail = buildString {
         item.installedVersion?.let { append("版本 $it") }
         if (item.diskSize > 0) {
             if (isNotEmpty()) append(" · ")
             append(modelFormatSize(item.diskSize))
         }
-        if (item.hasUpdate) append(" · 旧版，可删除后装新版")
+        updateNote?.let { append(" · $it") }
     }
     ModelRow(
         name = item.model.name,

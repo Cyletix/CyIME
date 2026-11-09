@@ -369,6 +369,8 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("插件市场", "$system › 扩展 › 插件", SettingsRoutes.MarketPlugins, "插件商店 下载 安装 API AI 翻译 帮写 回复 改写 润色 在线语音"),
         page("已安装的插件", "$system › 扩展 › 插件", SettingsRoutes.Plugins, "插件 已安装 插件管理 文件导入 xipk"),
         page("已安装的模型", "$system › 扩展 › 模型", SettingsRoutes.ModelLocal, "模型 识字 语音 手写 本地 下载 模型管理"),
+        SettingsSearchEntry("自动更新模型", "$system › 扩展 › 模型", SettingsRoutes.ModelLocal,
+            "模型 自动更新 新版本 升级 更新 Wi-Fi 手写 九键 词组模型 语音", section = "自动更新"),
         // 轻量版第一次用时下载，打开下载页；完整版内置在安装包里，打开已安装的模型。
         page("拍照识别模型", "$system › 扩展 › 模型",
             if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) SettingsRoutes.ModelLocal

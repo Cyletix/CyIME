@@ -204,6 +204,12 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
                     )
                 }
                 if (downloaded) {
+                    // 特意装了旧版本就固定在这一版，不被自动更新换掉；装最新版时解除。
+                    withContext(Dispatchers.IO) {
+                        val model = _uiState.value.models[index].model
+                        com.kingzcheung.xime.model.ModelAutoUpdater.onUserInstalled(context, model,
+                            model.versions.firstOrNull { it.version == actualVersion })
+                    }
                     val message = if (ModelManager.getModel(modelId)?.category == com.kingzcheung.xime.model.ModelCategory.CANDIDATE)
                         "已安装，重新启动输入法后生效" else "模型下载完成"
                     _uiState.update { s -> s.copy(toastMessage = message) }
@@ -220,6 +226,7 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
             if (success) {
                 withContext(Dispatchers.IO) {
                     MarketVersionStore.removeModelVersion(context, modelId)
+                    com.kingzcheung.xime.model.ModelAutoUpdater.onUserDeleted(context, modelId)
                 }
                 val index = _uiState.value.models.indexOfFirst { it.model.id == modelId }
                 if (index >= 0) {

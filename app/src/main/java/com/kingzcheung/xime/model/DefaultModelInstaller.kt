@@ -114,9 +114,12 @@ object DefaultModelInstaller {
                     // Wi-Fi 接上时可能先报可用、稍后才标成不计流量。
                     override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
                         if (waiting.value > 0 && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) start(app)
+                        if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) ModelAutoUpdater.start(app)
                     }
                 }) }
         }
+        // 已装模型有新版本时连着 Wi-Fi 自动换新（自己判断网络和间隔）。
+        ModelAutoUpdater.start(app)
         if (!started.compareAndSet(false, true)) return
         scope.launch {
             val prefs = preferences(app)
