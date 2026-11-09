@@ -2,7 +2,7 @@ package com.kingzcheung.xime.keyboard
 
 /**
  * 工具栏与菜单共用一组快捷入口：同一入口最多出现在一处，其余为“未使用”。
- * 工具栏沿用旧的已保存顺序；“设置”不能被移出，否则用户无法回到设置页。
+ * 工具栏沿用旧的已保存顺序；未使用的入口可在菜单编辑模式中重新添加。
  */
 data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) {
     /** 排列编辑器中的单一列表：分隔条之间即所在区域，拖过分隔条就换区。 */
@@ -12,7 +12,6 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
     companion object {
         const val MENU_DIVIDER = "#menu"
         const val UNUSED_DIVIDER = "#unused"
-        val PINNED = ToolbarButton.SETTINGS.id
         /** 2026-10-31 起默认在菜单里的开关；已保存的菜单由 SettingsPreferences 插入一次。 */
         val MENU_TOGGLES_1031 = listOf(ToolbarButton.FLOATING, ToolbarButton.TRADITIONAL)
 
@@ -20,7 +19,7 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
             // 旧版“固定内容”并入剪贴板：工具栏和菜单都按同一规则改写。
             val bar = ToolbarButton.normalizeIds(toolbar.filter { !it.startsWith("#") })
             val rest = ToolbarButton.normalizeIds(menu.filter { !it.startsWith("#") }).filter { it !in bar }
-            return QuickActionLayout(bar, if (PINNED in bar || PINNED in rest) rest else rest + PINNED)
+            return QuickActionLayout(bar, rest)
         }
 
         /** 未保存过菜单时使用默认菜单，但不重复已放在工具栏上的入口；布局手势开关放在“排列”之前。 */

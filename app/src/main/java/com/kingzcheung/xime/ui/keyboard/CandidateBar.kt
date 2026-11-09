@@ -19,6 +19,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,6 +55,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -86,6 +89,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -99,6 +103,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -110,7 +115,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -122,7 +126,6 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
-import com.kingzcheung.xime.R
 import com.kingzcheung.xime.keyboard.MainType
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.OverlayRoute
@@ -170,6 +173,8 @@ data class CandidateBarCallbacks(
     val onCandidateStripScrolled: (() -> Unit)? = null,
     /** 打字候选滑到最后几个了。 */
     val onCandidateStripNearEnd: (() -> Unit)? = null,
+    val onSaveQuickActions: (() -> Unit)? = null,
+    val onEditQuickActions: (() -> Unit)? = null,
 )
 
 /** 空间充足时均匀排布，项目溢出时保留完整触控尺寸并允许滚动。 */
@@ -524,8 +529,12 @@ fun CandidateBar(
                         } else {
                             KeyboardToolbarButton({ callbacks.onLogoClick?.invoke() }, iconButtonContainer,
                                 modifier = Modifier.testTag("toolbar-leading"), slotWidth = toolbarSlot) {
-                                Icon(painterResource(R.drawable.cyime_toolbar_mark), contentDescription = "CyIME Logo",
-                                    tint = iconButtonTint, modifier = Modifier.size(22.dp))
+                                Canvas(Modifier.size(22.dp).semantics { contentDescription = "展开菜单" }) {
+                                    val radius = size.minDimension * .115f
+                                    listOf(.2f, .5f, .8f).forEach { x ->
+                                        drawCircle(iconButtonTint, radius, androidx.compose.ui.geometry.Offset(size.width * x, size.height / 2))
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.width(4.dp))
@@ -685,7 +694,10 @@ fun CandidateBar(
                     // 收起按钮保留，退格回到 idle 时的状态感知不变
                     if (inlineSuggestions.isEmpty() && splitGapX != null) {
                         // 分体：图标按两侧宽度比例分到中缝左右，各自整格可点。
-                        SplitGapRow(splitGapX, Modifier.weight(1f).fillMaxHeight(), left = { leftWidth, rightWidth ->
+                        val editor = LocalInlineQuickActionEditor.current
+                        SplitGapRow(splitGapX, Modifier.weight(1f).fillMaxHeight().onGloballyPositioned {
+                            editor?.toolbarArea = it.boundsInRoot()
+                        }, left = { leftWidth, rightWidth ->
                             ToolbarHalf(toolbarActions, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState,
                                 callbacks.onReorderToolbar, leftWidth, rightWidth, rightSide = false)
                         }, right = { leftWidth, rightWidth ->
@@ -693,14 +705,35 @@ fun CandidateBar(
                                 callbacks.onReorderToolbar, leftWidth, rightWidth, rightSide = true)
                         })
                     } else if (inlineSuggestions.isEmpty()) {
+                        val editor = LocalInlineQuickActionEditor.current
                         ReorderableToolbar(toolbarActions, protectedVisuals.accentColor, callbacks.onReorderToolbar,
-                            modifier = Modifier.weight(1f)) { action ->
+                            modifier = Modifier.weight(1f).onGloballyPositioned {
+                                editor?.toolbarArea = it.boundsInRoot()
+                            }) { action ->
                             ToolbarActionButton(action, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState,
                                 modifier = Modifier.fillMaxWidth())
                         }
                     }
 
-                    if (callbacks.onHideKeyboard != null) {
+                    val editor = LocalInlineQuickActionEditor.current
+                    if (editor?.active == true && callbacks.onSaveQuickActions != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        KeyboardToolbarButton(callbacks.onSaveQuickActions, iconButtonContainer,
+                            modifier = Modifier.testTag("toolbar-save").onGloballyPositioned {
+                                editor.saveBounds = it.boundsInRoot()
+                            }, slotWidth = toolbarSlot) {
+                            Icon(Icons.Default.Check, contentDescription = "保存排列", tint = protectedVisuals.textColor,
+                                modifier = Modifier.size(24.dp))
+                        }
+                    } else if (page is KeyboardPage.Overlay && page.route is OverlayRoute.Menu &&
+                        callbacks.onEditQuickActions != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        KeyboardToolbarButton(callbacks.onEditQuickActions, iconButtonContainer,
+                            modifier = Modifier.testTag("toolbar-edit"), slotWidth = toolbarSlot) {
+                            Icon(Icons.Default.Edit, contentDescription = "编辑排列", tint = protectedVisuals.textColor,
+                                modifier = Modifier.size(22.dp))
+                        }
+                    } else if (callbacks.onHideKeyboard != null) {
                         Spacer(modifier = Modifier.width(4.dp))
                         HideKeyboardButton(callbacks.onHideKeyboard, iconButtonContainer, isVoiceSticky,
                             protectedVisuals.textColor, toolbarSlot)
@@ -791,6 +824,7 @@ internal fun ToolbarActionButton(
     source: MutableInteractionSource = remember { MutableInteractionSource() },
     modifier: Modifier = Modifier,
 ) {
+    val inlineEditor = LocalInlineQuickActionEditor.current
     val voiceActive = action.active && action.item.id == "voice"
     // 外圈（胶囊底色）固定，内圈只跟随实时音量；峰值按分贝映射，正常说话也能明显撑开。
     val voiceLevel by animateFloatAsState(
@@ -816,18 +850,20 @@ internal fun ToolbarActionButton(
     // 液态玻璃：胶囊露出来时（开启常亮，按下随底色淡出）加按键同款细亮边；听写音量光圈不加。
     val liquidEdge = com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn() && !listening
     BoxWithConstraints(
-        modifier.widthIn(min = 36.dp).height(40.dp)
+        modifier.widthIn(min = 36.dp).height(40.dp).inlineQuickActionTarget(action.item.id)
+            .graphicsLayer { alpha = if (inlineEditor?.dragging == action.item.id) 0f else 1f }
             // 音量光圈画在不裁切的外层：始终正圆、比图标大，宽格也不会被拉成胶囊。
             .then(if (listening) Modifier.microphoneLevelHalo({ voiceLevel }, visuals.accentColor) else Modifier)
             .semantics {
                 selected = action.active
                 if (voiceActive) stateDescription = if (voiceState == RecognitionState.PROCESSING) "正在转录" else "正在聆听，点击结束"
             }
-            .clickable(interactionSource = source, indication = null, onClick = action.onClick),
+            .clickable(interactionSource = source, indication = null, enabled = inlineEditor?.active != true, onClick = action.onClick),
         contentAlignment = Alignment.Center,
     ) {
     Box(
-        Modifier.size(if (listening) androidx.compose.ui.unit.DpSize(36.dp, 36.dp) else toolbarPillSize(maxWidth))
+        Modifier.inlineQuickActionMotion(action.item.id).testTag("toolbar-visual:${action.item.id}")
+            .size(if (listening) androidx.compose.ui.unit.DpSize(36.dp, 36.dp) else toolbarPillSize(maxWidth))
             .clip(CircleShape)
             .background(if (listening) Color.Transparent else glassActiveFill ?: visuals.glassControlBackground?.let { fill ->
                 if (action.active) androidx.compose.ui.graphics.lerp(fill, visuals.accentColor, 0.18f).copy(alpha = fill.alpha)
