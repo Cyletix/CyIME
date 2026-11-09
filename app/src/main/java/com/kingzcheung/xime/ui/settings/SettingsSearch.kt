@@ -361,6 +361,8 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("上屏后自动关闭剪贴板", clipboardPanel, SettingsRoutes.ClipboardPanel, "剪贴板 关闭 粘贴 连续贴"),
         SettingsSearchEntry("卡片显示行数", clipboardPanel, SettingsRoutes.ClipboardPanel,
             "剪贴板 卡片 行数 几行 显示 记录 折叠 最多显示 剪贴板卡片最多显示 卡片最多显示"),
+        SettingsSearchEntry("图片高度", clipboardPanel, SettingsRoutes.ClipboardPanel,
+            "剪贴板 图片 高度 太矮 比例 长图 截图 卡片"),
         SettingsSearchEntry("最近截图", clipboardPanel, SettingsRoutes.ClipboardPanel, "剪贴板 截图 截屏 相册 图片 照片"),
         SettingsSearchEntry("剪贴板数量上限", clipboardPanel, SettingsRoutes.ClipboardPanel,
             "剪贴板 条数 数量 最多 上限 保存 历史记录 不限 存文档", anchor = "数量上限", section = "历史记录"),

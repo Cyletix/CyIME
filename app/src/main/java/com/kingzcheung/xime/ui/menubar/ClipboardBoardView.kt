@@ -52,7 +52,6 @@ import com.kingzcheung.xime.clipboard.*
 import com.kingzcheung.xime.ui.keyboard.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 private data class ClipboardMenuAnchor(val bounds: Rect = Rect.Zero, val occupied: List<Rect> = emptyList(),
     val preferSide: Boolean = true, val corner: Dp = 8.dp)
@@ -107,6 +106,7 @@ internal fun ConnectedClipboardBoard(
     // Older history is read page by page while open; closing returns to the first page.
     DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
     val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
+    val imageHeight = remember(prefs) { clipboardImageHeight(prefs.getString(CLIPBOARD_IMAGE_HEIGHT_KEY, null)) }
     var closeAfterPaste by remember(prefs) { mutableStateOf(clipboardClosesAfterPaste(prefs)) }
     // A search submitted from the keyboard search bar shows only its matches (fixed records too).
     val boardQuery by manager.boardQuery.collectAsState()
@@ -178,7 +178,7 @@ internal fun ConnectedClipboardBoard(
             // Clearing means all unfixed history in the database, not only the pages read so far.
             manager.clearAll()
             store.removeImages(images.filterIsInstance<ClipboardCard.Image>().map { it.item.uri }.toSet())
-        }, cardMaxLines = cardMaxLines,
+        }, cardMaxLines = cardMaxLines, imageHeight = imageHeight,
         searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
         onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
         onOpenSearch = onOpenSearch, full = room.full, showControls = showControls,
@@ -254,6 +254,7 @@ internal fun ClipboardBoardView(
     /** Clears all unfixed history; receives the unfixed images to remove. Null deletes [textItems] only. */
     onClearUnpinned: ((List<ClipboardCard>) -> Unit)? = null,
     cardMaxLines: Int = 4,
+    imageHeight: ClipboardImageHeight = ClipboardImageHeight.STANDARD,
     /** The search shown in the board, or null; its chip clears it. */
     searchQuery: String? = null,
     onClearSearch: () -> Unit = {},
@@ -606,10 +607,12 @@ internal fun ClipboardBoardView(
                             ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen, maxLines = cardMaxLines,
                                 masked = card is ClipboardCard.Text && card.item.sensitive && card.key !in revealed,
                                 selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
-                                // Pictures share the pinned preview height: a tall screenshot must not fill the board.
-                                // Pins are one line; a recent picture keeps the bounded preview height.
+                                // Pins are one line; a recent picture follows 「图片高度」 (user 11-09), never
+                                // taller than part of the board, so a tall screenshot does not fill it.
                                 previewHeight = if (fixedRecords) ClipboardPinnedRowHeight
-                                    else if (card is ClipboardCard.Image) pinnedHeight else null,
+                                    else if (card is ClipboardCard.Image && imageHeight == ClipboardImageHeight.LOW) pinnedHeight
+                                    else null,
+                                imageHeight = imageHeight, recordsHeightDp = stableRecordsHeight,
                                 // Lazy layout retains removed keyed items through fade-out. Keep one
                                 // grid so collapsing pins does not flash or replace recent history.
                                 modifier = Modifier.animateItem(
@@ -803,6 +806,8 @@ private fun CompactClipboardFilter(label: String, isSelected: Boolean, onClick: 
 private fun ClipboardRecordCard(
     card: ClipboardCard, pinned: Boolean, chosen: Boolean, selecting: Boolean,
     keyboardFocused: Boolean, previewHeight: Dp?, maxLines: Int = 4,
+    /** A recent picture without [previewHeight]: how tall, from its width, the records area and the picture. */
+    imageHeight: ClipboardImageHeight = ClipboardImageHeight.STANDARD, recordsHeightDp: Float = Float.MAX_VALUE,
     /** A kept password not asked to be shown: dots instead of its text (#95). */
     masked: Boolean = false,
     onClick: () -> Unit, onLongClick: () -> Unit,
@@ -847,14 +852,23 @@ private fun ClipboardRecordCard(
                 val context = LocalContext.current
                 val density = LocalDensity.current
                 val widthPx = constraints.maxWidth.coerceAtLeast(1)
-                val heightPx = previewHeight?.let { with(density) { it.roundToPx() } }
-                    ?: (widthPx / ClipboardThumbnailAspectRatio).roundToInt()
+                val uri = card.item.uri
+                // Only 「按图片比例」 reads the picture's size; a known one is used at once, so reopening never jumps.
+                val aspect by produceState(ClipboardImageAspect.cached(uri), uri, imageHeight) {
+                    if (imageHeight == ClipboardImageHeight.RATIO && value == null)
+                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            ClipboardImageAspect.read(context, uri)
+                        }
+                }
+                val cardHeight = previewHeight ?: clipboardImageCardHeight(imageHeight,
+                    with(density) { widthPx.toDp().value }, recordsHeightDp, aspect).dp
+                val heightPx = with(density) { cardHeight.roundToPx() }
                 val thumbnail = remember(context, card.item.uri, widthPx, heightPx) {
                     ImageRequest.Builder(context).data(card.item.uri)
                         .size(widthPx, heightPx.coerceAtLeast(1)).build()
                 }
                 AsyncImage(thumbnail, card.item.label, contentScale = ContentScale.Crop,
-                    modifier = if (previewHeight == null) Modifier.fillMaxWidth().aspectRatio(ClipboardThumbnailAspectRatio)
+                    modifier = if (previewHeight == null) Modifier.fillMaxWidth().height(cardHeight)
                     else Modifier.fillMaxSize())
                 Canvas(Modifier.matchParentSize().testTag("clipboard-image-hatch:${card.key}")) {
                     val spacing = 36.dp.toPx()
