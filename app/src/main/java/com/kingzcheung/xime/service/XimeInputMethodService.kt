@@ -5523,6 +5523,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return target.editText()?.let(schemaController::internalConnectionFor)
     }
 
+    /**
+     * 编码光标在最前面时按删除：删输入框里编码前面的一个字，编码不动。输入框里显示编码时，
+     * 组合区起点就是光标，按组合区之前删；编码显示在候选栏时就是删光标前的字。
+     */
+    internal fun deleteBeforeComposition() {
+        if (uiState.value.inputTarget.isInternal) return
+        currentInputConnection?.deleteSurroundingTextInCodePoints(1, 0)
+    }
+
     /** 退格：开着「输入成对符号」且光标夹在一对空符号中间时两边一起删，否则照常发退格键。 */
     internal fun sendDeleteKey() {
         if (SettingsPreferences.isPairedSymbolsEnabled(this) && !isTerminalEditor() && deleteEmptyPairAroundCursor()) return

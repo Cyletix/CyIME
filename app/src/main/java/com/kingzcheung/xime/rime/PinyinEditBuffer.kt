@@ -77,6 +77,12 @@ internal object PinyinEditBuffer {
     fun keepsCase(schema: String): Boolean =
         com.kingzcheung.xime.settings.InputProfiles.describe(schema).capabilities.caseSensitiveCode
 
+    /** 去掉开头的分隔符（光标跟着往前挪）；编码开头的分隔符不分开任何音节。 */
+    fun dropLeadingSeparators(text: String, caret: Int): Pair<String, Int> {
+        val lead = text.takeWhile { it == '\'' }.length
+        return if (lead == 0) text to caret else text.drop(lead) to (caret - lead).coerceAtLeast(0)
+    }
+
     fun mergeSeparators(text: String, caret: Int): Pair<String, Int> {
         val result = StringBuilder()
         var newCaret = 0

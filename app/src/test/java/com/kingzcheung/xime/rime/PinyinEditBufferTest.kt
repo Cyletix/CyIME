@@ -18,6 +18,16 @@ class PinyinEditBufferTest {
         assertEquals("a'b" to 3, PinyinEditBuffer.mergeSeparators("a'''b", 5))
         assertEquals("a'b" to 0, PinyinEditBuffer.mergeSeparators("a'b", 0))
     }
+    /** 11-09 平板：ni'hao 在 ni 后面连删两下，剩下的开头分隔符显示成「‘hao」，光标在它后面也删不掉。 */
+    @Test fun leadingSeparatorsLeftByDeletingAreDropped() {
+        assertEquals("hao" to 0, PinyinEditBuffer.dropLeadingSeparators("'hao", 0))
+        assertEquals("hao" to 0, PinyinEditBuffer.dropLeadingSeparators("''hao", 1))
+        assertEquals("hao" to 2, PinyinEditBuffer.dropLeadingSeparators("'hao", 3))
+        assertEquals("" to 0, PinyinEditBuffer.dropLeadingSeparators("'", 1))
+        // 中间和末尾的分隔符不动。
+        assertEquals("n'hao" to 1, PinyinEditBuffer.dropLeadingSeparators("n'hao", 1))
+        assertEquals("ni'" to 3, PinyinEditBuffer.dropLeadingSeparators("ni'", 3))
+    }
     @Test fun mapsCaretOnBothSidesOfASeparator() {
         assertEquals(2, mapCodeOffset("ni'hao", "ni'hao", 2))
         assertEquals(3, mapCodeOffset("ni'hao", "ni'hao", 3))
