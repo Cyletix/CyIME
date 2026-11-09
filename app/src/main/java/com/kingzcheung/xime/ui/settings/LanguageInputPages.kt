@@ -74,7 +74,7 @@ private fun ChineseOutputSection() {
             HorizontalDivider()
         }
         SettingsToggleItem(Icons.TwoTone.Translate, "繁体输出",
-            "拼音、双拼、仓颉和注音的候选与上屏使用繁体字。繁体模式下关闭中文联想。",
+            "拼音、双拼、仓颉和注音的候选与上屏使用繁体字。",
             checked = input.traditionalOutput, onCheckedChange = { input.copy(traditionalOutput = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.TRADITIONAL)
         HorizontalDivider()

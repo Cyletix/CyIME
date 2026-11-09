@@ -28,8 +28,10 @@
 #include <jni.h>
 #include <android/log.h>
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -2885,11 +2887,11 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeLookupText(
 
 // 语音等不经 Rime 候选的文字跟「繁体输出」走：用方案 traditionalization 同一份 OpenCC 配置整句转换，
 // 和打字出的字是同一张表。与 Rime 会话无关，不占 rimeLock，单独一把锁；转换器第一次用时加载，之后常驻。
+// 繁体联想要简转繁、繁转简两份配置来回用，按路径各留一个转换器，不互相挤掉重载。
 // 配置加载失败时记住失败的路径，原样返回，不每个临时结果都重试。
 static std::mutex g_openccMutex;
-static std::string g_openccPath;
-static bool g_openccFailed = false;
-static opencc::ConverterPtr g_openccConverter;
+static std::map<std::string, opencc::ConverterPtr> g_openccConverters;
+static std::set<std::string> g_openccFailed;
 
 JNIEXPORT jstring JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeOpenccConvert(
@@ -2901,25 +2903,21 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeOpenccConvert(
     const std::string input = CandidateUtf8(env, text);
     if (path.empty() || input.empty()) return text;
     std::lock_guard<std::mutex> lock(g_openccMutex);
-    if (g_openccPath != path) {
-        g_openccPath = path;
-        g_openccFailed = false;
-        g_openccConverter.reset();
-    }
-    if (g_openccFailed) return text;
+    if (g_openccFailed.count(path)) return text;
     try {
-        if (!g_openccConverter) {
+        opencc::ConverterPtr& converter = g_openccConverters[path];
+        if (!converter) {
             opencc::Config config;
-            g_openccConverter = config.NewFromFile(path);
+            converter = config.NewFromFile(path);
         }
-        return CandidateString(env, g_openccConverter->Convert(input));
+        return CandidateString(env, converter->Convert(input));
     } catch (const std::exception& e) {
         LOGE("opencc convert failed (%s): %s", path.c_str(), e.what());
     } catch (...) {
         LOGE("opencc convert failed (%s)", path.c_str());
     }
-    g_openccFailed = true;
-    g_openccConverter.reset();
+    g_openccFailed.insert(path);
+    g_openccConverters.erase(path);
     return text;
 }
 

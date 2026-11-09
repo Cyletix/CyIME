@@ -1049,6 +1049,10 @@ class RimeEngine {
     }
 
     @Volatile private var traditionalConfig: String? = null
+    @Volatile private var simplifiedConfig: String? = null
+
+    private fun openccConfig(name: String): String? = listOf(userDataDir, sharedDataDir).filter { it.isNotEmpty() }
+        .map { File(it, "opencc/$name") }.firstOrNull { it.isFile }?.path
 
     /**
      * 简体转台湾正体，给语音这类不经 Rime 候选的文字用：和方案 traditionalization 是同一份 opencc/cyime_s2tw.json，
@@ -1056,9 +1060,17 @@ class RimeEngine {
      */
     fun toTraditional(text: String): String {
         if (text.isEmpty()) return text
-        val config = traditionalConfig ?: listOf(userDataDir, sharedDataDir).filter { it.isNotEmpty() }
-            .map { File(it, "opencc/cyime_s2tw.json") }.firstOrNull { it.isFile }?.path?.also { traditionalConfig = it }
-            ?: return text
+        val config = traditionalConfig ?: openccConfig("cyime_s2tw.json")?.also { traditionalConfig = it } ?: return text
+        return runCatching { nativeOpenccConvert(config, text) }.getOrNull() ?: text
+    }
+
+    /**
+     * 繁体转简体（opencc/cyime_t2s.json，仓颉、注音转简体用的同一份）：繁体输出时联想拿上文去查简体联想表、
+     * 个人学习也记成简体。其余同 [toTraditional]。
+     */
+    fun toSimplified(text: String): String {
+        if (text.isEmpty()) return text
+        val config = simplifiedConfig ?: openccConfig("cyime_t2s.json")?.also { simplifiedConfig = it } ?: return text
         return runCatching { nativeOpenccConvert(config, text) }.getOrNull() ?: text
     }
 

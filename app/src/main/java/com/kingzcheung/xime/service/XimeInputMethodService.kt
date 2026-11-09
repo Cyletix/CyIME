@@ -773,7 +773,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             )
         },
         completionLanguage = { uiState.value.let { if (it.isAsciiMode) com.kingzcheung.xime.settings.InputLanguage.ENGLISH else it.inputProfile.language } },
+        traditionalBridge = { if (traditionalChineseOutput()) traditionalScriptBridge else null },
     )
+    private val traditionalScriptBridge by lazy {
+        PredictionManager.ScriptBridge(toSimplified = rimeEngine::toSimplified, toTraditional = rimeEngine::toTraditional)
+    }
     
     internal val voiceRecognitionHandler = VoiceRecognitionHandler(
         context = this,
@@ -1191,7 +1195,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     
     private fun getPredictionFromPlugin(contextText: String, afterWholeWord: Boolean) {
-        if (!isChineseMode || !canPredictAfter(contextText) || traditionalChineseOutput()) return
+        if (!isChineseMode || !canPredictAfter(contextText)) return
         predictionManager.getPrediction(contextText, afterWholeWord)
     }
 
