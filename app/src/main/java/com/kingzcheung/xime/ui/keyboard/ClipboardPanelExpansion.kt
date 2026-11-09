@@ -29,6 +29,7 @@ internal class ClipboardPanelExpansion(
     private val onExpandedChange: (Boolean) -> Unit,
 ) {
     val collapsedHeight: Int get() = bounds.collapsed
+    val canExpand: Boolean get() = bounds.expanded > bounds.collapsed
     var height by mutableFloatStateOf(bounds.collapsed.toFloat())
         private set
     // Only endpoint changes resize fixed cards; intermediate drag heights resize the viewport.
