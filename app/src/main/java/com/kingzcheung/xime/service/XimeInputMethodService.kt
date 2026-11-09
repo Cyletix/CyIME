@@ -996,6 +996,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         pending.invokeOnCompletion { serviceScope.launch { initRimeEngine(languagesOnly) } }
                     } else initRimeEngine(languagesOnly)
                 }
+                com.kingzcheung.xime.settings.LanguagePreferences.SCHEMAS_READY_KEY -> sessionController.updateSchemaName()
                 com.kingzcheung.xime.settings.InputModes.ORDER_KEY -> {
                     uiState.value = uiState.value.copy(schemas =
                         com.kingzcheung.xime.settings.InputModes.ordered(this@XimeInputMethodService, uiState.value.schemas))
