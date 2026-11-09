@@ -2730,14 +2730,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.candidateState.value = if (candidate != null && result.isNotEmpty()) {
             service.candidateState.value.copy(
                 candidates = listOf(result, candidate),
-                candidateComments = emptyList()
+                candidateComments = emptyList(),
+                calculatorCandidates = listOf(result, candidate),
             )
         } else {
             // 如果计算器之前有显示但现在已清除，也要清空候选栏
             if (service.candidateState.value.candidates.isNotEmpty() && !service.calculatorEngine.isActive()) {
                 service.candidateState.value.copy(
                     candidates = emptyList(),
-                    candidateComments = emptyList()
+                    candidateComments = emptyList(),
+                    calculatorCandidates = emptyList(),
                 )
             } else {
                 service.candidateState.value

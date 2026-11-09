@@ -39,7 +39,15 @@ data class CandidateState(
     /** 「打数字出短语」放上去的那一组；[digitPhraseText] 是光标前那串数字（原样），选了就换掉它。见 DigitPhrases。 */
     val digitPhrases: List<String> = emptyList(),
     val digitPhraseText: String = "",
-)
+    /**
+     * 数字键盘算式放上去的那一组（结果、算式 = 结果）；[candidates] 还是这一组时候选栏按计算器显示（能滑、没有展开键）。
+     * 计算器引擎不是界面状态，界面按它判断会停在旧值：长算式被当成打字候选，展开页是空的（GitHub #289）。
+     */
+    val calculatorCandidates: List<String> = emptyList(),
+) {
+    /** 候选栏现在放的是不是计算器结果。 */
+    val showsCalculator: Boolean get() = calculatorCandidates.isNotEmpty() && calculatorCandidates == candidates
+}
 
 /** 候选栏上现在是删字后放回的那一组：不挡退格、不被空格上屏、不进九键选词。 */
 internal val CandidateState.isDeletionRecovery: Boolean

@@ -1048,7 +1048,7 @@ fun KeyboardView(
             val candidateBarState = remember(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
-                state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
+                cs.calculatorCandidates, handwritingCandidates, handwritingComments, showHandwritingCandidates,
                 railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage, cs.clipboardExtractedCount,
                 cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
                 hardwareCandidateHighlight, glossRevision, glossChinese, glossSwap,
@@ -1062,8 +1062,11 @@ fun KeyboardView(
                 } else if (isHandwritingPage) {
                     CandidateBarState.Idle
                 } else {
-                    val barTexts = if (expandedDataMode) railExpanded.map { it.second.text } else cs.candidates
-                    val barComments = if (expandedDataMode) railExpanded.map { it.second.comment } else cs.candidateComments
+                    // 计算器结果只看候选状态自己带的标记（GitHub #289），不受展开页数据影响。
+                    val calculator = cs.showsCalculator
+                    val expandedBar = expandedDataMode && !calculator
+                    val barTexts = if (expandedBar) railExpanded.map { it.second.text } else cs.candidates
+                    val barComments = if (expandedBar) railExpanded.map { it.second.comment } else cs.candidateComments
                     val (shownTexts, shownComments) = when {
                         glossSwap -> CandidateGlossary.swapped(barTexts, barComments)
                         glossChinese -> barTexts to CandidateGlossary.annotate(barTexts, barComments)
@@ -1082,7 +1085,7 @@ fun KeyboardView(
                         },
                         isShowingRecentClipboard = cs.isShowingRecentClipboard,
                         hasNextPage = cs.hasNextPage,
-                        isCalculatorActive = state.isCalculatorMode,
+                        isCalculatorActive = calculator,
                         smsVerificationCode = cs.smsVerificationCode,
                         clipboardImage = cs.clipboardImage,
                         clipboardExtractedCount = cs.clipboardExtractedCount,
@@ -1182,7 +1185,7 @@ fun KeyboardView(
                         closePreeditEditor()
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
                             selectHandwriting(index)
-                        } else if (expandedDataMode) {
+                        } else if (expandedDataMode && !cs.showsCalculator) {
                             // 展开态候选栏数据源=全量列表（筛选态为其单字子列表）：
                             // 位置索引经 railExpanded 换算全局索引再走全局链路
                             val globalIndex = railExpanded.getOrNull(index)?.first
