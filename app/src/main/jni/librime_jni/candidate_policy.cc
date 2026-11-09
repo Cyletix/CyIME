@@ -286,7 +286,7 @@ class PolicyTranslation : public Translation {
         if (!p || !p->language() || c->end() != end_ || p->entry().commit_count > 0 ||
             (p->type() != "table" && p->type() != "user_table")) return false;
         const auto& name = p->language()->name();
-        *pull_only = name == "en_dicts/cn_en";
+        *pull_only = name == "cyime_cn_en" || name == "en_dicts/cn_en";
         if (name != "cyime_t9_english" && name != "cyime_k14_english" && !*pull_only) return false;
         // Four keys or more, or a mixed word: shorter English words (go, the) stay after the Chinese ones.
         const auto& text = p->text();
@@ -333,6 +333,19 @@ class PolicyTranslation : public Translation {
         }
         if (!inserted) result.insert(result.end(), moved.begin(), moved.end());
         head_.swap(result);
+      }
+      // 2026-11-09「打 bzhan 选了 B站 记不住」: 26 keys' mixed words are learned in cyime_cn_en's user dictionary
+      // (upstream's cn_en table was read-only). One the user picked comes first when its whole code is typed again,
+      // ahead of the Chinese readings through initials (b + zhan: 不占), unless the first candidate is itself a
+      // learned word. Completions (bzha) and the nine-key and 14-key tables keep the rule above.
+      if (!numeric) {
+        const auto learned_mixed = std::find_if(head_.begin(), head_.end(), [&](const auto& c) {
+          const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+          return p && p->language() && p->language()->name() == "cyime_cn_en" && c->start() == 0 &&
+                 c->end() == end_ && p->type() != "completion" && p->entry().commit_count > 0;
+        });
+        if (learned_mixed != head_.end() && learned_mixed != head_.begin() && !Learned(head_.front()))
+          std::rotate(head_.begin(), learned_mixed, learned_mixed + 1);
       }
     }
     // A corrected whole word goes first when it is far more common than the typed reading's word (2026-11-05,
@@ -460,6 +473,11 @@ class PolicyTranslation : public Translation {
   bool Next() override { current_.reset(); Advance(); return !exhausted(); }
   an<Candidate> Peek() override { return current_; }
  private:
+  // A word in the user's own dictionary: picked before (user_phrase, or a table word with commits).
+  static bool Learned(const an<Candidate>& c) {
+    const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+    return p && (p->type() == "user_phrase" || p->entry().commit_count > 0);
+  }
   // Pairs the user ranks for himself, whatever was learned (2026-10-31): the plain 那个 comes
   // before the question 哪个 on the same span, even after picking 哪个 more often. Only the
   // first word moves, to just before the second; nothing else changes place.
