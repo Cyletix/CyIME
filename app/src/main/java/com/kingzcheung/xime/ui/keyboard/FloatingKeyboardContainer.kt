@@ -348,8 +348,8 @@ internal fun FloatingKeyboardContainer(
         }
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
         val context = LocalContext.current
-        var holdingFooter by remember { mutableStateOf(false) }
-        val lockProgress = floatingLockProgress(holdingFooter)
+        var holdPhase by remember { mutableStateOf(FloatingLockHoldPhase.Idle) }
+        val lockSweep = rememberFloatingLockSweep(holdPhase, floatingLockHoldMs(geometryLocked) - FLOATING_HOLD_QUIET_MS)
         var suppressCornerHint by remember(highlight.epoch) { mutableStateOf(false) }
         val cardPlacement = Modifier
             .align(Alignment.TopStart)
@@ -392,12 +392,13 @@ internal fun FloatingKeyboardContainer(
                 // 绕卡片中心转；调节界面的角度只在图层里读。
                 .graphicsLayer { rotationZ = previewRotationState?.value ?: restingRotation }
                 .clip(FloatingKeyboardCardShape)
+                // 边框和长按进度画在透明度图层外面：键盘调得再透明，进度也看得清。
+                .floatingLockOutline(geometryLocked, lockSweep, highlightColor)
                 .graphicsLayer {
                     alpha = opacity.coerceIn(0.3f, 1f)
                     // 只有半透明时才需要离屏合成；不透明时用 Auto，少一次全卡片离屏绘制。
                     compositingStrategy = if (opacity < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }
-                .floatingLockOutline(geometryLocked, highlightColor)
                 .testTag("floating-keyboard-card")
         ) {
             Column {
@@ -420,14 +421,14 @@ internal fun FloatingKeyboardContainer(
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .height((dragAreaHeight + capInset.floatValue.dp).coerceAtMost(cardTotalHeight))
                 .testTag("floating-footer").keyboardPanelBackground(backgroundColor), contentAlignment = Alignment.Center) {
-                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor, lockProgress)
+                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor)
             }
             if (!hideDragBar && previewRect == null) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
                 geometryLocked = geometryLocked,
-                onHolding = {
-                    holdingFooter = it
-                    if (it) suppressCornerHint = true
+                onHoldPhase = {
+                    holdPhase = it
+                    if (it == FloatingLockHoldPhase.Holding) suppressCornerHint = true
                 },
                 onToggle = { SettingsPreferences.setFloatingGeometryLocked(context, !lockedNow) },
                 onDragStart = {
@@ -698,7 +699,7 @@ internal const val UNDOCK_HANDLE_HEIGHT_DP = 14
 private fun DragBar(
     modifier: Modifier,
     geometryLocked: Boolean,
-    onHolding: (Boolean) -> Unit,
+    onHoldPhase: (FloatingLockHoldPhase) -> Unit,
     onToggle: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
@@ -715,23 +716,27 @@ private fun DragBar(
         modifier = modifier
             .fillMaxWidth()
             .testTag("floating-drag-bar")
-            .floatingFooterHold(geometryLocked, onHolding, onToggle)
-            .then(if (geometryLocked) Modifier else Modifier
+            // 长按锁定/解锁：锁没锁都在，同一个节点。
+            .floatingFooterHold(geometryLocked, onHoldPhase, onToggle)
+            // 点按、拖动的节点锁没锁都留着、顺序不变，只按 geometryLocked 重启，锁定时直接不处理：
+            // 锁定、解锁时不增删手势节点，解锁后拖动从新的一次按下开始，和没锁过一样。
             // 点一下（没拖动）：自己等按下和抬起，不要求按下没被消费，拖动手势先吃掉按下时也认得出点击；
             // 拖过了触摸阈值时拖动手势会消费移动，这里就不算点击。
-            .pointerInput(Unit) {
+            .pointerInput(geometryLocked) {
+                if (geometryLocked) return@pointerInput
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
                     if (waitForUpOrCancellation() != null) currentOnTap()
                 }
             }
-            .pointerInput(Unit) {
+            .pointerInput(geometryLocked) {
+                if (geometryLocked) return@pointerInput
                 detectDragGestures(
                     onDragStart = { currentOnDragStart() },
                     onDrag = { change, amount -> currentOnDrag(change, amount) },
                     onDragEnd = { currentOnDragEnd() },
                     onDragCancel = { currentOnDragCancel() },
                 )
-            }),
+            },
     )
 }

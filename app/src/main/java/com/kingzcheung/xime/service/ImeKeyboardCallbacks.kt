@@ -250,7 +250,7 @@ internal fun rememberImeKeyboardCallbacks(
                 val config = service.resources.configuration
                 val s = service.uiState.value
                 if (s.isFloatingMode && SettingsPreferences.floatingGeometryLocked(service)) {
-                    android.widget.Toast.makeText(service, "长按底部短横条 1 秒解锁，即可调整尺寸", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(service, "长按底部小锁 0.5 秒解锁，即可调整尺寸", android.widget.Toast.LENGTH_SHORT).show()
                     return@resize
                 }
                 val currentSize = service.currentResolvedKeyboardSize ?: service.resolveKeyboardSize(
