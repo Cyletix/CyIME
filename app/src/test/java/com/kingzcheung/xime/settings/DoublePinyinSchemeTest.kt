@@ -25,6 +25,13 @@ class DoublePinyinSchemeTest {
         it.copy(initials = it.initials + ("sh" to 'e'))
     }
 
+    /** 键位表上的编码；ju、qu、xu、yu 另外也能按 ü 的键打（首道 jv 出居），ü 和 u 同键时只有一个。 */
+    private fun codes(scheme: DoublePinyinScheme, syllable: String): Set<String> {
+        val code = scheme.code(syllable)!!
+        val umlaut = scheme.finals.getValue("v")
+        return if (syllable.matches(Regex("[jqxy]u")) && umlaut != scheme.finals["u"]) setOf(code, "${syllable[0]}$umlaut") else setOf(code)
+    }
+
     @Test fun flypyTableMatchesTheShippedFlypyRules() {
         for (syllable in DoublePinyinScheme.SYLLABLES)
             assertEquals(syllable, flypySyllable(syllable), DoublePinyinScheme.FLYPY.code(syllable))
@@ -62,8 +69,32 @@ class DoublePinyinSchemeTest {
     @Test fun algebraTurnsEverySyllableIntoItsCode() {
         for (scheme in DoublePinyinScheme.BUILTINS + custom) {
             val rules = scheme.algebra()
-            for (syllable in DoublePinyinScheme.SYLLABLES) assertEquals(syllable, scheme.code(syllable), apply(rules, syllable))
+            for (syllable in DoublePinyinScheme.SYLLABLES) assertEquals(syllable, codes(scheme, syllable), spellings(rules, syllable))
         }
+    }
+
+    /**
+     * 反馈 11-09：首道双拼 ü 在 V 上，jv 打不出居。ju、qu、xu、yu 的 u 读 ü，也能按 ü 的键打，与 Rime 官方双拼方案和
+     * 内置小鹤双拼相同；lü、nü 和 lu、nu 不受影响，屏上编码显示 ju。
+     */
+    @Test fun juCanAlsoBeTypedOnTheUmlautKey() {
+        val s = DoublePinyinScheme.SHOUDAO
+        val rules = s.algebra()
+        for (syllable in listOf("ju", "qu", "xu", "yu")) assertEquals(setOf(syllable, "${syllable[0]}v"), spellings(rules, syllable))
+        for (syllable in listOf("lv", "nv", "lu", "nu", "jue", "juan", "jun", "dui")) assertEquals(syllable, setOf(s.code(syllable)), spellings(rules, syllable))
+        assertEquals("ju qu xu yu lv dui", apply(s.preeditFormat(), "jvqvxvyvlvdv"))
+        assertEquals("ju", apply(s.preeditFormat(), "ju"))
+        // 自然码、智能ABC、拼音加加同样是 jv；微软双拼 ü 在 Y 上，是 jy。
+        for (scheme in listOf(DoublePinyinScheme.ZIRANMA, DoublePinyinScheme.ZNABC, DoublePinyinScheme.JIAJIA))
+            assertEquals(scheme.name, setOf("ju", "jv"), spellings(scheme.algebra(), "ju"))
+        assertEquals(setOf("ju", "jy"), spellings(DoublePinyinScheme.MICROSOFT.algebra(), "ju"))
+        assertEquals("ju xu", apply(DoublePinyinScheme.MICROSOFT.preeditFormat(), "jyxy"))
+        // 自定义方案：ü 和 u 同键不多派生；j/q/x 加 ü 键已是别的字（ü 放到 ia 的 X 上，jx 是加）时只给 y 加。
+        assertEquals(setOf("ju"), spellings(custom.copy(finals = custom.finals + ("v" to 'u')).algebra(), "ju"))
+        val onX = custom.copy(finals = custom.finals + ("v" to 'x'))
+        assertEquals(setOf("ju"), spellings(onX.algebra(), "ju"))
+        assertEquals(setOf("yu", "yx"), spellings(onX.algebra(), "yu"))
+        assertEquals("jia yu", apply(onX.preeditFormat(), "jxyx"))
     }
 
     @Test fun preeditShowsPinyin() {
@@ -237,7 +268,7 @@ class DoublePinyinSchemeTest {
             for (syllable in DoublePinyinScheme.SYLLABLES) {
                 val code = scheme.code(syllable)!!
                 val typed = spellings(rules, syllable)
-                assertEquals("${scheme.id} $syllable", setOf(code), typed.filterNot { '\'' in it }.toSet())
+                assertEquals("${scheme.id} $syllable", codes(scheme, syllable), typed.filterNot { '\'' in it }.toSet())
                 assertTrue("${scheme.id} $syllable $typed", "${code[0]}'" in typed)
             }
         }
@@ -429,6 +460,9 @@ class DoublePinyinSchemeTest {
                 val official = spellings(rules, syllable)
                 assertTrue("${scheme.name} $syllable ${scheme.code(syllable)} $official", scheme.code(syllable) in official)
             }
+            // 官方方案的 ju 也能按 ü 的键打（自然码 jv、微软 jy），生成的同样。
+            for (syllable in listOf("ju", "qu", "xu", "yu"))
+                assertEquals("${scheme.name} $syllable", spellings(rules, syllable), spellings(scheme.algebra(), syllable))
         }
         val z = DoublePinyinScheme.ZIRANMA
         assertEquals(listOf("vs", "ih", "ud", "sr", "jp", "ly", "xy", "lz", "lv", "lt"),
@@ -498,9 +532,8 @@ class DoublePinyinSchemeTest {
             assertEquals("erase/^[A-Z]$/", rules.first())
             assertEquals(1 + scheme.algebra().size + 24, rules.size)
             for (syllable in DoublePinyinScheme.SYLLABLES) {
-                val code = scheme.code(syllable)!!
                 val result = spellings(rules, syllable)
-                val expected = setOf(code, "${merged(code[0])}${code[1]}", "${code[0]}${merged(code[1])}", "${merged(code[0])}${merged(code[1])}")
+                val expected = codes(scheme, syllable).flatMap { setOf(it, "${merged(it[0])}${it[1]}", "${it[0]}${merged(it[1])}", "${merged(it[0])}${merged(it[1])}") }.toSet()
                 assertEquals(syllable, expected, result)
             }
         }
@@ -551,8 +584,7 @@ class DoublePinyinSchemeTest {
                 .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
             assertEquals(scheme.algebra() + scheme.separatorRules() + listOf(0, 1).flatMap { p -> groups.filter { it.length == 2 }.map { "derive/^(.{$p})[${it[1]}](.*)$/\$1${it[0]}\$2/" } }, rules)
             for (syllable in DoublePinyinScheme.SYLLABLES) {
-                val code = scheme.code(syllable)!!
-                val expected = setOf(code, "${merged(code[0])}${code[1]}", "${code[0]}${merged(code[1])}", "${merged(code[0])}${merged(code[1])}")
+                val expected = codes(scheme, syllable).flatMap { setOf(it, "${merged(it[0])}${it[1]}", "${it[0]}${merged(it[1])}", "${merged(it[0])}${merged(it[1])}") }.toSet()
                 assertEquals(syllable, expected, spellings(rules, syllable).filterNot { '\'' in it }.toSet())
             }
         }
@@ -561,7 +593,7 @@ class DoublePinyinSchemeTest {
     }
 
     @Test fun flypyFourteenKeyAssetMatchesTheGeneratedRules() {
-        // 随应用内置的 14 键小鹤双拼和由键位表生成的 14 键版本打出同样的编码（内置的另外多一组 ju→jv 的写法）。
+        // 随应用内置的 14 键小鹤双拼和由键位表生成的 14 键版本打出同样的编码（两边都有 ju→jv 的写法）。
         val asset = base14.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") || it.startsWith("    #") }
             .filter { it.startsWith("    - ") }.map { it.removePrefix("    - ").removeSurrounding("\"") }
         val generated = DoublePinyinScheme.FLYPY.copy(id = DoublePinyinScheme.ZIRANMA_ID).k14Schema(base14)

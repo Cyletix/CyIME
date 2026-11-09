@@ -61,10 +61,22 @@ data class DoublePinyinScheme(
      */
     fun algebra(): List<String> = buildList {
         add("erase/^xx$/")
+        umlautInitials().takeIf { it.isNotEmpty() }?.let { add("derive/^([$it])u$/\$1v/") }
         for (syllable in ZERO_SYLLABLES) add("xform/^$syllable$/${zero.getValue(syllable).upperCircled()}/")
         for (final in FINALS) add("xform/^(zh|ch|sh|[$PLAIN_INITIALS])$final$/\$1${finals.getValue(final).upperCircled()}/")
         for (initial in SPECIAL_INITIALS) add("xform/^$initial/${initials.getValue(initial).upperCircled()}/")
         add(if (usesSemicolon) "xlit/$UPPER_CIRCLED$SEMICOLON_PLACEHOLDER/$LETTERS;/" else "xlit/$UPPER_CIRCLED/$LETTERS/")
+    }
+
+    /**
+     * ju、qu、xu、yu 的 u 读 ü：除了按 u 的键，也能按 ü（v）的键打（首道、自然码 jv 出居），与 Rime 官方双拼方案和
+     * 内置小鹤双拼的 derive/^([jqxy])u$/$1v/ 相同。ü 和 u 同键、或 j/q/x/y 加 ü 键已是别的音节的编码时不加，不多出同码。
+     */
+    private fun umlautInitials(): String {
+        val key = finals["v"] ?: return ""
+        if (key == finals["u"]) return ""
+        val taken = SYLLABLES.mapNotNullTo(HashSet()) { code(it) }
+        return "jqxy".filter { "$it$key" !in taken }
     }
 
     /**
@@ -97,6 +109,10 @@ data class DoublePinyinScheme(
         readings.entries.groupBy({ it.key.second to it.value }, { it.key.first }).forEach { (keyAndFinal, firsts) ->
             val (key, final) = keyAndFinal
             add("xform/(^|[ '])([${firsts.sorted().joinToString("")}])$key(?=$|[ '])/\$1\$2${final.lowerCircled()}/")
+        }
+        // jv（ju 按 ü 键打）显示 ju。
+        umlautInitials().takeIf { it.isNotEmpty() }?.let { firsts ->
+            add("xform/(^|[ '])([$firsts])${finals.getValue("v")}(?=$|[ '])/\$1\$2${"u".lowerCircled()}/")
         }
         for (initial in SPECIAL_INITIALS) add("xform/(^|[ '])${initials.getValue(initial)}(?!$keys)/\$1${initial.lowerCircled()}/")
         add("xlit/$LOWER_CIRCLED/$LETTERS/")
