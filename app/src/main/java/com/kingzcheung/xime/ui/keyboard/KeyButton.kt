@@ -388,6 +388,12 @@ fun SwipeableKeyButton(
         if (discKey && state.movedOffPress()) discRevealed = true
         return discFlickPreview(state.keyFlick, discKey)
     }
+    // 按键浮标和方向盘是同一个东西（用户 11-09）：按下先出按键浮标，方向盘一出来就把浮标收掉，
+    // 不两个叠着；长按到点换成角标气泡。
+    fun forwardPreview(state: SwipeState) {
+        val discOwnsPress = discRevealed && state.isPressed && !state.isLongPress && state.keyFlick == null
+        onSwipeStateChange?.invoke(if (discOwnsPress) SwipeState() else state, buttonBounds)
+    }
     // In flick mode the held key's own value (the digit) is a one-item long-press popup: it shows
     // what will be entered and commits only on release, like every other long-press choice.
     // 「长按输入」（关闭角标滑动）时和其他布局的角标一样：按满设定时长立刻输入，气泡显示它，松手消失（用户 11-08）。
@@ -416,7 +422,7 @@ fun SwipeableKeyButton(
         onTap = tapOrCtrl,
         onPress = { isPressed = true; discRevealed = false; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { flickPreview = keyPreview(it); longPressShown = it.isLongPress; onSwipeStateChange?.invoke(it, buttonBounds) },
+        onPreview = { flickPreview = keyPreview(it); longPressShown = it.isLongPress; forwardPreview(it) },
         inlineVerticalPreview = true,
         inlineHorizontalPreview = true,
         leftText = flickAt(0), onLeft = flickAction(0),
@@ -442,7 +448,7 @@ fun SwipeableKeyButton(
         onPress = { isPressed = true; discRevealed = false; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
         // 长按到点后（角标已输入或弹出菜单）方向盘收起，和拂动键一样只留长按气泡。
-        onPreview = { flickPreview = keyPreview(it); longPressShown = it.isLongPress; onSwipeStateChange?.invoke(it, buttonBounds) },
+        onPreview = { flickPreview = keyPreview(it); longPressShown = it.isLongPress; forwardPreview(it) },
         inlineVerticalPreview = true,
         upText = swipeText,
         downText = swipeDownText,
@@ -515,6 +521,7 @@ fun SwipeableKeyButton(
         if (isPressed) {
             delay(FLICK_DISC_HOLD_MS)
             discRevealed = true
+            if (!longPressShown) onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
         }
     }
     val showDisc = inputPreferences.flickDirectionDisc && isPressed && discRevealed && !longPressShown &&

@@ -874,7 +874,7 @@ internal fun KeyboardAppearanceSettings() {
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "按下时在键上方放大显示这个字，多一点动画开销",
+                                text = "按下时在键上方显示按的键，长按换成角标，拂动换成方向盘",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

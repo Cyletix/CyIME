@@ -144,7 +144,8 @@ object SettingsPreferences {
     
     const val KEY_SWIPE_UP_HINTS_ENABLED = "swipe_up_hints_enabled"
     const val KEY_SWIPE_DOWN_HINTS_ENABLED = "swipe_down_hints_enabled"
-    const val KEY_SHOW_PRESS_BUBBLE = "show_press_bubble"
+    /** 按键浮标默认开（用户 11-09，别家和 Xime 都有）；换键名让 09-24 默认关时存下的值作废一次。 */
+    const val KEY_SHOW_PRESS_BUBBLE = "show_press_bubble_v2"
 
     private const val KEY_AUTO_NUMBER_KEYBOARD = "auto_number_keyboard_for_number_fields"
 
@@ -1156,7 +1157,7 @@ object SettingsPreferences {
     }
 
     fun shouldShowPressBubble(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_SHOW_PRESS_BUBBLE, false)
+        return getPrefs(context).getBoolean(KEY_SHOW_PRESS_BUBBLE, true)
     }
 
     fun setShowPressBubble(context: Context, show: Boolean) {
