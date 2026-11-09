@@ -29,14 +29,9 @@ class KeyboardBackgroundMotionTest {
         }
     }
 
-    /** 渐变回起点盖满之后，下一帧直接换成起点：看到的是同一个样子，不算跳。 */
-    private fun continuing(a: BackgroundMotionTransform, b: BackgroundMotionTransform): BackgroundMotionTransform =
-        a.fadeTo?.takeIf { a.fadeAlpha > .95f && b.fadeTo == null } ?: a
-
     @Test fun motionNeverJumps() {
         for (effect in BackgroundMotionEffect.entries) for (speed in BackgroundMotionSpeed.entries) {
-            samples(effect, speed).zipWithNext { prev, b ->
-                val a = continuing(prev, b)
+            samples(effect, speed).zipWithNext { a, b ->
                 assertTrue("$effect $speed 缩放跳了: $a → $b", abs(a.scale - b.scale) < .003f)
                 assertTrue("$effect $speed 位置跳了: $a → $b", abs(a.shiftX - b.shiftX) < .003f)
             }
@@ -48,8 +43,7 @@ class KeyboardBackgroundMotionTest {
         val width = 1080f
         for (effect in BackgroundMotionEffect.entries) for (speed in BackgroundMotionSpeed.entries) {
             val limit = if (speed == BackgroundMotionSpeed.FAST) 1.5f else 1f
-            samples(effect, speed).zipWithNext { prev, b ->
-                val a = continuing(prev, b)
+            samples(effect, speed).zipWithNext { a, b ->
                 // 边缘的点走得最远：缩放带来的半宽变化加上平移。
                 val edge = abs(b.scale - a.scale) * width / 2f + abs(b.shiftX - a.shiftX) * width
                 assertTrue("$effect $speed 每帧移动 $edge px", edge < limit)
@@ -71,40 +65,6 @@ class KeyboardBackgroundMotionTest {
         assertEquals(-BackgroundMotionPath.MAX_SHIFT, BackgroundMotionPath.at(BackgroundMotionEffect.CYCLE, shot, shot).shiftX, 1e-6f)
         assertEquals(BackgroundMotionPath.MAX_SHIFT, BackgroundMotionPath.at(BackgroundMotionEffect.CYCLE, 2 * shot, shot).shiftX, 1e-6f)
         assertTrue(BackgroundMotionPath.at(BackgroundMotionEffect.CYCLE, 3 * shot, shot).isIdentity)
-    }
-
-    /** 用户 11-08：放大走到头不能倒着缩回去，缩小也一样；走到头后渐变回起点，一圈结束正好是起点。 */
-    @Test fun zoomKeepsItsDirectionAndFadesBackToTheStart() {
-        for (speed in BackgroundMotionSpeed.entries) for ((effect, direction) in
-            listOf(BackgroundMotionEffect.ZOOM_IN to 1, BackgroundMotionEffect.ZOOM_OUT to -1)) {
-            val shot = speed.shotMs
-            val cycle = BackgroundMotionPath.cycleMs(effect, shot)
-            val frames = (0L until cycle step frameMs).map { BackgroundMotionPath.at(effect, it, shot) }
-            frames.zipWithNext { a, b ->
-                assertTrue("$effect $speed 倒着走了: ${a.scale} → ${b.scale}", (b.scale - a.scale) * direction >= -1e-6f)
-            }
-            val start = BackgroundMotionPath.at(effect, 0, shot)
-            val fading = frames.filter { it.fadeTo != null }
-            assertTrue("$effect 走到头要渐变回起点", fading.isNotEmpty())
-            fading.forEach { assertEquals("$effect 淡入的是起点的样子", start.scale, it.fadeTo!!.scale, 1e-6f) }
-            fading.zipWithNext { a, b -> assertTrue("$effect 渐变只往起点走", b.fadeAlpha >= a.fadeAlpha) }
-            assertTrue("$effect 渐变结束前几乎盖满", fading.last().fadeAlpha > .95f)
-            assertEquals("$effect 一圈结束回到起点", start, BackgroundMotionPath.at(effect, cycle, shot))
-            assertEquals("渐变时长", shot + BackgroundMotionPath.RETURN_FADE_MS, cycle)
-        }
-    }
-
-    @Test fun panAndCycleNeverFade() {
-        val shot = BackgroundMotionSpeed.NORMAL.shotMs
-        for (effect in listOf(BackgroundMotionEffect.PAN, BackgroundMotionEffect.CYCLE))
-            (0L..3 * shot step frameMs).forEach { assertEquals(null, BackgroundMotionPath.at(effect, it, shot).fadeTo) }
-    }
-
-    @Test fun fadingPoseIsNotIdentityAndDominantSwitchesHalfway() {
-        val pose = BackgroundMotionTransform(1f, 0f, 0f, fadeTo = BackgroundMotionTransform(1.12f, 0f, 0f), fadeAlpha = .3f)
-        assertFalse("缩小走到原样、上面还盖着放大的那层时不能当成静止", pose.isIdentity)
-        assertEquals(1f, pose.dominant.scale, 0f)
-        assertEquals(1.12f, pose.copy(fadeAlpha = .6f).dominant.scale, 0f)
     }
 
     @Test fun pausedClockKeepsThePosition() {

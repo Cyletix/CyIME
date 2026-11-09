@@ -66,24 +66,21 @@ internal fun BoxScope.KeyboardBackgroundMotionLayer(
             Modifier.fillMaxSize()
                 .graphicsLayer {
                     val t = motion.transform
-                    applyMotionPose(t, slot.frame() ?: Rect(Offset.Zero, size))
+                    val frame = slot.frame() ?: Rect(Offset.Zero, size)
+                    scaleX = t.scale
+                    scaleY = t.scale
+                    translationX = t.shiftX * frame.width
+                    translationY = t.shiftY * frame.height
+                    transformOrigin = TransformOrigin(
+                        if (size.width > 0f) frame.center.x / size.width else .5f,
+                        if (size.height > 0f) frame.center.y / size.height else .5f,
+                    )
                 }
         ) {
             // 换图时旧图垫在下面，新图在自己的一层里淡入；淡完旧图就丢掉，平时只有一层。
             if (slot.previousDraw != null) Box(Modifier.fillMaxSize().drawBehind { slot.previousDraw?.invoke(this) })
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = slot.fade.floatValue }.drawBehind { slot.draw?.invoke(this) })
         }
-        // 放大、缩小走到头后渐变回起点：起点的样子在这一层淡入（平时不透明度 0，渲染线程直接跳过不画）。
-        Box(
-            Modifier.fillMaxSize()
-                .graphicsLayer {
-                    val t = motion.transform
-                    val pose = t.fadeTo
-                    alpha = if (pose == null) 0f else t.fadeAlpha.coerceIn(0f, 1f)
-                    applyMotionPose(pose ?: t, slot.frame() ?: Rect(Offset.Zero, size))
-                }
-                .drawBehind { slot.draw?.invoke(this) }
-        )
     }
     val fadeToken = slot.fadeToken
     LaunchedEffect(fadeToken) {
@@ -97,19 +94,6 @@ internal fun BoxScope.KeyboardBackgroundMotionLayer(
         }
         slot.previousDraw = null
     }
-}
-
-private fun androidx.compose.ui.graphics.GraphicsLayerScope.applyMotionPose(
-    pose: com.kingzcheung.xime.ui.theme.BackgroundMotionTransform, frame: Rect,
-) {
-    scaleX = pose.scale
-    scaleY = pose.scale
-    translationX = pose.shiftX * frame.width
-    translationY = pose.shiftY * frame.height
-    transformOrigin = TransformOrigin(
-        if (size.width > 0f) frame.center.x / size.width else .5f,
-        if (size.height > 0f) frame.center.y / size.height else .5f,
-    )
 }
 
 /** 轮播换图的淡入时长。 */

@@ -139,7 +139,7 @@ private fun Modifier.liquidRefraction33(radius: Dp): Modifier = composed {
             val frame = backdrop.frame
             if (frame.size.width <= 0 || frame.size.height <= 0 || bitmap.width <= 0 || bitmap.height <= 0) return@onDrawBehind
             val offset = frame.origin + backdrop.windowToRoot - at
-            val motion = backdrop.motion?.transform?.dominant ?: BackgroundMotionTransform.Identity
+            val motion = backdrop.motion?.transform ?: BackgroundMotionTransform.Identity
             val width = frame.size.width.toFloat()
             val height = frame.size.height.toFloat()
             // Same centre and translation as withSharedBackdropMotion. Both the frame and the key
