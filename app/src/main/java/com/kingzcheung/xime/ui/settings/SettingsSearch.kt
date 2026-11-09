@@ -211,6 +211,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("九键滑行", glidePath, glide, "九宫格 九鍵 九键 滑行 连划 滑动拼音 连续输入 手势 九键滑行输入"),
         SettingsSearchEntry("逐字删除中文滑行", glidePath, glide, "滑行 划词 删除 退格 拼音 音节 中文"),
         SettingsSearchEntry("滑行时实时显示词", glidePath, glide, "滑行 实时 预览 显示 抬手 gboard 划词 swype"),
+        SettingsSearchEntry("贡献滑行轨迹", glidePath, glide, "滑行练习 练习 贡献 上传 轨迹 魔搭 数据 改进识别"),
         SettingsSearchEntry("三行字母错位", qwertyPath, qwerty, "错位 排布 实体键盘 对齐 手机排布 字母行 偏移"),
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),
         SettingsSearchEntry("空格左侧逗号键", qwertyPath, qwerty, "逗号 空格 加宽 标点"),

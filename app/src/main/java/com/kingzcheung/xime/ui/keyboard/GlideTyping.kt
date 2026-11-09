@@ -124,7 +124,10 @@ internal fun Modifier.glideTyping(
                 if (!change.pressed) {
                     if (tracker.claimed) {
                         change.consume()
-                        currentOnTrace(tracker.xs(), tracker.ys())
+                        val xs = tracker.xs(); val ys = tracker.ys()
+                        // 「贡献滑行轨迹」页开着时才有人收，平时直接返回。
+                        com.kingzcheung.xime.glide.GlideSampleRecorder.record("qwerty", keys, xs, ys, tracker.ts())
+                        currentOnTrace(xs, ys)
                     }
                     break
                 }

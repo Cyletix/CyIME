@@ -30,7 +30,7 @@ internal enum class LayoutInputCategory(val route: String, val title: String, va
     Qwerty("layout_input_qwerty", "26 键", "中英混输、字母错位、空格两侧标点、分词键"),
     Nine("layout_input_nine", "九键与 14 键", "拂动选字母、14 键双字母键、触发距离、方向圆盘与假名提示"),
     /** 英文、中文 26 键和九键滑行原来分在 26 键、九键两页三个开关（用户 11-09「三个入口太乱」），合到这一页；存的值不变。 */
-    Glide("layout_input_glide", "滑行输入", "英文、中文、九键滑行，实时显示词，逐字删除，滑行练习"),
+    Glide("layout_input_glide", "滑行输入", "英文、中文、九键滑行，实时显示词，逐字删除"),
 }
 
 /** 日语 26 键的长音 ー 放在哪：三张带图例的卡片，默认 L 键（见 JapaneseLongVowelKey）。 */
@@ -58,7 +58,7 @@ internal fun JapaneseLongVowelKeySettings(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: () -> Unit) {
+internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: () -> Unit, onNavigate: (String) -> Unit = {}) {
     val context = LocalContext.current
     val saved = rememberKeyboardInputPreferences()
     var settings by remember(saved) { mutableStateOf(saved) }
@@ -232,11 +232,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             settings = settings.copy(deleteChineseGlideCharacter = it); settings.save(context)
                         })
                 })
-                SettingsSection(title = "练习", content = {
-                    GlidePracticeItem(nine = false, title = "26 键滑行练习")
-                    HorizontalDivider()
-                    GlidePracticeItem(nine = true, title = "九键滑行练习")
-                })
+                SettingsSection(title = "贡献", content = { GlidePracticeItem { onNavigate(SettingsRoutes.GlideContribute) } })
                 }
             }
             SettingsJumpText((if (category == LayoutInputCategory.Glide) "" else "滑行在「键盘布局 › 滑行输入」；") +

@@ -81,6 +81,7 @@ internal fun Modifier.t9GlideTyping(
             val editor = ticket.value() ?: return@awaitEachGesture
             val stroke = DigitStroke(keys.toMap(), down.position + offset, first.key)
             val path = arrayListOf(down.position)
+            val times = arrayListOf(down.uptimeMillis)
             var moved = false
             var claimed = false
             try {
@@ -103,9 +104,10 @@ internal fun Modifier.t9GlideTyping(
                     }
                     if (!moved && change.uptimeMillis - down.uptimeMillis >= holdMs.value) break
                     moved = moved || (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-                    for (position in change.historical.map { it.position } + change.position) {
+                    for ((position, time) in change.historical.map { it.position to it.uptimeMillis } + (change.position to change.uptimeMillis)) {
                         if (path.last() != position) {
                             path += position
+                            times += time
                             stroke.move(position + offset)
                             if (stroke.cancelled) break
                         }
@@ -115,8 +117,15 @@ internal fun Modifier.t9GlideTyping(
                     if (stroke.cancelled || origin.value() != offset || ticket.value() != editor) break
                     if (!change.pressed) {
                         // Root coordinates, same as the key rectangles.
-                        if (claimed) submit.value(FloatArray(path.size) { path[it].x + offset.x },
-                            FloatArray(path.size) { path[it].y + offset.y })
+                        if (claimed) {
+                            val xs = FloatArray(path.size) { path[it].x + offset.x }
+                            val ys = FloatArray(path.size) { path[it].y + offset.y }
+                            // 「贡献滑行轨迹」页开着时才有人收，平时直接返回。
+                            if (com.kingzcheung.xime.glide.GlideSampleRecorder.listener != null)
+                                com.kingzcheung.xime.glide.GlideSampleRecorder.record("t9", keys.mapValues { (_, r) ->
+                                    com.kingzcheung.xime.keyboard.LetterKeyRect(r.left, r.top, r.width, r.height) }, xs, ys, times.toLongArray())
+                            submit.value(xs, ys)
+                        }
                         break
                     }
                     if (claimed) trail.points = path.toList()
