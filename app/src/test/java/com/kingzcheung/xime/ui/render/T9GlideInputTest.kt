@@ -111,6 +111,20 @@ class T9GlideInputTest {
         assertEquals("", input)
     }
 
+    /** 用户 11-09：九键滑行开着打不了字。落在 5 的上沿、手指往上抖进 2 一点点，不能被当成滑行吞掉。 */
+    @Test fun shortDriftFromAKeyEdgeIsNotAGlide() {
+        show(true)
+        val five = centerOf("JKL"); val two = centerOf("ABC")
+        board.performTouchInput { down(lerp(five, two, 0.35f)); moveTo(lerp(five, two, 0.75f)); up() }
+        val glided = runCatching { rule.waitUntil(1500) { input.contains("52") } }.isSuccess
+        org.junit.Assert.assertFalse("短短一抖不该滑出 52：$input", glided)
+        // 从 5 中间划到 2 中间仍是滑行。
+        input = ""
+        board.performTouchInput { down(five); moveTo(two); up() }
+        rule.waitUntil(5000) { input.length >= 2 }
+        assertEquals("从 5 起滑出两个键", "5", input.take(1))
+    }
+
     @Test fun disabledGlideDoesNotFeedCrossedDigits() {
         show(false)
         val five = centerOf("JKL"); val six = centerOf("MNO")
