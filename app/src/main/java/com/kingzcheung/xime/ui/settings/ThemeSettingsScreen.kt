@@ -84,6 +84,20 @@ private fun ThemeSettingsPage(
     
     var previewTheme by remember { mutableStateOf<KeyboardColorScheme?>(null) }
     var showGlassSettings by remember { mutableStateOf(false) }
+    // 背景图片和配色分开（11-09 用户：「这是两个系统」）：开着图片时，配色列表里选中的是图片下面那套配色，
+    // 换配色只换底，图片留着；「我的图片」不再作为一张配色卡出现，改由「背景图片」里的开关打开、关闭。
+    val imageOn = uiState.colorTheme == com.kingzcheung.xime.ui.theme.CustomImageTheme.ID
+    val schemeId = if (imageOn) com.kingzcheung.xime.ui.theme.CustomImageTheme.baseFor(context, uiState.colorTheme)
+        else com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme).id
+    val schemes = uiState.colorThemes.filter { it.id != com.kingzcheung.xime.ui.theme.CustomImageTheme.ID }
+    fun applyScheme(theme: KeyboardColorScheme) {
+        if (imageOn && com.kingzcheung.xime.ui.theme.CustomImageTheme.canUnderlay(theme)) {
+            com.kingzcheung.xime.ui.theme.CustomImageTheme.setBase(context, theme.id)
+            com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
+            viewModel.refreshThemes()
+            viewModel.setColorTheme(com.kingzcheung.xime.ui.theme.CustomImageTheme.ID)
+        } else viewModel.setColorTheme(theme.id)
+    }
     KeyboardSettingsScaffold("主题与外观", onBack, preview = previewTheme == null && !showGlassSettings) { modifier ->
         val listState = rememberSettingsSearchListState()
         LazyColumn(
@@ -188,8 +202,8 @@ private fun ThemeSettingsPage(
             }
             
             item {
-                val shownTheme = uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
-                    ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)
+                val shownTheme = schemes.firstOrNull { it.id == schemeId }
+                    ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(schemeId)
                 Text(
                     // 莫奈取色按每台设备的壁纸取色，不能说各设备相同。
                     text = if (shownTheme.isDynamic) "${shownTheme.name}跟随系统壁纸取色。点击可预览。"
@@ -200,7 +214,7 @@ private fun ThemeSettingsPage(
                 )
             }
             
-            uiState.colorThemes.chunked(3).forEach { rowThemes ->
+            schemes.chunked(3).forEach { rowThemes ->
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -210,7 +224,7 @@ private fun ThemeSettingsPage(
                             KeyboardThemeCard(
                                 theme = theme,
                                 glass = glass,
-                                isSelected = com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme).id == theme.id,
+                                isSelected = schemeId == theme.id,
                                 onClick = {
                                     previewTheme = theme
                                 },
@@ -229,7 +243,19 @@ private fun ThemeSettingsPage(
             }
             
             item {
-                CustomImageThemeSection(currentThemeId = uiState.colorTheme, onSaved = {
+                CustomImageThemeSection(currentThemeId = uiState.colorTheme, onUseImage = { on ->
+                    changeAppearance(context, onThemeChanged) {
+                        if (on) {
+                            // 打开图片：现在的配色能垫在图片下面就用它做底，否则沿用上次的底。
+                            schemes.firstOrNull { it.id == schemeId }
+                                ?.takeIf(com.kingzcheung.xime.ui.theme.CustomImageTheme::canUnderlay)
+                                ?.let { com.kingzcheung.xime.ui.theme.CustomImageTheme.setBase(context, it.id) }
+                            com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(context)
+                            viewModel.refreshThemes()
+                            viewModel.setColorTheme(com.kingzcheung.xime.ui.theme.CustomImageTheme.ID)
+                        } else viewModel.setColorTheme(schemeId)
+                    }
+                }, onSaved = {
                     viewModel.refreshThemes()
                     changeAppearance(context, onThemeChanged) {
                         viewModel.setColorTheme(com.kingzcheung.xime.ui.theme.CustomImageTheme.ID)
@@ -272,7 +298,7 @@ private fun ThemeSettingsPage(
                 theme = theme,
                 onApply = {
                     changeAppearance(context, onThemeChanged) {
-                        viewModel.setColorTheme(theme.id)
+                        applyScheme(theme)
                         previewTheme = null
                     }
                 },
@@ -327,8 +353,8 @@ private fun CustomImageVeilSlider(dark: Boolean, onChanged: () -> Unit) {
  * 设置过以后可以再调整或删除。
  */
 @Composable
-private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit, onDeleted: (String) -> Unit,
-    onVeilChanged: () -> Unit) {
+private fun CustomImageThemeSection(currentThemeId: String, onUseImage: (Boolean) -> Unit, onSaved: () -> Unit,
+    onDeleted: (String) -> Unit, onVeilChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var hasImage by remember { mutableStateOf(com.kingzcheung.xime.ui.theme.CustomImageTheme.hasImage(context)) }
@@ -350,11 +376,15 @@ private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit,
     }
     SettingsSection(title = "背景图片") {
         SettingsItem(icon = Icons.TwoTone.Image, title = "用自己的图片",
-            subtitle = if (hasImage) "已设置，在上面的配色里选「我的图片」使用；点这里换一张"
+            subtitle = if (hasImage) "已设置，点这里换一张"
                 else "从相册选一张图片做键盘背景，按键和文字的颜色沿用当前主题",
             onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             showArrow = true)
         if (hasImage) {
+            SettingsToggleItem(icon = Icons.TwoTone.Image, title = "使用背景图片",
+                subtitle = "开着时换配色只换按键和文字的颜色，图片留着；iOS 渐变不能垫在图片下面",
+                checked = currentThemeId == com.kingzcheung.xime.ui.theme.CustomImageTheme.ID,
+                onCheckedChange = onUseImage)
             SettingsItem(icon = Icons.TwoTone.Crop, title = "调整图片",
                 subtitle = "拖动、缩放，贴齐键盘的边，或让两边、上下留白",
                 onClick = {
@@ -367,7 +397,7 @@ private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit,
             CustomImageVeilSlider(dark = false, onChanged = onVeilChanged)
             CustomImageVeilSlider(dark = true, onChanged = onVeilChanged)
             SettingsItem(icon = Icons.TwoTone.Delete, title = "删除图片",
-                subtitle = "删掉这张图片和「我的图片」配色",
+                subtitle = "删掉这张图片，配色照旧",
                 onClick = { confirmDelete = true })
         }
         BackgroundMotionSettingsItems(hasCustomImage = hasImage)
@@ -405,7 +435,7 @@ private fun CustomImageThemeSection(currentThemeId: String, onSaved: () -> Unit,
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("删除图片") },
-            text = { Text("删掉这张背景图片，「我的图片」配色也一起去掉；正在用它时换回原来的配色。") },
+            text = { Text("删掉这张背景图片；正在用它时，键盘留下图片下面那套配色。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false

@@ -67,6 +67,17 @@ object CustomImageTheme {
     private fun usableBase(theme: KeyboardColorScheme) =
         theme.id != ID && theme.id != TransparentGlassTheme.ID
 
+    /** 这套配色能不能垫在图片下面（iOS 渐变没有固定底色，不能）。 */
+    fun canUnderlay(theme: KeyboardColorScheme): Boolean = usableBase(theme)
+
+    /**
+     * 开着图片时换配色：只换图片下面的配色，图片留着（11-09 用户：图片和配色是两个系统，
+     * 原来要先选配色再选图片才记得住）。在主线程调用也可以，只写一项设置。
+     */
+    fun setBase(context: Context, baseThemeId: String) {
+        check(SettingsPreferences.getPrefsPublic(context).edit().putString(KEY_BASE, baseThemeId).commit()) { "无法保存设置" }
+    }
+
     /** 选图时要沿用的主题：当前就是「我的图片」时沿用它原来的底。 */
     fun baseFor(context: Context, currentThemeId: String): String =
         if (currentThemeId == ID) SettingsPreferences.getPrefsPublic(context).getString(KEY_BASE, null) ?: SoftBlueTheme.ID

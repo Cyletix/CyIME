@@ -144,4 +144,20 @@ class CustomImageThemeTest {
         assertEquals(base.keyTextColorDark, KeyboardThemes.getKeyTextColorOverride(id, true))
         assertEquals(SoftBlueTheme.ID, CustomImageTheme.previewColorThemeId(themes, TransparentGlassTheme.ID))
     }
+
+    /** 11-09 用户：图片和配色是两个系统。开着图片换配色，只换图片下面的颜色，图片和摆放不动。 */
+    @Test fun changingTheSchemeKeepsTheImage() {
+        choose("mint_green")
+        CustomImageTheme.setBase(context, SoftBlueTheme.ID)
+        val custom = CustomImageTheme.build(context, themes)!!
+        val blue = themes.first { it.id == SoftBlueTheme.ID }
+        assertEquals(blue.keyBgLight, custom.keyBgLight)
+        assertEquals("themes/custom-keyboard-bg-1.jpg", custom.keyboardBackground!!.src)
+        assertEquals(SoftBlueTheme.ID, CustomImageTheme.baseFor(context, CustomImageTheme.ID))
+    }
+
+    @Test fun iosGradientCannotSitUnderTheImage() {
+        assertFalse(CustomImageTheme.canUnderlay(themes.first { it.id == TransparentGlassTheme.ID }))
+        assertTrue(CustomImageTheme.canUnderlay(themes.first { it.id == SoftBlueTheme.ID }))
+    }
 }
