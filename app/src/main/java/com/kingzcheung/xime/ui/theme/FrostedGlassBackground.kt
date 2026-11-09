@@ -96,11 +96,11 @@ internal fun Modifier.frostedGlassBackground(
             val draw: (DrawScope.() -> Unit)? = if (image == null) null else ({
                 if (shared.frame.size.width > 0 && shared.frame.size.height > 0) {
                     val offset = shared.frame.offsetIn(originState.value)
-                    clipRect {
-                        translate(offset.x, offset.y) {
-                            drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
-                                filterQuality = FilterQuality.Medium)
-                        }
+                    // 不在这里裁成卡片大小：图层按整窗的 frame 平移、缩放，卡片比窗口窄时（横屏调窄）
+                    // 裁过的图挪不了那么远，边上露底色。外面那层 clipToBounds 在变形之后再裁。
+                    translate(offset.x, offset.y) {
+                        drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
+                            filterQuality = FilterQuality.Medium)
                     }
                 }
             })
