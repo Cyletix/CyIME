@@ -279,6 +279,10 @@ class KeyboardInputPreferencesTest {
             values[it.getArgument(0)] = it.getArgument<Float>(1)
             editor
         }
+        whenever(editor.remove(any())).thenAnswer {
+            values.remove(it.getArgument<String>(0))
+            editor
+        }
     }
 
     @Test

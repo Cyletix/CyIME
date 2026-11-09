@@ -154,8 +154,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("关于 CyIME", system, SettingsRoutes.About, "版本 开发者 联系 许可 检查更新 最新版本 源代码 更新内容"),
         // 输入 › 语言与方案
         SettingsSearchEntry("语言键切换方式", languages, "languages", "语言键 切换语言 中英切换 循环切换 指定语言 英文 地球键 点按语言键"),
-        SettingsSearchEntry("繁体输出", chinesePath, chinese, "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换"),
-        SettingsSearchEntry("注音输出简体", chinesePath, chinese, "注音简体 注音繁体 注音转简体 大千 ㄅㄆㄇ 简繁切换"),
+        SettingsSearchEntry("繁体输出", chinesePath, chinese, "繁体 繁體 正体 简繁 简繁切换 简体 台湾 转换 注音简体 注音繁体 注音转简体 大千 ㄅㄆㄇ"),
         SettingsSearchEntry("生僻字", chinesePath, chinese, "生僻字 罕用字 缺字 打不出 大字表 扩展字 字库 冷僻字"),
         SettingsSearchEntry("时间日期候选", chinesePath, chinese, "时间 日期 星期 今天 几点 当前时间 当前日期 年月日 联想 候选 ts 时间戳 unix"),
         SettingsSearchEntry("网址、邮箱框自动切英文", englishPath, english, "网址 邮箱 链接 地址栏 url email 自动英文 自动切英文 切成英文 变英文 中文 换软件 输入框"),

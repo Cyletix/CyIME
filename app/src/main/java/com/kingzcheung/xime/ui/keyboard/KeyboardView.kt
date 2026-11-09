@@ -677,7 +677,6 @@ fun KeyboardView(
         val quickToggles = rememberQuickToggleStates()
         // 开无痕前先确认：菜单里一碰就开，之后复制的内容不再进剪贴板，用户不知道为什么。关掉不用确认。
         var incognitoConfirm by remember(state.inputSessionId) { mutableStateOf(false) }
-        val zhuyin = state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN
         // 中文全拼、双拼 26 键：菜单里的「滑行输入」开关的是「中文滑行输入」（其他中文键盘不滑行，不出现）。
         val chineseGlideMenu = !state.isAsciiMode &&
             com.kingzcheung.xime.glide.chineseGlideSupported(state.inputProfile, state.currentSchemaId)
@@ -743,10 +742,9 @@ fun KeyboardView(
                     })
                     // 英文状态标点固定半角，入口不出现，避免“点了看不到变化，实际却改了状态”。
                     ToolbarButton.FULL_SHAPE -> widthSwitch?.let { sw -> { callbacks.onToggleSchemaSwitch?.invoke(sw) } } ?: return null
-                    // 注音的简繁选择独立于其他中文方案。
+                    // 拼音、双拼、仓颉、注音共用一个简繁开关。
                     ToolbarButton.TRADITIONAL -> if (traditionalSwitchApplies) ({
-                        if (zhuyin) inputPreferences.copy(zhuyinSimplified = !inputPreferences.zhuyinSimplified).save(quickContext)
-                        else inputPreferences.copy(traditionalOutput = !inputPreferences.traditionalOutput).save(quickContext)
+                        inputPreferences.copy(traditionalOutput = !inputPreferences.traditionalOutput).save(quickContext)
                     }) else return null
                     // 「语音转文本」关着时麦克风入口不出现（工具栏和菜单都是），不再显示一个点了只弹提示的图标。
                     ToolbarButton.VOICE -> if (!state.isSttEnabled) return null else ({
@@ -768,7 +766,7 @@ fun KeyboardView(
                     }
                 })
             }
-            val settingsEntry = com.kingzcheung.xime.ui.settings.menuSettingsEntry(item, state.inputProfile.scheme)
+            val settingsEntry = com.kingzcheung.xime.ui.settings.menuSettingsEntry(item)
             val openSettings: (() -> Unit)? = settingsEntry?.let { entry -> {
                 toolbarFeedback()
                 com.kingzcheung.xime.ui.settings.SettingsSearchFocus.open(entry)
@@ -792,7 +790,7 @@ fun KeyboardView(
                 ToolbarButton.INCOGNITO -> quickToggles.incognito
                 in ToolbarButton.LAYOUT_GESTURES -> item.button.gestureOn(inputPreferences, chineseGlideMenu, nineGlideMenu)
                 ToolbarButton.FULL_SHAPE -> widthSwitch?.let { it.states.getOrNull(it.currentIndex) == "全角" } == true
-                ToolbarButton.TRADITIONAL -> if (zhuyin) !inputPreferences.zhuyinSimplified else inputPreferences.traditionalOutput
+                ToolbarButton.TRADITIONAL -> inputPreferences.traditionalOutput
                 else -> false
             }) {
                 toolbarFeedback()

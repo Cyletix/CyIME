@@ -1020,7 +1020,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 候选开关（繁体输出、表情、时间日期、符号名、希腊字母、生僻字、中英混输）：工具栏、菜单按钮或设置页一改就写进引擎，
                 // 正在打的拼音当场按新设置出候选，不用等下一个字母键（以前关了繁体直接点候选或空格，上屏的还是繁体）。
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY,
-                com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ZHUYIN_SIMPLIFIED_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CANDIDATE_EMOJI_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DATETIME_CANDIDATES_KEY,
                 com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.SYMBOL_NAMES_KEY,
@@ -1196,13 +1195,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         predictionManager.getPrediction(contextText, afterWholeWord)
     }
 
-    /** 联想表使用简体，以当前方案的实际输出字形决定是否显示。 */
-    internal fun traditionalChineseOutput(): Boolean {
-        val prefs = SettingsPreferences.getPrefsPublic(this)
-        return if (uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN)
-            !prefs.getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ZHUYIN_SIMPLIFIED_KEY, false)
-        else prefs.getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
-    }
+    /** 中文输出字形：拼音、双拼、仓颉、注音都跟「繁体输出」这一个开关。 */
+    internal fun traditionalChineseOutput(): Boolean =
+        SettingsPreferences.getPrefsPublic(this)
+            .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
     
     private var rimeInitializationJob: kotlinx.coroutines.Job? = null
 

@@ -581,7 +581,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             if (scheme == InputScheme.CANGJIE) add("simplification" to !traditional)
             if (scheme == InputScheme.ZHUYIN) {
                 add("zh_tw" to true) // 声调表使用台湾字形，简体输出在声调筛选后转换。
-                add("zhuyin_simplified" to prefs.getBoolean(KeyboardInputPreferences.ZHUYIN_SIMPLIFIED_KEY, false))
+                add("zhuyin_simplified" to !traditional) // 注音也跟「繁体输出」：关时转简体。
             }
             add("_cyime_datetime_off" to !prefs.getBoolean(KeyboardInputPreferences.DATETIME_CANDIDATES_KEY, false))
             add("emoji" to prefs.getBoolean(KeyboardInputPreferences.CANDIDATE_EMOJI_KEY, false))
