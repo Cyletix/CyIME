@@ -802,6 +802,7 @@ fun KeyboardLayout(
                             SemicolonShiftKey(
                                 ingActive = ingOnShift,
                                 onKeyPress = onKeyPress,
+                                onKeyPressDown = onKeyPressDown,
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
                                 modifier = shiftSlot,

@@ -24,6 +24,7 @@ internal fun awaitsDoublePinyinFinal(input: String): Boolean =
 internal fun SemicolonShiftKey(
     ingActive: State<Boolean>?,
     onKeyPress: (String) -> Unit,
+    onKeyPressDown: ((String) -> Unit)?,
     backgroundColor: Color,
     textColor: Color,
     modifier: Modifier,
@@ -36,6 +37,8 @@ internal fun SemicolonShiftKey(
         SwipeableKeyButton(
             text = "ing",
             onClick = { onKeyPress(";") },
+            // Same press-down feedback (vibration, sound) as the letter keys; GitHub #180.
+            onPress = { onKeyPressDown?.invoke(";") },
             backgroundColor = backgroundColor,
             textColor = textColor,
             modifier = modifier.fillMaxHeight().testTag("shift-key-ing"),
