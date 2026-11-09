@@ -327,7 +327,7 @@ private fun LayoutDisplayPage(
                         Column(Modifier.weight(1f)) {
                             Text("候选词间距加宽", style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium)
-                            Text("候选栏里候选之间空出约一个字，单字候选不挤在一起",
+                            Text("候选之间空出约一个字，中间用浅色竖线隔开",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

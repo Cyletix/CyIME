@@ -592,6 +592,8 @@ fun CandidateBar(
             } else if (state !is CandidateBarState.Idle) BoxWithConstraints(Modifier.weight(1f)) {
                 val showComments = candidateCommentsVisible(maxWidth.value, density.fontScale,
                     candidateTextSize.toFloat(), commentsAllowed)
+                val showDividers = candidateDividersShown(4.dp, candidateItemPadding)
+                val itemDividerColor = candidateDividerColor(protectedVisuals.textColor)
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     state = candidateListState,
@@ -624,6 +626,8 @@ fun CandidateBar(
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
                             correction = if (showComments && state is CandidateBarState.ChineseCandidates) LocalCorrectedCandidates.current[candidate].orEmpty() else "",
+                            modifier = if (showDividers && index > 0) Modifier.candidateLeadingDivider(itemDividerColor,
+                                4.dp, candidateTextSize.sp) else Modifier,
                             horizontalPadding = candidateItemPadding,
                         )
                     }
@@ -660,7 +664,9 @@ fun CandidateBar(
                             fontSize = candidateTextSize.sp,
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
-                            modifier = Modifier.testTag("bar-association:$index"),
+                            modifier = Modifier.testTag("bar-association:$index").then(
+                                if (showDividers && index > 0) Modifier.candidateLeadingDivider(itemDividerColor,
+                                    4.dp, candidateTextSize.sp) else Modifier),
                             horizontalPadding = candidateItemPadding,
                         )
                     }
@@ -1124,6 +1130,30 @@ internal fun candidateSecondaryText(comment: String, correction: String): Annota
 
 /** 候选两侧的默认留白。 */
 internal val CANDIDATE_ITEM_PADDING = 4.dp
+
+/** 两个候选之间的空白（间隔加两边留白）到这么宽才画分隔竖线：默认约 12dp 不画，「候选词间距加宽」约 23dp 画。 */
+internal val CANDIDATE_DIVIDER_MIN_GAP = 18.dp
+
+/** 候选之间空得开时，像 Gboard 那样中间画一条浅色竖线；挤的时候不画（用户 11-09）。 */
+internal fun candidateDividersShown(itemSpacing: androidx.compose.ui.unit.Dp, itemPadding: androidx.compose.ui.unit.Dp): Boolean =
+    itemSpacing + itemPadding * 2 >= CANDIDATE_DIVIDER_MIN_GAP
+
+/** 分隔竖线的颜色：候选文字色压到很淡，随主题；和展开页格子之间的竖线同一个颜色。 */
+internal fun candidateDividerColor(textColor: Color): Color = textColor.copy(alpha = 0.12f)
+
+/**
+ * 在这个候选左边那段 [spacing] 宽的间隔正中画竖线，约一个字高，上下居中。
+ * 画在候选自己的位置之外，不占宽度、不挡点按，候选怎么排都不变。按整像素画，细线不发虚。
+ */
+internal fun Modifier.candidateLeadingDivider(color: Color, spacing: androidx.compose.ui.unit.Dp,
+    fontSize: androidx.compose.ui.unit.TextUnit): Modifier = drawBehind {
+    val width = 1.dp.toPx().roundToInt().coerceAtLeast(1)
+    val left = (-spacing.toPx() / 2f - width / 2f).roundToInt().toFloat()
+    val height = minOf(fontSize.toPx(), size.height).roundToInt().toFloat()
+    val top = ((size.height - height) / 2f).roundToInt().toFloat()
+    drawRect(color, androidx.compose.ui.geometry.Offset(left, top),
+        androidx.compose.ui.geometry.Size(width.toFloat(), height))
+}
 
 /** 「候选词间距加宽」时每侧留白：按字号加大，两个候选之间（含 4dp 间隔）约空出 1.2 个字。 */
 internal fun wideCandidateItemPadding(fontSize: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
@@ -1693,12 +1723,14 @@ internal fun FixedCandidateStrip(
                 onFocusedGone = { focusedOnScreen = false })
             return@BoxWithConstraints
         }
+        val showDividers = candidateDividersShown(itemSpacing, itemPadding)
+        val itemDividerColor = candidateDividerColor(visuals.textColor)
         segments.forEach { (segmentIndices, offsetPx) ->
         val segmentPx = if (offsetPx == 0 && localGap != null) localGap.first else constraints.maxWidth - offsetPx
         Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) }
             .widthIn(max = with(density) { segmentPx.toDp() }).clipToBounds(),
             horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
-            segmentIndices.forEach { index ->
+            segmentIndices.forEachIndexed { position, index ->
                 // 联想按词定身份：按下后联想换了一组，手指松开不选中换上来的那个词（和展开页一样）。
                 androidx.compose.runtime.key(index, if (index < candidates.size) "" else all[index]) {
                 CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size), index, {
@@ -1712,6 +1744,9 @@ internal fun FixedCandidateStrip(
                     fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                     commentFontFamily = AppFonts.commentFontFamily,
                     modifier = Modifier.testTag("bar-candidate:$index")
+                        // 分体时中缝两边各自从头排，中缝那里不画竖线。
+                        .then(if (showDividers && position > 0) Modifier.candidateLeadingDivider(itemDividerColor,
+                            itemSpacing, fontSize) else Modifier)
                         .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     correction = if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "",
@@ -1744,6 +1779,8 @@ private fun ScrollableCandidateRow(
     onFocusedGone: () -> Unit,
 ) {
     val start = shown.first.takeUnless { shown.isEmpty() } ?: 0
+    val showDividers = candidateDividersShown(itemSpacing, itemPadding)
+    val itemDividerColor = candidateDividerColor(visuals.textColor)
     // 新编码或键盘焦点换了一屏：直接从那一屏开始，不带上一次滑到的位置。
     val listState = remember(scrollKey, start) { androidx.compose.foundation.lazy.LazyListState(start) }
     var revealed by remember(listState) { mutableStateOf(false) }
@@ -1823,6 +1860,8 @@ private fun ScrollableCandidateRow(
         horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
         items(all.size) { index ->
             val hidden = index in cutAtEdge
+            // 栏边藏起来的候选两边不画竖线，免得竖线孤零零挂在栏边。
+            val divided = showDividers && index > 0 && !hidden && (index - 1) !in cutAtEdge
             val numbered = index < candidates.size
             if (index == focused) DisposableEffect(Unit) { onDispose { onFocusedGone() } }
             // 选中的候选停在栏边被藏起来：选中底色也先不画。
@@ -1838,6 +1877,7 @@ private fun ScrollableCandidateRow(
                 fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                 commentFontFamily = AppFonts.commentFontFamily,
                 modifier = if (hidden) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier.testTag("bar-candidate:$index")
+                    .then(if (divided) Modifier.candidateLeadingDivider(itemDividerColor, itemSpacing, fontSize) else Modifier)
                     .then(if (index == focused) Modifier.onGloballyPositioned { onFocusedBounds(it.boundsInRoot()) } else Modifier),
                 onLongClick = if (numbered) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                 correction = if (numbered) corrections[all[index]].orEmpty() else "",

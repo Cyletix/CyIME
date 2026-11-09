@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -203,14 +204,17 @@ internal fun SplitRightGLegend(rightG: Boolean) {
     }
 }
 
-/** 「候选词间距加宽」（候选词页，行没有图标）：同一排候选，开时每两个之间空出约一个字。 */
+/** 「候选词间距加宽」（候选词页，行没有图标）：同一排候选，开时每两个之间空出约一个字，中间一条浅色竖线。 */
 @Composable
 internal fun CandidateSpacingLegend(wide: Boolean) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     ToggleRowLegend("candidate-spacing-legend", start = 16.dp) {
         LegendStrip {
             listOf("你", "尼", "泥", "拟", "逆").forEachIndexed { index, word ->
-                if (index > 0) Spacer(Modifier.width(if (wide) 22.dp else 10.dp))
+                if (index > 0 && wide) Box(Modifier.width(22.dp).testTag("candidate-spacing-legend-divider"),
+                    contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(1.dp).height(12.dp).background(onSurface.copy(alpha = 0.2f)))
+                } else if (index > 0) Spacer(Modifier.width(10.dp))
                 Text(word, fontSize = 13.sp, maxLines = 1,
                     color = if (index == 0) MaterialTheme.colorScheme.primary else onSurface,
                     fontWeight = if (index == 0) FontWeight.Medium else null)

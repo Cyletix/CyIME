@@ -151,10 +151,15 @@ class SettingsToggleLegendRenderTest {
         rule.setContent { XimeTheme(darkTheme = false) { AllLegends(on.value) } }
         val added = listOf("槻", "15:35", "😄", "+", "π", "微信支付", "qq.com", "分词", "␣")
         fun count(text: String) = rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().size
+        fun dividers() = rule.onAllNodesWithTag("candidate-spacing-legend-divider", useUnmergedTree = true)
+            .fetchSemanticsNodes().size
         added.forEach { assertEquals("关着时不该有 $it", 0, count(it)) }
+        assertEquals("候选词间距加宽关着时不画竖线", 0, dividers())
         rule.runOnIdle { on.value = true }
         rule.waitForIdle()
         added.forEach { assertEquals("开着时应有 $it", if (it == "␣") 2 else 1, count(it)) }
+        // 五个候选之间四条浅色竖线（11-09，像 Gboard）。
+        assertEquals(4, dividers())
         // 每个图例都在限宽卡片里（SettingsLegend 打的 tag）。
         listOf("syllable-split-key-legend", "shift-syllable-split-legend", "semicolon-on-shift-legend",
             "double-pinyin-abbreviation-legend", "even-merged-keys-legend", "split-right-g-legend",

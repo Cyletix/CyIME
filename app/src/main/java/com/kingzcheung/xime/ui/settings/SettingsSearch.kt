@@ -279,7 +279,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("图标设置", theme, SettingsRoutes.Theme, "桌面图标 应用图标 底板 图标样式 图标联动 跟随主题色 跟随视觉样式 自己选 同步图标 恢复原有图标"),
         // 外观 › 候选词
         SettingsSearchEntry("候选字大小", candidates, candidatePage, "候选 字号 字体大小 文字大小"),
-        SettingsSearchEntry("候选词间距加宽", candidates, candidatePage, "候选 间距 间隔 太挤 密度 单字 宽松"),
+        SettingsSearchEntry("候选词间距加宽", candidates, candidatePage, "候选 间距 间隔 太挤 密度 单字 宽松 分隔线 竖线"),
         SettingsSearchEntry("候选栏取消按钮", candidates, candidatePage, "取消 左箭头 取消输入"),
         SettingsSearchEntry("联想关闭键用叉号", candidates, candidatePage, "联想 关闭联想 关闭键 叉 叉号 圆叉 左箭头"),
         SettingsSearchEntry("候选栏按钮按压高亮", candidates, candidatePage, "按住 反馈 取消键 关闭 展开箭头"),
