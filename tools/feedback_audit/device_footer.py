@@ -160,7 +160,7 @@ def verify_hint_frames(output, mode):
     return {"pill_wing_contrast": wings, "lock_shackle_contrast": arch, "intermediate_wing_contrast": blend}
 
 
-INPUT_CASES = ("settings", "default", "reversed", "legacy", "long", "completion")
+INPUT_CASES = ("settings", "default", "reversed", "legacy", "long", "completion", "dictation")
 
 
 def run(serial, output, runtime_apk, compare, input_cases=(), bottom_calibration=False, menu_checks=False):

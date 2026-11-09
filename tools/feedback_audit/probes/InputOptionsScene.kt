@@ -15,6 +15,7 @@ import com.kingzcheung.xime.service.commitEnglishCompletion
 import com.kingzcheung.xime.service.commitAssociationSelection
 import com.kingzcheung.xime.service.commitEnglishLetter
 import com.kingzcheung.xime.service.englishSentenceStart
+import com.kingzcheung.xime.service.restoreDictationPosition
 import com.kingzcheung.xime.settings.CellDictionaryManager
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.keyboard.*
@@ -103,6 +104,18 @@ fun verifyEnglishCompletions(app: Application) {
     check(editor.selectionStart == 1 && editor.selectionEnd == 2)
     println("PASS stale cached prefix and active selection leave the text and selection intact")
 
+    val original = CandidateState(pendingEnglishText = "a", associationCandidates = listOf("and"))
+    fun pickOriginal() = commitAssociationSelection(original, 0, { connection.commitText(it, 1) },
+        connection::commitEnglishCompletion, suffix = " ")
+    editor.setText("前a后")
+    editor.setSelection(0)
+    check(!pickOriginal() && editor.text.toString() == "前a后" && editor.selectionEnd == 0)
+    editor.setSelection(1, 2)
+    check(!pickOriginal() && editor.text.toString() == "前a后" && editor.selectionStart == 1 && editor.selectionEnd == 2)
+    editor.setSelection(2)
+    check(pickOriginal() && editor.text.toString() == "前a 后" && editor.selectionEnd == 3)
+    println("PASS original-word auto-space respects moved caret, selected text and valid prefix")
+
     val correction = object : InputConnectionWrapper(editor.onCreateInputConnection(EditorInfo()), false) {
         override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) =
             error("A spelling correction tried to delete the draft before writing")
@@ -112,6 +125,29 @@ fun verifyEnglishCompletions(app: Application) {
     check(correction.commitEnglishCompletion("im", "I'm "))
     check(editor.text.toString() == "前I'm 后" && editor.selectionStart == 5 && editor.selectionEnd == 5)
     println("PASS im -> I'm with automatic space in the middle of a draft")
+}
+
+fun verifyDictationRestart(app: Application) {
+    val editor = EditText(app)
+    editor.setText("前听写后")
+    editor.setSelection(0)
+    val host = checkNotNull(editor.onCreateInputConnection(EditorInfo()))
+    for (ack in listOf(false, true)) {
+        val refusesMove = object : InputConnectionWrapper(host, false) {
+            override fun setSelection(start: Int, end: Int) = ack
+        }
+        check(refusesMove.restoreDictationPosition(listOf(3), "听写", true) == null && editor.selectionEnd == 0)
+    }
+    val limited = object : InputConnectionWrapper(host, false) {
+        override fun getExtractedText(request: android.view.inputmethod.ExtractedTextRequest?, flags: Int) = null
+    }
+    check(limited.restoreDictationPosition(listOf(3), "听写", true) == 3)
+    check(limited.commitText("听写完成", 1))
+    check(editor.text.toString() == "前听写完成后" && editor.selectionEnd == 5)
+    editor.setSelection(1, 3)
+    check(host.restoreDictationPosition(listOf(5), "完成", false) == null)
+    check(editor.selectionStart == 1 && editor.selectionEnd == 3)
+    println("PASS refused and ignored restart moves, surrounding-only editor, composing replacement and user selection")
 }
 
 @Composable

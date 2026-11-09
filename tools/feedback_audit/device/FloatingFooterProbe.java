@@ -259,9 +259,10 @@ public class FloatingFooterProbe {
     static void inputStep(int i) {
         main.postDelayed(() -> {
             try {
-                if (mode.endsWith("-input-completion")) {
+                if (mode.endsWith("-input-completion") || mode.endsWith("-input-dictation")) {
                     cls("com.kingzcheung.xime.audit.InputOptionsSceneKt")
-                        .getMethod("verifyEnglishCompletions",Application.class).invoke(null,testApp);
+                        .getMethod(mode.endsWith("dictation") ? "verifyDictationRestart" : "verifyEnglishCompletions",
+                            Application.class).invoke(null,testApp);
                     capture("keyboard"); finish(); return;
                 } else if (mode.endsWith("settings")) {
                     boolean enabled = i == 1;
@@ -507,7 +508,7 @@ public class FloatingFooterProbe {
         for(Method m:thread.getClass().getDeclaredMethods()) if(m.getName().equals("installProvider")&&m.getParameterCount()==6){
             m.setAccessible(true);m.invoke(thread,shell,holder,field(holder.getClass(),"info").get(holder),false,true,true);
         }
-        if (mode.endsWith("-input-settings") || mode.endsWith("-input-completion") || mode.endsWith("-menu-layouts")) {
+        if (mode.endsWith("-input-settings") || mode.endsWith("-input-completion") || mode.endsWith("-input-dictation") || mode.endsWith("-menu-layouts")) {
             // Android won't register change observers for a shell PID with no Activity.
             // The user's default IME never changes on this disposable settings display.
             Method getService = ContentResolver.class.getDeclaredMethod("getContentService");
