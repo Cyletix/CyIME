@@ -34,6 +34,46 @@ class RecognizerLeadCharsTest {
         assertEquals(setOf('=', '`'), SchemaManager.parseRecognizerLeads("", custom))
     }
 
+    @Test fun `one duplicate key or odd escape does not hide the other patterns`() {
+        val schema = """
+            recognizer:
+              import_preset: default
+              patterns:
+                # 部件组字
+                reverse_stroke: "^`[A-Za-z]*${'$'}"
+                calculator: "^V.*${'$'}"
+                calculator: "^V.*${'$'}"
+                odd: "^\d+\.\d*"
+                number: ^R[0-9]+   # 大写数字
+            engine:
+              processors: []
+        """.trimIndent()
+        assertEquals(setOf('`', 'V', 'R'), SchemaManager.parseRecognizerLeads(schema))
+    }
+
+    @Test fun `deployed schema adds included patterns but not the unchanged default preset`() {
+        val default = """
+            recognizer:
+              patterns:
+                email: "^[A-Za-z][-_.0-9A-Za-z]*@.*${'$'}"
+                punct: "^/([0-9]0?|[A-Za-z]+)${'$'}"
+        """.trimIndent()
+        val build = """
+            __build_info:
+              rime_version: 1.11.2
+            recognizer:
+              import_preset: default
+              patterns:
+                email: "^[A-Za-z][-_.0-9A-Za-z]*@.*${'$'}"
+                punct: "^/([0-9]0?|[A-Za-z]+)${'$'}"
+                calculator: "^V.*${'$'}"
+                reverse_stroke: "^`[A-Za-z]*${'$'}"
+            speller:
+              alphabet: abc
+        """.trimIndent()
+        assertEquals(setOf('V', '`'), SchemaManager.parseRecognizerLeads("", "", build, default))
+    }
+
     @Test fun `classes, groups and anchors without a fixed lead are ignored`() {
         listOf("^[a-z]+", "^(a|b)", "^.*", "V.*", "^", "^1.*", "^\\d+").forEach {
             assertNull(it, SchemaManager.regexLeadChar(it))

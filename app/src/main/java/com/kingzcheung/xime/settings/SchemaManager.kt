@@ -808,36 +808,67 @@ object SchemaManager {
 
     /**
      * 导入方案作者自己写的 recognizer/patterns 里以固定字符开头的规则（`^V` 计算、`` ^` `` 部件组字）的开头字符（GitHub #118）。
-     * 只读方案文件和它的 .custom.yaml，不算 default 预设里的通用规则（/ 符号、大写），所以不改其他方案原来的按键。
+     * 读方案文件、它的 .custom.yaml，再加部署后的 build/<id>.schema.yaml（__include、__patch 展开后的结果）。
+     * 不算 default 预设里原样带进来的通用规则（/ 符号、大写），所以不改其他方案原来的按键。
      * 小写字母、数字不算：小写本来就交给 Rime，数字按 #106 的规则走。读不到返回空集。
      */
     fun recognizerLeadChars(context: Context, schemaId: String): Set<Char> {
         recognizerLeads?.takeIf { it.first == schemaId }?.let { return it.second }
         val dir = getRimeDir(context)
+        fun read(file: File) = runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull().orEmpty()
         val leads = runCatching {
-            val schema = File(dir, "$schemaId.schema.yaml").takeIf { it.isFile }?.readText().orEmpty()
-            val custom = File(dir, "$schemaId.custom.yaml").takeIf { it.isFile }?.readText().orEmpty()
-            parseRecognizerLeads(schema, custom)
+            parseRecognizerLeads(read(File(dir, "$schemaId.schema.yaml")), read(File(dir, "$schemaId.custom.yaml")),
+                read(File(getBuildDir(context), "$schemaId.schema.yaml")),
+                read(File(getBuildDir(context), "default.yaml")).ifEmpty { read(File(dir, "default.yaml")) })
         }.getOrDefault(emptySet())
-        recognizerLeads = schemaId to leads
+        // 还没部署完（build 里没有这个方案）时不记住，部署后再读一次。
+        if (File(getBuildDir(context), "$schemaId.schema.yaml").isFile) recognizerLeads = schemaId to leads
         return leads
     }
 
-    /** 纯解析：方案的 recognizer: → patterns: 下各条，加上 custom.yaml 里 `recognizer/patterns/<名字>: "..."` 的补丁。 */
-    internal fun parseRecognizerLeads(schemaText: String, customText: String = ""): Set<Char> {
-        val patterns = mutableListOf<String>()
-        runCatching {
-            val block = topLevelSection(schemaText.trimStart('\uFEFF'), "recognizer")
-            val map = block?.let { yaml.parseToYamlNode(it) as? YamlMap }
-            val inner = map?.entries?.values?.firstOrNull() as? YamlMap
-            (inner?.get<YamlNode>("patterns") as? YamlMap)?.entries?.values?.forEach { node ->
-                (node as? YamlScalar)?.content?.let(patterns::add)
-            }
-        }
+    /**
+     * 纯解析：方案的 recognizer: → patterns: 下各条，custom.yaml 里 `recognizer/patterns/<名字>: "..."` 的补丁，
+     * 以及部署结果 [buildText] 里的规则（去掉和 [defaultText] 预设里同名同值的通用规则）。
+     * 按行读，不整段交给 YAML 解析器：方案里一条重复的键或写法不规范的转义不能让所有规则都读不到。
+     */
+    internal fun parseRecognizerLeads(schemaText: String, customText: String = "", buildText: String = "",
+        defaultText: String = ""): Set<Char> {
+        val patterns = recognizerPatterns(schemaText).map { it.second }.toMutableList()
         Regex("""recognizer/patterns/[^:\s]+\s*:\s*(.+)""").findAll(customText).forEach { m ->
-            patterns.add(m.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'"))
+            patterns.add(yamlScalar(m.groupValues[1]))
         }
+        val preset = recognizerPatterns(defaultText).toSet()
+        recognizerPatterns(buildText).filterNot { it in preset }.forEach { patterns.add(it.second) }
         return patterns.mapNotNullTo(LinkedHashSet()) { regexLeadChar(it) }
+    }
+
+    /** 顶层 recognizer: 下 patterns: 里每一条（名字, 正则），块写法；读不到返回空。 */
+    private fun recognizerPatterns(text: String): List<Pair<String, String>> {
+        val block = topLevelSection(text.trimStart('\uFEFF'), "recognizer") ?: return emptyList()
+        val lines = block.lines()
+        val header = lines.indexOfFirst { it.trimStart().startsWith("patterns:") }
+        if (header < 0) return emptyList()
+        val indent = lines[header].length - lines[header].trimStart().length
+        val entry = Regex("""^\s+("[^"]+"|'[^']+'|[^\s:#][^:]*?)\s*:\s+(.+)$""")
+        val result = mutableListOf<Pair<String, String>>()
+        for (line in lines.drop(header + 1)) {
+            val t = line.trimStart()
+            if (t.isEmpty() || t.startsWith("#")) continue
+            if (line.length - t.length <= indent) break
+            val m = entry.find(line) ?: continue
+            result.add(yamlScalar(m.groupValues[1]) to yamlScalar(m.groupValues[2]))
+        }
+        return result
+    }
+
+    /** 一行 YAML 标量：去掉引号；双引号里的 \\ 还原成 \；不带引号时去掉行尾注释。 */
+    private fun yamlScalar(raw: String): String {
+        val v = raw.trim()
+        return when {
+            v.length >= 2 && v.startsWith('"') -> v.substring(1, v.lastIndexOf('"').coerceAtLeast(1)).replace("\\\\", "\\")
+            v.length >= 2 && v.startsWith('\'') -> v.substring(1, v.lastIndexOf('\'').coerceAtLeast(1)).replace("''", "'")
+            else -> v.substringBefore(" #").trim()
+        }
     }
 
     /** `^V…` → V，`` ^\`… `` → `；开头是字符类、分组、点等不是固定字符时为 null。 */
