@@ -91,9 +91,13 @@ object HandwritingContribution {
 
     fun resetUploaded(context: Context) = setUploadedLines(context, 0)
 
-    /** 自用包里「手写训练」一页两用：记住上次停在贡献题还是训练题库，下次进来接着写；第一次进来是贡献题（写完能直接上传）。 */
+    /**
+     * 自用包里「手写训练」一页两用：记住上次停在贡献题还是训练题库，下次进来接着写。
+     * 没切换过时进训练题库，顶栏就是题库分类（中文汉字、英语、日语…）；11-08 改成默认进贡献题后，
+     * 一进来只见「贡献手写样本」、看不到分类（用户 11-09：「没有分类选择了」），改回。
+     */
     fun lastOpened(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("last_opened", true)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("last_opened", false)
 
     fun setLastOpened(context: Context, contribute: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("last_opened", contribute).apply()

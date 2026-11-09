@@ -74,8 +74,32 @@ class HandwritingTrainingMergeTest {
         rule.onNodeWithTag("contribute-upload").assertIsNotEnabled()
     }
 
-    @Test fun firstOpenOfTrainingEntryLandsOnContribute() {
-        assertTrue(HandwritingContribution.lastOpened(context))
+    /**
+     * 回归（11-09「没有分类选择了」）：自用包第一次进「手写训练」要落在训练题库，顶栏是题库分类按钮，
+     * 不能一进来就是贡献题。照设置页路由的写法用 lastOpened 决定进哪边。
+     */
+    @Test fun firstOpenOfTrainingEntryShowsBankCategories() {
+        assertFalse(HandwritingContribution.lastOpened(context))
+        rule.setContent { MaterialTheme {
+            HandwritingTrainingScreen(onBack = {}, contribute = HandwritingContribution.lastOpened(context), devTools = true)
+        } }
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("切换题库").assertExists()
+        rule.onAllNodesWithText("贡献手写样本").assertCountEquals(0)
+        rule.onNodeWithTag("contribute-status").assertDoesNotExist()
+        // 分类菜单里训练题库都在，贡献题排最后
+        rule.onNodeWithContentDescription("切换题库").performClick()
+        rule.waitForIdle()
+        for (title in listOf("公式", "日语句子", "英语", "假名", "英文字母", "数学符号", "中文汉字", "自己的文字", "认错的字", "贡献手写样本")) {
+            assertTrue("分类菜单缺 $title", rule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty())
+        }
+    }
+
+    /** 自用包停在贡献题时，顶栏仍然是能切回分类的题库按钮。 */
+    @Test fun selfBuildContributeKeepsBankCategories() {
+        rule.setContent { MaterialTheme { HandwritingTrainingScreen(onBack = {}, contribute = true, devTools = true) } }
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("切换题库").assertExists()
     }
 
     @Test fun bankMenuSwitchesBetweenTrainingAndContribute() {
