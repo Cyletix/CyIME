@@ -109,7 +109,7 @@ internal fun FrostedGlassSettingsSheet(
     )) { mutableStateOf(FrostedGlassPreferences.readProfiles(context)) }
     AppearancePreviewSheet("透明度与模糊", theme, glass, { onApply(glass) }, onDismiss) { isDark ->
         Spacer(Modifier.height(12.dp))
-        FrostedThemeControls(glass.forAppearance(isDark), isDark) {
+        FrostedThemeControls(glass.forAppearance(isDark), isDark, themeId = theme.id) {
             glass = glass.withAppearance(it, isDark)
         }
     }
