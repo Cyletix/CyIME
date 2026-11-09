@@ -130,8 +130,14 @@ fun MenuItemButton(
     isLandscape: Boolean = false
 ) {
     val on = item.selected == true
-    // 开启的开关用文字色作底、取反色作字，任何主题（含玻璃半透明键帽）下都能一眼看出。
-    val fill = if (on) textColor else bgColor
+    // 开了玻璃，格子和按键是同一种玻璃键帽（同一个透明度，透出后面）；原来一直是不透明的键色，
+    // 玻璃键盘上一整块实心格子（用户 11-09）。
+    // 开启的开关用文字色作底、取反色作字，任何主题下都能一眼看出；玻璃上也留一点透。
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    val fill = when {
+        on -> if (glass.enabled) textColor.copy(alpha = MENU_ON_GLASS_ALPHA) else textColor
+        else -> frostedKeyColor(bgColor, textColor, glass)
+    }
     val content = if (on) (if (textColor.luminance() > .5f) Color.Black else Color.White) else textColor
     Column(
         modifier = modifier
@@ -179,3 +185,6 @@ fun MenuItemButton(
         )
     }
 }
+
+/** 玻璃上开启的格子：反色底留一点透，白字黑字对它都在 10:1 以上。 */
+internal const val MENU_ON_GLASS_ALPHA = .86f
