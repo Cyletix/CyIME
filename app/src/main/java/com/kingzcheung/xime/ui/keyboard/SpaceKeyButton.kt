@@ -1,6 +1,9 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import com.kingzcheung.xime.ui.theme.KeyShapes
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -18,6 +21,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
@@ -91,6 +95,23 @@ fun SpaceKeyButton(
     val cancelColors = if (showVoiceCancel && voiceCancelArmed) keyFlickFeedbackColors(keyFill, textColor,
         com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.accent ?: androidx.compose.material3.MaterialTheme.colorScheme.primary,
         KeyFlickFeedback.DELETE, 1f, frostedGlass.enabled) else null
+    // 换语言后空格先写语言名再淡成图标（用户 11-09，像 iOS）；只在平时不写语言名时出现。
+    val displayName = schemaName.replace("拼音九键", "拼音")
+    LaunchedEffect(displayName) { SpaceLanguageFlash.observe(displayName, android.os.SystemClock.uptimeMillis()) }
+    val languageFlash = SpaceLanguageFlash.current
+    val flashAlpha = remember { Animatable(0f) }
+    LaunchedEffect(languageFlash, displayName) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val start = SpaceLanguageFlash.alpha(languageFlash, displayName, now)
+        flashAlpha.snapTo(start)
+        if (start <= 0f || languageFlash == null) return@LaunchedEffect
+        val holdLeft = languageFlash.startMs + SpaceLanguageFlash.HOLD_MS - now
+        if (holdLeft > 0L) delay(holdLeft)
+        val fadeLeft = languageFlash.startMs + SpaceLanguageFlash.HOLD_MS + SpaceLanguageFlash.FADE_MS -
+            android.os.SystemClock.uptimeMillis()
+        flashAlpha.animateTo(0f, tween(fadeLeft.coerceIn(1L, SpaceLanguageFlash.FADE_MS).toInt(), easing = LinearEasing))
+    }
+    val flashVisible by remember { derivedStateOf { flashAlpha.value > 0f } }
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
             .pointerInput(holdAction, settings.cursorStepDp, settings.cursorSwipeLines, cursorUnitPx, settings.spaceHoldDelayMs,
@@ -207,20 +228,34 @@ fun SpaceKeyButton(
         val labelSize = minOf(keyLabelSizeSp(schemaName, 10f,
             maxWidth.value, maxHeight.value, density.fontScale, settings.keyTextScale),
             labelHeight / (density.fontScale * 1.4f)).coerceAtLeast(1f)
+        // 闪示时语言名独占这块键，不用给图标让高度。
+        val flashSize = minOf(keyLabelSizeSp(displayName, 12f,
+            maxWidth.value, maxHeight.value, density.fontScale, settings.keyTextScale),
+            maxHeight.value / (density.fontScale * 1.4f)).coerceAtLeast(1f)
         if (showVoiceCancel) {
             val hintSize = (maxHeight.value * 0.32f / density.fontScale).coerceIn(9f, 16f)
             Text(if (voiceCancelArmed) "松手取消" else "上滑取消", color = cancelColors?.foreground ?: textColor,
                 fontSize = hintSize.sp, lineHeight = (hintSize * 1.2f).sp, maxLines = 1, softWrap = false,
                 fontFamily = AppFonts.keyFontFamily, modifier = Modifier.testTag("space-voice-cancel-hint"))
-        } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        } else if (!settings.hideFunctionKeyHints && SpaceLanguageFlash.isLanguageName(displayName) && labelSize >= 8f) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(displayName, color = textColor,
+                    fontSize = labelSize.sp, lineHeight = (labelSize * 1.2f).sp, maxLines = 1, softWrap = false,
+                    fontFamily = AppFonts.keyFontFamily)
+                Icon(Icons.Default.SpaceBar, contentDescription = "空格", tint = textColor,
+                    modifier = Modifier.size(iconSize.dp))
+            }
+        } else Box(contentAlignment = Alignment.Center) {
             // 键太矮时方案名会被压成看不清的小点，这时只留空格图标。
-            // 「功能键不显示提示字」开着时空格只留图标（GitHub #11）。
-            if (!settings.hideFunctionKeyHints && schemaName.isNotBlank() && schemaName != "空格" && labelSize >= 8f) Text(
-                schemaName.replace("拼音九键", "拼音"), color = textColor,
-                fontSize = labelSize.sp, lineHeight = (labelSize * 1.2f).sp, maxLines = 1, softWrap = false,
-                fontFamily = AppFonts.keyFontFamily)
+            // 「功能键不显示提示字」开着时空格只留图标（GitHub #11）；刚换语言时语言名占图标的位置，再淡回图标。
             Icon(Icons.Default.SpaceBar, contentDescription = "空格", tint = textColor,
-                modifier = Modifier.size(iconSize.dp))
+                modifier = Modifier.size(iconSize.dp).graphicsLayer { alpha = 1f - flashAlpha.value })
+            if (flashVisible) {
+                Text(displayName, color = textColor,
+                    fontSize = flashSize.sp, lineHeight = (flashSize * 1.2f).sp, maxLines = 1, softWrap = false,
+                    fontFamily = AppFonts.keyFontFamily,
+                    modifier = Modifier.testTag("space-language-flash").graphicsLayer { alpha = flashAlpha.value })
+            }
         }
     }
 }
