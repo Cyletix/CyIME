@@ -545,7 +545,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 全屏手写时只模糊底部控件区，书写区保持清晰、能看见后面的应用。 */
     private var handwritingGlassControls: android.graphics.Rect? = null
     private var handwritingGlassControlsOrigin: androidx.compose.ui.unit.IntOffset? = null
+    /** 全屏手写底下那块按键（含底部留白）在窗口里的位置；导航栏那条照它的宽度接下去，和平时的键盘卡片一样。 */
+    private val handwritingFooterCard = androidx.compose.runtime.mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
     private val handwritingGlassRegionReporter: (android.graphics.Rect?) -> Unit = { bounds ->
+        handwritingFooterCard.value = bounds?.let {
+            androidx.compose.ui.geometry.Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat())
+        }
         val origin = glassAnchorOrigin()
         if (handwritingGlassControls != bounds || handwritingGlassControlsOrigin != origin) {
             handwritingGlassControls = bounds
@@ -2554,15 +2559,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             val filledSides = !handwritingExpanded &&
                                 com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).fillBlankAreas
                             // 卡片底下系统按钮那条只和卡片一样宽，卡片底色接到屏幕底边；「填满留空处」开着时仍整宽。
+                            // 全屏手写：画板透明，这条接着底下那块按键（11-09：以前整宽另铺，和按键那块断开）。
+                            val stripCard = { if (handwritingExpanded) handwritingFooterCard.value else navigationStripCard.value }
                             NavigationStripBelowCard(
                                 height = activeBottomDp.dp,
-                                card = navigationStripCard.value,
-                                followCard = !filledSides && !handwritingExpanded,
+                                card = stripCard(),
+                                followCard = !filledSides,
                                 onBounds = { updateGlassSurface("navigation", it) },
                                 surface = Modifier
                                     .graphicsLayer { alpha = keyboardLayerOpacity }
                                     .keyboardBackgroundBelowCard(rootTheme.keyboardBackground, isDark, keyboardBgColor,
-                                        card = { navigationStripCard.value }, filledSides = filledSides),
+                                        card = stripCard, filledSides = filledSides),
                             )
                         }
                         Box(
