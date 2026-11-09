@@ -66,6 +66,9 @@ internal object QwertySwipeSymbols {
 
     const val LEGACY_VERSION = "旧布局"
     private const val VERSIONS_KEY = "qwerty_symbol_versions"
+    /** 英文26键自己的版本表，和中文分开存，两边的版本列表互不混入。 */
+    private const val ENGLISH_VERSIONS_KEY = "qwerty_symbol_versions_en"
+    private fun versionsKey(english: Boolean) = if (english) ENGLISH_VERSIONS_KEY else VERSIONS_KEY
     private const val LEGACY_SAVED_KEY = "qwerty_symbol_versions_legacy_saved"
     const val V1012_VERSION = "10-12布局"
     private const val FIXED_PRESET_KEY = "qwerty_symbol_fixed_preset_adopted"
@@ -74,9 +77,9 @@ internal object QwertySwipeSymbols {
     /** 一个版本的 52 个位置：先全部上方，再全部下方。 */
     val slotIds: List<String> get() = listOf("up", "down").flatMap { direction -> keys.map { "$direction.$it" } }
 
-    /** 用户另存的整套中文角标，按保存顺序。 */
-    fun versions(context: Context): Map<String, Map<String, String>> {
-        val raw = SettingsPreferences.getPrefsPublic(context).getString(VERSIONS_KEY, null).orEmpty()
+    /** 用户另存的整套角标，按保存顺序；[english] 为 true 时是英文26键的版本。 */
+    fun versions(context: Context, english: Boolean = false): Map<String, Map<String, String>> {
+        val raw = SettingsPreferences.getPrefsPublic(context).getString(versionsKey(english), null).orEmpty()
         val ids = slotIds
         return raw.split(RECORD).mapNotNull { record ->
             val fields = record.split(FIELD)
@@ -85,20 +88,21 @@ internal object QwertySwipeSymbols {
         }.toMap(LinkedHashMap<String, Map<String, String>>())
     }
 
-    fun saveVersion(context: Context, name: String, values: Map<String, String>) =
-        writeVersions(context, versions(context) + (versionName(name) to values))
+    fun saveVersion(context: Context, name: String, values: Map<String, String>, english: Boolean = false) =
+        writeVersions(context, versions(context, english) + (versionName(name) to values), english)
 
-    fun deleteVersion(context: Context, name: String) = writeVersions(context, versions(context) - name)
+    fun deleteVersion(context: Context, name: String, english: Boolean = false) =
+        writeVersions(context, versions(context, english) - name, english)
 
     fun versionName(name: String) = name.filter { it != RECORD && it != FIELD }.trim()
 
-    private fun writeVersions(context: Context, all: Map<String, Map<String, String>>) {
+    private fun writeVersions(context: Context, all: Map<String, Map<String, String>>, english: Boolean = false) {
         val ids = slotIds
         val raw = all.entries.joinToString(RECORD.toString()) { (name, values) ->
             (listOf(name) + ids.map { values[it].orEmpty().filter { c -> c != RECORD && c != FIELD } })
                 .joinToString(FIELD.toString())
         }
-        check(SettingsPreferences.getPrefsPublic(context).edit().putString(VERSIONS_KEY, raw).commit()) { "无法保存布局版本" }
+        check(SettingsPreferences.getPrefsPublic(context).edit().putString(versionsKey(english), raw).commit()) { "无法保存布局版本" }
     }
 
     /**
