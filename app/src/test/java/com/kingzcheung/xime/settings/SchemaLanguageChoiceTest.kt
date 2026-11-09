@@ -2,6 +2,7 @@ package com.kingzcheung.xime.settings
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -12,9 +13,9 @@ import java.io.File
 class SchemaLanguageChoiceTest {
     @get:Rule val tempDir = TemporaryFolder()
 
-    private fun schema(id: String, extra: String = ""): SchemaMeta {
+    private fun schema(id: String, extra: String = "", name: String = "声笔小鹤"): SchemaMeta {
         val file = File(tempDir.root, "$id.schema.yaml")
-        file.writeText("schema:\n  schema_id: $id\n  name: 声笔小鹤\n$extra")
+        file.writeText("schema:\n  schema_id: $id\n  name: $name\n$extra")
         return SchemaManager.parseSchemaYaml(file)!!
     }
 
@@ -26,8 +27,38 @@ class SchemaLanguageChoiceTest {
         assertEquals(InputLanguage.CHINESE, chosen.language)
         assertTrue(chosen.languageChosen)
         assertEquals(InputLanguage.CHINESE, chosen.toSchemaInfo().profile.language)
-        // 没选时原样留在未标注语言。
-        assertEquals(sbxm, SchemaLanguageChoice.applyTo(sbxm, null))
+        // 没选时按方案名先当中文，但不算用户选的，还能改。
+        val guessed = SchemaLanguageChoice.applyTo(sbxm, null)
+        assertEquals(InputLanguage.CHINESE, guessed.language)
+        assertFalse(guessed.languageChosen)
+        assertTrue(guessed.languageAssignable)
+        // 选了「不指定」就留在未标注语言，不再猜。
+        val none = SchemaLanguageChoice.applyTo(sbxm, InputLanguage.UNSPECIFIED)
+        assertEquals(InputLanguage.UNSPECIFIED, none.language)
+        assertTrue(none.languageChosen)
+    }
+
+    @Test fun `imported schemas with a Chinese name count as Chinese until the user picks`() {
+        assertEquals(InputLanguage.CHINESE, SchemaLanguageChoice.guess(schema("rime_frost", name = "白霜拼音")))
+        assertEquals(InputLanguage.CHINESE, SchemaLanguageChoice.guess(schema("wanxiang_pro", name = "万象拼音pro")))
+        assertEquals(InputLanguage.CHINESE, SchemaLanguageChoice.guess(schema("tiger", name = "虎码")))
+        // 英文名、假名、谚文、日语方案猜不出，仍是未标注语言。
+        assertNull(SchemaLanguageChoice.guess(schema("easy_en", name = "Easy English")))
+        assertNull(SchemaLanguageChoice.guess(schema("my_kana_x", name = "かな入力")))
+        assertNull(SchemaLanguageChoice.guess(schema("hangul_x", name = "한국어")))
+        assertNull(SchemaLanguageChoice.guess(schema("jaroomaji_x", name = "日本語ローマ字")))
+        assertNull(SchemaLanguageChoice.guess(schema("nihongo_x", name = "日本語")))
+        assertEquals(InputLanguage.UNSPECIFIED,
+            SchemaLanguageChoice.resolve(schema("easy_en", name = "Easy English"), appProvided = false) { null }.language)
+    }
+
+    @Test fun `a deployed imported Chinese schema is in the Chinese scheme row`() {
+        // 11-09「部署的方案还是看不到」：键盘方案栏只列当前语言的方案，未标注语言的导入方案不在中文里。
+        val frost = SchemaLanguageChoice.resolve(schema("rime_frost", name = "白霜拼音"), appProvided = false) { null }
+        val ice = schema("rime_ice", name = "雾凇拼音")
+        val row = InputModes.inCurrentLanguage(listOf(ice, frost).map(SchemaMeta::toSchemaInfo), "rime_ice").map { it.schemaId }
+        assertTrue(row.toString(), "rime_frost" in row && "rime_ice" in row)
+        assertEquals(InputLanguage.CHINESE, frost.toSchemaInfo().profile.language)
     }
 
     @Test fun `declared and built-in languages are never replaced`() {
@@ -61,7 +92,7 @@ class SchemaLanguageChoiceTest {
         assertFalse(InputLanguage.ENGLISH in choices)
         assertFalse(InputLanguage.UNSPECIFIED in choices)
         assertTrue(choices.none { it.typesLettersDirectly })
-        // 存着一个直接打字母的语言（比如旧数据）时不生效。
-        assertEquals(InputLanguage.UNSPECIFIED, SchemaLanguageChoice.applyTo(schema("sbyp"), InputLanguage.GERMAN).language)
+        // 存着一个直接打字母的语言（比如旧数据）时不生效，按没选处理（汉字名当中文）。
+        assertEquals(InputLanguage.CHINESE, SchemaLanguageChoice.applyTo(schema("sbyp"), InputLanguage.GERMAN).language)
     }
 }

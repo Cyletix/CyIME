@@ -180,7 +180,8 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
                         if (index > 0) HorizontalDivider()
                         SettingsItem(Icons.TwoTone.Translate, schema.name, "方案没写语言，点开选一次",
                             onClick = { picking = schema }, showArrow = true,
-                            status = if (schema.languageChosen) schema.language.displayName else InputLanguage.UNSPECIFIED.displayName,
+                            status = if (schema.languageChosen || schema.language == InputLanguage.UNSPECIFIED) schema.language.displayName
+                                else "${schema.language.displayName}(自动)",
                             searchKey = "导入方案的语言:${schema.schemaId}")
                     }
                 }

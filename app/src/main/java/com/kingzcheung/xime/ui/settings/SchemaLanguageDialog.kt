@@ -26,13 +26,15 @@ import com.kingzcheung.xime.settings.SchemaMeta
 /** 没写语言的导入方案：单选它的语言（和「界面语言」同一种单选框）。null 是「不指定」。 */
 @Composable
 internal fun SchemaLanguageDialog(schema: SchemaMeta, onChosen: (InputLanguage?) -> Unit, onDismiss: () -> Unit) {
-    val current = if (schema.languageChosen) schema.language else null
+    // 没选过时显示按方案名猜的语言（中文）；「不指定」是 null。
+    val current = schema.language.takeUnless { it == InputLanguage.UNSPECIFIED }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("「${schema.name}」的语言") },
         text = {
             Column {
-                Text("这个方案没写语言。选好后，字母布局、语音和手写按这个语言走；方案文件不改，不用重新部署。",
+                Text((if (!schema.languageChosen && current != null) "这个方案没写语言，现在按方案名当作${current.displayName}。" else "这个方案没写语言。") +
+                    "选好后，字母布局、语音和手写按这个语言走；方案文件不改，不用重新部署。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp))
                 (SchemaLanguageChoice.choices + listOf<InputLanguage?>(null)).forEach { language ->

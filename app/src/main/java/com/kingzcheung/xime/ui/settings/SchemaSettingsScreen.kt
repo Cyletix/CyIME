@@ -549,7 +549,8 @@ internal fun SchemaToggleItem(
                 if (schema.languageAssignable && !isBuiltIn) TextButton(onClick = onChooseLanguage,
                     contentPadding = PaddingValues(0.dp),
                     modifier = Modifier.heightIn(min = 36.dp).testTag("schema-language:${schema.schemaId}")) {
-                    Text(if (schema.languageChosen) "修改语言" else "选择语言", style = MaterialTheme.typography.labelLarge)
+                    Text(if (schema.languageChosen || schema.language != InputLanguage.UNSPECIFIED) "修改语言" else "选择语言",
+                        style = MaterialTheme.typography.labelLarge)
                 }
                 com.kingzcheung.xime.settings.CyimeInputDefaults.description(schema.schemaId)?.let { description ->
                     Text(description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
