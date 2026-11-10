@@ -352,6 +352,7 @@ internal fun FloatingKeyboardContainer(
         val context = LocalContext.current
         var holdPhase by remember { mutableStateOf(FloatingLockHoldPhase.Idle) }
         val lockSweep = rememberFloatingLockSweep(holdPhase, floatingLockHoldMs(geometryLocked) - FLOATING_HOLD_QUIET_MS)
+        val lockNudge = rememberFloatingLockNudge()
         var suppressCornerHint by remember(highlight.epoch) { mutableStateOf(false) }
         val cardPlacement = Modifier
             .align(Alignment.TopStart)
@@ -395,7 +396,7 @@ internal fun FloatingKeyboardContainer(
                 .graphicsLayer { rotationZ = previewRotationState?.value ?: restingRotation }
                 .clip(FloatingKeyboardCardShape)
                 // 边框和长按进度画在透明度图层外面：键盘调得再透明，进度也看得清。
-                .floatingLockOutline(geometryLocked, lockSweep, highlightColor)
+                .floatingLockOutline(geometryLocked, lockSweep, highlightColor, lockNudge)
                 .graphicsLayer {
                     alpha = opacity.coerceIn(0.3f, 1f)
                     // 只有半透明时才需要离屏合成；不透明时用 Auto，少一次全卡片离屏绘制。
@@ -423,7 +424,7 @@ internal fun FloatingKeyboardContainer(
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .height((dragAreaHeight + capInset.floatValue.dp).coerceAtMost(cardTotalHeight))
                 .testTag("floating-footer").keyboardPanelBackground(backgroundColor), contentAlignment = Alignment.Center) {
-                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor, footerDp.toFloat())
+                if (!hideDragBar) FloatingFooterIndicator(geometryLocked, dragIndicatorColor, footerDp.toFloat(), lockNudge)
             }
             if (!hideDragBar && previewRect == null) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
@@ -433,6 +434,7 @@ internal fun FloatingKeyboardContainer(
                     if (it == FloatingLockHoldPhase.Holding) suppressCornerHint = true
                 },
                 onToggle = { SettingsPreferences.setFloatingGeometryLocked(context, !lockedNow) },
+                onLockedDrag = lockNudge::trigger,
                 onDragStart = {
                     dockGesture.cancel()
                     dragX = safeOffsetX
@@ -705,6 +707,8 @@ private fun DragBar(
     geometryLocked: Boolean,
     onHoldPhase: (FloatingLockHoldPhase) -> Unit,
     onToggle: () -> Unit,
+    /** 锁定时拖过了触摸阈值：卡片不动，交给外面提示一下为什么不动。每次按下最多一次。 */
+    onLockedDrag: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -716,6 +720,7 @@ private fun DragBar(
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val currentOnDragCancel by rememberUpdatedState(onDragCancel)
+    val currentOnLockedDrag by rememberUpdatedState(onLockedDrag)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -741,6 +746,22 @@ private fun DragBar(
                     onDragEnd = { currentOnDragEnd() },
                     onDragCancel = { currentOnDragCancel() },
                 )
+            }
+            // 锁定时拖：卡片不动，挪过触摸阈值时提示一次（小锁抖、边框亮）。长按解锁满了以后这根手指的事件
+            // 已经被长按吃掉，不再提示；只按着不动、点一下都不提示。没锁时直接不处理，和上面两个节点对称。
+            .pointerInput(geometryLocked) {
+                if (!geometryLocked) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed || change.isConsumed) break
+                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                            currentOnLockedDrag()
+                            break
+                        }
+                    }
+                }
             },
     )
 }

@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -48,7 +50,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** 系统栏 inset 相对窗口，卡片坐标相对宿主；宿主已经避开的空间只扣一次。 */
 @Composable
@@ -112,7 +118,13 @@ internal fun floatingLockHoldMs(locked: Boolean): Int = if (locked) FLOATING_UNL
  * 手机横屏数字键盘时锁的上半截压在底排按键下面那条上，看着和键区重叠（用户 11-10 截图）。条太矮时锁按比例缩小，上下各留 3dp。
  */
 @Composable
-internal fun FloatingFooterIndicator(locked: Boolean, color: Color, lockBandDp: Float = Float.MAX_VALUE) {
+internal fun FloatingFooterIndicator(
+    locked: Boolean,
+    color: Color,
+    lockBandDp: Float = Float.MAX_VALUE,
+    /** 锁定时有人拖：小锁左右抖（[FloatingLockNudge]）；只在绘制时读。 */
+    nudge: FloatingLockNudge? = null,
+) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(Modifier.size(FLOATING_DRAG_INDICATOR_WIDTH_DP.dp, 4.dp).testTag("floating-drag-indicator"))
         Canvas(Modifier.fillMaxSize()) {
@@ -126,7 +138,7 @@ internal fun FloatingFooterIndicator(locked: Boolean, color: Color, lockBandDp: 
             val band = minOf(lockBandDp.dp.toPx(), size.height)
             val (fraction, offset) = floatingLockGlyphPlacement(band / 1.dp.toPx())
             val unit = fraction * 1.dp.toPx()
-            val cx = center.x
+            val cx = center.x + (nudge?.shakeDp() ?: 0f) * 1.dp.toPx()
             val cy = size.height - offset * 1.dp.toPx()
             val stroke = 1.4f * unit
             // The outside of the shackle and bottom of the body are exactly 6 units from the same centre.
@@ -155,6 +167,60 @@ internal const val FLOATING_LOCK_GLYPH_MARGIN_DP = 3f
 internal fun floatingLockGlyphPlacement(bandDp: Float): Pair<Float, Float> {
     val scale = ((bandDp - 2 * FLOATING_LOCK_GLYPH_MARGIN_DP) / FLOATING_LOCK_GLYPH_DP).coerceIn(0.6f, 1f)
     return scale to bandDp / 2f
+}
+
+/** 锁定时拖底部拖动条：小锁左右抖几下的总时长。 */
+internal const val FLOATING_LOCK_SHAKE_MS = 360
+/** 小锁抖动的最大幅度。 */
+private const val FLOATING_LOCK_SHAKE_DP = 3f
+/** 锁定时拖底部拖动条：卡片边框亮起后先停这么久，再用 [FLOATING_LOCK_FLASH_FADE_MS] 淡回平时的淡描边。 */
+private const val FLOATING_LOCK_FLASH_HOLD_MS = 150
+private const val FLOATING_LOCK_FLASH_FADE_MS = 650
+
+/**
+ * 锁定后有人拖底部拖动条，卡片不动（用户 11-10：不动也不知道为什么，让锁抖一下或把外边框显出来）：
+ * 小锁左右抖几下、越抖越小，同时卡片边框整圈亮成强调色再慢慢淡回去。不加设置、不振动。
+ */
+internal class FloatingLockNudge {
+    /** 0..1：抖动走到哪了。 */
+    internal val shake = Animatable(0f)
+    /** 0..1：边框亮度。 */
+    internal val flash = Animatable(0f)
+    /** 每次触发加一，动画从头来。 */
+    internal var epoch by mutableIntStateOf(0)
+        private set
+
+    fun trigger() {
+        epoch++
+    }
+
+    /** 小锁现在的横向偏移（dp）：三个来回，幅度线性收到零。 */
+    fun shakeDp(): Float {
+        val t = shake.value
+        if (t <= 0f || t >= 1f) return 0f
+        return sin(t * 6f * PI.toFloat()) * (1f - t) * FLOATING_LOCK_SHAKE_DP
+    }
+}
+
+@Composable
+internal fun rememberFloatingLockNudge(): FloatingLockNudge {
+    val nudge = remember { FloatingLockNudge() }
+    val epoch = nudge.epoch
+    LaunchedEffect(nudge, epoch) {
+        if (epoch == 0) return@LaunchedEffect
+        coroutineScope {
+            launch {
+                nudge.shake.snapTo(0f)
+                nudge.shake.animateTo(1f, tween(FLOATING_LOCK_SHAKE_MS, easing = LinearEasing))
+                nudge.shake.snapTo(0f)
+            }
+            launch {
+                nudge.flash.snapTo(1f)
+                nudge.flash.animateTo(0f, tween(FLOATING_LOCK_FLASH_FADE_MS, delayMillis = FLOATING_LOCK_FLASH_HOLD_MS))
+            }
+        }
+    }
+    return nudge
 }
 
 /** 长按底部拖动条的阶段：按住时边框进度往上走；没满松手原路退回；满了切换锁定，整条进度淡掉。 */
@@ -196,7 +262,13 @@ internal fun rememberFloatingLockSweep(phase: FloatingLockHoldPhase, holdMs: Int
  * 卡片边框：锁定时一圈淡描边，提示位置和大小已锁住；长按底部拖动条时，一条进度从底边中点沿左右两边同时往上走，
  * 到顶边中点会合（用户 11-09），没满松手原路退回。两半路径一样长，含圆角。
  */
-internal fun Modifier.floatingLockOutline(locked: Boolean, sweep: FloatingLockSweep, color: Color) = drawWithCache {
+internal fun Modifier.floatingLockOutline(
+    locked: Boolean,
+    sweep: FloatingLockSweep,
+    color: Color,
+    /** 锁定时有人拖：整圈边框亮一下（[FloatingLockNudge.flash]）。 */
+    nudge: FloatingLockNudge? = null,
+) = drawWithCache {
     val cx = size.width / 2f
     fun halfPath(inset: Float): Path {
         val left = inset
@@ -228,6 +300,8 @@ internal fun Modifier.floatingLockOutline(locked: Boolean, sweep: FloatingLockSw
             scale(-1f, 1f, center) { drawPath(path, tint, style = stroke) }
         }
         if (locked) halves(faint, color.copy(alpha = color.alpha * .55f), faintStroke)
+        val flash = nudge?.flash?.value ?: 0f
+        if (flash > 0f) halves(track, color.copy(alpha = color.alpha * flash), sweepStroke)
         val p = sweep.progress.value
         if (p > 0f) {
             segment.reset()

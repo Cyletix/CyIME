@@ -242,6 +242,42 @@ class FloatingRotationRenderTest {
         rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(rule.activity)) }
     }
 
+    /**
+     * 用户 11-10：锁定后拖底部拖动条，卡片不动也不知道为什么。拖过触摸阈值时整圈边框亮一下（小锁同时抖），
+     * 过一会儿淡回平时的淡描边；卡片不动、仍然锁着。
+     */
+    @Test fun draggingTheLockedBarFlashesTheBorderAndKeepsTheCard() {
+        val prefs = com.kingzcheung.xime.settings.SettingsPreferences
+        prefs.setFloatingGeometryLocked(rule.activity, true)
+        show()
+        val card = rule.onNodeWithTag("floating-keyboard-card")
+        val bar = rule.onNodeWithTag("floating-drag-bar")
+        fun leftSide(): Int {
+            val bounds = card.fetchSemanticsNode().boundsInRoot
+            val root = rule.activity.window.decorView
+            val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            rule.runOnUiThread { root.draw(android.graphics.Canvas(full)) }
+            return full.getPixel(bounds.left.toInt() + 1, (bounds.top + bounds.height * 3 / 4).toInt())
+        }
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeByFrame()
+        val before = leftSide()
+        val placed = card.fetchSemanticsNode().boundsInRoot
+        bar.performTouchInput { down(center); moveBy(Offset(30f, -20f)) }
+        // The flash starts in a LaunchedEffect: let the main looper run it before sampling the border.
+        rule.waitForIdle()
+        rule.mainClock.advanceTimeBy(80)
+        rule.waitForIdle()
+        assertTrue("border lit", leftSide() != before)
+        assertEquals(placed, card.fetchSemanticsNode().boundsInRoot)
+        bar.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(1200)
+        assertEquals("faded back", before, leftSide())
+        rule.mainClock.autoAdvance = true
+        assertEquals(placed, card.fetchSemanticsNode().boundsInRoot)
+        rule.runOnIdle { assertTrue(prefs.floatingGeometryLocked(rule.activity)) }
+    }
+
     @Test fun rotatedFooterAtExtremeOffsetsCanUnlock() {
         rotation = -90f
         offsetX = -400
