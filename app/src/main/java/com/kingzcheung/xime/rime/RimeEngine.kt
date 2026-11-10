@@ -1101,9 +1101,12 @@ class RimeEngine {
     fun prefetchCandidates(schemaId: String): List<String> {
         if (!isInitialized || schemaId.isEmpty()) return emptyList()
         // Skipped while the engine is busy (typing, deploying): the next keyboard show tries again.
+        var usesModel = false
         val names = tryLocked(emptyList<String>()) {
             val dicts = listOfNotNull(getSchemaDictionary(schemaId)) + getSchemaPacks(schemaId)
             val prism = getSchemaString(schemaId, "translator/prism") ?: schemaId
+            // 词组模型只给配了 t9/ngram_model 的方案（九键、14 键、注音）；26 键全拼不读它，不再每次弹键盘把一两百 MB 读回内存。
+            usesModel = !getSchemaString(schemaId, "t9/ngram_model").isNullOrEmpty()
             // Most valuable first: every key reads the syllable prism and the main table.
             listOf("$prism.prism.bin") + dicts.map { "$it.table.bin" }
         }
@@ -1111,7 +1114,7 @@ class RimeEngine {
             listOf(userDataDir, sharedDataDir).filter { it.isNotEmpty() }
                 .map { java.io.File(it, "build/$name") }.firstOrNull { it.isFile }?.path
         }
-        val model = java.io.File(userDataDir, "t9_ngram.lm").takeIf { userDataDir.isNotEmpty() && it.isFile }
+        val model = java.io.File(userDataDir, "t9_ngram.lm").takeIf { usesModel && userDataDir.isNotEmpty() && it.isFile }
         return (files + listOfNotNull(model?.path)).distinct()
     }
 
