@@ -95,13 +95,11 @@ internal fun letterSwipeCornerLabels(key: String): Pair<String?, String?> {
 }
 
 /**
- * [reserveDragForGlide]：这个键上的拖动留给滑行，键自己不做上下滑、拂动。
- * [tapUnclaimedGlideDrift]：拖动后滑行没接管（没有消费这根手指）时，抬手仍按点按结算（见 [glideDriftIsTap]）；
- * 为 false 时挪过触摸阈值就放手，这一下不出字（26 键滑行原样）。
+ * [reserveDragForGlide]：这个键上的拖动留给滑行（九键滑行、26 键英文/中文滑行），键自己不做上下滑、拂动。
+ * 拖动后滑行没接管（没有消费这根手指）时，抬手仍按点按结算（见 [glideDriftIsTap]）。
  */
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
     reserveDragForGlide: Boolean = false,
-    tapUnclaimedGlideDrift: Boolean = false,
     currentActions: () -> KeyGestureActions,
 ) = coroutineScope {
     val gestureScope = this
@@ -153,11 +151,9 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 if (!longPressed && (abs(dx) > viewConfiguration.touchSlop || abs(dy) > viewConfiguration.touchSlop)) {
                     moved = true
                     longPressJob?.cancel()
-                    // The layout owns this drag even if it ends too short to decode a word.
-                    // 九键滑行例外：滑行要走大半个键才接管（T9GlideTyping 的 DigitStroke.claimed），
-                    // 这里一过触摸阈值就放手的话，快打时手指一抖、没到滑行又不算点按，这一下就吞了（用户 11-10）。
-                    // 九键改成接着跟这根手指：滑行接管时会消费事件，下面照常放手；没接管就在抬手时按点按算。
-                    if (reserveDragForGlide && !tapUnclaimedGlideDrift) break
+                    // 留给滑行的键以前一过触摸阈值就放手，可滑行要走一段才接管（九键 DigitStroke.claimed、
+                    // 26 键 GlideTracker.claimed）：快打时手指一抖、没到滑行又不算点按，这一下就吞了（用户 11-10）。
+                    // 现在接着跟这根手指：滑行接管时会消费事件，下面照常放手；没接管就在抬手时按点按算。
                 }
                 val slop = viewConfiguration.touchSlop
                 // Back at the key's own centre also means the centre choice, for presses that began
