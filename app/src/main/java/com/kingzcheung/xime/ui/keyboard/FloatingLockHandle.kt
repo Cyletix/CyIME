@@ -108,9 +108,11 @@ internal fun floatingLockHoldMs(locked: Boolean): Int = if (locked) FLOATING_UNL
 /**
  * 底部拖动条中间的标记：没锁时是短横条；锁定后换成一把小锁（用户 11-08：下方用一个小的解锁图标）。
  * 长按的进度画在卡片边框上（[floatingLockOutline]），这里不画。
+ * 小锁比短横条高得多，只放在最下面那段 [lockBandDp] 高的拖动条里，不往上伸进键帽下的留白：
+ * 手机横屏数字键盘时锁的上半截压在底排按键下面那条上，看着和键区重叠（用户 11-10 截图）。条太矮时锁按比例缩小，上下各留 3dp。
  */
 @Composable
-internal fun FloatingFooterIndicator(locked: Boolean, color: Color) {
+internal fun FloatingFooterIndicator(locked: Boolean, color: Color, lockBandDp: Float = Float.MAX_VALUE) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(Modifier.size(FLOATING_DRAG_INDICATOR_WIDTH_DP.dp, 4.dp).testTag("floating-drag-indicator"))
         Canvas(Modifier.fillMaxSize()) {
@@ -121,20 +123,38 @@ internal fun FloatingFooterIndicator(locked: Boolean, color: Color) {
                     CornerRadius(halfHeight))
                 return@Canvas
             }
-            val unit = 1.dp.toPx()
+            val band = minOf(lockBandDp.dp.toPx(), size.height)
+            val (fraction, offset) = floatingLockGlyphPlacement(band / 1.dp.toPx())
+            val unit = fraction * 1.dp.toPx()
+            val cx = center.x
+            val cy = size.height - offset * 1.dp.toPx()
             val stroke = 1.4f * unit
-            // The outside of the shackle and bottom of the body are exactly 6dp from the same centre.
-            val archTop = center.y - 6 * unit + stroke / 2
+            // The outside of the shackle and bottom of the body are exactly 6 units from the same centre.
+            val archTop = cy - 6 * unit + stroke / 2
             val archRadius = 3 * unit
-            drawArc(color, 180f, 180f, false, Offset(center.x - archRadius, archTop),
+            drawArc(color, 180f, 180f, false, Offset(cx - archRadius, archTop),
                 Size(2 * archRadius, 2 * archRadius), style = Stroke(stroke))
-            for (x in listOf(center.x - archRadius, center.x + archRadius)) {
-                drawLine(color, Offset(x, archTop + archRadius), Offset(x, center.y), strokeWidth = stroke)
+            for (x in listOf(cx - archRadius, cx + archRadius)) {
+                drawLine(color, Offset(x, archTop + archRadius), Offset(x, cy), strokeWidth = stroke)
             }
-            drawRoundRect(color, Offset(center.x - 4.5f * unit, center.y - unit), Size(9 * unit, 7 * unit),
+            drawRoundRect(color, Offset(cx - 4.5f * unit, cy - unit), Size(9 * unit, 7 * unit),
                 CornerRadius(1.6f * unit))
         }
     }
+}
+
+/** 小锁原本 12dp 高。 */
+internal const val FLOATING_LOCK_GLYPH_DP = 12f
+/** 小锁上下至少留的空。 */
+internal const val FLOATING_LOCK_GLYPH_MARGIN_DP = 3f
+
+/**
+ * 小锁在高 [bandDp] 的最下面那段拖动条里怎么放：返回（缩放比例，锁中心离卡片底边的 dp）。
+ * 放得下 12dp 加上下各 3dp 就原样大小，放不下按比例缩小（最小 0.6 倍），锁中心在这段的正中。
+ */
+internal fun floatingLockGlyphPlacement(bandDp: Float): Pair<Float, Float> {
+    val scale = ((bandDp - 2 * FLOATING_LOCK_GLYPH_MARGIN_DP) / FLOATING_LOCK_GLYPH_DP).coerceIn(0.6f, 1f)
+    return scale to bandDp / 2f
 }
 
 /** 长按底部拖动条的阶段：按住时边框进度往上走；没满松手原路退回；满了切换锁定，整条进度淡掉。 */
