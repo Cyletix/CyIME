@@ -455,11 +455,13 @@ internal fun FloatingKeyboardContainer(
                     }
                     val dxDp = with(density) { dragAmount.x.toDp().value }
                     val dyDp = with(density) { dragAmount.y.toDp().value }
+                    val beforeY = dragY
                     dragX = (dragX + dxDp).coerceIn(-horizontalTravel, horizontalTravel)
                     dragY = (dragY - dyDp).coerceIn(minimumY, maxOffsetY)
                     val nextEdge = floatingDockEdge(dragX.roundToInt().toFloat(), dragY.roundToInt().toFloat(),
                         horizontalTravel, maxOffsetY, minOffsetY.toFloat())
-                    dockGesture.move(dxDp, dyDp, nextEdge != null && destination != null)
+                    // 只把卡片已经顶在底边、手指还往下走的那部分交给贴底判定；卡片跟着往下挪的不算。
+                    dockGesture.move(dxDp, dyDp - (beforeY - dragY), nextEdge != null && destination != null)
                 },
                 onDragEnd = {
                     // Dock exactly when the preview shows it docked; the old separate timer could end a

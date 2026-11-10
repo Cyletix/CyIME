@@ -341,12 +341,14 @@ internal fun KeyboardResizeOverlay(
         val dockGesture = remember(floatingMode) { FloatingDockGesture() }
         TrackDockHold(dockGesture)
         val morphProgress = if (floatingMode) dockGesture.progress else undockProgress
-        fun dragTowardDock(rect: ResizeRect, bounds: ResizeRect, amount: Offset) {
+        /** [cardMovedY] 是这一下卡片实际往下挪的距离：手指比卡片多走的（卡片已经顶在底边）才算往下顶。 */
+        fun dragTowardDock(rect: ResizeRect, bounds: ResizeRect, amount: Offset, cardMovedY: Float) {
             val onBottom = bounds.bottom - rect.bottom <= 12f * density.density &&
                 !isFloatingRotated(rotationState?.floatValue ?: 0f)
             if (onBottom && morphTarget == null)
                 morphTarget = currentModeSwitchTarget?.invoke(false, currentViewRect.width, currentViewRect.height)
-            dockGesture.move(amount.x / density.density, amount.y / density.density, onBottom && morphTarget != null)
+            dockGesture.move(amount.x / density.density, (amount.y - cardMovedY) / density.density,
+                onBottom && morphTarget != null)
         }
         fun endMorph() {
             morphTarget = null
@@ -694,6 +696,7 @@ internal fun KeyboardResizeOverlay(
                                     maxWidth = maxWidthPx,
                                     maxHeight = screenMaxHeightPx,
                                 )
+                                val cardMovedY = proposed.top - rawResizeRect.top
                                 rawResizeRect = proposed
                                 val reachable = if (dragEdge == ResizeHandle.NONE) proposed else
                                     gestureRect.resizeWithReachableWidth(proposed, dragEdge, stableBounds, aspect,
@@ -704,7 +707,7 @@ internal fun KeyboardResizeOverlay(
                                 snapFeedback(if (workingRect != reachable) "square" else null)
                                 dragRect = workingRect
                                 currentOnPreviewRectChange(workingRect)
-                                if (dragEdge == ResizeHandle.NONE) dragTowardDock(workingRect, stableBounds, amount)
+                                if (dragEdge == ResizeHandle.NONE) dragTowardDock(workingRect, stableBounds, amount, cardMovedY)
                                 currentWidthDp = (workingRect.width / density.density)
                                 currentHeightDp = (workingRect.height / density.density) - footerDp
                             } else {
@@ -1128,7 +1131,7 @@ internal fun KeyboardResizeOverlay(
                 val moved = base.translated(dxPx, if (floatingMode) dyPx else 0f).coerceInside(moveBounds)
                 dragRect = moved
                 currentOnPreviewRectChange(moved)
-                if (floatingMode) dragTowardDock(moved, moveBounds, Offset(dxPx, dyPx))
+                if (floatingMode) dragTowardDock(moved, moveBounds, Offset(dxPx, dyPx), moved.top - base.top)
                 // 预览矩形是调节事务的唯一位置源；确认时统一保存，避免同时改宿主偏移。
             }
         }
