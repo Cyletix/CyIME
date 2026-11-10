@@ -2058,10 +2058,6 @@ fun KeyboardView(
                         ),
                         actions = menuQuickActions,
                         modifier = panelMaterial.fillMaxWidth().fillMaxHeight(),
-                        onBack = if ((page as? KeyboardPage.Overlay)?.route == OverlayRoute.Menu) ({
-                            toolbarFeedback()
-                            viewModel.backFromOverlay()
-                        }) else null,
                     )
                     is OverlayRoute.Ocr -> com.kingzcheung.xime.ocr.OcrCameraPanel(
                         active = (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Ocr,

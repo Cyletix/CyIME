@@ -100,7 +100,6 @@ fun MenuBar(
     state: MenuBarState,
     actions: List<ToolbarAction>,
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
 ) {
     if (!state.isVisible) return
     val textColor = state.keyTextColor
@@ -114,7 +113,7 @@ fun MenuBar(
     }
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
         modifier.fillMaxWidth().keyboardPanelBackground(state.backgroundColor),
-        preferSinglePage = true, onSwipeBack = onBack) { item, cellModifier ->
+        preferSinglePage = true) { item, cellModifier ->
         MenuItemButton(item, state.keyBgColor, textColor,
             cellModifier.testTag("menu-item:${item.id}"), isLandscape)
     }
