@@ -33,6 +33,13 @@ class AssociationSelectionTest {
         assertTrue(commitAssociationSelection(state, 1, { error("must replace") }, { _, _ -> true }))
     }
 
+    @Test fun nextWordSelectionCanAddTheTrailingSpace() {
+        val state = CandidateState(associationCandidates = listOf("you"), englishNextWord = true)
+        var committed = ""
+        assertTrue(commitAssociationSelection(state, 0, { committed = it; true }, { _, _ -> false }, suffix = " "))
+        assertEquals("you ", committed)
+    }
+
     @Test fun rawReturnHasNoPresentationSpacingAndKeepsT9PartialText() {
         assertEquals("fuck", rawCompositionCommitText("fuck", "fu c k", false))
         assertEquals("fuck", rawCompositionCommitText("3825", "fu c k", true))

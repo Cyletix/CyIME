@@ -11,6 +11,8 @@ data class CandidateState(
     val hasNextPage: Boolean = false,
     val hasPrevPage: Boolean = false,
     val associationCandidates: List<String> = emptyList(),
+    /** 候选栏是英文“下一个词”联想（不是补全）：点选后补空格，并接着给下一批。 */
+    val englishNextWord: Boolean = false,
     val pendingEnglishText: String = "",
     /** 刚由滑行整词上屏的词；光标仍紧跟它时，下一个点按字母先补空格。 */
     val glidedWord: String = "",

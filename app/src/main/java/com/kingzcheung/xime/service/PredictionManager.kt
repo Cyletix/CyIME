@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.kingzcheung.xime.association.AssociationManager
 import com.kingzcheung.xime.association.AssociationService
+import com.kingzcheung.xime.association.EnglishNextWordContext
+import com.kingzcheung.xime.association.EnglishNextWordModel
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.settings.SettingsPreferences
@@ -12,6 +14,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class PredictionManager(
@@ -48,6 +52,10 @@ class PredictionManager(
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (error: Exception) { Log.e(TAG, "Prediction failed", error); emptyList() }
     }, deliver = onPredictionResult)
+
+    /** Built-in English next-word index; loaded on the first English next-word request. */
+    @Volatile private var englishNextWordModel: EnglishNextWordModel? = null
+    private val englishNextWordLoading = Mutex()
 
     val hasPendingPrediction: Boolean get() = latest.isPending
     val requestRevision: Long get() = latest.revision
@@ -185,6 +193,29 @@ class PredictionManager(
         }
     }
     
+    /**
+     * English next words after [previous] from the bundled bigram table. The model is lazy; the
+     * first call parses english_bigrams.txt off the main thread.
+     */
+    suspend fun getEnglishNextWords(previous: String, limit: Int = 6): List<String> {
+        if (limit <= 0 || !SettingsPreferences.isSmartPredictionEnabled(context)) return emptyList()
+        val key = EnglishNextWordContext.normalize(previous) ?: return emptyList()
+        val model = englishNextWordModel ?: englishNextWordLoading.withLock {
+            englishNextWordModel ?: withContext(Dispatchers.IO) {
+                runCatching { EnglishNextWordModel.load(context) }
+                    .onFailure { Log.e(TAG, "Cannot load English next-word table", it) }
+                    .getOrNull()
+            }?.also { englishNextWordModel = it }
+        }
+        return model?.predict(key, limit).orEmpty()
+    }
+
+    /** Settings off / keyboard destroyed: drop the English index; the next request reloads it. */
+    @Synchronized
+    fun releaseEnglishNextWords() {
+        englishNextWordModel = null
+    }
+
     suspend fun getChineseAssociations(text: String, limit: Int = MAX_ASSOCIATION_COUNT): List<String> {
         return try {
             if (!AssociationManager.isInitialized()) {

@@ -40,7 +40,7 @@ internal fun commitAssociationSelection(
     val hasOriginal = pending.isNotEmpty() && state.englishReplaceSupported
     val word = associationWordAt(state, index) ?: return false
     return when {
-        pending.isEmpty() -> commit(word)
+        pending.isEmpty() -> if (suffix.isEmpty()) commit(word) else commit(word + suffix)
         // The original word is already in the editor; only the suffix is new.
         hasOriginal && index == 0 -> suffix.isEmpty() || replace(pending, pending + suffix)
         !state.englishReplaceSupported -> false

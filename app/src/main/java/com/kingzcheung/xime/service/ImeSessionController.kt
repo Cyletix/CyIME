@@ -198,8 +198,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             candidateComments = displayComments,
             correctedCandidates = candidatesWithComments.filter { it.correction.isNotEmpty() }.associate { it.text to it.correction },
             isComposing = isComposing,
-            // 刚打 @ 给的邮箱后缀（默认关）不是英文补全，跟着这次刷新留着。
+            // 刚打 @ 给的邮箱后缀（默认关）和英文“下一个词”不是英文补全，跟着这次刷新留着。
             associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty() &&
+                !(service.candidateState.value.englishNextWord && !isComposing) &&
                 !EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)) emptyList()
                 else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
@@ -365,8 +366,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             candidateComments = displayComments,
             correctedCandidates = candidatesWithComments.filter { it.correction.isNotEmpty() }.associate { it.text to it.correction },
             isComposing = isComposing,
-            // 刚打 @ 给的邮箱后缀（默认关）不是英文补全，跟着这次刷新留着。
+            // 刚打 @ 给的邮箱后缀（默认关）和英文“下一个词”不是英文补全，跟着这次刷新留着。
             associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty() &&
+                !(service.candidateState.value.englishNextWord && !isComposing) &&
                 !EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)) emptyList()
                 else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,

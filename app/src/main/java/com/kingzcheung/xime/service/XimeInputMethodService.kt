@@ -199,6 +199,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     companion object {
         /** 键盘与语音悬浮条互换、悬浮条进出时内容下沉/上浮的距离。 */
         private const val CONTENT_SHIFT_DP = 24f
+        /** 英文下一个词最多给几个：候选栏一行够看，也不挤掉补全。 */
+        private const val ENGLISH_NEXT_WORD_LIMIT = 6
         /** App 收起键盘后等这么久再弹出悬浮条：翻看时 App 可能连续收起几次。 */
         private const val VOICE_PILL_RESHOW_DELAY_MS = 400L
         /** 收起键盘后等系统下滑动画播完再拆玻璃模糊窗口（动画约 0.2–0.4 秒）。 */
@@ -1069,6 +1071,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
         } else {
             com.kingzcheung.xime.association.AssociationManager.release()
+            predictionManager.releaseEnglishNextWords()
         }
     }
     
@@ -4857,6 +4860,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // recreates this service when another keyboard was used in between, and destroying the engine here
         // made the next keyboard open reload every dictionary behind "正在加载词库".
         AssociationManager.release()
+        predictionManager.releaseEnglishNextWords()
         voiceRecognitionHandler.release()
         com.kingzcheung.xime.handwriting.HandwritingEngine.release()
         ExtensionManager.release()
@@ -5315,7 +5319,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun dismissPredictionsForPaste() {
         predictionManager.invalidatePendingPredictions()
         candidateState.value = candidateState.value.copy(
-            associationCandidates = emptyList(), pendingEnglishText = "",
+            associationCandidates = emptyList(), englishNextWord = false, pendingEnglishText = "",
         )
     }
 
@@ -5359,7 +5363,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (result.accepted) {
             predictionManager.invalidatePendingPredictions()
             predictionManager.clearCommittedText()
-            candidateState.value = candidateState.value.copy(associationCandidates = emptyList())
+            candidateState.value = candidateState.value.copy(
+                associationCandidates = emptyList(), englishNextWord = false)
         }
         return result
     }
@@ -5372,25 +5377,79 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val result = commitTextSilently(text, isPaste, caret = caret)
         if (result != TextCommitResult.ACCEPTED_HOST || isPaste || !allowPrediction) return result
         if (isSecretEditor() || editorInputPolicy.directInput) return result
-        if (!canPredictAfter(text)) {
-            predictionManager.invalidatePendingPredictions()
-            candidateState.value = candidateState.value.copy(associationCandidates = emptyList(), pendingEnglishText = "")
+        // Only the English words scheme gets next words and learning here. Direct English input
+        // keeps its original completion-only behaviour.
+        if (!isChineseMode) {
+            if (isEnglishPredictionMode()) {
+                requestEnglishNextWord(englishTextBeforeCursor())
+            } else if (!canPredictAfter(text)) {
+                // Other letter keyboards (Spanish, Japanese romaji, direct English) keep the old rule:
+                // a space ends the word and drops the previous completion row.
+                predictionManager.invalidatePendingPredictions()
+                candidateState.value = candidateState.value.copy(
+                    associationCandidates = emptyList(), pendingEnglishText = "", englishNextWord = false)
+            }
             return result
         }
-        if (isChineseMode) {
-            val predictionAdmission = inputReadiness.ticket()
-            val predictionEditor = uiState.value.inputSessionId
-            val predictionRevision = predictionManager.reservePrediction()
-            mainHandler.post {
-                if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
-                    uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode &&
-                    predictionManager.requestRevision == predictionRevision) {
-                    getPredictionFromPlugin(predictionManager.lastCommittedText, endsWithWholeWord(text))
-                }
-                predictionManager.releasePrediction(predictionRevision)
+        if (!canPredictAfter(text)) {
+            predictionManager.invalidatePendingPredictions()
+            candidateState.value = candidateState.value.copy(
+                associationCandidates = emptyList(), pendingEnglishText = "", englishNextWord = false)
+            return result
+        }
+        val predictionAdmission = inputReadiness.ticket()
+        val predictionEditor = uiState.value.inputSessionId
+        val predictionRevision = predictionManager.reservePrediction()
+        mainHandler.post {
+            if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
+                uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode &&
+                predictionManager.requestRevision == predictionRevision) {
+                getPredictionFromPlugin(predictionManager.lastCommittedText, endsWithWholeWord(text))
             }
+            predictionManager.releasePrediction(predictionRevision)
         }
         return result
+    }
+
+    /** Continuous English association and learning belong to the English words scheme only. */
+    private fun isEnglishPredictionMode(): Boolean {
+        val state = uiState.value
+        return !state.inputTarget.isInternal && !state.isAsciiMode &&
+            state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH &&
+            state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.WORDS
+    }
+
+    private fun englishTextBeforeCursor(limit: Int = 128): String? =
+        runCatching { currentInputConnection?.getTextBeforeCursor(limit, 0)?.toString() }.getOrNull()
+
+    /**
+     * After a commit at a word boundary, learn the pair/personal token and ask for the next words.
+     * The old list is dropped immediately; a result that arrives after the user typed again is
+     * refused by comparing the live editor text with [before].
+     */
+    private fun requestEnglishNextWord(before: String?) {
+        candidateState.value = candidateState.value.copy(
+            associationCandidates = emptyList(), englishNextWord = false)
+        if (before == null) return
+        val context = com.kingzcheung.xime.association.EnglishNextWordContext.parse(before)
+        if (!context.justCompleted || context.previous == null) return
+        if (!SettingsPreferences.isSmartPredictionEnabled(this)) return
+        val previous = context.previous
+        val expected = before
+        val session = uiState.value.inputSessionId
+        val owner = runCatching { InputCommandOwner.requireOwner() }.getOrNull() ?: return
+        serviceScope.launch(owner.context()) {
+            val words = predictionManager.getEnglishNextWords(previous, ENGLISH_NEXT_WORD_LIMIT)
+            if (words.isEmpty()) return@launch
+            // serviceScope is Main; getEnglishNextWords comes back here after its IO/Default work.
+            if (uiState.value.inputSessionId != session) return@launch
+            val current = candidateState.value
+            if (current.isComposing || current.inputText.isNotEmpty() ||
+                current.pendingEnglishText.isNotEmpty() || current.associationCandidates.isNotEmpty() ||
+                current.isShowingRecentClipboard || !isEnglishPredictionMode()) return@launch
+            if (englishTextBeforeCursor() != expected) return@launch
+            candidateState.value = current.copy(associationCandidates = words, englishNextWord = true)
+        }
     }
 
     /**
@@ -5474,6 +5533,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (before != null) predictionManager.replaceCommittedText(before)
             else predictionManager.appendCommittedText(delivered)
             if (!isPaste) predictionManager.recordInput(delivered)
+        } else if (isEnglishPredictionMode()) {
+            // onUpdateSelection compares the editor context with this cache; keeping it current
+            // keeps an English next-word row from being cleared by the commit's own selection event.
+            val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull()
+            if (before != null) predictionManager.replaceCommittedText(before)
         }
         return TextCommitResult.ACCEPTED_HOST
     }

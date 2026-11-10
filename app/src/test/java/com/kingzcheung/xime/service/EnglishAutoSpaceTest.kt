@@ -14,9 +14,12 @@ class EnglishAutoSpaceTest {
 
     @Test fun originalWordOnlyAddsTheSpace() {
         val state = CandidateState(pendingEnglishText = "hel", associationCandidates = listOf("hello"))
-        val committed = mutableListOf<String>()
-        assertTrue(commitAssociationSelection(state, 0, { committed += it; true }, { _, _ -> error("already typed") }, suffix = " "))
-        assertEquals(listOf(" "), committed)
+        var replaced: Pair<String, String>? = null
+        // The replacement verifies the typed prefix is still at the caret; commitEnglishCompletion
+        // then writes only the missing suffix (the space).
+        assertTrue(commitAssociationSelection(state, 0, { error("must not rewrite the word") },
+            { old, new -> replaced = old to new; true }, suffix = " "))
+        assertEquals("hel" to "hel ", replaced)
         assertEquals("hel", associationWordAt(state, 0))
     }
 

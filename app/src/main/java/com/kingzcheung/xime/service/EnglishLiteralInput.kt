@@ -28,7 +28,7 @@ internal fun commitEnglishLetter(
         candidates = emptyList(), candidateComments = emptyList(), candidateActions = emptyList(),
         pendingEnglishText = (if (afterGlide) "" else state.pendingEnglishText) + text, glidedWord = "",
         // Deliver the letter before asking the host about optional completion support.
-        associationCandidates = emptyList(), englishReplaceSupported = replaceSupported(),
+        associationCandidates = emptyList(), englishNextWord = false, englishReplaceSupported = replaceSupported(),
         hasNextPage = false, hasPrevPage = false, isShowingRecentClipboard = false,
     )
 }

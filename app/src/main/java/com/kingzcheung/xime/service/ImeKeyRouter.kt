@@ -1420,7 +1420,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             service.commitText(" ")
                             service.candidateState.value = service.candidateState.value.copy(
                                 pendingEnglishText = "",
-                                associationCandidates = emptyList()
+                                associationCandidates = emptyList(),
+                                englishNextWord = false
                             )
                         }
                     } else if (candState.isComposing) {
@@ -1626,7 +1627,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             service.commitText(finalKey)
                             service.candidateState.value = service.candidateState.value.copy(
                                 pendingEnglishText = "",
-                                associationCandidates = emptyList()
+                                associationCandidates = emptyList(),
+                                englishNextWord = false
                             )
                         }
                     } else {
@@ -1795,12 +1797,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // 回删替换也会破坏受限宿主的输入。NO_SUGGESTIONS 只是宿主
                         // 不要内联补全，候选栏联想仍提供（与退格/applyComposition 路径同口径）。
                         val secret = service.isSecretEditor()
+                        val keepNextWords = service.candidateState.value.englishNextWord && capturedInputText.isEmpty()
                         service.candidateState.value = service.candidateState.value.copy(
                             inputText = capturedInputText,
                             candidates = filteredTexts,
                             candidateComments = filteredComments,
                             isComposing = capturedInputText.isNotEmpty(),
-                            associationCandidates = if (deferAssociationClear || secret || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty())) emptyList() else service.candidateState.value.associationCandidates,
+                            associationCandidates = if (deferAssociationClear || secret || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty() && !keepNextWords)) emptyList() else service.candidateState.value.associationCandidates,
                             isShowingRecentClipboard = false,
                             hasNextPage = capturedHasNext,
                             hasPrevPage = capturedHasPrev,
@@ -2109,6 +2112,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val autoSpace = state.pendingEnglishText.isNotEmpty() && !emailSuffix &&
             service.uiState.value.let { (it.isAsciiMode || it.inputProfile.typesLettersDirectly) && !it.inputTarget.isInternal } &&
             SettingsPreferences.getPrefsPublic(service).getBoolean(EnglishAutoSpace.PREF_KEY, false)
+        // 英文“下一个词”是完整词：点选后补空格，下一轮才能接着给下一个词（单次联想由 allowPrediction 管）。
+        val nextWord = state.englishNextWord && state.pendingEnglishText.isEmpty() && !emailSuffix &&
+            service.uiState.value.let {
+                !it.isAsciiMode && !it.inputTarget.isInternal &&
+                    it.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH &&
+                    it.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.WORDS
+            }
+        val appendSpace = nextWord || autoSpace
         val accepted = commitAssociationSelection(state, index,
             commit = { text ->
                 service.commitTextAndPredict(text, isPaste = false,
@@ -2118,12 +2129,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 if (service.uiState.value.inputTarget.isInternal) service.replaceBeforeCursor(prefix, completion)
                 else service.currentInputConnection?.commitEnglishCompletion(prefix, completion) == true
             },
-            suffix = if (autoSpace) " " else "")
+            suffix = if (appendSpace) " " else "")
         if (!accepted) return false
         associationWordAt(state, index)?.let(com.kingzcheung.xime.stats.TypingStats::onAssociationPicked)
-        if (autoSpace) associationWordAt(state, index)?.let(englishAutoSpace::arm)
+        if (appendSpace) associationWordAt(state, index)?.let(englishAutoSpace::arm)
         service.candidateState.value = service.candidateState.value.copy(
-            pendingEnglishText = "", associationCandidates = emptyList())
+            pendingEnglishText = "", associationCandidates = emptyList(), englishNextWord = false)
         hardwareNavigation.clear()
         publishHardwareCandidateSelection()
         return true
@@ -2375,6 +2386,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     candidates = emptyList(),
                     candidateComments = emptyList(),
                     associationCandidates = emptyList(),
+                    englishNextWord = false,
                     isShowingRecentClipboard = false
                 )
                 // 候选展开页：联想/剪贴板候选清空后无内容，收起
