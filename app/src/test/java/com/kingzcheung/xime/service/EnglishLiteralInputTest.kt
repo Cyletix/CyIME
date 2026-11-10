@@ -22,6 +22,37 @@ class EnglishLiteralInputTest {
         assertFalse(englishSentenceStart(app, editor))
     }
 
+    @Test fun sentenceOpenersOfOtherLanguagesStillStartASentence() {
+        // 光标紧跟 « ¿ ¡ „ “ ：前面是输入框开头、换行或句末加空格，就是句首。
+        for (before in listOf("«", "¿", "¡", "„", "“", "‹", "(«", "Он ушёл. «", "¿Qué? ¡", "Hola.\n¿",
+                "Ende! „", "Fin.» «", "Done.\" “", "   «")) {
+            assertTrue(before, sentenceStartsAfterOpener(before))
+        }
+        // 反例：开头符号紧贴前面的字、前面没有句末、缩写的点、正在打的字、只有空格没有开头符号。
+        for (before in listOf("a¿", "Он сказал «", "Hola, ¿", "a.m. «", "e.g. „", "При", "Hello. ", "", null,
+                " ".repeat(40) + "«")) {
+            assertFalse(before.toString(), sentenceStartsAfterOpener(before))
+        }
+    }
+
+    @Test fun openerFallbackOnlyAtWordStartAndOnlyWhenSwitchIsOn() {
+        val app = mock<android.content.Context>()
+        val prefs = mock<android.content.SharedPreferences>()
+        val editor = mock<android.view.inputmethod.InputConnection>()
+        whenever(app.getSharedPreferences("kime_settings", 0)).thenReturn(prefs)
+        whenever(editor.getTextBeforeCursor(any(), any())).thenReturn("Да. «")
+        // 开关关着：俄语、西班牙语键盘也不自动大写，不碰输入框。
+        assertFalse(englishSentenceStart(app, editor, wordStart = true))
+        verifyNoInteractions(editor)
+        whenever(prefs.getBoolean(ENGLISH_SENTENCE_CAPS, false)).thenReturn(true)
+        whenever(editor.getCursorCapsMode(android.text.TextUtils.CAP_MODE_SENTENCES)).thenReturn(0)
+        assertTrue(englishSentenceStart(app, editor, wordStart = true))
+        // 打到词中间：只问一次系统，不多读光标前的文字。
+        clearInvocations(editor)
+        assertFalse(englishSentenceStart(app, editor, wordStart = false))
+        verify(editor, never()).getTextBeforeCursor(any(), any())
+    }
+
     @Test fun lettersCommitLiterallyEvenWithStaleChineseDecoderCandidates() {
         for (word in listOf("hello", "fuck", "you", "Hello")) {
             var state = CandidateState(candidates = listOf("核力量哦"), isComposing = true, inputText = "old")

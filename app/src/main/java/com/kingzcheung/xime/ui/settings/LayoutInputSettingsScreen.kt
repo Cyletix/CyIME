@@ -72,9 +72,9 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
             when (category) {
                 LayoutInputCategory.Qwerty -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // 邻键纠错、模糊音 11-01 搬到「语言与方案」（跟着方案走，九键和 26 键页不再各放一份）。
-                SettingsSection(title = "英文输入", content = {
-                    SettingsToggleItem(Icons.TwoTone.Abc, "英文句首自动大写",
-                        "英文输入时，新句子和新段落的第一个字母自动大写。",
+                SettingsSection(title = "大小写", content = {
+                    SettingsToggleItem(Icons.TwoTone.Abc, "首字母大写",
+                        "英文和西、德、法、意、俄语键盘上，新句子和新段落的第一个字母自动大写。",
                         checked = settings.englishSentenceCaps, onCheckedChange = {
                             settings = settings.copy(englishSentenceCaps = it); settings.save(context)
                         })

@@ -681,11 +681,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     /** 紧挨着的上一笔英文滑行（候选、大小写），连着划时连同它一起选；屏上不再紧跟它就作废。 */
     private var lastGlide: com.kingzcheung.xime.glide.PreviousGlide? = null
 
+    /** 「首字母大写」：英文和西、德、法、意、俄语键盘都按这一个开关（日语英数、密码、终端等除外）。 */
     private fun capitalizeEnglishHere(): Boolean {
         val state = service.uiState.value
         if (state.inputTarget.isInternal || service.editorInputPolicy.field.scoped || service.isSecretEditor() ||
             service.isTerminalEditor() || service.textCommit.isJapaneseProfile()) return false
-        return englishSentenceStart(service, service.editorConnection())
+        return englishSentenceStart(service, service.editorConnection(),
+            wordStart = service.candidateState.value.pendingEnglishText.isEmpty())
     }
 
     private fun glideCase(case: (String) -> String, start: Boolean): (String) -> String =
@@ -1167,8 +1169,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             ?.toString() == current.glidedWord
                     // Japanese 英数 follows 全角／半角, so full-width letters can be typed directly.
                     val fullWidthLetter = service.textCommit.isJapaneseProfile() && service.textCommit.isFullWidthPunctuation()
-                    val autoCaps = hardwareEvent == null && letterLanguage == null &&
-                        !isShifted && capitalizeEnglishHere()
+                    // 西、德、法、意、俄语键盘和英文同一个「首字母大写」开关（以前只有英文会自动大写）；韩文没有大小写。
+                    val autoCaps = hardwareEvent == null && !isShifted && capitalizeEnglishHere()
                     val next = commitEnglishLetter(current, key, isShifted || autoCaps,
                         service::supportsEnglishCandidateReplace, afterGlide = afterGlide) {
                         val letter = if (fullWidthLetter) fullWidthLetters(it) else it
