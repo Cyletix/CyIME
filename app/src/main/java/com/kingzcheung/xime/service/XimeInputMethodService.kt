@@ -2187,9 +2187,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val activeBottomDp = keyboardBottomSpaceDp(state)
                 val minimumBottomDp = imeBottomSpaceDp(fixedMinimumInsetPxState.value, resources.displayMetrics.density)
                 val editingFixedBottom = state.showKeyboardResize && !state.isFloatingMode
-                val edgeKeyboard = SettingsPreferences.edgeToEdgeKeyboard(this@XimeInputMethodService)
-                // 调节固定键盘时底边从哪里量起（11-03「用户点到哪儿就是哪儿」）：贴底时从屏幕底边量，底边能一直拖到屏幕底边，
-                // 调低过的也从它现在真实的位置开始，确认后停在拖到的地方；不贴底时仍从系统按钮上沿量，不会拖到按钮下面。
+                // 「底部位置」三档的留白都能调到 0（11-08），键盘调节的底边也一样能拖到屏幕底边（11-10「调不了」）：
+                // 只剩没选过底部位置、又关着贴底的旧状态照原来从系统按钮上沿量。
+                val edgeKeyboard = SettingsPreferences.edgeToEdgeKeyboard(this@XimeInputMethodService) ||
+                    SettingsPreferences.keyboardBottomPosition(this@XimeInputMethodService) != SettingsPreferences.KeyboardBottomPosition.AUTO
+                // 调节固定键盘时底边从哪里量起（11-03「用户点到哪儿就是哪儿」）：从屏幕底边量，底边能一直拖到屏幕底边，
+                // 调低过的也从它现在真实的位置开始，确认后停在拖到的地方。
                 val previewInsetDp = if (!editingFixedBottom) activeBottomDp else if (edgeKeyboard) 0 else minimumBottomDp
                 // 「重置」回到的位置，和确认时换算校准值的基准：贴底时是贴底位置，不贴底时是系统建议。
                 val defaultBottomPadding = if (!editingFixedBottom) 0 else if (edgeKeyboard) minimumBottomDp

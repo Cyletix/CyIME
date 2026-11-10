@@ -256,6 +256,27 @@ class FixedKeyboardBottomInsetTest {
         assertEquals(48, measure())
     }
 
+    /** 键盘调节的底边把手要放在系统画的「切换输入法 / 收起键盘」那条上面（11-10 用户截图）：量出那条的上沿。 */
+    @Test fun resizeHandleKnowsWhereTheSystemImeButtonsStart() {
+        val decor = activity.window.decorView as android.widget.FrameLayout
+        val host = android.view.View(activity)
+        decor.addView(host)
+        val exact = android.view.View.MeasureSpec.EXACTLY
+        fun layout() {
+            decor.measure(android.view.View.MeasureSpec.makeMeasureSpec(360, exact), android.view.View.MeasureSpec.makeMeasureSpec(800, exact))
+            decor.layout(0, 0, 360, 800)
+        }
+        layout()
+        assertEquals(null, imeNavButtonsTopInWindowPx(host))
+        val frame = Class.forName("android.inputmethodservice.navigationbar.NavigationBarFrame")
+            .getConstructor(android.content.Context::class.java).newInstance(activity) as android.view.View
+        decor.addView(frame, android.widget.FrameLayout.LayoutParams(-1, 48, android.view.Gravity.BOTTOM))
+        layout()
+        assertEquals(752, imeNavButtonsTopInWindowPx(host))
+        frame.visibility = android.view.View.GONE
+        assertEquals(null, imeNavButtonsTopInWindowPx(host))
+    }
+
     @Test @Config(qualifiers = "sw800dp-w800dp-h1200dp")
     fun tabletKeepsTheTaskbarEvenIfTheWindowReportsNoButtons() {
         mode(2)

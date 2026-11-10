@@ -252,13 +252,16 @@ internal fun KeyboardResizeOverlay(
             return updated to padding
         }
         // 固定键盘底边把手：手势导航时抬到系统底部手势区上面，往上拖不会触发回桌面。
+        // 系统在键盘下面画了「切换输入法 / 收起键盘」那条按钮时也抬到它上面，不被按钮盖住、按得到（11-10）。
         val reportedGesturePx = WindowInsets.mandatorySystemGestures.getBottom(density)
         val tappablePx = WindowInsets.tappableElement.getBottom(density)
         val gestureZoneTopPx = remember(hostView, floatingMode, laidOutWindowHeight, overlayOrigin, reportedGesturePx, tappablePx,
             previewState.fixedBottomInsetDp) {
-            if (floatingMode || laidOutWindowHeight <= 0) null else (com.kingzcheung.xime.service.bottomGestureZoneTopInWindowPx(hostView)
-                ?: reportedGesturePx.takeIf { it > 0 }?.let { laidOutWindowHeight - it })
-                ?.let { it - overlayOrigin.y }
+            if (floatingMode || laidOutWindowHeight <= 0) null else listOfNotNull(
+                com.kingzcheung.xime.service.bottomGestureZoneTopInWindowPx(hostView)
+                    ?: reportedGesturePx.takeIf { it > 0 }?.let { laidOutWindowHeight - it },
+                com.kingzcheung.xime.service.imeNavButtonsTopInWindowPx(hostView),
+            ).minOrNull()?.let { it - overlayOrigin.y }
         }
         val bottomHandleClearancePx = BOTTOM_HANDLE_GESTURE_CLEARANCE_DP * density.density
         // 左右边把手常贴着屏幕边，从边上往里拖会被系统当成返回手势，直接退出调节（11-05 平板）。
