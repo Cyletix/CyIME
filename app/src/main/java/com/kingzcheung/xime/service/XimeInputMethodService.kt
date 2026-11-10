@@ -14,6 +14,7 @@ import android.os.Looper
 import android.util.Log
 import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import android.view.KeyEvent
+import android.view.KeyCharacterMap
 import android.view.View
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
@@ -3229,6 +3230,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private val hardwareLanguageShortcuts = HardwareLanguageShortcuts()
+
+    /** 只按着 Alt 时这个键在本机键盘布局里打出的字（没有就是 null）；普通电脑键盘的 Alt+字母没有字。 */
+    private fun altLayerChar(e: KeyEvent): Char? {
+        if (!e.isAltPressed || e.isCtrlPressed || e.isMetaPressed) return null
+        val code = runCatching { e.getUnicodeChar(e.metaState) }.getOrDefault(0)
+        if (code == 0 || code and KeyCharacterMap.COMBINING_ACCENT != 0) return null
+        return code.toChar().takeUnless { it.isISOControl() || it.isWhitespace() }
+    }
     private var clipboardRestoreCompact = false
     private var microphoneRestoreCompact = false
     private val clipboardNavigationKeys = mutableSetOf<Int>()
@@ -3330,8 +3339,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val e = event ?: return super.onKeyDown(keyCode, event)
         if (hasHardwareKeyboard) {
             // Shift 单击切语言时这个键会被下面的快捷键吞掉，按住状态要先记下。
+            // 全键盘手机的 Alt 数字层（Titan 2：Alt+字母 = 数字）：打字中按出数字就和数字键一样选候选（GitHub #295）。
+            val altChar = altLayerChar(e)
+            val altDigit = altChar.takeIf { it in '0'..'9' && keyCode !in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 }
+                ?.let { KeyEvent.KEYCODE_0 + (it - '0') }
+            if (altDigit != null && keyRouter.hardwareComposing() && keyRouter.handleHardwareCandidateKey(altDigit,
+                    KeyEvent(e.downTime, e.eventTime, e.action, altDigit, e.repeatCount))) {
+                hardwareCandidateNavigationKeys += keyCode
+                return true
+            }
             val shortcut = hardwareLanguageShortcuts.down(keyCode, e.eventTime, e.repeatCount,
-                e.isCtrlPressed, e.isAltPressed, e.isMetaPressed, e.isShiftPressed, uiState.value.hardwareOptions)
+                e.isCtrlPressed, e.isAltPressed, e.isMetaPressed, e.isShiftPressed, uiState.value.hardwareOptions,
+                altTypesChar = altChar != null)
             shortcut.switchMode?.let { switchHardwareLanguage(it) }
             shortcut.tool?.let { handleHardwareTool(it) }
             if (shortcut.consume) return true

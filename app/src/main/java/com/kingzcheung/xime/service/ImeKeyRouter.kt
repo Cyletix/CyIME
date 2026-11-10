@@ -409,6 +409,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     private val keyEventFieldKinds = setOf(EditorFieldPolicy.Kind.NUMBER_PASSWORD, EditorFieldPolicy.Kind.NUMBER,
         EditorFieldPolicy.Kind.PHONE, EditorFieldPolicy.Kind.PASSWORD)
 
+    /** 实体键盘打字中（有编码或候选）；按键队列外读界面状态，和 Esc 的判断一样。 */
+    internal fun hardwareComposing(): Boolean {
+        val state = service.candidateState.value
+        return state.isComposing || state.inputText.isNotEmpty() || state.preeditText.isNotEmpty() ||
+            service.t9PartialSegments.isNotEmpty()
+    }
+
     internal fun handleHardwareCandidateKey(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && hasPendingCandidateCommit) {
             cancelRejectedCommit()
