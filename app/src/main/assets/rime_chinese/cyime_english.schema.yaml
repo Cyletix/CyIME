@@ -40,6 +40,7 @@ engine:
     - table_translator@completion
   filters:
     - lua_filter@*cyime_en_memory
+    - lua_filter@*cyime_en_phrases
     - lua_filter@*cyime_english_words
     - uniquifier
 

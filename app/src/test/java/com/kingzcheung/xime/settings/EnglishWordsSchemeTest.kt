@@ -157,12 +157,15 @@ class EnglishWordsSchemeTest {
 
     @Test fun `lua modules named by the schema are bundled`() {
         val modules = Regex("""lua_(?:translator|filter)@\*(\w+)""").findAll(schema).map { it.groupValues[1] }.toList()
-        assertEquals(listOf("cyime_en_memory", "cyime_english_words"), modules)
+        assertEquals(listOf("cyime_en_memory", "cyime_en_phrases", "cyime_english_words"), modules)
         // cyime_en_memory 和雾凇共用（构建时拷进 rime_ice/lua）；单词方案自己的过滤器随中文资源装。
         repoFile("data/cyime_en_memory.lua")
         val filter = repoFile("src/main/assets/rime_chinese/lua/cyime_english_words.lua").readText()
         assertTrue(filter.contains("return cyime_english_words"))
         assertTrue(filter.contains("Candidate(\"raw\""))
+        val phrases = repoFile("src/main/assets/rime_chinese/lua/cyime_en_phrases.lua").readText()
+        assertTrue(phrases.contains("cyime_en_phrases.txt"))
+        assertTrue(phrases.contains("Candidate(\"cyime_en_phrase\""))
     }
 
     @Test fun `generated dictionary ranks common words and keeps spellings`() {
