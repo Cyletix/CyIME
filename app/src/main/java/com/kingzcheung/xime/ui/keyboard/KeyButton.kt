@@ -415,8 +415,8 @@ fun SwipeableKeyButton(
         if (ctrlTargets?.ctrlTap(pick) != true) onClick()
     }
     val letterGlideOwnsDrag = LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true
-    val reserveDragForGlide = letterGlideOwnsDrag ||
-        (LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true)
+    val t9GlideOwnsDrag = LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true
+    val reserveDragForGlide = letterGlideOwnsDrag || t9GlideOwnsDrag
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -602,7 +602,10 @@ fun SwipeableKeyButton(
                     ctrlTapFraction[0] = if (size.width > 0) down.position.x / size.width else 0.5f
                 }
             } else Modifier)
-            .pointerInput(reserveDragForGlide) { detectExclusiveKeyGestures(reserveDragForGlide) { currentActions } }
+            .pointerInput(reserveDragForGlide, t9GlideOwnsDrag) {
+                // 九键滑行没接管的拖动抬手仍算点按（用户 11-10：开了九键滑行，快打一句吞一半的键）。
+                detectExclusiveKeyGestures(reserveDragForGlide, tapUnclaimedGlideDrift = t9GlideOwnsDrag) { currentActions }
+            }
             .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()

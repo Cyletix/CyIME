@@ -66,4 +66,18 @@ class T9GlideClaimTest {
         val out = stroke(listOf(center('5'), center('2'), Offset(center('2').x, -40f)))
         assertFalse("滑出数字区作废", out.claimed)
     }
+
+    /** 用户 11-10：没成滑行的那一下键自己要按点按算（[glideDriftIsTap]），和上面的滑行判定接得上。 */
+    @Test fun unclaimedDriftCountsAsATapOnTheKeyItStartedOn() {
+        val slop = 8f
+        // 键 100×50：键里挪 30，算点按。
+        assertTrue(glideDriftIsTap(Offset(50f, 25f), Offset(80f, 25f), 100f, 50f, slop))
+        // 落在上沿往上抖出键 19（上面的用例），不到 0.6 个短边（30），算点按。
+        assertTrue(glideDriftIsTap(Offset(50f, 3f), Offset(50f, -16f), 100f, 50f, slop))
+        // 出了键而且走了 0.6 个短边以上（滑行该接管的距离）又没成滑行：拖去左栏、功能键，不出字。
+        assertFalse(glideDriftIsTap(Offset(10f, 25f), Offset(-40f, 25f), 100f, 50f, slop))
+        assertFalse(glideDriftIsTap(Offset(50f, 25f), Offset(50f, 90f), 100f, 50f, slop))
+        // 走远了又回到键上松手，仍算这个键。
+        assertTrue(glideDriftIsTap(Offset(50f, 25f), Offset(95f, 45f), 100f, 50f, slop))
+    }
 }
