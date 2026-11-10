@@ -25,6 +25,7 @@
 #include "t9_digit_userdict.h"
 #include "t9_suppression.h"
 #include "t9_sentence_scorer.h"
+#include "t9_ngram_model.h"
 #include <jni.h>
 #include <android/log.h>
 #include <algorithm>
@@ -1587,6 +1588,18 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativePrefetchFile(
     }
     close(fd);
     return static_cast<jlong>(requested * page / 1024);
+}
+
+// 当前方案不用九键词组模型时（九键换回 26 键后收起键盘），把模型已读进本进程的页放掉。
+// 文件页仍在系统缓存，下次九键打字时取回；映射本身不动，别的线程正在读也安全。
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeReleaseT9ModelPages(
+    JNIEnv* env,
+    jobject thiz
+) {
+    (void)env;
+    (void)thiz;
+    T9NgramModel::ReleaseResidentPages();
 }
 
 // 抽查文件有多少页在内存里：每 stride 页查一页，返回 0~1，打不开返回 -1。

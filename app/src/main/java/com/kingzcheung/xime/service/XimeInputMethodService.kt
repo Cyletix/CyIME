@@ -4369,6 +4369,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         suspendCompositionForScreenOff()
         KeyboardPanelLaunch.previewVisible = false
         DictionaryPrefetch.onHide()
+        // 九键换回 26 键后收起：九键词组模型读进来的页不再算在输入法头上。
+        serviceScope.launch(Dispatchers.IO) { rimeEngine.releaseT9ModelIfUnused(rimeEngine.getCurrentSchema()) }
         if (!lockCompositionSuspended) discardInlinePinyinBeforeFrameworkFinish()
         // The search bar belongs to this keyboard session; leaving restores learning.
         closeClipboardSearch(openBoard = false)

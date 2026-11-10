@@ -1133,6 +1133,18 @@ class RimeEngine {
         return (files + listOfNotNull(model?.path)).distinct()
     }
 
+    /**
+     * 当前方案不用九键词组模型（26 键全拼等）时，把模型已读进本进程的页放掉：九键打过字再换回 26 键，
+     * 这些页（平板实测十几 MB，打得多可到上百 MB）一直算在输入法头上。文件页还在系统缓存，再用九键时取回。
+     * 引擎正忙就跳过，下次收起再试。在 IO 线程调用。
+     */
+    @androidx.annotation.WorkerThread
+    fun releaseT9ModelIfUnused(schemaId: String) {
+        if (!isInitialized || schemaId.isEmpty()) return
+        val usesModel = tryLocked(true) { !getSchemaString(schemaId, "t9/ngram_model").isNullOrEmpty() }
+        if (!usesModel) nativeReleaseT9ModelPages()
+    }
+
     /** 抽查文件在内存里的比例（每 [stride] 页查一页），0~1；打不开为 -1。在 IO 线程调用。 */
     @androidx.annotation.WorkerThread
     fun residentFraction(path: String, stride: Int = 64): Float = nativeResidentFraction(path, stride)
@@ -1273,6 +1285,7 @@ class RimeEngine {
     private external fun nativeIsMaintaining(): Boolean
     private external fun nativePrefetchFile(path: String): Long
     private external fun nativeResidentFraction(path: String, stride: Int): Float
+    private external fun nativeReleaseT9ModelPages()
     private external fun nativeGetCurrentSchema(): String?
     private external fun nativeProcessKey(keycode: Int, mask: Int): Boolean
     private external fun nativeProcessKeyAndGetResult(keycode: Int, mask: Int): RimeProcessResult
