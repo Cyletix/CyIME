@@ -441,6 +441,7 @@ object SettingsPreferences {
     const val KEY_SHOW_CANDIDATE_COMMENTS = "show_candidate_comments"
     const val KEY_CANDIDATE_COMMENT_MODE = "candidate_comment_mode"
     const val KEY_CANDIDATE_COMMENT_CONTENT = "candidate_comment_content"
+    const val KEY_SHOW_CORRECTION_MARKS = "show_correction_marks"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
     const val KEY_ASSOCIATION_CANCEL_CROSS = "association_cancel_cross"
     const val KEY_HANDWRITING_WUBI_HINTS = "handwriting_wubi_hints"
@@ -469,6 +470,12 @@ object SettingsPreferences {
     const val INPUT_TEXT_INPUT_BOX = "input_box"
     const val INPUT_TEXT_CANDIDATE_BAR = "candidate_bar"
     const val DEFAULT_PAGE_SIZE = 20 // 手机候选栏每页候选词数；schema 里的 page_size 来自 PC 版（5），太短，默认用 20
+
+    fun showCorrectionMarks(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SHOW_CORRECTION_MARKS, true)
+
+    fun setShowCorrectionMarks(context: Context, show: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SHOW_CORRECTION_MARKS, show).apply()
+    }
 
     fun candidateCommentMode(context: Context): CandidateCommentMode {
         val prefs = getPrefs(context)

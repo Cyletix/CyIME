@@ -319,6 +319,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     internal val uiState = mutableStateOf(InputUIState())
     internal val candidateState = mutableStateOf(CandidateState())
+    internal val glideCandidatePreview = mutableStateOf("")
+    internal val glideRimePreview = mutableStateOf<com.kingzcheung.xime.rime.RimeProcessResult?>(null)
+    internal val glideEnglishPreview = mutableStateOf<com.kingzcheung.xime.ui.keyboard.GlideEnglishPreview?>(null)
     private val clipboardItemsState = mutableStateOf<List<com.kingzcheung.xime.clipboard.ClipboardItem>>(emptyList())
     private val voiceAmplitudeState = mutableFloatStateOf(0f)
     private val voiceSpectrumState = mutableStateOf(FloatArray(16))
@@ -2857,6 +2860,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     })
                                 },
                                 predictionTransition = if (settingsPreviewEditor) null else predictionManager.transitionPending,
+                                glideCandidatePreview = glideCandidatePreview,
+                                glideRimePreview = glideRimePreview,
+                                glideEnglishPreview = glideEnglishPreview,
                                 voiceAmplitudeState = this@XimeInputMethodService.voiceAmplitudeState,
                                 voiceSpectrumState = this@XimeInputMethodService.voiceSpectrumState,
                                 callbacks = callbacks,
@@ -3622,6 +3628,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
+        endGlidePreview()
         super.onStartInput(attribute, restarting)
         editorStartedAt = android.os.SystemClock.uptimeMillis()
         val preview = KeyboardPanelLaunch.isPreview(attribute, packageName)
@@ -4289,6 +4296,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onFinishInput() {
         gameShowExplicit = false
         suspendCompositionForScreenOff()
+        endGlidePreview()
         // 离开后的最后一帧仍不可输入，下一次 onStartInput 按新编辑器恢复正常行为。
         settingsPreviewPanel = null
         KeyboardPanelLaunch.previewVisible = false
@@ -4573,6 +4581,90 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * Android 无法查询宿主编辑器的 composing 状态，由写入点主动标记。
      */
     private val inlineComposition = InlineCompositionTracker()
+    internal val glideInputPreview by lazy {
+        GlideInputPreview(
+            connection = { editorConnection() }, session = { uiState.value.inputSessionId },
+            baseline = { inlineComposition.text.takeIf { inlineComposition.active } },
+            canStart = { !uiState.value.inputTarget.isInternal && !isSecretEditor() && !isTerminalEditor() &&
+                (!inlineComposition.active || inlineComposition.text?.let { inlineComposition.caret == it.length } == true) },
+            mark = { markInputBoxComposing(it) },
+            owns = { inlineComposition.active && inlineComposition.text == it && inlineComposition.caret == it.length },
+            clear = { endComposingInputBox() },
+        )
+    }
+    private val glidePreviewRouter by lazy {
+        GlidePreviewRouter(
+            session = { uiState.value.inputSessionId },
+            useInputBox = { TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX },
+            input = glideInputPreview::show, clearInput = glideInputPreview::end,
+            candidate = { glideCandidatePreview.value = it },
+        )
+    }
+    internal fun showGlideEnglishPreview(preview: com.kingzcheung.xime.ui.keyboard.GlideEnglishPreview, session: Long) {
+        if (session != uiState.value.inputSessionId) return
+        glideEnglishPreview.value = preview
+        glidePreviewRouter.show(preview.text, session)
+    }
+    @Volatile private var glidePreviewSequence = 0L
+    private var glidePreviewGesture = -1
+    private var glidePreviewRevision = 0L
+    internal fun showGlidePreviewCode(code: String, session: Long, gesture: Int) {
+        if (session != uiState.value.inputSessionId) return
+        if (gesture != glidePreviewGesture) {
+            glidePreviewGesture = gesture
+            glidePreviewRevision = rimeEngine.glidePreviewRevision()
+        }
+        val revision = glidePreviewRevision
+        val seq = ++glidePreviewSequence
+        if (code.isEmpty()) return
+        keyRouter.postRimeJob("glide_preview") {
+            if (seq != glidePreviewSequence) return@postRimeJob
+            val result = rimeEngine.glidePreview(code, revision)
+            if (result == null) {
+                withContext(Dispatchers.Main) {
+                    if (seq == glidePreviewSequence && session == uiState.value.inputSessionId &&
+                        !rimeEngine.isCandidateRevisionCurrent(revision)) {
+                        glideRimePreview.value = null
+                        glideInputPreview.end()
+                    }
+                }
+                return@postRimeJob
+            }
+            val transformed = candidateTransform.transformFor(result)
+            val shown = transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result
+            withContext(Dispatchers.Main) {
+                if (seq != glidePreviewSequence || session != uiState.value.inputSessionId ||
+                    !rimeEngine.isCandidateRevisionCurrent(revision)) return@withContext
+                glideRimePreview.value = shown
+                if (TerminalEditor.inputTextLocation(this@XimeInputMethodService) == SettingsPreferences.INPUT_TEXT_INPUT_BOX)
+                    glideInputPreview.showComplete(shown.preeditText, session)
+                else glideInputPreview.end()
+            }
+        }
+    }
+    internal fun endGlidePreview() {
+        glidePreviewSequence++
+        glidePreviewGesture = -1
+        glideRimePreview.value = null
+        glideEnglishPreview.value = null
+        glidePreviewRouter.end()
+    }
+
+    internal fun holdGlidePreview(): Long? {
+        val token = ++glidePreviewSequence
+        return token.takeIf { glideRimePreview.value != null }
+    }
+
+    internal fun isGlidePreviewHeld(token: Long): Boolean = token == glidePreviewSequence
+
+    internal fun finishGlidePreview(token: Long, keepComposition: Boolean) {
+        if (token != glidePreviewSequence) return
+        if (keepComposition) glideInputPreview.release() else glideInputPreview.end()
+        glideRimePreview.value = null
+        glidePreviewGesture = -1
+        glidePreviewSequence++
+    }
+
     private var lockCompositionSuspended = false
 
     private fun refreshLockResumedCandidates() {

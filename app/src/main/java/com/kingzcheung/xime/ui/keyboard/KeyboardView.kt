@@ -90,6 +90,7 @@ import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.MainType
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.PanelType
+import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.keyboard.ToolbarAction
 import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
@@ -138,6 +139,9 @@ fun KeyboardView(
     onCornerHandlesPositioned: (List<android.graphics.Rect>) -> Unit = {},
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     predictionTransition: kotlinx.coroutines.flow.StateFlow<Boolean>? = null,
+    glideCandidatePreview: State<String> = remember { mutableStateOf("") },
+    glideRimePreview: State<RimeProcessResult?> = remember { mutableStateOf(null) },
+    glideEnglishPreview: State<GlideEnglishPreview?> = remember { mutableStateOf(null) },
     voiceAmplitudeState: State<Float> = remember { mutableFloatStateOf(0f) },
     voiceSpectrumState: State<FloatArray> = remember { mutableStateOf(FloatArray(16)) },
     /**
@@ -1028,6 +1032,8 @@ fun KeyboardView(
                 candidateState.value.expandedCandidatesLoaded
 
             val cs = candidateState.value
+            val liveGlide = glideRimePreview.value
+            val englishGlide = glideEnglishPreview.value
             androidx.compose.runtime.SideEffect { com.kingzcheung.xime.service.KeyLatencyProbe.composed() }
             // 展开态候选栏数据源：全量列表（筛选态取单字子列表，仍是同源关系）。
             // 每项携带全量原索引：筛选态过滤掉词组后位置索引 ≠ 全局索引，
@@ -1056,6 +1062,7 @@ fun KeyboardView(
                 railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage, cs.clipboardExtractedCount,
                 cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
                 hardwareCandidateHighlight, glossRevision, glossChinese, glossSwap,
+                liveGlide, englishGlide,
             ) {
                 if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
@@ -1065,6 +1072,21 @@ fun KeyboardView(
                     )
                 } else if (isHandwritingPage) {
                     CandidateBarState.Idle
+                } else if (englishGlide != null) {
+                    CandidateBarState.AssociationOnly(candidates = englishGlide.candidates, highlightIndex = 0)
+                } else if (liveGlide != null) {
+                    val texts = liveGlide.candidates.map { it.text }
+                    val comments = liveGlide.candidates.map { it.comment }
+                    val (shownTexts, shownComments) = when {
+                        glossSwap -> CandidateGlossary.swapped(texts, comments)
+                        glossChinese -> texts to CandidateGlossary.annotate(texts, comments)
+                        else -> texts to comments
+                    }
+                    CandidateBarState.ChineseCandidates(
+                        candidates = shownTexts, comments = shownComments,
+                        inputText = liveGlide.inputText, preeditText = liveGlide.preeditText,
+                        hasMore = liveGlide.hasNextPage,
+                    )
                 } else {
                     // 计算器结果只看候选状态自己带的标记（GitHub #289），不受展开页数据影响。
                     val calculator = cs.showsCalculator
@@ -1112,8 +1134,23 @@ fun KeyboardView(
                 }
             }
             val holdingBar = predictionPending && candidateBarState is CandidateBarState.Idle && previousBar != null
+            val correctionVisible = rememberCorrectionMarksVisible()
+            val doublePinyinKeysShown = rememberDoublePinyinKeysShown()
+            val correctionScheme = remember(state.currentSchemaId) {
+                com.kingzcheung.xime.settings.DoublePinyinSchemes.find(state.currentSchemaId)
+            }
+            val correctionMarks = remember(cs.correctedCandidates, correctionVisible, correctionScheme, doublePinyinKeysShown) {
+                when {
+                    !correctionVisible -> emptyMap()
+                    correctionScheme == null || !doublePinyinKeysShown -> cs.correctedCandidates
+                    else -> cs.correctedCandidates.mapValues { (_, marks) ->
+                        com.kingzcheung.xime.rime.CorrectionMarks.doublePinyin(marks, correctionScheme)
+                    }
+                }
+            }
             androidx.compose.runtime.CompositionLocalProvider(
-                LocalCorrectedCandidates provides candidateState.value.correctedCandidates) {
+                LocalCorrectedCandidates provides correctionMarks,
+                LocalCorrectionFullScheme provides correctionScheme.takeIf { !doublePinyinKeysShown }) {
             ScaledCandidateBar(candidateBarScaleState.floatValue) {
             CandidateBar(
                 modifier = Modifier.then(if (holdingBar) Modifier.clearAndSetSemantics {}.pointerInput(Unit) {
@@ -1131,6 +1168,8 @@ fun KeyboardView(
                 state = if (barPage is KeyboardPage.Overlay || candidateBarState is CandidateBarState.ClipboardDisplay &&
                     (state.voiceSticky || state.isHandwritingMode || viewModel.hasTemporaryHandwriting))
                     CandidateBarState.Idle else if (holdingBar) previousBar!! else candidateBarState,
+                glidePreviewText = glideCandidatePreview.value,
+                isGlidePreview = liveGlide != null || englishGlide != null,
                 page = barPage,
                 candidatePageExpanded = candidatePageExpanded,
                 commentsAreGlosses = glossChinese && CandidateGlossary.isLoaded,
@@ -1185,6 +1224,7 @@ fun KeyboardView(
                     onClipboardImageSelect = callbacks.onClipboardImageSelect,
                     onExpandClipboardImages = callbacks.onExpandClipboardImages,
                     onCandidateSelect = select@{ index ->
+                        if (liveGlide != null || englishGlide != null) return@select
                         if (!showHandwritingCandidates && !callbacks.isCandidateSnapshotCurrent(cs)) return@select
                         closePreeditEditor()
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
@@ -1277,7 +1317,8 @@ fun KeyboardView(
                             callbacks.onClipboardSelect?.invoke(candidateState.value.inputText)
                         }
                     },
-                    onAssociationSelect = { index ->
+                    onAssociationSelect = select@{ index ->
+                        if (englishGlide != null || liveGlide != null) return@select
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
                             selectHandwriting(index)
                         } else {
@@ -1290,7 +1331,7 @@ fun KeyboardView(
                 inlineSuggestions = if (barPage is KeyboardPage.Overlay) emptyList<Any>() else inlineSuggestions,
                 showPreeditPreview = preeditEditSession == null,
                 inlinePreeditEditor = drawPreeditEditor,
-                onEditPreedit = if (!state.isAsciiMode && !isHandwritingPage &&
+                onEditPreedit = if (liveGlide == null && englishGlide == null && glideCandidatePreview.value.isEmpty() && !state.isAsciiMode && !isHandwritingPage &&
                     com.kingzcheung.xime.rime.PinyinEditBuffer.supports(state.currentSchemaId) &&
                     callbacks.onOpenPreeditEditor != null) ({
                     openPreeditEditor()

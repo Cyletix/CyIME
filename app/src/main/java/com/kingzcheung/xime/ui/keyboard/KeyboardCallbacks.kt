@@ -14,9 +14,14 @@ data class KeyboardCallbacks(
      */
     val onGlideWord: ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> Unit)? = null,
     /** 中文滑行：识别出的一个词的编码（全拼或双拼），按点按同一路径接进当前编码。 */
-    val onGlideCode: ((String) -> Unit)? = null,
+    val onGlideCode: ((String, Long?) -> Unit)? = null,
     /** 英文滑行实时预览：每笔开头取一次，返回按上下文算“现在抬手会上屏什么”的函数（可在后台线程调用）。 */
-    val glidePreviewer: (() -> ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> String)?)? = null,
+    val glidePreviewer: (() -> ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> GlideEnglishPreview)?)? = null,
+    val onGlideEnglishPreview: ((GlideEnglishPreview, Long) -> Unit)? = null,
+    val onGlidePreviewCode: ((String, Long, Int) -> Unit)? = null,
+    val onGlidePreviewEnd: (() -> Unit)? = null,
+    val onGlidePreviewHold: (() -> Long?)? = null,
+    val onGlidePreviewFinish: ((Long, Boolean) -> Unit)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },
     val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },
     /** 九键组句的上文：组合为空时光标前的已上屏文字；null 表示未知或正在组合。 */

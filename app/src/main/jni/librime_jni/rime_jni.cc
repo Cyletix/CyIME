@@ -436,6 +436,50 @@ public:
         return rime->set_input(session_id_, input);
     }
 
+    // A transient session keeps preview edits and candidate generation out of the live session.
+    // T9 uses a process-global active processor; do not create another session while it is active.
+    std::vector<std::string> glidePreview(const std::string& code) {
+        if (!rime || !session_id_ || code.empty() || rime::T9ProcessorRequire()) return {};
+        auto source = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!source || !source->context()) return {};
+        auto original = source->context();
+        const std::string input = original->input();
+        const size_t caret = std::min(original->caret_pos(), input.size());
+        if (caret < original->composition().GetConfirmedPosition()) return {};
+        const std::string schema = getCurrentSchema();
+        if (schema.empty()) return {};
+        const RimeSessionId id = rime->create_session();
+        if (!id) return {};
+        struct Guard {
+            RimeApi* api; RimeSessionId id;
+            ~Guard() { api->destroy_session(id); }
+        } guard{rime, id};
+        if (!rime->select_schema(id, schema.c_str())) return {};
+        auto isolated = rime::Service::instance().GetSession(static_cast<rime::SessionId>(id));
+        if (!isolated || !isolated->context()) return {};
+        auto ctx = isolated->context();
+        for (const auto& option : original->options()) ctx->set_option(option.first, option.second);
+        for (const auto& property : original->properties()) ctx->set_property(property.first, property.second);
+        ctx->set_input(input);
+        auto composition = original->composition();
+        ctx->set_composition(std::move(composition));
+        const std::string separator = !input.empty() && input.back() != '\'' ? "'" : "";
+        const std::string inserted = separator + code;
+        const std::string next = input.substr(0, caret) + inserted + input.substr(caret);
+        ctx->set_input(next);
+        rime->set_caret_pos(id, caret + inserted.size());
+        RIME_STRUCT(RimeContext, result);
+        if (!rime->get_context(id, &result)) return {};
+        std::vector<std::string> values = {next, result.composition.preedit ? result.composition.preedit : "",
+                                           result.menu.is_last_page ? "0" : "1"};
+        for (int i = 0; i < result.menu.num_candidates; ++i) {
+            values.emplace_back(result.menu.candidates[i].text ? result.menu.candidates[i].text : "");
+            values.emplace_back(result.menu.candidates[i].comment ? result.menu.candidates[i].comment : "");
+        }
+        rime->free_context(&result);
+        return values;
+    }
+
     CompositionResult getComposition() {
         CompositionResult result;
         if (!rime || !session_id_) {
@@ -1777,6 +1821,24 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeHighlightCandidate(JNIEnv*, jobj
 JNIEXPORT jobjectArray JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinEditSnapshot(JNIEnv* env, jobject) {
     auto values = Rime::Instance().pinyinEditSnapshot();
+    jclass stringClass = env->FindClass("java/lang/String");
+    auto result = env->NewObjectArray(values.size(), stringClass, nullptr);
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto value = CandidateString(env, values[i]);
+        env->SetObjectArrayElement(result, i, value);
+        env->DeleteLocalRef(value);
+    }
+    env->DeleteLocalRef(stringClass);
+    return result;
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeGlidePreview(JNIEnv* env, jobject, jstring code) {
+    if (!code) return nullptr;
+    const char* raw = env->GetStringUTFChars(code, nullptr);
+    if (!raw) return nullptr;
+    const auto values = Rime::Instance().glidePreview(raw);
+    env->ReleaseStringUTFChars(code, raw);
     jclass stringClass = env->FindClass("java/lang/String");
     auto result = env->NewObjectArray(values.size(), stringClass, nullptr);
     for (size_t i = 0; i < values.size(); ++i) {

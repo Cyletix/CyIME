@@ -46,6 +46,8 @@ class GlideCornerHintTest {
 
     private val typed: MutableList<String> = Collections.synchronizedList(mutableListOf())
     private val codes: MutableList<String> = Collections.synchronizedList(mutableListOf())
+    private val previews: MutableList<String> = Collections.synchronizedList(mutableListOf())
+    private val englishCandidates: MutableList<List<String>> = Collections.synchronizedList(mutableListOf())
     private var schema by mutableStateOf("rime_ice")
     private var ascii by mutableStateOf(false)
     private var boardWidth by mutableStateOf(400)
@@ -62,7 +64,9 @@ class GlideCornerHintTest {
                 MaterialTheme {
                     Box(Modifier.requiredSize(boardWidth.dp, 260.dp)) {
                         KeyboardLayout({ typed += it }, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
-                            onGlideWord = { words, _ -> codes += "en:${words.first().word}" }, onGlideCode = { codes += it }),
+                            onGlideWord = { words, _ -> codes += "en:${words.first().word}" }, onGlideCode = { code, _ -> codes += code },
+                            onGlideEnglishPreview = { shown, _ -> previews += shown.text; englishCandidates += shown.candidates },
+                            onGlidePreviewCode = { code, _, _ -> previews += code }, onGlidePreviewEnd = { previews += "" }),
                             KeyboardUiState(currentSchemaId = schema, isAsciiMode = ascii), ascii, Modifier.requiredSize(boardWidth.dp, 260.dp))
                     }
                 }
@@ -148,30 +152,38 @@ class GlideCornerHintTest {
         }
     }
 
-    private fun previewText(): String? = rule.onAllNodes(hasTestTag("glide-preview"), useUnmergedTree = true).fetchSemanticsNodes()
-        .firstOrNull()?.config?.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text }
-
-    /** 别的用户 11-02（用惯 Gboard）：开着「滑行时实时显示词」时，手指没抬起就显示现在抬手会出的词，抬手后消失。 */
+    /** 按下期间把预览送往输入框，抬手时清除预览，再交付最终编码。 */
     @Test fun livePreviewShowsTheWordBeforeLiftingAndGoesAwayAfter() {
         show(glide = false, chinese = true, preview = true)
         glide("nihao", lift = false)
         // 第一次识别在刚确认是滑行时开始（只划过 ni），手指停下后最迟再隔一次识别就跟上整条轨迹。
-        rule.waitUntil(5000) { previewText() != null }
-        rule.waitUntil(5000) { previewText() == "ni hao" }
+        rule.waitUntil(5000) { previews.contains("nihao") }
+        assertTrue(rule.onAllNodes(hasTestTag("glide-preview"), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         assertTrue("还没抬手，不上屏", codes.isEmpty())
         // 预览是单独的小窗（另一个根），抬手要落在键盘那个根上。
         rule.onAllNodes(isRoot())[0].performTouchInput { up() }
         rule.waitUntil(5000) { codes.isNotEmpty() }
         assertEquals(listOf("nihao"), codes.toList())
         rule.waitForIdle()
-        assertEquals(null, previewText())
+        assertEquals("", previews.last())
     }
 
     @Test fun noLivePreviewWhileTheSwitchIsOff() {
         show(glide = false, chinese = true, preview = false)
         glide("nihao")
         rule.waitUntil(5000) { codes.isNotEmpty() }
-        assertEquals(null, previewText())
+        assertTrue(previews.none { it.isNotEmpty() })
+    }
+
+    @Test fun englishGlideProvidesCandidatesBeforeRelease() {
+        show(glide = true, chinese = false, preview = true)
+        use("rime_ice", english = true)
+        glide("hello", lift = false)
+        rule.waitUntil(5000) { englishCandidates.any { it.isNotEmpty() } }
+        assertTrue(codes.isEmpty())
+        rule.onRoot().performTouchInput { up() }
+        rule.waitUntil(5000) { codes.isNotEmpty() }
+        assertTrue(codes.first().startsWith("en:"))
     }
 
     @Test fun chineseGlideTypesThePinyinOfOneWord() {
