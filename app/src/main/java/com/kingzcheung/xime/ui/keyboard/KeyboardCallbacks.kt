@@ -13,8 +13,8 @@ data class KeyboardCallbacks(
      * 输入法按上下文（连着划时连同上一个词）选出上屏的词，其余作为可替换的英文候选。
      */
     val onGlideWord: ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> Unit)? = null,
-    /** 中文滑行：识别出的一个词的编码（全拼或双拼），按点按同一路径接进当前编码。 */
-    val onGlideCode: ((String, Long?) -> Unit)? = null,
+    /** 中文滑行：识别出的一个词的编码（全拼或双拼），按点按同一路径接进当前编码；其后几个编码作候选栏里的备选。 */
+    val onGlideCode: ((String, List<String>, Long?) -> Unit)? = null,
     /** 英文滑行实时预览：每笔开头取一次，返回按上下文算“现在抬手会上屏什么”的函数（可在后台线程调用）。 */
     val glidePreviewer: (() -> ((List<com.kingzcheung.xime.glide.GlideCandidate>, (String) -> String) -> GlideEnglishPreview)?)? = null,
     val onGlideEnglishPreview: ((GlideEnglishPreview, Long) -> Unit)? = null,

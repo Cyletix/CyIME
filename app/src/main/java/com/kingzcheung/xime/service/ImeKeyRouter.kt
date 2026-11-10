@@ -774,11 +774,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 中文滑行：一个词的编码按点按同一路径逐键送进 Rime，已打的拼音、分段选词、邻键纠错和候选刷新都不变。
      * 接在未上屏的编码后面时先补音节分隔符（xi 后面划 an 是 xi'an，不会并成 xian）。
      */
-    internal fun typeGlideCode(code: String, previewToken: Long?) {
+    internal fun typeGlideCode(code: String, alternatives: List<String>, previewToken: Long?) {
         if (code.isEmpty() || hasPendingCandidateCommit) {
             previewToken?.let { service.finishGlidePreview(it, false) }
             return
         }
+        prepareGlideAlternatives(code, alternatives)
         // The editor's snapshot predates this glide; queued edits still finish in FIFO order.
         service.keyboardCallbacks?.onDismissPreeditEditor?.invoke()
         val trackGlide = chineseGlideDeleteEnabled()
@@ -834,6 +835,50 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 withContext(Dispatchers.Main) { service.finishGlidePreview(previewToken, false) }
             }
         }
+    }
+
+    /**
+     * 打这一笔之前，在独立会话里把其后几个编码各预览一次，记下各自的第一个候选（[GlideAlternatives]）；
+     * 打完后候选栏在首选之后给出。组合里已经选过字（部分上屏）时不给，免得换编码时动到已选的部分。
+     */
+    private fun prepareGlideAlternatives(code: String, alternatives: List<String>) {
+        val holder = service.candidateTransform.glideAlternatives
+        val codes = alternatives.filter { it.isNotEmpty() && it != code }.distinct().take(GlideAlternatives.MAX)
+        if (codes.isEmpty()) { holder.clear(); return }
+        val schema = service.uiState.value.currentSchemaId
+        val session = service.uiState.value.inputSessionId
+        postRimeJob("glide_alternatives") {
+            holder.clear()
+            val snapshot = service.rimeEngine.readPinyinEditSnapshot()
+            val input = snapshot.getOrNull(0).orEmpty()
+            val caret = snapshot.getOrNull(1)?.toIntOrNull() ?: input.length
+            if ((snapshot.getOrNull(2)?.toIntOrNull() ?: 0) > 0) return@postRimeJob
+            val revision = service.rimeEngine.glidePreviewRevision()
+            val choices = codes.mapNotNull { alternative ->
+                val preview = runCatching { service.rimeEngine.glidePreview(alternative, revision) }.getOrNull() ?: return@mapNotNull null
+                val text = preview.candidates.firstOrNull()?.text?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+                val (next, nextCaret) = GlideAlternatives.inserted(input, caret, alternative)
+                if (preview.inputText != next) return@mapNotNull null
+                GlideAlternatives.Choice(text, next, nextCaret)
+            }
+            if (choices.isEmpty()) return@postRimeJob
+            val (typed, typedCaret) = GlideAlternatives.inserted(input, caret, code)
+            holder.entry = GlideAlternatives.Entry(typed, typedCaret, schema, session, choices)
+        }
+    }
+
+    /** 点了滑行备选：把这一笔的编码换成它，组合留着。换不了（组合已经变了）时不上屏，什么也不做。 */
+    private fun applyGlideAlternative(input: String, snapshot: CandidateState) {
+        val holder = service.candidateTransform.glideAlternatives
+        val before = holder.entry ?: return
+        val state = service.uiState.value
+        if (before.schema != state.currentSchemaId || before.session != state.inputSessionId) return
+        val choice = holder.choose(input, snapshot.candidates.firstOrNull()) ?: return
+        if (!service.rimeEngine.applyPinyinEdit(before.input, choice.input, choice.caret, expectedSchema = before.schema)) {
+            holder.entry = before
+            return
+        }
+        service.rimeEngine.readQueuedResult()?.let { sendTransformedResult(it) }
     }
 
     /**
@@ -2514,6 +2559,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             snapshot.candidateActions.getOrNull(index)
         } else {
             null
+        }
+        pendingAction?.glideInput?.let { input ->
+            applyGlideAlternative(input, snapshot)
+            return
         }
         if (pendingAction != null && pendingAction.isPluginCandidate) {
             // 防御：中英/方案切换后引擎组合已清空但 candidateState 残留旧候选+actions，

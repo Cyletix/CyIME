@@ -64,7 +64,7 @@ class GlideCornerHintTest {
                 MaterialTheme {
                     Box(Modifier.requiredSize(boardWidth.dp, 260.dp)) {
                         KeyboardLayout({ typed += it }, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
-                            onGlideWord = { words, _ -> codes += "en:${words.first().word}" }, onGlideCode = { code, _ -> codes += code },
+                            onGlideWord = { words, _ -> codes += "en:${words.first().word}" }, onGlideCode = { code, _, _ -> codes += code },
                             onGlideEnglishPreview = { shown, _ -> previews += shown.text; englishCandidates += shown.candidates },
                             onGlidePreviewCode = { code, _, _ -> previews += code }, onGlidePreviewEnd = { previews += "" }),
                             KeyboardUiState(currentSchemaId = schema, isAsciiMode = ascii), ascii, Modifier.requiredSize(boardWidth.dp, 260.dp))

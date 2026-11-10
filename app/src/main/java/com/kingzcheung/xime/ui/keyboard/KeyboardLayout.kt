@@ -492,7 +492,8 @@ fun KeyboardLayout(
             if (candidates.isEmpty()) return@launch
             viewModel.onCharacterTyped()
             if (chinese) {
-                kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word, heldPreview) }
+                kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word,
+                    candidates.drop(1).map { it.word }, heldPreview) }
                 handedOff = true
                 return@launch
             }

@@ -87,7 +87,7 @@ class CornerLongPressTimingTest {
                     Box(Modifier.requiredSize(400.dp, 260.dp)) {
                         KeyboardLayout({ typed += it }, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
                             onGlideWord = if (glide) ({ words, _ -> typed += "glide:${words.first().word}" }) else null,
-                            onGlideCode = if (glide) ({ code, _ -> typed += "glide:$code" }) else null),
+                            onGlideCode = if (glide) ({ code, _, _ -> typed += "glide:$code" }) else null),
                             KeyboardUiState(currentSchemaId = schema), ascii, Modifier.requiredSize(400.dp, 260.dp))
                     }
                 }
