@@ -5381,6 +5381,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // keeps its original completion-only behaviour.
         if (!isChineseMode) {
             if (isEnglishPredictionMode()) {
+                // The words scheme commits a candidate before the space; learn that token too.
+                predictionManager.recordEnglishWord(text)
                 requestEnglishNextWord(englishTextBeforeCursor())
             } else if (!canPredictAfter(text)) {
                 // Other letter keyboards (Spanish, Japanese romaji, direct English) keep the old rule:
@@ -5432,6 +5434,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             associationCandidates = emptyList(), englishNextWord = false)
         if (before == null) return
         val context = com.kingzcheung.xime.association.EnglishNextWordContext.parse(before)
+        predictionManager.recordEnglishCommit(before)
         if (!context.justCompleted || context.previous == null) return
         if (!SettingsPreferences.isSmartPredictionEnabled(this)) return
         val previous = context.previous

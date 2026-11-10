@@ -3,8 +3,9 @@ package com.kingzcheung.xime.settings
 import java.io.File
 
 /**
- * English words the user typed by hand in Chinese 26-key input (letters committed with Enter, e.g. Obsidian),
- * kept as typed so lua/cyime_en_memory.lua offers them again even when no dictionary has them.
+ * English words the user typed by hand (Chinese 26-key Enter, or a committed word in the English
+ * words scheme, e.g. Obsidian/isilsolme), kept as typed so lua/cyime_en_memory.lua offers them
+ * again even when no dictionary has them.
  * One word per line in the Rime user directory, newest last; commits append, duplicates are compacted away.
  */
 object EnglishWordMemory {

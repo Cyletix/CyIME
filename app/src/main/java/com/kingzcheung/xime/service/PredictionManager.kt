@@ -8,6 +8,11 @@ import com.kingzcheung.xime.association.EnglishNextWordContext
 import com.kingzcheung.xime.association.EnglishNextWordModel
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.plugin.ExtensionManager
+import com.kingzcheung.xime.settings.EnglishBigramMemory
+import com.kingzcheung.xime.settings.EnglishPhraseMemory
+import com.kingzcheung.xime.settings.EnglishWordMemory
+import com.kingzcheung.xime.settings.IncognitoState
+import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
@@ -194,12 +199,17 @@ class PredictionManager(
     }
     
     /**
-     * English next words after [previous] from the bundled bigram table. The model is lazy; the
-     * first call parses english_bigrams.txt off the main thread.
+     * English next words after [previous]: what this user typed after it first, then the bundled
+     * bigram table. Both sources are lazy; the first call parses english_bigrams.txt off the main thread.
      */
     suspend fun getEnglishNextWords(previous: String, limit: Int = 6): List<String> {
         if (limit <= 0 || !SettingsPreferences.isSmartPredictionEnabled(context)) return emptyList()
         val key = EnglishNextWordContext.normalize(previous) ?: return emptyList()
+        val learned = withContext(Dispatchers.IO) {
+            runCatching { EnglishBigramMemory.next(SchemaManager.getRimeDir(context), key, limit) }
+                .onFailure { Log.w(TAG, "Cannot read learned English pairs", it) }
+                .getOrDefault(emptyList())
+        }
         val model = englishNextWordModel ?: englishNextWordLoading.withLock {
             englishNextWordModel ?: withContext(Dispatchers.IO) {
                 runCatching { EnglishNextWordModel.load(context) }
@@ -207,13 +217,56 @@ class PredictionManager(
                     .getOrNull()
             }?.also { englishNextWordModel = it }
         }
-        return model?.predict(key, limit).orEmpty()
+        val builtIn = model?.predict(key, limit).orEmpty()
+        return (learned + builtIn)
+            .filterNot { EnglishNextWordContext.normalize(it) == key }
+            .distinctBy { it.lowercase(java.util.Locale.ROOT) }.take(limit)
+    }
+
+    /**
+     * A word boundary was just committed. Remember the user's own words/phrases and the pair that
+     * ended here; this runs off the main thread and stays silent in incognito.
+     */
+    fun recordEnglishCommit(before: CharSequence?) {
+        if (IncognitoState.active || !SettingsPreferences.isSmartPredictionEnabled(context)) return
+        val text = before?.toString() ?: return
+        val parsed = EnglishNextWordContext.parse(text)
+        if (!parsed.justCompleted) return
+        serviceScope.launch(Dispatchers.IO) {
+            val rimeDir = runCatching { SchemaManager.getRimeDir(context) }.getOrNull() ?: return@launch
+            parsed.previous?.let { word ->
+                if (EnglishWordMemory.isLearnable(word)) EnglishWordMemory.remember(rimeDir, word)
+            }
+            parsed.lastToken?.let { token ->
+                if (EnglishPhraseMemory.isLearnable(token)) EnglishPhraseMemory.remember(rimeDir, token)
+            }
+            parsed.pair?.let { (previous, next) -> EnglishBigramMemory.remember(rimeDir, previous, next) }
+        }
+    }
+
+    /**
+     * Remember a single committed English token even when it did not end with a space. The English
+     * words scheme commits a candidate before its space arrives, and a name/email is often confirmed
+     * without pressing space; learning on the token itself makes both cases survive a new line.
+     */
+    fun recordEnglishWord(text: String) {
+        if (IncognitoState.active || !SettingsPreferences.isSmartPredictionEnabled(context)) return
+        val token = text.trim()
+        if (token.isEmpty() || token.length > 64 || token.any { it.isWhitespace() }) return
+        serviceScope.launch(Dispatchers.IO) {
+            val rimeDir = runCatching { SchemaManager.getRimeDir(context) }.getOrNull() ?: return@launch
+            when {
+                EnglishPhraseMemory.isLearnable(token) -> EnglishPhraseMemory.remember(rimeDir, token)
+                EnglishWordMemory.isLearnable(token) -> EnglishWordMemory.remember(rimeDir, token)
+            }
+        }
     }
 
     /** Settings off / keyboard destroyed: drop the English index; the next request reloads it. */
     @Synchronized
     fun releaseEnglishNextWords() {
         englishNextWordModel = null
+        EnglishBigramMemory.release()
     }
 
     suspend fun getChineseAssociations(text: String, limit: Int = MAX_ASSOCIATION_COUNT): List<String> {
