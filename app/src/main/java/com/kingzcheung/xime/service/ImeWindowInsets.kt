@@ -284,7 +284,8 @@ internal fun fixedKeyboardMinimumInsetPx(insets: WindowInsets, window: Window, n
     val controls = maxOf(cutout, tappable, navButtons)
     // 「底部位置」选了固定的一档（11-08）：不猜导航方式。只有「自动」走下面 1.15.66 的算法。
     when (position) {
-        SettingsPreferences.KeyboardBottomPosition.FLUSH -> return maxOf(cutout, navButtons)
+        // 贴到最底：系统在键盘下面画的「切换输入法 / 收起键盘」那条也不留（11-10「后面都调不了」），只躲屏幕底部缺口。
+        SettingsPreferences.KeyboardBottomPosition.FLUSH -> return cutout
         SettingsPreferences.KeyboardBottomPosition.KEEP_BUTTONS -> {
             val navBar = if (AndroidPlatform.windowInsetTypes) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
                 else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
