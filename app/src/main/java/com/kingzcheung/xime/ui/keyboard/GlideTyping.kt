@@ -11,10 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -136,16 +133,47 @@ internal fun Modifier.glideTyping(
     } }
 }
 
+/**
+ * 滑行轨迹（用户 11-10 对照 Gboard 截图：原来 5dp 的半透明灰线又细又淡，整条留到抬手，盖住一片键）。
+ * 现在只画手指最近走过的 [GLIDE_TRAIL_LENGTH] 一段：手指处最粗最实，往后渐细渐淡；颜色用主题强调色，
+ * 强调色是灰色（饱和度低）时换成醒目的蓝，深浅主题都看得清。
+ */
 @Composable
 internal fun GlideTrailOverlay(trail: GlideTrail, color: Color, modifier: Modifier = Modifier) {
+    val stroke = glideTrailColor(color)
     Canvas(modifier) {
         val points = trail.points
         if (points.size < 2) return@Canvas
-        val path = Path().apply {
-            moveTo(points[0].x, points[0].y)
-            for (index in 1 until points.size) lineTo(points[index].x, points[index].y)
+        val tail = GLIDE_TRAIL_LENGTH.toPx()
+        val head = GLIDE_TRAIL_HEAD_WIDTH.toPx()
+        val thin = GLIDE_TRAIL_TAIL_WIDTH.toPx()
+        // 从手指往回走，走过的长度决定这一小段的粗细和透明度。
+        var walked = 0f
+        var index = points.size - 1
+        while (index > 0 && walked < tail) {
+            val a = points[index]; val b = points[index - 1]
+            val length = (a - b).getDistance()
+            if (length > 0f) {
+                val fade = 1f - (walked + length / 2f) / tail
+                if (fade <= 0f) break
+                drawLine(stroke.copy(alpha = stroke.alpha * (0.15f + 0.85f * fade)), a, b,
+                    strokeWidth = thin + (head - thin) * fade, cap = StrokeCap.Round)
+            }
+            walked += length
+            index--
         }
-        drawPath(path, color.copy(alpha = 0.55f),
-            style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
+
+/** 轨迹颜色：强调色够鲜艳就用它，灰色系主题（饱和度不到 0.3）换成蓝色。 */
+internal fun glideTrailColor(accent: Color): Color {
+    val max = maxOf(accent.red, accent.green, accent.blue)
+    val min = minOf(accent.red, accent.green, accent.blue)
+    val saturation = if (max <= 0f) 0f else (max - min) / max
+    return if (saturation >= 0.3f) accent.copy(alpha = 0.9f) else GLIDE_TRAIL_FALLBACK
+}
+
+internal val GLIDE_TRAIL_FALLBACK = Color(0xE6448AFF)
+internal val GLIDE_TRAIL_LENGTH = 240.dp
+internal val GLIDE_TRAIL_HEAD_WIDTH = 10.dp
+internal val GLIDE_TRAIL_TAIL_WIDTH = 2.dp
