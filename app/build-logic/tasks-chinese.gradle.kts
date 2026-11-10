@@ -511,7 +511,9 @@ val prepareChineseDictionaries by tasks.registering {
             "  dictionary_beam: 64\n  sentence_beam: 8\n  result_budget: 12\n  display_sentences: 1\n" +
             "  spelling_penalty: 0\n  word_penalty: 8.0\n  correction_penalty: -9.2\n  whole_input_phrases: 16\n" +
             "  prefer_user_entries: true\n  ngram_model: t9_ngram\n" +
-            "  ngram_sentence_start: false\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
+            // rescore_rime_weight: share of Rime's own sentence weight added to the word model's score (0 = model alone).
+            // 0.3: 11-10 sweep fixed 又发现一个问题; B站 and SMS together +3, homophone set +37, 26-key must-pass none lost.
+            "  ngram_sentence_start: false\n  rescore_rime_weight: 0.3\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
             "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n" +
             // CyLM (CyIME-Windows tools/cylm) puts its best sentence first when its files are in the Rime user
             // directory. Only the 装到我的设备 package carries them; without them the open fails once and Rime's
@@ -648,7 +650,7 @@ val prepareChineseDictionaries by tasks.registering {
                 schema.replace("    - script_translator\n", "    - script_translator\n    - lua_translator@*cyime_rare_chars\n") +
                     "\ncyime_rare_double_pinyin: true\n" +
                     "\nt9:\n  sentence_rescore: true\n  rescore_keys_per_syllable: 2\n  ngram_model: t9_ngram\n" +
-                    "  ngram_sentence_start: false\n"
+                    "  ngram_sentence_start: false\n  rescore_rime_weight: 0\n"
             })
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",
