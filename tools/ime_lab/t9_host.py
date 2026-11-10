@@ -89,6 +89,13 @@ def inspect_user_dict(path):
 
 def filesystem_type(path):
     """Filesystem type of `path` from /proc/self/mounts; "unknown" where that is unavailable."""
+    if os.name == "nt":  # Windows native replay: the volume's own filesystem name (NTFS on a local disk)
+        import ctypes
+        anchor = Path(path).resolve().anchor
+        name = ctypes.create_unicode_buffer(64)
+        if ctypes.windll.kernel32.GetVolumeInformationW(anchor, None, 0, None, None, None, name, len(name)):
+            return name.value.lower()
+        return "unknown"
     try:
         mounts = Path("/proc/self/mounts").read_text(encoding="utf-8").splitlines()
     except OSError:
