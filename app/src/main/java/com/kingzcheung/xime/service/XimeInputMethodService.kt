@@ -796,11 +796,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         PredictionManager.ScriptBridge(toSimplified = rimeEngine::toSimplified, toTraditional = rimeEngine::toTraditional)
     }
     
+    /** 这次说话写进哪个框：开始说话时焦点在翻译栏、剪贴板搜索这些键盘自己的输入框，就一直写那个框（11-11）。 */
+    private val voiceTarget = VoiceTarget(
+        focusedInternal = { uiState.value.inputTarget.editText() },
+        connectionFor = { box: android.widget.EditText -> schemaController.internalConnectionFor(box) },
+        host = { currentInputConnection },
+    )
+
     internal val voiceRecognitionHandler = VoiceRecognitionHandler(
         context = this,
         onStateChanged = { newState -> uiState.value = newState },
         getState = { uiState.value },
-        getInputConnection = { currentInputConnection },
+        getInputConnection = { voiceTarget.connection() },
         onRecordingStopped = { restoreAfterVoiceFinish() },
         onVoiceComplete = {
             val action = pendingVoiceAction
@@ -815,9 +822,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         onSpectrumChanged = { spectrum ->
             voiceSpectrumState.value = spectrum
         },
-        onComposingWritten = { markInputBoxComposing() },
-        remoteTyping = { remoteTypingSink() },
+        // 写进键盘自己的框时，应用输入框里没有语音的组合区，也不发到电脑。
+        onComposingWritten = { if (!voiceTarget.internal) markInputBoxComposing() },
+        remoteTyping = { if (voiceTarget.internal) null else remoteTypingSink() },
         traditionalConverter = { if (traditionalChineseOutput()) rimeEngine::toTraditional else null },
+        onSessionStart = { voiceTarget.begin() },
     )
 
     /** 隔空输入开着、存过电脑时：说完的话发到电脑（RemoteTyping），开始说话时提示一次发到哪。 */
@@ -1816,6 +1825,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal fun closeClipboardSearch(openBoard: Boolean, keepQuery: Boolean = false) {
         if (!uiState.value.clipboardSearchVisible) return
+        stopVoiceForClosedEditor(ToolPanelEditTextHolder.editText)
         if (!keepQuery) clipboardManager.boardQuery.value = ""
         if (candidateState.value.isComposing) {
             keyRouter.postRimeJob { keyRouter.endQueuedComposition(); withContext(Dispatchers.Main) { updateUI() } }
@@ -1843,7 +1853,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         textCommit.selectClipboardItem(text)
     }
 
+    /** 正对着键盘自己的框（翻译栏、剪贴板搜索）说话时把框关了：这次语音跟着结束，后面的字不再写进关掉的框。 */
+    private fun stopVoiceForClosedEditor(box: android.widget.EditText?) {
+        if (box == null || voiceTarget.editor !== box || !(uiState.value.isVoiceMode || voiceRecordingStarted)) return
+        voiceRecognitionHandler.endInputSession()
+        restoreAfterVoiceFinish()
+    }
+
     internal fun closeToolPanel() {
+        stopVoiceForClosedEditor(ToolPanelEditTextHolder.editText)
         // 翻译栏：写进输入框的译文留下（定下来），没译完的不再写
         if (uiState.value.toolPanelDisplay == ToolResult.LIVE.name) liveToolBar.close()
         toolPanelSelection = null
@@ -3775,8 +3793,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             clipboardImagesExpanded = false,
             isSttEnabled = SettingsPreferences.isSttEnabled(this@XimeInputMethodService),
         )
-        // 听写接上新的输入会话；文字或光标对不上时照旧结束听写。
-        if (voiceThroughRestart && !voiceRecognitionHandler.continueAfterHostRestart(hostCaretsBeforeRestart)) {
+        // 听写接上新的输入会话；文字或光标对不上时照旧结束听写。说进翻译栏这类键盘自己的框时，宿主重启后结束听写，
+        // 不拿宿主的光标去对键盘里的框。
+        if (voiceThroughRestart && (voiceTarget.internal || !voiceRecognitionHandler.continueAfterHostRestart(hostCaretsBeforeRestart))) {
             noteVoicePillInterrupted(VoiceSessionEnd.FOCUS_TO_OTHER_FIELD)
             voiceRecognitionHandler.endInputSession()
             if (uiState.value.isVoiceMode || voiceRecordingStarted) restoreAfterVoiceFinish()
