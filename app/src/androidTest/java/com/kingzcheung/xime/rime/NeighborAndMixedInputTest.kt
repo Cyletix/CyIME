@@ -58,6 +58,41 @@ class NeighborAndMixedInputTest {
         } finally { e.setNeighborMap(""); e.clearQueuedComposition() }
     }
 
+    /**
+     * 2026-11-11 (1.15.76): with 邻键纠错 on, ok gave 偶看 / 空 kong / 🈳 / 欧卡 and no ok on the first row; with it
+     * off ok came first. Short English typed in Chinese 26 keys ranks the same with the switch on or off, two letters
+     * never grow into a longer corrected syllable, and a one-key slip on two letters (wp for wo) is still corrected.
+     */
+    @Test fun shortEnglishRanksTheSameWithNeighbourCorrectionOnOrOff() {
+        val e = engine()
+        fun top(input: String): List<String> {
+            e.clearQueuedComposition()
+            input.forEach { e.processQueuedKeyAndGetResult(it.code, 0) }
+            return e.getAllCandidates(40).map { it.text }.also { e.clearQueuedComposition() }
+        }
+        try {
+            for (input in listOf("ok", "hi", "no", "yes", "app")) {
+                e.setNeighborMap("")
+                val off = top(input)
+                e.setNeighborMap(graph())
+                val on = top(input)
+                assertTrue("$input must be in the first two with correction on: ${on.take(8)}", on.indexOf(input) in 0..1)
+                assertEquals("$input: first candidate must not depend on 邻键纠错 (off ${off.take(5)}, on ${on.take(5)})",
+                    off.first(), on.first())
+            }
+            e.setNeighborMap(graph())
+            val ok = top("ok")
+            assertEquals("ok: ${ok.take(8)}", "ok", ok.first())
+            assertFalse("two letters must not grow into a corrected kong: ${ok.take(10)}", ok.take(10).contains("空"))
+            // A one-key slip on a whole two-letter syllable is still corrected: wp offers wo (我 and its homophones).
+            e.clearQueuedComposition()
+            "wp".forEach { e.processQueuedKeyAndGetResult(it.code, 0) }
+            val page = e.readQueuedComposition()!!.candidates
+            assertTrue("wp must still offer a wo correction: ${page.map { it.text + "/" + it.correction }}",
+                page.any { it.correction.contains("wp=wo") })
+        } finally { e.setNeighborMap(""); e.clearQueuedComposition() }
+    }
+
     @Test fun englishAndChineseWordsCommitInTheSameChineseMode() {
         val e = engine()
         try {
