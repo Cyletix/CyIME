@@ -54,7 +54,7 @@ enum class ToolbarButton(
     // 名称用于自定义列表；键盘上按当前状态显示“全角”或“半角”（见 [stateLabel]）。
     FULL_SHAPE("full_shape", "全角/半角", HalfWidthIcon),
     // 切换当前方案的输出字形；注音使用独立的简体设置。
-    // 键盘上按当前状态显示“繁体”或“简体”（见 [stateLabel]）。
+    // 键盘上按当前状态显示“繁体”或“简体”（见 [stateLabel]）；图标是「简」或「繁」字（ToolbarButtonIcon），这里的图标不显示。
     TRADITIONAL("traditional", "简繁", Icons.TwoTone.Translate),
     // 布局手势开关：只在对应布局里出现（见 LayoutGestureMenuItems.kt），其他布局自动隐藏。
     GLIDE("glide", "滑行输入", Icons.Outlined.Gesture),
