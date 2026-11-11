@@ -8,6 +8,8 @@ object BuiltinModelCatalog {
     const val SPEAKER_MODEL_FILE = "3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx"
     /** 拍照识别（PP-OCRv5 mobile）。轻量版不带，第一次拍照识别时下载；带模型的安装包仍内置在 assets/ocr/ppocr-v5。 */
     const val OCR_MODEL = "ocr-ppocr-v5"
+    /** 拍照识别引擎（OpenCV 原生库）。轻量版不带，和拍照识别模型一起下载（ocr/OcrEngine.kt）。 */
+    const val OCR_ENGINE = "ocr-engine"
 
     val models = com.kingzcheung.xime.speech.SpeechModelCatalog.models + CandidateModelCatalog.models + listOf(
         ModelInfo("ochwpro", "手写模型", "本地手写识别模型。", ModelCategory.HANDWRITING,
@@ -41,6 +43,28 @@ object BuiltinModelCatalog {
                     ModelFile("ppocrv5-characters.txt", "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/paddle/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile/ppocrv5_dict.txt", "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b", 74012L,
                         mirrors = listOf(RELEASE + "ocr-ppocr-v5-characters.txt", DownloadMirrors.CYIME_MODELSCOPE + "ocr-ppocr-v5-characters.txt")),
                 )))),
+        // 拍照识别引擎：OpenCV 4.12.0 的 libopencv_java4.so，原样取自 Maven 上 org.opencv:opencv:4.12.0 的 AAR（Apache-2.0），
+        // 每个 ABI 打成一个 tar.bz2 传到 Release `models` 和魔搭。轻量版不带，第一次拍照识别时和识别模型一起下载；
+        // 完整版、离线包仍在安装包里（app/build.gradle.kts）。按这台手机跑的 ABI 选一份（[NativeAbi]）。
+        ModelInfo(OCR_ENGINE, "拍照识别引擎", "拍照识字时处理图片用的程序库（OpenCV）。轻量版第一次拍照识别时和识别模型一起下载，完整版已内置。", ModelCategory.OTHER,
+            versions = listOf(when (NativeAbi.current) {
+                "armeabi-v7a" -> ModelVersion(version = "4.12.0", size = "7.4 MB",
+                    archiveUrl = RELEASE + "ocr-engine-opencv-4.12.0-armeabi-v7a.tar.bz2", sha256 = "004ac5715c05070d44c3878cedc4b66cc1c32a783eb338c3bb4fbf7e0e1bd3f2",
+                    archiveMirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "ocr-engine-opencv-4.12.0-armeabi-v7a.tar.bz2"),
+                    files = listOf(ModelFile("libopencv_java4.so", "", "933fe7879c07fe603ce5e0f6a04298fa4b07e553c6dc83744a2779161d47e773", 15622192L)))
+                "x86_64" -> ModelVersion(version = "4.12.0", size = "19.7 MB",
+                    archiveUrl = RELEASE + "ocr-engine-opencv-4.12.0-x86_64.tar.bz2", sha256 = "e197526bf6b11fa273f2e2c729b46813cb816c76c436fb89e35093e4cf658e3c",
+                    archiveMirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "ocr-engine-opencv-4.12.0-x86_64.tar.bz2"),
+                    files = listOf(ModelFile("libopencv_java4.so", "", "373e5a25a92bf6a683fecf4d9c73adaf478c04efad10171d865dcf78b242709a", 55830920L)))
+                "x86" -> ModelVersion(version = "4.12.0", size = "14.0 MB",
+                    archiveUrl = RELEASE + "ocr-engine-opencv-4.12.0-x86.tar.bz2", sha256 = "2d1699a1f7ea8f56e5f9b8602b2cf8fa0f0929bc3058a26aaf73a41c4248fb3c",
+                    archiveMirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "ocr-engine-opencv-4.12.0-x86.tar.bz2"),
+                    files = listOf(ModelFile("libopencv_java4.so", "", "d906a2c418230a79689922000e962a6c1cea95925f430183abf331ab3669bfcc", 41727236L)))
+                else -> ModelVersion(version = "4.12.0", size = "8.5 MB",
+                    archiveUrl = RELEASE + "ocr-engine-opencv-4.12.0-arm64-v8a.tar.bz2", sha256 = "6a9571b82d6f7fae849a230a0db44e009e8681b611791e00ef3d0c2975ac9eb1",
+                    archiveMirrors = listOf(DownloadMirrors.CYIME_MODELSCOPE + "ocr-engine-opencv-4.12.0-arm64-v8a.tar.bz2"),
+                    files = listOf(ModelFile("libopencv_java4.so", "", "144bbc9ad0b0bac4ba58f7d53198aead64379e5314f68200968c703d2c1c14ab", 23465088L)))
+            })),
         // 公式手写（LaTeX）：tools/handwriting_training 训练，只用公开的 MathWriting 2024，不含用户样本；
         // 日语、英文手写的“边写边学”也用它算特征。
         ModelInfo("handwriting-formula", "公式手写模型", "手写数学公式，识别成 LaTeX；日语、英文手写的边写边学也需要它。", ModelCategory.HANDWRITING,

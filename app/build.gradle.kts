@@ -228,6 +228,10 @@ android {
     // 声纹和手写模型保持解压：模型管理（是否装好、删除、设置向导跳过）和手写模板、训练页都按 models/ 下的文件路径读，
     // 为省 7–27 MB 改这些地方不值得。
     androidResources.noCompress.addAll(listOf("ch_PP-OCRv5_det_mobile.onnx", "ch_PP-OCRv5_rec_mobile.onnx"))
+    // 拍照识别引擎 OpenCV（arm64 约 9 MB）同理：轻量版用到时和模型一起下载（模型目录 ocr-engine，ocr/OcrEngine.kt），
+    // 带模型的安装包照旧内置。它要的 libc++_shared.so 留在包里。离线包（assembleOffline）也必须带 bundleModels。
+    if (providers.gradleProperty("bundleModels").orNull != "true")
+        packaging.jniLibs.excludes.add("**/libopencv_java4.so")
     // The elder package carries no Japanese dictionaries and no letter-language (Spanish, German…) schemas (elder-pack-spec.md).
     if (providers.gradleProperty("elderEdition").orNull == "true") {
         listOf("<dir>rime_japanese", "<dir>azookey", "<dir>rime_letters").forEach { androidResources.ignoreAssetsPatterns.add(it) }
