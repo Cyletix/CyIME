@@ -219,6 +219,13 @@ internal fun hideKeyboardFrom(context: Context) {
 /** Preference (board prefs) for how many lines a history card shows: 2, 4 or 8. */
 internal const val CLIPBOARD_CARD_MAX_LINES_KEY = "card_max_lines"
 
+/**
+ * 多选里「全选」选哪些（用户 11-11 转述：删除时固定的要一条条点掉）：固定的不选，想删固定的就单独点上。
+ * 眼前全是固定的（比如某个分组里都固定了）时才把它们全选上，免得全选什么也选不到。
+ */
+internal fun clipboardSelectAllKeys(cards: List<ClipboardCard>, pins: Set<String>): Set<String> =
+    cards.filterNot { it.key in pins }.ifEmpty { cards }.mapTo(mutableSetOf()) { it.key }
+
 internal fun clipboardCardMaxLines(stored: Int): Int = if (stored in setOf(2, 4, 8)) stored else 4
 
 /**
@@ -495,13 +502,14 @@ internal fun ClipboardBoardView(
                         selecting = false
                         selected = emptySet()
                     }, "clipboard-exit-selection")
-                    val allSelected = cards.isNotEmpty() && cards.all { it.key in selected }
+                    val selectAll = clipboardSelectAllKeys(cards, pins)
+                    val allSelected = selectAll.isNotEmpty() && selected.containsAll(selectAll)
                     CompactClipboardAction(
                         if (allSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                        if (allSelected) "取消全选" else "全选当前分类", {
-                            selected = if (allSelected) emptySet() else cards.mapTo(mutableSetOf()) { it.key }
+                        if (allSelected) "取消全选" else "全选当前分类（不含固定）", {
+                            selected = if (allSelected) emptySet() else selectAll
                             // Do not operate on invisible folded pins without making the selection inspectable.
-                            if (!allSelected) changePinsExpansion(true)
+                            if (!allSelected && selectAll.any { it in pins }) changePinsExpansion(true)
                         }, "clipboard-select-all", enabled = cards.isNotEmpty(),
                         label = if (compactControls) null else "全选")
                     Text("已选 ${selected.size}", color = colors.onSurface,
