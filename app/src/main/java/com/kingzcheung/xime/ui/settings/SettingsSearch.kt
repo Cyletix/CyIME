@@ -41,6 +41,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -551,8 +553,34 @@ internal fun searchSettings(query: String, index: List<SettingsSearchEntry> = Se
     }.sortedByDescending { it.second }.map { it.first }
 }
 
+/**
+ * 输入框里没上屏的部分（composing）。输入法「编码显示在输入框」时，没选字的拼音（如 wu'hen）就在这里，
+ * 拿它去搜会在选字前先闪一句「没有找到「wu'hen」相关的设置」。
+ */
+internal fun committedSearchText(text: String, composition: TextRange?): String {
+    if (composition == null || composition.collapsed) return text
+    val start = composition.min.coerceIn(0, text.length)
+    val end = composition.max.coerceIn(start, text.length)
+    return text.removeRange(start, end)
+}
+
+/**
+ * 实际拿去搜的词：整段文字能搜到就用整段（别的输入法边拼英文单词边搜照旧），
+ * 搜不到而且有没上屏的部分，就只用已上屏的字，不为拼音报「没有找到」。
+ */
+internal fun searchTextFor(text: String, composition: TextRange?): String {
+    val committed = committedSearchText(text, composition)
+    if (committed == text || text.isBlank() || searchSettings(text).isNotEmpty()) return text
+    return committed
+}
+
 @Composable
 internal fun SettingsSearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var field by remember { mutableStateOf(TextFieldValue(query, TextRange(query.length))) }
+    // 外面改了搜索词（点清除、返回时恢复）才同步回输入框；拼音还在拼时 query 不变，不打断输入法。
+    LaunchedEffect(query) {
+        if (searchTextFor(field.text, field.composition) != query) field = TextFieldValue(query, TextRange(query.length))
+    }
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
@@ -562,14 +590,18 @@ internal fun SettingsSearchField(query: String, onQueryChange: (String) -> Unit,
         Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Box(Modifier.weight(1f).padding(vertical = 14.dp)) {
-            BasicTextField(value = query, onValueChange = onQueryChange, singleLine = true,
+            BasicTextField(value = field, onValueChange = {
+                    field = it
+                    val next = searchTextFor(it.text, it.composition)
+                    if (next != query) onQueryChange(next)
+                }, singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 modifier = Modifier.fillMaxWidth().testTag("settings-search"))
-            if (query.isEmpty()) Text("搜索设置，如“拂动”“长按”“字号”", style = MaterialTheme.typography.bodyLarge,
+            if (field.text.isEmpty()) Text("搜索设置，如“拂动”“长按”“字号”", style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
         }
-        if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Close, "清除搜索") }
+        if (field.text.isNotEmpty()) IconButton(onClick = { field = TextFieldValue(""); onQueryChange("") }) { Icon(Icons.Default.Close, "清除搜索") }
         else Spacer(Modifier.size(48.dp))
     }
 }

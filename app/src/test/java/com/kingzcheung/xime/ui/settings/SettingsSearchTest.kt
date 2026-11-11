@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import androidx.compose.ui.text.TextRange
 
 class SettingsSearchTest {
     private fun titles(q: String) = searchSettings(q).map { it.title }
@@ -231,5 +232,20 @@ class SettingsSearchTest {
         // 整页条目不带定位。
         SettingsSearchFocus.open(SettingsSearchIndex.first { it.title == "主题与外观" })
         assertNull(SettingsSearchFocus.request)
+    }
+
+    @Test fun composingPinyinIsNotSearched() {
+        // 11-11：编码显示在输入框时，没选字的 wu'hen 不能拿去搜。
+        assertEquals("", committedSearchText("wu'hen", TextRange(0, 6)))
+        assertEquals("无", committedSearchText("无hen", TextRange(1, 4)))
+        assertEquals("无痕", committedSearchText("无痕", null))
+        assertEquals("无痕", committedSearchText("无痕", TextRange(2, 2)))
+        // 输入法给的范围越界也不崩。
+        assertEquals("无", committedSearchText("无h", TextRange(1, 9)))
+        // 实际搜的词：拼音搜不到就不拿去搜；整段能搜到（别的输入法边拼英文边搜）照旧。
+        assertEquals("", searchTextFor("wu'hen", TextRange(0, 6)))
+        assertEquals("字号", searchTextFor("字号", null))
+        assertTrue(searchSettings("字号").isNotEmpty())
+        assertEquals("字号", searchTextFor("字号", TextRange(1, 2)))
     }
 }
