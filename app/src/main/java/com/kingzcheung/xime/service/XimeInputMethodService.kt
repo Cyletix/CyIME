@@ -750,7 +750,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (!candidateState.value.expandedCandidatesLoaded) loadExpandedCandidates()
     }
 
-    private fun loadExpandedCandidates() {
+    /** 打开「单字」：已读的候选里单字不够（长编码的单字排在几百个词后面）就从已读处接着往后读。 */
+    internal fun loadSingleCharacterCandidates() {
+        val snapshot = candidateState.value
+        if (!keyboardViewModel.singleCharFilter.value || !snapshot.expandedCandidatesLoaded) return
+        if (snapshot.expandedCandidates.size >= ExpandedCandidateLoader.readLimit(snapshot.expandedCandidates, true)) return
+        loadExpandedCandidates(initial = snapshot.expandedCandidates)
+    }
+
+    private fun loadExpandedCandidates(initial: List<com.kingzcheung.xime.rime.RimeCandidate> = emptyList()) {
         val snapshot = candidateState.value
         val session = uiState.value.inputSessionId
         val admission = inputReadiness.ticket() ?: return
@@ -762,7 +770,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             inputReadiness.accepts(admission) && uiState.value.inputSessionId == session &&
                 (keyboardViewModel.candidatePageExpanded.value || keyboardViewModel.candidateStripExtended.value) &&
                 candidateState.value.engineRevision == snapshot.engineRevision
-        }) { candidates ->
+        }, singleCharacters = { keyboardViewModel.singleCharFilter.value }, initial = initial) { candidates ->
             candidateState.value = candidateState.value.copy(expandedCandidates = candidates, expandedCandidatesLoaded = true)
         }
     }

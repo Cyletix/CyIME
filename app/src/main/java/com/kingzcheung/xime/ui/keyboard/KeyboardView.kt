@@ -1473,6 +1473,7 @@ fun KeyboardView(
                         onToggleSingleCharFilter = {
                             onHapticFeedback?.invoke()
                             viewModel.toggleSingleCharFilter()
+                            if (viewModel.singleCharFilter.value) callbacks.onSingleCharFilterOn?.invoke()
                         }.takeIf { cs.isComposing || cs.candidates.isNotEmpty() },
                         onAssociationSelect = select@{ index ->
                             val sourceIndex = index + barAssociationCount
