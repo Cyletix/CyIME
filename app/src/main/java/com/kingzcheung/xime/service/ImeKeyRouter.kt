@@ -666,7 +666,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (key.length != 1 || !englishPunctuationSpaceEnabled()) return false
         return withEditor {
             val ui = service.uiState.value
-            if (ui.inputTarget.isInternal || !(ui.isAsciiMode || ui.inputProfile.typesLettersDirectly)) return@withEditor false
+            if (ui.inputTarget.isInternal || !(ui.isAsciiMode || ui.inputProfile.typesLettersDirectly ||
+                    typesEnglishWords(ui.inputProfile, ui.isAsciiMode))) return@withEditor false
             if (service.textCommit.isJapaneseProfile()) return@withEditor false
             if (service.editorInputPolicy.field.scoped || service.isSecretEditor() || service.isTerminalEditor()) return@withEditor false
             if (service.keyboardViewModel.keyboardState.value is KeyboardLayoutState.Number) return@withEditor false
@@ -687,6 +688,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
 
     /** 紧挨着的上一笔英文滑行（候选、大小写），连着划时连同它一起选；屏上不再紧跟它就作废。 */
     private var lastGlide: com.kingzcheung.xime.glide.PreviousGlide? = null
+
+    /** 英文单词方案这一轮组字的首字母是「首字母大写」自动打成大写的（回车记词时还原，见 [spellingWithoutAutoCap]）。按键线程读写。 */
+    private var wordsAutoCapped = false
+
+    /** 英文单词方案选词后自动加空格（同「选词后自动加空格」开关，默认关，#311）：只在应用的输入框里、只跟在词后面。 */
+    private fun wordsAutoSpaceAfter(text: String): Boolean {
+        val ui = service.uiState.value
+        return typesEnglishWords(ui.inputProfile, ui.isAsciiMode) && !ui.inputTarget.isInternal && takesWordsAutoSpace(text) &&
+            SettingsPreferences.getPrefsPublic(service).getBoolean(EnglishAutoSpace.PREF_KEY, false)
+    }
 
     /** 「首字母大写」：英文和西、德、法、意、俄语键盘都按这一个开关（日语英数、密码、终端等除外）。 */
     private fun capitalizeEnglishHere(): Boolean {
@@ -1460,7 +1471,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             if (!isT9 && typesEnglishCapitals(state.currentSchemaId) &&
                                 !com.kingzcheung.xime.settings.IncognitoState.active) {
                                 com.kingzcheung.xime.settings.EnglishWordMemory.remember(
-                                    com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service), input)
+                                    com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service),
+                                    if (wordsAutoCapped && typesEnglishWords(state.inputProfile, state.isAsciiMode))
+                                        spellingWithoutAutoCap(input) else input)
                             }
                         }
                         // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。
@@ -1779,7 +1792,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 service.rimeEngine.readQueuedComposition()?.input?.let(::isUnicodeCodeWithDigit) == true) {
                                 if (!commitHardwareLiteral("")) return@command
                             }
-                            val result = if (capitalsInRime) service.rimeEngine.processQueuedKeyAndGetResult(char.uppercase()[0].code, 0)
+                            // 英文单词方案开着「首字母大写」：句首打的第一个字母按大写进组字区，候选跟着首字母大写（Hello），
+                            // 和英文直接输入同一规则（#311）；实体键盘、手动 Shift 不在此列，打到一半不再判断。
+                            val wordsFirstLetter = isLetter && !mergedKey && typesEnglishWords(state.inputProfile, state.isAsciiMode) &&
+                                service.rimeEngine.readQueuedComposition()?.input.isNullOrEmpty()
+                            val wordsSentenceCap = wordsFirstLetter && hardwareEvent == null && !isShifted &&
+                                SettingsPreferences.getPrefsPublic(service).getBoolean(ENGLISH_SENTENCE_CAPS, false) &&
+                                withEditor { capitalizeEnglishHere() }
+                            if (wordsFirstLetter) wordsAutoCapped = wordsSentenceCap
+                            val result = if (capitalsInRime || wordsSentenceCap) service.rimeEngine.processQueuedKeyAndGetResult(char.uppercase()[0].code, 0)
                                 else service.rimeEngine.processQueuedKeyAndGetResult(keyCode, mask)
                             if (result.processed) {
                                 if (isShiftedChinese && !capitalsInRime && result.committedText != char) {
@@ -2660,9 +2681,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             } else {
                 textToMerge
             }
-            deliverCandidateCommit(PendingCandidateCommit(
-                InputCommandOwner.requireOwner(), fullCommitText, isT9
+            // 英文单词方案开着「选词后自动加空格」：点候选或按空格上屏的词后面跟一个空格，接着的键按 [EnglishAutoSpace] 处理（#311）。
+            val autoSpace = !isT9 && wordsAutoSpaceAfter(fullCommitText)
+            val delivered = deliverCandidateCommit(PendingCandidateCommit(
+                InputCommandOwner.requireOwner(), if (autoSpace) "$fullCommitText " else fullCommitText, isT9
             ))
+            if (autoSpace && delivered.accepted) englishAutoSpace.arm(fullCommitText)
         } else {
             withEditor {
                 if (isT9) {
@@ -3059,9 +3083,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 snapshot.correctedCandidates[expandedCandidate.text].orEmpty())
             val committedText = selection.committedText
             if (committedText.isNotEmpty()) {
-                deliverCandidateCommit(PendingCandidateCommit(
-                    InputCommandOwner.requireOwner(), committedText, false
+                val autoSpace = wordsAutoSpaceAfter(committedText)
+                val delivered = deliverCandidateCommit(PendingCandidateCommit(
+                    InputCommandOwner.requireOwner(), if (autoSpace) "$committedText " else committedText, false
                 ))
+                if (autoSpace && delivered.accepted) englishAutoSpace.arm(committedText)
             } else {
                 // 引擎未产生 commit（选中后继续组句的多段场景）：刷新组合态
                 withEditor {

@@ -146,4 +146,34 @@ class EnglishLiteralInputTest {
         }
         assertEquals("ßПр", editor.toString())
     }
+
+    @Test fun englishWordsSchemeFollowsTheEnglishSwitches() {
+        // #311：「英文单词」方案在打单词时同样按「首字母大写」「选词后/标点后自动加空格」；它的 ABC 状态、英文直接输入、中文不算。
+        val words = com.kingzcheung.xime.settings.InputProfiles.builtin(com.kingzcheung.xime.settings.InputModes.ENGLISH_WORDS)
+        assertTrue(typesEnglishWords(words, asciiMode = false))
+        assertFalse(typesEnglishWords(words, asciiMode = true))
+        val direct = com.kingzcheung.xime.settings.InputProfiles.builtin(com.kingzcheung.xime.settings.InputModes.ENGLISH)
+        assertFalse(typesEnglishWords(direct, asciiMode = false))
+        assertFalse(typesEnglishWords(com.kingzcheung.xime.settings.InputProfiles.builtin("rime_ice"), asciiMode = false))
+    }
+
+    @Test fun autoCappedFirstLetterIsNotLearnedAsTyped() {
+        assertEquals("xyzw", spellingWithoutAutoCap("Xyzw"))
+        assertEquals("obsidian", spellingWithoutAutoCap("Obsidian"))
+        // 后面还有大写是自己打的，照原样。
+        assertEquals("McDonald", spellingWithoutAutoCap("McDonald"))
+        assertEquals("NASA", spellingWithoutAutoCap("NASA"))
+        assertEquals("hello", spellingWithoutAutoCap("hello"))
+        assertEquals("I", spellingWithoutAutoCap("I"))
+    }
+
+    @Test fun wordsAutoSpaceOnlyFollowsWords() {
+        assertTrue(takesWordsAutoSpace("hello"))
+        assertTrue(takesWordsAutoSpace("don't"))
+        assertTrue(takesWordsAutoSpace("Hello"))
+        assertFalse(takesWordsAutoSpace(""))
+        assertFalse(takesWordsAutoSpace("."))
+        assertFalse(takesWordsAutoSpace("123"))
+        assertFalse(takesWordsAutoSpace("hello "))
+    }
 }

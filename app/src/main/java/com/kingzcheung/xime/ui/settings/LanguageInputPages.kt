@@ -122,13 +122,13 @@ private fun EnglishInputSection() {
             checked = input.addressFieldsEnglish, onCheckedChange = { input.copy(addressFieldsEnglish = it).save(context) })
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.SpaceBar, "选词后自动加空格",
-            "英文(含西班牙语)点候选栏的词后自动补一个空格，接着打下一个词不用再按空格。紧接着按空格不会多出一个；" +
+            "英文(含西班牙语、英文单词方案)选词后自动补一个空格，接着打下一个词不用再按空格。紧接着按空格不会多出一个；" +
                 "打 , . ? ! : ; 时标点挪到空格前面；退格删掉这个空格。",
             checked = input.englishAutoSpace, onCheckedChange = { input.copy(englishAutoSpace = it).save(context) })
         AutoSpaceLegend("english-auto-space-legend", "点 world", "hello world", "|", input.englishAutoSpace)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.SpaceBar, "标点后自动加空格",
-            "英文(含西班牙语)键盘在字母后面打 , . ? ! : ; 时自动跟一个空格(Hello, world)。紧接着按空格不会多出一个，" +
+            "英文(含西班牙语、英文单词方案)键盘在字母后面打 , . ? ! : ; 时自动跟一个空格(Hello, world)。紧接着按空格不会多出一个，" +
                 "连打 ... ?! 空格留在最后；3.14、1,000、10:30 和网址、邮箱、密码框不加；退格删掉这个空格。",
             checked = input.englishPunctuationSpace, onCheckedChange = { input.copy(englishPunctuationSpace = it).save(context) })
         AutoSpaceLegend("english-punctuation-space-legend", "打 ,", "Hello,", "|", input.englishPunctuationSpace)
