@@ -272,11 +272,12 @@ private fun T9KeyboardSwipeOverlay(
                 val dictionary = glideDictionary
                 val doublePinyin = glideDoublePinyin
                 glideScope.launch {
+                    // 很短又认不出：快打时手指一抖被当成了滑行，按点了起点那个键算，不吞这一下（用户 11-11）。
                     val digits = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                         runCatching {
                             com.kingzcheung.xime.glide.GlideLexicon.t9Digits(glideContext, keys, xs, ys, dictionary, doublePinyin)
                         }.getOrDefault("")
-                    }
+                    }.ifEmpty { com.kingzcheung.xime.glide.shortGlideTapKey(keys, xs, ys)?.toString().orEmpty() }
                     if (digits.isEmpty()) return@launch
                     kotlinx.coroutines.withContext(inputContext) {
                         for (digit in digits) {

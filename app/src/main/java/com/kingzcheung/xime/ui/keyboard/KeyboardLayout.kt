@@ -489,7 +489,15 @@ fun KeyboardLayout(
                 if (chinese) com.kingzcheung.xime.glide.GlideLexicon.chineseDecoder(glideContext, keyboard, doublePinyin).decode(xs, ys)
                 else com.kingzcheung.xime.glide.GlideLexicon.decoder(glideContext, keyboard).decode(xs, ys)
             }
-            if (candidates.isEmpty()) return@launch
+            if (candidates.isEmpty()) {
+                // 很短又认不出词：快打时手指一抖被当成了滑行，按点了起点那个键算，不吞这一下（用户 11-11）。
+                com.kingzcheung.xime.glide.shortGlideTapKey(keys, xs, ys)?.toString()?.let { key ->
+                    val value = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(key,
+                        KeysConfigHelper.getKeyCommitValue(key, isAsciiMode), false, shift.isShifted)
+                    kotlinx.coroutines.withContext(inputContext) { onKeyPress(value) }
+                }
+                return@launch
+            }
             viewModel.onCharacterTyped()
             if (chinese) {
                 kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word,

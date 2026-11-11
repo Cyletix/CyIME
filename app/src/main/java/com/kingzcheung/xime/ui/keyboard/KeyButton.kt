@@ -605,9 +605,9 @@ fun SwipeableKeyButton(
                     ctrlTapFraction[0] = if (size.width > 0) down.position.x / size.width else 0.5f
                 }
             } else Modifier)
-            .pointerInput(reserveDragForGlide) {
+            .pointerInput(reserveDragForGlide, letterGlideOwnsDrag) {
                 // 滑行没接管的拖动抬手仍算点按（用户 11-10：快打一句吞一半的键）。
-                detectExclusiveKeyGestures(reserveDragForGlide) { currentActions }
+                detectExclusiveKeyGestures(reserveDragForGlide, letterGlide = letterGlideOwnsDrag) { currentActions }
             }
             .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
