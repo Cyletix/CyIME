@@ -1264,7 +1264,8 @@ fun KeyboardView(
                                 com.kingzcheung.xime.handwriting.HandwritingTemplates.forget(handwritingContext, handwritingWord)
                             }
                         } else if (!word.isNullOrEmpty()) {
-                            deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word)) {
+                            val parts = sentenceParts(callbacks, cs, word, first = (railEntry?.first ?: index) == 0)
+                            deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word), parts = parts) {
                                 if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                 if (railEntry != null) {
                                     callbacks.onGlobalCandidateDelete?.invoke(railEntry.first)
@@ -1462,7 +1463,8 @@ fun KeyboardView(
                                 .getOrNull(entry.globalIndex)?.text
                             if (!word.isNullOrEmpty()) {
                                 onHapticFeedback?.invoke()
-                                deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word)) {
+                                val parts = sentenceParts(callbacks, cs, word, first = entry.globalIndex == 0)
+                                deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word), parts = parts) {
                                     if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                     callbacks.onGlobalCandidateDelete?.invoke(entry.globalIndex)
                                 }
@@ -2030,7 +2032,14 @@ fun KeyboardView(
                 onCancel = { onHapticFeedback?.invoke(); deletePending = null },
                 onConfirm = { onHapticFeedback?.invoke(); deletePending = null; pending.onConfirm() },
                 pinned = pending.pin?.pinned,
-                onPin = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.apply?.invoke() })
+                onPin = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.apply?.invoke() },
+                parts = pending.parts?.words,
+                onPart = { part ->
+                    onHapticFeedback?.invoke(); deletePending = null
+                    pending.parts?.reselect?.invoke(part)
+                    // 重选这个词：收起展开页，候选栏就是这个词的其它写法。
+                    viewModel.setCandidatePageExpanded(false)
+                })
         }
 
         // A route change replaces only the panel content, never restarts the reveal host.
@@ -2378,7 +2387,8 @@ private fun KeyboardResizeControlsHost(
  */
 @Composable
 internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Modifier,
-    onCancel: () -> Unit, onConfirm: () -> Unit, pinned: Boolean? = null, onPin: () -> Unit = {}) {
+    onCancel: () -> Unit, onConfirm: () -> Unit, pinned: Boolean? = null, onPin: () -> Unit = {},
+    parts: List<String>? = null, onPart: (Int) -> Unit = {}) {
     val forget = "忘掉「$word」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。"
     KeyboardConfirmCard(
         title = if (pinned == null) "忘掉学习" else "「$word」",
@@ -2392,7 +2402,7 @@ internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Mod
         tag = "forget-learning-confirm",
         modifier = modifier, onCancel = onCancel, onConfirm = onConfirm,
         extraLabel = when (pinned) { null -> null; false -> "固定"; true -> "取消固定" },
-        onExtra = onPin)
+        onExtra = onPin, parts = parts, onPart = onPart)
 }
 
 /**
@@ -2402,7 +2412,9 @@ internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Mod
 @Composable
 internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: String, destructive: Boolean,
     tag: String, modifier: Modifier, onCancel: () -> Unit, onConfirm: () -> Unit,
-    extraLabel: String? = null, onExtra: () -> Unit = {}) {
+    extraLabel: String? = null, onExtra: () -> Unit = {},
+    /** 长按首选整句时拆出的词；点一个只重选它。 */
+    parts: List<String>? = null, onPart: (Int) -> Unit = {}) {
     val cardColors = keyboardCardColors()
     Box(
         modifier = modifier
@@ -2426,6 +2438,16 @@ internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: S
                     style = MaterialTheme.typography.titleMedium,
                     color = cardColors.text
                 )
+                if (!parts.isNullOrEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "点一个词重选",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = cardColors.text.copy(alpha = .7f)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    SentencePartChips(parts, cardColors.text, tag, onPart)
+                }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = message,
@@ -2463,8 +2485,48 @@ private data class DeletePendingWord(
     val message: String? = null,
     /** 引擎候选的固定按钮；null＝不显示（手写候选、没在组词）。 */
     val pin: PinChoice? = null,
+    /** 长按首选整句时拆出的词；null＝不是整句（不显示）。 */
+    val parts: SentenceParts? = null,
     val onConfirm: () -> Unit,
 )
+
+/** 长按首选整句：拆出的词，以及点了第几个词后去重选。 */
+private class SentenceParts(val words: List<String>, val reselect: (Int) -> Unit)
+
+/** 首选是引擎组出来的整句（两个词以上）时拆成词；其它候选、拿不到（引擎正忙）都不拆。 */
+private fun sentenceParts(callbacks: KeyboardCallbacks, cs: com.kingzcheung.xime.service.CandidateState,
+    word: String, first: Boolean): SentenceParts? {
+    val reselect = callbacks.onReselectSentenceWord ?: return null
+    if (!first || !cs.isComposing || cs.candidates.firstOrNull() != word) return null
+    val words = callbacks.sentenceWords(word)?.takeIf { it.size >= 2 } ?: return null
+    return SentenceParts(words) { target ->
+        if (callbacks.isCandidateSnapshotCurrent(cs)) reselect(words, target)
+    }
+}
+
+/** 整句拆出的词，一行排不下就换行；每个词一个按钮。 */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SentencePartChips(parts: List<String>, textColor: Color, tag: String, onPart: (Int) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        parts.forEachIndexed { index, part ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(textColor.copy(alpha = .1f))
+                    .clickable { onPart(index) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .testTag("$tag-part-$index"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(part, style = MaterialTheme.typography.titleMedium, color = textColor)
+            }
+        }
+    }
+}
 
 /** 长按卡片的固定按钮：现在是否已固定，以及按下后切换。 */
 private class PinChoice(val pinned: Boolean, val apply: () -> Unit)

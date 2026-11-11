@@ -58,6 +58,10 @@ data class KeyboardCallbacks(
     val candidatePinState: (String) -> Boolean? = { null },
     /** 固定（true）或取消固定（false）当前编码下的这个词。 */
     val onCandidatePin: ((String, Boolean) -> Unit)? = null,
+    /** 长按首选时拆出的词：首选是引擎组出来的整句（两个词以上）才有，否则 null。 */
+    val sentenceWords: (String) -> List<String>? = { null },
+    /** 长按卡片里点了整句的第几个词：只重选这个词，前后的字不动。 */
+    val onReselectSentenceWord: ((List<String>, Int) -> Unit)? = null,
     /** 用户展开候选页时请求服务层拉取跨页全量候选（本地分页数据源）。 */
     val onRequestExpandedCandidates: (() -> Unit)? = null,
     /** 收起的候选栏滑到最后几个：服务层把展开列表接到候选栏后面。 */

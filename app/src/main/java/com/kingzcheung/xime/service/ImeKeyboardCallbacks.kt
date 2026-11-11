@@ -378,6 +378,8 @@ internal fun rememberImeKeyboardCallbacks(
             },
             candidatePinState = { text -> service.rimeEngine.candidatePinState(text) },
             onCandidatePin = { text, pinned -> service.keyRouter.pinCandidate(text, pinned) },
+            sentenceWords = { text -> service.rimeEngine.firstSentenceWords(text) },
+            onReselectSentenceWord = { words, target -> service.keyRouter.reselectSentenceWord(words, target) },
             onRequestExpandedCandidates = {
                 // Expanded candidates have global indices; leave the collapsed page's focus behind.
                 service.candidateState.value = service.candidateState.value.copy(candidateFocus = null)

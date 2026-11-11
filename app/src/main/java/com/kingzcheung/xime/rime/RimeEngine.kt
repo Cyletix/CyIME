@@ -1602,6 +1602,76 @@ class RimeEngine {
         when (nativeCandidatePinState(text)) { 1 -> true; 0 -> false; else -> null }
     }
 
+    /**
+     * 长按首选时拆出的词：首选是引擎组出来的整句（两个词以上）才有，否则 null。
+     * 主线程调用，拿不到锁不等待。
+     */
+    internal fun firstSentenceWords(shown: String): List<String>? = tryLocked(null) {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode()) return@tryLocked null
+        val row = nativeInspectCandidates(1).firstOrNull() ?: return@tryLocked null
+        if (row.getOrNull(0) != shown) return@tryLocked null
+        splitSentenceWords(shown, row.getOrNull(9).orEmpty())
+    }
+
+    /** 当前候选里第一个文字是 [text] 的：全局序号、注释、在编码里的结束位置。须在锁内调用。 */
+    private fun candidateSpan(text: String, limit: Int = SENTENCE_WORD_SEARCH): Triple<Int, String, Int>? =
+        nativeInspectCandidates(limit).firstOrNull { it.getOrNull(0) == text }?.let { row ->
+            val index = row.getOrNull(4)?.toIntOrNull() ?: return null
+            val end = row.getOrNull(6)?.toIntOrNull() ?: return null
+            Triple(index, row.getOrNull(1).orEmpty(), end)
+        }
+
+    /** 九键：当前候选里 [text] 的注释（拼音），重选整句里的词时交给九键选词。 */
+    internal fun candidateReading(text: String): String? = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked null
+        candidateSpan(text)?.second
+    }
+
+    /**
+     * 长按首选整句、点了第 [target] 个词（全拼、双拼等非九键方案）：前面的词照原样逐个选定，
+     * 光标放到这个词后面，候选就只剩这个词的其它写法；选好后 Rime 把光标送回末尾，后面照常组句。
+     * 首选已经变了、光标不在末尾时不做；中途哪个词找不到就停在那里（只是选定了前几个词，没有上屏）。
+     */
+    internal fun reselectSentenceWord(words: List<String>, target: Int, revision: Long): RimeProcessResult? =
+        editPinyinAndReadState {
+            if (target !in words.indices || words.size < 2 || !isCandidateRevisionCurrent(revision) || !isInitialized ||
+                !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode()) return@editPinyinAndReadState false
+            val input = nativeGetInput().orEmpty()
+            if (nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull() != input.length) return@editPinyinAndReadState false
+            if (nativeInspectCandidates(1).firstOrNull()?.getOrNull(0) != words.joinToString("")) return@editPinyinAndReadState false
+            candidateRevision.incrementAndGet()
+            for (i in 0 until target) {
+                val span = candidateSpan(words[i]) ?: return@editPinyinAndReadState true
+                if (!nativeSelectCandidateByGlobalIndex(span.first)) return@editPinyinAndReadState true
+            }
+            placeCaretAfterWord(words[target], nativeGetInput().orEmpty().length) { span -> span.third }
+            true
+        }
+
+    /**
+     * 九键：前面的词已由九键选词选定后，把光标放到第一个词 [word] 后面（[word] 的拼音字母数＝数字键数）。
+     * 双拼九键的注释是全拼、和数字键数对不上，不挪光标。
+     */
+    internal fun placeT9CaretAfterWord(word: String, doublePinyin: Boolean): RimeProcessResult? = editPinyinAndReadState {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode() || doublePinyin)
+            return@editPinyinAndReadState false
+        val input = nativeGetInput().orEmpty()
+        val keys = t9KeysOfReading(candidateSpan(word)?.second ?: return@editPinyinAndReadState true)
+        if (keys <= 0 || keys >= codeKeysBefore(input, input.length)) return@editPinyinAndReadState true
+        if (placeT9CodeCaret(keys, input) && candidateSpan(word) == null) nativeSetCaret(input.length)
+        true
+    }
+
+    /** 光标挪到 [word] 后面；挪过去后候选里没有 [word]（对不上）就放回末尾 [inputEnd]。须在锁内调用。 */
+    private inline fun placeCaretAfterWord(word: String, inputEnd: Int, end: (Triple<Int, String, Int>) -> Int) {
+        val span = candidateSpan(word) ?: return
+        val caret = end(span)
+        if (caret <= 0 || caret >= inputEnd) return
+        candidateRevision.incrementAndGet()
+        nativeSetCaret(caret)
+        if (candidateSpan(word) == null) nativeSetCaret(inputEnd)
+    }
+
     /** 固定：当前编码下排第一，固定多个按先后排；取消固定回到原位。候选过期时不做。 */
     @androidx.annotation.WorkerThread
     internal fun setCandidatePinnedAtRevision(text: String, pinned: Boolean, revision: Long): Boolean = locked {
@@ -1758,3 +1828,6 @@ internal inline fun backspaceComposition(
     clear()
     return reread(result)
 }
+
+/** 重选整句里的词时，在前多少个候选里找这个词。 */
+private const val SENTENCE_WORD_SEARCH = 200
