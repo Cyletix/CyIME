@@ -733,6 +733,8 @@ fun KeyboardLayout(
                             val row1 = renderRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
                             val row1Inset = if (zhuyin) (splitCellDp / 2f).dp else standardRowInset
                                 ?: if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) 0.dp else 16.dp
+                            val (row1Start, row1End) = fourteenHomeRowInsets(fourteenKey, evenMergedKeys,
+                                row1Inset.value, (standardRowEndInset ?: row1Inset).value)
                             KeyboardRowWithConfig(
                                 keys = row1,
                                 keySpans = renderSpans?.getOrNull(1),
@@ -747,8 +749,8 @@ fun KeyboardLayout(
                                 ),
                                 isShifted = isShifted,
                                 isAsciiMode = isAsciiMode,
-                                edgeInset = row1Inset,
-                                edgeEndInset = standardRowEndInset ?: row1Inset,
+                                edgeInset = row1Start.dp,
+                                edgeEndInset = row1End.dp,
                                 extendLastKeyToEdge = fourteenHomeRowLastKeyToEdge(fourteenKey, row1, evenMergedKeys),
                                 onSwipeStateChange = { state, bounds ->
                                     processSwipeState(

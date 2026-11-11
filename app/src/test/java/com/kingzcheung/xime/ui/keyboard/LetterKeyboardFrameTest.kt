@@ -162,4 +162,13 @@ class LetterKeyboardFrameTest {
         assertFalse(fourteenHomeRowLastKeyToEdge(true, listOf("as", "df", "gh", "jkl"), evenMerged = false))
         assertFalse(fourteenHomeRowLastKeyToEdge(false, standard[1], evenMerged = false))
     }
+
+    @Test
+    fun evenMergedFourteenKeyHomeRowGapsAreEqualOnStaggeredTablets() {
+        // 平板 26 键第二排错位：左 16、右 48。均匀排布的 14 键两边各 32，总留空不变。
+        assertEquals(32f to 32f, fourteenHomeRowInsets(true, evenMerged = true, start = 16f, end = 48f))
+        // 严格对齐、或不是 14 键，照旧。
+        assertEquals(16f to 48f, fourteenHomeRowInsets(true, evenMerged = false, start = 16f, end = 48f))
+        assertEquals(16f to 48f, fourteenHomeRowInsets(false, evenMerged = true, start = 16f, end = 48f))
+    }
 }

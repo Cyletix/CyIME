@@ -68,6 +68,13 @@ internal fun splitPairSpans(pairedRow: List<String>, evenMerged: Boolean): List<
 internal fun fourteenHomeRowLastKeyToEdge(fourteenKey: Boolean, homeRow: List<String>, evenMerged: Boolean): Boolean =
     fourteenKey && !evenMerged && homeRow.lastOrNull()?.length == 1
 
+/**
+ * 14 键第二排左右留空。「合并键均匀排布」打开时两边取平均，a 左边和 l 右边一样宽：平板上 26 键第二排按实体键盘错位
+ * （左窄右宽），照搬过来 l 右边会比 a 左边宽好几倍。总留空不变，键宽不变；严格对齐和其他布局原样返回。
+ */
+internal fun fourteenHomeRowInsets(fourteenKey: Boolean, evenMerged: Boolean, start: Float, end: Float): Pair<Float, Float> =
+    if (fourteenKey && evenMerged) ((start + end) / 2f).let { it to it } else start to end
+
 /** 当前键盘是否按「合并键均匀排布」分键宽：自建/内置字母排列和 14 键生效，分体键盘照旧严格对齐。 */
 internal val LocalEvenMergedKeys = staticCompositionLocalOf { false }
 
