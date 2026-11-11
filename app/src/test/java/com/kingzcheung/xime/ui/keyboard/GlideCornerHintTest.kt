@@ -172,6 +172,63 @@ class GlideCornerHintTest {
         }
     }
 
+    /**
+     * 用户 11-11「先打一个字再划…划了就没了」：快打时点字母的手指还没抬，另一根手指已经开始划。
+     * 以前看到第二根手指就整次放弃，这一划什么也不出；现在点的字母照常出，划的词接在后面。
+     * [liftTapAt] 是划到第几步时抬起点字母的手指（超出步数就等划完再抬；点按的手指按满长按时长会出长按的字，所以不拖太久）。
+     */
+    private fun tapThenGlide(tap: Char, word: String, liftTapAt: Int) {
+        val host = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        fun letter(char: Char) = rule.onNodeWithTag("qwerty-key:$char", true).fetchSemanticsNode().boundsInRoot.center - host.topLeft
+        val path = word.map(::letter)
+        rule.onRoot().performTouchInput {
+            down(0, letter(tap))
+            advanceEventTime(30)
+            down(1, path.first())
+            var step = 0
+            var tapDown = true
+            path.zipWithNext().forEach { (a, b) ->
+                for (i in 1..6) {
+                    moveTo(1, a + (b - a) * (i / 6f))
+                    if (++step == liftTapAt) { up(0); tapDown = false }
+                }
+            }
+            up(1)
+            if (tapDown) { advanceEventTime(30); up(0) }
+        }
+    }
+
+    @Test fun glideRightAfterATapWithTheOtherThumbStillGlides() {
+        show(glide = true, chinese = true)
+        for (liftTapAt in listOf(1, 4, 12)) {
+            use("rime_ice")
+            rule.runOnIdle { typed.clear(); codes.clear() }
+            tapThenGlide('w', "nihao", liftTapAt)
+            rule.waitUntil(5000) { codes.isNotEmpty() }
+            rule.waitForIdle()
+            assertEquals("中文 抬起点按的手指在第 $liftTapAt 步", listOf("nihao"), codes.toList())
+            assertEquals("中文 点的字母照常出", listOf("w"), typed.toList())
+
+            use("rime_ice", english = true)
+            rule.runOnIdle { typed.clear(); codes.clear() }
+            tapThenGlide('i', "hello", liftTapAt)
+            rule.waitUntil(5000) { codes.isNotEmpty() }
+            rule.waitForIdle()
+            assertEquals("英文 抬起点按的手指在第 $liftTapAt 步", 1, codes.size)
+            assertTrue(codes.first().startsWith("en:"))
+            assertEquals("英文 点的字母照常出", listOf("i"), typed.toList())
+        }
+    }
+
+    @Test fun glideRightAfterATapAlsoWorksWithLivePreview() {
+        show(glide = false, chinese = true, preview = true)
+        tapThenGlide('w', "nihao", 3)
+        rule.waitUntil(5000) { codes.isNotEmpty() }
+        rule.waitForIdle()
+        assertEquals(listOf("nihao"), codes.toList())
+        assertEquals(listOf("w"), typed.toList())
+    }
+
     /** 按下期间把预览送往输入框，抬手时清除预览，再交付最终编码。 */
     @Test fun livePreviewShowsTheWordBeforeLiftingAndGoesAwayAfter() {
         show(glide = false, chinese = true, preview = true)
