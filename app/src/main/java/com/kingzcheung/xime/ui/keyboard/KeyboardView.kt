@@ -1563,9 +1563,11 @@ fun KeyboardView(
             } else state
             // 换布局（26/14/9、全键/手写/语音）或进出数字、常用符号页时新键盘快速淡入；不吞连点。
             // 中英切换不算换布局：直接换字，不淡入（深色主题下淡入看起来像黑了一下）。
+            // 符号页收起（直接换页，没有揭幕）回到键盘时，键盘也同样淡入。
+            val symbolPageShown = (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Symbol
             val underlaySwapKey = when (underlyingPage) {
-                is KeyboardPage.Main -> listOf(underlyingPage.type, state.inputProfile.layout)
-                is KeyboardPage.Panel -> listOf(underlyingPage.type)
+                is KeyboardPage.Main -> listOf(underlyingPage.type, state.inputProfile.layout, symbolPageShown)
+                is KeyboardPage.Panel -> listOf(underlyingPage.type, symbolPageShown)
                 else -> null
             }
             Column(Modifier.clipboardUnderlaySize(clipboardPanel, state.keyboardHeightDp).fillMaxSize()
@@ -2042,6 +2044,9 @@ fun KeyboardView(
                 visibility = overlayVisibility,
                 revealState = overlayReveal,
             ) {
+            // 面板里换页（菜单进剪贴板、表情和符号互换等）新页快速淡入；符号页打开没有揭幕，打开本身也淡入。
+            Box(Modifier.fillMaxSize().cySwapFadeIn(retainedOverlay?.route?.let { it::class },
+                fadeOnFirst = symbolPageSwap)) {
             when (val p = retainedOverlay) {
                 is KeyboardPage.Overlay -> when (p.route) {
                     is OverlayRoute.Menu -> MenuBar(
@@ -2254,6 +2259,7 @@ fun KeyboardView(
                     )
                 }
                 else -> {}
+            }
             }
         }
         // 画在面板之后：从菜单或打开着的面板上点「无痕」时，确认卡也在最上面。

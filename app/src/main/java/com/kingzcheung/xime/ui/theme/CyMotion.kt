@@ -98,16 +98,17 @@ fun Modifier.cyPopupEnter(
 
 /**
  * [key] 变化时（换布局、进数字页等）新内容快速淡入。新内容立即可点，不做淡出、
- * 不叠两层内容，因此不会像揭幕遮罩那样在动画期间吞掉连点。首次出现不播放。
+ * 不叠两层内容，因此不会像揭幕遮罩那样在动画期间吞掉连点。首次出现不播放，
+ * 除非 [fadeOnFirst]（如符号页这类每次打开都新建的页面，打开本身就是一次换页）。
  */
 @Composable
-fun Modifier.cySwapFadeIn(key: Any?, instantKey: Any? = null): Modifier {
+fun Modifier.cySwapFadeIn(key: Any?, instantKey: Any? = null, fadeOnFirst: Boolean = false): Modifier {
     // 新 key 的第一帧就用起始透明度：若等 LaunchedEffect 再降透明度，会先整帧闪现一次。
     // [instantKey] 同时变了（如中英切换）就直接换，不淡入：同一块键盘只是换了字。
     val first = remember { booleanArrayOf(true) }
     val lastInstant = remember { arrayOf(instantKey) }
     val alpha = remember(key) {
-        val instant = first[0] || lastInstant[0] != instantKey
+        val instant = (first[0] && !fadeOnFirst) || (!first[0] && lastInstant[0] != instantKey)
         first[0] = false
         lastInstant[0] = instantKey
         Animatable(if (instant) 1f else CyMotion.SWAP_FROM_ALPHA)

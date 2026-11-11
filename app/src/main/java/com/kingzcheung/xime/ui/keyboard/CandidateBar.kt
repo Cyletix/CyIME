@@ -18,6 +18,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.tween
+import com.kingzcheung.xime.ui.theme.cySwapFadeIn
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -489,7 +490,10 @@ fun CandidateBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } },
+                .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } }
+                // 工具栏和候选互换（开始打字、上屏回到空闲）时新内容快速淡入，和键盘换页同一套；
+                // 只淡这一行的图标和字，不淡栏底色，候选从第一帧起就能点。
+                .cySwapFadeIn(state is CandidateBarState.Idle),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (showCompositionCancel && closesAssociation && associationCancelCross) {
