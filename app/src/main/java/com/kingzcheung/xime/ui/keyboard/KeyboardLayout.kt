@@ -962,6 +962,7 @@ fun KeyboardLayout(
                                         swipeText = swipeUpText,
                                         symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
                     .takeUnless { longPressLabels != null && KeysConfigHelper.longPressLetters(isAsciiMode).isNotEmpty() },
+                                        symbolInputDownText = symbolInputValue(swipeDownLabel, swipeDownAction),
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
                                         swipeDownKeyLabel = boundDownLabel?.takeIf { swipeDownHintsEnabled }
@@ -1719,6 +1720,7 @@ fun KeyboardRowWithConfig(
                 swipeText = swipeUpText,
                 symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
                     .takeUnless { longPressLabels != null && KeysConfigHelper.longPressLetters(isAsciiMode).isNotEmpty() },
+                symbolInputDownText = symbolInputValue(swipeDownLabel, swipeDownAction),
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = boundDownLabel?.takeIf { swipeDownHintsEnabled }
@@ -1945,6 +1947,7 @@ fun SwipeableKeyButtonLandscape(
     modifier: Modifier = Modifier,
     swipeText: String? = null,
     symbolInputText: String? = null,
+    symbolInputDownText: String? = null,
     swipeDownText: String? = null,
     swipeUpKeyLabel: String? = null,
     swipeDownKeyLabel: String? = null,
@@ -1965,7 +1968,7 @@ fun SwipeableKeyButtonLandscape(
     SwipeableKeyButton(text = text, onClick = onClick, letterGroup = letterGroup, onLetterSelection = onLetterSelection, backgroundColor = backgroundColor,
         followSymbolSwipeDirection = true,
         textColor = textColor, modifier = modifier, swipeText = swipeText, swipeDownText = swipeDownText,
-        symbolInputText = symbolInputText,
+        symbolInputText = symbolInputText, symbolInputDownText = symbolInputDownText,
         swipeUpKeyLabel = swipeUpKeyLabel, swipeDownKeyLabel = swipeDownKeyLabel,
         onSwipe = onSwipe, onSwipeDown = onSwipeDown, onPress = onPress, onRelease = onRelease,
         onLongPressSelect = onLongPressSelect, longPressItems = longPressItems,
@@ -2075,6 +2078,7 @@ fun CompactKeyboardRowWithConfig(
                 swipeText = swipeUpText,
                 symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
                     .takeUnless { longPressLabels != null && KeysConfigHelper.longPressLetters(isAsciiMode).isNotEmpty() },
+                symbolInputDownText = symbolInputValue(swipeDownLabel, swipeDownAction),
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = swipeDownKeyLabel,

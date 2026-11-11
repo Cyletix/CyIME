@@ -312,6 +312,8 @@ fun SwipeableKeyButton(
     keepSymbolSwipeOnLongPress: Boolean = false,
     /** Literal upper-hint input, independent of whether its visual hint is enabled. */
     symbolInputText: String? = null,
+    /** 下角标直接上屏的那个符号（不受「下方角标提示」开关影响）；26 键滑行时放进长按弹出的两格，见 [withGlideCornerMenu]。 */
+    symbolInputDownText: String? = null,
     onSwipe: ((String) -> Unit)? = null,
     onSwipeDown: ((String) -> Unit)? = null,
     onSwipeLeft: (() -> Unit)? = null,
@@ -417,9 +419,9 @@ fun SwipeableKeyButton(
     val letterGlideOwnsDrag = LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true
     val reserveDragForGlide = letterGlideOwnsDrag ||
         (LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true)
-    // 滑行接管拖动的键往下滑打不出下角标，角标只剩长按出上方那个：左下角不再画下角标（用户 11-11）。
-    // 只改显示，不动「下方角标提示」存的值；关掉滑行、或这个键盘没开滑行（14 键、数字行、没开中文滑行的中文 26 键）照旧显示。
-    val downCornerLabel = swipeDownKeyLabel.takeUnless { reserveDragForGlide }
+    // 九键滑行接管拖动的数字键往下滑打不出下角标：左下角不画（用户 11-11）。26 键字母滑行改成长按弹出上下两个角标
+    // （[withGlideCornerMenu]），下角标打得到，照旧画（用户 11-11「关闭数字行滑行打不出 !@#」）。
+    val downCornerLabel = swipeDownKeyLabel.takeUnless { reserveDragForGlide && !letterGlideOwnsDrag }
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -478,11 +480,13 @@ fun SwipeableKeyButton(
         onLongPressSelect = onLongPressSelect,
         longPressTimeoutMillis = longPressTimeoutMillis,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ).withSymbolInput(
-        // 26 键滑行开着时字母键的滑动给了滑行，角标改由长按输入（设置页同样锁在「长按输入」）。
+    ).let { actions ->
+        // 26 键滑行开着时字母键的滑动给了滑行：长按弹出上下两个角标，挪过去松手选（设置页锁在「长按输入」）。
+        if (letterGlideOwnsDrag) actions.withGlideCornerMenu(symbolInputText, symbolInputDownText, inputPreferences.symbolLongPressMs)
         // 底排标点固定上滑（空格两侧标点、数字键盘点键）：上滑和长按都输入角标（用户 11-09：键在底边，长按更顺手）。
-        if (letterGlideOwnsDrag || keepSymbolSwipeOnLongPress) SymbolInputMode.LONG_PRESS else symbolInputMode,
-        symbolInputText, keepSymbolSwipeOnLongPress, inputPreferences.symbolLongPressMs).let {
+        else actions.withSymbolInput(if (keepSymbolSwipeOnLongPress) SymbolInputMode.LONG_PRESS else symbolInputMode,
+            symbolInputText, keepSymbolSwipeOnLongPress, inputPreferences.symbolLongPressMs)
+    }.let {
         if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
     }
     val inputActions = LocalKeyboardInputActions.current

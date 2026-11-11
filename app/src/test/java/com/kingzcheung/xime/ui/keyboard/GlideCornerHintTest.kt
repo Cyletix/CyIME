@@ -37,7 +37,7 @@ import java.util.Collections
 /**
  * 滑行输入：英文滑行和中文滑行（全拼、双拼 26 键划一个词的编码）是两个开关，中文默认关；
  * 用户 10-31：滑行开着也照常画角标（听两个角标提示开关），开着英文滑行的老用户中文键盘不能变。
- * 用户 11-11：滑行接管的字母键下滑打不出下角标，角标只剩长按出的上角标，键上只画上角标；关掉滑行恢复。
+ * 用户 11-11：滑行接管的字母键下滑用来滑词，长按弹出上下两个角标来选（withGlideCornerMenu），所以上下角标照样都画。
  * 竖着滑不出角标符号（拖动给了滑行）；14 键不滑行。
  */
 @RunWith(AndroidJUnit4::class)
@@ -126,7 +126,7 @@ class GlideCornerHintTest {
         assertEquals(1, pullDown("q").size)
     }
 
-    @Test fun glideOwnedLettersShowOnlyTheUpperCorner() {
+    @Test fun glideOwnedLettersKeepBothCorners() {
         show(glide = false, chinese = false)
         val boards = listOf("rime_ice" to false, "double_pinyin_flypy" to false, "rime_ice" to true)
         fun snapshot() = boards.flatMap { (id, english) -> use(id, english); listOf("q", "f", "m").map { "$id/$english/$it" to hints(it) } }
@@ -134,9 +134,8 @@ class GlideCornerHintTest {
         plain.forEach { (key, shown) -> assertEquals("$key 没开滑行：上下两个角标 $shown", 2, shown.size) }
         rule.runOnIdle { prefs = prefs.copy(glideTyping = true, chineseGlideTyping = true) }
         rule.waitForIdle()
-        plain.zip(snapshot()).forEach { (before, after) ->
-            assertEquals("${before.first} 滑行时只剩上角标（长按出的那个）", before.second.take(1), after.second)
-        }
+        // 用户 11-11「关闭数字行，滑行打不出 !@#」：下角标在长按弹出的两格里选得到，键上照样画，开关滑行位置不变。
+        assertEquals("开着滑行，上下角标照样都画", plain, snapshot())
         rule.runOnIdle { prefs = prefs.copy(glideTyping = false, chineseGlideTyping = false) }
         rule.waitForIdle()
         assertEquals("关掉滑行，下角标照旧显示", plain, snapshot())
