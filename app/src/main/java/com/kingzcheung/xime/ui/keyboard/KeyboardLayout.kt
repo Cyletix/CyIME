@@ -404,6 +404,7 @@ fun KeyboardLayout(
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val liveKeyboardBounds = remember { LiveBounds() }
     // 滑行：英文 26 键出整词（「滑行输入」）；中文全拼、双拼 26 键（含分体、自定义字母排列）出一个词的编码交给 Rime
     // （「中文滑行输入」，单独的开关，默认关）。整键盘滑动移动光标与其冲突时让位。
     // 角标照常按两个角标提示开关显示，滑行不改它（用户 10-31：不能改他的习惯）。
@@ -527,6 +528,8 @@ fun KeyboardLayout(
     }
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
+        // 按键和键盘都按这一刻的位置算，见 [LiveBounds]。
+        val origin = liveKeyboardBounds.current(keyboardBounds, "keyboard")
         val newState = if (state.isSwipeDown && state.swipeText != null) {
             state.copy(charInfos = SubcharHelper.parseSwipeDownText(state.swipeText))
         } else {
@@ -535,10 +538,10 @@ fun KeyboardLayout(
         swipeBubble.update(
             newState,
             Rect(
-                left = bounds.left - keyboardBounds.left,
-                top = bounds.top - keyboardBounds.top,
-                right = bounds.right - keyboardBounds.left,
-                bottom = bounds.bottom - keyboardBounds.top
+                left = bounds.left - origin.left,
+                top = bounds.top - origin.top,
+                right = bounds.right - origin.left,
+                bottom = bounds.bottom - origin.top
             )
         )
     }
@@ -567,6 +570,7 @@ fun KeyboardLayout(
         modifier = bodyModifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
+                liveKeyboardBounds.coordinates = coordinates
                 shiftSlideTargets.keyboardBounds = dragSpace.bounds(coordinates)
             }
             // 轨迹原点与键位同用键盘卡片坐标（未旋转时与 boundsInRoot 相同），旋转的悬浮键盘滑行落在手指下的键。

@@ -376,6 +376,8 @@ fun SwipeableKeyButton(
     // 方向圆盘只在手指拂出去或按住一会儿后出现；快速点按不弹（用户 11-03：只点不拂时轮盘让打字发卡）。
     var discRevealed by remember { mutableStateOf(false) }
     var buttonBounds by remember { mutableStateOf(Rect.Zero) }
+    // 浮标按这一刻按键的位置画，见 [LiveBounds]。
+    val liveBounds = remember { LiveBounds() }
 
     val view = LocalView.current
     val density = LocalDensity.current
@@ -395,7 +397,7 @@ fun SwipeableKeyButton(
     // 不两个叠着；长按到点换成角标气泡。
     fun forwardPreview(state: SwipeState) {
         val discOwnsPress = discRevealed && state.isPressed && !state.isLongPress && state.keyFlick == null
-        onSwipeStateChange?.invoke(if (discOwnsPress) SwipeState() else state, buttonBounds)
+        onSwipeStateChange?.invoke(if (discOwnsPress) SwipeState() else state, liveBounds.current(buttonBounds, "key $text"))
     }
     // In flick mode the held key's own value (the digit) is a one-item long-press popup: it shows
     // what will be entered and commits only on release, like every other long-press choice.
@@ -530,7 +532,7 @@ fun SwipeableKeyButton(
         if (isPressed) {
             delay(FLICK_DISC_HOLD_MS)
             discRevealed = true
-            if (!longPressShown) onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
+            if (!longPressShown) onSwipeStateChange?.invoke(SwipeState(), liveBounds.current(buttonBounds, "key $text"))
         }
     }
     val showDisc = inputPreferences.flickDirectionDisc && isPressed && discRevealed && !longPressShown &&
@@ -616,6 +618,7 @@ fun SwipeableKeyButton(
             .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
+                liveBounds.coordinates = coordinates
                 if (shiftTargets != null) dragBounds = if (dragSpace.card == null) buttonBounds else dragSpace.bounds(coordinates)
                 // 滑行的键位与轨迹同在键盘卡片坐标里：悬浮键盘旋转后 boundsInRoot 是斜放键的外接框，滑行会落到别的键。
                 letterGeometry?.place(text, if (dragSpace.card == null) buttonBounds else dragSpace.bounds(coordinates))
@@ -1046,6 +1049,7 @@ fun SwipeableIconKeyButton(
     var isPressed by remember { mutableStateOf(false) }
     var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val liveBounds = remember { LiveBounds() }
     val keyLabelFontFamily = AppFonts.keyLabelFontFamily
     val density = LocalDensity.current
 
@@ -1117,13 +1121,14 @@ fun SwipeableIconKeyButton(
                         actionDistanceDp = actionDistanceDp,
                         onPreview = { state ->
                             flickPreview = state.keyFlick
-                            currentOnSwipeStateChange?.invoke(state, buttonBounds)
+                            currentOnSwipeStateChange?.invoke(state, liveBounds.current(buttonBounds, "function key"))
                         },
                     ).let { if (swapVertical) it.withSymbolSwipeDirection(reverse = false) else it }
                 }
             }
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
+                liveBounds.coordinates = coordinates
             }
             .padding(visualPadding ?: scaledKeyVisualPadding())
             .then(if (honeycombEdge != null) Modifier.honeycombCap() else Modifier)
