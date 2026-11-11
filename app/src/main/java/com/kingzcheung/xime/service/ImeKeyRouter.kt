@@ -1177,8 +1177,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     commitHardwareLiteral(key)
                     return@command
                 }
-                if (key.length == 1 && (hardwareEvent.isShiftPressed && !key[0].isLetter() ||
-                        hardwareEvent.keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_EQUALS)) {
+                if (hardwareSymbolIsLiteral(key, hardwareEvent.isShiftPressed,
+                        numpad = hardwareEvent.keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_EQUALS,
+                        chinesePunctuation = !service.uiState.value.isAsciiMode &&
+                            service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE)) {
                     commitHardwareLiteral(key)
                     return@command
                 }
