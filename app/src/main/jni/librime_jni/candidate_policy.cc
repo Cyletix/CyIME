@@ -2,6 +2,7 @@
 #include "candidate_pins.h"
 #include "basic_particle_choices.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -91,6 +92,16 @@ bool OneKeySubstitution(const std::string& marks) {
     corrected = true;
   }
   return corrected;
+}
+
+// A whole-input candidate that is the typed letters in other capitals (OK when ok was typed).
+bool SameWordOtherCase(const an<Candidate>& c, const std::string& input, size_t end) {
+  const auto& text = c->text();
+  if (c->start() != 0 || c->end() != end || text.size() != input.size() || text == input) return false;
+  for (size_t i = 0; i < text.size(); ++i)
+    if (std::tolower(static_cast<unsigned char>(text[i])) != std::tolower(static_cast<unsigned char>(input[i])))
+      return false;
+  return true;
 }
 
 double SpellingCoverage(const an<Phrase>& phrase) {
@@ -272,7 +283,11 @@ class PolicyTranslation : public Translation {
     // Fully spelled Chinese (e.g. you -> 有) and explicit non-dictionary entries
     // retain their native priority. No word list or fixed candidate is injected.
     // Nor does it lose to a word reached only through a spelling correction (2026-11-11: with 邻键纠错 on, a
-    // corrected 空 "kong" in second place kept ok below it; with the switch off ok came first).
+    // corrected 空 "kong" in second place kept ok below it).
+    // The same word written another way (OK for ok, US for us: the English dictionary has both, with the same
+    // code) does not stop it either: before, ok stopped right behind OK, which came after the guessed 偶看 欧卡
+    // 藕块 欧坑, so ok was 6th with the switch off too (2026-11-11, tablet probe). The variant keeps its place
+    // after the Chinese words.
     if (!numeric && !input.empty() && input.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") == std::string::npos) {
       const auto exact = std::find_if(head_.begin(), head_.end(), [&](const auto& c) {
         return c->start() == 0 && c->end() == end_ && c->text() == input && c->type() == "table";
@@ -282,6 +297,7 @@ class PolicyTranslation : public Translation {
         while (insertion != head_.begin()) {
           auto previous = insertion - 1;
           const auto phrase = As<Phrase>(Candidate::GetGenuineCandidate(*previous));
+          if (SameWordOtherCase(*previous, input, end_)) { insertion = previous; continue; }
           if (!phrase || HanCharacters(phrase->text()).empty() ||
               (SpellingCoverage(phrase) >= 1.0 && !Corrected(phrase))) break;
           insertion = previous;

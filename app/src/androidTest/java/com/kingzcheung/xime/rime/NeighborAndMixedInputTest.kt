@@ -60,8 +60,10 @@ class NeighborAndMixedInputTest {
 
     /**
      * 2026-11-11 (1.15.76): with 邻键纠错 on, ok gave 偶看 / 空 kong / 🈳 / 欧卡 and no ok on the first row; with it
-     * off ok came first. Short English typed in Chinese 26 keys ranks the same with the switch on or off, two letters
-     * never grow into a longer corrected syllable, and a one-key slip on two letters (wp for wo) is still corrected.
+     * off ok was 6th, behind OK. Short English typed in Chinese 26 keys ranks the same with the switch on or off, a
+     * whole English word comes before guessed abbreviations even when the dictionary also has it in capitals (OK),
+     * two letters never grow into a longer corrected syllable, and a one-key slip on two letters (wp for wo) is
+     * still corrected. Inputs that are no English word (wp, nh) keep a Chinese first candidate.
      */
     @Test fun shortEnglishRanksTheSameWithNeighbourCorrectionOnOrOff() {
         val e = engine()
@@ -79,6 +81,15 @@ class NeighborAndMixedInputTest {
                 assertTrue("$input must be in the first two with correction on: ${on.take(8)}", on.indexOf(input) in 0..1)
                 assertEquals("$input: first candidate must not depend on 邻键纠错 (off ${off.take(5)}, on ${on.take(5)})",
                     off.first(), on.first())
+                if (input.length == 2) assertEquals("$input must come first: ${off.take(8)}", input, off.first())
+            }
+            for (input in listOf("wp", "nh")) {
+                for (map in listOf("", graph())) {
+                    e.setNeighborMap(map)
+                    val first = top(input).first()
+                    assertTrue("$input must keep a Chinese first candidate (correction ${map.isNotEmpty()}): $first",
+                        first.isNotEmpty() && first.all { it.code in 0x3400..0x9fff })
+                }
             }
             e.setNeighborMap(graph())
             val ok = top("ok")
