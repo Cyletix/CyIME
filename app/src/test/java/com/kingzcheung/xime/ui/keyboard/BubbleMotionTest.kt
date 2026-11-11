@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -179,6 +180,8 @@ class BubbleMotionTest {
     private fun choose(bounds: Rect, index: Int) = rule.runOnUiThread {
         controller.update(SwipeState(isPressed = true, isLongPress = true, longPressItems = listOf("1", "2", "3"),
             selectedLongPressIndex = index), bounds)
+        // 测试线程外改的状态，暂停时钟时要自己通知，下一帧才会重组（自动推进时由测试规则代办）。
+        Snapshot.sendApplyNotifications()
     }
 
     private fun popupWindows() = rule.onAllNodes(isPopup()).fetchSemanticsNodes().size
@@ -191,7 +194,7 @@ class BubbleMotionTest {
         choose(keyA, 2)
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithTag("key-choice-popup", useUnmergedTree = true).assertExists()
-        rule.runOnUiThread { controller.update(SwipeState(), keyA) }
+        rule.runOnUiThread { controller.update(SwipeState(), keyA); Snapshot.sendApplyNotifications() }
         rule.mainClock.advanceTimeByFrame()
         // 松手后已不是可选的菜单，但还在淡出。
         rule.onNodeWithTag("key-choice-popup", useUnmergedTree = true).assertDoesNotExist()
@@ -206,7 +209,7 @@ class BubbleMotionTest {
         rule.mainClock.autoAdvance = false
         choose(keyA, 1)
         rule.mainClock.advanceTimeByFrame()
-        rule.runOnUiThread { controller.update(SwipeState(), keyA) }
+        rule.runOnUiThread { controller.update(SwipeState(), keyA); Snapshot.sendApplyNotifications() }
         rule.mainClock.advanceTimeByFrame()
         choose(keyB, 0)
         rule.mainClock.advanceTimeByFrame()
@@ -221,7 +224,7 @@ class BubbleMotionTest {
         rule.mainClock.autoAdvance = false
         choose(keyA, 0)
         rule.mainClock.advanceTimeByFrame()
-        rule.runOnUiThread { controller.update(SwipeState(), keyA) }
+        rule.runOnUiThread { controller.update(SwipeState(), keyA); Snapshot.sendApplyNotifications() }
         rule.mainClock.advanceTimeByFrame()
         // 淡出还在走（时钟停着），连点三下都立即上屏，不等淡出。
         assertEquals(1, popupWindows())
