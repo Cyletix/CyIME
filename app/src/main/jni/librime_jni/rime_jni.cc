@@ -390,7 +390,7 @@ public:
         auto dictionary = cyime::pinyin_selection::OpenDictionary(session->schema());
         if (!dictionary) return {};
         const auto options = cyime::pinyin_selection::Options(
-            session->context(), session->schema(), dictionary.get());
+            session->context(), session->schema(), session->engine(), dictionary.get());
         std::vector<std::string> result;
         result.reserve(options.size());
         for (const auto& option : options) {
@@ -405,7 +405,7 @@ public:
                               int start, int end, int syllable) {
         if (start < 0 || end <= start || syllable < 0) return false;
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
-        return session && cyime::pinyin_selection::Select(session->context(), session->schema(),
+        return session && cyime::pinyin_selection::Select(session->context(), session->schema(), session->engine(),
             expectedInput, expectedSchema, static_cast<size_t>(start),
             static_cast<size_t>(end), static_cast<rime::SyllableId>(syllable));
     }
