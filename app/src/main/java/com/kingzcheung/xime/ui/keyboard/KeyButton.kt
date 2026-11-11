@@ -417,6 +417,9 @@ fun SwipeableKeyButton(
     val letterGlideOwnsDrag = LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true
     val reserveDragForGlide = letterGlideOwnsDrag ||
         (LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true)
+    // 滑行接管拖动的键往下滑打不出下角标，角标只剩长按出上方那个：左下角不再画下角标（用户 11-11）。
+    // 只改显示，不动「下方角标提示」存的值；关掉滑行、或这个键盘没开滑行（14 键、数字行、没开中文滑行的中文 26 键）照旧显示。
+    val downCornerLabel = swipeDownKeyLabel.takeUnless { reserveDragForGlide }
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -647,7 +650,7 @@ fun SwipeableKeyButton(
         // 和角标一起显示时键面实际写的上下角标（截短规则同下面单独画角标时）。
         val dpUpCorner = (swipeUpKeyLabel ?: swipeText)?.takeIf { it.isNotEmpty() && it != badgeText }
             ?.let { punctuationKeyLabel(if (it.length <= 4) it else it.take(4)) }
-        val dpDownCorner = swipeDownKeyLabel?.takeIf { it.isNotEmpty() }
+        val dpDownCorner = downCornerLabel?.takeIf { it.isNotEmpty() }
             ?.let { punctuationKeyLabel(if (it.length <= 4) it else it.take(4)) }
         // 放不下（键太小）时为 null：这个键退回只画键位提示、不画角标，不让两者重叠。
         val dpCornerLayout = if (dpWithCorners && hintsVisible) fitDoublePinyinWithCorners(
@@ -708,7 +711,7 @@ fun SwipeableKeyButton(
                             )
                         }
 
-                        val swipeDownHint = swipeDownKeyLabel
+                        val swipeDownHint = downCornerLabel
                         if (hintsVisible && !dpHidesCorners && flickPreview?.fromTop != false && !swipeDownHint.isNullOrEmpty()) {
                             val hasChinese = swipeDownHint.any { it in '\u4e00'..'\u9fff' || it in '\u3400'..'\u4dbf' || it in '\uf900'..'\ufaff' }
                             val adjustedFontSize = if (hasChinese && effectiveSwipeFontSize > 6.sp) (effectiveSwipeFontSize.value * 0.85f).sp else effectiveSwipeFontSize
@@ -780,8 +783,8 @@ fun SwipeableKeyButton(
                     )
                 }
 
-                if (hintsVisible && !dpHidesCorners && flickPreview?.fromTop != false && !swipeDownKeyLabel.isNullOrEmpty()) {
-                    val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
+                if (hintsVisible && !dpHidesCorners && flickPreview?.fromTop != false && !downCornerLabel.isNullOrEmpty()) {
+                    val displayText = if (downCornerLabel.length <= 4) downCornerLabel else downCornerLabel.take(4)
                     Text(
                         text = punctuationKeyLabel(displayText),
                         color = keyHintColor(resolvedText, frostedGlass, 0.5f, LocalKeyboardInputPreferences.current.cornerHintOpacity),
