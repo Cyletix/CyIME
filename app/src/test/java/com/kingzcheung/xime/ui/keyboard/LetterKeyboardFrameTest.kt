@@ -148,4 +148,18 @@ class LetterKeyboardFrameTest {
         val spans = fourteen[1].map { letterKeySpan(it, true, true) }
         assertEquals(1f / (16f / 3f + 1f), spans.last() / spans.sum(), 1e-5f)
     }
+
+    @Test fun fourteenHomeRowLastKeyReachesEdgeOnlyWhenStrict() {
+        // 严格对齐：l 画到行尾，与 p 右边对齐。
+        assertTrue(fourteenHomeRowLastKeyToEdge(true, fourteen[1], evenMerged = false))
+        // 均匀排布：l 右边留空和 a 左边一样宽。
+        assertFalse(fourteenHomeRowLastKeyToEdge(true, fourteen[1], evenMerged = true))
+        // Shift 拆开后最后一个仍是 l，规则相同。
+        val split = fourteen[1].flatMap { k -> if (k.length == 2) listOf(k.take(1), k.drop(1)) else listOf(k) }
+        assertTrue(fourteenHomeRowLastKeyToEdge(true, split, evenMerged = false))
+        assertFalse(fourteenHomeRowLastKeyToEdge(true, split, evenMerged = true))
+        // 末尾是合并键、或不是 14 键，都不画到行尾。
+        assertFalse(fourteenHomeRowLastKeyToEdge(true, listOf("as", "df", "gh", "jkl"), evenMerged = false))
+        assertFalse(fourteenHomeRowLastKeyToEdge(false, standard[1], evenMerged = false))
+    }
 }

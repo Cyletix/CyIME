@@ -749,7 +749,7 @@ fun KeyboardLayout(
                                 isAsciiMode = isAsciiMode,
                                 edgeInset = row1Inset,
                                 edgeEndInset = standardRowEndInset ?: row1Inset,
-                                extendLastKeyToEdge = fourteenKey && row1.lastOrNull()?.length == 1,
+                                extendLastKeyToEdge = fourteenHomeRowLastKeyToEdge(fourteenKey, row1, evenMergedKeys),
                                 onSwipeStateChange = { state, bounds ->
                                     processSwipeState(
                                         state,
