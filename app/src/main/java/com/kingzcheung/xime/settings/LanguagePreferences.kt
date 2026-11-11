@@ -66,6 +66,8 @@ object LanguagePreferences {
         }
         // 补全词表是商店里的下载包：开启时就在后台下载，打字前多半已经下好。
         if (enabled) LetterLanguage.of(language)?.let { com.kingzcheung.xime.association.WordCompletion.download(context, it) }
+        // 日语是插件：在这里打开日语也装上「日语」插件（随包带着），轻量版缺的词库和引擎开始下载。
+        if (enabled && language == InputLanguage.JAPANESE) JapanesePlugin.onLanguageEnabled(context)
         // The English entry is virtual. Keep a real Rime schema as the engine fallback.
         val current = SettingsPreferences.getCurrentSchema(context)
         if (current == InputModes.ENGLISH || InputLanguage.forSchema(current) !in next) {

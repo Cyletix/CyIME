@@ -368,6 +368,8 @@ object SettingsPreferences {
         }
         editor.apply()
         if (caption) com.kingzcheung.xime.ui.caption.CaptionPlugin.sync(context)
+        // 日语插件：卸载就关掉日语、删掉下载的日语词库和引擎（学习记录留着）。
+        if (pluginId == JapanesePlugin.ID) JapanesePlugin.onUninstalled(context)
     }
 
     /** 插件按钮现在在哪：设置里「用法」那一行照这个写。 */
@@ -818,6 +820,8 @@ object SettingsPreferences {
         com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.setEnabled(context, pluginId, enabled)
         // 字幕插件：开关一拨，键盘菜单、下拉快捷开关、桌面图标、设置里的字幕跟着出现或收起。
         if (pluginId == com.kingzcheung.xime.ui.caption.CaptionPlugin.ID) com.kingzcheung.xime.ui.caption.CaptionPlugin.sync(context)
+        // 日语插件：开关一拨，日语跟着打开（缺的词库开始下载）或从语言切换里拿掉。
+        if (pluginId == JapanesePlugin.ID) JapanesePlugin.sync(context)
         // 通讯录插件：关掉立刻丢掉内存里的通讯录，打开（已授权）就后台读入。
         if (com.kingzcheung.xime.contacts.ContactSuggestions.isContactsPlugin(pluginId)) {
             val app = context.applicationContext

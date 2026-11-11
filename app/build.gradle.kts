@@ -232,6 +232,12 @@ android {
     // 带模型的安装包照旧内置。它要的 libc++_shared.so 留在包里。离线包（assembleOffline）也必须带 bundleModels。
     if (providers.gradleProperty("bundleModels").orNull != "true")
         packaging.jniLibs.excludes.add("**/libopencv_java4.so")
+    // 日语词库（assets/azookey，约 18 MB）和转换引擎 libCyAzooKey.so（约 6 MB）：轻量版不带，装「日语」插件时下载
+    // （settings/JapanesePack.kt）；带模型的安装包（完整版、朋友包、离线包）照旧内置。日语方案 rime_japanese 很小，留在包里。
+    if (providers.gradleProperty("bundleModels").orNull != "true") {
+        androidResources.ignoreAssetsPatterns.add("<dir>azookey")
+        packaging.jniLibs.excludes.add("**/libCyAzooKey.so")
+    }
     // The elder package carries no Japanese dictionaries and no letter-language (Spanish, German…) schemas (elder-pack-spec.md).
     if (providers.gradleProperty("elderEdition").orNull == "true") {
         listOf("<dir>rime_japanese", "<dir>azookey", "<dir>rime_letters").forEach { androidResources.ignoreAssetsPatterns.add(it) }

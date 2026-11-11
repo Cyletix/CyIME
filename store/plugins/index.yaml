@@ -68,3 +68,14 @@ plugins:
     downloadUrl:
     - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/caption-0.1.0.xipk
       sha256: 5dfdcd8dccf9ea8c6853fdb3f7091201015df9b341e78749a657719d883f14df
+- id: com.kingzcheung.xime.plugin.japanese
+  name: 日语
+  description: 日语罗马字、假名九键输入，azooKey 整句转换成汉字假名。装好后日语出现在语言切换里，第一次要下载日语词库和转换引擎（约 24 MB）。转换在手机上做，不联网。
+  pluginType: tool
+  appVersion: '>=1.15.75'
+  currentVersion: 0.1.0
+  versions:
+  - version: 0.1.0
+    downloadUrl:
+    - url: https://raw.githubusercontent.com/Cyletix/CyIME/main/store/plugins/packages/japanese-0.1.0.xipk
+      sha256: 5c78571a68d2b0b7fe1c23f0fda83ab39404e50550f2fb1a28c67789219b8941
