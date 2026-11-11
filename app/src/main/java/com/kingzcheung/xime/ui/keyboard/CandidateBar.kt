@@ -499,13 +499,15 @@ fun CandidateBar(
                     Icon(Icons.Outlined.HighlightOff, contentDescription = "关闭联想",
                         tint = protectedVisuals.textColor, modifier = Modifier.size(22.dp))
                 }
-                Spacer(Modifier.width(4.dp))
+                // 这 4dp 铺满栏高、自己接点按，免得点在第一个候选左边被这个键放大的触摸范围接走（#274）。
+                Spacer(Modifier.width(4.dp).fillMaxHeight().candidateGapTaps())
             } else if (showCompositionCancel) {
                 KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill, protectedVisuals.textColor,
                     label = if (closesAssociation) "关闭联想" else "取消输入",
                     modifier = if (closesAssociation) Modifier.testTag("association-cancel") else Modifier,
                     restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
-                Spacer(Modifier.width(4.dp))
+                // 同上：点在「<」和第一个候选之间算点候选，不算取消输入（#274）。
+                Spacer(Modifier.width(4.dp).fillMaxHeight().candidateGapTaps())
             }
             if (inlinePreeditEditor != null && previewPrefs.showCodeInCandidateBar && previewPrefs.inlinePreeditPreview) {
                 Box(Modifier.width(minOf(240.dp, toolbarRowWidth * 0.42f))) { inlinePreeditEditor() }
@@ -594,7 +596,8 @@ fun CandidateBar(
                     comments = displayComments,
                     visuals = protectedVisuals, callbacks = stripCallbacks,
                     fontSize = candidateTextSize.sp,
-                    modifier = Modifier.weight(1f),
+                    // 铺满栏高：候选上下的留白、候选之间的空隙点下去也算点最近的候选（#274）。
+                    modifier = Modifier.weight(1f).fillMaxHeight().candidateGapTaps(),
                     commentMode = commentsAllowed,
                     commentsAreGlosses = commentsAreGlosses && state is CandidateBarState.ChineseCandidates,
                     highlightIndex = (state as? CandidateBarState.ChineseCandidates)?.highlightIndex ?: 0,
@@ -1614,6 +1617,7 @@ internal fun FixedCandidateStrip(
     }
     val highlightAccent = visuals.accentColor
     val highlightVisible = candidates.isNotEmpty()
+    // 候选栏里这条铺满栏高（见 candidateGapTaps），候选照旧上下居中。
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")
         .onGloballyPositioned { stripOriginX = it.positionInWindow().x; stripRootOrigin = it.boundsInRoot().topLeft }
         .drawBehind {
@@ -1621,7 +1625,7 @@ internal fun FixedCandidateStrip(
             if (highlightShown && highlightVisible && focusedOnScreen && CandidateDropTargets.shared.hoveredBounds == null && rect.width > 0f)
                 drawRoundRect(highlightAccent.copy(alpha = 0.2f), rect.topLeft - stripRootOrigin, rect.size,
                     androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
-        }) {
+        }, contentAlignment = Alignment.CenterStart) {
         // 中缝在本条内的位置（像素）；未测到位置前按整条排。
         val localGap = gapWindowX?.takeUnless { stripOriginX.isNaN() }?.let { (l, r) ->
             val left = (l - stripOriginX).coerceIn(0f, constraints.maxWidth.toFloat())
