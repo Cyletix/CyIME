@@ -1041,6 +1041,7 @@ fun KeyboardLayout(
                     val bottom = letterKeyboardBottomRow(keyRows, fourteenKey || zhuyin)
                     // 空格左侧逗号、右侧句号；只开逗号时沿用原配置的逗号键。
                     val bottomPrefs = LocalKeyboardInputPreferences.current
+                    val modeCount = com.kingzcheung.xime.keyboard.modeSlotCount(bottomPrefs.symbolKeyCycle)
                     val commaOnLeft = bottomPrefs.qwertyCommaKey
                     val periodOnRight = bottomPrefs.qwertyPeriodKey
                     val punctuationFull = LocalKeyboardPunctuation.current?.full ?: !isAsciiMode
@@ -1048,7 +1049,7 @@ fun KeyboardLayout(
                         punctuationFull, english = isAsciiMode,
                         japanese = LocalKeyboardPunctuation.current?.japanese == true)
                     val punctuationCount = (if (commaOnLeft) 1 else 0) + (if (periodOnRight) 1 else 0)
-                    val bottomSpaceWeight = bottom.space + bottom.punctuation * (1 - punctuationCount)
+                    val bottomSpaceWeight = bottom.space + bottom.punctuation * (1 - punctuationCount) + bottom.mode * (2 - modeCount)
                     // 键面写什么就上屏什么：只有与当前宽度一致的全角标点走普通按键；
                     // 半角模式下滑的全角标点、中文状态的半角标点都原样上屏，避免被宽度设置转回去。
                     val commitPunctuation: (String) -> Unit = { text ->
@@ -1091,190 +1092,8 @@ fun KeyboardLayout(
                             .fillMaxWidth()
                             .weight(1f),
                     ) {
-                        if (isVoiceMode && !isVoiceSticky) {
-                            DummyKeyButton(
-                                backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(bottom.mode * 2)
-                            )
-                            if (commaOnLeft) DummyKeyButton(
-                                backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(bottom.punctuation)
-                            )
-                        } else {
-                            for (slot in 1..2) {
-                                KeyboardModeKey(
-                                    slot = slot, onKeyPress = onKeyPress,
-                                    backgroundColor = specialKeyBackgroundColor,
-                                    textColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(bottom.mode),
-                                    onKeyPressDown = onKeyPressDown,
-                                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-                                    shadowShapeRadius = shadowShapeRadius,
-                                    ctrlTargets = shiftSlideTargets,
-                                    onCtrlShortcut = { letter ->
-                                        onGestureAction(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.command(letter))
-                                    },
-                                )
-                            }
-
-                            if (leftPunctuation != null) PunctuationKey(leftPunctuation, "qwerty-punctuation-key", leftSplit)
-                            else if (commaOnLeft) {
-                            // 逗号 — 从配置读取 "'"
-                            val k2KeyGesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
-                            val k2TapAction = k2KeyGesture?.tap?.action
-                            val k2TapValue = k2KeyGesture?.tap?.value?.takeIf { it.isNotEmpty() }
-                                ?: k2KeyGesture?.tap?.label?.takeIf { it.isNotEmpty() }
-                                ?: if (isAsciiMode) "," else "，"
-                            val k2TapLabel = k2KeyGesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: k2TapValue
-                            val k2SwipeUpRaw = k2KeyGesture?.swipeUp
-                            val k2SwipeUpLabel = if (isAsciiMode)
-                                (k2SwipeUpRaw?.value?.takeIf { it.isNotEmpty() } ?: "")
-                                else (k2SwipeUpRaw?.label?.takeIf { it.isNotEmpty() } ?: k2SwipeUpRaw?.value?.takeIf { it.isNotEmpty() } ?: "")
-                            val k2SwipeUpValue = k2SwipeUpRaw?.value?.takeIf { it.isNotEmpty() }
-                                ?: k2SwipeUpRaw?.label?.takeIf { it.isNotEmpty() }
-                            val k2SwipeUpDisplay = k2SwipeUpRaw?.display ?: DisplayMode.BOTH
-                            val k2SwipeUpCommitValue = k2SwipeUpValue
-                            val k2SwipeDownRaw = k2KeyGesture?.swipeDown
-                            val k2SwipeDownLabel = k2SwipeDownRaw?.label?.takeIf { it.isNotEmpty() }
-                            val k2SwipeDownAction = k2SwipeDownRaw?.action
-                            val k2SwipeDownValue = k2SwipeDownRaw?.value
-                            val k2SwipeDownDisplay = k2SwipeDownRaw?.display ?: DisplayMode.BOTH
-                            val k2SwipeDownBubbleText = if (k2SwipeDownDisplay != DisplayMode.KEY) k2SwipeDownLabel else null
-                            val k2LongPressConfig = k2KeyGesture?.longPress
-                            val k2LongPressDisplay = k2LongPressConfig?.display ?: "key"
-                            val k2LongPressLabels = if (k2LongPressDisplay == "bubble") {
-                                k2LongPressConfig?.values?.map { it.label }?.filter { it.isNotEmpty() }
-                                    ?.ifEmpty { null }
-                            } else null
-                            val k2LongPressGestureMap = if (k2LongPressDisplay == "bubble") {
-                                k2LongPressConfig?.values?.associateBy { it.label }
-                            } else null
-                            val k2OnClick: () -> Unit = remember(k2TapAction, k2TapValue, onKeyPress, onGestureAction) {
-                                {
-                                    if (k2TapAction != null && k2TapAction != GestureAction.COMMIT) {
-                                        onGestureAction?.invoke(k2TapAction, k2TapValue)
-                                    } else {
-                                        onKeyPress(k2TapValue)
-                                    }
-                                }
-                            }
-                            val k2OnSwipeDown: ((String) -> Unit)? = if (k2SwipeDownAction != null && k2SwipeDownLabel != null) {
-                                remember(k2SwipeDownAction, k2SwipeDownValue, k2SwipeDownLabel, onKeyPress, onGestureAction, onCommitText) {
-                                    val label = k2SwipeDownLabel
-                                    { _: String ->
-                                        if (k2SwipeDownAction == GestureAction.COMMIT) {
-                                            (onCommitText ?: onKeyPress)(k2SwipeDownValue?.ifEmpty { label } ?: label)
-                                        } else {
-                                            onGestureAction?.invoke(k2SwipeDownAction, k2SwipeDownValue?.ifEmpty { label } ?: label)
-                                        }
-                                        Unit
-                                    }
-                                }
-                            } else null
-                            val k2OnLongPressSelect: ((String) -> Unit)? = remember(k2LongPressGestureMap, onGestureAction, onCommitText, onKeyPress) {
-                                { selectedLabel: String ->
-                                    val gesture = k2LongPressGestureMap?.get(selectedLabel)
-                                    if (gesture != null && gesture.action != GestureAction.COMMIT) {
-                                        onGestureAction?.invoke(gesture.action!!, gesture.value.ifEmpty { selectedLabel })
-                                    } else {
-                                        // 气泡里写的就是要上屏的写法（如全角时选半角 , .），不再随全角/半角转换。
-                                        (callbacks.onCommitExactText ?: onCommitText ?: onKeyPress)(selectedLabel)
-                                    }
-                                    Unit
-                                }
-                            }
-                            if (k2TapAction == GestureAction.TOGGLE_ASCII) {
-                                LanguageKeyButton(
-                                    icon = rememberVectorPainter(Icons.Default.Language),
-                                    onClick = k2OnClick,
-                                    backgroundColor = specialKeyBackgroundColor,
-                                    iconColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(bottom.punctuation).testTag("qwerty-punctuation-key"),
-                                    onPress = { onKeyPressDown?.invoke(k2TapValue) },
-                                    onRelease = { onKeyRelease?.invoke(k2TapValue) },
-                                    swipeText = k2SwipeUpLabel,
-                                    swipeDownText = k2SwipeDownBubbleText,
-                                    swipeDownKeyLabel = if (k2SwipeDownDisplay != DisplayMode.BUBBLE) k2SwipeDownLabel else null,
-                                    onSwipe = if (k2SwipeUpCommitValue != null) { { onKeyPress(k2SwipeUpCommitValue) } } else null,
-                                    onSwipeDown = k2OnSwipeDown,
-                                    onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
-                                    shadowEnabled = shadowEnabled,
-                                    shadowElevation = shadowElevation,
-                                    shadowShapeRadius = shadowShapeRadius,
-                                )
-                            } else {
-                                SwipeableKeyButton(
-                                    layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
-                                    followSymbolSwipeDirection = true,
-                                    text = k2TapLabel,
-                                    onClick = k2OnClick,
-                                    backgroundColor = keyBackgroundColor,
-                                    textColor = keyTextColor,
-                                    modifier = Modifier.weight(bottom.punctuation).testTag("qwerty-punctuation-key"),
-                                    swipeText = k2SwipeUpLabel,
-                                    symbolInputText = symbolInputValue(k2SwipeUpCommitValue, k2SwipeUpRaw?.action),
-                                    swipeDownText = k2SwipeDownBubbleText,
-                                    swipeDownKeyLabel = if ((k2SwipeDownDisplay == DisplayMode.KEY || k2SwipeDownDisplay == DisplayMode.BOTH)) k2SwipeDownLabel else null,
-                                    onSwipe = if (k2SwipeUpCommitValue != null) { { onKeyPress(k2SwipeUpCommitValue) } } else null,
-                                    onSwipeDown = k2OnSwipeDown,
-                                    onSwipeStateChange = { state, bounds ->
-                                        processSwipeState(state, bounds)
-                                    },
-                                    onPress = { onKeyPressDown?.invoke(k2TapValue) },
-                                    onRelease = { onKeyRelease?.invoke(k2TapValue) },
-                                    onLongPressSelect = k2OnLongPressSelect,
-                                    longPressItems = k2LongPressLabels,
-                                    shadowEnabled = shadowEnabled,
-                                    shadowElevation = shadowElevation,
-                                    shadowShapeRadius = shadowShapeRadius,
-                                )
-                            }
-                            }
-                        }
-
-                        // 分体时空格在中线处分成左右两块，两块都是完整的空格键。
-                        val spaceParts = if (splitKeyboard) SplitKeyboardGeometry.spaceSplit(bottom, bottomSpaceWeight,
-                            bottom.mode * 2f + if (commaOnLeft) bottom.punctuation else 0f).toList()
-                            else listOf(bottomSpaceWeight)
-                        spaceParts.forEachIndexed { part, spaceWeight ->
-                            if (part > 0) SplitGapSpacer(3, splitGapDp)
-                            SpaceKey(
-                                schemaName = if (part == 0) schemaName else "",
-                                isAsciiMode = isAsciiMode && part == 0,
-                                isSttEnabled = isSttEnabled,
-                                isVoiceMode = isVoiceMode,
-                                voiceSticky = isVoiceSticky,
-                                keyBackgroundColor = keyBackgroundColor,
-                                keyTextColor = keyTextColor,
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                                modifier = Modifier.weight(spaceWeight),
-                                onKeyPress = onKeyPress,
-                                onKeyPressDown = onKeyPressDown,
-                                onKeyRelease = onKeyRelease,
-                                onVoiceModeChange = onVoiceModeChange,
-                            )
-                        }
-
-                        if (rightPunctuation != null) {
-                            if (isVoiceMode && !isVoiceSticky) DummyKeyButton(
-                                backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(bottom.punctuation)
-                            ) else PunctuationKey(rightPunctuation, "qwerty-period-key", rightSplit)
-                        }
-
-                        // 中/英切换 + 回车（硬编码 + 配置驱动）
-                        if (isVoiceMode && !isVoiceSticky) {
-                            DummyKeyButton(
-                                backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(bottom.language)
-                            )
-                            DummyKeyButton(
-                                backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(bottom.enter)
-                            )
-                        } else {
+                        val languageOnLeft = LocalKeyboardInputPreferences.current.languageKeyOnLeft
+                        @Composable fun LanguageKey() {
                             // earth — 从配置读取
                             val k4KeyGesture = KeysConfigHelper.getKeyGesture("earth", isAsciiMode)
                             val k4TapAction = k4KeyGesture?.tap?.action
@@ -1395,6 +1214,194 @@ fun KeyboardLayout(
                                 )
                             }
 
+                        }
+                        if (isVoiceMode && !isVoiceSticky) {
+                            DummyKeyButton(
+                                backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
+                                modifier = Modifier.weight(bottom.mode * modeCount + if (languageOnLeft) bottom.language else 0f)
+                            )
+                            if (commaOnLeft) DummyKeyButton(
+                                backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
+                                modifier = Modifier.weight(bottom.punctuation)
+                            )
+                        } else {
+                            for (slot in 1..modeCount) {
+                                KeyboardModeKey(
+                                    slot = slot, onKeyPress = onKeyPress,
+                                    backgroundColor = specialKeyBackgroundColor,
+                                    textColor = specialKeyTextColor,
+                                    modifier = Modifier.weight(bottom.mode),
+                                    onKeyPressDown = onKeyPressDown,
+                                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                    ctrlTargets = shiftSlideTargets,
+                                    onCtrlShortcut = { letter ->
+                                        onGestureAction(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.command(letter))
+                                    },
+                                )
+                                if (slot == modeCount && languageOnLeft) LanguageKey()
+                            }
+
+                            if (leftPunctuation != null) PunctuationKey(leftPunctuation, "qwerty-punctuation-key", leftSplit)
+                            else if (commaOnLeft) {
+                            // 逗号 — 从配置读取 "'"
+                            val k2KeyGesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
+                            val k2TapAction = k2KeyGesture?.tap?.action
+                            val k2TapValue = k2KeyGesture?.tap?.value?.takeIf { it.isNotEmpty() }
+                                ?: k2KeyGesture?.tap?.label?.takeIf { it.isNotEmpty() }
+                                ?: if (isAsciiMode) "," else "，"
+                            val k2TapLabel = k2KeyGesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: k2TapValue
+                            val k2SwipeUpRaw = k2KeyGesture?.swipeUp
+                            val k2SwipeUpLabel = if (isAsciiMode)
+                                (k2SwipeUpRaw?.value?.takeIf { it.isNotEmpty() } ?: "")
+                                else (k2SwipeUpRaw?.label?.takeIf { it.isNotEmpty() } ?: k2SwipeUpRaw?.value?.takeIf { it.isNotEmpty() } ?: "")
+                            val k2SwipeUpValue = k2SwipeUpRaw?.value?.takeIf { it.isNotEmpty() }
+                                ?: k2SwipeUpRaw?.label?.takeIf { it.isNotEmpty() }
+                            val k2SwipeUpDisplay = k2SwipeUpRaw?.display ?: DisplayMode.BOTH
+                            val k2SwipeUpCommitValue = k2SwipeUpValue
+                            val k2SwipeDownRaw = k2KeyGesture?.swipeDown
+                            val k2SwipeDownLabel = k2SwipeDownRaw?.label?.takeIf { it.isNotEmpty() }
+                            val k2SwipeDownAction = k2SwipeDownRaw?.action
+                            val k2SwipeDownValue = k2SwipeDownRaw?.value
+                            val k2SwipeDownDisplay = k2SwipeDownRaw?.display ?: DisplayMode.BOTH
+                            val k2SwipeDownBubbleText = if (k2SwipeDownDisplay != DisplayMode.KEY) k2SwipeDownLabel else null
+                            val k2LongPressConfig = k2KeyGesture?.longPress
+                            val k2LongPressDisplay = k2LongPressConfig?.display ?: "key"
+                            val k2LongPressLabels = if (k2LongPressDisplay == "bubble") {
+                                k2LongPressConfig?.values?.map { it.label }?.filter { it.isNotEmpty() }
+                                    ?.ifEmpty { null }
+                            } else null
+                            val k2LongPressGestureMap = if (k2LongPressDisplay == "bubble") {
+                                k2LongPressConfig?.values?.associateBy { it.label }
+                            } else null
+                            val k2OnClick: () -> Unit = remember(k2TapAction, k2TapValue, onKeyPress, onGestureAction) {
+                                {
+                                    if (k2TapAction != null && k2TapAction != GestureAction.COMMIT) {
+                                        onGestureAction?.invoke(k2TapAction, k2TapValue)
+                                    } else {
+                                        onKeyPress(k2TapValue)
+                                    }
+                                }
+                            }
+                            val k2OnSwipeDown: ((String) -> Unit)? = if (k2SwipeDownAction != null && k2SwipeDownLabel != null) {
+                                remember(k2SwipeDownAction, k2SwipeDownValue, k2SwipeDownLabel, onKeyPress, onGestureAction, onCommitText) {
+                                    val label = k2SwipeDownLabel
+                                    { _: String ->
+                                        if (k2SwipeDownAction == GestureAction.COMMIT) {
+                                            (onCommitText ?: onKeyPress)(k2SwipeDownValue?.ifEmpty { label } ?: label)
+                                        } else {
+                                            onGestureAction?.invoke(k2SwipeDownAction, k2SwipeDownValue?.ifEmpty { label } ?: label)
+                                        }
+                                        Unit
+                                    }
+                                }
+                            } else null
+                            val k2OnLongPressSelect: ((String) -> Unit)? = remember(k2LongPressGestureMap, onGestureAction, onCommitText, onKeyPress) {
+                                { selectedLabel: String ->
+                                    val gesture = k2LongPressGestureMap?.get(selectedLabel)
+                                    if (gesture != null && gesture.action != GestureAction.COMMIT) {
+                                        onGestureAction?.invoke(gesture.action!!, gesture.value.ifEmpty { selectedLabel })
+                                    } else {
+                                        // 气泡里写的就是要上屏的写法（如全角时选半角 , .），不再随全角/半角转换。
+                                        (callbacks.onCommitExactText ?: onCommitText ?: onKeyPress)(selectedLabel)
+                                    }
+                                    Unit
+                                }
+                            }
+                            if (k2TapAction == GestureAction.TOGGLE_ASCII) {
+                                LanguageKeyButton(
+                                    icon = rememberVectorPainter(Icons.Default.Language),
+                                    onClick = k2OnClick,
+                                    backgroundColor = specialKeyBackgroundColor,
+                                    iconColor = specialKeyTextColor,
+                                    modifier = Modifier.weight(bottom.punctuation).testTag("qwerty-punctuation-key"),
+                                    onPress = { onKeyPressDown?.invoke(k2TapValue) },
+                                    onRelease = { onKeyRelease?.invoke(k2TapValue) },
+                                    swipeText = k2SwipeUpLabel,
+                                    swipeDownText = k2SwipeDownBubbleText,
+                                    swipeDownKeyLabel = if (k2SwipeDownDisplay != DisplayMode.BUBBLE) k2SwipeDownLabel else null,
+                                    onSwipe = if (k2SwipeUpCommitValue != null) { { onKeyPress(k2SwipeUpCommitValue) } } else null,
+                                    onSwipeDown = k2OnSwipeDown,
+                                    onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
+                                    shadowEnabled = shadowEnabled,
+                                    shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                )
+                            } else {
+                                SwipeableKeyButton(
+                                    layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
+                                    followSymbolSwipeDirection = true,
+                                    text = k2TapLabel,
+                                    onClick = k2OnClick,
+                                    backgroundColor = keyBackgroundColor,
+                                    textColor = keyTextColor,
+                                    modifier = Modifier.weight(bottom.punctuation).testTag("qwerty-punctuation-key"),
+                                    swipeText = k2SwipeUpLabel,
+                                    symbolInputText = symbolInputValue(k2SwipeUpCommitValue, k2SwipeUpRaw?.action),
+                                    swipeDownText = k2SwipeDownBubbleText,
+                                    swipeDownKeyLabel = if ((k2SwipeDownDisplay == DisplayMode.KEY || k2SwipeDownDisplay == DisplayMode.BOTH)) k2SwipeDownLabel else null,
+                                    onSwipe = if (k2SwipeUpCommitValue != null) { { onKeyPress(k2SwipeUpCommitValue) } } else null,
+                                    onSwipeDown = k2OnSwipeDown,
+                                    onSwipeStateChange = { state, bounds ->
+                                        processSwipeState(state, bounds)
+                                    },
+                                    onPress = { onKeyPressDown?.invoke(k2TapValue) },
+                                    onRelease = { onKeyRelease?.invoke(k2TapValue) },
+                                    onLongPressSelect = k2OnLongPressSelect,
+                                    longPressItems = k2LongPressLabels,
+                                    shadowEnabled = shadowEnabled,
+                                    shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                )
+                            }
+                            }
+                        }
+
+                        // 分体时空格在中线处分成左右两块，两块都是完整的空格键。
+                        val spaceParts = if (splitKeyboard) SplitKeyboardGeometry.spaceSplit(bottom, bottomSpaceWeight,
+                            bottom.mode * modeCount + (if (commaOnLeft) bottom.punctuation else 0f) +
+                                (if (languageOnLeft) bottom.language else 0f)).toList()
+                            else listOf(bottomSpaceWeight)
+                        spaceParts.forEachIndexed { part, spaceWeight ->
+                            if (part > 0) SplitGapSpacer(3, splitGapDp)
+                            SpaceKey(
+                                schemaName = if (part == 0) schemaName else "",
+                                isAsciiMode = isAsciiMode && part == 0,
+                                isSttEnabled = isSttEnabled,
+                                isVoiceMode = isVoiceMode,
+                                voiceSticky = isVoiceSticky,
+                                keyBackgroundColor = keyBackgroundColor,
+                                keyTextColor = keyTextColor,
+                                shadowEnabled = shadowEnabled,
+                                shadowElevation = shadowElevation,
+                                shadowShapeRadius = shadowShapeRadius,
+                                modifier = Modifier.weight(spaceWeight),
+                                onKeyPress = onKeyPress,
+                                onKeyPressDown = onKeyPressDown,
+                                onKeyRelease = onKeyRelease,
+                                onVoiceModeChange = onVoiceModeChange,
+                            )
+                        }
+
+                        if (rightPunctuation != null) {
+                            if (isVoiceMode && !isVoiceSticky) DummyKeyButton(
+                                backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
+                                modifier = Modifier.weight(bottom.punctuation)
+                            ) else PunctuationKey(rightPunctuation, "qwerty-period-key", rightSplit)
+                        }
+
+                        // 中/英切换 + 回车（硬编码 + 配置驱动）
+                        if (isVoiceMode && !isVoiceSticky) {
+                            if (!languageOnLeft) DummyKeyButton(
+                                backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
+                                modifier = Modifier.weight(bottom.language)
+                            )
+                            DummyKeyButton(
+                                backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
+                                modifier = Modifier.weight(bottom.enter)
+                            )
+                        } else {
+                            if (!languageOnLeft) LanguageKey()
                             // 回车 — 硬编码。按住 !@# 时另一根手指点回车、或从 !@# 拖到回车上松手：Ctrl+回车，发送（用户 11-03）。
                             // 按住 Shift 点回车、或从 Shift 拖到回车上松手：Shift+回车，换行（用户 11-04）。
                             // 只认手指按着的 Shift：自动大写、单次大写、大写锁定时的回车照常（不把句首回车变成换行）。

@@ -706,30 +706,35 @@ private fun T9KeyboardContent(
                 )
             }
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                KeyboardModeKey(
+                val languageOnLeft = LocalKeyboardInputPreferences.current.languageKeyOnLeft
+                @Composable fun LanguageKey() {
+                    LanguageKeyButton(
+                        icon = rememberVectorPainter(Icons.Default.Language),
+                        onClick = { onKeyPress("ime_switch") },
+                        backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
+                        modifier = Modifier.weight(0.8f),
+                        onPress = { onKeyPressDown?.invoke("ime_switch") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                    )
+                }
+                if (!LocalKeyboardInputPreferences.current.symbolKeyCycle) KeyboardModeKey(
                     slot = 2, onKeyPress = onKeyPress,
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                     modifier = Modifier.weight(0.8f), onKeyPressDown = onKeyPressDown,
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                     ctrlTargets = ctrlTargets, onCtrlShortcut = onCtrlShortcut,
                 )
+                if (languageOnLeft) LanguageKey()
                 T9SpaceKey(
                     schemaName = "拼音", isSttEnabled = uiState.isSttEnabled,
                     voiceSticky = uiState.voiceSticky,
                     onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
                     onVoiceModeChange = callbacks.onVoiceModeChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1.8f),
+                    modifier = Modifier.weight(if (LocalKeyboardInputPreferences.current.symbolKeyCycle) 2.6f else 1.8f),
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
-                LanguageKeyButton(
-                    icon = rememberVectorPainter(Icons.Default.Language),
-                    onClick = { onKeyPress("ime_switch") },
-                    backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
-                    modifier = Modifier.weight(0.8f),
-                    onPress = { onKeyPressDown?.invoke("ime_switch") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                )
+                if (!languageOnLeft) LanguageKey()
             }
         }
 
