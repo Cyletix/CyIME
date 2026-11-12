@@ -685,6 +685,9 @@ val prepareChineseDictionaries by tasks.registering {
                 .replace("name: 雾凇拼音", "name: $name"))
         }
 
+        // 用户 11-11（B 站）说打不出的字：8105 里没有，原来只在默认关着的生僻字开关里（读音取 rime-ice 41448）。
+        // 直接进主词库，单字权重 1 排在同音字最后，不抢常用字；生僻字表不再重复带它们。雫 8105 只有 xia，补上 na。
+        val directRareChars = linkedMapOf("吔" to "ye", "蚵" to "ke", "槻" to "gui", "榎" to "jia", "塁" to "lei")
         // Same IME vocabulary as CyIME-Windows data/rime/cyime_terms.dict.yaml; imported after upstream
         // tables so upstream weights win on duplicates.
         File(root, "cyime_terms.dict.yaml").writeText(
@@ -700,7 +703,9 @@ val prepareChineseDictionaries by tasks.registering {
                 "收起键\tshou qi jian\t5000", "全选键\tquan xuan jian\t5000", "撤销键\tche xiao jian\t5000",
                 "拼音键\tpin yin jian\t5000", "手写键\tshou xie jian\t5000", "地球键\tdi qiu jian\t5000",
                 "搜索键\tsou suo jian\t5000", "十四键\tshi si jian\t5000", "悬浮键盘\txuan fu jian pan\t5000",
-                "单手键盘\tdan shou jian pan\t5000", "键盘高度\tjian pan gao du\t5000").joinToString("\n", postfix = "\n") +
+                "单手键盘\tdan shou jian pan\t5000", "键盘高度\tjian pan gao du\t5000",
+                "雫\tna\t1", "吔屎\tye shi\t10", "蚵仔煎\tke zai jian\t50").joinToString("\n", postfix = "\n") +
+            directRareChars.entries.joinToString("\n", postfix = "\n") { (text, code) -> "$text\t$code\t1" } +
             // Only words rime-ice lacks: a second copy of an existing entry is just more to look up.
             (domainFloors.keys - domainPresent).joinToString("\n", postfix = "\n") { it + "\t" + domainFloors.getValue(it) })
         // rime-ice reads the adverbial 地 in 慢慢地/默默地 only as de; many people type it as di (manmandi), which
@@ -742,6 +747,7 @@ val prepareChineseDictionaries by tasks.registering {
             val text = fields[0]
             !line.startsWith("#") && fields.size == 2 && text.codePointCount(0, text.length) == 1 &&
                 text.codePointAt(0) < 0x10000 && Character.isIdeographic(text.codePointAt(0)) && text !in common &&
+                text !in directRareChars &&
                 fields[1] in commonCodes
         }
         check(rare.any { it == "瀺\tchan" } && rare.size > 15000) { "Upstream 41448.dict.yaml changed" }
