@@ -364,7 +364,10 @@ fun SwipeableKeyButton(
     val resolvedColors = customLayoutKeyColors(customLayout, text, backgroundColor, textColor, customAccent, glassLabelSurface)
     val resolvedBackground = resolvedColors.first
     val resolvedText = resolvedColors.second
-    val symbolInputMode = LocalKeyboardInputPreferences.current.symbolInputMode
+    // 九键滑行占了 2～9 键的滑动，上滑出数字、角标都滑不出来：这些键的角标改为长按输入，和 26 键滑行一样
+    // （用户 11-11「开着滑行长按失效…只有九键不会跳转」：以前照存的「滑动输入」，长按什么都不出）。
+    val t9GlideOwnsDrag = LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true
+    val symbolInputMode = if (t9GlideOwnsDrag) SymbolInputMode.LONG_PRESS else LocalKeyboardInputPreferences.current.symbolInputMode
     val inputPreferences = LocalKeyboardInputPreferences.current
     val letterSwipeLayout = letterSwipeAvailable(LocalFourteenKeyLayout.current,
         customLayout?.mergedGroups?.isNotEmpty() == true)
@@ -419,8 +422,7 @@ fun SwipeableKeyButton(
         if (ctrlTargets?.ctrlTap(pick) != true) onClick()
     }
     val letterGlideOwnsDrag = LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true
-    val reserveDragForGlide = letterGlideOwnsDrag ||
-        (LocalT9GlideKeys.current != null && badgeText?.singleOrNull()?.let { it in '2'..'9' } == true)
+    val reserveDragForGlide = letterGlideOwnsDrag || t9GlideOwnsDrag
     // 九键滑行接管拖动的数字键往下滑打不出下角标：左下角不画（用户 11-11）。26 键字母滑行改成长按弹出上下两个角标
     // （[withGlideCornerMenu]），下角标打得到，照旧画（用户 11-11「关闭数字行滑行打不出 !@#」）。
     val downCornerLabel = swipeDownKeyLabel.takeUnless { reserveDragForGlide && !letterGlideOwnsDrag }

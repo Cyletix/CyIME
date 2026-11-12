@@ -333,4 +333,18 @@ class CornerLongPressTimingTest {
                 symbolLongPressSeconds = delaySeconds, t9FlickLetters = flick, t9GlideTyping = true))
         }
     }
+
+    /**
+     * 用户 11-11「开着滑行长按失效…只有九键不会跳转」：存的是「滑动输入」时开九键滑行，2～9 键的滑动给了滑行，
+     * 以前上滑出数字滑不出来、长按也不出；现在和 26 键滑行一样按长按输入，到点出数字。
+     */
+    @Test fun nineKeyGlideTurnsSavedSwipeIntoLongPressDigits() {
+        val prefs = KeyboardInputPreferences(symbolInputMode = SymbolInputMode.SWIPE_UP,
+            symbolLongPressSeconds = delaySeconds, t9FlickLetters = false, t9GlideTyping = true)
+        showNine(prefs)
+        for ((digit, letters) in listOf("2" to "ABC", "5" to "JKL", "7" to "PQRS", "9" to "WXYZ")) {
+            val key = rule.onAllNodesWithText(letters, ignoreCase = true, useUnmergedTree = true).onFirst()
+            holdAndCheck("九键滑行 $digit", key, digit, prefs.showPressBubble) { committed.toList() }
+        }
+    }
 }
