@@ -21,8 +21,10 @@ class Sentence;
 // about vowels; 0 counts the vowel groups of pinyin letters. `rime_weight` (t9/rescore_rime_weight) adds that
 // share of Rime's own sentence weight to the word model's score, so the model overrules Rime's order only by a
 // clear margin (youfaxyigewenti: Rime ranks 又发现一个问题 first, the model alone took 有发现一个问题).
+// `tail_correction_margin` (t9/tail_correction_margin): a sentence corrected only in its last word of three letters
+// or more leads when the typed letters do not read in full and it beats the typed choice by this margin (0: off).
 void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
-                        size_t keys_per_syllable, double rime_weight, Poet* poet,
+                        size_t keys_per_syllable, double rime_weight, double tail_correction_margin, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences);

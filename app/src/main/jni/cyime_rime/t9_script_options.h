@@ -80,6 +80,8 @@ struct T9ScriptOptions {
   // t9/rescore_rime_weight: how much Rime's own sentence weight counts next to the word model when the
   // 26-key rescoring picks a sentence (0: the word model alone, as before).
   double t9_rescore_rime_weight_ = 0;
+  // t9/tail_correction_margin: see T9RescoreSentences; 0 keeps a slip in the last syllable behind the typed reading.
+  double t9_tail_correction_margin_ = 0;
   bool t9_ngram_merge_segmentations_ = false;
   string t9_left_context_;
   string t9_neighbors_;

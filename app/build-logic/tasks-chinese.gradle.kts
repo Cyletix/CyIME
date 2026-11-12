@@ -566,6 +566,10 @@ val prepareChineseDictionaries by tasks.registering {
             // rescore_rime_weight: share of Rime's own sentence weight added to the word model's score (0 = model alone).
             // 0.3: 11-10 sweep fixed 又发现一个问题; B站 and SMS together +3, homophone set +37, 26-key must-pass none lost.
             "  ngram_sentence_start: false\n  rescore_rime_weight: 0.3\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
+            // tail_correction_margin: a slip in the last syllable (nihso 你好, jintisn 今天, xiexir 谢谢) leads the typed
+            // abbreviations when the corrected sentence beats them by this margin (ln units; ln 20 like the other typo gates).
+            // 11-11 tablet: the typed readings 你受 / 近体是你 / 歇息人 came first. To be swept on the computer (0 = off).
+            "  tail_correction_margin: 3.0\n" +
             "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n" +
             // CyLM (CyIME-Windows tools/cylm) puts its best sentence first when its files are in the Rime user
             // directory. Only the 装到我的设备 package carries them; without them the open fails once and Rime's

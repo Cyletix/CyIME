@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -14,8 +15,49 @@
 
 namespace rime {
 
+namespace {
+// Whether the typed letters read in full syllables without any correction, the last syllable included
+// (aniu reads a'niu, so the corrected 按钮 never leads 阿牛). Abbreviated or unreadable letters do not count.
+bool TypedReadsInFull(const SyllableGraph& graph) {
+  const size_t end = graph.interpreted_length;
+  if (end == 0) return false;
+  std::set<size_t> reached{0};
+  for (const auto& from : graph.edges) {
+    if (!reached.count(from.first)) continue;
+    for (const auto& to : from.second)
+      for (const auto& spelling : to.second)
+        if (spelling.second.type <= kFuzzySpelling && !spelling.second.is_correction) {
+          reached.insert(to.first);
+          break;
+        }
+  }
+  return reached.count(end) > 0;
+}
+
+// Whether the sentence's only corrections lie in its last word and that word spans at least three letters
+// (nihso: 你好 through hso -> hao; jintisn: 今天; xiexir: 谢谢). A one- or two-letter tail is still being typed
+// and a correction there only makes particles (henhaok -> 很好哦), so it never counts.
+bool CorrectedOnlyAtTail(const T9ScriptQuery& q, const Sentence& sentence) {
+  const auto& words = sentence.components();
+  const auto& lengths = sentence.word_lengths();
+  if (words.empty() || lengths.size() != words.size()) return false;
+  const size_t end = sentence.end() - q.start;
+  const size_t last_length = lengths.back();
+  if (last_length < 3 || last_length > end) return false;
+  const size_t last_start = end - last_length;
+  if (!q.IsCorrection(words.back().code, end, last_start)) return false;
+  if (last_start == 0) return true;
+  const Code& code = sentence.code();
+  const size_t last_syllables = words.back().code.size();
+  if (last_syllables > code.size()) return false;
+  Code prefix;
+  prefix.assign(code.begin(), code.end() - static_cast<std::ptrdiff_t>(last_syllables));
+  return !q.IsCorrection(prefix, last_start);
+}
+}  // namespace
+
 void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
-                        size_t keys_per_syllable, double rime_weight, Poet* poet,
+                        size_t keys_per_syllable, double rime_weight, double tail_correction_margin, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences) {
@@ -167,6 +209,27 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
       if (fixed) {
         sentences->clear();
         sentences->push_back(fixed);
+        sentences->push_back(chosen);
+        return;
+      }
+    }
+    // A slip in the last syllable (nihso, jintisn, xiexir, nihap): the typed letters only read as abbreviations
+    // (你受, 近体是你, 歇息人), which MarkStrayInitials leaves alone because the last syllable may still be typed.
+    // The corrected sentence leads when the typed letters cannot be read in full, its corrections are all in a
+    // last word of three letters or more, and it beats the typed choice by `tail_correction_margin`
+    // (t9/tail_correction_margin, ln units; 0 keeps the typed reading first as before). The typed choice follows.
+    if (tail_correction_margin > 0 && q.enable_correction && std::isfinite(chosen_score) && !corrected(chosen) &&
+        !TypedReadsInFull(q.syllables)) {
+      an<Sentence> tail;
+      double tail_score = -std::numeric_limits<double>::infinity();
+      for (const auto& sentence : *sentences) {
+        if (!corrected(sentence) || !CorrectedOnlyAtTail(q, *sentence)) continue;
+        const double value = score(*sentence) + rime_weight * sentence->weight();
+        if (value > tail_score) { tail_score = value; tail = sentence; }
+      }
+      if (tail && tail_score > chosen_score + tail_correction_margin) {
+        sentences->clear();
+        sentences->push_back(tail);
         sentences->push_back(chosen);
         return;
       }
