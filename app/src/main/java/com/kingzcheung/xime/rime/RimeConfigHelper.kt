@@ -273,6 +273,8 @@ object RimeConfigHelper {
         com.kingzcheung.xime.settings.ChineseSchemas.installOptionalLayoutSchemas(context, rimeDir)
         com.kingzcheung.xime.settings.DoublePinyinSchemes.install(context, rimeDir)
         check(installing.delete()) { "Cannot finish bundled asset installation" }
+        // 内置排列和自建布局是中文26键方案的副本：26 键方案随版本更新后，按当前方案重新生成，不停在旧快照。
+        com.kingzcheung.xime.settings.CustomKeyboardLayouts.followBaseSchema(context)
         com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)
         // F1: assets 会用内置 default.yaml 覆盖，这里把启用方案重新写回 schema_list
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
