@@ -157,6 +157,7 @@ fun KeyButton(
     shadowShapeRadius: Dp = 8.dp,
     /** 手势由外层接管时（符号键按住当 Ctrl），按下的样子由外层给。 */
     externalPressed: Boolean = false,
+    underline: Boolean = false,
 ) {
     var ownPressed by remember { mutableStateOf(false) }
     val isPressed = ownPressed || externalPressed
@@ -243,6 +244,7 @@ fun KeyButton(
         }, contentAlignment = Alignment.Center) {
             Text(
                 text = punctuationKeyLabel(text),
+                textDecoration = if (underline) androidx.compose.ui.text.style.TextDecoration.Underline else null,
                 modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp),
                 color = textColor,
                 fontSize = labelSize.sp,

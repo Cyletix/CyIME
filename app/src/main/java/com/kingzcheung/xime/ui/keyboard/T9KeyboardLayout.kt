@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -473,6 +474,58 @@ private fun T9KeyboardContent(
         } else Modifier
     }
 
+    val traditional = LocalKeyboardInputPreferences.current.baiduTraditionalLayout
+    @Composable
+    fun NextCandidateKey(modifier: Modifier) {
+            // 只在「0 键是不是下一项」变化时重组九键整块，每按一个数字只重组候选栏和左栏。
+            val nextCandidate by remember(candidateState, uiState.inputProfile) {
+                androidx.compose.runtime.derivedStateOf { candidateState.value.usesT9CandidateNavigation(uiState.inputProfile) }
+            }
+            // 长按“下一项”= 按住 Shift：按住期间候选中英对调，松手就恢复（用户 10-30：松手不恢复就再也变不回去）；
+            // 长按那次松手不切下一项。
+            var glossHoldUsed by remember { mutableStateOf(false) }
+            androidx.compose.runtime.LaunchedEffect(nextCandidate) {
+                if (!nextCandidate) com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
+            }
+            // 读 revision 让词典加载完成后重组到这里。
+            val glossHoldEnabled = nextCandidate && com.kingzcheung.xime.gloss.CandidateGlossary.revision
+                .let { com.kingzcheung.xime.gloss.CandidateGlossary.isLoaded }
+            NineKeyButton(
+                digit = "", letters = if (traditional) "空格" else if (nextCandidate) "下一项" else "0",
+                icon = if (traditional) rememberVectorPainter(Icons.Default.SpaceBar)
+                    else if (nextCandidate) rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight) else null,
+                // 箭头只占图标框中间一小块，按退格等功能图标的视觉高度放大（用户 10-24：太小看不清）。
+                iconSizeDp = T9NextCandidateIconDp,
+                onClick = {
+                    if (glossHoldUsed) glossHoldUsed = false
+                    else if (traditional) onKeyPress("space")
+                    else if (nextCandidate) {
+                        callbacks.onDismissPreeditEditor?.invoke()
+                        callbacks.onNextCandidate(candidateState.value)
+                    } else commitDirect("0")
+                },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                // 拖出超过键盘一半宽或高（设置里可调）才算拖动选词（画出拖线），拖到候选上松手等于按住 Shift 选它（有英文上屏英文）；
+                // 没拖那么远仍是本键的左滑「上一项」等手势（用户 10-25）。拖动选词和 26 键 Shift 拖动一样不看释义词典：
+                // 注释是拼音时照样选中文候选（用户 10-31：九键拖不动了）；只有长按对调中英要等词典。
+                modifier = modifier.testTag("t9-zero-key").dragToCandidate(nextCandidate, dragArea,
+                    fraction = LocalKeyboardInputPreferences.current.candidateDragPercent / 100f).t9NextShiftHold(glossHoldEnabled,
+                    onDown = { glossHoldUsed = false }, onHeld = { glossHoldUsed = true }),
+                onSwipeLeft = if (nextCandidate) ({
+                    callbacks.onDismissPreeditEditor?.invoke()
+                    callbacks.onPreviousCandidate(candidateState.value)
+                }) else null,
+                onSwipeRight = if (nextCandidate) ({
+                    callbacks.onDismissPreeditEditor?.invoke()
+                    callbacks.onNextCandidate(candidateState.value)
+                }) else null,
+                onPress = { onKeyPressDown?.invoke("0") },
+                onSwipeStateChange = onSwipeStateChange, swipes = swipesFor("0"),
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius,
+            )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -565,7 +618,7 @@ private fun T9KeyboardContent(
             }
 
             KeyboardModeKey(
-                slot = 1, onKeyPress = onKeyPress,
+                slot = if (traditional) 2 else 1, onKeyPress = onKeyPress,
                 backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                 modifier = Modifier.fillMaxWidth().weight(1f), onKeyPressDown = onKeyPressDown,
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
@@ -701,6 +754,27 @@ private fun T9KeyboardContent(
                 )
             }
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                if (traditional) {
+                    LanguageKeyButton(languageLabel = if (uiState.isAsciiMode) "英 · 中" else "中 · 英",
+                        onClick = { onKeyPress("ime_switch") }, backgroundColor = specialKeyBackgroundColor,
+                        textColor = specialKeyTextColor, modifier = Modifier.weight(1f),
+                        onPress = { onKeyPressDown?.invoke("ime_switch") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                    // Traditional 0/space shares digit-key corner input, never the space cursor gesture.
+                    NineKeyButton(digit = "0", letters = "空格", icon = rememberVectorPainter(Icons.Default.SpaceBar),
+                        onClick = { onKeyPress("space") }, swipes = swipesFor("0").copy(
+                            symbolInputText = "0", onSwipeUp = { commitDirect("0") },
+                            swipeUpText = "0", swipeUpKeyLabel = "0"),
+                        onPress = { onKeyPressDown?.invoke("space") }, onSwipeStateChange = onSwipeStateChange,
+                        backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                        modifier = Modifier.weight(1f).testTag("traditional-t9-space"),
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                    KeyboardModeKey(slot = 1, labelOverride = "符号", onKeyPress = onKeyPress, backgroundColor = specialKeyBackgroundColor,
+                        textColor = specialKeyTextColor, modifier = Modifier.weight(1f), onKeyPressDown = onKeyPressDown,
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                        ctrlTargets = ctrlTargets, onCtrlShortcut = onCtrlShortcut)
+                } else {
+
                 KeyboardModeKey(
                     slot = 2, onKeyPress = onKeyPress,
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
@@ -725,7 +799,8 @@ private fun T9KeyboardContent(
                     onPress = { onKeyPressDown?.invoke("ime_switch") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
-            }
+            }                }
+
         }
 
         // ── 第3列：功能键（退格 / 重输 / 确定） ──
@@ -776,51 +851,7 @@ private fun T9KeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
-            // 只在「0 键是不是下一项」变化时重组九键整块，每按一个数字只重组候选栏和左栏。
-            val nextCandidate by remember(candidateState, uiState.inputProfile) {
-                androidx.compose.runtime.derivedStateOf { candidateState.value.usesT9CandidateNavigation(uiState.inputProfile) }
-            }
-            // 长按“下一项”= 按住 Shift：按住期间候选中英对调，松手就恢复（用户 10-30：松手不恢复就再也变不回去）；
-            // 长按那次松手不切下一项。
-            var glossHoldUsed by remember { mutableStateOf(false) }
-            androidx.compose.runtime.LaunchedEffect(nextCandidate) {
-                if (!nextCandidate) com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
-            }
-            // 读 revision 让词典加载完成后重组到这里。
-            val glossHoldEnabled = nextCandidate && com.kingzcheung.xime.gloss.CandidateGlossary.revision
-                .let { com.kingzcheung.xime.gloss.CandidateGlossary.isLoaded }
-            NineKeyButton(
-                digit = "", letters = if (nextCandidate) "下一项" else "0",
-                icon = if (nextCandidate) rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight) else null,
-                // 箭头只占图标框中间一小块，按退格等功能图标的视觉高度放大（用户 10-24：太小看不清）。
-                iconSizeDp = T9NextCandidateIconDp,
-                onClick = {
-                    if (glossHoldUsed) glossHoldUsed = false
-                    else if (nextCandidate) {
-                        callbacks.onDismissPreeditEditor?.invoke()
-                        callbacks.onNextCandidate(candidateState.value)
-                    } else commitDirect("0")
-                },
-                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                // 拖出超过键盘一半宽或高（设置里可调）才算拖动选词（画出拖线），拖到候选上松手等于按住 Shift 选它（有英文上屏英文）；
-                // 没拖那么远仍是本键的左滑「上一项」等手势（用户 10-25）。拖动选词和 26 键 Shift 拖动一样不看释义词典：
-                // 注释是拼音时照样选中文候选（用户 10-31：九键拖不动了）；只有长按对调中英要等词典。
-                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(nextCandidate, dragArea,
-                    fraction = LocalKeyboardInputPreferences.current.candidateDragPercent / 100f).t9NextShiftHold(glossHoldEnabled,
-                    onDown = { glossHoldUsed = false }, onHeld = { glossHoldUsed = true }),
-                onSwipeLeft = if (nextCandidate) ({
-                    callbacks.onDismissPreeditEditor?.invoke()
-                    callbacks.onPreviousCandidate(candidateState.value)
-                }) else null,
-                onSwipeRight = if (nextCandidate) ({
-                    callbacks.onDismissPreeditEditor?.invoke()
-                    callbacks.onNextCandidate(candidateState.value)
-                }) else null,
-                onPress = { onKeyPressDown?.invoke("0") },
-                onSwipeStateChange = onSwipeStateChange, swipes = swipesFor("0"),
-                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-                shadowShapeRadius = shadowShapeRadius,
-            )
+            if (!traditional) NextCandidateKey(Modifier.weight(1f))
             // 按住 !@# 点回车、或从 !@# 拖到回车上松手：Ctrl+回车，发送（同 26 键，用户 11-03）。
             // 位置一定下来就登记（这一列布局后不一定重组，只靠重组会漏登记，拖到回车上没反应）；
             // 目标换了一份时重组再按记下的位置登记一次。id 每个回车键各一个。
@@ -835,7 +866,7 @@ private fun T9KeyboardContent(
                 onClick = { if (!ctrlTargets.ctrlEnter()) onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f).testTag("t9-enter-key")
+                modifier = Modifier.weight(if (traditional) 2f else 1f).testTag("t9-enter-key")
                     .onGloballyPositioned {
                         enterBounds = dragSpace.bounds(it)
                         ctrlTargets.putEnter(enterTargetId, enterBounds)

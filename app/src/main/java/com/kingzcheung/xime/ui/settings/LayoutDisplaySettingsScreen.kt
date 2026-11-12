@@ -56,6 +56,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -113,6 +115,28 @@ private fun LayoutDisplayPage(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = keyboardPreviewContentPadding()
         ) {
+            if (page == null) item {
+                SettingsSection(title = "布局风格", content = {
+                    val input = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
+                    Column(Modifier.selectableGroup()) {
+                        com.kingzcheung.xime.ui.keyboard.KeyboardLayoutStyle.entries.forEach { style ->
+                            Row(Modifier.fillMaxWidth().testTag("layout-style:${style.name}")
+                                .selectable(input.layoutStyle == style, role = Role.RadioButton) {
+                                    input.copy(layoutStyle = style).save(context)
+                                }.padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = input.layoutStyle == style, onClick = null)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(style.title, style = MaterialTheme.typography.bodyLarge)
+                                    Text(style.description, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                })
+            }
             if (page == null) item {
                 SettingsSection(title = "各布局", content = {
                     LayoutInputCategory.entries.forEachIndexed { index, category ->

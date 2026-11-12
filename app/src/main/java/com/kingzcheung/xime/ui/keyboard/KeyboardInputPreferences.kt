@@ -70,6 +70,8 @@ enum class CursorGestureMode(val label: String) {
 }
 
 data class KeyboardInputPreferences(
+    /** Only key arrangement; never changes language, scheme, theme or symbol pages. */
+    val layoutStyle: KeyboardLayoutStyle = KeyboardLayoutStyle.DEFAULT,
     val spaceHold: SpaceHoldAction = SpaceHoldAction.CURSOR,
     val cursorStepDp: Float = 10f,
     val keyTextScale: Float = DEFAULT_KEY_TEXT_SCALE,
@@ -235,6 +237,7 @@ data class KeyboardInputPreferences(
     /** 按住空格说话时上滑取消：手指往上滑出空格约一个键高再松手，这次说的话不上屏（默认关，别人提的需求，11-02）。 */
     val voiceSwipeCancel: Boolean = false,
 ) {
+    val baiduTraditionalLayout: Boolean get() = layoutStyle == KeyboardLayoutStyle.BAIDU_TRADITIONAL
     internal val showCodeInCandidateBar: Boolean get() = showPreeditPreview &&
         com.kingzcheung.xime.service.TerminalEditor.inputTextLocation { inputTextLocation } == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR
     /** 拼音放进候选栏左侧：只在「显示在候选栏」下生效；切到输入框后留着的旧值不把气泡挤进栏里。 */
@@ -264,6 +267,8 @@ data class KeyboardInputPreferences(
         minOf(com.kingzcheung.xime.glide.GlideTracker.HOLD_MS, symbolLongPressMs) else com.kingzcheung.xime.glide.GlideTracker.HOLD_MS
     companion object {
         /** 中英混输开关；输入法每次按字母键读它（ImeKeyRouter），改了下一键就生效。 */
+        const val LAYOUT_STYLE_KEY = "keyboard_layout_style"
+        const val BAIDU_TRADITIONAL_LAYOUT_KEY = "baidu_traditional_layout"
         const val MIXED_INPUT_KEY = "mixed_input"
         /** 生僻字开关；同繁体输出，输入法按字母、数字键前读它（ImeKeyRouter）。 */
         const val RARE_CHARACTERS_KEY = "rare_characters"
@@ -328,7 +333,7 @@ data class KeyboardInputPreferences(
         const val CORNER_HINT_OPACITY_KEY = "corner_hint_opacity"
         const val HIDE_FUNCTION_KEY_HINTS_KEY = "hide_function_key_hints"
         internal val watchedKeys: Set<String> by lazy {
-            setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
+            setOf(LAYOUT_STYLE_KEY, BAIDU_TRADITIONAL_LAYOUT_KEY, KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
@@ -358,6 +363,10 @@ data class KeyboardInputPreferences(
             // 开关一变，26 键第一排的角标跟着换（见 QwertySwipeSymbols.numberRowUp）；键盘随后按新设置重画。
             com.kingzcheung.xime.settings.KeysConfigHelper.numberRowCorners = numberRow
             return KeyboardInputPreferences(
+                layoutStyle = prefs.getString(LAYOUT_STYLE_KEY, null)?.let { name ->
+                    KeyboardLayoutStyle.entries.firstOrNull { it.name == name }
+                } ?: if (prefs.getBoolean(BAIDU_TRADITIONAL_LAYOUT_KEY, false)) KeyboardLayoutStyle.BAIDU_TRADITIONAL
+                    else KeyboardLayoutStyle.DEFAULT,
                 keyGlowEnabled = KeyEffectPreferences.glowEnabled(prefs),
                 keyAnimationEnabled = KeyEffectPreferences.animationEnabled(prefs),
                 // 过透时自动加深到在白底和黑底上都看得清键面文字。
@@ -471,6 +480,8 @@ data class KeyboardInputPreferences(
 
     fun save(context: Context) {
         SettingsPreferences.getPrefsPublic(context).edit()
+            .putString(LAYOUT_STYLE_KEY, layoutStyle.name)
+            .putBoolean(BAIDU_TRADITIONAL_LAYOUT_KEY, baiduTraditionalLayout)
             .putString("space_hold_action", spaceHold.name)
             .putString("cursor_gesture_mode", cursorGesture.name)
             .putFloat("cursor_hold_seconds", normalizeCursorHoldSeconds(cursorHoldSeconds))
