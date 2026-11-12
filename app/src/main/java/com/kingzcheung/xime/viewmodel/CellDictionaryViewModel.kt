@@ -108,7 +108,21 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
         else "词库已是最新"
     }
 
+    fun restoreBuiltin(id: String) = work("恢复词库…") {
+        CellDictionaryManager.restoreBuiltin(context, id)
+        store.select(id, true)
+        "已恢复，点「应用更改」后生效"
+    }
+
     fun remove(id: String) = work("删除词库…") {
+        val current = store.read()
+        if (id in current.applied) {
+            store.select(id, false)
+            RimeConfigHelper.applyCellDictionaries(context)
+        }
+        val engineCopy = java.io.File(com.kingzcheung.xime.settings.SchemaManager.getRimeDir(context),
+            "cyime_cells/${store.dictionaryFile(id).name}")
+        check(!engineCopy.exists() || engineCopy.delete()) { "删除输入引擎词库副本失败，请重试" }
         store.remove(id)
         "已删除"
     }

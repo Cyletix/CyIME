@@ -253,6 +253,24 @@ class CellDictionaryTest {
         assertEquals(v2, store.dictionaryFile(builtin.id).readText())
     }
 
+    @Test fun `removed built-in stays removed on sync and can be restored`() {
+        val store = store()
+        val builtin = CellDictionaryCatalog.builtins.single { it.id == "builtin_arknights" }
+        val text = "---\nname: cell_builtin_arknights\n...\n解手流\tjie shou liu\t1200\n"
+        store.installBuiltin(builtin, text)
+        store.select(builtin.id, false)
+        store.markApplied(emptySet())
+        store.remove(builtin.id)
+        assertFalse(store.dictionaryFile(builtin.id).exists())
+        store.installBuiltin(builtin, text)
+        assertTrue(store.read().installed.isEmpty())
+        assertFalse(store.dictionaryFile(builtin.id).exists())
+        store.installBuiltin(builtin, text, restore = true)
+        assertEquals(builtin.id, store.read().installed.single().id)
+        assertTrue(store.read().removedBuiltins.isEmpty())
+        assertTrue(store.read().selected.isEmpty())
+    }
+
     @Test fun `other built-in dictionaries start off and carry their english words`() {
         val store = store()
         val builtin = BuiltinCellDictionary("builtin_dota2", "Dota2", "电子游戏")

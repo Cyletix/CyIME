@@ -72,14 +72,23 @@ object CellDictionaryManager {
     fun syncBuiltins(context: Context) {
         val store = store(context)
         CellDictionaryCatalog.builtins.forEach { builtin ->
-            // The packager can leave a built-in dictionary out of an APK; skip it instead of failing deployment.
-            val stream = try { context.assets.open(builtin.asset) } catch (_: java.io.FileNotFoundException) { return@forEach }
-            val text = stream.bufferedReader().use { it.readText() }
-            val english = try {
-                context.assets.open(builtin.englishAsset).bufferedReader().use { it.readLines() }.filter { it.isNotBlank() }
-            } catch (_: java.io.FileNotFoundException) { emptyList() }
-            store.installBuiltin(builtin, text, english)
+            // Some packages omit optional built-in assets.
+            try { installBuiltin(context, store, builtin, restore = false) }
+            catch (_: java.io.FileNotFoundException) { }
         }
+    }
+
+    fun restoreBuiltin(context: Context, id: String) {
+        val builtin = requireNotNull(CellDictionaryCatalog.builtins.find { it.id == id }) { "找不到内置词库" }
+        installBuiltin(context, store(context), builtin, restore = true)
+    }
+
+    private fun installBuiltin(context: Context, store: CellDictionaryStore, builtin: BuiltinCellDictionary, restore: Boolean) {
+        val text = context.assets.open(builtin.asset).bufferedReader().use { it.readText() }
+        val english = try {
+            context.assets.open(builtin.englishAsset).bufferedReader().use { it.readLines() }.filter { it.isNotBlank() }
+        } catch (_: java.io.FileNotFoundException) { emptyList() }
+        store.installBuiltin(builtin, text, english, restore)
     }
 
     fun prepare(context: Context, ids: Set<String> = store(context).read().applied,

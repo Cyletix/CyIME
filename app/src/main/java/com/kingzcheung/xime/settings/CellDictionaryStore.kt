@@ -26,6 +26,7 @@ data class CellDictionaryState(
     val applied: Set<String> = emptySet(),
     /** Built-ins enabled once by default; a later switch-off by the user is never reverted. */
     val seeded: Set<String> = emptySet(),
+    val removedBuiltins: Set<String> = emptySet(),
     val selectedEnglish: Boolean = false,
     val appliedEnglish: Boolean = false,
     val downloadedWordRevision: Int = 0,
@@ -249,8 +250,9 @@ class CellDictionaryStore(val directory: File) {
      * Refresh a bundled dictionary from the APK, with its English words (CellDictionaryEnglish) if it has any;
      * a default-on one is enabled once on first sight.
      */
-    fun installBuiltin(builtin: BuiltinCellDictionary, text: String, english: List<String> = emptyList()) = synchronized(lock) {
+    fun installBuiltin(builtin: BuiltinCellDictionary, text: String, english: List<String> = emptyList(), restore: Boolean = false) = synchronized(lock) {
         val old = read()
+        if (!restore && builtin.id in old.removedBuiltins) return@synchronized
         val hash = digest((text + english.joinToString("\n")).toByteArray())
         val count = text.substringAfter("\n...\n").lineSequence().count { it.contains('\t') }
         val entry = InstalledCellDictionary(builtin.id, builtin.name, builtin.category, count,
@@ -266,6 +268,7 @@ class CellDictionaryStore(val directory: File) {
             selected = if (enable) old.selected + builtin.id else old.selected,
             applied = if (enable) old.applied + builtin.id else old.applied,
             seeded = old.seeded + builtin.id,
+            removedBuiltins = old.removedBuiltins - builtin.id,
         ))
     }
 
@@ -279,14 +282,15 @@ class CellDictionaryStore(val directory: File) {
         save(read().copy(selectedEnglish = enabled))
     }
 
-    /** Removes a downloaded or imported dictionary that is not in use; built-ins stay. */
+    /** Removes a dictionary that is not in use; removed built-ins stay removed across syncs. */
     fun remove(id: String) = synchronized(lock) {
         val old = read()
-        require(!id.startsWith("builtin_")) { "内置词库不能删除，可以关闭" }
         require(id !in old.applied) { "请先关闭这个词库并应用更改，再删除" }
-        dictionaryFile(id).delete()
-        englishFile(id).delete()
-        save(old.copy(installed = old.installed.filterNot { it.id == id }, selected = old.selected - id))
+        listOf(dictionaryFile(id), englishFile(id)).forEach { file ->
+            check(!file.exists() || file.delete()) { "删除词库文件失败，请重试" }
+        }
+        save(old.copy(installed = old.installed.filterNot { it.id == id }, selected = old.selected - id,
+            removedBuiltins = if (id.startsWith("builtin_")) old.removedBuiltins + id else old.removedBuiltins))
     }
 
     fun markApplied(ids: Set<String>, english: Boolean? = null, wordRevision: Int? = null) = synchronized(lock) {
