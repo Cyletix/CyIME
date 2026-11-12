@@ -205,8 +205,10 @@ class SettingsSearchTest {
         val dir = java.io.File("src/main/java/com/kingzcheung/xime/ui/settings")
         // 「拼音纠错」里每种纠错一行，标题来自 SpellingPatches.Typo，页面上按它循环画出来。
         val typoTitles = java.io.File("src/main/java/com/kingzcheung/xime/settings/SpellingPatches.kt")
+        // 语音转文本页每种语言一组，标题按 "${language.displayName}语音" 拼出来（中文语音、英文语音…）。
+        val speechSections = com.kingzcheung.xime.settings.InputLanguage.speech.joinToString("\n") { "\"${it.displayName}语音\"" }
         val source = (dir.listFiles { f -> f.extension == "kt" && f.name != "SettingsSearch.kt" }!! + typoTitles)
-            .joinToString("\n") { it.readText() }
+            .joinToString("\n") { it.readText() } + "\n" + speechSections
         val missing = SettingsSearchIndex.flatMap { listOfNotNull(it.anchor, it.section) }.distinct()
             .filter { "\"$it\"" !in source }
         assertTrue("页面上找不到：$missing", missing.isEmpty())
