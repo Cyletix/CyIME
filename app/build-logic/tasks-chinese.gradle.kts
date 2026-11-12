@@ -228,14 +228,41 @@ val prepareChineseDictionaries by tasks.registering {
                 }
             }
         }
-        val domainTexts = domainFloors.keys.associateBy { it.substringBefore('\t') }
-        val domainPresent = mutableSetOf<String>()
         // Web phrases that never occur in the subtitle, chat or wiki corpora (2026-10-30: 173,590, mostly from
         // tencent.dict: 玻璃打砂机, 未满十八岁勿进, 训练家) are dropped: nine-key 600 fresh SMS clauses 397 → 399 right,
         // 26-key unchanged. List built by D:/CyIME-Data/eval/junk-sweep-20261030 (count_all.py, remove-A.txt).
         val removed = java.util.zip.GZIPInputStream(removedWords.inputStream()).bufferedReader().useLines { lines ->
             lines.filter { it.isNotBlank() }.toHashSet()
         }
+        // 那 before 哪 (his rule: 那个 ahead of 哪个; ime5 2026-11-11 那几家 came after 哪几家). Where 那X and 哪X are both
+        // words and X starts with a measure word or 几/些/一 (那几家, 那一种, 那些人), 那X gets at least 哪X's weight + 1.
+        // A 那 form under 5% of its 哪 form is a misspelling, not a word of its own (那怕, 那一), and is left alone.
+        val demonstrativeNext = (measureWords.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") } +
+            listOf("几", "些", "一")).toSet()
+        val naWeights = mutableMapOf<String, Pair<String, Int>>()
+        for (name in listOf("base", "ext", "tencent")) {
+            var body = false
+            for (line in File(root, "cn_dicts/$name.dict.yaml").readLines()) {
+                if (line.trim() == "...") { body = true; continue }
+                val fields = line.split('\t')
+                if (!body || fields.size !in 2..3 || !fields[0].contains('哪') && !fields[0].contains('那')) continue
+                val weight = fields.last().toIntOrNull() ?: continue
+                val code = if (fields.size == 3) fields[1] else ""
+                val known = naWeights[fields[0]]
+                if (known == null || known.second < weight) naWeights[fields[0]] = (code.ifEmpty { known?.first ?: "" }) to weight
+            }
+        }
+        for ((text, which) in naWeights) {
+            val at = text.indexOf('哪')
+            if (at < 0 || at + 1 >= text.length || text.substring(at + 1, at + 2) !in demonstrativeNext) continue
+            val that = text.substring(0, at) + "那" + text.substring(at + 1)
+            val other = naWeights[that] ?: continue
+            val code = which.first.ifEmpty { other.first }
+            if (code.isEmpty() || that in removed || other.second * 20 < which.second || other.second > which.second) continue
+            domainFloors.merge(that + "\t" + code, which.second + 1, ::maxOf)
+        }
+        val domainTexts = domainFloors.keys.associateBy { it.substringBefore('\t') }
+        val domainPresent = mutableSetOf<String>()
         for (name in listOf("base", "ext", "tencent")) {
             val dict = File(root, "cn_dicts/$name.dict.yaml")
             var header = true
