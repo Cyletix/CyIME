@@ -486,9 +486,9 @@ fun KeyboardLayout(
             var handedOff = false
             try {
             val candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                val keyboard = com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys)
-                if (chinese) com.kingzcheung.xime.glide.GlideLexicon.chineseDecoder(glideContext, keyboard, doublePinyin).decode(xs, ys)
-                else com.kingzcheung.xime.glide.GlideLexicon.decoder(glideContext, keyboard).decode(xs, ys)
+                // 词表读不出来时这一笔当没认出，不闪退（用户 11-12）。
+                com.kingzcheung.xime.glide.GlideLexicon.decodeStroke(glideContext,
+                    com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys), chinese, doublePinyin, xs, ys)
             }
             if (candidates.isEmpty()) {
                 // 很短又认不出词：快打时手指一抖被当成了滑行，按点了起点那个键算，不吞这一下（用户 11-11）。
