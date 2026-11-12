@@ -210,8 +210,13 @@ class PredictionManager(
     suspend fun getEnglishAssociations(text: String, limit: Int = MAX_ASSOCIATION_COUNT): List<String> {
         return try {
             val letters = com.kingzcheung.xime.settings.LetterLanguage.of(completionLanguage())
-            if (letters != null) com.kingzcheung.xime.association.WordCompletion.complete(context, letters, text, limit)
+            val words = if (letters != null) com.kingzcheung.xime.association.WordCompletion.complete(context, letters, text, limit)
             else AssociationService.getAssociations(context, text, true, limit)
+            // 英文出短语（默认关）：编码正好是这串字母的「我的短语」排在补全词前面，见 EnglishPhrases。
+            if (!EnglishPhrases.isEnabled(context)) words
+            else EnglishPhrases.merge(withContext(Dispatchers.IO) {
+                EnglishPhrases.matching(text, EnglishPhrases.phrases(context))
+            }, words, limit)
         } catch (e: Exception) {
             Log.e(TAG, "English association failed", e)
             emptyList()
