@@ -322,6 +322,9 @@ class PolicyTranslation : public Translation {
     // on nine keys, B站 118th on 14 keys and 45th on 26 keys). A first version put them 6th outright, which moved
     // a fully spelled 傍 from 20th to 21st (nine-key replay gate, 2026-11-08). A learned one is left where its
     // learned quality puts it (first after one pick); 26 keys' English words (melt_eng) keep their rule above.
+    // 2026-11-11「都按权重算」: mixed words (B站, 哆啦A梦, C罗) are no longer placed here. Typed in full they sat 6th,
+    // off the candidate bar; they now carry public-corpus weights on the Chinese scale (data/cyime_mixed_word_counts.tsv)
+    // and stand where Rime's quality puts them. Only pure English words keep this rule.
     {
       constexpr size_t kSlot = 5;
       auto bundled = [&](const an<Candidate>& c, bool* pull_only) {
@@ -329,12 +332,10 @@ class PolicyTranslation : public Translation {
         if (!p || !p->language() || c->end() != end_ || p->entry().commit_count > 0 ||
             (p->type() != "table" && p->type() != "user_table")) return false;
         const auto& name = p->language()->name();
-        *pull_only = name == "cyime_cn_en" || name == "en_dicts/cn_en";
-        if (name != "cyime_t9_english" && name != "cyime_k14_english" && !*pull_only) return false;
-        // Four keys or more, or a mixed word: shorter English words (go, the) stay after the Chinese ones.
-        const auto& text = p->text();
-        return c->end() - c->start() >= 4 ||
-               std::any_of(text.begin(), text.end(), [](char ch) { return static_cast<unsigned char>(ch) >= 0x80; });
+        *pull_only = false;
+        if (name != "cyime_t9_english" && name != "cyime_k14_english") return false;
+        // Four keys or more: shorter English words (go, the) stay after the Chinese ones. Mixed words: by weight.
+        return c->end() - c->start() >= 4 && HanCharacters(p->text()).empty();
       };
       // A Chinese candidate reading every key of the input as a full letter of its pinyin (one letter per key on
       // 9/14/26 keys), not an abbreviation: what a typed word is, at the end of a syllable.
@@ -377,19 +378,8 @@ class PolicyTranslation : public Translation {
         if (!inserted) result.insert(result.end(), moved.begin(), moved.end());
         head_.swap(result);
       }
-      // 2026-11-09「打 bzhan 选了 B站 记不住」: 26 keys' mixed words are learned in cyime_cn_en's user dictionary
-      // (upstream's cn_en table was read-only). One the user picked comes first when its whole code is typed again,
-      // ahead of the Chinese readings through initials (b + zhan: 不占), unless the first candidate is itself a
-      // learned word. Completions (bzha) and the nine-key and 14-key tables keep the rule above.
-      if (!numeric) {
-        const auto learned_mixed = std::find_if(head_.begin(), head_.end(), [&](const auto& c) {
-          const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
-          return p && p->language() && p->language()->name() == "cyime_cn_en" && c->start() == 0 &&
-                 c->end() == end_ && p->type() != "completion" && p->entry().commit_count > 0;
-        });
-        if (learned_mixed != head_.end() && learned_mixed != head_.begin() && !Learned(head_.front()))
-          std::rotate(head_.begin(), learned_mixed, learned_mixed + 1);
-      }
+      // (2026-11-09's「a learned mixed word comes first」was removed on 2026-11-11: a pick raises its weight in the
+      // user dictionary like any learned word, and the weight decides.)
     }
     // A corrected whole word goes first when it is far more common than the typed reading's word (2026-11-05,
     // replacing the 10-21 rule that kept the typed reading first: fandu gave 贩毒 before 单独). The corrected word's
