@@ -203,7 +203,9 @@ fun BackupSettingsContent(onBack: () -> Unit) {
                                 Text("导出备份", modifier = Modifier.padding(start = 6.dp))
                             }
                             OutlinedButton(
-                                onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) },
+                                // 不按类型过滤：别处传来的 zip 可能被标成 application/x-zip-compressed 等别的类型，
+                                // 在选择器里会变灰选不了；是不是 CyIME 备份由 readBackup 看内容判断。
+                                onClick = { importLauncher.launch(arrayOf("*/*")) },
                                 modifier = Modifier.weight(1f),
                                 enabled = !busy
                             ) {
