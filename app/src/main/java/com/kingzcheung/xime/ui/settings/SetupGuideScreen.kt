@@ -414,10 +414,24 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
     GuideQuestion("打中文用哪种方式？", listOfNotNull(
         Triple(TypingWay.FULL_PINYIN, "全拼", "拼音全部打出来，如“中国”打 zhongguo；不用记键位"),
         Triple(TypingWay.DOUBLE_PINYIN, "双拼", "每个字只按两个键，如小鹤双拼“中国”打 vsgo；打得快，要先记键位"),
-        Triple(TypingWay.WUBI, "五笔", "按字形拆成字根打，不看读音；" +
-            if (facts.wubiInstalled || facts.typing == TypingWay.WUBI) "五笔方案已在${facts.device}上" else "要下载五笔86方案，约 2 MB"),
+        Triple(TypingWay.WUBI, "五笔", "按字形拆成字根打，不看读音；" + when {
+            facts.typing == TypingWay.WUBI -> "现在就在用五笔"
+            facts.wubiInstalled && facts.wubi98Installed -> "五笔86、98 都已在${facts.device}上"
+            facts.wubiInstalled -> "五笔86 已在${facts.device}上"
+            facts.wubi98Installed -> "五笔98 已在${facts.device}上"
+            else -> "要下载五笔方案，1～2 MB"
+        }),
         Triple(TypingWay.KEEP, "保持现在的${facts.typingName}", "不改打字方式").takeIf { facts.typing == TypingWay.KEEP },
     ), answers.typing, "setup-typing") { onAnswers(answers.copy(typing = it)) }
+    // 从别的打法改五笔才问哪一种（默认 86，用户 11-12）；已经在用五笔的不动。五笔只有 26 键，不问键盘，写一句为什么。
+    if (answers.typing == TypingWay.WUBI && facts.typing != TypingWay.WUBI) {
+        fun where(installed: Boolean, mb: Int) = if (installed) "已在${facts.device}上" else "要下载，约 $mb MB"
+        GuideQuestion("用哪一种五笔？", listOf(
+            Triple(SetupGuidePlanner.WUBI, "五笔86", "用的人最多的一版；" + where(facts.wubiInstalled, 2)),
+            Triple(SetupGuidePlanner.WUBI98, "五笔98", "另一版字根，方案带繁体字；" + where(facts.wubi98Installed, 1)),
+        ), answers.wubi, "setup-wubi",
+            note = "五笔只用 26 键打：14 键、九键一个键上有几组字根，打不了五笔。") { onAnswers(answers.copy(wubi = it)) }
+    }
     if (answers.typing == TypingWay.DOUBLE_PINYIN && facts.doublePinyinChoices.isNotEmpty()) {
         GuideQuestion("用哪一种双拼？", facts.doublePinyinChoices.map { choice ->
             Triple(choice.id, choice.name, "“双拼”两个字打 ${choice.example}" + if (choice.builtin) "" else "(你自己建的)")

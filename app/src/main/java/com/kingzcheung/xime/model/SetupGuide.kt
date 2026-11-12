@@ -128,6 +128,7 @@ object SetupGuide {
             doublePinyinChoices = doublePinyins.map { DoublePinyinChoice(it.id, it.name, it.preview(), !DoublePinyinSchemes.isCustom(it.id),
                 lettersOnly = it.usesSemicolon) },
             wubiInstalled = File(SchemaManager.getRimeDir(context), "${SetupGuidePlanner.WUBI}.schema.yaml").isFile,
+            wubi98Installed = File(SchemaManager.getRimeDir(context), "${SetupGuidePlanner.WUBI98}.schema.yaml").isFile,
             doublePinyinKeyHints = keys.doublePinyinKeyHints,
             canEnableDoublePinyinKeyHints = canEnableKeyHints(keys),
             fuzzy = SpellingPatches.fuzzy(context).mapTo(linkedSetOf()) { it.id },
@@ -323,9 +324,11 @@ object SetupGuide {
 
         var wubiReady = !input.useWubi
         var redeploy = false
+        val wubi = input.wubiId
+        val wubiName = SetupGuidePlanner.wubiName(wubi)
         if (input.useWubi) {
             if (input.downloadWubi) {
-                val scheme = com.kingzcheung.xime.settings.CuratedRimeSchemes.merge(emptyList()).first { it.id == SetupGuidePlanner.WUBI }
+                val scheme = com.kingzcheung.xime.settings.CuratedRimeSchemes.merge(emptyList()).first { it.id == wubi }
                 val download = if (online) com.kingzcheung.xime.settings.XimeIndexSource.downloadScheme(app, scheme) else null
                 val install = if (download?.success == true) com.kingzcheung.xime.settings.XimeIndexSource.installFromMarket(app, scheme) else null
                 if (install?.success == true) {
@@ -333,15 +336,15 @@ object SetupGuide {
                     wubiReady = true
                     redeploy = true
                 } else failed += when {
-                    !online -> "五笔86方案没下载：现在没联网。可以连上网后再来这页，或在 扩展 → 方案 里获取。"
-                    else -> "五笔86方案没装上(${install?.failureReason ?: download?.failureReason ?: "下载失败"})，可以在 扩展 → 方案 里再获取。"
+                    !online -> "${wubiName}方案没下载：现在没联网。可以连上网后再来这页，或在 扩展 → 方案 里获取。"
+                    else -> "${wubiName}方案没装上(${install?.failureReason ?: download?.failureReason ?: "下载失败"})，可以在 扩展 → 方案 里再获取。"
                 }
             } else wubiReady = true
             // 装过但从方案栏关掉了：打开它。
             val enabled = SchemaManager.getEnabledSchemas(app)
-            if (wubiReady && SetupGuidePlanner.WUBI !in enabled) {
-                SchemaManager.setEnabledSchemas(app, enabled + SetupGuidePlanner.WUBI)
-                LanguagePreferences.enableForSchema(app, SetupGuidePlanner.WUBI)
+            if (wubiReady && wubi !in enabled) {
+                SchemaManager.setEnabledSchemas(app, enabled + wubi)
+                LanguagePreferences.enableForSchema(app, wubi)
                 redeploy = true
             }
         }
@@ -350,7 +353,7 @@ object SetupGuide {
         if (hideDoublePinyin) input.hideDoublePinyin.forEach { id ->
             runCatching { DoublePinyinSchemes.setEnabled(app, id, false) }
         }
-        val switchTo = input.switchTo?.takeIf { it != SetupGuidePlanner.WUBI || wubiReady }
+        val switchTo = input.switchTo?.takeIf { it != wubi || wubiReady }
         switchTo?.let { id ->
             // 要用的布局不在方案栏里（如 14 键没开过、全拼被关掉过）：先打开，双拼由下面那一步打开。
             // 双拼的九键版本走双拼页同一个开关（排在九键后面）；双拼的 14 键版本随双拼和中文14键自动出现。

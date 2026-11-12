@@ -243,6 +243,24 @@ class SetupGuidePlanTest {
         assertNull(same.switchTo)
     }
 
+    @Test fun wubiDefaultsTo86AndCanPick98() {
+        val f = typingFacts()
+        // 不选就是 86（用户 11-12：五笔默认 86）。
+        assertEquals(SetupGuidePlanner.WUBI, SetupGuidePlanner.suggest(f).wubi)
+        val input = SetupGuidePlanner.plan(f, SetupGuidePlanner.suggest(f).copy(typing = TypingWay.WUBI,
+            wubi = SetupGuidePlanner.WUBI98)).input
+        assertEquals(SetupGuidePlanner.WUBI98, input.wubiId)
+        assertEquals(SetupGuidePlanner.WUBI98, input.switchTo)
+        assertTrue(input.useWubi && input.downloadWubi)
+        assertTrue(input.lines.toString(), input.lines.any { it.startsWith("下载五笔98方案") })
+        assertTrue(input.lines.toString(), "中文 26 键改用五笔98。" in input.lines)
+        // 98 已经装着：不下载，只切过去；86 装没装不影响。
+        val installed = SetupGuidePlanner.plan(f.copy(wubi98Installed = true), SetupGuidePlanner.suggest(f).copy(
+            typing = TypingWay.WUBI, wubi = SetupGuidePlanner.WUBI98)).input
+        assertFalse(installed.downloadWubi)
+        assertEquals(SetupGuidePlanner.WUBI98, installed.switchTo)
+    }
+
     @Test fun fuzzyOnlyChangesTheGroupsWhoseAnswerChanged() {
         // 现在开着 z/zh 和 r/l：选平翘舌＋n/l → 只加 n/l，不把 c/ch、s/sh 也补上，r/l 不在向导里，不动。
         val f = typingFacts().copy(fuzzy = setOf("z_zh", "r_l"))

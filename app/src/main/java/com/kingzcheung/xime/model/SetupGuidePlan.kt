@@ -88,6 +88,8 @@ data class SetupFacts(
     val doublePinyinChoices: List<DoublePinyinChoice> = emptyList(),
     /** 五笔86 已经装在手机上。 */
     val wubiInstalled: Boolean = false,
+    /** 五笔98 已经装在手机上。 */
+    val wubi98Installed: Boolean = false,
     /** 「双拼键位提示」已经开着。 */
     val doublePinyinKeyHints: Boolean = false,
     /** 当前角标设置允许额外显示双拼键位提示。 */
@@ -115,6 +117,8 @@ data class SetupAnswers(
     val keyboard: KeyboardWay = KeyboardWay.QWERTY,
     /** 有内存焦虑（用户 11-04）：只留必需的模型、九键用精简版、语音空闲很快卸掉。 */
     val memorySaver: Boolean = false,
+    /** 选五笔时用 86 还是 98（[SetupGuidePlanner.WUBI]、[SetupGuidePlanner.WUBI98]）；默认 86。 */
+    val wubi: String = SetupGuidePlanner.WUBI,
 ) {
     companion object { const val FLYPY = "double_pinyin_flypy" }
 }
@@ -135,6 +139,8 @@ data class InputPlan(
     /** 打字方式选了五笔：没装就下载，没在方案栏就打开。 */
     val useWubi: Boolean = false,
     val downloadWubi: Boolean = false,
+    /** 用哪一份五笔：86 或 98。 */
+    val wubiId: String = SetupGuidePlanner.WUBI,
     val fuzzyOn: Set<String> = emptySet(),
     val fuzzyOff: Set<String> = emptySet(),
     /** 从别的打法改成双拼时可打开键位提示，前提是不会挤掉现有角标。 */
@@ -233,6 +239,10 @@ object SetupGuidePlanner {
 
     /** 五笔86 的方案 id（「扩展 › 方案」里审过的那份，约 2 MB）。 */
     const val WUBI = "wubi86"
+    /** 五笔98（「扩展 › 方案」里的那份，约 1 MB）。用户 11-12：五笔默认 86，也能选 98。 */
+    const val WUBI98 = "wubi98"
+    val wubiIds = listOf(WUBI, WUBI98)
+    fun wubiName(id: String) = if (id == WUBI98) "五笔98" else "五笔86"
     const val FULL_PINYIN = "rime_ice"
     const val K14 = "pinyin_14jian"
     const val T9 = "t9_pinyin"
@@ -278,10 +288,11 @@ object SetupGuidePlanner {
         val typing = answers.typing
         val choice = facts.doublePinyinChoices.firstOrNull { it.id == answers.doublePinyin }
         val keyboard = keyboardOf(facts, answers)
+        val wubiId = answers.wubi.takeIf { it in wubiIds } ?: WUBI
         val name = when (typing) {
             TypingWay.FULL_PINYIN -> "全拼"
             TypingWay.DOUBLE_PINYIN -> choice?.name ?: "双拼"
-            TypingWay.WUBI -> "五笔86"
+            TypingWay.WUBI -> wubiName(wubiId)
             TypingWay.KEEP -> facts.typingName
         }
         // 打法、哪一种双拼、键盘都和现在一样就不切：自己的字母排列（QWJRTK 等）、自定义布局不会被换掉。
@@ -290,22 +301,22 @@ object SetupGuidePlanner {
             (typing != TypingWay.WUBI && keyboard != KeyboardWay.KEEP && keyboard != facts.keyboard))
         // 已经显示着时再打开一次什么也不改（DoublePinyinSchemes.setEnabled 内容没变不写）。
         val showDoublePinyin = answers.doublePinyin.takeIf { typing == TypingWay.DOUBLE_PINYIN }
-        // 已经在用五笔（86、98 或五笔拼音）就不动；从别的方式改成五笔才装、才打开五笔86。
+        // 已经在用五笔（86、98 或五笔拼音）就不动；从别的方式改成五笔才装、才打开选的那份（默认 86）。
         val useWubi = typing == TypingWay.WUBI && facts.typing != TypingWay.WUBI
-        val downloadWubi = useWubi && !facts.wubiInstalled
-        if (downloadWubi) lines += "下载五笔86方案(约 2 MB，要联网)，装好后在方案栏里打开。"
+        val downloadWubi = useWubi && !(if (wubiId == WUBI98) facts.wubi98Installed else facts.wubiInstalled)
+        if (downloadWubi) lines += "下载${name}方案(约 ${if (wubiId == WUBI98) 1 else 2} MB，要联网)，装好后在方案栏里打开。"
         // 五笔只有 26 键：在 26 键上才替人切过去，九键、14 键、手写不动。全拼、双拼按回答的键盘切。
         val switchTo = if (!changed) null
-            else if (typing == TypingWay.WUBI) WUBI.takeIf { facts.keyboard == KeyboardWay.QWERTY }
+            else if (typing == TypingWay.WUBI) wubiId.takeIf { facts.keyboard == KeyboardWay.QWERTY }
             else schemaFor(typing, answers.doublePinyin, keyboard)
         // 要用的布局不在方案栏里就打开：中文14键（双拼的 14 键版本也靠它）、九键、双拼的九键版本。
         val enable = buildList {
             if (switchTo == null) return@buildList
             if (keyboard == KeyboardWay.K14) add(K14)
-            if (switchTo != showDoublePinyin && switchTo != WUBI && !switchTo.endsWith(K14_SUFFIX) && switchTo !in this) add(switchTo)
+            if (switchTo != showDoublePinyin && switchTo !in wubiIds && !switchTo.endsWith(K14_SUFFIX) && switchTo !in this) add(switchTo)
         }
         when {
-            switchTo != null && keyboard == KeyboardWay.QWERTY || switchTo == WUBI -> lines += "中文 26 键改用$name。"
+            switchTo != null && keyboard == KeyboardWay.QWERTY || switchTo in wubiIds -> lines += "中文 26 键改用$name。"
             switchTo != null -> lines += "中文换成${if (keyboard == KeyboardWay.K14) " " else ""}${keyboard.title}，用${name}打。"
             // 全拼（雾凇）一直在方案栏里，不切时没有要改的。
             changed && typing != TypingWay.FULL_PINYIN -> lines += "方案栏里打开$name，在键盘上切到中文 26 键就能用；现在的键盘不变。"
@@ -341,7 +352,7 @@ object SetupGuidePlanner {
             false -> lines += "桌面上的「字幕」图标关掉(变灰后可长按移除)。"
             null -> {}
         }
-        return InputPlan(switchTo, enable, showDoublePinyin, hide, useWubi, downloadWubi, fuzzyOn, fuzzyOff,
+        return InputPlan(switchTo, enable, showDoublePinyin, hide, useWubi, downloadWubi, wubiId, fuzzyOn, fuzzyOff,
             keyHintsOn, captionIcon, lines, hideLine)
     }
 
