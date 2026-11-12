@@ -749,7 +749,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     reopenHandwriting(keepHandwriting, targetLanguage)
                     service.sessionController.updateSchemaName()
                     service.updateUI()
-                    Toast.makeText(service, "已切换输入方案", Toast.LENGTH_SHORT).show()
+                    //Toast.makeText(service, "已切换输入方案", Toast.LENGTH_SHORT).show()
                 }
                 // 显示状态同步后再回写标点宽度：此处 uiState 可能还残留英文态，
                 // 显式 asciiMode=false，保证中文/日文方案按用户选择输出标点。
