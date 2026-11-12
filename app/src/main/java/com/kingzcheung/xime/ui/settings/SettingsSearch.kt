@@ -421,7 +421,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         it.target != SettingsRoutes.HandwritingContribute ||
             !(com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
     }.filter {
-        // The elder package has no update entry (AppUpdater.supported).
+        // The elder package and F-Droid installs have no update entry (AppUpdater.supported).
         com.kingzcheung.xime.update.AppUpdater.supported || it.title !in setOf("检查更新", "自动检查更新", "更新后提示更新内容")
     }
 }
