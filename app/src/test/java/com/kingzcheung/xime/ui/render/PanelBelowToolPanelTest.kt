@@ -38,6 +38,11 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import com.kingzcheung.xime.rime.T9InputController
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.spy
+import org.mockito.kotlin.whenever
 
 /**
  * 11-10 用户截图：开着翻译栏打开菜单，工具栏的图标画在菜单格子上（菜单只从顶上量了一个候选栏高）。
@@ -64,7 +69,14 @@ class PanelBelowToolPanelTest {
             Case("schemas-live", "LIVE", TOOL_PANEL_BAR_HEIGHT, OverlayRoute.SchemaList),
         )
         val keyboardDp = 268
-        val vm = KeyboardViewModel(app)
+        // 九键控制器要加载 native 引擎，这里和 KeyboardBottomEdgeRenderTest 一样换成假的。
+        val vm = spy(KeyboardViewModel(app))
+        val callbacks = KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {})
+        val t9 = mock<T9InputController> {
+            on { leftPanelState } doReturn T9InputController.LeftPanelState.IDLE
+            on { firstOptions } doReturn emptyList()
+        }
+        doReturn(t9).whenever(vm).bindT9Controller(callbacks)
         var case by mutableStateOf(cases.first())
         rule.setContent {
             val prefs = rememberKeyboardInputPreferences()
@@ -73,7 +85,7 @@ class PanelBelowToolPanelTest {
                     val c = case
                     KeyboardView(vm, KeyboardUiState(currentSchemaId = "pinyin", keyboardHeightDp = keyboardDp,
                         toolPanelVisible = c.display != null, toolPanelDisplay = c.display, toolPanelTitle = "AI 改写"),
-                        KeyboardCallbacks(onKeyPress = { _, _ -> }),
+                        callbacks,
                         // 和服务一样：键盘高度加上候选栏上面那一截（开着面板也算）
                         Modifier.fillMaxWidth().height((keyboardDp + c.extraDp).dp).testTag("keyboard"))
                 }
