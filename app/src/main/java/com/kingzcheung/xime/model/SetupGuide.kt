@@ -18,6 +18,7 @@ import com.kingzcheung.xime.settings.InputScheme
 import com.kingzcheung.xime.settings.InputProfiles
 import com.kingzcheung.xime.settings.LanguagePreferences
 import com.kingzcheung.xime.settings.LayoutKind
+import com.kingzcheung.xime.settings.PerformanceCosts
 import com.kingzcheung.xime.settings.PerformanceProfile
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
@@ -137,7 +138,18 @@ object SetupGuide {
                 android.app.ActivityManager.MemoryInfo().also { context.getSystemService(android.app.ActivityManager::class.java)!!.getMemoryInfo(it) }.availMem
             }.getOrNull()?.takeIf { it > 0 },
             memorySaver = SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_MEMORY_SAVER, false),
+            memoryExtras = memoryExtras(context),
         )
+    }
+
+    /** 现在开着、关掉能省内存的功能；开没开和省多少都问「性能与省电」那张代价表，两页说同一个数。 */
+    private fun memoryExtras(context: Context): List<MemoryExtra> {
+        val table = runCatching { PerformanceCosts.source(context)?.device?.items }.getOrNull().orEmpty()
+        return SetupGuidePlanner.memoryExtras.mapNotNull { (id, title, loss) ->
+            val item = PerformanceCosts.Item.byId(id) ?: return@mapNotNull null
+            if (!runCatching { PerformanceCosts.isOn(context, item) }.getOrDefault(false)) return@mapNotNull null
+            MemoryExtra(id, title, loss, table[id]?.memoryMb?.takeIf { it >= 1 })
+        }
     }
 
     private fun socName(): String? {
@@ -214,14 +226,19 @@ object SetupGuide {
             if (now.speechEngineIdleMinutes != minutes || now.speechRefinerIdleMinutes != minutes)
                 PerformanceProfile.applyCustom(app, now.copy(speechRefinerIdleMinutes = minutes, speechEngineIdleMinutes = minutes))
         }
+        // 另外选了要关的功能：和设置页、「性能与省电」写同一个值（PerformanceCosts.set）。
+        plan.turnOff.forEach { extra ->
+            PerformanceCosts.Item.byId(extra.id)?.let { runCatching { PerformanceCosts.set(app, it, false) } }
+        }
         val inputFailed = applyInput(app, plan.input, hideDoublePinyin, facts.online)
-        val inputDone = (plan.input.lines + listOfNotNull(plan.input.hideLine?.takeIf { hideDoublePinyin }))
+        val inputDone = (plan.input.lines + listOfNotNull(plan.input.hideLine?.takeIf { hideDoublePinyin },
+            plan.turnOff.takeIf { it.isNotEmpty() }?.let { off -> "为省内存关掉了：${off.joinToString("、") { it.title }}。" }))
             .filterNot { it.startsWith("打字方式还是") }
             .filterNot { line -> "五笔" in line && inputFailed.any { "五笔" in it } }
         markShown(app)
         FileLogger.i("SetupGuide", "按推荐设置：语音=${plan.voiceMode} 九键=${plan.t9Model} " +
             "删除=${removing.map { it.id }} 取回=${fromPackage.map { it.id }} 下载=${fromNetwork.map { it.id }} 打字=${plan.input} " +
-            "省内存=${plan.answers.memorySaver} 语音卸载=${plan.voiceIdleMinutes}")
+            "省内存=${plan.answers.memorySaver} 语音卸载=${plan.voiceIdleMinutes} 关掉=${plan.turnOff.map { it.id }}")
         return Result(removing.count { it.source == SetupSource.ON_PHONE } - failed.size, freed, fromNetwork.sumOf { it.bytes }, waiting, failed,
             inputDone, inputFailed, fromNetwork.map { it.id }, fromPackage.map { it.id })
     }

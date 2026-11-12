@@ -2,6 +2,7 @@ package com.kingzcheung.xime.model
 
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
 import com.kingzcheung.xime.speech.SpeechModelCatalog
+import kotlin.math.roundToInt
 
 /** 语音输入打算怎么用：向导里的三个选项，说法面向不懂模型名的人。 */
 enum class VoiceUse { OFTEN, SOMETIMES, NEVER }
@@ -31,6 +32,12 @@ enum class FuzzyHabit(val title: String, val example: String, val fuzzyIds: List
 data class DoublePinyinChoice(val id: String, val name: String, val example: String, val builtin: Boolean = true,
     /** 只有 26 键（ing 在分号键上的微软双拼）：14 键、九键没有分号键，不生成这两个版本。 */
     val lettersOnly: Boolean = false)
+
+/**
+ * 「有内存焦虑」时还能关掉的一项（用户 11-12：选项太少）。[id] 是「性能与省电」代价表的键（PerformanceCosts.Item），
+ * 关的时候和设置页写同一个值；[memoryMb] 取同一张表，没有就不写数。只列现在开着的。
+ */
+data class MemoryExtra(val id: String, val title: String, val loss: String, val memoryMb: Double? = null)
 
 /** 一台设备在向导眼里的样子；大小都是字节，读不到的为 null。 */
 data class SetupFacts(
@@ -102,6 +109,8 @@ data class SetupFacts(
     val availMemoryBytes: Long? = null,
     /** 上次在引导里答了“有内存焦虑”；没答过为 false，所以默认推荐不变。 */
     val memorySaver: Boolean = false,
+    /** 现在开着、关掉能省内存的功能（[SetupGuidePlanner.memoryExtras] 里列的）。 */
+    val memoryExtras: List<MemoryExtra> = emptyList(),
 )
 
 data class SetupAnswers(
@@ -119,6 +128,8 @@ data class SetupAnswers(
     val memorySaver: Boolean = false,
     /** 选五笔时用 86 还是 98（[SetupGuidePlanner.WUBI]、[SetupGuidePlanner.WUBI98]）；默认 86。 */
     val wubi: String = SetupGuidePlanner.WUBI,
+    /** 有内存焦虑时另外选了要关掉的功能（[MemoryExtra.id]）；默认一个不选，点了才关。 */
+    val memoryOff: Set<String> = emptySet(),
 ) {
     companion object { const val FLYPY = "double_pinyin_flypy" }
 }
@@ -177,6 +188,8 @@ data class SetupPlan(
     val input: InputPlan = InputPlan(),
     /** 语音模型空闲多少分钟后全部卸掉（二次校正同时）；null 不改。 */
     val voiceIdleMinutes: Int? = null,
+    /** 有内存焦虑时要关掉的功能；没答“有”时为空。 */
+    val turnOff: List<MemoryExtra> = emptyList(),
 ) {
     val downloadBytes: Long get() = keep.filter { it.source == SetupSource.DOWNLOAD }.sumOf { it.bytes }
     val freedBytes: Long get() = remove.filter { it.source == SetupSource.ON_PHONE }.sumOf { it.bytes }
@@ -236,6 +249,25 @@ object SetupGuidePlanner {
 
     /** 有内存焦虑时语音模型空闲多久卸掉：和低配档一样 1 分钟。 */
     const val SAVER_VOICE_IDLE_MINUTES = 1
+
+    /**
+     * 有内存焦虑时还能关的功能，按省得多少排（数取「性能与省电」代价表，作者平板，大多是估算）：
+     * id 是 PerformanceCosts.Item 的 id，后面是给人看的名字和关掉后少了什么。
+     * 不列智能联想：关了就没有联想词，影响打字；表里 60 MB 是联想表压缩（11-10，电脑上 38.6 → 6.9 MB）以前的估算。
+     */
+    val memoryExtras: List<Triple<String, String, String>> = listOf(
+        Triple("glass", "玻璃效果", "键盘不再半透明"),
+        Triple("glide_typing", "英文滑行", "英文只能一个键一个键点"),
+        Triple("rare_characters", "生僻字", "候选里不再出生僻字"),
+        Triple("chinese_glide", "中文滑行", "中文只能一个键一个键点"),
+        Triple("t9_glide_typing", "九键滑行", "九键只能一个键一个键点"),
+        Triple("traditional_output", "繁体输出", "打出来的是简体字"),
+        Triple("candidate_emoji", "候选里显示表情", "候选里不再夹着表情，表情面板照常用"),
+        Triple("key_glow", "键内炫光", "按键时键里不再亮一下"),
+        Triple("handwriting_recognize_while_writing", "手写边写边识别", "写完停一下才出字"),
+        Triple("press_bubble", "点按弹出气泡", "点字母键时上方不再弹出放大的字母"),
+        Triple("background_motion", "动态背景", "图片背景不再缓慢平移、缩放"),
+    )
 
     /** 五笔86 的方案 id（「扩展 › 方案」里审过的那份，约 2 MB）。 */
     const val WUBI = "wubi86"
@@ -362,6 +394,7 @@ object SetupGuidePlanner {
         val veryTight = free != null && free < VERY_TIGHT_FREE
         val light = facts.tier == DeviceModelTier.LIGHT
         val saver = answers.memorySaver
+        val turnOff = if (!saver) emptyList() else facts.memoryExtras.filter { it.id in answers.memoryOff }
         val notes = mutableListOf<String>()
         fun available(id: String) = id in facts.installed || id in facts.inPackage
 
@@ -460,8 +493,11 @@ object SetupGuidePlanner {
         // 有内存焦虑：语音空闲 1 分钟就从内存卸掉（性能与省电里同一项）。不用语音、也不用字幕时没有模型可卸，不改。
         val voiceIdle = SAVER_VOICE_IDLE_MINUTES.takeIf { saver && voiceNeeded }
         if (voiceIdle != null) notes += "语音空闲 $voiceIdle 分钟后从内存卸掉，之后第一次说话要多等一两秒。在 性能与省电 里可以改。"
+        if (turnOff.isNotEmpty()) notes += "关掉${turnOff.joinToString("、") { it.title }}" +
+            (turnOff.mapNotNull { it.memoryMb }.sum().takeIf { it >= 1 }?.let { "，按「性能与省电」里的表约省 ${it.roundToInt()} MB 内存" } ?: "") +
+            "。以后想开，在设置里各自的开关打开。"
         return SetupPlan(answers, answers.voice != VoiceUse.NEVER, voiceMode, t9Model, keep, remove, notes,
-            inputPlan(facts, answers), voiceIdle)
+            inputPlan(facts, answers), voiceIdle, turnOff)
     }
 
     private fun keepReason(id: String, facts: SetupFacts, answers: SetupAnswers, streaming: Boolean): String = when (id) {

@@ -62,6 +62,7 @@ import com.kingzcheung.xime.model.SetupSource
 import com.kingzcheung.xime.model.TypingWay
 import com.kingzcheung.xime.model.VoiceUse
 import kotlinx.coroutines.Dispatchers
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -500,6 +501,23 @@ private fun AnswerSection(facts: SetupFacts, answers: SetupAnswers, onAnswers: (
         Triple(true, "有，能省就省", "只留必需的模型，九键用精简版(首选略差)，语音空闲 ${SetupGuidePlanner.SAVER_VOICE_IDLE_MINUTES} 分钟就从内存卸掉"),
         Triple(false, "没有", "按这台${facts.device}的情况推荐"),
     ), answers.memorySaver, "setup-memory-saver") { onAnswers(answers.copy(memorySaver = it)) }
+    // 用户 11-12：选项太少。答“有”时再列现在开着、关掉能省内存的功能，多选，默认一个不选，点了才关。
+    if (answers.memorySaver && facts.memoryExtras.isNotEmpty()) {
+        Text("还可以关掉这些(现在都开着，点一下选上，按推荐设置时关掉)：",
+            style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            facts.memoryExtras.forEach { extra ->
+                val selected = extra.id in answers.memoryOff
+                GuideOption(selected, "关掉${extra.title}",
+                    extra.loss + (extra.memoryMb?.let { "；内存 +${it.roundToInt()} MB" } ?: ""),
+                    "setup-memory-off:${extra.id}", multi = true) {
+                    onAnswers(answers.copy(memoryOff = if (selected) answers.memoryOff - extra.id else answers.memoryOff + extra.id))
+                }
+            }
+        }
+    }
+    if (answers.memorySaver) Text("实际占了多少，可以在 设置 → 关于 → 存储空间 最上面的「运行内存」看。",
+        style = GuideText.note(), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** 打字方式这一块要改的：每项一句；只有主动打开开关才收起其他双拼。 */
