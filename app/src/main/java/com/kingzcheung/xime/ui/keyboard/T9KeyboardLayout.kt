@@ -261,7 +261,11 @@ private fun T9KeyboardSwipeOverlay(
     val ctrlTargets = remember(controller, uiState.inputProfile) { ShiftSlideTargets() }
 
 
-    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys) {
+    // 键缝动效的光层（默认关，关着时是 null）。
+    val gapLight = rememberKeyGapLight()
+
+    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys,
+        LocalKeyGapLight provides gapLight) {
     Box(
         modifier = modifier
             // 键位与轨迹原点同用键盘卡片坐标：旋转的悬浮键盘滑行落在手指下的键（未旋转时与 boundsInRoot 相同）。
@@ -296,6 +300,8 @@ private fun T9KeyboardSwipeOverlay(
                 dragArea = dragSpace.bounds(coordinates)
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp)) {
+        // 最先画 = 在所有键帽底下，只从键缝里露出来。
+        KeyGapLightLayer(gapLight, Modifier.matchParentSize())
         KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
         if (isLandscape) {
             // 横屏：去除原左侧候选大面板（候选已在顶部候选栏展示），
@@ -497,6 +503,8 @@ private fun T9KeyboardContent(
                     .fillMaxHeight()
                     .weight(3f)
                     .padding(scaledKeyVisualPadding())
+                    // 键缝动效：左边这块面板不是键，按它不画；登记位置是为了线能绕着它走、半透明时光不从它底下透出来。
+                    .then(keyGapLightSource(GapLightKind.NONE))
                     .then(candidateShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
                     .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))

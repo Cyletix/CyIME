@@ -95,6 +95,14 @@ internal fun letterSwipeCornerLabels(key: String): Pair<String?, String?> {
 }
 
 /**
+ * 这组手势按多少毫秒算长按；没有长按时是 null。[systemTimeoutMillis] 传系统的长按时限。
+ * 手势本身和键缝动效的长按进度都用这一个数，进度走满正好是长按生效的那一刻。
+ */
+internal fun KeyGestureActions.longPressDelayMillis(systemTimeoutMillis: Long): Long? =
+    if (longPressItems.isEmpty() && onLongPress == null) null
+    else longPressTimeoutMillis ?: if (longPressItems.isNotEmpty()) 400L else systemTimeoutMillis
+
+/**
  * [reserveDragForGlide]：这个键上的拖动留给滑行（九键滑行、26 键英文/中文滑行），键自己不做上下滑、拂动。
  * 拖动后滑行没接管（没有消费这根手指）时，抬手仍按点按结算（见 [glideDriftIsTap]）。
  */
@@ -128,8 +136,9 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         var flickClaimed = false
         var selectedIndex = 0
         val items = actions.longPressItems
-        val longPressJob = if (items.isNotEmpty() || actions.onLongPress != null) gestureScope.launch {
-            delay(actions.longPressTimeoutMillis ?: if (items.isNotEmpty()) 400L else viewConfiguration.longPressTimeoutMillis)
+        val longPressDelay = actions.longPressDelayMillis(viewConfiguration.longPressTimeoutMillis)
+        val longPressJob = if (longPressDelay != null) gestureScope.launch {
+            delay(longPressDelay)
             longPressed = true
             actions.onLongPressFeedback()
             if (items.isNotEmpty()) {

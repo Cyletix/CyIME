@@ -165,7 +165,8 @@ fun KeyButton(
     val view = LocalView.current
     val keyFontFamily = AppFonts.keyFontFamily
     val keyLabelFontFamily = AppFonts.keyLabelFontFamily
-    val currentActions by rememberUpdatedState(KeyGestureActions(
+    // 组合时只读这个值；rememberUpdatedState 每次都写进新对象，组合时读它会自己让自己失效、一直重组。
+    val keyActions = KeyGestureActions(
         text = text,
         onTap = onClick,
         onPress = { ownPressed = true; onPress?.invoke() },
@@ -178,7 +179,8 @@ fun KeyButton(
         onDown = onSwipeDown,
         onLongPress = onLongClick,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ))
+    )
+    val currentActions by rememberUpdatedState(keyActions)
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
@@ -225,7 +227,10 @@ fun KeyButton(
                 pressed = isPressed, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(backgroundColor),
                 functionDepth = glassFunctionKeyDepth(backgroundColor),
-            )).keyHeldHighlight(isPressed)),
+            )).keyHeldHighlight(isPressed),
+                // 键缝动效的长按进度：这个键有长按动作才画。
+                gapLightHoldMillis = keyActions.longPressDelayMillis(
+                    androidx.compose.ui.platform.LocalViewConfiguration.current.longPressTimeoutMillis)),
         contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
@@ -495,9 +500,10 @@ fun SwipeableKeyButton(
     }
     val inputActions = LocalKeyboardInputActions.current
     val bindings = if (inputActions.englishLetters) inputPreferences.englishLetterSwipes else inputPreferences.chineseLetterSwipes
-    val currentActions by rememberUpdatedState(if (bindings.isEmpty() || letterSwipeLayout ||
+    val effectiveActions = if (bindings.isEmpty() || letterSwipeLayout ||
         flick != null || letterGroup?.length != 1 || inputActions.onLetterSwipeAction == null) gestureActions
-        else gestureActions.withLetterSwipes(letterGroup.lowercase(), bindings, inputActions.onLetterSwipeAction))
+        else gestureActions.withLetterSwipes(letterGroup.lowercase(), bindings, inputActions.onLetterSwipeAction)
+    val currentActions by rememberUpdatedState(effectiveActions)
 
     // 同一组文字只建一次：手指移动时圆盘不因标签“换了个对象”而整个重画。
     val discLabels = if (flick == null && letters == null && !fourteenSingle) null else gestureActions.let { actions ->
@@ -637,7 +643,10 @@ fun SwipeableKeyButton(
                 pressed = isPressed || shiftHovered, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(resolvedBackground),
                 functionDepth = glassFunctionKeyDepth(resolvedBackground),
-            )).keyHeldHighlight(isPressed || shiftHovered))
+            )).keyHeldHighlight(isPressed || shiftHovered),
+                // 键缝动效的长按进度：按这个键实际生效的那套手势算（角标长按、长按菜单、九键数字），没有长按就不画。
+                gapLightHoldMillis = effectiveActions.longPressDelayMillis(
+                    androidx.compose.ui.platform.LocalViewConfiguration.current.longPressTimeoutMillis))
             .then(if (hexagonal) Modifier.honeycombLabelArea() else Modifier),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
@@ -907,11 +916,15 @@ fun IconKeyButton(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
     contentDescription: String? = null,
+    /** 键缝动效里这个键画什么（回车：点一下整排往上扫；删除：往里收）。 */
+    gapLight: GapLightKind = GapLightKind.PRESS,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnRelease by rememberUpdatedState(onRelease)
+    // 键缝动效：这个键点了一下并且生效时告诉光层（回车整排往上扫）。
+    val gapLightTrigger = remember { KeyGapLightTrigger() }
     val density = LocalDensity.current
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
@@ -957,6 +970,7 @@ fun IconKeyButton(
                         currentOnRelease?.invoke()
                     },
                     onTap = {
+                        gapLightTrigger.tap()
                         currentOnClick()
                     }
                 )
@@ -972,7 +986,8 @@ fun IconKeyButton(
                 pressed = isPressed, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(backgroundColor),
                 functionDepth = glassFunctionKeyDepth(backgroundColor),
-            )), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
+            )), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED, gapLight = gapLight,
+                gapLightTrigger = gapLightTrigger),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -1138,7 +1153,8 @@ fun SwipeableIconKeyButton(
             .clip(keyClipShape)
             .background(feedbackColors.background)
             .keyHeldHighlight(isPressed && feedback == KeyFlickFeedback.NORMAL), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED,
-                glowVisibility = if (feedback == KeyFlickFeedback.NORMAL) 1f else 1f - (flickPreview?.progress ?: 0f))
+                glowVisibility = if (feedback == KeyFlickFeedback.NORMAL) 1f else 1f - (flickPreview?.progress ?: 0f),
+                gapLight = if (deleteKey) GapLightKind.PULL else GapLightKind.PRESS)
             .then(if (honeycombEdge != null) Modifier.honeycombLabelArea(half = true) else Modifier),
         contentAlignment = Alignment.Center
     ) {

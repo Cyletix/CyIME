@@ -314,6 +314,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长按振动振幅", effect, SettingsRoutes.KeyEffect, "长按 振动 震动 振幅 强度", section = "振动反馈"),
         SettingsSearchEntry("按键动效", effect, SettingsRoutes.KeyEffect, "动效 动画 缩放 回弹 键帽"),
         SettingsSearchEntry("键内炫光", effect, SettingsRoutes.KeyEffect, "炫光 发光 光效 渐变 彩虹"),
+        SettingsSearchEntry("键缝动效", effect, SettingsRoutes.KeyEffect, "键缝 动效 动画 光线 线路 流光 扩散 特效"),
         // 智能 › 词库
         page("导入的词库", dictionary, SettingsRoutes.CellDictionaries, "分类词库 细胞词库 搜狗 scel txt json 导入词库 下载词库 本地导入 删除词库 自动更新词库 词库更新 在线词库 新词"),
         SettingsSearchEntry("我的短语", dictionary, SettingsRoutes.Dictionary, "自定义短语 短语 快捷短语 常用语 编码", anchor = null),

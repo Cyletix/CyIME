@@ -548,7 +548,13 @@ fun KeyboardLayout(
 
 
 
+    // 键缝动效的光层（默认关，关着时是 null）；蜂窝布局没有横平竖直的键缝，不画。
+    val gapLight = rememberKeyGapLight(allowed = !honeycomb)
+    // 大小写的显示一变就扩开或收回一次；只看状态，按下、松开不会各触发一次。
+    KeyGapLightCase(gapLight, isShifted)
+
     CompositionLocalProvider(
+        LocalKeyGapLight provides gapLight,
         LocalFourteenKeyLayout provides fourteenKey,
         LocalLongVowelOnL provides (longVowelKey == JapaneseLongVowelKey.L_KEY),
         LocalLetterGeometry provides geometry,
@@ -578,6 +584,8 @@ fun KeyboardLayout(
                 onEnd = { glidePreview.stop(); callbacks.onGlidePreviewEnd?.invoke() })
 
     ) {
+        // 最先画 = 在所有键帽底下，只从键缝里露出来。
+        KeyGapLightLayer(gapLight, Modifier.matchParentSize())
         KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBgColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
         if (glideEnabled) GlideTrailOverlay(glideTrail,
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme),
@@ -1792,6 +1800,7 @@ internal fun ShiftCapsKeyButton(
     val currentPress by rememberUpdatedState(onKeyPressDown)
     val currentKey by rememberUpdatedState(onKeyPress)
     val currentTapKey by rememberUpdatedState(tapKey)
+    val currentGapLight by rememberUpdatedState(LocalKeyGapLight.current)
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
@@ -1876,6 +1885,10 @@ internal fun ShiftCapsKeyButton(
                             if (!change.pressed) {
                                 released = true
                                 upTime = change.uptimeMillis
+                                // 键缝动效：从 Shift 拖到字母上松手，大写收到那个字母上（换成按键区里的位置）。
+                                if (dragged && target != null && targets != null && targets.keyboardBounds.contains(target.bounds.center)) {
+                                    currentGapLight?.aim(target.bounds.center - targets.keyboardBounds.topLeft)
+                                }
                                 if (dragged) target?.commit?.invoke()
                                 break
                             }
@@ -1910,6 +1923,8 @@ internal fun ShiftCapsKeyButton(
                 }
             }
             .padding(scaledKeyVisualPadding())
+            // 键缝动效：Shift 自己按下不画线，只登记位置，大写出现时从它扩开。
+            .then(keyGapLightSource(GapLightKind.NONE, caseAnchor = true))
             .then(if (honeycombEdge != null) Modifier.honeycombCap() else shadowModifier)
             .clip(keyClipShape)
             .background(colors.background).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),

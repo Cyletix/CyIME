@@ -369,7 +369,14 @@ fun KeyboardView(
     val floatingBottomClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
     // 上拉变悬浮后接着跟手：换模式时这一层不变，由它接着读手指。
     val undockFollow = remember { KeyboardUndockFollow() }
+    // 键缝动效的语音音量条：只交给光层一个取音量的函数，音量在光层里读，变了不重组键盘。没在听时是 0。
+    val gapLightListening = androidx.compose.runtime.rememberUpdatedState(
+        state.voiceRecognitionState == com.kingzcheung.xime.speech.RecognitionState.LISTENING)
+    val gapLightVoice: () -> Float = remember(voiceAmplitudeState) {
+        { if (gapLightListening.value) microphoneLevel(voiceAmplitudeState.value) else 0f }
+    }
     CompositionLocalProvider(
+        LocalKeyGapLightVoice provides gapLightVoice,
         LocalKeyboardUndockFollow provides undockFollow,
         LocalKeyboardResizeOpacityEditing provides opacityEditingState.takeIf { resizeActive },
         LocalSplitKeyboardGap provides splitKeyboardGap,

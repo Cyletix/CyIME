@@ -40,7 +40,9 @@ fun ActionKeyButton(
         backgroundColor = enter?.background ?: backgroundColor, iconColor = enter?.foreground ?: textColor, modifier = modifier,
         onPress = onPress, onRelease = onRelease, contentDescription = text,
         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-        shadowShapeRadius = shadowShapeRadius)
+        shadowShapeRadius = shadowShapeRadius,
+        // 键缝动效：删除往里收；其余都是回车（发送、搜索、完成……），点一下整排往上扫。
+        gapLight = if (text == "删除") GapLightKind.PULL else GapLightKind.SWEEP)
 }
 
 /** 回车键（和删除键）按输入框动作名取图标；主键盘、数字、符号和编辑面板共用。 */

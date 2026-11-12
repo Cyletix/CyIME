@@ -87,6 +87,8 @@ data class KeyboardInputPreferences(
     val fixedSymbols: String = "",
     val keyGlowEnabled: Boolean = false,
     val keyAnimationEnabled: Boolean = false,
+    /** 键缝动效（默认关）；各项细调见 [com.kingzcheung.xime.settings.KeyGapLightConfig]。 */
+    val gapLight: com.kingzcheung.xime.settings.KeyGapLightConfig = com.kingzcheung.xime.settings.KeyGapLightConfig(),
     val handwritingPauseSeconds: Float = 0.5f,
     /** 手写边写边识别：每写完一笔就在后台先认，停顿一到直接出候选（默认关，见 HandwritingInputSession）。 */
     val handwritingRecognizeWhileWriting: Boolean = false,
@@ -341,7 +343,8 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 BOTTOM_LIFT_CURSOR_KEY, VOICE_SWIPE_CANCEL_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
-                "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
+                "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys +
+                com.kingzcheung.xime.settings.KeyGapLightPreferences.keys
         }
 
         fun read(context: Context, isDark: Boolean = FrostedGlassPreferences.isDark(context)): KeyboardInputPreferences {
@@ -360,6 +363,7 @@ data class KeyboardInputPreferences(
             return KeyboardInputPreferences(
                 keyGlowEnabled = KeyEffectPreferences.glowEnabled(prefs),
                 keyAnimationEnabled = KeyEffectPreferences.animationEnabled(prefs),
+                gapLight = com.kingzcheung.xime.settings.KeyGapLightPreferences.read(prefs),
                 // 过透时自动加深到在白底和黑底上都看得清键面文字。
                 frostedGlass = FrostedGlassPreferences.read(context, isDark)
                     .legibleForTheme(SettingsPreferences.getKeyboardTheme(context), isDark),
