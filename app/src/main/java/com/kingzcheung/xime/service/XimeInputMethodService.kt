@@ -1565,10 +1565,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 不替换输入框里原有的字。[startAction]：面板打开后自动点这个动作（如 `mode:translate`）。
      */
     internal fun openToolPanel(pluginId: String, sourceText: String? = null, startAction: String? = null) {
-        if (toolPanelBlocked()) {
-            Toast.makeText(this, "工具面板不支持在悬浮/横屏模式下使用", Toast.LENGTH_SHORT).show()
-            return
-        }
         closeQuickSend()
         // 翻译栏开着又点了插件按钮：已经写进输入框的译文先定下来
         if (uiState.value.toolPanelDisplay == ToolResult.LIVE.name) liveToolBar.close()
@@ -1663,16 +1659,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
-    /** 悬浮键盘、横屏下工具面板不开（面板高度按竖屏固定键盘算）。 */
-    private fun toolPanelBlocked(): Boolean = uiState.value.isFloatingMode ||
-        resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
-
     /**
      * 剪贴板长按「翻译」用的插件：装着并开着的 AI 改写（它的「翻译」动作，用户自己的接口）。
-     * 没有，或者现在开不了工具面板（悬浮、横屏），就返回 null，长按菜单里不显示「翻译」。
+     * 没有就返回 null，长按菜单里不显示「翻译」。横屏、悬浮也能开（矮屏幕用一行的面板，见 toolPanelCompact）。
      */
     internal fun clipboardTranslatePluginId(): String? = CLIPBOARD_TRANSLATE_PLUGIN_ID.takeIf { id ->
-        !toolPanelBlocked() && SettingsPreferences.isPluginEnabled(this, id) &&
+        SettingsPreferences.isPluginEnabled(this, id) &&
             ExtensionManager.getAllInstalledPlugins().any { it.id == id }
     }
 
@@ -2243,8 +2235,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         (effectiveScreenH - keyboardHeight - floatingDragBarHeight).coerceAtLeast(floatingMinY)) + floatingDragBarHeight
                 } else fixedClipboardBottomDp(activeBottomDp, visibleNavBarHeightDp) + contentBottomPaddingDp
                 // 工具面板、翻译栏开着时剪贴板照样在它们下面（见下面 toolPanelExtra），上拉的最高处给它们留出这一截。
+                // 手机横屏（悬浮时按卡片下面剩的高度）放不下完整面板：一行的面板。
+                val toolPanelCompact = com.kingzcheung.xime.ui.keyboard.toolPanelCompact(
+                    keyboardHeight, effectiveScreenH - clipboardBottomSpace)
                 val toolPanelAboveBar = com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
-                    state.toolPanelVisible, state.toolPanelDisplay)
+                    state.toolPanelVisible, state.toolPanelDisplay, toolPanelCompact)
                 val clipboardExpansion = rememberClipboardPanelExpansion(
                     clipboardPanelOpen, state.inputSessionId,
                     clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace + toolPanelAboveBar),
@@ -2641,7 +2636,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 effectiveKeyboardHeight,
                                 // Without this key the keyboard view kept a stale results height (0) and the keys
                                 // stretched into the results.
-                                clipboardSearchResultsHeight, clipboardSearchInline,
+                                clipboardSearchResultsHeight, clipboardSearchInline, toolPanelCompact,
                                 handwritingExpanded, handwritingWidth, handwritingOffsetX,
                                 protectedSize,
                                 floatingMinY,
@@ -2720,6 +2715,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     clipboardSearchVisible = state.clipboardSearchVisible,
                                     clipboardSearchResultsHeight = clipboardSearchResultsHeight,
                                     clipboardSearchInline = clipboardSearchInline,
+                                    toolPanelCompact = toolPanelCompact,
                                     toolPanelPluginId = state.toolPanelPluginId,
                                     toolPanelTitle = state.toolPanelTitle,
                                     toolPanelPrefillText = state.toolPanelPrefillText,
@@ -3114,7 +3110,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             fixed.keyboardBottomPaddingDp
         // 和窗口高度同一口径：开着菜单等面板时工具面板、翻译栏仍在候选栏上面。
         val toolExtra = com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
-            fixed.toolPanelVisible, fixed.toolPanelDisplay)
+            fixed.toolPanelVisible, fixed.toolPanelDisplay,
+            com.kingzcheung.xime.ui.keyboard.toolPanelCompact(normal.height, resources.configuration.screenHeightDp - clipboardBottom))
         val contentHeight = if (clipboardPanelCanExpand(page, false, fixed.isCompact) && fixed.clipboardImagesExpanded)
             clipboardPanelBounds(normal.height, resources.configuration.screenHeightDp, clipboardBottom + toolExtra).expanded
             else normal.height

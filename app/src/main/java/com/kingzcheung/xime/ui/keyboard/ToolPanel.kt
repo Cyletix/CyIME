@@ -48,12 +48,27 @@ internal const val CLIPBOARD_SEARCH_INLINE_PANEL_HEIGHT = 48
 /** 翻译栏（display: live）：一行，和横屏剪贴板搜索栏一样高。 */
 internal const val TOOL_PANEL_BAR_HEIGHT = 48
 
-/** 工具面板在键盘上方撑出的高度；窗口高度和面板绘制用同一个数。PASSIVE 走全屏覆盖，不撑高。 */
-internal fun toolPanelExtraHeight(visible: Boolean, display: String?): Int = when {
+/** 屏幕矮（手机横屏）时的 AI 工具面板：关闭钮和输入框一行，不显示状态行，和横屏剪贴板搜索栏一样高。 */
+internal const val TOOL_PANEL_COMPACT_HEIGHT = CLIPBOARD_SEARCH_INLINE_PANEL_HEIGHT
+
+/**
+ * 工具面板在键盘上方撑出的高度；窗口高度和面板绘制用同一个数。PASSIVE 走全屏覆盖，不撑高。
+ * [compact]：完整面板放不下（[toolPanelCompact]）时用一行的面板。
+ */
+internal fun toolPanelExtraHeight(visible: Boolean, display: String?, compact: Boolean = false): Int = when {
     !visible || display == "PASSIVE" -> 0
     display == "LIVE" -> TOOL_PANEL_BAR_HEIGHT
+    compact -> TOOL_PANEL_COMPACT_HEIGHT
     else -> TOOL_PANEL_HEIGHT
 }
+
+/**
+ * 键盘加上完整的工具面板超出能用的高度 [available]（屏幕减去底部留白、悬浮时减去卡片下面那截）：
+ * 手机横屏就是这样。以前横屏、悬浮一律不开面板（提示「不支持」），下载的翻译、AI 插件在横屏用不了（用户 11-12）；
+ * 现在改用一行的面板，窗口不超出屏幕。
+ */
+internal fun toolPanelCompact(keyboardHeight: Int, available: Int): Boolean =
+    keyboardHeight + TOOL_PANEL_HEIGHT > available
 
 /**
  * AI 工具插件输入面板（候选栏上方）。

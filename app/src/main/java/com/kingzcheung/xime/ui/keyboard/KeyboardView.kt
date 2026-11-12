@@ -978,6 +978,11 @@ fun KeyboardView(
                     cardBgColor = keyBgColor,
                     onClose = { callbacks.onToolPanelClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                    // 手机横屏：一行的面板（高度和窗口用同一个数，见 toolPanelExtraHeight）。
+                    heightDp = if (state.toolPanelCompact) TOOL_PANEL_COMPACT_HEIGHT else TOOL_PANEL_HEIGHT,
+                    statusText = if (state.toolPanelCompact) "" else null,
+                    singleLine = state.toolPanelCompact,
+                    inline = state.toolPanelCompact,
                 )
             }
 
