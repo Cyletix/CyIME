@@ -193,6 +193,7 @@ private fun NumberRows(
     specialKeyTextColor: Color = Color.White,
     enterKeyText: String = "确定",
 ) {
+    val traditional = LocalKeyboardInputPreferences.current.baiduTraditionalLayout
     val modeWeight = 0.8f
     val symFontSize = if (compactMode) 14.sp else 18.sp
     val keyFontSize = if (compactMode) 16.sp else androidx.compose.ui.unit.TextUnit.Unspecified
@@ -235,6 +236,16 @@ private fun NumberRows(
                     onSwipeStateChange = onSwipeStateChange,
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius)
+                if (traditional) {
+                    KeyButton(text = "@", onClick = { onKeyPress("@") },
+                        backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                        modifier = Modifier.weight(1f).testTag("number-at-key"), onPress = { onKeyPressDown?.invoke("@") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                    KeyButton(text = ".", onClick = { onKeyPress(".") },
+                        backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                        modifier = Modifier.weight(1f).testTag("number-decimal-key"), onPress = { onKeyPressDown?.invoke(".") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                } else {
                 SpaceKeyButton(schemaName = "空格", onClick = { onKeyPress("space") },
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f), onPress = { onKeyPressDown?.invoke("space") },
@@ -246,9 +257,28 @@ private fun NumberRows(
                     modifier = Modifier.weight(1f).testTag("number-at-key"), onPress = { onKeyPressDown?.invoke("@") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
+                }
             }
         }
         Row(Modifier.fillMaxWidth().weight(1f)) {
+            if (traditional) {
+                KeyButton(text = "返回", onClick = { onKeyPress("abc") },
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                    modifier = Modifier.weight(.8f).testTag("traditional-number-back"), onPress = { onKeyPressDown?.invoke("abc") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                SpaceKeyButton(schemaName = "", onClick = { onKeyPress("space") },
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                    modifier = Modifier.weight(3.4f / 3f), onPress = { onKeyPressDown?.invoke("space") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                KeyButton(text = "0", onClick = { onKeyPress("0") },
+                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                    modifier = Modifier.weight(3.4f / 3f).testTag("number-zero"), onPress = { onKeyPressDown?.invoke("0") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                KeyButton(text = "符号", onClick = { onKeyPress("symbol") },
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                    modifier = Modifier.weight(3.4f / 3f), onPress = { onKeyPressDown?.invoke("symbol") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+            } else {
             for (slot in 1..2) KeyboardModeKey(slot = slot, page = KeyboardInputPage.NUMBERS,
                 onKeyPress = onKeyPress, backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor, modifier = Modifier.weight(modeWeight),
@@ -270,6 +300,7 @@ private fun NumberRows(
                 followSymbolSwipeDirection = !bottomSwipeUp, keepSymbolSwipeOnLongPress = bottomSwipeUp,
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
+            }
             ActionKeyButton(text = enterKeyText, onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                 modifier = Modifier.weight(0.8f), onPress = { onKeyPressDown?.invoke("enter") },

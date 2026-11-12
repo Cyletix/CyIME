@@ -32,11 +32,12 @@ internal fun KeyboardModeKey(
     /** 26 键传入：符号键按住当 Ctrl，拖到字母上发 Ctrl+字母（用户 10-24）。 */
     ctrlTargets: ShiftSlideTargets? = null,
     onCtrlShortcut: ((Char) -> Unit)? = null,
+    labelOverride: String? = null,
 ) {
     val target = modeSlotTarget(page, slot, LocalTextModeLabel.current)
     androidx.compose.runtime.CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
     if (ctrlTargets != null && onCtrlShortcut != null && target.action == "symbol") CtrlSymbolKeyButton(
-        text = target.label,
+        text = labelOverride ?: target.label,
         targets = ctrlTargets,
         holdMillis = LocalKeyboardInputPreferences.current.symbolKeyHoldMs,
         onOpenSymbols = { onKeyPress(target.action) },
@@ -49,7 +50,7 @@ internal fun KeyboardModeKey(
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
     ) else KeyButton(
-        text = target.label,
+        text = labelOverride ?: target.label,
         fontSize = 16.sp,
         onClick = { onKeyPress(target.action) },
         onPress = { onKeyPressDown?.invoke("mode_change") },

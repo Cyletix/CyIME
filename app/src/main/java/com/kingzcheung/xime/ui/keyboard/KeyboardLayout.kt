@@ -1070,6 +1070,82 @@ fun KeyboardLayout(
                             shadowShapeRadius = shadowShapeRadius,
                         )
                         }
+                    val traditional = bottomPrefs.baiduTraditionalLayout && !splitKeyboard &&
+                        keyRows.map { it.size } == listOf(10, 9, 7) && keyRows.flatten().all { it.length == 1 } &&
+                        !(isVoiceMode && !isVoiceSticky)
+                    if (traditional) Row(Modifier.fillMaxWidth().weight(1f).testTag("traditional-qwerty-bottom")) {
+                        KeyButton(text = "123", onClick = { onKeyPress("number") },
+                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                            modifier = Modifier.weight(1.4f), onPress = { onKeyPressDown?.invoke("number") },
+                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                        LanguageKeyButton(languageLabel = if (isAsciiMode) "英/中" else "中/英", fontSize = 16.sp,
+                            onClick = { onKeyPress("ime_switch") }, backgroundColor = specialKeyBackgroundColor,
+                            textColor = specialKeyTextColor, modifier = Modifier.weight(1.1f),
+                            onPress = { onKeyPressDown?.invoke("ime_switch") },
+                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                        val profile = uiState.inputProfile
+                        val english = profile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
+                        val words = english && profile.scheme == com.kingzcheung.xime.settings.InputScheme.WORDS
+                        KeyButton(text = "abc", underline = words, onClick = {
+                            if (english) {
+                                val targetScheme = if (words) com.kingzcheung.xime.settings.InputScheme.DIRECT
+                                    else com.kingzcheung.xime.settings.InputScheme.WORDS
+                                val target = (uiState.schemas + com.kingzcheung.xime.settings.InputModes.english)
+                                    .firstOrNull { it.profile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH && it.profile.scheme == targetScheme }
+                                if (target != null) callbacks.onSwitchSchema?.invoke(target.schemaId)
+                                else Toast.makeText(context, "请先在语言与方案中启用英文单词输入", Toast.LENGTH_SHORT).show()
+                            } else viewModel.toggleOverlay(OverlayRoute.SchemaList)
+                        },
+                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                            modifier = Modifier.weight(.9f), onPress = { onKeyPressDown?.invoke("mode_change") },
+                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                        SpaceKey(schemaName = schemaName, isAsciiMode = isAsciiMode,
+                            isSttEnabled = isSttEnabled, isVoiceMode = isVoiceMode, voiceSticky = isVoiceSticky,
+                            keyBackgroundColor = keyBackgroundColor, keyTextColor = keyTextColor,
+                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                            modifier = Modifier.weight(2.6f), onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
+                            onKeyRelease = onKeyRelease, onVoiceModeChange = onVoiceModeChange)
+                        val period = spacePunctuationKeys(false, true, punctuationFull, english = isAsciiMode,
+                            japanese = LocalKeyboardPunctuation.current?.japanese == true).second
+                        if (period != null) PunctuationKey(period, "qwerty-period-key", rightSplit)
+                        CtrlSymbolKeyButton(text = "符", targets = shiftSlideTargets,
+                            holdMillis = bottomPrefs.symbolKeyHoldMs, onOpenSymbols = { onKeyPress("symbol") },
+                            onShortcut = { letter -> onGestureAction(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.command(letter)) },
+                            onPressDown = { onKeyPressDown?.invoke("mode_change") },
+                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                            modifier = Modifier.weight(1.1f), shadowEnabled = shadowEnabled,
+                            shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                            val enterTargetId = remember { Any() }
+                            var enterBounds by remember { mutableStateOf(Rect.Zero) }
+                            val shiftEnter: () -> Unit = {
+                                onGestureAction(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.SHIFT_ENTER_COMMAND)
+                            }
+                            DisposableEffect(shiftSlideTargets) { onDispose { shiftSlideTargets.remove(enterTargetId) } }
+                            androidx.compose.runtime.SideEffect {
+                                if (enterBounds != Rect.Zero) shiftSlideTargets.putEnter(enterTargetId, enterBounds, shiftEnter)
+                            }
+                            ActionKeyButton(
+                                text = enterKeyText,
+                                onClick = {
+                                    if (!shiftSlideTargets.ctrlEnter()) {
+                                        if (viewModel.shiftMode.value == ShiftMode.HELD) {
+                                            // 算用过 Shift：松开 Shift 不再当点按切大小写。
+                                            viewModel.onCharacterTyped()
+                                            shiftEnter()
+                                        } else onKeyPress("enter")
+                                    }
+                                },
+                                backgroundColor = specialKeyBackgroundColor,
+                                textColor = specialKeyTextColor,
+                                modifier = Modifier.weight(1.4f).testTag("qwerty-enter-key")
+                                    .onGloballyPositioned { enterBounds = dragSpace.bounds(it) },
+                                onPress = { onKeyPressDown?.invoke("enter") },
+                                onRelease = { onKeyRelease?.invoke("enter") },
+                                shadowEnabled = shadowEnabled,
+                                shadowElevation = shadowElevation,
+                                shadowShapeRadius = shadowShapeRadius,
+                            )
+                    } else {
                     // 第四行（控制行）
                     Row(
                         modifier = Modifier
@@ -1417,6 +1493,8 @@ fun KeyboardLayout(
                             )
                         }
                     }
+                    }
+
                 }
 
             }
