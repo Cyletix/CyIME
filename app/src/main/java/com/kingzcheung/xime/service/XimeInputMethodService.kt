@@ -2242,9 +2242,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     state.floatingOffsetY.coerceIn(floatingMinY,
                         (effectiveScreenH - keyboardHeight - floatingDragBarHeight).coerceAtLeast(floatingMinY)) + floatingDragBarHeight
                 } else fixedClipboardBottomDp(activeBottomDp, visibleNavBarHeightDp) + contentBottomPaddingDp
+                // 工具面板、翻译栏开着时剪贴板照样在它们下面（见下面 toolPanelExtra），上拉的最高处给它们留出这一截。
+                val toolPanelAboveBar = com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
+                    state.toolPanelVisible, state.toolPanelDisplay)
                 val clipboardExpansion = rememberClipboardPanelExpansion(
                     clipboardPanelOpen, state.inputSessionId,
-                    clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace),
+                    clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace + toolPanelAboveBar),
                     state.clipboardImagesExpanded,
                 ) { expanded ->
                     uiState.value = uiState.value.copy(clipboardImagesExpanded = expanded)
@@ -2277,17 +2280,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 工具面板为"键盘上方的撑高面板"：显示时键盘总高增加面板高度（面板在键盘上方，
                 // 不遮键盘按键），同时容器物理高度同步变大（updateHeight）→ IME insets 由系统确定性重算，
                 // 关闭后容器还原，彻底避免 insets 残留与白色区域。
-                // Overlay 页面（menubar/剪贴板/emoji 等）全屏覆盖键盘内容区：激活期间撑高面板
-                // 不参与计算，否则 Overlay 页面会带上表单/工具面板的额外高度（容器整体被撑高）。
-                val isOverlayPage = page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay
+                // 菜单、表情、剪贴板等面板打开时照样算：工具面板、翻译栏、剪贴板搜索还画在候选栏上面（表情、符号也打进它们里面），
+                // 面板只换掉下面的按键。以前打开面板就不算这一截，键盘先矮一截，面板又从顶上量候选栏高度，
+                // 盖住了被往下推的工具栏（11-10：开着翻译栏打开菜单，工具栏图标画在菜单格子上）。
                 // Clipboard editing uses a separate popup and does not resize the keyboard.
                 // 与面板实际高度同一来源（toolPanelExtraHeight），否则容器比面板多/少一截，键盘被拉高。
                 // PASSIVE 纯展示面板走 Overlay 全屏覆盖（键盘窗口内容区），不撑高。
-                val toolPanelExtra = if (!isOverlayPage) com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
-                    state.toolPanelVisible, state.toolPanelDisplay) else 0
+                val toolPanelExtra = toolPanelAboveBar
                 // Clipboard search adds its results and search panel above the keyboard like the tool panel.
                 val overlayPanelExtra = toolPanelExtra + com.kingzcheung.xime.ui.keyboard.clipboardSearchExtraHeight(
-                    state.clipboardSearchVisible, isOverlayPage, clipboardSearchResultsHeight, clipboardSearchInline)
+                    state.clipboardSearchVisible, clipboardSearchResultsHeight, clipboardSearchInline)
 
                 val isDark = isDarkTheme
                 val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
@@ -3110,11 +3112,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val bottom = keyboardBottomSpaceDp(fixed)
         val clipboardBottom = fixedClipboardBottomDp(bottom, tryGetVisibleNavBarHeightDp(this, window.window)) +
             fixed.keyboardBottomPaddingDp
+        // 和窗口高度同一口径：开着菜单等面板时工具面板、翻译栏仍在候选栏上面。
+        val toolExtra = com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
+            fixed.toolPanelVisible, fixed.toolPanelDisplay)
         val contentHeight = if (clipboardPanelCanExpand(page, false, fixed.isCompact) && fixed.clipboardImagesExpanded)
-            clipboardPanelBounds(normal.height, resources.configuration.screenHeightDp, clipboardBottom).expanded
+            clipboardPanelBounds(normal.height, resources.configuration.screenHeightDp, clipboardBottom + toolExtra).expanded
             else normal.height
-        val toolExtra = if (page !is KeyboardPage.Overlay) com.kingzcheung.xime.ui.keyboard.toolPanelExtraHeight(
-            fixed.toolPanelVisible, fixed.toolPanelDisplay) else 0
         return KeyboardDockTarget(normal.width, contentHeight + toolExtra, normal.offsetX,
             fixed.keyboardBottomPaddingDp, bottom)
     }
