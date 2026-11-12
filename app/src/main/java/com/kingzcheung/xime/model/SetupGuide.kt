@@ -238,6 +238,16 @@ object SetupGuide {
                 feedback = SetupMore.feedbackOf(SettingsPreferences.isSoundEnabled(context), SettingsPreferences.isVibrationEnabled(context)),
                 glass = glass,
                 autoPunctuation = SettingsPreferences.isSttAutoPunctuation(context),
+                // 存着的角标方式，不管滑行：开着滑行时键盘按长按处理，关了滑行就回到这里存的方式（见 SetupMore.effectiveCorner）。
+                corner = when {
+                    keys.symbolInputMode == com.kingzcheung.xime.ui.keyboard.SymbolInputMode.LONG_PRESS ->
+                        com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS
+                    keys.letterLongPressMenu -> com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE
+                    else -> com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE
+                },
+                reverseSwipe = keys.reverseSymbolSwipe,
+                glide = GlideChoice.of(keys.glideTyping, keys.chineseGlideTyping),
+                cancelButton = SettingsPreferences.shouldShowCandidateCancelButton(context),
             ),
             sttEnabled = SettingsPreferences.isSttEnabled(context),
             predictionEnabled = SettingsPreferences.isSmartPredictionEnabled(context),
@@ -248,17 +258,34 @@ object SetupGuide {
                 com.kingzcheung.xime.settings.PerformanceCosts.let { costs -> costs.source(context)?.let { costs.note(it,
                     com.kingzcheung.xime.settings.PerformanceCosts.Item.GLASS.id) } }
             }.getOrNull(),
+            reverseDeleteSwipe = keys.reverseDeleteSwipe,
+            glideLock = glideLock(keys),
         )
     }
+
+    /** 滑行被「键盘面板滑动光标」锁住时的说明，同设置页「滑行输入」；现在开着滑行的不算锁。 */
+    private fun glideLock(keys: KeyboardInputPreferences): String? =
+        InputGestureLocks.lockFor(keys, InputGestureLock.Option.GLIDE_TYPING, true)
+            ?.takeIf { !keys.glideTyping && !keys.chineseGlideTyping }?.message
 
     /**
      * 照「更多配置」改设置：只改 [from] 到 [to] 变了的项，每项都走设置页同一个写法（长按空格连带键盘滑动光标、
      * 振动关了再开恢复原来的模式），输入法监听这些设置，马上生效。返回改了的项，白话。
      */
-    fun applyMore(context: Context, from: SetupMoreChoices, to: SetupMoreChoices): List<String> {
+    fun applyMore(context: Context, from: SetupMoreChoices, wanted: SetupMoreChoices): List<String> {
         val app = context.applicationContext
-        if (to.spaceHold != from.spaceHold)
-            com.kingzcheung.xime.ui.keyboard.CursorChoices.withSpaceHold(KeyboardInputPreferences.read(app), to.spaceHold).save(app)
+        if (wanted.spaceHold != from.spaceHold)
+            com.kingzcheung.xime.ui.keyboard.CursorChoices.withSpaceHold(KeyboardInputPreferences.read(app), wanted.spaceHold).save(app)
+        // 长按空格选了「移动光标」会关掉键盘面板滑动光标、解开滑行的锁；改完还锁着就不开滑行（设置页同一把锁）。
+        val to = if (wanted.glide != from.glide && wanted.glide != GlideChoice.OFF &&
+            glideLock(KeyboardInputPreferences.read(app)) != null) wanted.copy(glide = from.glide) else wanted
+        if (to.glide != from.glide)
+            KeyboardInputPreferences.read(app).copy(glideTyping = to.glide.english, chineseGlideTyping = to.glide.chinese).save(app)
+        // 和设置页三张卡同一个写法（选长按顺带打开九键拂动）。
+        if (to.corner != from.corner) to.corner.applyTo(KeyboardInputPreferences.read(app)).save(app)
+        if (to.reverseSwipe != from.reverseSwipe)
+            KeyboardInputPreferences.read(app).copy(reverseSymbolSwipe = to.reverseSwipe).save(app)
+        if (to.cancelButton != from.cancelButton) SettingsPreferences.setShowCandidateCancelButton(app, to.cancelButton)
         if (to.deleteSkipsAssociation != from.deleteSkipsAssociation)
             SettingsPreferences.setDeleteSkipsAssociation(app, to.deleteSkipsAssociation)
         if (to.clearBeforeCursorOnly != from.clearBeforeCursorOnly)

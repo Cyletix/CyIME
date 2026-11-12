@@ -620,7 +620,8 @@ private fun MoreEntry(onClick: () -> Unit) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("更多配置", style = GuideText.optionTitle(), color = MaterialTheme.colorScheme.primary)
-                Text("长按空格、删除键、字大小、声音振动、玻璃效果、语音标点。可以不设", style = GuideText.body(),
+                Text("滑行输入、角标滑动还是长按、上下滑方向、候选栏取消按钮、长按空格、删除键、字大小、声音振动等。可以不设",
+                    style = GuideText.body(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(12.dp))
@@ -720,6 +721,47 @@ internal fun SetupMoreContent(
 
 @Composable
 private fun MoreQuestions(facts: SetupMoreFacts, answers: SetupMoreChoices, onAnswers: (SetupMoreChoices) -> Unit) {
+    // 用户 11-12：滑行、角标滑动还是长按、上下滑方向、候选栏取消按钮问的人最多，放最前面。
+    // 滑行先问：开了滑行，字母键的滑动都用来滑词，角标只能长按，下面那题跟着变。
+    val glideLocked = facts.glideLock != null && answers.spaceHold != com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.CURSOR
+    if (glideLocked) {
+        GuideHeading("要滑行输入吗？")
+        Text("${facts.glideLock}：手指在键盘上拖动已经用来移动光标。下面「长按空格」选「移动光标」，或在 设置 → 输入 → 按键与手势 里关掉它，才能开滑行。",
+            style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else GuideQuestion("要滑行输入吗？", SetupMore.glideChoices(facts.current.glide).map { choice ->
+        Triple(choice, choice.title, when (choice) {
+            com.kingzcheung.xime.model.GlideChoice.OFF -> "一个键一个键点着打"
+            com.kingzcheung.xime.model.GlideChoice.ENGLISH -> "英文 26 键手指划过字母出整词"
+            com.kingzcheung.xime.model.GlideChoice.CHINESE -> "中文全拼、双拼 26 键划一个词的拼音"
+            com.kingzcheung.xime.model.GlideChoice.BOTH -> "英文划出整词，中文全拼、双拼 26 键划一个词的拼音"
+        } + if (choice != com.kingzcheung.xime.model.GlideChoice.OFF) "；字母键的滑动都用来滑词，角标改成长按输入" else "")
+    }, answers.glide, "setup-more-glide") { onAnswers(answers.copy(glide = it)) }
+
+    val upper = if (answers.reverseSwipe) "上滑" else "下滑"
+    val lower = if (answers.reverseSwipe) "下滑" else "上滑"
+    if (SetupMore.cornerLockedByGlide(answers.glide)) {
+        GuideHeading("按键角标的符号和数字")
+        Text("开着滑行，字母键的滑动都用来滑词：按住字母键输入上方角标，下方角标不再显示。",
+            style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else GuideQuestion("按键角标的符号和数字怎么输入？", com.kingzcheung.xime.ui.keyboard.CornerInputChoice.entries.map { choice ->
+        Triple(choice, choice.label, when (choice) {
+            com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE -> "${upper}出上角标，${lower}出下角标；长按没有反应"
+            com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE -> "${upper}出上角标，${lower}出下角标；长按弹出这个字母的大写和带声调的写法"
+            com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS -> "按住一下出上角标，${lower}出下角标；九键长按出数字"
+        })
+    }, answers.corner, "setup-more-corner") { onAnswers(answers.copy(corner = it)) }
+
+    GuideQuestion("上下滑的方向", listOf(
+        Triple(false, "下滑出上角标", "上滑出下角标；删除键" + if (facts.reverseDeleteSwipe) "上滑清空、下滑撤回" else "下滑清空、上滑撤回"),
+        Triple(true, "上滑出上角标", "下滑出下角标；删除键" + if (facts.reverseDeleteSwipe) "下滑清空、上滑撤回" else "上滑清空、下滑撤回"),
+    ), answers.reverseSwipe, "setup-more-reverse",
+        note = "就是设置里的「反转上下滑方向」。") { onAnswers(answers.copy(reverseSwipe = it)) }
+
+    GuideQuestion("候选栏左边要取消按钮吗？", listOf(
+        Triple(true, "要", "打字时候选栏最左边有个左箭头，点它取消当前输入"),
+        Triple(false, "不要", "候选词从最左边开始，能多放一个词"),
+    ), answers.cancelButton, "setup-more-cancel") { onAnswers(answers.copy(cancelButton = it)) }
+
     GuideQuestion("长按空格做什么？", com.kingzcheung.xime.ui.keyboard.CursorChoices.spaceHoldChoices.map { action ->
         Triple(action, action.label, when (action) {
             com.kingzcheung.xime.ui.keyboard.SpaceHoldAction.CURSOR -> "按住空格左右滑，光标跟着走"
@@ -735,8 +777,10 @@ private fun MoreQuestions(facts: SetupMoreFacts, answers: SetupMoreChoices, onAn
         Triple(true, "退格直接删字", "第一下就删字"),
     ), answers.deleteSkipsAssociation, "setup-more-delete") { onAnswers(answers.copy(deleteSkipsAssociation = it)) }
 
-    val clear = if (facts.reverseSwipe) "上滑" else "下滑"
-    val undo = if (facts.reverseSwipe) "下滑" else "上滑"
+    // 跟着上面「上下滑的方向」那题走；删除键单独反向开着时再反过来。
+    val deleteReversed = answers.reverseSwipe != facts.reverseDeleteSwipe
+    val clear = if (deleteReversed) "上滑" else "下滑"
+    val undo = if (deleteReversed) "下滑" else "上滑"
     GuideQuestion("删除键${clear}清空时", listOf(
         Triple(false, "清空整个输入框", "光标前后的字都清；清完立刻${undo}能撤回"),
         Triple(true, "只清空光标前的内容", "光标后面的字留着"),
