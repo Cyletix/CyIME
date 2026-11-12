@@ -22,15 +22,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.glide.GlideSampleRecorder
+import com.kingzcheung.xime.handwriting.training.ContributePromptDeck
 import com.kingzcheung.xime.handwriting.training.HandwritingContribution
 import com.kingzcheung.xime.ui.common.CompactDropdownMenu
 import com.kingzcheung.xime.ui.common.CompactMenuRow
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -77,7 +80,7 @@ private suspend fun uploadPractice(context: Context, samples: List<String>) {
 
 /**
  * 「贡献滑行轨迹」页的三种键盘（用户 11-09：顶上选模式，跟手写贡献一样）。[layout] 是上传样本里的 layout，
- * 和原来练习板的一样（26 键中英文都是 qwerty）。题目同原来练习板，各加了几个常用词。
+ * 和原来练习板的一样（26 键中英文都是 qwerty）。题目见 [deck]；[prompts] 只在词表读不到时用。
  */
 internal enum class GlideContributeMode(val title: String, val layout: String, val switchTitle: String, val prompts: List<String>) {
     English("英文 26 键", "qwerty", "英文滑行",
@@ -99,12 +102,36 @@ internal enum class GlideContributeMode(val title: String, val layout: String, v
         Nine -> prefs.copy(t9GlideTyping = on)
     }
 
+    /**
+     * 这种键盘的题，每人随机（用户 11-12：原来每人都是同样 8 个词，几十个人交上来全一样）。
+     * 英文从 english.txt 常用词出，中文、九键从贡献题库的两字词出、滑全拼；按贡献编号打乱，中文和九键顺序也不同。
+     */
+    fun deck(context: Context): List<ContributePromptDeck.GlidePrompt> = runCatching {
+        val seed = ContributePromptDeck.seedOf(HandwritingContribution.writerId(context), "glide-$name")
+        when (this) {
+            English -> context.assets.open("english.txt").bufferedReader(Charsets.UTF_8)
+                .useLines { ContributePromptDeck.englishGlide(it, seed) }
+            Chinese, Nine -> context.assets.open(ContributePromptDeck.POOL_ASSET).bufferedReader(Charsets.UTF_8)
+                .useLines { ContributePromptDeck.pinyinGlide(it, seed) }
+        }
+    }.getOrNull()?.takeIf { it.isNotEmpty() } ?: prompts.map { ContributePromptDeck.GlidePrompt(it) }
+
+    /** 滑到第几题，按键盘分开记，下次进来接着滑。 */
+    fun position(context: Context): Int =
+        context.getSharedPreferences(GLIDE_PREFS, Context.MODE_PRIVATE).getInt("pos_$name", 0)
+
+    fun setPosition(context: Context, index: Int) {
+        context.getSharedPreferences(GLIDE_PREFS, Context.MODE_PRIVATE).edit().putInt("pos_$name", index).apply()
+    }
+
     val keyboardHint: String get() = when (this) {
         English -> "把键盘换成英文 26 键，从题目第一个字母滑到最后一个字母。"
         Chinese -> "把键盘换成中文全拼 26 键，按全拼滑，从第一个字母滑到最后一个字母。"
         Nine -> "把键盘换成九键，从题目第一个字母的键滑到最后一个字母的键。"
     }
 }
+
+private const val GLIDE_PREFS = "glide_contribute"
 
 /**
  * 「滑行输入」页最底下一行，点开 [GlideContributeScreen]。
@@ -123,12 +150,17 @@ internal fun GlidePracticeItem(onOpen: () -> Unit) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun GlideContributeScreen(onBack: () -> Unit, upload: suspend (Context, List<String>) -> Unit = ::uploadPractice) {
+internal fun GlideContributeScreen(
+    onBack: () -> Unit,
+    upload: suspend (Context, List<String>) -> Unit = ::uploadPractice,
+    deckOf: (Context, GlideContributeMode) -> List<ContributePromptDeck.GlidePrompt> = { c, m -> m.deck(c) },
+) {
     val context = LocalContext.current.applicationContext
     val prefs = rememberKeyboardInputPreferences()
     var settings by remember(prefs) { mutableStateOf(prefs) }
     var mode by remember { mutableStateOf(GlideContributeMode.English) }
     var modeMenu by remember { mutableStateOf(false) }
+    var deck by remember { mutableStateOf(emptyList<ContributePromptDeck.GlidePrompt>()) }
     var index by remember { mutableIntStateOf(0) }
     // 每换一题换一个输入框：输入法重新开始，上一题留在键盘里的拼音不带到下一题。
     var round by remember { mutableIntStateOf(0) }
@@ -141,10 +173,17 @@ internal fun GlideContributeScreen(onBack: () -> Unit, upload: suspend (Context,
     // 哪一题的输入框有焦点：只收本页输入框里滑的（分屏时别的应用里滑的不算）。按题记，旧框失焦晚到也不会把新框算成没焦点。
     var focusedRound by remember { mutableIntStateOf(-1) }
     val pending = remember { mutableStateListOf<String>() }
-    val prompt = mode.prompts[index % mode.prompts.size]
+    LaunchedEffect(mode) {
+        deck = emptyList()
+        val loaded = withContext(Dispatchers.IO) { deckOf(context, mode) }
+        index = mode.position(context)
+        deck = loaded
+    }
+    val current = if (deck.isEmpty()) null else deck[index % deck.size]
+    val prompt = current?.letters.orEmpty()
 
     val onStroke by rememberUpdatedState<(GlideSampleRecorder.Stroke) -> Unit> { stroke ->
-        if (focusedRound != round) return@rememberUpdatedState
+        if (focusedRound != round || prompt.isEmpty()) return@rememberUpdatedState
         val sample = if (stroke.layout == mode.layout) GlideSampleRecorder.sample(stroke, prompt) else null
         when {
             stroke.layout != mode.layout -> { hint = "现在是${if (stroke.layout == "t9") "九键" else "26 键"}，这一页要${mode.title}。" }
@@ -154,6 +193,7 @@ internal fun GlideContributeScreen(onBack: () -> Unit, upload: suspend (Context,
                 if (enabled) pending.add(sample)
                 accepted++
                 index++
+                mode.setPosition(context, index)
                 round++
                 hint = ""
             }
@@ -194,11 +234,11 @@ internal fun GlideContributeScreen(onBack: () -> Unit, upload: suspend (Context,
                     CompactDropdownMenu(expanded = modeMenu, onDismissRequest = { modeMenu = false }) {
                         for (m in GlideContributeMode.entries) CompactMenuRow(label = m.title, selected = m == mode,
                             supportingText = if (m.on(settings)) null else "${m.switchTitle}没开",
-                            onClick = { modeMenu = false; if (m != mode) { mode = m; index = 0; round++; hint = "" } })
+                            onClick = { modeMenu = false; if (m != mode) { mode = m; round++; hint = "" } })
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text("${index % mode.prompts.size + 1}/${mode.prompts.size} · 已滑 $accepted 条", fontSize = 13.sp,
+                Text(if (deck.isEmpty()) "已滑 $accepted 条" else "第 ${index % deck.size + 1} 题 · 已滑 $accepted 条", fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(12.dp))
             }
@@ -212,7 +252,11 @@ internal fun GlideContributeScreen(onBack: () -> Unit, upload: suspend (Context,
                 enabled, { turnOn ->
                     if (turnOn) showLicense = true else { enabled = false; pending.clear(); error = "" }
                 })
-            Text("请滑出 $prompt", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(when {
+                current == null -> "正在出题…"
+                current.label.isEmpty() -> "请滑出 $prompt"
+                else -> "请滑出 $prompt（${current.label}）"
+            }, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp))
             Text(mode.keyboardHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             key(round) {
                 val thisRound = round

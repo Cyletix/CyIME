@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
 
 /**
- * 「贡献手写样本」：公开版里按固定题目写字，写好的样本分享成文件或上传给作者，用来训练手写模型。
+ * 「贡献手写样本」：公开版里按题目写字（每人随机，见 [prompts]），写好的样本分享成文件或上传给作者，用来训练手写模型。
  *
  * - 只收这一页写的字；输入法手写板平时写的内容不经过这里，也不会被保存或上传。
  * - 样本存在 app 私有目录 `files/handwriting_contribute/`，和训练模式的样本分开。
@@ -45,9 +45,20 @@ object HandwritingContribution {
 
     fun uploadAvailable(): Boolean = UPLOAD_URL.isNotEmpty()
 
-    /** 固定题目：常用字、生僻字、两字词，见 tools/handwriting_training/build_contribute_prompts.py。 */
-    fun prompts(context: Context): List<TrainingPrompt> =
-        context.assets.open(ASSET).bufferedReader(Charsets.UTF_8).useLines { parse(it) }
+    /**
+     * 这个人的题：常用字、生僻字、两字词按 [writerId] 打乱穿插，每个人不一样，几千道写不完（见 [ContributePromptDeck]）。
+     * contribute_prompts.tsv 里缺数据的常用字排在前面几轮；题库读不到时只出这 150 道固定题。
+     */
+    fun prompts(context: Context): List<TrainingPrompt> {
+        val fixed = asset(context, ASSET) { parse(it) }
+        return runCatching {
+            val pools = asset(context, ContributePromptDeck.POOL_ASSET) { ContributePromptDeck.pools(fixed, it) }
+            ContributePromptDeck.handwriting(pools, ContributePromptDeck.seedOf(writerId(context)))
+        }.getOrElse { fixed }
+    }
+
+    private fun <T> asset(context: Context, name: String, read: (Sequence<String>) -> T): T =
+        context.assets.open(name).bufferedReader(Charsets.UTF_8).useLines(read)
 
     internal fun parse(lines: Sequence<String>): List<TrainingPrompt> = lines.mapNotNull { line ->
         if (line.isBlank() || line.startsWith("#")) return@mapNotNull null

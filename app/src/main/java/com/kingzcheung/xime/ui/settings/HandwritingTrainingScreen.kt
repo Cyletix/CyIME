@@ -104,6 +104,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import com.kingzcheung.xime.BuildConfig
+import com.kingzcheung.xime.handwriting.training.ContributePromptDeck
 import com.kingzcheung.xime.handwriting.training.BuiltinTrainingPrompts
 import com.kingzcheung.xime.handwriting.training.FormulaGenerator
 import com.kingzcheung.xime.handwriting.training.HandwritingContribution
@@ -309,7 +310,12 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
             return
         }
         val prompts = promptsFor(bank)
-        val index = store.position(bank).coerceIn(0, (prompts.size - 1).coerceAtLeast(0))
+        val saved = store.position(bank).coerceIn(0, (prompts.size - 1).coerceAtLeast(0))
+        // 贡献题每人随机、几千道：接着上次的位置，跳过已经写过的
+        val index = if (bank == TrainingBank.Contribute) {
+            val counts = _state.value.counts
+            ContributePromptDeck.firstUnwritten(prompts, saved) { (counts[it] ?: 0) > 0 }
+        } else saved
         _state.update { it.copy(bank = bank, prompts = prompts, index = index, custom = null, loading = false, check = null) }
     }
 
@@ -497,7 +503,9 @@ class HandwritingTrainingViewModel @JvmOverloads constructor(
         if (s.prompts.isEmpty()) return
         val next = s.index + 1
         val wrapped = next >= s.prompts.size
-        val index = if (wrapped) 0 else next
+        val index = if (s.bank == TrainingBank.Contribute) {
+            ContributePromptDeck.firstUnwritten(s.prompts, if (wrapped) 0 else next) { (s.counts[it] ?: 0) > 0 }
+        } else if (wrapped) 0 else next
         store.setPosition(s.bank, index)
         _state.update { it.copy(index = index) }
         if (wrapped) _events.tryEmit(TrainingEvent.Message(
@@ -870,7 +878,7 @@ private fun HandwritingTrainingBody(
                 Spacer(Modifier.weight(1f))
                 Text(
                     // 贡献题的条数写在下面那一行，这里只留第几题
-                    text = if (contribute && state.prompts.isNotEmpty()) "${state.index + 1}/${state.prompts.size}"
+                    text = if (contribute && state.prompts.isNotEmpty()) "第 ${state.index + 1} 题"
                     else if (state.prompts.isEmpty()) "已存 ${state.totalSamples}"
                     else "${state.index + 1}/${state.prompts.size} · 已存 ${state.totalSamples}",
                     fontSize = 13.sp,

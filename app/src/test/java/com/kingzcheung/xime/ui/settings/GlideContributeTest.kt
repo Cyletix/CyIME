@@ -8,6 +8,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.glide.GlideSampleRecorder
+import com.kingzcheung.xime.handwriting.training.ContributePromptDeck
 import com.kingzcheung.xime.keyboard.LetterKeyRect
 import org.json.JSONObject
 import org.junit.After
@@ -50,6 +51,12 @@ class GlideContributeTest {
         val ts = LongArray(steps + 1) { 5000L + it * 16L }
         return GlideSampleRecorder.Stroke(layout, keys, xs, ys, ts)
     }
+    /** 页面的题每人随机；这里用固定的几道，好断言。 */
+    private val fixedDeck: (android.content.Context, GlideContributeMode) -> List<ContributePromptDeck.GlidePrompt> =
+        { _, mode -> mode.prompts.map { ContributePromptDeck.GlidePrompt(it) } }
+    /** 题在后台读，读完才显示。 */
+    private fun waitFor(text: String) = rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+
     private fun send(s: GlideSampleRecorder.Stroke) = rule.runOnIdle { GlideSampleRecorder.record(s.layout, s.keys, s.xs, s.ys, s.ts) }
 
     @Test fun sampleKeepsTheOldFormatAndChecksStartAndEndKeys() {
@@ -80,7 +87,8 @@ class GlideContributeTest {
 
     @Test fun realKeyboardStrokesAdvanceAndUploadOnlyAfterConsent() {
         val sent = mutableListOf<String>()
-        rule.setContent { MaterialTheme { GlideContributeScreen(onBack = {}, upload = { _, rows -> sent.addAll(rows) }) } }
+        rule.setContent { MaterialTheme { GlideContributeScreen(onBack = {}, upload = { _, rows -> sent.addAll(rows) }, deckOf = fixedDeck) } }
+        waitFor("请滑出 hello")
         rule.onNodeWithTag("glide-contribute-field").performClick()
         rule.onNodeWithText("请滑出 hello").assertExists()
         // 滑错：题目不换，写原因。
@@ -126,13 +134,33 @@ class GlideContributeTest {
     }
 
     @Test fun modeMenuSwitchesToNineKeyPrompts() {
-        rule.setContent { MaterialTheme { GlideContributeScreen(onBack = {}, upload = { _, _ -> }) } }
+        rule.setContent { MaterialTheme { GlideContributeScreen(onBack = {}, upload = { _, _ -> }, deckOf = fixedDeck) } }
+        waitFor("请滑出 hello")
         rule.onNodeWithTag("glide-contribute-mode").performClick()
         rule.onNodeWithText("九键").performClick()
+        waitFor("请滑出 nihao")
         rule.onNodeWithText("请滑出 nihao").assertExists()
         rule.onNodeWithTag("glide-contribute-field").performClick()
         send(stroke("t9", nine, '6', '6'))  // n、o 都在 6
         rule.onNodeWithText("请滑出 shuru").assertExists()
+        // 滑到哪一题记下来，下次进来接着滑。
+        assertEquals(1, GlideContributeMode.Nine.position(rule.activity.applicationContext))
         GlideSampleRecorder.listener?.let { } ?: fail("页面开着时要有人收轨迹")
+    }
+
+    @Test fun realDeckDiffersBetweenModesAndShowsTheChineseWord() {
+        val context = rule.activity.applicationContext
+        val english = GlideContributeMode.English.deck(context)
+        val chinese = GlideContributeMode.Chinese.deck(context)
+        val nine = GlideContributeMode.Nine.deck(context)
+        assertTrue(english.size > 1000 && chinese.size > 1000)
+        assertTrue(english.all { it.label.isEmpty() } && chinese.all { it.label.isNotEmpty() })
+        assertNotEquals(chinese.take(20), nine.take(20))
+        rule.setContent { MaterialTheme { GlideContributeScreen(onBack = {}, upload = { _, _ -> }) } }
+        waitFor("请滑出 ${english.first().letters}")
+        rule.onNodeWithText("第 1 题 · 已滑 0 条").assertExists()
+        rule.onNodeWithTag("glide-contribute-mode").performClick()
+        rule.onNodeWithText("中文 26 键").performClick()
+        waitFor("请滑出 ${chinese.first().letters}（${chinese.first().label}）")
     }
 }
