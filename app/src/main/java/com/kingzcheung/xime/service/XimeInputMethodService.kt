@@ -2158,7 +2158,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val isHandwritingMode = (page.underlyingPage() as? KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
                 val handwritingExpansion = com.kingzcheung.xime.ui.keyboard.rememberHandwritingExpansion(
                     isHandwritingMode && !state.showKeyboardResize && !state.isCompact,
-                    state.handwritingExpanded, state.inputSessionId)
+                    state.handwritingExpanded, state.inputSessionId, instant = state.handwritingRestored)
                 val handwritingExpanded = handwritingExpansion.active
                 val clipboardPanelOpen = clipboardPanelCanExpand(page, state.showKeyboardResize, state.isCompact)
                 val imagePanelExpanded = clipboardPanelOpen && state.clipboardImagesExpanded
@@ -3556,7 +3556,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.handwritingExpanded) {
             if (event?.isCanceled != true) {
                 com.kingzcheung.xime.ui.keyboard.HandwritingFullscreenMemory.write(this, false)
-                uiState.value = uiState.value.copy(handwritingExpanded = false)
+                uiState.value = uiState.value.copy(handwritingExpanded = false, handwritingRestored = false)
             }
             return true
         }
@@ -3927,7 +3927,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 resizing = state.showKeyboardResize,
                 settingsPreview = settingsPreviewEditor,
             )) return
-        uiState.value = state.copy(handwritingExpanded = true)
+        uiState.value = state.copy(handwritingExpanded = true, handwritingRestored = true)
     }
 
     private fun requestHardwareCursorUpdates() {

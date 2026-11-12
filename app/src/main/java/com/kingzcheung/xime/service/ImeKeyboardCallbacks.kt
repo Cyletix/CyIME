@@ -289,7 +289,7 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onHandwritingExpand = { expanded ->
                 com.kingzcheung.xime.ui.keyboard.HandwritingFullscreenMemory.write(service, expanded)
-                service.uiState.value = service.uiState.value.copy(handwritingExpanded = expanded)
+                service.uiState.value = service.uiState.value.copy(handwritingExpanded = expanded, handwritingRestored = false)
             },
             onHandwritingToggle = { service.schemaController.toggleHandwriting() },
             onToggleSchemaSwitch = { sw -> service.sessionController.toggleSchemaSwitch(sw) },
