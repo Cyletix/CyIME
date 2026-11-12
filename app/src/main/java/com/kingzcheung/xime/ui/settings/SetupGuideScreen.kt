@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.ui.theme.CyMotion
 import com.kingzcheung.xime.model.BuiltinModelCatalog
 import com.kingzcheung.xime.model.FuzzyHabit
@@ -77,12 +79,15 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (
     onOpenRoute: ((String) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var facts by remember { mutableStateOf<SetupFacts?>(null) }
-    var answers by remember { mutableStateOf<SetupAnswers?>(null) }
+    // 从这页点进「性能与省电」等页面再返回时，这个界面会重新组合，remember 的回答全没了（用户 11-12）。
+    // 回答、要删的模型、开关和完成页存在跟着这一页走的 ViewModel 里，回来照原样接着显示。
+    val draft: SetupGuideDraft = viewModel()
+    var facts by remember { mutableStateOf(draft.facts) }
+    var answers by remember { mutableStateOf(draft.answers) }
     var applying by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<SetupGuide.Result?>(null) }
-    var allowMetered by remember { mutableStateOf(false) }
-    var hideDoublePinyin by remember { mutableStateOf(SetupGuidePlanner.HIDE_OTHER_DOUBLE_PINYIN_BY_DEFAULT) }
+    var result by remember { mutableStateOf(draft.result) }
+    var allowMetered by remember { mutableStateOf(draft.allowMetered) }
+    var hideDoublePinyin by remember { mutableStateOf(draft.hideDoublePinyin) }
     // 「更多配置」：从跳转页回来仍停在这一页；回答每次打开都从现在的设置读起。
     var showMore by rememberSaveable { mutableStateOf(false) }
     var moreFacts by remember { mutableStateOf<SetupMoreFacts?>(null) }
@@ -98,14 +103,24 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (
     LaunchedEffect(Unit) {
         val read = withContext(Dispatchers.IO) { SetupGuide.readFacts(context) }
         facts = read
-        answers = SetupGuidePlanner.suggest(read)
+        // 回来时设备情况重新读（期间可能下好了模型），已经选过的回答不换成推荐值。
+        if (answers == null) answers = SetupGuidePlanner.suggest(read)
     }
     val plan = remember(facts, answers) {
         val f = facts; val a = answers
         if (f != null && a != null) SetupGuidePlanner.plan(f, a) else null
     }
-    // 默认全部勾上“删掉”；换了回答，方案变了就重新全选。
-    var removeIds by remember(plan) { mutableStateOf(plan?.remove?.map { it.id }?.toSet().orEmpty()) }
+    // 默认全部勾上“删掉”；换了回答，可删的那几项变了就重新全选；没变（如从别的页面回来）留着原来的勾选。
+    val removable = plan?.remove?.map { it.id }?.toSet().orEmpty()
+    var removeIds by remember(removable) { mutableStateOf(draft.removeIdsFor(removable) ?: removable) }
+    SideEffect {
+        draft.facts = facts
+        draft.answers = answers
+        draft.result = result
+        draft.allowMetered = allowMetered
+        draft.hideDoublePinyin = hideDoublePinyin
+        draft.keepRemoveIds(removable, removeIds)
+    }
     if (showMore) {
         BackHandler { showMore = false }
         // 改了的先存下，再去别的页面，回来不丢。
@@ -158,6 +173,27 @@ fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit, onOpenPerformance: (
         // 没按推荐设置就直接去「更多配置」，也算看过这一页，下次不再自动弹出。
         onOpenMore = { SetupGuide.markShown(context); showMore = true },
     )
+}
+
+/**
+ * 推荐配置页上已经选了的东西：在设置里跟着这一页的返回栈项，在首次设置里跟着 Activity。
+ * 去「性能与省电」「更多配置」里的跳转页再回来不丢；关掉这一页（返回栈弹出）才清掉，下次进来照推荐重新选。
+ */
+class SetupGuideDraft : ViewModel() {
+    var facts: SetupFacts? = null
+    var answers: SetupAnswers? = null
+    var result: SetupGuide.Result? = null
+    var allowMetered: Boolean = false
+    var hideDoublePinyin: Boolean = SetupGuidePlanner.HIDE_OTHER_DOUBLE_PINYIN_BY_DEFAULT
+    private var removable: Set<String>? = null
+    private var removeIds: Set<String> = emptySet()
+
+    /** 可删的还是同一批时返回上次的勾选。 */
+    fun removeIdsFor(removable: Set<String>): Set<String>? = removeIds.takeIf { this.removable == removable }
+    fun keepRemoveIds(removable: Set<String>, removeIds: Set<String>) {
+        this.removable = removable
+        this.removeIds = removeIds
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
