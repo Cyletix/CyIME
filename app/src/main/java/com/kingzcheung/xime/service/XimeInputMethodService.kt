@@ -1266,9 +1266,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 withContext(Dispatchers.Main) {
                     val availableSchemas = rimeEngine.getAvailableSchemas()
                     val storedSchema = SettingsPreferences.getCurrentSchema(this@XimeInputMethodService)
-                    val selectableSchemas = if (storedSchema.isNotBlank() && storedSchema !in availableSchemas && storedSchema != com.kingzcheung.xime.settings.InputModes.ENGLISH &&
-                        (isHandwritingSchema(storedSchema) || SchemaManager.isSchemaCompiled(this@XimeInputMethodService, storedSchema)))
-                        availableSchemas.toList() + storedSchema else availableSchemas.toList()
+                    val selectableSchemas = selectableWithStored(storedSchema, availableSchemas.toList(),
+                        { SchemaManager.getEnabledSchemas(this@XimeInputMethodService) }, ::isHandwritingSchema,
+                        { SchemaManager.isSchemaCompiled(this@XimeInputMethodService, it) })
                     val savedSchema = com.kingzcheung.xime.settings.LanguagePreferences.nativeSchema(
                         storedSchema, selectableSchemas,
                         com.kingzcheung.xime.settings.LanguagePreferences.enabled(this@XimeInputMethodService))

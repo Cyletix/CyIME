@@ -396,13 +396,13 @@ object SetupGuide {
                 .putBoolean(KeyboardInputPreferences.DOUBLE_PINYIN_KEY_HINTS_KEY, true).apply()
         }
         if (redeploy) {
-            // 与「已安装的方案」里「应用方案更改」同一步。
+            // 与「已安装的方案」里「重新部署(修复)」同一步。
             val deployed = runCatching {
                 com.kingzcheung.xime.settings.KeysConfigHelper.loadConfig(app)
                 com.kingzcheung.xime.ui.theme.KeyboardThemes.reload(app)
                 com.kingzcheung.xime.rime.RimeConfigHelper.redeploy(app)
             }.getOrDefault(false)
-            if (!deployed) failed += "方案没部署成功；到 设置 → 已安装的方案 点「应用方案更改」。"
+            if (!deployed) failed += "方案没部署成功；到 设置 → 已安装的方案 点「重新部署(修复)」。"
         }
         // 方案已经部署好时直接切过去；还没部署的，输入法部署完按当前方案切。
         if (switchTo != null && com.kingzcheung.xime.rime.RimeEngine.isInitialized()) runCatching {
