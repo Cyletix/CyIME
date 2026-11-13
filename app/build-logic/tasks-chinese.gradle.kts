@@ -617,6 +617,17 @@ val prepareChineseDictionaries by tasks.registering {
             // 能找到, tuolaile 拖来了 -> 过来了). Swept on the short-sentence patches: ln 2000 broke 7 of them
             // (zaipushang 再铺上 -> 在路上) for 528 clauses, ln 100000 none for 509. 0 = off.
             "  slip_correction_margin: 9.2\n" +
+            // initials_choices: input typed as initials only (wmjs, xydj) kept the dictionary's order and made no sentence
+            // when a dictionary word had those initials. With a count above 0 the leading whole words and the sentences
+            // made of words are ordered by the same score as full input (word model + rescore_rime_weight of Rime's
+            // weight) and that many lead the menu; 0 keeps the dictionary order.
+            // initials_lead_margin: the dictionary's first word with these initials keeps the first place unless another
+            // candidate's score is higher by this much (ln 7.4). 2026-11-13 cloud engine, 1250 codes of 2-4 letters whose
+            // most likely text is clear in the word model: first choice 1007 -> 1137 without a margin, but 14 of 300
+            // common dictionary words lost the first place to a near tie (jyb 进一步 -> 加油吧, largest lead 1.43) and
+            // the reported zdky 这都可以 to 真的可以 (1.71). With 2.0: 1007 -> 1068, none of them moves.
+            "  initials_choices: 5\n" +
+            "  initials_lead_margin: 2.0\n" +
             // final_g_word_margin: a dictionary word read with the final g added (cyime_final_g_correction) leads the
             // sentence of the typed letters when the word model finds it more likely by this margin (ln 100, the
             // weight of a correction): 已安装 -14.8 against 一按转 -22.2. Of 68843 correctly typed short phrases 12

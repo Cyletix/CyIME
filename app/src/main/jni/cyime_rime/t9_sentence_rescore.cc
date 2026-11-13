@@ -56,9 +56,17 @@ bool CorrectedOnlyAtTail(const T9ScriptQuery& q, const Sentence& sentence) {
 }
 }  // namespace
 
+bool T9InitialsOnly(const string& input) {
+  if (input.size() < 2) return false;
+  for (char ch : input)
+    if (ch < 'a' || ch > 'z' || std::strchr("aeiouv", ch)) return false;
+  return true;
+}
+
 void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
                         size_t keys_per_syllable, double rime_weight, double tail_correction_margin,
-                        double slip_margin, Poet* poet,
+                        double slip_margin, int initials_choices, double initials_margin,
+                        const string& initials_first, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences) {
@@ -85,8 +93,10 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
     groups = keys / keys_per_syllable;
     consonants_only = false;
   }
-  // Initials and short abbreviations (zjqa, zdky) keep Rime's dictionary order.
-  if (ngram && !consonants_only && groups >= 2) {
+  // Initials and short abbreviations (zjqa, zdky) keep Rime's dictionary order, unless t9/initials_choices asks for
+  // the computed score there too.
+  const bool initials = consonants_only && !keys_per_syllable && initials_choices > 0 && T9InitialsOnly(in);
+  if (ngram && (initials || (!consonants_only && groups >= 2))) {
     // Substring -> model word id, kept across keys (consecutive n-bests share most substrings).
     thread_local std::unordered_map<string, int32_t> ids;
     thread_local const T9NgramModel* ids_model = nullptr;
@@ -157,6 +167,38 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
       }
       return total;
     };
+    if (initials) {
+      // Initials only (2026-11-13): whole dictionary words and sentences made of words are ordered by the same
+      // computed score as full input, so a common combination (wmjs 我们就是, xydj 需要多久) leads a rarer dictionary
+      // word (文明建设, 需要大家) by its frequency and nothing else. The translator added the leading whole words as
+      // one-word sentences. Corrected readings stay out, as for full input.
+      deque<an<Sentence>> pool;
+      std::set<string> seen;
+      for (const auto& sentence : *sentences)
+        if (!corrected(sentence) && seen.insert(sentence->text()).second) pool.push_back(sentence);
+      vector<std::pair<double, an<Sentence>>> ranked;
+      for (const auto& sentence : pool)
+        ranked.emplace_back(score(*sentence) + rime_weight * sentence->weight(), sentence);
+      if (ranked.empty()) { sentences->clear(); sentences->push_back(chosen); return; }
+      // The first choice of the old order (the dictionary's first word, or Rime's first sentence when no word has
+      // these initials) keeps its place unless another candidate's score is higher by the margin: near a tie the
+      // dictionary count and the word model disagree both ways (jyb 进一步 / 加油吧), and a word that was right
+      // must not move for that.
+      const string kept = initials_first.empty() ? ranked.front().second->text() : initials_first;
+      std::stable_sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+      if (initials_margin > 0 && ranked.front().second->text() != kept) {
+        const auto first = std::find_if(ranked.begin(), ranked.end(),
+                                        [&](const auto& item) { return item.second->text() == kept; });
+        if (first != ranked.end() && ranked.front().first - first->first < initials_margin)
+          std::rotate(ranked.begin(), first, first + 1);
+      }
+      sentences->clear();
+      for (const auto& item : ranked) {
+        if (sentences->size() >= static_cast<size_t>(initials_choices)) break;
+        sentences->push_back(item.second);
+      }
+      return;
+    }
     // A typo correction never wins on the word model alone. Corrected sentences would also take
     // n-best places from typed readings (qunawanle lost 你去哪玩了 to 你去哪完了 once swapped letters
     // were corrections), so the choice is among sentences made from the same graph without

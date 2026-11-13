@@ -85,6 +85,12 @@ struct T9ScriptOptions {
   // t9/slip_correction_margin: see T9RescoreSentences; 0 keeps a typed reading that reads in full before every
   // corrected sentence.
   double t9_slip_correction_margin_ = 0;
+  // t9/initials_choices: for input typed as initials only, how many leading candidates are chosen by the same
+  // computed score as full sentences (word model + rescore_rime_weight of Rime's weight). 0: dictionary order.
+  int t9_initials_choices_ = 0;
+  // t9/initials_lead_margin (ln units): see T9RescoreSentences; how much higher a score must be to take the first
+  // place from the dictionary's first word with these initials.
+  double t9_initials_lead_margin_ = 0.0;
   // t9/final_g_word_margin (ln units): a dictionary word that reads the whole input with the final g added
   // (translator/cyime_final_g_correction; yianzhuan: 已安装) leads the sentence of the typed letters (一按转) when the
   // word model finds its text more likely by more than this; 0 keeps the typed sentence first. Uses
