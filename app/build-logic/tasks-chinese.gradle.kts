@@ -555,7 +555,14 @@ val prepareChineseDictionaries by tasks.registering {
             "  sentence_position_initial_only: [把, 被]\n" +
             // Four sentences for t9/sentence_rescore to choose from (the menu still shows one); the cutoff
             // keeps Rime from dropping alternatives whose weight is a word penalty away.
-            "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
+            "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n" +
+            // Sentences of short input (four syllables at most) choose from two words per span, not one: liangkuaile
+            // could only be 两块 + 了, 凉快 never reached a sentence. And after the four n-best, four more whose words
+            // before the last differ (the n-best is often one word with four last characters: 语言过 语言国 语言果
+            // 语言锅, no 预言过). 2026-11-12 cloud engine, 68843 two- to four-character phrases of 51 patterns typed in
+            // full: first choice 48351 -> 50613 (2500 gained, 238 lost); long input keeps one word per span (with two,
+            // 我用纸折成了一个纸船 became 我用指着成了一个只穿).
+            "  sentence_word_homophones: 2\n  sentence_word_max_syllables: 4\n  sentence_other_prefixes: 4\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
             .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_shortcut_order", "    - lua_filter@*cyime_acronym_filter",
                 "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory")
