@@ -410,7 +410,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("开源许可证", about, SettingsRoutes.Licenses, "许可 开源 license 第三方"),
         page("日志查看器", about, SettingsRoutes.LogViewer, "日志 log 崩溃 错误"),
         page("存储空间", about, SettingsRoutes.StorageSpace, "存储 空间 占用 清理 缓存 容量 内存 运行内存 RAM 释放 安装包 体积"),
-        // 入口在首页最上面一行；搜索路径归到「智能」，和用户学习数据放在一组。
+        // 入口在首页「智能」组最后一行（带开关，关了统计也在），标题栏右边的小字只在开着时显示。
         page("打字统计", smart, SettingsRoutes.TypingStats, "统计 字数 打字速度 码长 纠错 按错 首选率 称号 输入统计"),
     ).filter {
         // Developer-only tools (handwriting training, speech tuning recordings, raw Rime file manager)
