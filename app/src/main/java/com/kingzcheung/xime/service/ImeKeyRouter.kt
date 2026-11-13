@@ -1593,7 +1593,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             if (SettingsPreferences.isSingleAssociationMode(service)) {
                                 service.predictionManager.suppressNextPredictionOnce()
                             }
-                            service.commitText(association)
+                            service.commitTextAndPredict(association, isPaste = false, chained = true)
                         }
                     } else {
                         withEditor {
@@ -2240,7 +2240,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val accepted = commitAssociationSelection(state, index,
             commit = { text ->
                 service.commitTextAndPredict(text, isPaste = false,
-                    allowPrediction = !emailSuffix && !SettingsPreferences.isSingleAssociationMode(service)).accepted
+                    allowPrediction = !emailSuffix && !SettingsPreferences.isSingleAssociationMode(service),
+                    chained = true).accepted
             },
             replace = { prefix, completion ->
                 if (service.uiState.value.inputTarget.isInternal) service.replaceBeforeCursor(prefix, completion)

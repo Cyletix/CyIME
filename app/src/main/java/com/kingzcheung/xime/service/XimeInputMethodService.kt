@@ -1220,9 +1220,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     
-    private fun getPredictionFromPlugin(contextText: String, afterWholeWord: Boolean) {
+    private fun getPredictionFromPlugin(contextText: String, afterWholeWord: Boolean, chained: Boolean = false) {
         if (!isChineseMode || !canPredictAfter(contextText)) return
-        predictionManager.getPrediction(contextText, afterWholeWord)
+        predictionManager.getPrediction(contextText, afterWholeWord, chained)
     }
 
     /** 中文输出字形：拼音、双拼、仓颉、注音都跟「繁体输出」这一个开关。 */
@@ -5522,8 +5522,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return result
     }
 
+    /** [chained]: [text] 是选中的联想词，接着出的联想要够有把握才出（[continuesAssociationChain]）。 */
     internal fun commitTextAndPredict(text: String, isPaste: Boolean, allowPrediction: Boolean = true,
-        caret: CommitCaret = CommitCaret.NONE): TextCommitResult {
+        caret: CommitCaret = CommitCaret.NONE, chained: Boolean = false): TextCommitResult {
         // Invalidate before delivery: a queued prediction or English completion must
         // not reappear after a paste, including rejected/internal-editor pastes.
         if (isPaste) dismissPredictionsForPaste()
@@ -5543,7 +5544,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
                     uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode &&
                     predictionManager.requestRevision == predictionRevision) {
-                    getPredictionFromPlugin(predictionManager.lastCommittedText, endsWithWholeWord(text))
+                    getPredictionFromPlugin(predictionManager.lastCommittedText, endsWithWholeWord(text), chained)
                 }
                 predictionManager.releasePrediction(predictionRevision)
             }
