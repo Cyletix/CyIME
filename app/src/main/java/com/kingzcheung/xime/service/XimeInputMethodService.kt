@@ -2900,10 +2900,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 callbacks = callbacks,
                                 inlineSuggestions = if (settingsPreviewEditor) emptyList() else inlineSuggestionManager?.suggestions.orEmpty(),
                                 // 悬浮透明度在卡片本身处理，宿主不再强制创建键盘大小的离屏缓冲。
+                                // 固定键盘也只在半透明或挖中缝时才用离屏图：不透明时整块画进离屏图，按一个键、键帽动一帧，
+                                // 渲染线程就要把整张键盘（平板 2800×752）重画一遍（11-13 平板 84 录的 Perfetto）。
                                 modifier = if (state.isFloatingMode || state.showKeyboardResize) Modifier
                                     else Modifier.graphicsLayer {
                                         alpha = keyboardLayerOpacity
-                                        compositingStrategy = CompositingStrategy.Offscreen
+                                        compositingStrategy = com.kingzcheung.xime.ui.keyboard.dockedKeyboardCompositing(
+                                            keyboardLayerOpacity, splitKeyboardGap.cutsKeyboard)
                                     },
                                 // 非按键交互（符号/表情面板、菜单栏、候选栏按钮）的振动，
                                 // 语义与按键按下反馈完全一致（模式/时长/振幅走同一配置）
