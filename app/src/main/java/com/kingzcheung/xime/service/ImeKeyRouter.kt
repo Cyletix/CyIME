@@ -1677,7 +1677,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         val emailDomain = emailSuffixesShown
                         val literal = withEditor {
                             service.textCommit.keyboardLiteral(routeResult.commitText, numberPanel = isNumberKeyboard)
-                                .also { service.commitText(it) }
+                                .also {
+                                    service.commitText(it)
+                                    if (isNumberKeyboard && com.kingzcheung.xime.calculator.CalculatorEngine.isCalculatorKey(key))
+                                        syncCalculatorWithEditor(it)
+                                }
                         }
                         if (isNumberKeyboard) updateCalculatorCandidates()
                         // 数字键盘、常用符号面板打的 @：和主键盘一样给邮箱后缀（默认开），接着打的数字、点重新筛。
@@ -2862,6 +2866,28 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /**
+     * 数字键盘上打完一个数字或运算符后，按光标前屏幕上的算式重新对一次（用户 11-13）：
+     * 断一会（收起键盘、切走、移过光标、去符号面板打了 ×）再接着打，和前面已经上屏的算式接上算；
+     * 选了「= 结果」后接着打，从结果往下算。读不到、密码框、键盘里的面板输入框不读，照原来按键记的算。
+     * 刚打的字不在光标前（编辑框没收），或算式比读到的这段还长，也不动。主线程调用。
+     */
+    private fun syncCalculatorWithEditor(literal: String) {
+        if (literal.isEmpty() || service.uiState.value.inputTarget.isInternal || service.isSecretEditor()) return
+        val ic = service.currentInputConnection ?: return
+        val before = runCatching { ic.getTextBeforeCursor(CALCULATOR_CONTEXT_LENGTH, 0)?.toString() }.getOrNull() ?: return
+        if (!before.endsWith(literal)) return
+        val tail = com.kingzcheung.xime.calculator.CalculatorEngine.trailingExpression(before)
+        val engine = service.calculatorEngine
+        if (tail.isEmpty()) {
+            // 光标前不是算式（移到了 abc 后面）：按键记下的旧算式也对不上屏幕了，不再给它的候选。
+            if (!before.endsWith(engine.getExpression())) engine.clear()
+            return
+        }
+        if (!tail.endsWith(literal) || tail.length >= CALCULATOR_CONTEXT_LENGTH) return
+        if (tail != engine.getExpression()) engine.resume(tail)
+    }
+
+    /**
      * 更新计算器候选栏显示
      * 显示两个候选：
      * - index 0: 计算结果（如 "2"），点击直接替换为结果
@@ -3237,3 +3263,6 @@ internal fun takesOverShiftedCandidateKey(
 
 /** 按住 Shift 选中的候选要上屏的英文；null 表示照常上屏中文。两种情况都只上屏这个词本身，不附加空格。 */
 internal fun shiftSelectionEnglish(candidate: String, englishFor: (String) -> String?): String? = englishFor(candidate)
+
+/** 接算式时读光标前多少字；算式比这还长就不接（读到的只是后半截）。 */
+private const val CALCULATOR_CONTEXT_LENGTH = 256
