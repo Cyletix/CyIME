@@ -508,7 +508,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         associationLimit = service.hardwareAssociationLimit(),
         expanded = !service.uiState.value.isCompact && service.keyboardViewModel.candidatePageExpanded.value,
         singleCharOnly = service.keyboardViewModel.singleCharFilter.value,
-        windowStart = if (service.uiState.value.isCompact) hardwareNavigation.windowStart(state) else 0)
+        windowStart = if (service.uiState.value.isCompact) hardwareNavigation.windowStart(state) else 0,
+        windowStep = if (service.uiState.value.isCompact) hardwareNavigation.step(state) else HARDWARE_PAGE_SIZE)
+
+    /** The physical-keyboard candidate row drew [words] and [count] of them fit; paging follows it. */
+    internal fun reportHardwareShown(words: List<String>, count: Int) = hardwareNavigation.reportShown(words, count)
 
     /** First engine-page index the physical-keyboard toolbar shows; read in composition, so window moves redraw it. */
     internal fun hardwareWindowStart(state: CandidateState): Int = hardwareSelectionRevision.intValue.let {
@@ -2049,7 +2053,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         publishHardwareCandidateSelection()
                     }
                 } else {
-                    pageHardwareCandidates(snapshot.state, decision.direction)
+                    pageHardwareCandidates(snapshot.state, decision.direction,
+                        stride = if (decision.wholeWindow) snapshot.words.size else null)
                     withEditor {
                         publishHardwareCandidateSelection()
                         service.updateUI()
@@ -2111,8 +2116,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /** On the compact toolbar, page through its windows before turning the engine page. */
-    private fun pageHardwareCandidates(shown: CandidateState, direction: Int) {
-        if (service.uiState.value.isCompact && hardwareNavigation.moveWindow(shown, direction)) return
+    private fun pageHardwareCandidates(shown: CandidateState, direction: Int, stride: Int? = null) {
+        if (service.uiState.value.isCompact && hardwareNavigation.moveWindow(shown, direction, stride)) return
         val paged = if (direction < 0) service.rimeEngine.hasPrevPage() && service.rimeEngine.pageUp()
             else service.rimeEngine.hasNextPage() && service.rimeEngine.pageDown()
         if (paged) hardwareNavigation.enginePaged(shown, direction)

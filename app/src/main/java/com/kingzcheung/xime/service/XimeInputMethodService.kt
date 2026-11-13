@@ -2452,6 +2452,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = false, it) },
                                 avoidBoundsInWindow = hardwareToolbarBounds.value,
                                 avoidCaret = state.cursorAnchor.takeIf { state.hardwareOptions.avoidEditor },
+                                onShown = { words, count -> keyRouter.reportHardwareShown(words, count) },
                             )
                             HardwareKeyboardToolbar(
                                 frostedGlass = glass,
@@ -2496,11 +2497,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         previousHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         nextHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         showNumberLabels = !hardwareEnglish,
-                                        commentsAreGlosses = hardwareGlosses && !hardwareCandidates.association)
+                                        commentsAreGlosses = hardwareGlosses && !hardwareCandidates.association,
+                                        onShown = { words, count -> keyRouter.reportHardwareShown(words, count) })
                                   }
                                 },
                                 showCandidatesWhenFloating = hardwareCandidates.association && !state.hardwareOptions.associationInWindow,
                                 candidatesPending = !hardwareEnglish && pendingPrediction != 0L,
+                                composing = !hardwareCandidates.association && hardwareCandidates.words.isNotEmpty(),
+                                candidatesRevision = cand.engineRevision,
                                 contentColor = hardwarePalette.candidateText,
                                 position = position,
                                 onPositionChange = { hardwareToolbarPosition.value = it },
