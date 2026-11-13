@@ -590,7 +590,7 @@ internal fun ClipboardBoardView(
                         ClipboardIncognitoNotice(onIncognitoOff)
                     }
                     if (full) item(key = "full", span = StaggeredGridItemSpan.FullLine) {
-                        Text("剪贴板已满，新复制的内容不再保存。删掉一些记录后恢复。",
+                        Text("固定和分组的记录占满了剪贴板，新复制的内容存不下。删掉一些后恢复。",
                             Modifier.padding(horizontal = 4.dp, vertical = 6.dp).testTag("clipboard-full"),
                             color = colors.error, fontSize = 13.sp)
                     }
