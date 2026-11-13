@@ -52,7 +52,10 @@ object SchemaChangeApplier {
                     RimeConfigHelper.applySchemaChanges(context)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
-                } catch (error: Exception) {
+                } catch (error: Throwable) {
+                    // Errors too (a native library that will not load, a class that failed to initialize): this loop
+                    // runs for the whole process with no handler, so one escaping would end every later apply and
+                    // crash the app. In JVM tests it also leaked into whichever test ran next.
                     FileLogger.e(TAG, "Applying schema changes failed", error)
                     RimeConfigHelper.recordFailure(context, error)
                     false
