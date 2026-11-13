@@ -1402,8 +1402,9 @@ fun KeyboardView(
                     finally { if (request == syllableRequest) syllableRequest++ }
                 }
                 val railPinyinOptions =
-                    if (isT9Layout) t9Controller.firstOptions.map { if (it.near) "≈" + it.pinyin else it.pinyin }
+                    if (isT9Layout) t9Controller.firstOptions.map { it.pinyin }
                     else syllableChoices?.labels.orEmpty()
+                val railPinyinNear = if (isT9Layout) t9Controller.firstOptions.map { it.near } else emptyList()
                 val railSelectedPinyinIndex =
                     if (isT9Layout && t9Controller.leftPanelState ==
                         T9InputController.LeftPanelState.SELECTION
@@ -1462,6 +1463,7 @@ fun KeyboardView(
                         singleCharFilter = singleCharFilter,
                         railSymbols = if (canChooseSyllable && merged14) emptyList() else customRailSymbols?.takeIf { it.isNotEmpty() },
                         railPinyinOptions = railPinyinOptions,
+                        railPinyinNear = railPinyinNear,
                         choosingMergedLetter = syllableChoices?.letterGroup != null,
                         railSelectedPinyinIndex = railSelectedPinyinIndex,
                         railAccentColor = accentColor,

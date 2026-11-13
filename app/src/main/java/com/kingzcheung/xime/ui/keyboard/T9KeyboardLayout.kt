@@ -521,7 +521,8 @@ private fun T9KeyboardContent(
                 val t9SideSymbols = customSymbols
                     ?: remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
                 val displayItems: List<String> = if (showCandidates) {
-                    currentFirstOptions.map { if (it.near) "≈" + it.pinyin else it.pinyin }
+                    // 相近读音不再加 ≈，改下划线和浅色（T9CandidateItem.approximate，用户 11-13）。
+                    currentFirstOptions.map { it.pinyin }
                 } else {
                     t9SideSymbols
                 }
@@ -566,8 +567,11 @@ private fun T9KeyboardContent(
                             textColor = keyTextColor,
                             backgroundColor = keyBackgroundColor,
                             accentColor = accentColor,
-                            fontSize = candidateFontSize.sp,
+                            // 读音用大一号的字，每个各自缩到放得下；符号列表照旧。
+                            fontSize = (if (option != null) metrics.pinyinFontSizeSp else candidateFontSize).sp,
                             isSelected = isSelected,
+                            approximate = option?.near == true,
+                            fitWidth = option != null,
                             modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp)
                                 .testTag("t9-pinyin-option:$index")
                         )
@@ -980,6 +984,10 @@ internal fun T9CandidateItem(
     fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
     isSelected: Boolean = false,
     preserveWidth: Boolean = false,
+    /** 相近读音（模糊音、纠错）：下划线、颜色浅一些，不再在前面加 ≈（用户 11-13）。 */
+    approximate: Boolean = false,
+    /** 字太宽时缩到放得下（读音一律缩，保证完整显示）；符号列表不缩，照旧。 */
+    fitWidth: Boolean = false,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
@@ -1001,43 +1009,62 @@ internal fun T9CandidateItem(
             },
         contentAlignment = Alignment.Center
     ) {
-        val fittedFontSize = if (text.startsWith("≈")) {
-            val measured = rememberTextMeasurer().measure(text, style = TextStyle(fontSize = fontSize,
-                fontFamily = AppFonts.candidateFontFamily, fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal)).size.width
-            val usable = with(LocalDensity.current) { (maxWidth - 6.dp).toPx() }.coerceAtLeast(1f)
-            fontSize * minOf(1f, usable / measured.coerceAtLeast(1))
-        } else fontSize
+        val shown = if (preserveWidth) text else punctuationKeyLabel(text)
+        val available = maxWidth - if (isSelected) 12.dp else 6.dp
+        val modifierWithMeaning = if (approximate) Modifier.semantics { contentDescription = "相近读音 $text" } else Modifier
         if (isSelected) {
             Box(
-                modifier = Modifier
+                modifier = modifierWithMeaning
                     .clip(RoundedCornerShape(5.dp))
                     .background(accentColor.copy(alpha = 0.2f))
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
-                Text(
-                    text = if (preserveWidth) text else punctuationKeyLabel(text),
-                    color = accentColor,
-                    fontSize = fittedFontSize,
-                    lineHeight = fittedFontSize * 1.2f,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    fontFamily = AppFonts.candidateFontFamily
-                )
+                FittedRailText(shown, accentColor, fontSize, FontWeight.Medium, approximate,
+                    if (fitWidth) available else null)
             }
         } else {
-            Text(
-                text = if (preserveWidth) text else punctuationKeyLabel(text),
-                color = textColor,
-                fontSize = fittedFontSize,
-                    lineHeight = fittedFontSize * 1.2f,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                fontFamily = AppFonts.candidateFontFamily
-            )
+            FittedRailText(shown, if (approximate) approximateRailColor(textColor) else textColor, fontSize,
+                FontWeight.Normal, approximate, if (fitWidth) available else null, modifierWithMeaning)
         }
     }
+}
+
+/** 相近读音的字色：同一字色淡一些，配下划线；选中时仍用强调色。 */
+internal fun approximateRailColor(textColor: Color): Color = textColor.copy(alpha = textColor.alpha * 0.62f)
+
+/**
+ * 左栏一行字：给了 [maxWidth] 时按实际字体量宽，放不下就缩小字号直到整行放得下（长读音 zhuang 也完整显示，
+ * 用户 11-13）；相近读音加下划线。
+ */
+@Composable
+internal fun FittedRailText(
+    text: String,
+    color: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight,
+    approximate: Boolean,
+    maxWidth: Dp?,
+    modifier: Modifier = Modifier,
+) {
+    val style = TextStyle(fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily, fontWeight = fontWeight)
+    val fitted = if (maxWidth == null) fontSize else {
+        val measured = rememberTextMeasurer().measure(text, style = style, maxLines = 1, softWrap = false).size.width
+        val usable = with(LocalDensity.current) { maxWidth.toPx() }.coerceAtLeast(1f)
+        fontSize * minOf(1f, usable / measured.coerceAtLeast(1))
+    }
+    Text(
+        text = text,
+        modifier = modifier,
+        color = color,
+        fontSize = fitted,
+        lineHeight = fitted * 1.2f,
+        fontWeight = fontWeight,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        softWrap = false,
+        fontFamily = AppFonts.candidateFontFamily,
+        textDecoration = if (approximate) androidx.compose.ui.text.style.TextDecoration.Underline else null,
+    )
 }
 
 /** 0 键「下一项」箭头的基准尺寸。 */
