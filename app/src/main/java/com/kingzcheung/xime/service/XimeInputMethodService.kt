@@ -3787,7 +3787,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         
         uiState.value = uiState.value.copy(
             inputSessionId = System.nanoTime(),
-            isAddressField = editorInputPolicy.field.isAddressField,
+            // 语言键菜单里中文指向进框前的方案：网址、邮箱框和可见密码框（代码编辑器）都先给英文、能切回中文。
+            isAddressField = editorInputPolicy.field.allowsNativeInput,
             isAsciiMode = editorPresentation.isAsciiMode,
             currentSchemaId = editorPresentation.currentSchemaId,
             clipboardImagesExpanded = false,

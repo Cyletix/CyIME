@@ -407,7 +407,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     private val keyEventFieldKinds = setOf(EditorFieldPolicy.Kind.NUMBER_PASSWORD, EditorFieldPolicy.Kind.NUMBER,
-        EditorFieldPolicy.Kind.PHONE, EditorFieldPolicy.Kind.PASSWORD)
+        EditorFieldPolicy.Kind.PHONE, EditorFieldPolicy.Kind.PASSWORD, EditorFieldPolicy.Kind.VISIBLE_PASSWORD)
 
     /** 实体键盘打字中（有编码或候选）；按键队列外读界面状态，和 Esc 的判断一样。 */
     internal fun hardwareComposing(): Boolean {
