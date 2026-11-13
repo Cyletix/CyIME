@@ -542,6 +542,13 @@ val prepareChineseDictionaries by tasks.registering {
             // neighbour corrections read them in full (zhen'zheng): such an initial weighs as a slip and the corrected
             // sentence comes first; long input is corrected from its start (docs/development/typo-correction-20261021.md).
             "  cyime_stray_initial_correction: true\n" +
+            // The final g left off (yianzhuan 已安装, xiwan 希望; 600 of the 1500 most common words end in ng): the
+            // letters that end the input on -n are also read as the -ng syllable, as a correction. Such a word is
+            // listed among the typed words by weight (0.01 like any correction: yijin 一斤 一进 已经) and leads a typed
+            // word only when 2000 times as common, as other corrections do; against a typed sentence see
+            // t9/final_g_word_margin below. 2026-11-12 cloud engine, the 600 words with the g left off: first 112 -> 306,
+            // first three 115 -> 533, first five 116 -> 580; 3000 correctly typed words ending in -n all kept first.
+            "  cyime_final_g_correction: true\n" +
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
             "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
             // 把/被 open a verb phrase and never end a sentence: shuoshuobei is 说说呗, not 说说被.
@@ -587,6 +594,11 @@ val prepareChineseDictionaries by tasks.registering {
             // abbreviations when the corrected sentence beats them by this margin (ln units; ln 20 like the other typo gates).
             // 11-11 tablet: the typed readings 你受 / 近体是你 / 歇息人 came first. To be swept on the computer (0 = off).
             "  tail_correction_margin: 3.0\n" +
+            // final_g_word_margin: a dictionary word read with the final g added (cyime_final_g_correction) leads the
+            // sentence of the typed letters when the word model finds it more likely by this margin (ln 100, the
+            // weight of a correction): 已安装 -14.8 against 一按转 -22.2. Of 68843 correctly typed short phrases 12
+            // changed (很聪敏 -> 很聪明, 灭完 -> 灭亡); at ln 20 it was 23. 0 = off.
+            "  final_g_word_margin: 4.6\n" +
             "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n" +
             // CyLM (CyIME-Windows tools/cylm) puts its best sentence first when its files are in the Rime user
             // directory. Only the 装到我的设备 package carries them; without them the open fails once and Rime's

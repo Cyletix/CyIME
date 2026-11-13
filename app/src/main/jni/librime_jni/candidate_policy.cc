@@ -406,6 +406,29 @@ class PolicyTranslation : public Translation {
       const auto top = As<Phrase>(Candidate::GetGenuineCandidate(head_.front()));
       if (!syllable && top && !As<Sentence>(top) && top->end() == end_ && HanCharacters(top->text()).size() >= 2 &&
           SpellingCoverage(top) >= 0.5) {
+        // A corrected whole word is first listed by its weight among the typed words (2026-11-12): the translator puts
+        // every typed word of the full length before any corrected one, so 已经 for yijin came after ten words read
+        // yi'jin, off the first page (of the 1500 most common words, 600 end in ng; with the g left off 484 were not
+        // in the first five). Its weight carries the correction penalty (0.01 per corrected syllable), so it only
+        // passes typed words at least 100 times rarer, and never takes the first place here: that is decided below.
+        // Learned words keep their places (their weights are on another scale).
+        {
+          size_t best = 0;
+          double best_weight = 0;
+          for (size_t i = 2; i < head_.size(); ++i) {
+            const auto p = As<Phrase>(Candidate::GetGenuineCandidate(head_[i]));
+            if (!p || As<Sentence>(p) || p->end() != end_ || head_[i]->start() != 0 || p->type() == "user_phrase" ||
+                corrections(p) == 0 || HanCharacters(p->text()).size() < 2) continue;
+            if (!best || p->weight() > best_weight) { best = i; best_weight = p->weight(); }
+          }
+          for (size_t i = 1; best && i < best; ++i) {
+            const auto p = As<Phrase>(Candidate::GetGenuineCandidate(head_[i]));
+            if (!p || As<Sentence>(p) || p->end() != end_ || p->type() == "user_phrase" || corrections(p) > 0 ||
+                HanCharacters(p->text()).empty() || p->weight() >= best_weight) continue;
+            std::rotate(head_.begin() + i, head_.begin() + best, head_.begin() + best + 1);
+            break;
+          }
+        }
         const auto limit = head_.begin() + std::min<size_t>(5, head_.size());
         int count = 0;
         const auto corrected = std::find_if(head_.begin() + 1, limit, [&](const auto& c) {
