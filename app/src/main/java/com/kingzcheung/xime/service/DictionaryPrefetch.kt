@@ -31,6 +31,7 @@ import com.kingzcheung.xime.platform.AndroidPlatform
  *
  * 九键、14 键、注音（用词组模型的方案）的文件按「整份」看：抽查到缺页就补，不按九成算热（平板 11-13 实测：
  * 冷启动那一轮在编码长度 6、13、17、24 处卡 70~106 ms，全是等读盘；同样的字预热一遍后 P90 44 ms、零读盘）。
+ * 键盘开着时换到这类方案（26 键换九键）也查一次：弹键盘那次查的是 26 键的文件，九键的模型可能刚在收起时放掉。
  */
 internal class PrefetchPolicy(
     val minIntervalMs: Long = 60_000L,
@@ -71,9 +72,11 @@ internal class PrefetchPolicy(
 
     /**
      * Residency was read; returns the files to prefetch, most valuable first, within the memory
-     * [headroomBytes] above [reserveBytes].
+     * [headroomBytes] above [reserveBytes]. [switched]: the files of a schema just switched to while the
+     * keyboard is up; the refill interval (which spaces out refills of the same files) does not hold them back.
      */
-    fun plan(now: Long, files: List<FileState>, headroomBytes: Long, reserveBytes: Long): List<String> {
+    fun plan(now: Long, files: List<FileState>, headroomBytes: Long, reserveBytes: Long,
+             switched: Boolean = false): List<String> {
         lastCheckAt = now
         val total = files.sumOf { it.bytes }.coerceAtLeast(1)
         val resident = files.sumOf { (it.bytes * it.resident).toLong() }.toFloat() / total
@@ -89,7 +92,7 @@ internal class PrefetchPolicy(
             thrashCounted = true
             widen()
         }
-        if (!faultsSeen && sinceLast != null && sinceLast < intervalMs) return emptyList()
+        if (!switched && !faultsSeen && sinceLast != null && sinceLast < intervalMs) return emptyList()
         var room = headroomBytes - reserveBytes
         val chosen = mutableListOf<String>()
         for (file in files) {
@@ -149,20 +152,15 @@ internal object DictionaryPrefetch {
      */
     private val RETRY_DELAYS_MS = listOf(300L, 700L, 1_500L, 3_000L)
 
+    /** Keyboard up (between onShow and onHide): a schema switch now is typed on right away. */
+    @Volatile private var visible = false
+
     fun onShow(context: Context, scope: CoroutineScope, engine: RimeEngine) {
         val now = SystemClock.elapsedRealtime()
         faultsAtShow = majorFaults()
-        val activity = context.getSystemService(ActivityManager::class.java)
-        val memory = ActivityManager.MemoryInfo().also { info -> runCatching { activity?.getMemoryInfo(info) } }
-        val power = context.getSystemService(PowerManager::class.java)
-        val conditions = PrefetchPolicy.Conditions(
-            powerSave = power?.isPowerSaveMode == true,
-            lowRamDevice = activity?.isLowRamDevice == true,
-            lowMemory = memory.lowMemory,
-            thermalSevere = AndroidPlatform.thermalStatus &&
-                (power?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_SEVERE,
-        )
+        val (conditions, memory) = readConditions(context)
         val serial = ++showSerial
+        visible = true
         if (!synchronized(policy) { policy.shouldCheck(now, conditions) }) return
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -171,23 +169,64 @@ internal object DictionaryPrefetch {
                     schema = engine.getCurrentSchema()
                     engine.prefetchCandidates(schema)
                 }
-                val full = candidates.any { File(it).name == T9_MODEL_FILE }
-                val files = candidates.mapNotNull { path ->
-                    val fraction = engine.residentFraction(path)
-                    if (fraction < 0) null else PrefetchPolicy.FileState(path, File(path).length(), fraction, full)
-                }
-                if (files.isEmpty()) return@runCatching
-                // Leave the system its low-memory threshold plus an eighth of RAM after reading.
-                val reserve = maxOf(memory.threshold, memory.totalMem / 8)
-                val chosen = synchronized(policy) { policy.plan(now, files, memory.availMem, reserve) }
-                val requested = chosen.sumOf { engine.prefetchFile(it).coerceAtLeast(0) }
-                if (requested > 0) FileLogger.i(TAG, "schema=$schema requested=${requested}KB files=${chosen.size} " +
-                    "interval=${policy.intervalMs / 1000}s")
+                fill(engine, schema, candidates, now, memory, switched = false)
             }.onFailure { FileLogger.w(TAG, "prefetch skipped: ${it.message}") }
         }
     }
 
+    /**
+     * 键盘开着时换了方案（如 26 键换九键）：弹键盘那次查的是旧方案的文件，九键词组模型还可能在上次收起时放掉了，
+     * 换过来头几键全在等读盘。只管用词组模型的方案（九键、14 键、注音）；26 键照旧只在弹键盘时查。
+     * 省电、发热、内存紧这些条件照旧挡着。在哪个线程调都行，活都在 IO 线程做。
+     */
+    fun onSchemaSwitched(context: Context, scope: CoroutineScope, engine: RimeEngine, schemaId: String) {
+        if (!visible || schemaId.isEmpty()) return
+        val serial = showSerial
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                val now = SystemClock.elapsedRealtime()
+                val (conditions, memory) = readConditions(context)
+                if (synchronized(policy) { policy.blocked(now, conditions) }) return@runCatching
+                val candidates = retryWhileEmpty(RETRY_DELAYS_MS, { showSerial == serial }) {
+                    engine.prefetchCandidates(schemaId)
+                }
+                if (candidates.none { File(it).name == T9_MODEL_FILE }) return@runCatching
+                fill(engine, schemaId, candidates, now, memory, switched = true)
+            }.onFailure { FileLogger.w(TAG, "prefetch on switch skipped: ${it.message}") }
+        }
+    }
+
+    private fun readConditions(context: Context): Pair<PrefetchPolicy.Conditions, ActivityManager.MemoryInfo> {
+        val activity = context.getSystemService(ActivityManager::class.java)
+        val memory = ActivityManager.MemoryInfo().also { info -> runCatching { activity?.getMemoryInfo(info) } }
+        val power = context.getSystemService(PowerManager::class.java)
+        return PrefetchPolicy.Conditions(
+            powerSave = power?.isPowerSaveMode == true,
+            lowRamDevice = activity?.isLowRamDevice == true,
+            lowMemory = memory.lowMemory,
+            thermalSevere = AndroidPlatform.thermalStatus &&
+                (power?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_SEVERE,
+        ) to memory
+    }
+
+    private fun fill(engine: RimeEngine, schema: String, candidates: List<String>, now: Long,
+                     memory: ActivityManager.MemoryInfo, switched: Boolean) {
+        val full = candidates.any { File(it).name == T9_MODEL_FILE }
+        val files = candidates.mapNotNull { path ->
+            val fraction = engine.residentFraction(path)
+            if (fraction < 0) null else PrefetchPolicy.FileState(path, File(path).length(), fraction, full)
+        }
+        if (files.isEmpty()) return
+        // Leave the system its low-memory threshold plus an eighth of RAM after reading.
+        val reserve = maxOf(memory.threshold, memory.totalMem / 8)
+        val chosen = synchronized(policy) { policy.plan(now, files, memory.availMem, reserve, switched) }
+        val requested = chosen.sumOf { engine.prefetchFile(it).coerceAtLeast(0) }
+        if (requested > 0) FileLogger.i(TAG, "schema=$schema requested=${requested}KB files=${chosen.size} " +
+            "interval=${policy.intervalMs / 1000}s" + if (switched) " switched" else "")
+    }
+
     fun onHide() {
+        visible = false
         showSerial++
         val start = faultsAtShow
         val end = majorFaults()

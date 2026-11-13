@@ -66,6 +66,32 @@ class DictionaryPrefetchTest {
         assertEquals(1, calls)
     }
 
+    /**
+     * 平板 84（11-13）：键盘开着从 26 键换到九键时没有补读。弹键盘那次刚补过 26 键的文件，
+     * 一分钟间隔不能挡住新方案的模型；内存不够照旧不读。
+     */
+    @Test fun aSchemaSwitchedToIsFilledInsideTheRefillInterval() {
+        val policy = PrefetchPolicy()
+        assertEquals(listOf("prism", "table", "model"), policy.plan(0, files(0f), 4 * gb, 1 * gb))
+        val model = listOf(PrefetchPolicy.FileState("model", 105 * mb, 0.4f, full = true))
+        assertEquals(emptyList<String>(), policy.plan(5_000, model, 4 * gb, 1 * gb))
+        assertEquals(listOf("model"), policy.plan(5_000, model, 4 * gb, 1 * gb, switched = true))
+        assertEquals(emptyList<String>(), policy.plan(6_000, model, 1 * gb, 1 * gb, switched = true))
+    }
+
+    /** 源码检查：引擎换方案成功后通知服务，服务在创建时接上、销毁时摘掉。 */
+    @Test fun aSuccessfulSchemaSwitchReachesThePrefetch() {
+        fun source(path: String) = listOf("src/main/java/com/kingzcheung/xime/$path",
+            "app/src/main/java/com/kingzcheung/xime/$path").map { java.io.File(it) }.first { it.isFile }.readText()
+        val engine = source("rime/RimeEngine.kt")
+        val switch = engine.substring(engine.indexOf("fun switchSchema(schemaId: String): Boolean {")).substringBefore("private fun switchSchemaLocked")
+        assertTrue(switch, switch.contains("if (switched) runCatching { onSchemaSwitched?.invoke(schemaId) }"))
+        val service = source("service/XimeInputMethodService.kt")
+        assertTrue(service.contains("rimeEngine.onSchemaSwitched = schemaSwitchPrefetch"))
+        assertTrue(service.contains("if (rimeEngine.onSchemaSwitched === schemaSwitchPrefetch) rimeEngine.onSchemaSwitched = null"))
+        assertTrue(service.contains("DictionaryPrefetch.onSchemaSwitched(this, serviceScope, rimeEngine, schemaId)"))
+    }
+
     @Test fun checksAreSpacedButTypingFaultsBypassTheInterval() {
         val policy = PrefetchPolicy()
         policy.plan(0, files(0f), 4 * gb, 1 * gb)

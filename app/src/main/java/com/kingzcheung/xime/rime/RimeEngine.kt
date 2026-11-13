@@ -962,6 +962,12 @@ class RimeEngine {
         }
     }
 
+    /**
+     * 换方案成功后通知（锁已放开，在调用 switchSchema 的线程上）。服务拿它在键盘开着换到九键时补读词组模型；
+     * 只放一个，服务创建时设、销毁时清。
+     */
+    @Volatile var onSchemaSwitched: ((String) -> Unit)? = null
+
     fun switchSchema(schemaId: String): Boolean {
         // 部署/全量编译进行中（30s+）不阻塞等待：直接返回 false，避免主线程
         // onStartInput/selectSchema 等路径 ANR。部署完成后的 initRimeEngine
@@ -970,6 +976,12 @@ class RimeEngine {
             FileLogger.w(TAG, "switchSchema($schemaId) skipped: deployment in progress")
             return false
         }
+        val switched = switchSchemaLocked(schemaId)
+        if (switched) runCatching { onSchemaSwitched?.invoke(schemaId) }
+        return switched
+    }
+
+    private fun switchSchemaLocked(schemaId: String): Boolean {
         mutateLocked {
             if (!nativeHasSession()) {
                 FileLogger.w(TAG, "switchSchema($schemaId) failed: no rime session")

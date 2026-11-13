@@ -1138,6 +1138,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         com.kingzcheung.xime.stats.TypingStats.init(this)
         com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter = handwritingGlassRegionReporter
         com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.requester = cursorLineRequester
+        // 键盘开着换到九键（14 键、注音）：补读新方案的词组模型，不等头几键读盘。
+        rimeEngine.onSchemaSwitched = schemaSwitchPrefetch
         // 记录与打字速度有关的本机状态（用户词库体积、可选模型、内存余量），只记数量不记内容。
         serviceScope.launch(Dispatchers.IO) {
             delay(5_000)
@@ -3318,6 +3320,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** 引擎换方案后的回调（见 onCreate）：键盘开着时给新方案补读，活在 IO 线程做。 */
+    private val schemaSwitchPrefetch: (String) -> Unit = { schemaId ->
+        DictionaryPrefetch.onSchemaSwitched(this, serviceScope, rimeEngine, schemaId)
+    }
+
     private var hardwareCursorImmediateOnly = false
     private var cursorLinePending = false
     // 移光标开始时要一次输入框排版；实体键盘模式已常驻监听，等下一次更新即可。输入法内部输入框不向宿主要。
@@ -4985,6 +4992,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onDestroy() {
         if (EnterProbe.service?.get() === this) EnterProbe.service = null
+        if (rimeEngine.onSchemaSwitched === schemaSwitchPrefetch) rimeEngine.onSchemaSwitched = null
         KeyboardPanelLaunch.previewVisible = false
         com.kingzcheung.xime.runtime.adaptation.CpuBenchmarkRunner.keyboardShown = false
         if (com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter === handwritingGlassRegionReporter)
