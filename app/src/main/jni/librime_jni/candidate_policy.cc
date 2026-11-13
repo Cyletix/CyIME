@@ -439,8 +439,15 @@ class PolicyTranslation : public Translation {
         static const double kPenalty = std::log(100.0), kMargin = std::log(2000.0);
         if (corrected != limit && corrections(top) == 0) {
           const auto p = As<Phrase>(Candidate::GetGenuineCandidate(*corrected));
-          if (top->type() != "user_phrase" && p->type() != "user_phrase" &&
-              p->weight() + count * kPenalty >= top->weight() + kMargin)
+          // Only the first corrected syllable's penalty is given back (2026-11-12): a word that needs two or three
+          // slips at once must be 100 times more common again for each further one. With every penalty given back,
+          // paofuchan (剖腹产 as commonly misread) gave 排土场 first once a dropped final g counted as a slip too:
+          // o for i, f for t and the g, three in one word. That entry has no count in the dictionary at all (the
+          // misreadings of others.dict), which reads as rarer than anything: a typed word counts as seen once at least
+          // (a dictionary weight is ln count - ln 1e8, Dictionary's kS).
+          static const double kOnce = -std::log(1e8);
+          if (top->type() != "user_phrase" && p->type() != "user_phrase" && count > 0 &&
+              p->weight() + kPenalty >= std::max(top->weight(), kOnce) + kMargin)
             std::rotate(head_.begin(), corrected, corrected + 1);
         }
       }
