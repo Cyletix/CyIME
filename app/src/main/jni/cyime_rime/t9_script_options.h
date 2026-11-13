@@ -82,6 +82,9 @@ struct T9ScriptOptions {
   double t9_rescore_rime_weight_ = 0;
   // t9/tail_correction_margin: see T9RescoreSentences; 0 keeps a slip in the last syllable behind the typed reading.
   double t9_tail_correction_margin_ = 0;
+  // t9/slip_correction_margin: see T9RescoreSentences; 0 keeps a typed reading that reads in full before every
+  // corrected sentence.
+  double t9_slip_correction_margin_ = 0;
   // t9/final_g_word_margin (ln units): a dictionary word that reads the whole input with the final g added
   // (translator/cyime_final_g_correction; yianzhuan: 已安装) leads the sentence of the typed letters (一按转) when the
   // word model finds its text more likely by more than this; 0 keeps the typed sentence first. Uses

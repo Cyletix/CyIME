@@ -57,7 +57,8 @@ bool CorrectedOnlyAtTail(const T9ScriptQuery& q, const Sentence& sentence) {
 }  // namespace
 
 void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
-                        size_t keys_per_syllable, double rime_weight, double tail_correction_margin, Poet* poet,
+                        size_t keys_per_syllable, double rime_weight, double tail_correction_margin,
+                        double slip_margin, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences) {
@@ -230,6 +231,28 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
       if (tail && tail_score > chosen_score + tail_correction_margin) {
         sentences->clear();
         sentences->push_back(tail);
+        sentences->push_back(chosen);
+        return;
+      }
+    }
+    // A slip anywhere in a sentence (2026-11-13, nichifanoema: 你吃饭哦饿吗 led 你吃饭了吗). Pinyin is dense, so the
+    // letters of a slip nearly always still read as something and the typed reading kept the first place whatever it
+    // said. A corrected sentence among Rime's n-best now leads when the word model finds it more likely than the
+    // typed choice by `slip_margin` for every corrected syllable (t9/slip_correction_margin, ln units; 0: off).
+    // The typed choice follows.
+    if (slip_margin > 0 && q.enable_correction && std::isfinite(chosen_score) && !corrected(chosen)) {
+      an<Sentence> fixed;
+      double fixed_score = chosen_score;
+      for (const auto& sentence : *sentences) {
+        if (!corrected(sentence)) continue;
+        const string marks = sentence->correction_marks();
+        const auto slips = std::max<std::ptrdiff_t>(1, std::count(marks.begin(), marks.end(), '='));
+        const double value = score(*sentence) + rime_weight * sentence->weight() - slip_margin * slips;
+        if (value > fixed_score) { fixed_score = value; fixed = sentence; }
+      }
+      if (fixed) {
+        sentences->clear();
+        sentences->push_back(fixed);
         sentences->push_back(chosen);
         return;
       }

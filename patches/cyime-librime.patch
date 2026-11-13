@@ -2002,7 +2002,7 @@ index 459f31d..2899e00 100644
  
  }  // namespace rime
 diff --git a/src/rime/gear/script_translator.cc b/src/rime/gear/script_translator.cc
-index 99e4511..7ea9b4b 100644
+index 99e4511..d6afbb4 100644
 --- a/src/rime/gear/script_translator.cc
 +++ b/src/rime/gear/script_translator.cc
 @@ -7,6 +7,7 @@
@@ -2622,7 +2622,7 @@ index 99e4511..7ea9b4b 100644
 +  if (t9_sentence_rescore_ && (sentences_.size() > 1 || lone_correction)) {
 +    // cyime_rime/t9_sentence_rescore.cc
 +    const an<PhraseSyllabifier> phrase_syllabifier = syllabifier_;
-+    T9RescoreSentences(T9Query(phrase_syllabifier), t9_ngram_.get(), t9_ngram_sentence_start_, t9_rescore_keys_per_syllable_, t9_rescore_rime_weight_, t9_tail_correction_margin_, poet_,
++    T9RescoreSentences(T9Query(phrase_syllabifier), t9_ngram_.get(), t9_ngram_sentence_start_, t9_rescore_keys_per_syllable_, t9_rescore_rime_weight_, t9_tail_correction_margin_, t9_slip_correction_margin_, poet_,
 +                       t9_sentence_graph_, SentencesToMake(), sentence_cutoff_threshold_, exact_sentence_, rime_best,
 +                       &sentences_);
 +  }

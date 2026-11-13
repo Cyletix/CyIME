@@ -23,8 +23,11 @@ class Sentence;
 // clear margin (youfaxyigewenti: Rime ranks 又发现一个问题 first, the model alone took 有发现一个问题).
 // `tail_correction_margin` (t9/tail_correction_margin): a sentence corrected only in its last word of three letters
 // or more leads when the typed letters do not read in full and it beats the typed choice by this margin (0: off).
+// `slip_margin` (t9/slip_correction_margin): a corrected sentence leads a typed one that reads in full when it
+// beats it by this margin for every corrected syllable (0: off).
 void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool ngram_sentence_start,
-                        size_t keys_per_syllable, double rime_weight, double tail_correction_margin, Poet* poet,
+                        size_t keys_per_syllable, double rime_weight, double tail_correction_margin,
+                        double slip_margin, Poet* poet,
                         const WordGraph* sentence_graph, int max_sentences, double cutoff,
                         const an<Sentence>& exact_sentence, const an<Sentence>& rime_best,
                         deque<an<Sentence>>* sentences);

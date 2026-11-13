@@ -608,6 +608,15 @@ val prepareChineseDictionaries by tasks.registering {
             // abbreviations when the corrected sentence beats them by this margin (ln units; ln 20 like the other typo gates).
             // 11-11 tablet: the typed readings 你受 / 近体是你 / 歇息人 came first. To be swept on the computer (0 = off).
             "  tail_correction_margin: 3.0\n" +
+            // slip_correction_margin: a corrected sentence leads a typed one that reads in full when the word model finds
+            // it more likely by this margin for every corrected syllable (ln 10000, like correction_penalty above). One
+            // neighbour-key slip in a sentence nearly always still reads as something (nichifanoema: 你吃饭哦饿吗 led
+            // 你吃饭了吗). 2026-11-13 cloud engine, this rule alone on main: 120 held-out everyday clauses, one slip at
+            // five places each, first choice 382 -> 527 of 600; 4000 short phrases with one slip 2030 -> 2392. Of 68843
+            // correctly typed short phrases 91 changed their first choice, 2 of them right before (nengzhaidao 能摘到 ->
+            // 能找到, tuolaile 拖来了 -> 过来了). Swept on the short-sentence patches: ln 2000 broke 7 of them
+            // (zaipushang 再铺上 -> 在路上) for 528 clauses, ln 100000 none for 509. 0 = off.
+            "  slip_correction_margin: 9.2\n" +
             // final_g_word_margin: a dictionary word read with the final g added (cyime_final_g_correction) leads the
             // sentence of the typed letters when the word model finds it more likely by this margin (ln 100, the
             // weight of a correction): 已安装 -14.8 against 一按转 -22.2. Of 68843 correctly typed short phrases 12
