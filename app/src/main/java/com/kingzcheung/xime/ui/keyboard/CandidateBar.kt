@@ -1591,6 +1591,12 @@ internal fun FixedCandidateStrip(
     val measurer = rememberTextMeasurer()
     var stripOriginX by remember { mutableStateOf(Float.NaN) }
     val density = LocalDensity.current
+    // 排窗口只要宽度：只算固有宽度、跨按键记着（见 CandidateTextWidths）；两行排版仍用 measurer。
+    val fontFamilyResolver = androidx.compose.ui.platform.LocalFontFamilyResolver.current
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val textWidths = remember(density, fontFamilyResolver, layoutDirection) {
+        candidateTextWidths(density, fontFamilyResolver, layoutDirection)
+    }
     val inheritedTextStyle = LocalTextStyle.current
     val commentsAllowed = rememberCandidateCommentsAllowed().let { commentMode ?: it }
     // 选中底色由整条统一画，换选中的候选时从旧候选滑到新候选（用户 10-21 选 1）；
@@ -1644,23 +1650,22 @@ internal fun FixedCandidateStrip(
         // 纠错和画出来的一样算进宽度，否则放不下的最后一个候选也算「显示了」，「下一项」移到它时被栏边切掉。
         val correctedCandidates = shownCorrections(LocalCorrectedCandidates.current, commentsShown)
         val fullCorrectionScheme = LocalCorrectionFullScheme.current
-        val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, correctedCandidates, fullCorrectionScheme) {
+        val window = remember(viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, textWidths, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, correctedCandidates, fullCorrectionScheme) {
             val bodyWidths = HashMap<Int, Int>()
             fun bodyWidth(index: Int): Int = bodyWidths.getOrPut(index) {
                 val numbered = index < candidates.size
                 val text = candidateNumberedText(all[index], index, showNumberLabels && numbered)
-                val primary = measurer.measure(AnnotatedString(text),
-                    candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused),
-                    softWrap = false).size.width
+                val primary = textWidths.of(text,
+                    candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused))
                 primary + with(density) { 2 * itemPadding.roundToPx() }
             }
             val fullWidths = HashMap<Int, Int>()
             fun widthAt(index: Int): Int = fullWidths.getOrPut(index) {
                 val secondaryText = candidateSecondaryText(shownComments.getOrElse(index) { "" },
                     if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "", fullCorrectionScheme)
-                val secondary = if (secondaryText.isEmpty()) 0 else measurer.measure(secondaryText,
+                val secondary = if (secondaryText.isEmpty()) 0 else textWidths.of(secondaryText,
                     inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
-                        fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
+                        fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily))) + with(density) { 3.dp.roundToPx() }
                 bodyWidth(index) + secondary
             }
             // 纠错标记和拼音仍要完整。只有释义可以越过本段右边界。
@@ -1672,16 +1677,16 @@ internal fun FixedCandidateStrip(
                 val full = widthAt(index)
                 if (full <= constraints.maxWidth) return null
                 val text = AnnotatedString(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size))
-                val primary = measurer.measure(text, candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily,
-                    index == focused), softWrap = false).size.width
+                val primary = textWidths.of(text, candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily,
+                    index == focused))
                 val others = full - primary
                 val room = constraints.maxWidth - others
                 if (room <= 0 || primary <= 0) return null
                 // 一行：按比例缩，每级 0.5sp，不低于原字号 3/4。
                 var size = kotlin.math.floor(fontSize.value * room / primary * 2f) / 2f
                 while (size >= fontSize.value * CANDIDATE_SHRINK_FLOOR) {
-                    val width = measurer.measure(text, candidatePrimaryTextStyle(size.sp, AppFonts.candidateFontFamily,
-                        index == focused), softWrap = false).size.width
+                    val width = textWidths.of(text, candidatePrimaryTextStyle(size.sp, AppFonts.candidateFontFamily,
+                        index == focused))
                     if (width <= room) return CandidateFit(size.sp, twoLines = false, width, others + width)
                     size -= 0.5f
                 }
