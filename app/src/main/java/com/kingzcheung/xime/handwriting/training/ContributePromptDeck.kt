@@ -95,22 +95,71 @@ object ContributePromptDeck {
     }
 
     /**
-     * 写什么由用户自己选（用户 11-12：「要让用户能自己选择要输入什么内容」）。[kinds] 为 null 时不按类型挑：
-     * [Random] 是全部穿插，[Own] 是用户自己输入的字词。
+     * 写什么由用户自己选（用户 11-12：「要让用户能自己选择要输入什么内容」；11-13：字母、假名、日语、一段话、公式、
+     * 剪贴板也要能选，跟手写训练一样）。[kinds] 不为 null 的从这个人的随机中文题里挑；字母、假名、日文汉字、
+     * 数学符号、公式用内置题（见 [fromBuiltin]、[japanese]），[Paragraph]、[Own] 要用户先填（[typed]）。
      */
-    enum class Choice(val title: String, val kinds: Set<String>?) {
-        Random("随机", null),
+    enum class Choice(val title: String, val kinds: Set<String>?, val note: String? = null) {
+        Random("随机", null, "字、词、少用字穿插，每人不同"),
         Common("常用字", setOf("char")),
         Rare("少用字", setOf("rare")),
         Words("词语", setOf("word")),
-        Own("自己输入", null),
+        Latin("英文字母", null, "大小写字母和数字"),
+        Kana("假名", null, "平假名、片假名"),
+        Japanese("日文汉字", null, "日语常用的漢字"),
+        Symbol("数学符号", null),
+        Formula("公式", null, "一整条公式写完再点下一题"),
+        Paragraph("一段话", null, "粘贴或输入一段话，逐字写"),
+        Own("自己输入", null, "想写的字或词，空格隔开");
+
+        val typed: Boolean get() = this == Paragraph || this == Own
     }
 
-    /** 从这个人的随机题里只留选中的类型；[Choice.Random] 原样返回，[Choice.Own] 不从这里出题。 */
-    fun filter(deck: List<TrainingPrompt>, choice: Choice): List<TrainingPrompt> = when (choice) {
-        Choice.Random -> deck
-        Choice.Own -> emptyList()
-        else -> deck.filter { it.kind in choice.kinds.orEmpty() }
+    /** 从这个人的随机题里只留选中的类型；[Choice.Random] 原样返回，其余不从这里出题。 */
+    fun filter(deck: List<TrainingPrompt>, choice: Choice): List<TrainingPrompt> = when {
+        choice == Choice.Random -> deck
+        choice.kinds == null -> emptyList()
+        else -> deck.filter { it.kind in choice.kinds }
+    }
+
+    /** 内置题（字母、假名、数学符号、随机公式）换成贡献题：id 和 kind 用 [kind]，按 [seed] 打乱。 */
+    fun fromBuiltin(prompts: List<TrainingPrompt>, kind: String, seed: Long): List<TrainingPrompt> =
+        shuffled(prompts.map { it.copy(id = "contribute:$kind:${it.label}", source = "contribute", kind = kind, hint = null) }
+            .distinctBy { it.id }, seed)
+
+    /** 日文汉字题：japanese_kanji.json 的常用度表（字 → 名次），按 [seed] 打乱。 */
+    fun japanese(rank: Map<String, Int>, seed: Long): List<TrainingPrompt> =
+        shuffled(rank.entries.filter { isOneHan(it.key) }.sortedBy { it.value }.map {
+            TrainingPrompt(id = "contribute:ja:${it.key}", type = TrainingPromptType.Japanese, label = it.key,
+                source = "contribute", hint = JAPANESE_HINT, kind = "ja")
+        }, seed)
+
+    private const val JAPANESE_HINT = "按日语字形写"
+
+    /**
+     * 一段话逐字写：去掉空白、按出现顺序去重。汉字算 char（和常用字题同一个 id），假名算 kana，字母数字算 latin，
+     * 其余（标点、符号）算 text。
+     */
+    fun paragraph(text: String): List<TrainingPrompt> {
+        val seen = LinkedHashSet<String>()
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            i += Character.charCount(cp)
+            if (!Character.isWhitespace(cp) && !Character.isSpaceChar(cp) && !Character.isISOControl(cp)) {
+                seen += String(Character.toChars(cp))
+            }
+        }
+        return seen.map { ch ->
+            val cp = ch.codePointAt(0)
+            val (kind, type) = when (Character.UnicodeScript.of(cp)) {
+                Character.UnicodeScript.HAN -> "char" to TrainingPromptType.Chinese
+                Character.UnicodeScript.HIRAGANA, Character.UnicodeScript.KATAKANA -> "kana" to TrainingPromptType.Kana
+                else -> if (cp < 0x80 && Character.isLetterOrDigit(cp)) "latin" to TrainingPromptType.Latin
+                    else "text" to TrainingPromptType.Custom
+            }
+            TrainingPrompt(id = "contribute:$kind:$ch", type = type, label = ch, source = "contribute", kind = kind)
+        }
     }
 
     /** 自己输入的一段：按空白和常见标点分开，去重；接收端一题最多 [MAX_OWN_CHARS] 个字。 */

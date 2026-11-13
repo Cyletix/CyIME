@@ -105,6 +105,34 @@ class HandwritingTrainingMergeTest {
         rule.onNodeWithText("像平时手写输入那样写").assertExists()
     }
 
+    /** 用户 11-13：字母、假名、日语、一段话、公式也能选；一段话可以从剪贴板导入。 */
+    @Test fun contributeOffersOtherScriptsAndParagraphFromClipboard() {
+        HandwritingContribution.setConsented(context)
+        rule.setContent { MaterialTheme { HandwritingTrainingScreen(onBack = {}, contribute = true, devTools = false) } }
+        rule.waitForIdle()
+        for (title in listOf("假名", "英文字母", "日文汉字", "数学符号", "公式")) {
+            rule.onNodeWithTag("contribute-choice").performClick()
+            rule.waitForIdle()
+            rule.onNodeWithText(title).performClick()
+            rule.waitForIdle()
+            assertEquals(title, HandwritingContribution.choice(context).title)
+            rule.onNodeWithText("第 1 题").assertExists()
+            rule.onNodeWithTag("contribute-own-input").assertDoesNotExist()
+        }
+        rule.onNodeWithTag("contribute-choice").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("一段话").performClick()
+        rule.waitForIdle()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("t", "鑫淼 あい"))
+        rule.onNodeWithTag("contribute-own-paste").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("开始").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("鑫").assertExists()
+        assertEquals("鑫淼 あい", HandwritingContribution.paragraphText(context))
+    }
+
     /**
      * 回归（11-09「没有分类选择了」）：自用包第一次进「手写训练」要落在训练题库，顶栏是题库分类按钮，
      * 不能一进来就是贡献题。照设置页路由的写法用 lastOpened 决定进哪边。

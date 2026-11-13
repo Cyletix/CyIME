@@ -132,6 +132,14 @@ object HandwritingContribution {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("own_text", text).apply()
     }
 
+    /** 「一段话」填的那段话，原样存着。 */
+    fun paragraphText(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("paragraph_text", null).orEmpty()
+
+    fun setParagraphText(context: Context, text: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("paragraph_text", text).apply()
+    }
+
     /** 「随机」以外各类写到第几题（随机的位置沿用原来存的那份，升级后接着写）。 */
     fun position(context: Context, choice: ContributePromptDeck.Choice): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt("pos_${choice.name}", 0)

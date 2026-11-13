@@ -158,4 +158,39 @@ class ContributePromptDeckTest {
         assertEquals(null, lookup("我𠀀"))
         assertEquals("nv", ContributePromptDeck.toneless("nǚ"))
     }
+
+    // 用户 11-13：字母、假名、日语、一段话、公式也要能选
+    @Test fun builtinKindsBecomeContributePromptsShuffledPerWriter() {
+        val latin = BuiltinTrainingPrompts.prompts(TrainingPromptType.Latin)
+        val a = ContributePromptDeck.fromBuiltin(latin, "latin", ContributePromptDeck.seedOf("0123456789abcdef", "Latin"))
+        val b = ContributePromptDeck.fromBuiltin(latin, "latin", ContributePromptDeck.seedOf("fedcba9876543210", "Latin"))
+        assertEquals(latin.size, a.size)
+        assertEquals(latin.map { it.label }.toSet(), a.map { it.label }.toSet())
+        assertNotEquals(a.take(10), b.take(10))
+        assertTrue(a.all { it.source == "contribute" && it.kind == "latin" && it.id == "contribute:latin:${it.label}" })
+        val symbols = ContributePromptDeck.fromBuiltin(BuiltinTrainingPrompts.prompts(TrainingPromptType.Symbol), "symbol", 1L)
+        assertTrue(symbols.all { it.latex != null && it.type == TrainingPromptType.Symbol })
+    }
+
+    @Test fun japaneseKanjiFollowRankTableAndSkipNonHan() {
+        val prompts = ContributePromptDeck.japanese(mapOf("一" to 2, "働" to 900, "あ" to 1), 5L)
+        assertEquals(setOf("一", "働"), prompts.map { it.label }.toSet())
+        assertTrue(prompts.all { it.type == TrainingPromptType.Japanese && it.kind == "ja" && it.source == "contribute" })
+    }
+
+    @Test fun paragraphIsWrittenCharByCharWithKinds() {
+        val prompts = ContributePromptDeck.paragraph("今天 天气好，ok あ\n今")
+        assertEquals(listOf("今", "天", "气", "好", "，", "o", "k", "あ"), prompts.map { it.label })
+        assertEquals(listOf("char", "char", "char", "char", "text", "latin", "latin", "kana"), prompts.map { it.kind })
+        assertEquals("contribute:char:今", prompts[0].id)
+        assertTrue(ContributePromptDeck.paragraph(" \n ").isEmpty())
+    }
+
+    @Test fun onlyChineseChoicesFilterTheRandomDeck() {
+        val deck = listOf(char("char", "的"), char("word", "我们"))
+        for (c in listOf(ContributePromptDeck.Choice.Latin, ContributePromptDeck.Choice.Formula, ContributePromptDeck.Choice.Paragraph))
+            assertTrue(ContributePromptDeck.filter(deck, c).isEmpty())
+        assertEquals(setOf(ContributePromptDeck.Choice.Paragraph, ContributePromptDeck.Choice.Own),
+            ContributePromptDeck.Choice.entries.filter { it.typed }.toSet())
+    }
 }
