@@ -510,7 +510,10 @@ private fun T9KeyboardContent(
                     .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))
             ) {
                 val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
-                val highlightedSyllable = candidateState.value.highlightedT9Syllable(uiState.inputProfile)
+                // 左栏只关心高亮候选的第一个音节：只读这一项，候选换了但音节没变（多数按键）时左栏不跟着重组。
+                val highlightedSyllable by remember(candidateState, uiState.inputProfile) {
+                    androidx.compose.runtime.derivedStateOf { candidateState.value.highlightedT9Syllable(uiState.inputProfile) }
+                }
                 val currentFirstOptions = controller.firstOptions
                 // 空闲态符号列表来自 xime.yaml keyboard.t9.side_symbols（可自定义，>4 滚动）
                 val configVersion by KeysConfigHelper.configVersion.collectAsState()
