@@ -3615,6 +3615,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 imm.showInputMethodPicker()
             }
             com.kingzcheung.xime.keyboard.CtrlShortcuts.ENTER_COMMAND -> ctrlEnter()
+            com.kingzcheung.xime.keyboard.CtrlShortcuts.BACKSPACE_COMMAND -> ctrlBackspace()
             com.kingzcheung.xime.keyboard.CtrlShortcuts.SHIFT_ENTER_COMMAND -> shiftEnter()
             else -> com.kingzcheung.xime.keyboard.CtrlShortcuts.letterOf(name)?.let { letter ->
                 // Ctrl+A/C/X/V 和编辑面板的全选、复制、剪切、粘贴同一路；终端里 Ctrl+C 等是终端自己的键，照旧发按键。
@@ -3649,6 +3650,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             else -> schemaController.handleToolbarEditingAction("send")
         }
+    }
+
+    /**
+     * Ctrl+删除（屏幕上按住 !@# 点删除，用户 11-13）：还在打字时和删除一样删编码；否则和实体键盘一样把 Ctrl+删除交给应用
+     * （系统输入框删到上一个词的开头）。焦点在键盘自己的输入框时给那个框。
+     */
+    private fun ctrlBackspace() {
+        val composing = candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() || it.preeditText.isNotEmpty() } ||
+            t9PartialSegments.isNotEmpty()
+        if (composing) {
+            keyRouter.handleKeyPress("delete", false)
+            return
+        }
+        val connection = editorConnection()
+        com.kingzcheung.xime.keyboard.CtrlShortcuts.backspaceKeyEvents(SystemClock.uptimeMillis()).forEach { connection?.sendKeyEvent(it) }
     }
 
     /**

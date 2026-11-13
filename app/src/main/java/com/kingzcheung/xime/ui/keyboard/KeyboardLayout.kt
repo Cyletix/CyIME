@@ -605,14 +605,14 @@ fun KeyboardLayout(
                 val deleteKey: @Composable (Modifier) -> Unit = { keyModifier ->
                     SwipeableIconKeyButton(
                         icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                        onClick = { onKeyPress("delete") },
+                        onClick = { if (!shiftSlideTargets.ctrlBackspace()) onKeyPress("delete") },
                         backgroundColor = specialKeyBackgroundColor,
                         iconColor = specialKeyTextColor,
                         modifier = keyModifier
                             .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
                         swipeText = "清空",
                         onSwipe = { onKeyPress("clear_composition") },
-                        onLongClick = { onKeyPress("delete") },
+                        onLongClick = { if (!shiftSlideTargets.ctrlBackspace()) onKeyPress("delete") },
                         onPress = { onKeyPressDown?.invoke("delete") },
                         onRelease = { onKeyRelease?.invoke("delete") },
                         followSymbolSwipeDirection = true,

@@ -47,9 +47,10 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
             KeyTip("长按空格移光标时按住 Shift", "选中文字，和电脑上 Shift 加方向键一样。"),
         )),
         KeyTipGroup("Ctrl(左下角 !@# 键)", buildList {
-            add(KeyTip("按住 !@#", "按满 $hold 秒，字母键渐变成显示快捷键：全选、复制、粘贴、剪切、撤销、重做、保存、查找等；点一下开符号时键面不变。"))
+            add(KeyTip("按住 !@#", "按满 $hold 秒，这个键写成 Ctrl，字母键渐变成显示快捷键：全选、复制、粘贴、剪切、撤销、重做、保存、查找等；点一下开符号时键面不变。"))
             add(KeyTip("按住 !@# 拖到字母上松手", "发送 Ctrl 加这个字母，和实体键盘一样；也可以另一根手指直接点字母。不用等快捷键显示出来。"))
             add(KeyTip("按住 !@# 点回车", "发送消息，同 Ctrl+回车；也可以拖到回车上松手。还在打字时只上屏编码。"))
+            add(KeyTip("按住 !@# 点删除", "同 Ctrl+删除：系统输入框里删到上一个词的开头，不认 Ctrl 的应用当普通删除。还在打字时只删编码。"))
             add(KeyTip("按住 !@# 长按空格拖动", "选中文字，同按住 Shift。"))
             add(KeyTip("点一下 !@#", "$hold 秒内、没拖动就松手才打开符号面板；时限在「按键与手势 › 符号键松手打开符号的时限」里调。",
                 listOf("按键与手势 › 符号键松手打开符号的时限")))

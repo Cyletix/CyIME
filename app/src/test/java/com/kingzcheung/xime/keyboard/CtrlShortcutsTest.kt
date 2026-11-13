@@ -28,6 +28,13 @@ class CtrlShortcutsTest {
         assertEquals("ctrl:c", CtrlShortcuts.command('C'))
     }
 
+    // 用户 11-13：按住 !@# 点删除是 Ctrl+删除，有自己的命令，不会被当成字母。
+    @Test
+    fun backspaceHasItsOwnCommandAndCtrlKeyEvents() {
+        assertEquals(CtrlShortcuts.BACKSPACE_COMMAND, CtrlShortcuts.command(CtrlShortcuts.BACKSPACE))
+        assertNull(CtrlShortcuts.letterOf(CtrlShortcuts.BACKSPACE_COMMAND))
+    }
+
     /** 用户 11-03：九键 1 关闭 2 刷新 3 重做 4 全选 5 保存 6 剪切 7 撤销 8 复制 9 粘贴。 */
     @Test
     fun t9DigitsMapToTheRequestedShortcuts() {

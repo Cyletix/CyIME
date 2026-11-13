@@ -61,6 +61,15 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         return true
     }
 
+    /** 按住符号键时另一根手指点删除键：Ctrl+删除（用户 11-13）。不在按住符号键时返回 false，删除照常。 */
+    fun ctrlBackspace(): Boolean {
+        if (!ctrl) return false
+        val send = ctrlShortcut ?: return false
+        ctrlUsed = true
+        send(com.kingzcheung.xime.keyboard.CtrlShortcuts.BACKSPACE)
+        return true
+    }
+
     /** 长按空格移光标时按住符号键：和按住 Shift 一样扩选；算用过 Ctrl，松手不开符号（用户 11-03）。 */
     fun ctrlSelect(): Boolean {
         if (!ctrl) return false

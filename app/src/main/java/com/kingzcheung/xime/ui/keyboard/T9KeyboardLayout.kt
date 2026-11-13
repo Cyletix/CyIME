@@ -750,10 +750,15 @@ private fun T9KeyboardContent(
                 .fillMaxHeight()
                 .weight(0.8f).testTag("t9-right-rail"),
         ) {
+            // 按住 !@# 点删除：Ctrl+删除（用户 11-13）；还在打字时照常删编码，九键的删除要先经过它自己的选音节撤回。
+            val ctrlDelete: () -> Unit = {
+                val composing = candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() || it.preeditText.isNotEmpty() }
+                if (composing || !ctrlTargets.ctrlBackspace()) onDelete()
+            }
             SwipeableIconKeyButton(
                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                onClick = { onDelete() },
-                onLongClick = { onDelete() },
+                onClick = ctrlDelete,
+                onLongClick = ctrlDelete,
                 backgroundColor = specialKeyBackgroundColor,
                 iconColor = specialKeyTextColor,
                 modifier = Modifier.weight(1f).testTag("t9-delete-key").semantics { contentDescription = "删除" },
