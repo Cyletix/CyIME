@@ -3224,6 +3224,26 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /**
+     * 长按「固定在第 N 位」：这个词在当前编码下锁在第 [place] 位，别的词照常学习、排在空出来的位置。
+     * 和「固定」存在同一个 cyime_pins.txt（第四列是位置）。
+     */
+    internal fun pinCandidateAt(text: String, place: Int) {
+        val snapshot = service.candidateState.value
+        postRimeJob {
+            if (!snapshot.hasSameSelectionSource(service.candidateState.value)) return@postRimeJob
+            val done = service.rimeEngine.setCandidatePinnedAtPlace(text, place, snapshot.engineRevision)
+            FileLogger.i(XimeInputMethodService.TAG, "PinCandidateAt: text='$text' place=$place result=$done")
+            if (done) {
+                withEditor { service.updateUI() }
+            } else {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(service, "「$text」不能固定", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     /** A remembered hand-typed English word (lua/cyime_en_memory.lua) has no Rime record: forget it from its file. */
     private suspend fun forgetEnglishWord(text: String): Boolean {
         if (!typesEnglishCapitals(service.uiState.value.currentSchemaId)) return false

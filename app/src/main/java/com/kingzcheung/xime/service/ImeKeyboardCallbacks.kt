@@ -378,6 +378,12 @@ internal fun rememberImeKeyboardCallbacks(
             },
             candidatePinState = { text -> service.rimeEngine.candidatePinState(text) },
             onCandidatePin = { text, pinned -> service.keyRouter.pinCandidate(text, pinned) },
+            candidatePinPlaces = { text ->
+                service.rimeEngine.candidatePinInfo(text)?.let { info ->
+                    intArrayOf(if (info.pinned) info.pinnedPlace else -1, info.menuPlace)
+                }
+            },
+            onCandidatePinAt = { text, place -> service.keyRouter.pinCandidateAt(text, place) },
             sentenceWords = { text -> service.rimeEngine.firstSentenceWords(text) },
             onReselectSentenceWord = { words, target -> service.keyRouter.reselectSentenceWord(words, target) },
             onRequestExpandedCandidates = {

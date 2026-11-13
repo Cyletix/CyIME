@@ -2057,6 +2057,9 @@ fun KeyboardView(
                 onConfirm = { onHapticFeedback?.invoke(); deletePending = null; pending.onConfirm() },
                 pinned = pending.pin?.pinned,
                 onPin = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.apply?.invoke() },
+                pinnedPlace = pending.pin?.pinnedPlace ?: 0,
+                placeHere = pending.pin?.placeHere ?: 0,
+                onPinHere = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.applyHere?.invoke() },
                 parts = pending.parts?.words,
                 onPart = { part ->
                     onHapticFeedback?.invoke(); deletePending = null
@@ -2409,25 +2412,35 @@ private fun KeyboardResizeControlsHost(
 
 /**
  * 长按候选的卡片：忘掉学习记录；引擎候选还能固定（[pinned] 非空：false 显示「固定」，true 显示「取消固定」）。
+ * 没固定、现在排第 2 位以后（[placeHere] ≥ 2）时多一个「固定在第 N 位」：锁在现在的位置，别的词照常学习；
+ * 这时原来的「固定」写成「固定第一」。已固定时 [pinnedPlace] 说明固定在哪（0 排第一）。
  */
 @Composable
 internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Modifier,
     onCancel: () -> Unit, onConfirm: () -> Unit, pinned: Boolean? = null, onPin: () -> Unit = {},
-    parts: List<String>? = null, onPart: (Int) -> Unit = {}) {
+    parts: List<String>? = null, onPart: (Int) -> Unit = {},
+    pinnedPlace: Int = 0, placeHere: Int = 0, onPinHere: () -> Unit = {}) {
     val forget = "忘掉「$word」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。"
+    val forgetLine = "忘掉：删掉学习记录，词库里本来有的词回到原来的位置，自己打出来的新词会消失。"
+    val here = pinned == false && placeHere >= 2
     KeyboardConfirmCard(
         title = if (pinned == null) "忘掉学习" else "「$word」",
         message = message ?: when (pinned) {
             null -> forget
-            false -> "固定：这个编码下排第一，固定多个按先后排。\n忘掉：删掉学习记录，词库里本来有的词回到原来的位置，自己打出来的新词会消失。"
-            true -> "取消固定：回到原来的位置。\n忘掉：删掉学习记录，词库里本来有的词回到原来的位置，自己打出来的新词会消失。"
+            false -> if (here) "固定第一：这个编码下排第一，固定多个按先后排。\n" +
+                "固定在第 $placeHere 位：锁在现在这个位置，别的词照常学习。\n$forgetLine"
+                else "固定：这个编码下排第一，固定多个按先后排。\n$forgetLine"
+            true -> (if (pinnedPlace >= 1) "已固定在第 $pinnedPlace 位。" else "") +
+                "取消固定：回到原来的位置。\n$forgetLine"
         },
         confirmLabel = "忘掉",
         destructive = true,
         tag = "forget-learning-confirm",
         modifier = modifier, onCancel = onCancel, onConfirm = onConfirm,
-        extraLabel = when (pinned) { null -> null; false -> "固定"; true -> "取消固定" },
-        onExtra = onPin, parts = parts, onPart = onPart)
+        extraLabel = when (pinned) { null -> null; false -> if (here) "固定第一" else "固定"; true -> "取消固定" },
+        onExtra = onPin,
+        extra2Label = if (here) "固定在第 $placeHere 位" else null, onExtra2 = onPinHere,
+        parts = parts, onPart = onPart)
 }
 
 /**
@@ -2438,6 +2451,8 @@ internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Mod
 internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: String, destructive: Boolean,
     tag: String, modifier: Modifier, onCancel: () -> Unit, onConfirm: () -> Unit,
     extraLabel: String? = null, onExtra: () -> Unit = {},
+    /** 第二个附加按钮（长按候选的「固定在第 N 位」）；按钮多了一行放不下就换行。 */
+    extra2Label: String? = null, onExtra2: () -> Unit = {},
     /** 长按首选整句时拆出的词；点一个只重选它。 */
     parts: List<String>? = null, onPart: (Int) -> Unit = {}) {
     val cardColors = keyboardCardColors()
@@ -2480,10 +2495,7 @@ internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: S
                     color = cardColors.text.copy(alpha = .7f)
                 )
                 Spacer(Modifier.height(12.dp))
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                ConfirmCardButtons {
                     TextButton(onClick = onCancel) {
                         Text("取消", color = cardColors.text.copy(alpha = .7f))
                     }
@@ -2491,6 +2503,12 @@ internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: S
                         Spacer(Modifier.width(4.dp))
                         TextButton(onClick = onExtra, modifier = Modifier.testTag("$tag-extra")) {
                             Text(extraLabel, color = cardColors.text)
+                        }
+                    }
+                    if (extra2Label != null) {
+                        Spacer(Modifier.width(4.dp))
+                        TextButton(onClick = onExtra2, modifier = Modifier.testTag("$tag-extra2")) {
+                            Text(extra2Label, color = cardColors.text)
                         }
                     }
                     Spacer(Modifier.width(4.dp))
@@ -2553,15 +2571,38 @@ private fun SentencePartChips(parts: List<String>, textColor: Color, tag: String
     }
 }
 
-/** 长按卡片的固定按钮：现在是否已固定，以及按下后切换。 */
-private class PinChoice(val pinned: Boolean, val apply: () -> Unit)
+/** 卡片底部的按钮，一行放不下（多了「固定在第 N 位」）就换行。 */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ConfirmCardButtons(content: @Composable () -> Unit) {
+    // 和原来的 Row 一样按内容宽，放得下时位置不变；放不下才换行。
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.End,
+        verticalArrangement = Arrangement.Center,
+    ) { content() }
+}
+
+/** 固定在第几位最多到这里（三页九个），和 candidate_pins.h 的 kMaxPlace 一致。 */
+private const val MAX_PIN_PLACE = 27
+
+/**
+ * 长按卡片的固定按钮：现在是否已固定（[pinnedPlace] 固定在第几位，0 排第一），按下后切换；
+ * [placeHere] ≥ 2 时还能「固定在第 N 位」（[applyHere]）。
+ */
+private class PinChoice(val pinned: Boolean, val pinnedPlace: Int = 0, val placeHere: Int = 0,
+    val applyHere: (() -> Unit)? = null, val apply: () -> Unit)
 
 /** 引擎候选长按时查一次固定状态；拿不到（没在组词、引擎正忙）就不显示固定按钮。 */
 private fun pinChoice(callbacks: KeyboardCallbacks, cs: com.kingzcheung.xime.service.CandidateState, word: String): PinChoice? {
     val onPin = callbacks.onCandidatePin ?: return null
     if (!cs.isComposing) return null
-    val pinned = callbacks.candidatePinState(word) ?: return null
-    return PinChoice(pinned) {
+    val places = callbacks.candidatePinPlaces(word)
+    val pinned = if (places != null) places.getOrElse(0) { -1 } >= 0 else callbacks.candidatePinState(word) ?: return null
+    val menuPlace = places?.getOrNull(1) ?: 0
+    val onPinAt = callbacks.onCandidatePinAt?.takeIf { !pinned && menuPlace in 2..MAX_PIN_PLACE }
+    return PinChoice(pinned, pinnedPlace = places?.getOrNull(0)?.coerceAtLeast(0) ?: 0,
+        placeHere = if (onPinAt != null) menuPlace else 0,
+        applyHere = onPinAt?.let { at -> { if (callbacks.isCandidateSnapshotCurrent(cs)) at(word, menuPlace) } }) {
         if (callbacks.isCandidateSnapshotCurrent(cs)) onPin(word, !pinned)
     }
 }
