@@ -665,7 +665,10 @@ fun KeyboardView(
                 if (key.startsWith("preedit_cursor:")) {
                     editPreedit(key = key); true
                 } else if (key == "delete" || key == "'" || key.length == 1 &&
-                    (key[0].lowercaseChar() in 'a'..'z' || t9 && key[0] in '1'..'9')) {
+                    (key[0].lowercaseChar() in 'a'..'z' || t9 && key[0] in '1'..'9') ||
+                    // 14 键的合并键（qw）：挪过光标后接着点，插在光标处（11-13：原来关掉编辑，插到哪、显示什么都乱）。
+                    com.kingzcheung.xime.rime.MergedLetterInput.isGroup(key,
+                        state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14 && !state.isAsciiMode)) {
                     editPreedit(key = key); true
                 } else { closePreeditEditor(); false }
             }) else null
