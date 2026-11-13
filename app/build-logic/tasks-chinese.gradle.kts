@@ -497,6 +497,23 @@ val prepareChineseDictionaries by tasks.registering {
         fun withGreekLetters(schema: String) = schema.replace("\n    - simplifier@traditionalize",
             "\n    - lua_filter@*cyime_greek_letters\n    - simplifier@traditionalize")
             .also { check(it.split("\n    - lua_filter@*cyime_greek_letters\n").size == 2) { "Upstream traditionalize filter changed" } }
+        // 我的短语（user_table）里写的「余」照写的出（余宛如，用户 11-12）：traditionalize 跳过短语，
+        // traditionalize_user 用 cyime_s2tw_user.json 转它们（没有词组管着的「余」不改）；别的候选照旧只转一次。
+        // Same block in the nine-key and 14-key schemas (assets/rime_chinese); after the other filters wrap traditionalize.
+        fun withUserPhraseForms(schema: String): String {
+            val block = Regex("(?m)^traditionalize:\\n((?:  .*\\n)+)").find(schema)
+                ?: error("Upstream traditionalize block changed")
+            check(!block.value.contains("excluded_types")) { "Upstream traditionalize now excludes types" }
+            // rime-ice writes the filter with a trailing comment (`- simplifier@traditionalize   # 简繁切换`).
+            val filter = Regex("(?m)^    - simplifier@traditionalize(?![\\w_])[^\\n]*\\n")
+            check(filter.findAll(schema).count() == 1 && schema.split("\ntraditionalize:\n").size == 2) {
+                "Upstream traditionalize filter changed" }
+            val tags = block.groupValues[1].lineSequence().firstOrNull { it.startsWith("  tags:") }
+            return schema.replace(filter) { it.value + "    - simplifier@traditionalize_user\n" }
+                .replace("\ntraditionalize:\n", "\ntraditionalize:\n  excluded_types: [user_table]\n") +
+                "\ntraditionalize_user:\n  option_name: traditionalization\n  opencc_config: cyime_s2tw_user.json\n" +
+                "  tips: none\n  excluded_types: [simplified]\n" + (tags?.let { "$it\n" } ?: "")
+        }
         fun taiwanForms(schema: String) = schema.replace("  opencc_config: s2t.json ", "  opencc_config: cyime_s2tw.json ")
             .also { check(it.contains("  opencc_config: cyime_s2tw.json ")) { "Upstream traditionalize config changed" } }
         val vuRule = "    - derive/^([jqxy])v/\$1u/\n"
@@ -544,7 +561,7 @@ val prepareChineseDictionaries by tasks.registering {
             // shows 女 first (was 怒). 2026-11-01 host bench: ü-as-u 1/12 -> 11/12, nothing else changed.
             .replace(vuRule, vuRule + "    - fuzz/^([nl])v\$/\$1u/\n")
             .also { check(it.split(vuRule).size == 2) { "Upstream v/u spelling rules changed" } }
-            .let { withGreekLetters(withSymbolNames(withDatetimeHints(it))) } +
+            .let { withUserPhraseForms(withGreekLetters(withSymbolNames(withDatetimeHints(it)))) } +
             "\ncyime:\n  candidate_policy: true\n" +
             // 26-key ranking by the nine-key word n-gram model (docs/development/pinyin26-word-model-20261018.md):
             // same decoder and model file; initials are not penalized (a letter names its initial, unlike a
@@ -698,7 +715,7 @@ val prepareChineseDictionaries by tasks.registering {
             "  sentence_position_initial_only: [把, 被]\n" +
             "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
-            .let { withGreekLetters(withSymbolNames(withDatetimeHints(it))) }
+            .let { withUserPhraseForms(withGreekLetters(withSymbolNames(withDatetimeHints(it)))) }
             // 生僻字 also for double pinyin (GitHub #72, same default-off switch): the Lua translator maps the two keys
             // through this scheme's preedit_format; DoublePinyinScheme copies both lines into every generated scheme.
             .let { schema ->
