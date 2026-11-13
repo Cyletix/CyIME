@@ -562,7 +562,14 @@ val prepareChineseDictionaries by tasks.registering {
             // 语言锅, no 预言过). 2026-11-12 cloud engine, 68843 two- to four-character phrases of 51 patterns typed in
             // full: first choice 48351 -> 50613 (2500 gained, 238 lost); long input keeps one word per span (with two,
             // 我用纸折成了一个纸船 became 我用指着成了一个只穿).
-            "  sentence_word_homophones: 2\n  sentence_word_max_syllables: 4\n  sentence_other_prefixes: 4\n")
+            "  sentence_word_homophones: 2\n  sentence_word_max_syllables: 4\n  sentence_other_prefixes: 4\n" +
+            // Short input (the same four syllables) also gets eight sentences to choose from, not four, and long
+            // input goes without the other-prefix sentences. Of the short phrases still wrong with four, the right
+            // one was not among the sentences 1469 times in 1555 (shazhushi: 杀猪是 刹住是 啥注释 啥主食, no 杀猪时).
+            // 68843 short phrases: first choice 50613 -> 50927 (348 gained, 34 lost; of the 36 the two-word change had
+            // made clearly worse, all are right again). Sixteen sentences cost 8% on the per-key p95 of short input,
+            // eight 2%; for all lengths eight cost 5% on long input (cloud engine, rough).
+            "  sentence_short_max_sentences: 8\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
             .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_shortcut_order", "    - lua_filter@*cyime_acronym_filter",
                 "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory")
