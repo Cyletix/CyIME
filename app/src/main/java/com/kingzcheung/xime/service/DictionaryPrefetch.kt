@@ -9,6 +9,7 @@ import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import com.kingzcheung.xime.platform.AndroidPlatform
@@ -27,6 +28,9 @@ import com.kingzcheung.xime.platform.AndroidPlatform
  * 间隔自适应：补读后很快又被回收（内存紧的机器）就加倍，最长 30 分钟；连续几次都留得住就回到 1 分钟。
  * 补读前留出内存余量，余量不够时只补优先级高的（音节表、主词库），词组模型最后补。
  * 省电模式、严重发热、低内存设备不做。
+ *
+ * 九键、14 键、注音（用词组模型的方案）的文件按「整份」看：抽查到缺页就补，不按九成算热（平板 11-13 实测：
+ * 冷启动那一轮在编码长度 6、13、17、24 处卡 70~106 ms，全是等读盘；同样的字预热一遍后 P90 44 ms、零读盘）。
  */
 internal class PrefetchPolicy(
     val minIntervalMs: Long = 60_000L,
@@ -39,8 +43,14 @@ internal class PrefetchPolicy(
         val thermalSevere: Boolean = false,
     )
 
-    /** One file's state at a check: [resident] is the sampled fraction in memory, 0..1. */
-    data class FileState(val path: String, val bytes: Long, val resident: Float)
+    /**
+     * One file's state at a check: [resident] is the sampled fraction in memory, 0..1. [full]: any page
+     * may be read on the next key (the nine-key phrase model and its schema's tables), so it counts as warm
+     * only when nearly all of it is in memory, not at the 90 % line.
+     */
+    data class FileState(val path: String, val bytes: Long, val resident: Float, val full: Boolean = false)
+
+    private fun FileState.warm(): Boolean = resident >= if (full) FULL else WARM
 
     var intervalMs = minIntervalMs
         private set
@@ -68,7 +78,7 @@ internal class PrefetchPolicy(
         val total = files.sumOf { it.bytes }.coerceAtLeast(1)
         val resident = files.sumOf { (it.bytes * it.resident).toLong() }.toFloat() / total
         val sinceLast = lastPrefetchAt?.let { now - it }
-        if (resident >= WARM) {
+        if (resident >= WARM && files.all { it.warm() }) {
             if (++stableChecks >= STABLE_CHECKS_TO_RESET) intervalMs = minIntervalMs
             faultsSeen = false
             return emptyList()
@@ -84,7 +94,7 @@ internal class PrefetchPolicy(
         val chosen = mutableListOf<String>()
         for (file in files) {
             val missing = (file.bytes * (1f - file.resident)).toLong()
-            if (missing <= 0 || file.resident >= WARM) continue
+            if (missing <= 0 || file.warm()) continue
             if (missing > room) break
             room -= missing
             chosen += file.path
@@ -115,6 +125,7 @@ internal class PrefetchPolicy(
 
     companion object {
         const val WARM = 0.9f
+        const val FULL = 0.99f
         const val THRASHED = 0.5f
         const val THRASH_WINDOW_MS = 5 * 60_000L
         const val PRESSURE_HOLD_MS = 5 * 60_000L
@@ -128,6 +139,15 @@ internal object DictionaryPrefetch {
     private const val TAG = "DictionaryPrefetch"
     private val policy = PrefetchPolicy()
     @Volatile private var faultsAtShow = -1L
+    /** Bumped on every show and hide: a retry from an earlier show stops once the keyboard has gone. */
+    @Volatile private var showSerial = 0L
+    /** 九键词组模型的文件名（RimeEngine.prefetchCandidates 只给用它的方案列出）。 */
+    private const val T9_MODEL_FILE = "t9_ngram.lm"
+    /**
+     * 弹键盘这一刻引擎常在忙（刚准备输入框、冷启动还在加载）：读不到方案就隔一会儿再试，共约 5 秒，
+     * 键盘收起就停。以前这一下读不到就整次跳过，冷启动后头一轮打字全在等读盘。
+     */
+    private val RETRY_DELAYS_MS = listOf(300L, 700L, 1_500L, 3_000L)
 
     fun onShow(context: Context, scope: CoroutineScope, engine: RimeEngine) {
         val now = SystemClock.elapsedRealtime()
@@ -142,13 +162,19 @@ internal object DictionaryPrefetch {
             thermalSevere = AndroidPlatform.thermalStatus &&
                 (power?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_SEVERE,
         )
+        val serial = ++showSerial
         if (!synchronized(policy) { policy.shouldCheck(now, conditions) }) return
         scope.launch(Dispatchers.IO) {
             runCatching {
-                val schema = engine.getCurrentSchema()
-                val files = engine.prefetchCandidates(schema).mapNotNull { path ->
+                var schema = ""
+                val candidates = retryWhileEmpty(RETRY_DELAYS_MS, { showSerial == serial }) {
+                    schema = engine.getCurrentSchema()
+                    engine.prefetchCandidates(schema)
+                }
+                val full = candidates.any { File(it).name == T9_MODEL_FILE }
+                val files = candidates.mapNotNull { path ->
                     val fraction = engine.residentFraction(path)
-                    if (fraction < 0) null else PrefetchPolicy.FileState(path, File(path).length(), fraction)
+                    if (fraction < 0) null else PrefetchPolicy.FileState(path, File(path).length(), fraction, full)
                 }
                 if (files.isEmpty()) return@runCatching
                 // Leave the system its low-memory threshold plus an eighth of RAM after reading.
@@ -162,6 +188,7 @@ internal object DictionaryPrefetch {
     }
 
     fun onHide() {
+        showSerial++
         val start = faultsAtShow
         val end = majorFaults()
         if (start >= 0 && end >= start) synchronized(policy) { policy.onSessionEnd(end - start) }
@@ -179,4 +206,16 @@ internal object DictionaryPrefetch {
         val stat = File("/proc/self/stat").readText()
         stat.substring(stat.lastIndexOf(')') + 2).split(' ')[9].toLong()
     }.getOrDefault(-1L)
+}
+
+/** Reads again after each delay while the result is empty and [stillWanted]; the last result otherwise. */
+internal suspend fun retryWhileEmpty(delaysMs: List<Long>, stillWanted: () -> Boolean, read: () -> List<String>): List<String> {
+    var result = read()
+    for (wait in delaysMs) {
+        if (result.isNotEmpty() || !stillWanted()) break
+        delay(wait)
+        if (!stillWanted()) break
+        result = read()
+    }
+    return result
 }

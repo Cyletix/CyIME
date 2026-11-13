@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 
 class DictionaryPrefetchTest {
     private val ok = PrefetchPolicy.Conditions()
@@ -31,6 +32,38 @@ class DictionaryPrefetchTest {
 
     @Test fun warmFilesAreLeftAlone() {
         assertEquals(emptyList<String>(), PrefetchPolicy().plan(0, files(0.95f), 4 * gb, 1 * gb))
+    }
+
+    /** 平板 11-13：九键冷启动那一轮在等词组模型读盘；九成在内存不算热，缺的页要补。 */
+    @Test fun nineKeyFilesMissingAFewPercentAreStillFilled() {
+        val nineKey = listOf(
+            PrefetchPolicy.FileState("prism", 1 * mb, 1f, full = true),
+            PrefetchPolicy.FileState("table", 55 * mb, 1f, full = true),
+            PrefetchPolicy.FileState("model", 105 * mb, 0.93f, full = true),
+        )
+        assertEquals(listOf("model"), PrefetchPolicy().plan(0, nineKey, 4 * gb, 1 * gb))
+        // 几乎全在：不动。
+        val warm = nineKey.map { it.copy(resident = 0.995f) }
+        assertEquals(emptyList<String>(), PrefetchPolicy().plan(0, warm, 4 * gb, 1 * gb))
+        // 26 键的文件照旧九成算热（warmFilesAreLeftAlone），内存不够照旧不读。
+        assertEquals(emptyList<String>(), PrefetchPolicy().plan(0, nineKey, 1 * gb, 1 * gb))
+    }
+
+    @Test fun anEngineBusyAtShowIsAskedAgainUntilTheKeyboardGoes() = runBlocking {
+        var calls = 0
+        val found = retryWhileEmpty(listOf(1L, 1L, 1L), { true }) { if (++calls < 3) emptyList() else listOf("model") }
+        assertEquals(listOf("model"), found)
+        assertEquals(3, calls)
+        // 收起了就不再问。
+        calls = 0
+        var shown = true
+        val gone = retryWhileEmpty(listOf(1L, 1L, 1L), { shown }) { calls++; shown = false; emptyList() }
+        assertEquals(emptyList<String>(), gone)
+        assertEquals(1, calls)
+        // 第一次就有：不等。
+        calls = 0
+        assertEquals(listOf("prism"), retryWhileEmpty(listOf(10_000L), { true }) { calls++; listOf("prism") })
+        assertEquals(1, calls)
     }
 
     @Test fun checksAreSpacedButTypingFaultsBypassTheInterval() {
