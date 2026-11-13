@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kingzcheung.xime.handwriting.training.ContributePromptDeck
 import com.kingzcheung.xime.handwriting.training.HandwritingContribution
 import com.kingzcheung.xime.handwriting.training.TrainingPoint
 import com.kingzcheung.xime.handwriting.training.TrainingPromptType
@@ -72,6 +73,36 @@ class HandwritingTrainingMergeTest {
         rule.onNodeWithTag("contribute-status").assertExists()
         rule.onNodeWithText("照着上面的字写在框里", substring = true).assertExists()
         rule.onNodeWithTag("contribute-upload").assertIsNotEnabled()
+    }
+
+    /** 用户 11-12：贡献样本要能自己选写什么——随机、只写某一类，或者自己输入的字词。 */
+    @Test fun contributeLetsWriterChooseWhatToWrite() {
+        HandwritingContribution.setConsented(context)
+        rule.setContent { MaterialTheme { HandwritingTrainingScreen(onBack = {}, contribute = true, devTools = false) } }
+        rule.waitForIdle()
+        rule.onNodeWithTag("contribute-choice").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("自己输入").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("contribute-own-input").performTextInput("龘 你好")
+        rule.onNodeWithText("开始").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("龘").assertExists()
+        rule.onNodeWithText("第 1 题").assertExists()
+        rule.onNodeWithText("自己选的").assertExists()
+        assertEquals(ContributePromptDeck.Choice.Own, HandwritingContribution.choice(context))
+        assertEquals("龘 你好", HandwritingContribution.ownText(context))
+        // 换一批：回到填词
+        rule.onNodeWithTag("contribute-own-clear").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("contribute-own-input").assertExists()
+        // 只写词语
+        rule.onNodeWithTag("contribute-choice").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("词语").performClick()
+        rule.waitForIdle()
+        assertEquals(ContributePromptDeck.Choice.Words, HandwritingContribution.choice(context))
+        rule.onNodeWithText("像平时手写输入那样写").assertExists()
     }
 
     /**

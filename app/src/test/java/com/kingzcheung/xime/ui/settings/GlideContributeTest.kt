@@ -163,4 +163,30 @@ class GlideContributeTest {
         rule.onNodeWithText("中文 26 键").performClick()
         waitFor("请滑出 ${chinese.first().letters}（${chinese.first().label}）")
     }
+
+    /** 用户 11-12：滑什么也能自己选。英文页只收英文词，查不到的说一声。 */
+    @Test fun ownWordsComeInTheOrderTyped() {
+        rule.setContent { MaterialTheme { GlideContributeScreen(onBack = {}, upload = { _, _ -> }, deckOf = fixedDeck) } }
+        waitFor("请滑出 hello")
+        rule.onNodeWithTag("glide-contribute-choice").performClick()
+        rule.onNodeWithText("自己输入").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("glide-contribute-own-input").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("glide-contribute-own-input").performTextInput("apple 你好 banana")
+        rule.onNodeWithText("开始").performClick()
+        waitFor("请滑出 apple")
+        rule.onNodeWithText("1 个查不到，请改输拼音或英文").assertExists()
+        rule.onNodeWithTag("glide-contribute-field").performClick()
+        send(stroke("qwerty", qwerty, 'a', 'e'))
+        rule.onNodeWithText("请滑出 banana").assertExists()
+        rule.onNodeWithText("第 2 题 · 已滑 1 条").assertExists()
+        // 换一批：回到填词
+        rule.onNodeWithTag("glide-contribute-own-clear").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("glide-contribute-own-input").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test fun ownChineseWordsGetPinyin() {
+        val context = rule.activity.applicationContext
+        val parsed = GlideContributeMode.Nine.parseOwn(context, "方法 nihao 银行")
+        assertEquals(listOf("fangfa" to "方法", "nihao" to "", "yinhang" to "银行"), parsed.prompts.map { it.letters to it.label })
+    }
 }

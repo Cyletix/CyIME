@@ -111,4 +111,51 @@ class ContributePromptDeckTest {
         assertEquals(ContributePromptDeck.seedOf("xyz"), ContributePromptDeck.seedOf("xyz"))
         assertNotEquals(ContributePromptDeck.seedOf("ab", "glide-English"), ContributePromptDeck.seedOf("ab", "glide-Nine"))
     }
+
+    // 用户 11-12：要能自己选写什么、滑什么
+    @Test fun choiceKeepsOnlyThatKindInTheSameOrder() {
+        val pools = bundledPools() ?: return
+        val deck = ContributePromptDeck.handwriting(pools, ContributePromptDeck.seedOf("0123456789abcdef"))
+        val words = ContributePromptDeck.filter(deck, ContributePromptDeck.Choice.Words)
+        assertTrue(words.size > 2000 && words.all { it.kind == "word" })
+        assertEquals(deck.filter { it.kind == "word" }, words)
+        assertTrue(ContributePromptDeck.filter(deck, ContributePromptDeck.Choice.Rare).all { it.kind == "rare" })
+        assertTrue(ContributePromptDeck.filter(deck, ContributePromptDeck.Choice.Common).all { it.kind == "char" })
+        assertEquals(deck, ContributePromptDeck.filter(deck, ContributePromptDeck.Choice.Random))
+        assertTrue(ContributePromptDeck.filter(deck, ContributePromptDeck.Choice.Own).isEmpty())
+    }
+
+    @Test fun ownHandwritingSplitsDedupesAndLimitsLength() {
+        val own = ContributePromptDeck.ownHandwriting(" 我 你好，你好 abc、一二三四五六七八九  龘 ")
+        assertEquals(listOf("我", "你好", "abc", "龘"), own.prompts.map { it.label })
+        assertEquals(1, own.tooLong)
+        assertEquals(listOf("char", "word", "word", "char"), own.prompts.map { it.kind })
+        // 单个汉字和常用字题同一个 id，写过的计在一起
+        assertEquals("contribute:char:我", own.prompts[0].id)
+        assertEquals(TrainingPromptType.Custom, own.prompts[2].type)
+        assertTrue(own.prompts.all { it.source == "contribute" })
+        assertTrue(ContributePromptDeck.ownHandwriting("  ，。 ").prompts.isEmpty())
+    }
+
+    @Test fun ownGlideTakesEnglishPinyinAndChineseWords() {
+        val lookup = mapOf("方法" to "fangfa", "行" to "xing")
+        val en = ContributePromptDeck.ownGlide("Hello world a 你好 hello", english = true) { lookup[it] }
+        assertEquals(listOf("hello", "world"), en.prompts.map { it.letters })
+        assertEquals(2, en.unknown)
+        val zh = ContributePromptDeck.ownGlide("方法 nihao 不认识 行", english = false) { lookup[it] }
+        assertEquals(listOf("fangfa" to "方法", "nihao" to "", "xing" to "行"), zh.prompts.map { it.letters to it.label })
+        assertEquals(1, zh.unknown)
+    }
+
+    @Test fun pinyinLookupUsesWordsThenSpellsCharacters() {
+        val lookup = ContributePromptDeck.pinyinLookup(
+            sequenceOf("word\t银行\tyin hang"),
+            sequenceOf("银\tyín", "行\txíng/háng", "绿\tlǜ/lù", "我\two"),
+        )
+        assertEquals("yinhang", lookup("银行"))
+        assertEquals("woxing", lookup("我行"))
+        assertEquals("lv", lookup("绿"))
+        assertEquals(null, lookup("我𠀀"))
+        assertEquals("nv", ContributePromptDeck.toneless("nǚ"))
+    }
 }

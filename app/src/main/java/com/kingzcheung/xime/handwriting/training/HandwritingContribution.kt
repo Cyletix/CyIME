@@ -114,6 +114,32 @@ object HandwritingContribution {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("last_opened", contribute).apply()
     }
 
+    /** 贡献页选的「写什么」（随机、常用字、少用字、词语、自己输入），下次进来照旧。 */
+    fun choice(context: Context): ContributePromptDeck.Choice {
+        val name = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("choice", null)
+        return ContributePromptDeck.Choice.entries.firstOrNull { it.name == name } ?: ContributePromptDeck.Choice.Random
+    }
+
+    fun setChoice(context: Context, choice: ContributePromptDeck.Choice) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("choice", choice.name).apply()
+    }
+
+    /** 「自己输入」填的字词，原样存着。 */
+    fun ownText(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("own_text", null).orEmpty()
+
+    fun setOwnText(context: Context, text: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("own_text", text).apply()
+    }
+
+    /** 「随机」以外各类写到第几题（随机的位置沿用原来存的那份，升级后接着写）。 */
+    fun position(context: Context, choice: ContributePromptDeck.Choice): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt("pos_${choice.name}", 0)
+
+    fun setPosition(context: Context, choice: ContributePromptDeck.Choice, index: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("pos_${choice.name}", index).apply()
+    }
+
     /** 上传结果：[count] 是这次传了几条；没有新样本时为 0。 */
     data class UploadResult(val count: Int)
 

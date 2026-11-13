@@ -5,7 +5,7 @@ package com.kingzcheung.xime.handwriting.training
  *
  * 题从 [POOL_ASSET]（3000 常用字、3000 少用字、3000 两字词，tools/handwriting_training/build_contribute_pool.py 生成）里出，
  * 按每个人的随机贡献编号打乱：不同人拿到不同的字词，同一个人每次进来顺序不变，接着上次写。题量九千多道，写不完。
- * 纯函数，单测见 ContributePromptDeckTest。
+ * 也可以只出某一类，或者写、滑用户自己输入的字词（[Choice]）。纯函数，单测见 ContributePromptDeckTest。
  */
 object ContributePromptDeck {
     /** 一轮里每 10 道题的类型：P 缺数据的常用字（排完让给常用字）、C 常用字、R 生僻字、W 两字词。 */
@@ -93,6 +93,106 @@ object ContributePromptDeck {
         }
         return start
     }
+
+    /**
+     * 写什么由用户自己选（用户 11-12：「要让用户能自己选择要输入什么内容」）。[kinds] 为 null 时不按类型挑：
+     * [Random] 是全部穿插，[Own] 是用户自己输入的字词。
+     */
+    enum class Choice(val title: String, val kinds: Set<String>?) {
+        Random("随机", null),
+        Common("常用字", setOf("char")),
+        Rare("少用字", setOf("rare")),
+        Words("词语", setOf("word")),
+        Own("自己输入", null),
+    }
+
+    /** 从这个人的随机题里只留选中的类型；[Choice.Random] 原样返回，[Choice.Own] 不从这里出题。 */
+    fun filter(deck: List<TrainingPrompt>, choice: Choice): List<TrainingPrompt> = when (choice) {
+        Choice.Random -> deck
+        Choice.Own -> emptyList()
+        else -> deck.filter { it.kind in choice.kinds.orEmpty() }
+    }
+
+    /** 自己输入的一段：按空白和常见标点分开，去重；接收端一题最多 [MAX_OWN_CHARS] 个字。 */
+    const val MAX_OWN_CHARS = 8
+    private val OWN_SEPARATORS = Regex("[\\s,，、;；。.!！?？/|]+")
+
+    data class Own<T>(val prompts: List<T>, val tooLong: Int = 0, val unknown: Int = 0)
+
+    private fun ownTokens(text: String): List<String> =
+        text.split(OWN_SEPARATORS).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
+    /**
+     * 手写自己输入的题：一个汉字算 char（和常用字题同一个 id，写过的计在一起），其余算 word。
+     * 超过 [MAX_OWN_CHARS] 个字的不要（计入 tooLong）。
+     */
+    fun ownHandwriting(text: String): Own<TrainingPrompt> {
+        var tooLong = 0
+        val prompts = ownTokens(text).mapNotNull { token ->
+            if (token.codePointCount(0, token.length) > MAX_OWN_CHARS) { tooLong++; return@mapNotNull null }
+            val kind = if (isOneHan(token)) "char" else "word"
+            val han = token.codePoints().allMatch { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }
+            TrainingPrompt(id = "contribute:$kind:$token", type = if (han) TrainingPromptType.Chinese else TrainingPromptType.Custom,
+                label = token, source = "contribute", hint = OWN_HINT, kind = kind)
+        }
+        return Own(prompts, tooLong = tooLong)
+    }
+
+    private const val OWN_HINT = "自己选的"
+
+    /**
+     * 滑行自己输入的题。[english] 时只收 2～16 个字母的英文词（转小写）；中文、九键时字母直接当拼音，
+     * 汉字词用 [pinyinOf] 查拼音（查不到计入 unknown，请用户直接输拼音）。
+     */
+    fun ownGlide(text: String, english: Boolean, pinyinOf: (String) -> String?): Own<GlidePrompt> {
+        var tooLong = 0
+        var unknown = 0
+        val prompts = ownTokens(text).mapNotNull { raw ->
+            val token = raw.lowercase()
+            when {
+                LETTERS.matches(token) -> GlidePrompt(token)
+                token.all { it in 'a'..'z' } -> { if (token.length > 16) tooLong++ else unknown++; null }
+                english -> { unknown++; null }
+                else -> pinyinOf(raw)?.takeIf { LETTERS.matches(it) }?.let { GlidePrompt(it, raw) }
+                    ?: run { if (raw.length > MAX_OWN_CHARS) tooLong++ else unknown++; null }
+            }
+        }.distinctBy { it.letters }
+        return Own(prompts, tooLong, unknown)
+    }
+
+    private val LETTERS = Regex("[a-z]{2,16}")
+
+    /**
+     * 汉字词查拼音：先查 [POOL_ASSET] 的两字词，查不到就逐字拼 hanzi_pinyin.tsv 的第一个读音（去掉声调，ü 写成 v）。
+     * 多音字可能拼错，题目上会显示出来，用户可以改输拼音。
+     */
+    fun pinyinLookup(pool: Sequence<String>, hanziPinyin: Sequence<String>): (String) -> String? {
+        val words = HashMap<String, String>()
+        rows(pool).filter { it[0] == "word" }.forEach { cols ->
+            cols.getOrNull(2)?.replace(" ", "")?.takeIf { it.isNotEmpty() }?.let { words.putIfAbsent(cols[1].trim(), it) }
+        }
+        val chars = HashMap<String, String>()
+        hanziPinyin.forEach { line ->
+            val cols = line.split('\t')
+            if (cols.size >= 2 && cols[1].isNotBlank()) chars.putIfAbsent(cols[0], toneless(cols[1].substringBefore('/')))
+        }
+        return { word -> words[word] ?: spell(word, chars) }
+    }
+
+    private fun spell(word: String, chars: Map<String, String>): String? {
+        val out = StringBuilder()
+        var i = 0
+        while (i < word.length) {
+            val cp = word.codePointAt(i)
+            out.append(chars[String(Character.toChars(cp))] ?: return null)
+            i += Character.charCount(cp)
+        }
+        return out.toString().takeIf { it.isNotEmpty() }
+    }
+
+    internal fun toneless(reading: String): String =
+        java.text.Normalizer.normalize(reading.trim().lowercase(), java.text.Normalizer.Form.NFD)
+            .replace("u\u0308", "v").filter { it in 'a'..'z' }
 
     private fun isOneHan(text: String): Boolean =
         text.codePointCount(0, text.length) == 1 &&
