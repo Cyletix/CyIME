@@ -1213,15 +1213,15 @@ mixed-ai-manju	26	wofaxianyigeaimanjutaiyouyisile	我发现一个AI漫剧太有�
 mixed-cpan-red	26	wocpanhongle	我C盘红了	1	群聊	2026-11-13	群聊原句
 mixed-xguang	26	zhegexguangpianzenmekan	这个X光片怎么看	1	群聊	2026-11-13	同类句
 mixed-txu	26	woxiangmaijiantxu	我想买件T恤	1	群聊	2026-11-13	同类句
-mixed-kxian	26	jintiandekxianzenmeyang	今天的K线怎么样	1	群聊	2026-11-13	同类句；K线 公开语料词频太低（399），排在 空闲 后
+mixed-kxian	26	jintiandekxianzenmeyang	今天的K线怎么样	1	群聊	2026-11-13	同类句；K线 公开语料词频太低（399），排在 空闲 后；试过权重 2000、3000 都排第一（kx 时 K线 升到第 3），5000 时 kx 首选变 K线，等更新语料的词频再定
 mixed-ppt	26	pptzuohaole	PPT做好了	1	群聊	2026-11-13	同类句
 mixed-pdf	26	weixinfawogepdf	微信发我个PDF	1	群聊	2026-11-13	同类句
-mixed-shang-bzhan	26	woshangbzhankanle	我上B站看了	1	群聊	2026-11-13	同类句；B站 的词频还不够压过 上班
+mixed-shang-bzhan	26	woshangbzhankanle	我上B站看了	1	群聊	2026-11-13	同类句；混合词按上下文里的平均得分算后排第一（原来输给 上班站）
 mixed-agu	26	agujintiandiele	A股今天跌了	1	群聊	2026-11-13	同类句；a gu 能拼全时 A股 原来被裁掉
 mixed-cluo	26	cluojinqiule	C罗进球了	1	群聊	2026-11-13	同类句
 mixed-upan	26	woyaoqumaigeupan	我要去买个U盘	1	群聊	2026-11-13	同类句
-mixed-qbi	26	chongleyibaiqbi	充了一百Q币	1	群聊	2026-11-13	同类句；Q币 公开语料词频太低（127）
-mixed-pt	26	bangwopyixiazhezhangtu	帮我P一下这张图	1	群聊	2026-11-13	同类句；单个字母 P 不进组句词库
+mixed-qbi	26	chongleyibaiqbi	充了一百Q币	1	群聊	2026-11-13	同类句；Q币 最低权重 5000 后能进句子（冲了一百Q币）；充 还读成 冲：聊天语料常把 充 写成 冲（词模型 ln P(话费|冲) −4.84、P(话费|充) −12.51），整句 冲了一百元 和 充了一百元 词模型分数打平（−26.04 对 −26.26），词频上 冲了 49707 高于 充了 13049
+mixed-pt	26	bangwopyixiazhezhangtu	帮我P一下这张图	1	群聊	2026-11-13	同类句；P一下 在组句词库里（24388），混合词按上下文里的平均得分算后排第一（原来输给 拍一下）
 mixed-ptu	26	zhezhangzhaopianyaoptu	这张照片要P图	1	群聊	2026-11-13	同类句
 mixed-bzhan-alone	26	bzhan	B站	1	群聊	2026-11-13	单独打
 mixed-cpan-alone	26	cpan	C盘	1	群聊	2026-11-13	单独打

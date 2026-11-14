@@ -131,7 +131,12 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
       // its dictionary weight (ln of its frequency, as Rime weighs it) brought to the model's scale, besides the
       // splits of its text. The two scales differ by about this much: over the 305,851 base.dict words (weight
       // ≥ 20) the model has, ln P(word) − Rime's ln(weight / 1e8) has median −3.75 (p25 −4.67, p75 −2.41).
-      constexpr double kDictionaryToModel = -3.75;
+      // That is a word's frequency alone; the Han words around it are scored after the words before them, which
+      // in chat raises a word by about kInContext over its frequency (ln P(word | the two words before) − ln P(word)
+      // over the fixture chat texts and sentences, 393 words: median 2.10, mean 2.25). Without it a mixed word lost
+      // to readings the model knows only as pieces (我上班站看了 over 我上B站看了, 帮我拍一下这张图 over 帮我P一下这张图).
+      constexpr double kInContext = 2.1;
+      constexpr double kDictionaryToModel = -3.75 + kInContext;
       struct Whole { size_t start, end; double weight; };
       vector<Whole> wholes;
       {
