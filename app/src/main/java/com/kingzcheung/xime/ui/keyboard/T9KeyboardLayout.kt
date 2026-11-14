@@ -100,7 +100,7 @@ import kotlinx.coroutines.launch
  *   第2行：GHI(4) | JKL(5) | MNO(6) | 重输
  *   第3行：PQRS(7) | TUV(8) | WXYZ(9) | 0
  *   第4行：符 | 123 | 空格(显示方案名) | 中/En(地球图标) | 发送
- * - 按住左下角 !@# 当 Ctrl（同 26 键，用户 11-03）：1 关闭 2 刷新 3 重做 4 全选 5 保存 6 剪切 7 撤销 8 复制 9 粘贴，
+ * - 按住左下角 !@# 当 Ctrl（同 26 键，用户 11-03）：1 关闭 2 刷新 3 重做 4 全选 5 剪切 6 查找 7 撤销 8 复制 9 粘贴，
  *   回车 = Ctrl+回车（发送）。数字键对应的字母见 [com.kingzcheung.xime.keyboard.CtrlShortcuts.t9Letter]。
  */
 @Composable
