@@ -3054,6 +3054,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 XimeInputMethodService.TAG,
                 "ForgetCandidate: text='$text' display=$displayIndex engine=$engineIndex result=$result"
             )
+            if (result == 2 && demoteEnglishWord(text)) return@postRimeJob
             if (result != 0) {
                 withEditor {
                     service.updateUI()
@@ -3196,6 +3197,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 "ImeKeyRouter",
                 "forgetCandidateGlobal: text='$text' index=$globalIndex result=$result"
             )
+            if (result == 2 && demoteEnglishWord(text)) return@postRimeJob
             if (result == 0) return@postRimeJob
             withEditor {
                 service.updateUI()
@@ -3257,13 +3259,30 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /**
+     * 长按删除一个没有学习记录的词库英文词（中文 26 键的 melt_eng 词，没有用户词库）：以前只提示「没有学习记录」，
+     * 删不掉（2026-11-13）。现在记进 cyime_en_demoted.txt，lua/cyime_en_memory.lua 把它排到前四个候选之后；
+     * 再选它或回车打它就回到原位。只在雾凇系 26 键；英文单词方案全是英文，不放后面。
+     */
+    private suspend fun demoteEnglishWord(text: String): Boolean {
+        if (!isRimeIceCapitalSchema(service.uiState.value.currentSchemaId)) return false
+        val rimeDir = com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service)
+        if (!com.kingzcheung.xime.settings.EnglishWordMemory.demote(rimeDir, text)) return false
+        service.rimeEngine.setInput(service.rimeEngine.getInput())
+        withEditor { service.updateUI() }
+        showForgetResult(text, 4)
+        return true
+    }
+
+    /**
      * 忘掉学习的结果提示：用户看不到词库内部状态，只有这句话说明发生了什么。
-     * result 同 forgetCandidate：1 忘掉后仍是词库里的词、2 没有学习记录、3 忘掉后不再出现（自造词）。
+     * result 同 forgetCandidate：1 忘掉后仍是词库里的词、2 没有学习记录、3 忘掉后不再出现（自造词）；
+     * 4 词库英文词排到后面（demoteEnglishWord）。
      */
     private fun showForgetResult(text: String, result: Int) {
         val message = when (result) {
             1 -> "已忘掉「$text」的学习记录，回到词库原来的位置"
             3 -> "已删除自造的「$text」，以后再用会重新记住"
+            4 -> "「$text」以后排到后面，再选它就回到原位"
             else -> "「$text」没有学习记录，不会删掉，排序不变"
         }
         android.os.Handler(android.os.Looper.getMainLooper()).post {
