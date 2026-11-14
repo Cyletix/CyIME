@@ -374,6 +374,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("图片高度", clipboardPanel, SettingsRoutes.ClipboardPanel,
             "剪贴板 图片 高度 太矮 比例 长图 截图 卡片"),
         SettingsSearchEntry("最近截图", clipboardPanel, SettingsRoutes.ClipboardPanel, "剪贴板 截图 截屏 相册 图片 照片"),
+        SettingsSearchEntry("也显示相册照片", clipboardPanel, SettingsRoutes.ClipboardPanel, "剪贴板 相册 照片 最近 图片 不只截图"),
         SettingsSearchEntry("剪贴板数量上限", clipboardPanel, SettingsRoutes.ClipboardPanel,
             "剪贴板 条数 数量 最多 上限 保存 历史记录 不限 存文档", anchor = "数量上限", section = "历史记录"),
         SettingsSearchEntry("剪贴板保留时间", clipboardPanel, SettingsRoutes.ClipboardPanel,
