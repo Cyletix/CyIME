@@ -338,11 +338,33 @@ internal class KeyGapLightField {
         val size = layer?.takeIf { it.isAttached }?.size ?: return
         val origin = (if (upper) centerOf(caseAnchor, net) ?: centerOf(lastTouch, net)
             else aimed ?: centerOf(lastTouch, net) ?: centerOf(caseAnchor, net)) ?: return
+        wave(origin, upper, size.width, size.height, scale)
+    }
+
+    /**
+     * 整块键盘换了意思（用户 11-14：点 Ctrl、切换语言也要有大小写那样的全键盘效果）：和大小写同一种色带。
+     * [on] 时从刚按的那个键扩开（按住的符号键、点的语言键）；Ctrl 松开时收回到最近按的键
+     * （另一根手指点的那个字母，或符号键自己）。跟「切换大小写」同一个开关。
+     */
+    internal fun modeChanged(on: Boolean) {
+        val config = config
+        if (!config.enabled || !config.switch) return
+        val scale = motionScale?.scaleFactor ?: 1f
+        if (scale <= 0f) return
+        val net = ensureNet() ?: return
+        val size = layer?.takeIf { it.isAttached }?.size ?: return
+        val origin = centerOf(lastTouch, net) ?: return
+        wave(origin, on, size.width, size.height, scale)
+    }
+
+    private fun wave(origin: Offset, expand: Boolean, width: Int, height: Int, scale: Float) {
+        val config = config
+        val size = androidx.compose.ui.unit.IntSize(width, height)
         // 方形按横竖里较远的一边算，菱形按横竖相加算：要走到最远的那个角。
         val dx = max(origin.x, size.width - origin.x)
         val dy = max(origin.y, size.height - origin.y)
         val far = (if (config.style == KeyGapLightStyle.DIAMOND) dx + dy else max(dx, dy)) + 8f * pixelsPerDp
-        add(Band(BAND_WAVE, origin.x, origin.y, far, upper, scaled(far / pixelsPerDp / GAP_LIGHT_WAVE_DP_PER_MS, scale)))
+        add(Band(BAND_WAVE, origin.x, origin.y, far, expand, scaled(far / pixelsPerDp / GAP_LIGHT_WAVE_DP_PER_MS, scale)))
     }
 
     /** 点了一下空格或回车（松手时）。 */
@@ -1002,6 +1024,23 @@ internal fun keyGapLightSource(
                 }
             }
         }
+}
+
+/**
+ * 整块键盘换了意思就告诉光层（[KeyGapLightField.modeChanged]）：[state] 每变一次画一次，[on] 决定扩开还是收回。
+ * 用在按住符号键当 Ctrl（键面换成快捷键时扩开、换回字母时收回）和中英、语言切换（每切一次从语言键扩开）。
+ * 第一次组合只记下状态，不画。
+ */
+@Composable
+internal fun KeyGapLightMode(field: KeyGapLightField?, state: Any?, on: Boolean = true) {
+    if (field == null) return
+    val shown = remember(field) { arrayOf(state) }
+    SideEffect {
+        if (shown[0] != state) {
+            shown[0] = state
+            field.modeChanged(on)
+        }
+    }
 }
 
 /**

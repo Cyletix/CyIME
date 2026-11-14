@@ -552,6 +552,9 @@ fun KeyboardLayout(
     val gapLight = rememberKeyGapLight(allowed = !honeycomb)
     // 大小写的显示一变就扩开或收回一次；只看状态，按下、松开不会各触发一次。
     KeyGapLightCase(gapLight, isShifted)
+    // 按住符号键当 Ctrl：键面换成快捷键时从符号键扩开，换回字母时收回；中英、语言切换时从语言键扩开（用户 11-14）。
+    KeyGapLightMode(gapLight, shiftSlideTargets.ctrlFaces, on = shiftSlideTargets.ctrlFaces)
+    KeyGapLightMode(gapLight, isAsciiMode to uiState.currentSchemaId)
 
     CompositionLocalProvider(
         LocalKeyGapLight provides gapLight,

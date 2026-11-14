@@ -263,6 +263,9 @@ private fun T9KeyboardSwipeOverlay(
 
     // 键缝动效的光层（默认关，关着时是 null）。
     val gapLight = rememberKeyGapLight()
+    // 按住 !@# 当 Ctrl、中英或语言切换：和 26 键一样从按的那个键扩开（用户 11-14）。
+    KeyGapLightMode(gapLight, ctrlTargets.ctrlFaces, on = ctrlTargets.ctrlFaces)
+    KeyGapLightMode(gapLight, uiState.isAsciiMode to uiState.inputProfile)
 
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius, LocalT9GlideKeys provides glideKeys,
         LocalKeyGapLight provides gapLight) {
