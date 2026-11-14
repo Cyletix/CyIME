@@ -859,7 +859,7 @@ private fun T9KeyboardContent(
                 if (enterBounds != Rect.Zero) ctrlTargets.putEnter(enterTargetId, enterBounds)
             }
             ActionKeyButton(
-                text = uiState.enterKeyText,
+                text = heldEnterText(uiState.enterKeyText, ctrlTargets.ctrlFaces),
                 onClick = { if (!ctrlTargets.ctrlEnter()) onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,

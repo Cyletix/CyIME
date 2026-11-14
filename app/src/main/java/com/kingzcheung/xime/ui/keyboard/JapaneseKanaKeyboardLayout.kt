@@ -184,7 +184,7 @@ fun JapaneseKanaKeyboardLayout(
                 var enterBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
                 DisposableEffect(ctrlTargets) { onDispose { ctrlTargets.remove(enterTargetId) } }
                 SideEffect { if (enterBounds != androidx.compose.ui.geometry.Rect.Zero) ctrlTargets.putEnter(enterTargetId, enterBounds) }
-                ActionKeyButton(text = enterKeyText, onClick = { if (!ctrlTargets.ctrlEnter()) onKeyPress("enter") },
+                ActionKeyButton(text = heldEnterText(enterKeyText, ctrlTargets.ctrlFaces), onClick = { if (!ctrlTargets.ctrlEnter()) onKeyPress("enter") },
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                     modifier = Modifier.weight(1f).testTag("kana-enter").onGloballyPositioned {
                         enterBounds = dragSpace.bounds(it)

@@ -45,6 +45,17 @@ fun ActionKeyButton(
         gapLight = if (text == "删除") GapLightKind.PULL else GapLightKind.SWEEP)
 }
 
+/**
+ * 回车键现在按下去实际做什么，就写什么（用户 11-14：按住 Ctrl 回车一直没提示）。
+ * Ctrl 键面亮着（按住 !@# 满时限或拖出）时是 Ctrl+回车，发送；手指按着 Shift 时是 Shift+回车，换行；
+ * 其余照输入框的动作名。自动大写、单次大写、大写锁定不算按着 Shift，回车不变。
+ */
+internal fun heldEnterText(base: String, ctrl: Boolean, shiftHeld: Boolean = false): String = when {
+    ctrl -> "发送"
+    shiftHeld -> "换行"
+    else -> base
+}
+
 /** 回车键（和删除键）按输入框动作名取图标；主键盘、数字、符号和编辑面板共用。 */
 internal fun actionKeyIcon(text: String) = when (text) {
     "删除" -> Icons.AutoMirrored.Filled.Backspace
