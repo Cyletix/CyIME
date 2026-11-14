@@ -213,7 +213,8 @@ internal fun ConnectedClipboardBoard(
         onFormOpen = { tab, adding ->
             groupStore.setReturnTab(tab.key)
             if (adding) groupStore.setAddTarget((tab as? ClipboardTab.Group)?.group?.id)
-        })
+        },
+        onReorderGroup = groupStore::setRecordOrder)
 }
 
 /** Closes the keyboard this board is in (it runs inside the input method service). */
@@ -311,6 +312,8 @@ internal fun ClipboardBoardView(
     onOpenSettings: (() -> Unit)? = null,
     /** The add (true) or edit form is about to open from this tab. */
     onFormOpen: (ClipboardTab, Boolean) -> Unit = { _, _ -> },
+    /** Saves the order a group's records were dragged to while selecting (group id, record keys); null: no sorting. */
+    onReorderGroup: ((String, List<String>) -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val appContext = LocalContext.current.applicationContext
@@ -354,7 +357,12 @@ internal fun ClipboardBoardView(
         if (removing.isNotEmpty()) removing = removing.intersect(
             clipboardCards(textItems, images, ClipboardFilter.ALL, pins).mapTo(mutableSetOf()) { it.key })
     }
-    val cards = remember(all, tab, groups) { all.filter { clipboardMatches(it, tab, groups) } }
+    val cards = remember(all, tab, groups) {
+        all.filter { clipboardMatches(it, tab, groups) }.let { shown ->
+            // A group's tab shows its records in the order they were dragged to (user 11-14).
+            (tab as? ClipboardTab.Group)?.let { groups.inRecordOrder(it.group.id, shown) } ?: shown
+        }
+    }
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, tab.key) { mutableStateOf<String?>(null) }
     val gridState = rememberLazyStaggeredGridState()
@@ -634,7 +642,13 @@ internal fun ClipboardBoardView(
                             } else openItemMenu(card, fixedRecords)
                         })
                 }
-                LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
+                // 多选时在自定义分组里：记录排成「排列」面板那样的一条一行，点选、长按拖动排序（用户 11-14）。
+                val sortGroup = (tab as? ClipboardTab.Group)?.group?.id?.takeIf { selecting && onReorderGroup != null }
+                if (sortGroup != null) ClipboardGroupSortList(cards, selected, revealed,
+                    onToggle = { key -> selected = if (key in selected) selected - key else selected + key },
+                    onToggleAll = { selected = toggleClipboardSection(selected, cards.mapTo(mutableSetOf()) { it.key }) },
+                    onSave = { onReorderGroup?.invoke(sortGroup, it) })
+                else LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
                     state = gridState,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalItemSpacing = 6.dp) {
@@ -984,6 +998,63 @@ private fun CompactClipboardAction(icon: ImageVector, description: String, onCli
         Icon(icon, description, Modifier.size(16.dp), tint = color)
         if (label != null) Text(label, color = color, fontSize = 12.sp, lineHeight = 18.sp,
             maxLines = 1, modifier = Modifier.padding(start = 2.dp))
+    }
+}
+
+/**
+ * 自定义分组里多选（用户 11-14：多选时长按可以排序，交互照「排列」面板）：一条一行，左边选择圈，点一下选中或取消，
+ * 长按拖到新位置，松手就存；拖着的那条和「排列」一样带强调色描边。固定的在分组页照旧排在上面，
+ * 它们之间、没固定的之间按这里的顺序。
+ */
+@Composable
+private fun ClipboardGroupSortList(cards: List<ClipboardCard>, chosenKeys: Set<String>, revealed: Set<String>,
+    onToggle: (String) -> Unit, onToggleAll: () -> Unit, onSave: (List<String>) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val rowColor = clipboardCardColor()
+    val byKey = remember(cards) { cards.associateBy { it.key } }
+    val drag = rememberDragOrder(cards.map { it.key }, onSave)
+    val rows = drag.order.mapNotNull(byKey::get)
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize().testTag("clipboard-sort-list"), state = drag.list,
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        item(key = "#sort-header") {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val all = cards.isNotEmpty() && chosenKeys.containsAll(cards.map { it.key })
+                ClipboardSectionSelectAll("全选 ${cards.size}", all, "clipboard-select-group", Modifier.weight(1f), onToggleAll)
+                Text("长按拖动排序", color = colors.onSurfaceVariant.copy(alpha = .8f), fontSize = 12.sp,
+                    modifier = Modifier.padding(end = 8.dp))
+            }
+        }
+        items(rows.size, key = { rows[it].key }) { index ->
+            val card = rows[index]
+            val chosen = card.key in chosenKeys
+            val dragging = drag.dragging == card.key
+            val shape = RoundedCornerShape(12.dp)
+            Row(Modifier.fillMaxWidth().then(dragOrderItem(drag, card.key)).clip(shape)
+                .background(if (dragging) androidx.compose.ui.graphics.lerp(rowColor, colors.primary, .2f) else rowColor)
+                .border(if (dragging) 2.dp else 0.dp, if (dragging) colors.primary else Color.Transparent, shape)
+                .semantics { selected = chosen }
+                .clickable(role = Role.Checkbox, onClickLabel = if (chosen) "取消选择" else "选择") { onToggle(card.key) }
+                .heightIn(min = ClipboardPinnedRowHeight).padding(horizontal = 12.dp, vertical = 8.dp)
+                .testTag("clipboard-sort:${card.key}"),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (chosen) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    if (chosen) "已选" else "未选", Modifier.size(20.dp), tint = colors.onSurfaceVariant)
+                Spacer(Modifier.width(12.dp))
+                when (card) {
+                    is ClipboardCard.Text -> Text(
+                        if (card.item.sensitive && card.key !in revealed) com.kingzcheung.xime.clipboard.ClipboardLinkChoices.SENSITIVE_MASK
+                        else card.item.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty(),
+                        Modifier.weight(1f), color = colors.onSurface, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    is ClipboardCard.Image -> {
+                        AsyncImage(card.item.uri, card.item.label, Modifier.size(32.dp).clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Crop)
+                        Text(card.item.label, Modifier.weight(1f).padding(start = 8.dp), color = colors.onSurface,
+                            fontSize = 15.sp, maxLines = 1)
+                    }
+                }
+                Icon(Icons.Default.DragIndicator, "长按拖动", Modifier.size(20.dp), tint = colors.onSurfaceVariant.copy(alpha = .6f))
+            }
+        }
     }
 }
 
