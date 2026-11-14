@@ -35,10 +35,12 @@ int MenuPlace(rime::Context* context, const std::string& text);
 // Pins (only a text the menu of the active code offers) to the front or unpins `text` for the active code,
 // saves the file and refreshes the menu. True when the pin state now is the requested one.
 bool SetPinned(rime::Context* context, const std::string& text, bool pinned);
-// Same, fixing `text` at `place` (1..kMaxPlace) of the active code's menu.
+// Same, fixing `text` at `place` (1..kMaxPlace) of the active code's menu. Another pin of the code at that place is
+// removed: one place holds one word, so the place shown for a pin is where it is.
 bool SetPinnedAt(rime::Context* context, const std::string& text, int place);
 // For the settings page (no composition): pin `text` for `code` at `place` (0 = front, else 1..kMaxPlace),
-// or unpin it. The menu is not checked; a pin whose text the code never offers does nothing.
+// or unpin it (a place taken by another pin is replaced, as SetPinnedAt). The menu is not checked; a pin whose
+// text the code never offers does nothing.
 bool PinCode(const std::string& code, const std::string& text, int place);
 bool UnpinCode(const std::string& code, const std::string& text);
 // Every pin, by code, first pinned first.
@@ -48,8 +50,8 @@ namespace detail {
 struct Placed { std::string text; int place = 0; };
 // The new order of the first texts.size() candidates: indexes into `texts`. Pins (in pin order) found in
 // `texts` take their place: front pins first, then everything else in its own order, then each fixed pin is
-// put at its place (lowest place first; a place past the end goes last). Later copies of a pinned text are
-// dropped.
+// put at its place (lowest place first; a place past the end goes last; of two pins at one place the later pinned
+// keeps it and the other goes right after). Later copies of a pinned text are dropped.
 std::vector<size_t> Arrange(const std::vector<std::string>& texts, const std::vector<Placed>& pins);
 }  // namespace detail
 }  // namespace cyime::pins

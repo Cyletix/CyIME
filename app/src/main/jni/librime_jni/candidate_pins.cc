@@ -210,6 +210,14 @@ bool Change(const std::string& code, const std::string& text, int place) {
   const auto before = list;
   const auto countBefore = count;
   if (existing != list.end()) { list.erase(existing); --count; }
+  // One place holds one word: a word fixed at a place another pin of this code holds replaces that pin, which
+  // goes back to its learned order. Pushing it one place down instead (as before) made both cards wrong: the new
+  // word showed 「第 2 位」 at 3, and the words fixed below it moved down one each.
+  if (place > 0) {
+    const auto size = list.size();
+    list.erase(std::remove_if(list.begin(), list.end(), [&](const Pin& pin) { return pin.place == place; }), list.end());
+    count -= size - list.size();
+  }
   if (place >= 0) {
     if (count >= kMaxPins) { list = before; count = countBefore; if (list.empty()) pins.erase(code); return false; }
     // Later than every pin of this code, so a clock set back still appends.
@@ -341,8 +349,12 @@ std::vector<size_t> Arrange(const std::vector<std::string>& texts, const std::ve
   std::vector<size_t> fixed;
   for (size_t p = 0; p < pins.size(); ++p)
     if (at[p] < texts.size() && pins[p].place > 0) fixed.push_back(p);
-  std::stable_sort(fixed.begin(), fixed.end(), [&](size_t a, size_t b) { return pins[a].place < pins[b].place; });
-  size_t next = 0;  // two pins at one place: the earlier one keeps it, the later one goes right after
+  // Lowest place first; two pins at one place (a file written before Change replaced such a pin): the later pin
+  // keeps it, as it would replace the earlier one now, and the earlier one goes right after.
+  std::stable_sort(fixed.begin(), fixed.end(), [&](size_t a, size_t b) {
+    return pins[a].place != pins[b].place ? pins[a].place < pins[b].place : a > b;
+  });
+  size_t next = 0;
   for (const auto p : fixed) {
     const auto slot = std::min(std::max(static_cast<size_t>(pins[p].place - 1), next), order.size());
     order.insert(order.begin() + slot, at[p]);
