@@ -1235,3 +1235,6 @@ mixed-neg-wbzd	26	wbzd	我不知道	1	群聊	2026-11-13	反例
 mixed-neg-baozhang	26	baozhang	保障	1	群聊	2026-11-13	反例
 mixed-neg-kexiang	26	kexiang	!K线	1	群聊	2026-11-13	反例
 mixed-neg-woaini	26	woaini	我爱你	1	群聊	2026-11-13	反例：ai 不读成 AI
+name-guohaol	26	guohaol	过好了	1	用户反馈目标	2026-11-14	不知名人名 郭昊伦 从词库删掉后
+name-zhangsanl	26	zhangsanl	张三了	1	用户反馈目标	2026-11-14	张三禄 删掉后
+name-zhaoyunl	26	zhaoyunl	!赵云蕾	1	用户反馈目标	2026-11-14	赵云蕾 删掉后不再出现
