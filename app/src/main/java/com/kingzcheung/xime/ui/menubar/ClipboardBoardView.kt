@@ -107,6 +107,8 @@ internal fun ConnectedClipboardBoard(
     DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
     val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
     val imageHeight = remember(prefs) { clipboardImageHeight(prefs.getString(CLIPBOARD_IMAGE_HEIGHT_KEY, null)) }
+    // 平铺 / 列表，顶栏按钮切换，记住上次选的（用户 11-14）。
+    var listLayout by remember(prefs) { mutableStateOf(prefs.getBoolean(CLIPBOARD_LIST_LAYOUT_KEY, false)) }
     var closeAfterPaste by remember(prefs) { mutableStateOf(clipboardClosesAfterPaste(prefs)) }
     // A search submitted from the keyboard search bar shows only its matches (fixed records too).
     val boardQuery by manager.boardQuery.collectAsState()
@@ -178,7 +180,11 @@ internal fun ConnectedClipboardBoard(
             // Clearing means all unfixed history in the database, not only the pages read so far.
             manager.clearAll()
             store.removeImages(images.filterIsInstance<ClipboardCard.Image>().map { it.item.uri }.toSet())
-        }, cardMaxLines = cardMaxLines, imageHeight = imageHeight,
+        }, cardMaxLines = cardMaxLines, imageHeight = imageHeight, listLayout = listLayout,
+        onListLayoutChange = { value ->
+            listLayout = value
+            prefs.edit().putBoolean(CLIPBOARD_LIST_LAYOUT_KEY, value).apply()
+        },
         searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
         onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
         onOpenSearch = onOpenSearch, full = room.full, showControls = showControls,
@@ -266,6 +272,10 @@ internal fun ClipboardBoardView(
     onClearUnpinned: ((List<ClipboardCard>) -> Unit)? = null,
     cardMaxLines: Int = 4,
     imageHeight: ClipboardImageHeight = ClipboardImageHeight.STANDARD,
+    /** 列表: one record per row, recent pictures in one sideways row; false is the 瀑布流平铺 of several columns. */
+    listLayout: Boolean = false,
+    /** Switches between 平铺 and 列表 from the button in the top row; null hides the button. */
+    onListLayoutChange: ((Boolean) -> Unit)? = null,
     /** The search shown in the board, or null; its chip clears it. */
     searchQuery: String? = null,
     onClearSearch: () -> Unit = {},
@@ -399,18 +409,26 @@ internal fun ClipboardBoardView(
             // The source rectangles are opening-time snapshots. Resizing must not reuse stale anchors.
             menu = false; itemMenu = null; groupMenu = null; deleting = null
         }
-        val columns = clipboardColumnCount(maxWidth.value)
+        val list = remember(cards, listLayout) { clipboardListLayout(listLayout, cards) }
+        val columns = if (list) 1 else clipboardColumnCount(maxWidth.value)
         val compactControls = maxWidth.value / LocalDensity.current.fontScale < 360f
         val content = remember(cards, pins, columns, pinsExpanded) {
             clipboardBoardContent(cards, pins, columns, pinsExpanded)
         }
         val pinsActuallyExpanded = pinsExpanded && content.pinsCollapsible
-        val visibleCards = remember(content) { content.visible }
+        // 列表: recent pictures share one sideways row (user 11-14).
+        val strip = remember(content, list) { if (list) clipboardImageStrip(content.recent) else null }
+        val visibleCards = remember(content, strip) { if (strip == null) content.visible else content.pinned + strip.ordered }
+        fun inStrip(key: String?) = strip?.images?.any { it.key == key } == true
+        /** The grid cell showing [key]: its own, or the picture row for a picture in it. */
+        fun visibleCell(key: String) = gridState.layoutInfo.visibleItemsInfo.firstOrNull {
+            it.key == key || (inStrip(key) && it.key == CLIPBOARD_IMAGE_STRIP_KEY)
+        }
         val focused = focusedKey?.takeIf { key -> visibleCards.any { it.key == key } }
             ?: visibleCards.firstOrNull()?.key
         val showScreenshotAccess = screenshotAccess && searchQuery == null &&
             (tab as? ClipboardTab.Category)?.filter.let { it == ClipboardFilter.ALL || it == ClipboardFilter.IMAGE }
-        val gridKeys = remember(content, failure != null, full, incognito, showScreenshotAccess, selecting) {
+        val gridKeys = remember(content, strip, failure != null, full, incognito, showScreenshotAccess, selecting) {
             buildList {
                 if (incognito) add("incognito")
                 if (full) add("full")
@@ -420,19 +438,24 @@ internal fun ClipboardBoardView(
                 addAll(content.pinned.map { it.key })
                 if (content.pinned.isNotEmpty() && content.recent.isNotEmpty()) add("pins-end")
                 if (selecting && content.recent.isNotEmpty()) add("select-recent")
-                addAll(content.recent.map { it.key })
+                if (strip == null) addAll(content.recent.map { it.key })
+                else {
+                    addAll(strip.before.map { it.key })
+                    if (strip.images.isNotEmpty()) add(CLIPBOARD_IMAGE_STRIP_KEY)
+                    addAll(strip.after.map { it.key })
+                }
             }
         }
         LaunchedEffect(focused, keyboard?.active, gridKeys) {
             if (keyboard?.active == true) {
-                val index = gridKeys.indexOf(focused)
-                val visible = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == focused }
+                val index = gridKeys.indexOf(if (inStrip(focused)) CLIPBOARD_IMAGE_STRIP_KEY else focused)
+                val visible = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == gridKeys.getOrNull(index) }
                 if (index >= 0 && (visible == null || visible.offset.y < gridState.layoutInfo.viewportStartOffset ||
                     visible.offset.y + visible.size.height > gridState.layoutInfo.viewportEndOffset)) gridState.scrollToItem(index)
             }
         }
         fun openItemMenu(card: ClipboardCard, oneLine: Boolean) {
-            val cell = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == card.key } ?: return
+            val cell = visibleCell(card.key) ?: return
             val region = recordsCoordinates[0]?.boundsInRoot() ?: return
             val bounds = (cardBounds[card.key] ?: Rect(region.left + cell.offset.x, region.top + cell.offset.y,
                 region.left + cell.offset.x + cell.size.width, region.top + cell.offset.y + cell.size.height))
@@ -468,7 +491,7 @@ internal fun ClipboardBoardView(
                 }
                 if (!menu && !selecting && action == ClipboardNavigation.DELETE) {
                     focusedCard?.let { card ->
-                        val cell = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == card.key }
+                        val cell = visibleCell(card.key)
                         val region = recordsCoordinates[0]?.boundsInRoot()
                         if (cell != null && region != null) {
                             deleteAnchor = menuPosition(Rect(region.left + cell.offset.x, region.top + cell.offset.y,
@@ -551,6 +574,11 @@ internal fun ClipboardBoardView(
                                 pinsActuallyExpanded, colors.onSurface)
                         }
                     }
+                    onListLayoutChange?.let { change ->
+                        // The icon shows the layout a tap switches to.
+                        CompactClipboardAction(if (listLayout) Icons.Default.GridView else Icons.Default.ViewAgenda,
+                            if (listLayout) "切换为平铺" else "切换为列表", { change(!listLayout) }, "clipboard-layout")
+                    }
                     onOpenSearch?.let {
                         CompactClipboardAction(Icons.Default.Search, "搜索剪贴板", it, "clipboard-search")
                     }
@@ -582,6 +610,30 @@ internal fun ClipboardBoardView(
                 val stableRecordsHeight = expansion?.let { (it.collapsedHeight - chromeHeight).coerceAtLeast(0f) }
                     ?: maxHeight.value
                 val pinnedHeight = clipboardPinnedPreviewHeight(stableRecordsHeight).dp
+                // The list layout's picture row: every picture the same small square, the row scrolls sideways.
+                val stripHeight = pinnedHeight.coerceAtLeast(ClipboardImageMinHeight.dp)
+                @Composable
+                fun RecordCard(card: ClipboardCard, fixedRecords: Boolean, previewHeight: Dp?, modifier: Modifier) {
+                    val chosen = card.key in selected
+                    ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen, maxLines = cardMaxLines,
+                        masked = card is ClipboardCard.Text && card.item.sensitive && card.key !in revealed,
+                        selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
+                        previewHeight = previewHeight,
+                        imageHeight = imageHeight, recordsHeightDp = stableRecordsHeight,
+                        modifier = modifier.onGloballyPositioned { cardBounds[card.key] = it.boundsInRoot() },
+                        onClick = {
+                            focusedKey = card.key
+                            if (selecting) selected = if (chosen) selected - card.key else selected + card.key
+                            else when (card) {
+                                is ClipboardCard.Text -> onSelectText(card.item.text)
+                                is ClipboardCard.Image -> onSelectImage(card.item)
+                            }
+                        }, onLongClick = {
+                            if (selecting) {
+                                selected = if (chosen) selected - card.key else selected + card.key
+                            } else openItemMenu(card, fixedRecords)
+                        })
+                }
                 LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
                     state = gridState,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
@@ -610,35 +662,18 @@ internal fun ClipboardBoardView(
                     }
                     fun LazyStaggeredGridScope.records(records: List<ClipboardCard>, fixedRecords: Boolean) {
                         items(records, key = { it.key }) { card ->
-                            val chosen = card.key in selected
-                            ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen, maxLines = cardMaxLines,
-                                masked = card is ClipboardCard.Text && card.item.sensitive && card.key !in revealed,
-                                selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
+                            RecordCard(card, fixedRecords,
                                 // Pins are one line; a recent picture follows 「图片高度」 (user 11-09), never
                                 // taller than part of the board, so a tall screenshot does not fill it.
                                 previewHeight = if (fixedRecords) ClipboardPinnedRowHeight
                                     else if (card is ClipboardCard.Image && imageHeight == ClipboardImageHeight.LOW) pinnedHeight
                                     else null,
-                                imageHeight = imageHeight, recordsHeightDp = stableRecordsHeight,
                                 // Lazy layout retains removed keyed items through fade-out. Keep one
                                 // grid so collapsing pins does not flash or replace recent history.
                                 modifier = Modifier.animateItem(
                                     fadeInSpec = keyboardPanelMotion(true),
                                     placementSpec = keyboardPanelMotion(pinsActuallyExpanded),
-                                    fadeOutSpec = keyboardPanelMotion(false))
-                                    .onGloballyPositioned { cardBounds[card.key] = it.boundsInRoot() },
-                                onClick = {
-                                    focusedKey = card.key
-                                    if (selecting) selected = if (chosen) selected - card.key else selected + card.key
-                                    else when (card) {
-                                        is ClipboardCard.Text -> onSelectText(card.item.text)
-                                        is ClipboardCard.Image -> onSelectImage(card.item)
-                                    }
-                                }, onLongClick = {
-                                    if (selecting) {
-                                        selected = if (chosen) selected - card.key else selected + card.key
-                                    } else openItemMenu(card, fixedRecords)
-                                })
+                                    fadeOutSpec = keyboardPanelMotion(false)))
                         }
                     }
                     // 多选时每一栏前面一行自己的全选圈（用户 11-11）。
@@ -672,7 +707,24 @@ internal fun ClipboardBoardView(
                         }
                     }
                     if (selecting && content.recent.isNotEmpty()) sectionSelectAll(fixed = false)
-                    records(content.recent, fixedRecords = false)
+                    if (strip == null) records(content.recent, fixedRecords = false)
+                    else {
+                        records(strip.before, fixedRecords = false)
+                        if (strip.images.isNotEmpty()) item(key = CLIPBOARD_IMAGE_STRIP_KEY, span = StaggeredGridItemSpan.FullLine) {
+                            androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth().height(stripHeight)
+                                .animateItem(fadeInSpec = keyboardPanelMotion(true),
+                                    placementSpec = keyboardPanelMotion(pinsActuallyExpanded),
+                                    fadeOutSpec = keyboardPanelMotion(false))
+                                .testTag("clipboard-image-strip"),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                items(strip.images.size, key = { strip.images[it].key }) { index ->
+                                    RecordCard(strip.images[index], fixedRecords = false, previewHeight = stripHeight,
+                                        modifier = Modifier.width(stripHeight))
+                                }
+                            }
+                        }
+                        records(strip.after, fixedRecords = false)
+                    }
                 }
             }
         }
