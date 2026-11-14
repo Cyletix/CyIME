@@ -58,6 +58,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.flow.drop
 import androidx.compose.runtime.snapshotFlow
@@ -96,6 +97,7 @@ import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.keyboard.ToolbarAction
 import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
+import com.kingzcheung.xime.keyboard.QuickActionLayout
 import com.kingzcheung.xime.keyboard.resolveToolbarButtonItem
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
@@ -375,7 +377,24 @@ fun KeyboardView(
     val gapLightVoice: () -> Float = remember(voiceAmplitudeState) {
         { if (gapLightListening.value) microphoneLevel(voiceAmplitudeState.value) else 0f }
     }
+    val inlineMotionScope = rememberCoroutineScope()
+    val inlineEditor = remember(state.inputSessionId) { InlineQuickActionEditor(inlineMotionScope) }
+    var showInlineSaveHint by remember(state.inputSessionId) { mutableStateOf(false) }
+    LaunchedEffect(inlineEditor.active) {
+        showInlineSaveHint = inlineEditor.active
+        if (inlineEditor.active) {
+            kotlinx.coroutines.delay(2500)
+            showInlineSaveHint = false
+        }
+    }
+    LaunchedEffect(page) {
+        if ((page as? KeyboardPage.Overlay)?.route != OverlayRoute.Menu && inlineEditor.active) inlineEditor.cancel()
+    }
+    // 设置里「在菜单里直接编辑」关着时，菜单右上角不出编辑按钮，和以前一样；编辑中被关掉就放弃这次编辑。
+    val inlineEditingEnabled = rememberInlineQuickActionEditing()
+    LaunchedEffect(inlineEditingEnabled) { if (!inlineEditingEnabled && inlineEditor.active) inlineEditor.cancel() }
     CompositionLocalProvider(
+        LocalInlineQuickActionEditor provides inlineEditor,
         LocalKeyGapLightVoice provides gapLightVoice,
         LocalKeyboardUndockFollow provides undockFollow,
         LocalKeyboardResizeOpacityEditing provides opacityEditingState.takeIf { resizeActive },
@@ -575,7 +594,7 @@ fun KeyboardView(
         }
         // 候选栏上面那一截的高度（翻译栏、工具面板、剪贴板搜索、拼音编辑条）；菜单等面板据此让开工具栏，见 belowCandidateBar。
         val aboveCandidateBarPx = remember { mutableIntStateOf(0) }
-        Box(modifier = Modifier.fillMaxSize().then(contentModifier).onSizeChanged { size ->
+        Box(modifier = Modifier.fillMaxSize().then(contentModifier).inlineQuickActionGestures(inlineEditor).onSizeChanged { size ->
             if (!barScaleFrozen && size.width > 0 && size.height > 0) {
                 candidateBarScaleState.floatValue = candidateBarScale(size.width / resizeControlDensity.density,
                     size.height / resizeControlDensity.density - renderedBottomPaddingDp)
@@ -823,8 +842,16 @@ fun KeyboardView(
             }
         }
         // 无痕只在它自己的位置（工具栏或菜单）显示开启状态，不额外插入图标。
-        val toolbarQuickActions = state.toolbarButtons.mapNotNull(::quickAction)
-        val menuQuickActions = state.menuButtons.mapNotNull(::quickAction)
+        val toolbarQuickActions = (if (inlineEditor.active) inlineEditor.toolbar else state.toolbarButtons).mapNotNull(::quickAction)
+        val menuQuickActions = (if (inlineEditor.active) inlineEditor.menu else state.menuButtons).mapNotNull(::quickAction)
+        val unusedQuickActions = if (inlineEditor.active) inlineEditor.unused.mapNotNull(::quickAction) else emptyList()
+        val startInlineEditing: (() -> Unit)? = callbacks.onUpdateQuickActions?.takeIf { inlineEditingEnabled }?.let { {
+            toolbarFeedback()
+            inlineEditor.start(QuickActionLayout(state.toolbarButtons, state.menuButtons),
+                toolbarQuickActions.map { it.item.id }, menuQuickActions.map { it.item.id },
+                (ToolbarButton.CUSTOMIZABLE.map { it.id } + state.toolbarPluginButtons.map { it.id })
+                    .distinct().filter { quickAction(it) != null })
+        } }
         // 面板高度包含工具栏/候选栏；按键区只分配剩余高度。
         // Service 以整张卡片顶部上报避让区域，不能只上报按键区。
         // 拼音放在键盘内时，光标调整移动的就是候选栏里的拼音：候选栏不压淡，只压淡按键区（#162）。
@@ -1234,7 +1261,7 @@ fun KeyboardView(
                         visibleBarUsesExpanded = expandedDataMode
                     },
                     onVisibleAssociationsChanged = { visibleBarAssociations = it },
-                    onReorderToolbar = callbacks.onUpdateToolbarButtons,
+                    onReorderToolbar = if (inlineEditor.active) null else callbacks.onUpdateToolbarButtons,
                     onCancelInput = {
                         closePreeditEditor()
                         toolbarFeedback()
@@ -1325,6 +1352,7 @@ fun KeyboardView(
                     },
                     onBack = {
                         toolbarFeedback()
+                        if (inlineEditor.active) inlineEditor.cancel()
                         if (page is KeyboardPage.Overlay) {
                             viewModel.backFromOverlay()
                         } else if (isHandwritingPage) {
@@ -1342,6 +1370,11 @@ fun KeyboardView(
                         callbacks.onHideKeyboard?.invoke()
                         viewModel.resetKeyboard(state.isAsciiMode, state.currentSchemaId)
                     },
+                    onSaveQuickActions = {
+                        toolbarFeedback()
+                        callbacks.onUpdateQuickActions?.invoke(inlineEditor.finish())
+                    },
+                    onEditQuickActions = startInlineEditing,
                     onShowMoreCandidates = {
                         toolbarFeedback()
                         candidatePageOpening++
@@ -2116,6 +2149,7 @@ fun KeyboardView(
                             isAsciiMode = state.isAsciiMode,
                         ),
                         actions = menuQuickActions,
+                        hiddenActions = unusedQuickActions,
                         modifier = panelMaterial.fillMaxWidth().fillMaxHeight(),
                     )
                     is OverlayRoute.Ocr -> com.kingzcheung.xime.ocr.OcrCameraPanel(
@@ -2316,6 +2350,8 @@ fun KeyboardView(
             }
             }
         }
+        InlineQuickActionOverlay(inlineEditor, toolbarQuickActions + menuQuickActions, showInlineSaveHint,
+            keyBgColor, keyTextColor, accentColor)
         // 画在面板之后：从菜单或打开着的面板上点「无痕」时，确认卡也在最上面。
         if (incognitoConfirm) {
             KeyboardConfirmCard(
