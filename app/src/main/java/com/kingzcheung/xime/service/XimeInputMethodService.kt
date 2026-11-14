@@ -1610,6 +1610,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val pluginName = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.name ?: pluginId
         if (live) liveToolBar.reset()
+        // 打开翻译栏：键盘回到打字界面，不停在菜单、符号、剪贴板这些页上。
+        if (live) {
+            // 菜单里再打开的页（菜单 → 剪贴板）一层层退回去，最多退几层，防止页面不变时死循环
+            repeat(4) {
+                if (keyboardViewModel.page.value is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay) keyboardViewModel.closeOverlay()
+            }
+        }
         val epoch = uiState.value.toolPanelRequestEpoch + 1
         uiState.value = uiState.value.copy(
             toolPanelVisible = true,
@@ -1852,6 +1859,59 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (box == null || voiceTarget.editor !== box || !(uiState.value.isVoiceMode || voiceRecordingStarted)) return
         voiceRecognitionHandler.endInputSession()
         restoreAfterVoiceFinish()
+    }
+
+    /**
+     * 翻译栏开着时打字去哪个框：true 栏里，false 应用输入框（栏留着不抢）。点栏进栏，点应用输入框回应用。
+     * 换框时没打完的拼音、联想收掉，候选上屏、编码、删除都跟着去同一个框。
+     */
+    internal fun setLiveBarFocus(focused: Boolean) {
+        val state = uiState.value
+        if (!state.toolPanelVisible || state.toolPanelDisplay != ToolResult.LIVE.name ||
+            state.toolPanelInputFocused == focused) return
+        val pending = candidateState.value
+        if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty() ||
+            pending.associationCandidates.isNotEmpty()) keyRouter.dropCompositionForTargetChange()
+        uiState.value = uiState.value.copy(
+            toolPanelInputFocused = focused,
+            enterKeyText = if (focused) "完成" else editorEnterKeyText(),
+        )
+        if (focused) liveToolBar.enter() else liveToolBar.leave()
+    }
+
+    /**
+     * 工具栏长按插件按钮弹出的列表：插件 ui 里 style = "quick" 的选择（翻译的目标语言）。
+     * 面板开着就用面板现在的节点，不和翻译栏的请求同时去问插件；没开才在后台问一次。
+     */
+    internal suspend fun toolPanelQuickOptions(pluginId: String): com.kingzcheung.xime.keyboard.PressMenuOptions? {
+        val state = uiState.value
+        val nodes = if (state.toolPanelVisible && state.toolPanelPluginId == pluginId) state.toolPanelUiNodes
+        else withContext(Dispatchers.IO) {
+            runCatching { (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)?.getPanelState("") }.getOrNull()?.ui
+        }
+        return toolPanelQuickNode(nodes)
+    }
+
+    /** 长按列表里选了一项：翻译栏开着就直接换，没开就打开翻译栏再换。 */
+    internal fun toolPanelQuickSelect(pluginId: String, key: String, option: String) {
+        val action = toolPanelSelectAction(key, option)
+        val state = uiState.value
+        if (state.toolPanelVisible && state.toolPanelPluginId == pluginId) dispatchToolPanelAction(action)
+        else openToolPanel(pluginId, startAction = action)
+    }
+
+    /** 应用输入框里一个字都没有（读不到当作有字）。 */
+    private fun hostFieldEmpty(): Boolean = runCatching {
+        val ic = currentInputConnection ?: return@runCatching false
+        ic.getTextBeforeCursor(1, 0)?.isEmpty() == true && ic.getTextAfterCursor(1, 0)?.isEmpty() == true
+    }.getOrDefault(false)
+
+    /** 用户点了应用的输入框（框架只对会报点击的输入框调用）：翻译栏开着就把输入还给应用。 */
+    @Deprecated("Deprecated in Java")
+    override fun onViewClicked(focusChanged: Boolean) {
+        @Suppress("DEPRECATION")
+        super.onViewClicked(focusChanged)
+        setLiveBarFocus(false)
     }
 
     internal fun closeToolPanel() {
@@ -4038,6 +4098,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
         if (restored == null && caretLeftInlineComposition(newSelStart, newSelEnd, candidatesStart, candidatesEnd))
             keyRouter.finishCompositionAfterCaretLeft()
+        // 翻译栏拿着输入时用户点了应用输入框（光标变了，不是译文写出来的）：输入回到应用。
+        // 输入框被应用清空（点了发送）不算：接着在栏里打下一句。
+        if (liveToolBar.userMovedHostCaret(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd) &&
+            !(newSelStart == 0 && newSelEnd == 0 && hostFieldEmpty())) setLiveBarFocus(false)
         val hostCaret = if (newSelStart >= 0 && newSelStart == newSelEnd) newSelStart else -1
         if (hostCaret != voiceHostCaret) { voiceHostCaretBefore = voiceHostCaret; voiceHostCaret = hostCaret }
         if (restored != null || oldSelStart != newSelStart || oldSelEnd != newSelEnd) {

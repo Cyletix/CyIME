@@ -791,7 +791,14 @@ fun KeyboardView(
                 callbacks.onSettingsPage?.invoke(entry.target)
                 viewModel.closeOverlay()
             } }
-            return ToolbarAction(item, onLongClick = openSettings, active = item is ToolbarButtonItem.Builtin && when (item.button) {
+            // 插件按钮（翻译）：工具栏上长按弹出插件给的列表，滑到一项松手就选
+            val pressMenu = (item as? ToolbarButtonItem.Plugin)?.takeIf { it.action == "open_panel" }?.let { plugin ->
+                val load = callbacks.onToolPanelQuickOptions ?: return@let null
+                val choose = callbacks.onToolPanelQuickSelect ?: return@let null
+                com.kingzcheung.xime.keyboard.ToolbarPressMenu(load = { load(plugin.pluginId) },
+                    onChoose = { key, option -> toolbarFeedback(); choose(plugin.pluginId, key, option) })
+            }
+            return ToolbarAction(item, onLongClick = openSettings, pressMenu = pressMenu, active = item is ToolbarButtonItem.Builtin && when (item.button) {
                 ToolbarButton.EDIT -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Edit
                 ToolbarButton.EMOJI -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Emoji
                 ToolbarButton.CLIPBOARD -> (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Clipboard
@@ -954,7 +961,11 @@ fun KeyboardView(
             if (state.toolPanelVisible && state.toolPanelDisplay == "LIVE") {
                 // 翻译栏：一行，圆钮和提示由插件给（第一个按钮、第一段文字）
                 val nodes = state.toolPanelUiNodes.orEmpty()
-                val chip = nodes.firstOrNull { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.BUTTON }
+                // 插件给了语言选择就画「源 ⇄ 目标」，标成 fallback 的圆钮（给旧版本用的换语言钮）和箭头不当圆钮
+                val selects = nodes.filter { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.SELECT && !it.key.isNullOrBlank() }
+                val swap = nodes.firstOrNull { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.BUTTON && it.style == "swap" }
+                val chip = nodes.firstOrNull { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.BUTTON &&
+                    it.style != "swap" && (selects.isEmpty() || it.style != "fallback") }
                 val hintNode = nodes.firstOrNull { it.type == com.kingzcheung.xime.plugin.core.config.UiNodeType.TEXT }
                 ToolPanelBar(
                     chipLabel = chip?.label,
@@ -968,6 +979,12 @@ fun KeyboardView(
                     onClose = { callbacks.onToolPanelClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
                     onTextChange = { text -> callbacks.onToolPanelTextChange?.invoke(text) },
+                    selects = selects.take(2),
+                    showSwap = swap?.key != null && selects.size >= 2,
+                    onSelect = { key, option ->
+                        callbacks.onToolPanelAction?.invoke(com.kingzcheung.xime.service.toolPanelSelectAction(key, option))
+                    },
+                    onSwap = { swap?.key?.let { callbacks.onToolPanelAction?.invoke(it) } },
                 )
             } else if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE") {
                 ToolPanel(

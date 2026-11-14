@@ -2817,6 +2817,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.rimeEngine.endQueuedComposition(isT9Schema(service.uiState.value.currentSchemaId))
 
     /**
+     * 翻译栏开着时输入从栏换到应用输入框、或反过来：没打完的拼音和联想收掉，
+     * 免得候选上屏、编码、删除一部分去旧框一部分去新框。
+     */
+    internal fun dropCompositionForTargetChange() {
+        postRimeJob("input_target_changed") { clearInputStateForKeys() }
+    }
+
+    /**
      * 拼音写在输入框里时，用户把光标点到了编码以外（11-08 红米 K70 反馈：光标挪到中间按删除，删的是末尾）。
      * 原来组词照旧，下一下删除删的是末尾编码的字母，再写回编码时光标被拉回末尾。
      * 这里结束组词：编码字母原样留在输入框里成为普通文字（不替用户删掉看得见的字），候选和引擎清空，

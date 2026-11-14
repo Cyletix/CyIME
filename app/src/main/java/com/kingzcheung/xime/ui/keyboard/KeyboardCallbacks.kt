@@ -139,6 +139,10 @@ data class KeyboardCallbacks(
      * passive 纯展示面板的 action 节点点击（InfoPanel）：通知插件 actionId 并刷新面板数据。
      */
     val onToolPanelAction: ((actionId: String) -> Unit)? = null,
+    /** 工具栏长按插件按钮：取插件给的长按列表（翻译的目标语言）；没有就是 null。 */
+    val onToolPanelQuickOptions: (suspend (pluginId: String) -> com.kingzcheung.xime.keyboard.PressMenuOptions?)? = null,
+    /** 长按列表里选了一项：翻译栏开着就换，没开就打开再换。 */
+    val onToolPanelQuickSelect: ((pluginId: String, key: String, option: String) -> Unit)? = null,
     /**
      * 通用工具面板输入框焦点变化。
      */

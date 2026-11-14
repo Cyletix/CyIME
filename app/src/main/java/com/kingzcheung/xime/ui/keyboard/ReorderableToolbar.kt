@@ -73,6 +73,8 @@ internal fun ReorderableToolbar(
                 var completed = false
                 val timer = scope.launch {
                     delay(2000L)
+                    // 按着的是带长按列表的按钮、列表正开着：手指在选语言，不拖走按钮
+                    if (ToolbarPressMenuGate.open) return@launch
                     pointer = rowBounds.topLeft + down.position
                     dragged = order.firstOrNull { bounds[it]?.contains(pointer) == true }
                     if (dragged != null) haptic.performHapticFeedback(HapticFeedbackType.LongPress)

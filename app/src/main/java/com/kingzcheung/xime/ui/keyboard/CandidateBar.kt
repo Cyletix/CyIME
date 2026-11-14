@@ -72,6 +72,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.runtime.rememberUpdatedState
@@ -839,6 +840,12 @@ internal fun ToolbarActionButton(
     val listening = voiceActive && voiceState == RecognitionState.LISTENING
     // 液态玻璃：胶囊露出来时（开启常亮，按下随底色淡出）加按键同款细亮边；听写音量光圈不加。
     val liquidEdge = com.kingzcheung.xime.ui.theme.LiquidGlass.surfacesOn() && !listening
+    val pressMenu = action.pressMenu
+    val pressMenuState = remember { ToolbarPressMenuState() }
+    val pressMenuScope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val currentPressMenu by rememberUpdatedState(pressMenu)
+    val currentClick by rememberUpdatedState(action.onClick)
     BoxWithConstraints(
         modifier.widthIn(min = 36.dp).height(40.dp)
             // 音量光圈画在不裁切的外层：始终正圆、比图标大，宽格也不会被拉成胶囊。
@@ -847,9 +854,13 @@ internal fun ToolbarActionButton(
                 selected = action.active
                 if (voiceActive) stateDescription = if (voiceState == RecognitionState.PROCESSING) "正在转录" else "正在聆听，点击结束"
             }
-            .clickable(interactionSource = source, indication = null, onClick = action.onClick),
+            .then(if (pressMenu != null) Modifier.toolbarPressMenu({ currentPressMenu }, pressMenuState, source, pressMenuScope,
+                onLongPress = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
+                onClick = { currentClick() })
+            else Modifier.clickable(interactionSource = source, indication = null, onClick = action.onClick)),
         contentAlignment = Alignment.Center,
     ) {
+    if (pressMenu != null) ToolbarPressMenuPopup(pressMenuState)
     Box(
         Modifier.size(if (listening) androidx.compose.ui.unit.DpSize(36.dp, 36.dp) else toolbarPillSize(maxWidth))
             .clip(CircleShape)

@@ -424,6 +424,8 @@ internal fun rememberImeKeyboardCallbacks(
             onToolPanelClose = { service.closeToolPanel() },
             onToolPanelItemClick = { item -> service.commitToolPanelItem(item.text) },
             onToolPanelAction = { actionId -> service.dispatchToolPanelAction(actionId) },
+            onToolPanelQuickOptions = { pluginId -> service.toolPanelQuickOptions(pluginId) },
+            onToolPanelQuickSelect = { pluginId, key, option -> service.toolPanelQuickSelect(pluginId, key, option) },
             onToolPanelTextChange = { text -> service.liveToolBar.onTextChanged(text) },
             onClipboardSearchOpen = { service.openClipboardSearch() },
             onClipboardTranslate = { text -> service.translateClipboardText(text) },
@@ -439,7 +441,12 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onToolPanelFocusChange = { focused ->
                 val ui = service.uiState.value
-                service.uiState.value = ui.copy(toolPanelInputFocused = ui.toolPanelFocusAfter(focused))
+                if (ui.toolPanelVisible && ui.toolPanelDisplay == com.kingzcheung.xime.plugin.core.api.ToolResult.LIVE.name) {
+                    // 翻译栏：点栏进栏；离开只在用户点了应用输入框时（见 setLiveBarFocus）。
+                    if (focused) service.setLiveBarFocus(true)
+                } else {
+                    service.uiState.value = ui.copy(toolPanelInputFocused = ui.toolPanelFocusAfter(focused))
+                }
             },
             onKeyboardModeChange = { chineseMode ->
                 if (service.isChineseMode != chineseMode) {

@@ -100,5 +100,16 @@ data class ToolbarAction(
     val active: Boolean = false,
     /** 菜单里长按：打开这一项在设置里的对应页；没有对应设置时为 null。 */
     val onLongClick: (() -> Unit)? = null,
+    /** 工具栏上长按弹出、滑到一项松手就选它的列表（插件按钮，如「翻译」选目标语言）；null 时没有。 */
+    val pressMenu: ToolbarPressMenu? = null,
     val onClick: () -> Unit
 )
+
+/** 长按列表：[load] 在长按时才取选项（插件给的），[onChoose] 收到选中的那一项。 */
+class ToolbarPressMenu(
+    val load: suspend () -> PressMenuOptions?,
+    val onChoose: (key: String, option: String) -> Unit,
+)
+
+/** 一组选项：[key] 是插件里这一项设置的名字，[selected] 是现在选着的。 */
+data class PressMenuOptions(val key: String, val title: String, val options: List<String>, val selected: String?)
