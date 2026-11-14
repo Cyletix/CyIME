@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.service.originalRemainingStart
 import com.kingzcheung.xime.service.isSingleCharacter
 import androidx.compose.ui.zIndex
 
@@ -127,6 +128,13 @@ internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> DeleteDragSession
 
 /** How long startup may take before the loading panel shows "正在加载词库" and its progress bar. */
 internal const val DEPLOY_NOTICE_DELAY_MS = 600L
+
+/** Keep choices for the unconfirmed suffix when an earlier candidate is selected. */
+internal fun remainingSentenceSyllables(
+    selected: List<com.kingzcheung.xime.rime.PinyinSyllableOption>, consumed: Int,
+): List<com.kingzcheung.xime.rime.PinyinSyllableOption> = selected
+    .filter { it.start >= consumed }
+    .map { it.copy(start = it.start - consumed, end = it.end - consumed) }
 
 @Composable
 fun KeyboardView(
@@ -599,6 +607,158 @@ fun KeyboardView(
         var preeditEditSession by remember(state.inputSessionId, state.currentSchemaId, state.isAsciiMode) {
             mutableStateOf<com.kingzcheung.xime.rime.PinyinEditSession?>(null)
         }
+        var sentenceEdit by remember(state.inputSessionId, state.currentSchemaId, state.isAsciiMode) {
+            mutableStateOf<com.kingzcheung.xime.service.SentenceEditSession?>(null)
+        }
+        var sentenceDragOwner by remember { mutableStateOf<com.kingzcheung.xime.service.SentenceEditSession?>(null) }
+        var sentenceDragRange by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+        var sentenceDragRequest by remember { mutableIntStateOf(0) }
+        var sentenceDragLoading by remember { mutableStateOf(false) }
+        fun showSentenceDrag(owner: com.kingzcheung.xime.service.SentenceEditSession) {
+            val range = sentenceDragRange ?: return
+            val current = candidateState.value
+            if (current.engineRevision != owner.snapshot.revision || current.candidates.firstOrNull() != owner.snapshot.sentence ||
+                range.first < 0 || range.first >= range.second || range.second >= owner.snapshot.boundaries.size) return
+            val next = owner.copy(start = range.first, end = range.second)
+            sentenceDragOwner = next
+            callbacks.onSentenceDragPreview?.invoke(next)
+        }
+        fun updateSentenceDrag(start: Int, end: Int, revision: Long) {
+            sentenceDragRange = start to end
+            val owner = sentenceDragOwner
+            if (owner != null) { showSentenceDrag(owner); return }
+            if (sentenceDragLoading) return
+            sentenceDragLoading = true
+            val request = ++sentenceDragRequest
+            callbacks.onOpenSentenceEdit?.invoke(start, end, revision) { result ->
+                if (request == sentenceDragRequest) {
+                    sentenceDragLoading = false
+                    if (result != null && sentenceDragRange != null) showSentenceDrag(result)
+                }
+            } ?: run { sentenceDragLoading = false }
+        }
+        fun endSentenceDrag() {
+            sentenceDragRequest++
+            sentenceDragLoading = false
+            sentenceDragRange = null
+            sentenceDragOwner = null
+            callbacks.onSentenceDragPreview?.invoke(null)
+        }
+        var sentenceCode by remember { mutableStateOf("") }
+        var sentenceWord by remember { mutableStateOf("") }
+        var sentenceWordCode by remember { mutableStateOf("") }
+        var sentenceConfirmed by remember { mutableStateOf(emptyList<com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate>()) }
+        var sentenceWords by remember { mutableStateOf(emptyList<com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate>()) }
+        var sentenceWordsCode by remember { mutableStateOf<String?>(null) }
+        var sentenceWordsSelection by remember { mutableStateOf(emptyList<com.kingzcheung.xime.rime.PinyinSyllableOption>()) }
+        var sentenceOptions by remember { mutableStateOf(emptyList<com.kingzcheung.xime.rime.PinyinSyllableOption>()) }
+        var sentenceSelected by remember { mutableStateOf(emptyList<com.kingzcheung.xime.rime.PinyinSyllableOption>()) }
+        var sentenceChoicesCode by remember { mutableStateOf("") }
+        var sentenceReplaceOnType by remember { mutableStateOf(false) }
+        var sentenceJustSelected by remember { mutableStateOf(false) }
+        var sentenceRequest by remember { mutableIntStateOf(0) }
+        var sentenceApplying by remember { mutableStateOf(false) }
+        fun sentenceReplacement(owner: com.kingzcheung.xime.service.SentenceEditSession): String =
+            if (sentenceConfirmed.isNotEmpty()) sentenceConfirmed.joinToString("") { it.text } + sentenceWord
+            else if (sentenceCode.isEmpty()) "" else sentenceWord.ifEmpty {
+                if (sentenceCode == owner.originalCode) owner.originalWord else ""
+            }
+        val sentenceContext = LocalContext.current
+        fun refreshSentenceWords(owner: com.kingzcheung.xime.service.SentenceEditSession) {
+            val code = sentenceCode
+            if (sentenceChoicesCode != code) {
+                sentenceChoicesCode = code
+                sentenceSelected = emptyList()
+            }
+            val selected = sentenceSelected
+            val request = ++sentenceRequest
+            callbacks.onSentenceCandidates?.invoke(owner, code, selected, sentenceConfirmed.joinToString("") { it.code }) { result ->
+                if (sentenceEdit === owner && request == sentenceRequest) {
+                    sentenceWords = result.words
+                    sentenceWordsCode = code
+                    sentenceWordsSelection = selected
+                    sentenceOptions = result.options
+                    if (code != owner.originalCode || selected.isNotEmpty()) {
+                        val preferred = result.words.firstOrNull { it.code == code } ?: result.words.firstOrNull()
+                        sentenceWord = preferred?.text.orEmpty()
+                        sentenceWordCode = preferred?.code.orEmpty()
+                    }
+                }
+            }
+        }
+        fun closeSentenceEdit() {
+            sentenceEdit?.let { callbacks.onEndSentencePreview?.invoke(it) }
+            sentenceEdit = null
+            callbacks.onSentenceHorizontalDelete = null
+            sentenceWords = emptyList()
+            sentenceWordsCode = null
+            sentenceWordsSelection = emptyList()
+            sentenceConfirmed = emptyList()
+            sentenceOptions = emptyList()
+            sentenceSelected = emptyList()
+            sentenceChoicesCode = ""
+            sentenceJustSelected = false
+            sentenceRequest++
+            sentenceApplying = false
+        }
+        fun previewSentenceCode(owner: com.kingzcheung.xime.service.SentenceEditSession) {
+            callbacks.onSentencePreview?.invoke(owner, sentenceConfirmed.joinToString("") { it.code } + sentenceCode)
+        }
+        fun finishSentenceEdit(commit: Boolean, segments: List<com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate>) {
+            val owner = sentenceEdit ?: return
+            if (sentenceApplying) return
+            val code = segments.joinToString("") { it.code }
+            val word = segments.joinToString("") { it.text }
+            if (code == owner.originalCode && word == owner.originalWord) {
+                closeSentenceEdit()
+                viewModel.setCandidatePageExpanded(false)
+                if (commit) callbacks.onCandidateSelect(0)
+                return
+            }
+            sentenceApplying = true
+            callbacks.onApplySentenceEdit?.invoke(owner, segments, commit) { success ->
+                if (sentenceEdit === owner) {
+                    sentenceApplying = false
+                    if (success) { closeSentenceEdit(); viewModel.setCandidatePageExpanded(false) }
+                    else android.widget.Toast.makeText(sentenceContext, "选词状态已变化，请重试", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } ?: run { sentenceApplying = false }
+        }
+        fun selectSentenceCandidate(candidate: com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate, commit: Boolean = false) {
+            val owner = sentenceEdit ?: return
+            if (sentenceApplying || candidate.code.isEmpty() || !sentenceCode.startsWith(candidate.code)) return
+            val segments = sentenceConfirmed + candidate
+            val remaining = sentenceCode.drop(candidate.code.length).trimStart('\'')
+            if (remaining.isEmpty()) {
+                finishSentenceEdit(commit, segments)
+            } else {
+                val previousWord = sentenceWord
+                val originalSuffix = owner.originalRemainingStart(remaining, segments.joinToString("") { it.code })
+                    ?.let { owner.snapshot.sentence.substring(it, owner.end) }.orEmpty()
+                val consumed = sentenceCode.length - remaining.length
+                sentenceSelected = remainingSentenceSyllables(sentenceSelected, consumed)
+                sentenceChoicesCode = remaining
+                sentenceConfirmed = segments
+                sentenceJustSelected = true
+                sentenceCode = remaining
+                sentenceWord = if (previousWord.startsWith(candidate.text)) previousWord.drop(candidate.text.length) else originalSuffix
+                sentenceWordCode = ""
+                sentenceReplaceOnType = false
+                previewSentenceCode(owner)
+                refreshSentenceWords(owner)
+            }
+        }
+        fun applySentenceEdit(commit: Boolean) {
+            if (sentenceApplying) return
+            if (sentenceCode.isEmpty()) {
+                finishSentenceEdit(commit, sentenceConfirmed)
+            } else if (sentenceWord.isNotEmpty() && sentenceWordCode.isNotEmpty()) {
+                selectSentenceCandidate(
+                    sentenceWords.firstOrNull { it.text == sentenceWord && it.code == sentenceWordCode &&
+                        sentenceWordsCode == sentenceCode && sentenceWordsSelection == sentenceSelected }
+                        ?: com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate(sentenceWord, sentenceWordCode), commit)
+            }
+        }
         var preeditRequest by remember(state.inputSessionId, state.currentSchemaId) { mutableIntStateOf(0) }
         var preeditFrame by remember { mutableStateOf<com.kingzcheung.xime.rime.PinyinEditSession?>(null) }
         var preeditOpening by remember(state.inputSessionId, state.currentSchemaId, state.isAsciiMode) { mutableStateOf(false) }
@@ -643,9 +803,13 @@ fun KeyboardView(
             }
         }
         SideEffect {
+            callbacks.onSentenceHorizontalDelete = if (sentenceEdit != null) ({
+                if (sentenceEdit != null) callbacks.onPreeditKeyInput?.invoke("clear_all")
+            }) else null
             callbacks.onPreeditCursorMove = { key ->
                 when {
                     state.quickSendFormFocused || state.toolPanelInputFocused -> false
+                    sentenceEdit != null -> false
                     preeditEditSession != null -> { editPreedit(key = key); true }
                     !state.isAsciiMode && state.inputProfile.capabilities.editablePinyin &&
                         callbacks.onOpenPreeditEditor != null &&
@@ -659,8 +823,64 @@ fun KeyboardView(
                     else -> false
                 }
             }
-            callbacks.onDismissPreeditEditor = if (preeditEditSession != null || preeditOpening) ({ closePreeditEditor() }) else null
-            callbacks.onPreeditKeyInput = if (preeditEditSession != null) ({ key ->
+            callbacks.onDismissPreeditEditor = when {
+                sentenceEdit != null -> ({ closeSentenceEdit(); viewModel.setCandidatePageExpanded(false) })
+                preeditEditSession != null || preeditOpening -> ({ closePreeditEditor() })
+                else -> null
+            }
+            callbacks.onPreeditKeyInput = if (sentenceEdit != null) ({ key ->
+                val owner = sentenceEdit
+                when {
+                    owner == null -> false
+                    sentenceApplying -> true
+                    key == "space" || key == "enter" -> { applySentenceEdit(false); true }
+                    key == "clear_all" || key == "clear_composition" -> {
+                        sentenceCode = ""
+                        sentenceWord = ""
+                        sentenceWordCode = ""
+                        sentenceConfirmed = emptyList()
+                        sentenceReplaceOnType = false
+                        sentenceJustSelected = false
+                        previewSentenceCode(owner)
+                        refreshSentenceWords(owner)
+                        if (!callbacks.isDeleteDragging()) viewModel.setCandidatePageExpanded(false)
+                        true
+                    }
+                    key == "delete" -> {
+                        if ((sentenceJustSelected || sentenceCode.isEmpty()) && sentenceConfirmed.isNotEmpty()) {
+                            val previous = sentenceConfirmed.last()
+                            val prefixLength = previous.code.length
+                            sentenceSelected = previous.selected + sentenceSelected.map {
+                                it.copy(start = it.start + prefixLength, end = it.end + prefixLength)
+                            }
+                            sentenceCode = previous.code + sentenceCode
+                            sentenceChoicesCode = sentenceCode
+                            sentenceConfirmed = sentenceConfirmed.dropLast(1)
+                            sentenceWord = previous.text + sentenceWord
+                        } else {
+                            sentenceCode = if (sentenceReplaceOnType) "" else sentenceCode.dropLast(1)
+                            if (sentenceCode.isEmpty()) sentenceWord = ""
+                        }
+                        sentenceJustSelected = false
+                        sentenceReplaceOnType = false
+                        sentenceWordCode = ""
+                        previewSentenceCode(owner)
+                        refreshSentenceWords(owner)
+                        if (sentenceCode.isEmpty()) viewModel.setCandidatePageExpanded(false)
+                        true
+                    }
+                    key.length == 1 && (key[0].lowercaseChar() in 'a'..'z' || key == ";" || key == "'") -> {
+                        sentenceCode = (if (sentenceReplaceOnType) "" else sentenceCode) + key.lowercase()
+                        sentenceJustSelected = false
+                        sentenceReplaceOnType = false
+                        sentenceWordCode = ""
+                        previewSentenceCode(owner)
+                        refreshSentenceWords(owner)
+                        true
+                    }
+                    else -> true
+                }
+            }) else if (preeditEditSession != null) ({ key ->
                 val t9 = preeditEditSession?.isT9 == true
                 if (key.startsWith("preedit_cursor:")) {
                     editPreedit(key = key); true
@@ -677,10 +897,13 @@ fun KeyboardView(
             onDispose {
                 callbacks.onDismissPreeditEditor = null
                 callbacks.onPreeditKeyInput = null
+                callbacks.onSentenceHorizontalDelete = null
                 callbacks.onPreeditCursorMove = null
                 preeditRequest++
                 pendingPreeditMoves.clear()
                 preeditEditSession?.invalidate()
+                endSentenceDrag()
+                closeSentenceEdit()
             }
         }
         LaunchedEffect(underlyingPage, resizeOverlay != null, inputPreferences.showCodeInCandidateBar) { closePreeditEditor() }
@@ -688,6 +911,17 @@ fun KeyboardView(
         LaunchedEffect(Unit) {
             snapshotFlow { candidateState.value.isComposing || candidateState.value.inputText.isNotEmpty() }
                 .collect { composing -> if (!composing) closePreeditOnEmpty() }
+        }
+        LaunchedEffect(state.inputSessionId) {
+            snapshotFlow { candidateState.value.engineRevision }.collect { revision ->
+                val owner = sentenceEdit
+                if (owner != null && !sentenceApplying && revision != owner.snapshot.revision) closeSentenceEdit()
+            }
+        }
+        LaunchedEffect(state.inputSessionId) {
+            snapshotFlow { callbacks.isDeleteDragging() }.collect { dragging ->
+                if (!dragging && sentenceEdit != null && sentenceCode.isEmpty()) viewModel.setCandidatePageExpanded(false)
+            }
         }
 
         // 工具栏与菜单共用一组入口：动作、开/关状态和按键反馈相同，放在哪一处都一样。
@@ -1081,9 +1315,16 @@ fun KeyboardView(
                 railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage, cs.clipboardExtractedCount,
                 cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
                 hardwareCandidateHighlight, glossRevision, glossChinese, glossSwap,
-                liveGlide, englishGlide,
+                liveGlide, englishGlide, sentenceEdit, sentenceCode, sentenceWord, sentenceWords, sentenceConfirmed,
             ) {
-                if (showHandwritingCandidates) {
+                if (sentenceEdit != null) {
+                    val owner = sentenceEdit!!
+                    CandidateBarState.ChineseCandidates(
+                        candidates = listOf(owner.sentence(sentenceReplacement(owner))) + sentenceWords.map { it.text },
+                        comments = emptyList(), inputText = sentenceCode, preeditText = sentenceCode,
+                        hasMore = sentenceWords.isNotEmpty(),
+                    )
+                } else if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
                         candidates = handwritingCandidates,
                         comments = handwritingComments,
@@ -1169,6 +1410,11 @@ fun KeyboardView(
             }
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalCorrectedCandidates provides correctionMarks,
+                LocalSentenceSelection provides sentenceDragOwner,
+                LocalSentenceCandidateHighlight provides sentenceEdit?.let { owner ->
+                    val replacement = sentenceReplacement(owner)
+                    SentenceCandidateHighlight(owner.sentence(replacement), owner.start, owner.start + replacement.length)
+                },
                 LocalCorrectionFullScheme provides correctionScheme.takeIf { !doublePinyinKeysShown }) {
             ScaledCandidateBar(candidateBarScaleState.floatValue) {
             CandidateBar(
@@ -1219,6 +1465,11 @@ fun KeyboardView(
                     onVisibleAssociationsChanged = { visibleBarAssociations = it },
                     onReorderToolbar = callbacks.onUpdateToolbarButtons,
                     onCancelInput = {
+                        if (sentenceEdit != null) {
+                            closeSentenceEdit()
+                            viewModel.setCandidatePageExpanded(false)
+                            return@CandidateBarCallbacks
+                        }
                         closePreeditEditor()
                         toolbarFeedback()
                         viewModel.setCandidatePageExpanded(false)
@@ -1243,6 +1494,11 @@ fun KeyboardView(
                     onClipboardImageSelect = callbacks.onClipboardImageSelect,
                     onExpandClipboardImages = callbacks.onExpandClipboardImages,
                     onCandidateSelect = select@{ index ->
+                        if (sentenceEdit != null) {
+                            if (index == 0) applySentenceEdit(true)
+                            else if (sentenceWordsCode == sentenceCode && sentenceWordsSelection == sentenceSelected) sentenceWords.getOrNull(index - 1)?.let { selectSentenceCandidate(it) }
+                            return@select
+                        }
                         if (liveGlide != null || englishGlide != null) return@select
                         if (!showHandwritingCandidates && !callbacks.isCandidateSnapshotCurrent(cs)) return@select
                         closePreeditEditor()
@@ -1260,6 +1516,7 @@ fun KeyboardView(
                         }
                     },
                     onCandidateStripScrolled = {
+                        if (sentenceEdit != null) return@CandidateBarCallbacks
                         // 展开着滑候选栏：收起展开页，候选栏接着用展开列表滑下去，同一个候选不出现两次。
                         if (candidatePageExpanded) {
                             viewModel.setCandidateStripExtended(true)
@@ -1272,6 +1529,7 @@ fun KeyboardView(
                             !cs.hasPrevPage && cs.candidateFocus == null) callbacks.onExtendCandidateStrip?.invoke()
                     },
                     onCandidateLongPress = { index ->
+                        if (sentenceEdit != null) return@CandidateBarCallbacks
                         // 手写候选：读手写列表（不是引擎列表），长按＝忘掉这个字从手写里学到的笔迹
                         val handwritingWord = if (showHandwritingCandidates) handwritingCandidates.getOrNull(index) else null
                         val railEntry = if (expandedDataMode && !showHandwritingCandidates) railExpanded.getOrNull(index) else null
@@ -1283,8 +1541,7 @@ fun KeyboardView(
                                 com.kingzcheung.xime.handwriting.HandwritingTemplates.forget(handwritingContext, handwritingWord)
                             }
                         } else if (!word.isNullOrEmpty()) {
-                            val parts = sentenceParts(callbacks, cs, word, first = (railEntry?.first ?: index) == 0)
-                            deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word), parts = parts) {
+                            deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word)) {
                                 if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                 if (railEntry != null) {
                                     callbacks.onGlobalCandidateDelete?.invoke(railEntry.first)
@@ -1294,6 +1551,28 @@ fun KeyboardView(
                             }
                         }
                     },
+                    onSentenceSelectionChange = { start, end -> updateSentenceDrag(start, end, cs.engineRevision) },
+                    onSentenceSelectionEnd = ::endSentenceDrag,
+                    onSentenceSelection = if (sentenceEdit == null && !showHandwritingCandidates && !glossSwap &&
+                        !state.isAsciiMode && state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN &&
+                        !expandedDataMode && (cs.candidates.firstOrNull()?.length ?: 0) >= 2) { start, end ->
+                        callbacks.onOpenSentenceEdit?.invoke(start, end, cs.engineRevision) { owner ->
+                            if (owner != null && callbacks.isCandidateSnapshotCurrent(cs)) {
+                                closePreeditEditor()
+                                sentenceEdit = owner
+                                sentenceCode = owner.originalCode
+                                sentenceWord = owner.originalWord
+                                sentenceWordCode = owner.originalCode
+                                sentenceReplaceOnType = true
+                                sentenceJustSelected = false
+                                callbacks.onSentencePreview?.invoke(owner, sentenceCode)
+                                refreshSentenceWords(owner)
+                                viewModel.setCandidatePageExpanded(true)
+                            } else if (callbacks.isCandidateSnapshotCurrent(cs)) {
+                                android.widget.Toast.makeText(quickContext, "这句话暂时无法按字对应编码", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else null,
                     onClearAssociation = {
                         toolbarFeedback()
                         if (showHandwritingCandidates) {
@@ -1330,7 +1609,7 @@ fun KeyboardView(
                         candidatePageOpening++
                         viewModel.setCandidatePageExpanded(true)
                         // 拉取跨页全量候选（展开页数据源，含首次展开）
-                        if (candidateBarState !is CandidateBarState.AssociationOnly) callbacks.onRequestExpandedCandidates?.invoke()
+                        if (sentenceEdit == null && candidateBarState !is CandidateBarState.AssociationOnly) callbacks.onRequestExpandedCandidates?.invoke()
                     },
                     onInputTextClick = {
                         if (candidateState.value.inputText.isNotEmpty()) {
@@ -1383,7 +1662,7 @@ fun KeyboardView(
                 }
                 val isT9Layout = keyboardState is KeyboardLayoutState.T9Pinyin
                 val syllableRevision = candidateState.value.engineRevision
-                val canChooseSyllable = !isT9Layout && !state.isAsciiMode &&
+                val canChooseSyllable = sentenceEdit == null && !isT9Layout && !state.isAsciiMode &&
                     state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
                     state.inputProfile.capabilities.editablePinyin && candidateState.value.isComposing
                 val merged14 = state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
@@ -1453,19 +1732,20 @@ fun KeyboardView(
                 val barAssociationCount = visibleBarAssociations.size
                 CandidatePage(
                     state = CandidatePageState(
-                        candidates = expandedEntries,
+                        candidates = sentenceEdit?.let { sentenceWords.mapIndexed { index, word -> CandidateEntry(word.text, globalIndex = index) } }
+                            ?: expandedEntries,
                         engineRevision = displayedExpandedRevision,
-                        associationCandidates = cs.associationCandidates.drop(barAssociationCount),
+                        associationCandidates = if (sentenceEdit != null) emptyList() else cs.associationCandidates.drop(barAssociationCount),
                         backgroundColor = keyboardBgColor,
                         textColor = candidateTextColor,
                         keyBackgroundColor = keyBgColor,
                         bottomPaddingDp = renderedBottomPaddingDp,
                         singleCharFilter = singleCharFilter,
-                        railSymbols = if (canChooseSyllable && merged14) emptyList() else customRailSymbols?.takeIf { it.isNotEmpty() },
-                        railPinyinOptions = railPinyinOptions,
+                        railSymbols = if (sentenceEdit != null || canChooseSyllable && merged14) emptyList() else customRailSymbols?.takeIf { it.isNotEmpty() },
+                        railPinyinOptions = if (sentenceEdit != null) sentenceOptions.map { it.pinyin } else railPinyinOptions,
                         railPinyinNear = railPinyinNear,
                         choosingMergedLetter = syllableChoices?.letterGroup != null,
-                        railSelectedPinyinIndex = railSelectedPinyinIndex,
+                        railSelectedPinyinIndex = if (sentenceEdit != null) sentenceOptions.indexOfFirst { it.selected } else railSelectedPinyinIndex,
                         railAccentColor = accentColor,
                         enterKeyText = state.enterKeyText,
                         matchT9Geometry = isT9Layout,
@@ -1474,20 +1754,26 @@ fun KeyboardView(
                     ),
                     callbacks = CandidatePageCallbacks(
                         onCandidateSelect = { entry ->
+                            if (sentenceEdit != null) {
+                                if (sentenceWordsCode == sentenceCode && sentenceWordsSelection == sentenceSelected) sentenceWords.getOrNull(entry.globalIndex)?.let {
+                                    selectSentenceCandidate(it)
+                                }
+                                return@CandidatePageCallbacks
+                            }
                             if (!expandedReady || !candidateState.value.expandedCandidatesLoaded) return@CandidatePageCallbacks
                             if (!callbacks.isCandidateSnapshotCurrent(cs)) return@CandidatePageCallbacks
                             // entry.globalIndex 即跨页全局索引（引擎侧 select_candidate）
                             callbacks.onGlobalCandidateSelect?.invoke(entry.globalIndex)
                         },
                         onCandidateLongPress = { entry ->
+                            if (sentenceEdit != null) return@CandidatePageCallbacks
                             if (!expandedReady || !candidateState.value.expandedCandidatesLoaded) return@CandidatePageCallbacks
                             // 长按删除自造词：与候选栏共用确认弹窗
                             val word = cs.expandedCandidates
                                 .getOrNull(entry.globalIndex)?.text
                             if (!word.isNullOrEmpty()) {
                                 onHapticFeedback?.invoke()
-                                val parts = sentenceParts(callbacks, cs, word, first = entry.globalIndex == 0)
-                                deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word), parts = parts) {
+                                deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word)) {
                                     if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                     callbacks.onGlobalCandidateDelete?.invoke(entry.globalIndex)
                                 }
@@ -1497,7 +1783,7 @@ fun KeyboardView(
                             onHapticFeedback?.invoke()
                             viewModel.toggleSingleCharFilter()
                             if (viewModel.singleCharFilter.value) callbacks.onSingleCharFilterOn?.invoke()
-                        }.takeIf { cs.isComposing || cs.candidates.isNotEmpty() },
+                        }.takeIf { sentenceEdit == null && (cs.isComposing || cs.candidates.isNotEmpty()) },
                         onAssociationSelect = select@{ index ->
                             val sourceIndex = index + barAssociationCount
                             val word = cs.associationCandidates.getOrNull(sourceIndex) ?: return@select
@@ -1509,7 +1795,14 @@ fun KeyboardView(
                         },
                         onRailPinyinSelect = { index ->
                             onHapticFeedback?.invoke()
-                            if (isT9Layout) {
+                            if (sentenceEdit != null) {
+                                val owner = sentenceEdit
+                                val option = sentenceOptions.getOrNull(index).takeIf { sentenceWordsCode == sentenceCode }
+                                if (owner != null && option != null) {
+                                    sentenceSelected = sentenceSelected.takeWhile { it.end <= option.start } + option
+                                    refreshSentenceWords(owner)
+                                }
+                            } else if (isT9Layout) {
                                 // 与九键键盘左栏同语义：切换音节选项，引擎重组后
                                 // 服务层重拉全量候选，展开页内容随之刷新
                                 t9Controller.firstOptions.getOrNull(index)?.let {
@@ -2059,14 +2352,7 @@ fun KeyboardView(
                 onPin = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.apply?.invoke() },
                 pinnedPlace = pending.pin?.pinnedPlace ?: 0,
                 placeHere = pending.pin?.placeHere ?: 0,
-                onPinHere = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.applyHere?.invoke() },
-                parts = pending.parts?.words,
-                onPart = { part ->
-                    onHapticFeedback?.invoke(); deletePending = null
-                    pending.parts?.reselect?.invoke(part)
-                    // 重选这个词：收起展开页，候选栏就是这个词的其它写法。
-                    viewModel.setCandidatePageExpanded(false)
-                })
+                onPinHere = { onHapticFeedback?.invoke(); deletePending = null; pending.pin?.applyHere?.invoke() })
         }
 
         // A route change replaces only the panel content, never restarts the reveal host.
@@ -2418,7 +2704,6 @@ private fun KeyboardResizeControlsHost(
 @Composable
 internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Modifier,
     onCancel: () -> Unit, onConfirm: () -> Unit, pinned: Boolean? = null, onPin: () -> Unit = {},
-    parts: List<String>? = null, onPart: (Int) -> Unit = {},
     pinnedPlace: Int = 0, placeHere: Int = 0, onPinHere: () -> Unit = {}) {
     val forget = "忘掉「$word」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。"
     val forgetLine = "忘掉：删掉学习记录，词库里本来有的词回到原来的位置，自己打出来的新词会消失。"
@@ -2439,8 +2724,7 @@ internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Mod
         modifier = modifier, onCancel = onCancel, onConfirm = onConfirm,
         extraLabel = when (pinned) { null -> null; false -> if (here) "固定第一" else "固定"; true -> "取消固定" },
         onExtra = onPin,
-        extra2Label = if (here) "固定在第 $placeHere 位" else null, onExtra2 = onPinHere,
-        parts = parts, onPart = onPart)
+        extra2Label = if (here) "固定在第 $placeHere 位" else null, onExtra2 = onPinHere)
 }
 
 /**
@@ -2452,9 +2736,7 @@ internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: S
     tag: String, modifier: Modifier, onCancel: () -> Unit, onConfirm: () -> Unit,
     extraLabel: String? = null, onExtra: () -> Unit = {},
     /** 第二个附加按钮（长按候选的「固定在第 N 位」）；按钮多了一行放不下就换行。 */
-    extra2Label: String? = null, onExtra2: () -> Unit = {},
-    /** 长按首选整句时拆出的词；点一个只重选它。 */
-    parts: List<String>? = null, onPart: (Int) -> Unit = {}) {
+    extra2Label: String? = null, onExtra2: () -> Unit = {}) {
     val cardColors = keyboardCardColors()
     Box(
         modifier = modifier
@@ -2478,16 +2760,6 @@ internal fun KeyboardConfirmCard(title: String, message: String, confirmLabel: S
                     style = MaterialTheme.typography.titleMedium,
                     color = cardColors.text
                 )
-                if (!parts.isNullOrEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "点一个词重选",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = cardColors.text.copy(alpha = .7f)
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    SentencePartChips(parts, cardColors.text, tag, onPart)
-                }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = message,
@@ -2528,50 +2800,9 @@ private data class DeletePendingWord(
     val message: String? = null,
     /** 引擎候选的固定按钮；null＝不显示（手写候选、没在组词）。 */
     val pin: PinChoice? = null,
-    /** 长按首选整句时拆出的词；null＝不是整句（不显示）。 */
-    val parts: SentenceParts? = null,
     val onConfirm: () -> Unit,
 )
 
-/** 长按首选整句：拆出的词，以及点了第几个词后去重选。 */
-private class SentenceParts(val words: List<String>, val reselect: (Int) -> Unit)
-
-/** 首选是引擎组出来的整句（两个词以上）时拆成词；其它候选、拿不到（引擎正忙）都不拆。 */
-private fun sentenceParts(callbacks: KeyboardCallbacks, cs: com.kingzcheung.xime.service.CandidateState,
-    word: String, first: Boolean): SentenceParts? {
-    val reselect = callbacks.onReselectSentenceWord ?: return null
-    if (!first || !cs.isComposing || cs.candidates.firstOrNull() != word) return null
-    val words = callbacks.sentenceWords(word)?.takeIf { it.size >= 2 } ?: return null
-    return SentenceParts(words) { target ->
-        if (callbacks.isCandidateSnapshotCurrent(cs)) reselect(words, target)
-    }
-}
-
-/** 整句拆出的词，一行排不下就换行；每个词一个按钮。 */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun SentencePartChips(parts: List<String>, textColor: Color, tag: String, onPart: (Int) -> Unit) {
-    androidx.compose.foundation.layout.FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        parts.forEachIndexed { index, part ->
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(textColor.copy(alpha = .1f))
-                    .clickable { onPart(index) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .testTag("$tag-part-$index"),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(part, style = MaterialTheme.typography.titleMedium, color = textColor)
-            }
-        }
-    }
-}
-
-/** 卡片底部的按钮，一行放不下（多了「固定在第 N 位」）就换行。 */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ConfirmCardButtons(content: @Composable () -> Unit) {

@@ -252,13 +252,62 @@ class RimeEngine {
 
     private val candidateRevision = java.util.concurrent.atomic.AtomicLong(1L)
 
-    /**
-     * 长按整句点词重选时挪到词后面的光标位置和当时的编码；没在重选时为 -1。
-     * 只在锁内读写。见 [resumeCaretAfterPartialReselect]。
-     */
-    private var reselectCaret = -1
-    private var reselectInput = ""
     internal fun currentCandidateRevision(): Long = candidateRevision.get()
+
+    data class SentenceEditSnapshot(
+        val input: String, val sentence: String, val boundaries: List<Int>, val revision: Long,
+    )
+
+    internal fun sentenceEditSnapshot(revision: Long): SentenceEditSnapshot? = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsAsciiMode() || candidateRevision.get() != revision) return@locked null
+        val values = nativeSentenceEditSnapshot()
+        if (values.size < 5) return@locked null
+        val boundaries = values.drop(2).map { it.toIntOrNull() ?: return@locked null }
+        SentenceEditSnapshot(values[0], values[1], boundaries, revision)
+    }
+
+    data class SentenceEditCandidate(
+        val text: String, val code: String, val selected: List<PinyinSyllableOption> = emptyList(),
+    )
+    data class SentenceEditCandidates(val words: List<SentenceEditCandidate>, val options: List<PinyinSyllableOption>)
+
+    internal fun sentenceEditCandidates(snapshot: SentenceEditSnapshot, code: String,
+        selected: List<PinyinSyllableOption>, originalBegin: Int, originalEnd: Int): SentenceEditCandidates = locked {
+        if (candidateRevision.get() != snapshot.revision || !nativeHasSession())
+            return@locked SentenceEditCandidates(emptyList(), emptyList())
+        val selectedIds = selected.flatMap { listOf(it.syllableId, it.start, it.end) }.toIntArray()
+        val records = nativeSentenceEditCandidates(code, selectedIds, originalBegin, originalEnd)
+        val options = parsePinyinSyllableOptions(records.filter { it.startsWith('\u001f') }
+            .map { it.drop(1) }.toTypedArray(), code, 0)
+        val words = records.filterNot { it.startsWith('\u001f') }.mapNotNull { record ->
+            val split = record.indexOf('\t')
+            val length = record.substring(0, split.takeIf { it >= 0 } ?: return@mapNotNull null).toIntOrNull()
+                ?: return@mapNotNull null
+            val text = record.substring(split + 1)
+            if (length !in 1..code.length || text.isEmpty()) null
+            else if (selected.any { it.start < length && it.end > length }) null
+            else SentenceEditCandidate(text, code.take(length), selected.filter { it.end <= length })
+        }.distinct()
+        SentenceEditCandidates(words, options)
+    }
+
+    internal fun applySentenceEdit(snapshot: SentenceEditSnapshot, start: Int, end: Int,
+                                   segments: List<SentenceEditCandidate>): RimeProcessResult? = editPinyinAndReadState {
+        val code = segments.joinToString("") { it.code }
+        val replacement = segments.joinToString("") { it.text }
+        val lengths = segments.flatMap { listOf(it.code.length, it.text.length) }.toIntArray()
+        val choices = segments.flatMap { segment ->
+            listOf(segment.selected.size) + segment.selected.flatMap { listOf(it.syllableId, it.start, it.end) }
+        }.toIntArray()
+        if (candidateRevision.get() != snapshot.revision || !nativeHasSession() ||
+            !nativeApplySentenceEdit(snapshot.input, snapshot.sentence, start, end, code, replacement, lengths, choices)) false
+        else { candidateRevision.incrementAndGet(); true }
+    }
+
+    private external fun nativeSentenceEditSnapshot(): Array<String>
+    private external fun nativeSentenceEditCandidates(code: String, selected: IntArray, originalBegin: Int, originalEnd: Int): Array<String>
+    private external fun nativeApplySentenceEdit(input: String, sentence: String, start: Int, end: Int,
+                                                  code: String, replacement: String, lengths: IntArray, choices: IntArray): Boolean
 
     internal fun glidePreviewRevision(): Long = candidateRevision.get()
 
@@ -1561,10 +1610,8 @@ class RimeEngine {
     internal fun selectCandidateAtRevision(index: Int, revision: Long, global: Boolean = false): RimeProcessResult? = locked {
         if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked null
         candidateRevision.incrementAndGet()
-        val caret = reselectCaret.also { reselectCaret = -1 }
         val selected = if (global) nativeSelectCandidateByGlobalIndex(index) else nativeSelectCandidate(index)
         if (!selected) return@locked null
-        if (caret > 0) resumeCaretAfterPartialReselect(caret, reselectInput)
         withDisplayPreedit(nativeGetProcessResult(true))
     }
 
@@ -1640,91 +1687,6 @@ class RimeEngine {
             0 -> PinInfo(false, 0, info.getOrElse(2) { 0 })
             else -> null
         }
-    }
-
-    /**
-     * 长按首选时拆出的词：首选是引擎组出来的整句（两个词以上）才有，否则 null。
-     * 主线程调用，拿不到锁不等待。
-     */
-    internal fun firstSentenceWords(shown: String): List<String>? = tryLocked(null) {
-        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode()) return@tryLocked null
-        val row = nativeInspectCandidates(1).firstOrNull() ?: return@tryLocked null
-        if (row.getOrNull(0) != shown) return@tryLocked null
-        splitSentenceWords(shown, row.getOrNull(9).orEmpty())
-    }
-
-    /** 当前候选里第一个文字是 [text] 的：全局序号、注释、在编码里的结束位置。须在锁内调用。 */
-    private fun candidateSpan(text: String, limit: Int = SENTENCE_WORD_SEARCH): Triple<Int, String, Int>? =
-        nativeInspectCandidates(limit).firstOrNull { it.getOrNull(0) == text }?.let { row ->
-            val index = row.getOrNull(4)?.toIntOrNull() ?: return null
-            val end = row.getOrNull(6)?.toIntOrNull() ?: return null
-            Triple(index, row.getOrNull(1).orEmpty(), end)
-        }
-
-    /** 九键：当前候选里 [text] 的注释（拼音），重选整句里的词时交给九键选词。 */
-    internal fun candidateReading(text: String): String? = locked {
-        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked null
-        candidateSpan(text)?.second
-    }
-
-    /**
-     * 长按首选整句、点了第 [target] 个词（全拼、双拼等非九键方案）：前面的词照原样逐个选定，
-     * 光标放到这个词后面，候选就只剩这个词的其它写法；选好后 Rime 把光标送回末尾，后面照常组句。
-     * 首选已经变了、光标不在末尾时不做；中途哪个词找不到就停在那里（只是选定了前几个词，没有上屏）。
-     */
-    internal fun reselectSentenceWord(words: List<String>, target: Int, revision: Long): RimeProcessResult? =
-        editPinyinAndReadState {
-            if (target !in words.indices || words.size < 2 || !isCandidateRevisionCurrent(revision) || !isInitialized ||
-                !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode()) return@editPinyinAndReadState false
-            val input = nativeGetInput().orEmpty()
-            if (nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull() != input.length) return@editPinyinAndReadState false
-            if (nativeInspectCandidates(1).firstOrNull()?.getOrNull(0) != words.joinToString("")) return@editPinyinAndReadState false
-            candidateRevision.incrementAndGet()
-            reselectCaret = -1
-            for (i in 0 until target) {
-                val span = candidateSpan(words[i]) ?: return@editPinyinAndReadState true
-                if (!nativeSelectCandidateByGlobalIndex(span.first)) return@editPinyinAndReadState true
-            }
-            placeCaretAfterWord(words[target], nativeGetInput().orEmpty().length) { span -> span.third }
-            true
-        }
-
-    /**
-     * 九键：前面的词已由九键选词选定后，把光标放到第一个词 [word] 后面（[word] 的拼音字母数＝数字键数）。
-     * 双拼九键的注释是全拼、和数字键数对不上，不挪光标。
-     */
-    internal fun placeT9CaretAfterWord(word: String, doublePinyin: Boolean): RimeProcessResult? = editPinyinAndReadState {
-        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining() || nativeIsAsciiMode() || doublePinyin)
-            return@editPinyinAndReadState false
-        val input = nativeGetInput().orEmpty()
-        val keys = t9KeysOfReading(candidateSpan(word)?.second ?: return@editPinyinAndReadState true)
-        if (keys <= 0 || keys >= codeKeysBefore(input, input.length)) return@editPinyinAndReadState true
-        if (placeT9CodeCaret(keys, input) && candidateSpan(word) == null) nativeSetCaret(input.length)
-        true
-    }
-
-    /** 光标挪到 [word] 后面；挪过去后候选里没有 [word]（对不上）就放回末尾 [inputEnd]。须在锁内调用。 */
-    private inline fun placeCaretAfterWord(word: String, inputEnd: Int, end: (Triple<Int, String, Int>) -> Int) {
-        val span = candidateSpan(word) ?: return
-        val caret = end(span)
-        if (caret <= 0 || caret >= inputEnd) return
-        candidateRevision.incrementAndGet()
-        nativeSetCaret(caret)
-        if (candidateSpan(word) == null) { nativeSetCaret(inputEnd); return }
-        reselectCaret = caret
-        reselectInput = nativeGetInput().orEmpty()
-    }
-
-    /**
-     * 重选的这个词只选了一部分（wo'men 这段点了「我么」，只吃掉 wome）：Rime 只在选到光标处才把光标送回末尾，
-     * 没选到就停在原处，剩下的 n 单独成段、只出单字。这时把光标送回末尾，剩下的拼音和后面一起照常组句。
-     * 编码已经变了（中间打字、删字）或光标已经不在原处时不动。须在锁内、选词之后调用。
-     */
-    private fun resumeCaretAfterPartialReselect(caret: Int, input: String) {
-        val now = nativeGetInput().orEmpty()
-        if (now != input || caret >= now.length) return
-        if (nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull() != caret) return
-        nativeSetCaret(now.length)
     }
 
     /** 固定：当前编码下排第一，固定多个按先后排；取消固定回到原位。候选过期时不做。 */
@@ -1919,6 +1881,3 @@ internal inline fun backspaceComposition(
     clear()
     return reread(result)
 }
-
-/** 重选整句里的词时，在前多少个候选里找这个词。 */
-private const val SENTENCE_WORD_SEARCH = 200

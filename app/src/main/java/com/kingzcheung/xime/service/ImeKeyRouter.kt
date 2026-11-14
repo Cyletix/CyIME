@@ -3134,56 +3134,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             }
     }
 
-    /**
-     * 长按首选整句、点了其中第 [target] 个词：只重选这个词。前面的词照原样选定（九键走九键选词，
-     * 其它方案在引擎里一次做完），光标放到这个词后面，候选只剩这个词的其它写法；选好后后面的字照常组句。
-     */
-    internal fun reselectSentenceWord(words: List<String>, target: Int) {
-        val snapshot = service.candidateState.value
-        if (words.size < 2 || target !in words.indices || snapshot.candidates.firstOrNull() != words.joinToString("")) return
-        postRimeJob("reselect") { reselectSentenceWordAsync(words, target, snapshot) }
-    }
-
-    private suspend fun reselectSentenceWordAsync(words: List<String>, target: Int, snapshot: CandidateState) {
-        if (usesDirectFieldInput || hasPendingCandidateCommit) return
-        if (!snapshot.hasSameSelectionSource(service.candidateState.value) ||
-            !service.rimeEngine.isCandidateRevisionCurrent(snapshot.engineRevision)) return
-        val schema = service.uiState.value.currentSchemaId
-        if (!isT9Schema(schema)) {
-            val result = service.rimeEngine.reselectSentenceWord(words, target, snapshot.engineRevision) ?: return
-            withEditor { service.sessionController.updateUIWithResult(result) }
-            return
-        }
-        // 九键：前面的词逐个走和点候选一样的九键选词（消耗数字、记进已选的词），再挪光标。
-        for (i in 0 until target) {
-            val word = words[i]
-            val revision = service.rimeEngine.currentCandidateRevision()
-            val pinyin = service.rimeEngine.candidateReading(word)?.takeIf { it.isNotBlank() } ?: break
-            val full = service.keyboardCallbacks?.onT9RightCandidateWillBeSelected?.invoke(pinyin, word, word.length, revision)
-                ?: return
-            if (full) {
-                // 不会发生（后面还有要重选的词）；万一数字已全部用完，照点候选的规矩整段上屏，不丢字。
-                deliverCandidateCommit(PendingCandidateCommit(InputCommandOwner.requireOwner(),
-                    service.t9PartialSegments.joinToString("") { it.text } + word, true))
-                return
-            }
-            withEditor {
-                service.t9PartialSegments.add(T9PartialSegment(word, pinyin))
-                service.uiState.value = service.uiState.value.copy(
-                    t9RightCandidateSelectedCount = service.uiState.value.t9RightCandidateSelectedCount + 1,
-                    t9SelectedCandidatePinyin = pinyin)
-            }
-            service.keyboardCallbacks?.onT9ForceSendToRime?.invoke()
-        }
-        val doublePinyin = com.kingzcheung.xime.settings.InputProfiles.describe(schema).scheme ==
-            com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN
-        val result = service.rimeEngine.placeT9CaretAfterWord(words[target], doublePinyin)
-        withEditor {
-            service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
-            if (result != null) service.sessionController.updateUIWithResult(result)
-        }
-    }
-
     /** 展开页使用同一原生候选版本与全局索引执行反馈，再重读候选。 */
     internal fun deleteCandidateGlobal(globalIndex: Int) {
         val snapshot = service.candidateState.value
