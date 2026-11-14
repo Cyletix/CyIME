@@ -57,6 +57,8 @@ struct T9ScriptOptions {
   the<Grammar> t9_grammar_;
   std::shared_ptr<const T9NgramModel> t9_ngram_;
   double t9_ngram_user_weight_ = 0.05;
+  // t9/ngram_user_input_weight: share of recent picks among the spelled-out words that cover the whole input.
+  double t9_ngram_user_input_weight_ = 0;
   double t9_ngram_dictionary_prior_ = 0;
   bool t9_ngram_sentence_start_ = false;
   double t9_ngram_eos_weight_ = 0;
