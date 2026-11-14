@@ -4799,6 +4799,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal fun inlinePinyinText(): String? = inlineComposition.text
 
+    internal fun inlinePinyinCaret(): Int = inlineComposition.caret
+
+    /** Move only within the composing text we just wrote, leaving surrounding text untouched. */
+    internal fun placeInlinePinyinCaret(text: String, offset: Int): Boolean {
+        if (inlineComposition.text != text || offset !in 0..text.length) return false
+        if (offset == inlineComposition.caret) return true
+        val ic = currentInputConnection ?: return false
+        val value = runCatching { ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) }.getOrNull() ?: return false
+        val content = value.text ?: return false
+        val sel = value.selectionStart
+        if (value.startOffset < 0 || sel !in 0..content.length || sel != value.selectionEnd) return false
+        val start = sel - inlineComposition.caret
+        if (start < 0 || start + text.length > content.length ||
+            content.subSequence(start, start + text.length).toString() != text) return false
+        if (!ic.setSelection(value.startOffset + start + offset, value.startOffset + start + offset)) return false
+        inlineComposition.moveCaret(offset)
+        return true
+    }
+
     internal fun hasInlinePinyinCaretInside(): Boolean = inlineComposition.text?.let {
         inlineComposition.caret < it.length
     } == true

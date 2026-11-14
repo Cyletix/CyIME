@@ -1,5 +1,12 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.service.displaySelection
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.magnifier
+import androidx.compose.ui.input.pointer.pointerInput
+
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.theme.drawUnderTopFeather
@@ -147,6 +154,26 @@ data class CandidateBarVisuals(
     val glassControlBackground: Color? = null,
 )
 
+internal val LocalSentenceSelection = androidx.compose.runtime.staticCompositionLocalOf<com.kingzcheung.xime.service.SentenceEditSession?> { null }
+
+/** Highlight the replacement in the first sentence while its local editor is open. */
+internal data class SentenceCandidateHighlight(val sentence: String, val start: Int, val end: Int)
+internal val LocalSentenceCandidateHighlight = androidx.compose.runtime.staticCompositionLocalOf<SentenceCandidateHighlight?> { null }
+
+internal fun sentenceCandidateText(text: String, index: Int, drag: IntRange?,
+                                   active: SentenceCandidateHighlight?, color: Color): AnnotatedString =
+    androidx.compose.ui.text.buildAnnotatedString {
+        append(text)
+        val selected = drag ?: active?.takeIf { index == 0 && text.endsWith(it.sentence) }
+            ?.let { item ->
+                val prefix = text.length - item.sentence.length
+                (prefix + item.start) until (prefix + item.end)
+            }
+        selected?.takeIf { !it.isEmpty() && it.first >= 0 && it.last < text.length }?.let {
+            addStyle(androidx.compose.ui.text.SpanStyle(background = color.copy(alpha = 0.3f)), it.first, it.last + 1)
+        }
+    }
+
 data class CandidateBarCallbacks(
     val onCandidateSelect: (Int) -> Unit,
     val onVisibleCandidatesChanged: ((List<String>) -> Unit)? = null,
@@ -167,6 +194,10 @@ data class CandidateBarCallbacks(
     // 长按候选：抛事件给宿主（键盘视图内弹确认覆盖层，不弹独立窗口——
     // 焦点型弹窗会抢焦点导致 IME 被系统收起）。
     val onCandidateLongPress: ((Int) -> Unit)? = null,
+    /** A long press followed by a drag selects a range within the first sentence. */
+    val onSentenceSelection: ((Int, Int) -> Unit)? = null,
+    val onSentenceSelectionChange: ((Int, Int) -> Unit)? = null,
+    val onSentenceSelectionEnd: (() -> Unit)? = null,
     /** 手指开始左右滑打字候选。 */
     val onCandidateStripScrolled: (() -> Unit)? = null,
     /** 打字候选滑到最后几个了。 */
@@ -519,7 +550,8 @@ fun CandidateBar(
                 Box(Modifier.widthIn(max = minOf(108.dp, toolbarRowWidth * 0.32f)).height(44.dp)
                     .then(if (onEditPreedit == null) Modifier else Modifier.clickable(onClickLabel = "编辑拼音", onClick = onEditPreedit))
                     .padding(horizontal = 4.dp).testTag("inline-preedit"), contentAlignment = Alignment.CenterStart) {
-                    Text(preeditText, color = protectedVisuals.textColor, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(sentenceSelectionText(preeditText, LocalSentenceSelection.current, protectedVisuals.accentColor),
+                        color = protectedVisuals.textColor, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (showLeftIcon) {
@@ -1082,6 +1114,9 @@ fun CandidateItem(
     candidateFontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Default,
     commentFontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Default,
     onLongClick: (() -> Unit)? = null,
+    onSentenceSelection: ((Int, Int) -> Unit)? = null,
+    onSentenceSelectionChange: ((Int, Int) -> Unit)? = null,
+    onSentenceSelectionEnd: (() -> Unit)? = null,
     opaqueComment: Boolean = false,
     textShadow: androidx.compose.ui.graphics.Shadow? = null,
     /** 纠错来的候选：引擎给的逐音节纠正，代替拼音注释标出怎么改的。 */
@@ -1099,6 +1134,13 @@ fun CandidateItem(
     val dropId = remember { Any() }
     val dragSpace = LocalKeyDragSpace.current
     val currentClick by rememberUpdatedState(onClick)
+    val currentLongClick by rememberUpdatedState(onLongClick)
+    val currentSentenceSelection by rememberUpdatedState(onSentenceSelection)
+    val currentSentenceSelectionChange by rememberUpdatedState(onSentenceSelectionChange)
+    val currentSentenceSelectionEnd by rememberUpdatedState(onSentenceSelectionEnd)
+    var textLayout by remember(text) { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    var dragSelection by remember(text) { mutableStateOf<IntRange?>(null) }
+    var magnifierPosition by remember(text) { mutableStateOf(androidx.compose.ui.geometry.Offset.Unspecified) }
     DisposableEffect(dropId) { onDispose { CandidateDropTargets.shared.remove(dropId) } }
     if (!interactive) SideEffect { CandidateDropTargets.shared.remove(dropId) }
     Row(
@@ -1115,7 +1157,7 @@ fun CandidateItem(
             .semantics { selected = isSelected }
             .then(if (interactive) Modifier.combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = if (onSentenceSelection == null) onLongClick else null
             ) else Modifier)
             .padding(horizontal = horizontalPadding, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1126,9 +1168,49 @@ fun CandidateItem(
             if (twoLineWidth != null) candidateTwoLineTextStyle(it, textSize) else it
         }.copy(shadow = textShadow)
         Text(
-            text = text,
-            modifier = if (twoLineWidth != null) Modifier.width(with(LocalDensity.current) { twoLineWidth.toDp() })
-                else Modifier.candidateBaseline(textSize),
+            text = sentenceCandidateText(text, index, dragSelection, LocalSentenceCandidateHighlight.current, accentColor),
+            modifier = (if (twoLineWidth != null) Modifier.width(with(LocalDensity.current) { twoLineWidth.toDp() })
+                else Modifier.candidateBaseline(textSize)).then(if (interactive && onSentenceSelection != null && text.isNotEmpty()) Modifier
+                .magnifier(sourceCenter = { magnifierPosition })
+                .pointerInput(text) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val held = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                    val layout = textLayout ?: return@awaitEachGesture
+                    fun characterAt(position: androidx.compose.ui.geometry.Offset): Int {
+                        val offset = layout.getOffsetForPosition(position).coerceIn(0, text.lastIndex)
+                        return if (offset > 0 && layout.getBoundingBox(offset - 1).contains(position)) offset - 1 else offset
+                    }
+                    val first = characterAt(down.position)
+                    var last = first
+                    var dragged = false
+                    dragSelection = first..first
+                    currentSentenceSelectionChange?.invoke(first, first + 1)
+                    magnifierPosition = held.position
+                    try { do {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if ((change.position - down.position).getDistance() >= viewConfiguration.touchSlop) dragged = true
+                        if (dragged) {
+                            val next = characterAt(change.position)
+                            if (next != last) {
+                                last = next
+                                dragSelection = minOf(first, last)..maxOf(first, last)
+                                currentSentenceSelectionChange?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                            }
+                        }
+                        magnifierPosition = change.position
+                        change.consume()
+                    } while (change.pressed) } finally {
+                        dragSelection = null
+                        currentSentenceSelectionEnd?.invoke()
+                        magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
+                    }
+                    if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                    else currentLongClick?.invoke()
+                }
+            } else Modifier),
+            onTextLayout = { textLayout = it },
             color = if (isSelected) selectedTextColor else textColor,
             fontSize = textSize,
             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
@@ -1495,7 +1577,8 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
         val caretAlpha = if (caretOn) 1f else 0f
         // 折行时在隔音符后面垫零宽空格：tou'ming'du 整串没有空格，不垫就只能从音节中间断开。
         val displayText = if (maxLines > 1) shownText.replace("'", "'\u200B") else shownText
-        val annotated = preeditWithCaret(displayText, visuals.accentColor, textColor, visuals.selectedTextColor, caretAlpha)
+        val annotated = sentenceSelectionText(displayText, LocalSentenceSelection.current, visuals.accentColor,
+            preeditWithCaret(displayText, visuals.accentColor, textColor, visuals.selectedTextColor, caretAlpha))
         val textStyle = LocalTextStyle.current.copy(shadow = visuals.textShadow)
         if (maxLines <= 1) {
             Text(annotated, color = textColor, fontSize = PreeditStyle.FontSize, maxLines = 1,
@@ -1793,6 +1876,9 @@ internal fun FixedCandidateStrip(
                             itemSpacing, fontSize) else Modifier)
                         .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
+                    onSentenceSelection = callbacks.onSentenceSelection.takeIf { index == 0 && !showNumberLabels },
+                    onSentenceSelectionChange = callbacks.onSentenceSelectionChange.takeIf { index == 0 && !showNumberLabels },
+                    onSentenceSelectionEnd = callbacks.onSentenceSelectionEnd.takeIf { index == 0 && !showNumberLabels },
                     correction = if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "",
                     selectionFill = shiftDragFree && !highlightShown, horizontalPadding = itemPadding, fit = window.fits[index])
                 }
@@ -1922,6 +2008,9 @@ private fun ScrollableCandidateRow(
                     .then(if (divided) Modifier.candidateLeadingDivider(itemDividerColor, itemSpacing, fontSize) else Modifier)
                     .then(if (index == focused) Modifier.onGloballyPositioned { onFocusedBounds(it.boundsInRoot()) } else Modifier),
                 onLongClick = if (numbered) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
+                onSentenceSelection = callbacks.onSentenceSelection.takeIf { index == 0 && !showNumberLabels },
+                    onSentenceSelectionChange = callbacks.onSentenceSelectionChange.takeIf { index == 0 && !showNumberLabels },
+                    onSentenceSelectionEnd = callbacks.onSentenceSelectionEnd.takeIf { index == 0 && !showNumberLabels },
                 correction = if (numbered) corrections[all[index]].orEmpty() else "",
                 selectionFill = selectionFill,
                 interactive = !hidden, horizontalPadding = itemPadding, fit = fits[index])
@@ -2021,6 +2110,26 @@ private val TOOLBAR_SLOT_BLEND_FULL = 840.dp
  * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的选中字色；光标只是一道线，不垫底色（用户 10-21）。
  * [alpha] 是闪烁的当前亮度。
  */
+internal fun sentenceSelectionText(text: String, owner: com.kingzcheung.xime.service.SentenceEditSession?,
+    accent: Color, base: AnnotatedString = AnnotatedString(text)): AnnotatedString {
+    val plain = text.replace("\u200B", "")
+    val range = owner?.displaySelection(plain) ?: return base
+    fun displayOffset(offset: Int): Int {
+        var plainCount = 0
+        for (index in text.indices) {
+            if (plainCount == offset) return index
+            if (text[index] != '\u200B') plainCount++
+        }
+        return text.length
+    }
+    val start = displayOffset(range.first)
+    val end = displayOffset(range.last + 1)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(base)
+        addStyle(androidx.compose.ui.text.SpanStyle(background = accent.copy(alpha = 0.3f)), start, end)
+    }
+}
+
 internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Color.Unspecified,
                               selectedText: Color = accent, alpha: Float = 1f): AnnotatedString {
     val caret = text.indexOf(com.kingzcheung.xime.service.PREEDIT_CARET)

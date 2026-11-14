@@ -52,6 +52,7 @@ internal fun rememberImeKeyboardCallbacks(
 ): KeyboardCallbacks {
     val view = LocalView.current
     val preeditEditor = remember(service) { ImePreeditEditor(service) }
+    val sentenceEditor = remember(service) { ImeSentenceEditor(service) }
     val syllableSelector = remember(service) { ImePinyinSyllableSelector(service) }
     return remember(floatingMinY, state.isFloatingMode, effectiveScreenH, state.inputSessionId, state.showKeyboardResize) {
         val floatingDragX = FloatingDragAxis()
@@ -59,7 +60,19 @@ internal fun rememberImeKeyboardCallbacks(
         KeyboardCallbacks(
             startDeleteDrag = {
                 val generation = service.beginDeleteDrag()
-                DeleteDragSession(ImeDistanceBackspace(service, state.inputSessionId)::move) { service.finishDeleteDrag(generation) }
+                val clearSentence = service.keyboardCallbacks?.onSentenceHorizontalDelete
+                val move = if (clearSentence == null) ImeDistanceBackspace(service, state.inputSessionId)::move
+                else {
+                    var cleared = false
+                    val handler: (Int) -> Unit = { distance ->
+                        if (!cleared && distance != 0) {
+                            cleared = true
+                            clearSentence()
+                        }
+                    }
+                    handler
+                }
+                DeleteDragSession(move) { service.finishDeleteDrag(generation) }
             },
             isDeleteDragging = { service.deleteDragActive.value },
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
@@ -86,6 +99,12 @@ internal fun rememberImeKeyboardCallbacks(
             onRetryRejectedCommit = service.keyRouter::retryRejectedCommit,
             onCancelRejectedCommit = service.keyRouter::cancelRejectedCommit,
             onOpenPreeditEditor = preeditEditor::open,
+            onOpenSentenceEdit = sentenceEditor::open,
+            onSentenceCandidates = sentenceEditor::candidates,
+            onApplySentenceEdit = sentenceEditor::apply,
+            onSentencePreview = sentenceEditor::preview,
+            onSentenceDragPreview = sentenceEditor::dragPreview,
+            onEndSentencePreview = sentenceEditor::endPreview,
             onLivePreeditEdit = preeditEditor::edit,
             onRequestPinyinSyllables = syllableSelector::request,
             onSelectPinyinSyllable = syllableSelector::select,
@@ -384,8 +403,6 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onCandidatePinAt = { text, place -> service.keyRouter.pinCandidateAt(text, place) },
-            sentenceWords = { text -> service.rimeEngine.firstSentenceWords(text) },
-            onReselectSentenceWord = { words, target -> service.keyRouter.reselectSentenceWord(words, target) },
             onRequestExpandedCandidates = {
                 // Expanded candidates have global indices; leave the collapsed page's focus behind.
                 service.candidateState.value = service.candidateState.value.copy(candidateFocus = null)
