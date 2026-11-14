@@ -277,6 +277,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("按键形状", theme, SettingsRoutes.Theme, "形状 圆角 方形 方角 直角 方块 键帽 按键外形 iOS"),
         SettingsSearchEntry("按键字号", theme, SettingsRoutes.Theme, "字号 字体 文字大小 按键文字 字体大小"),
         SettingsSearchEntry("键帽字母大小写", theme, SettingsRoutes.Theme, "大写 小写 大小写 字母 键帽 按键文字 显示 干净 简洁 中英 中文 英文 分辨 区分 搜狗 盲打 大写QWER 字母键显示大写 中文键盘字母显示大写"),
+        SettingsSearchEntry("上下滑输入符号", gestures, gesturePage, "角标 符号 上滑 下滑 上下滑 拖动 滑动 关闭 关掉 误触 滑到哪个键 三星 滑动按键 手势"),
         SettingsSearchEntry("上方角标提示", gestures, gesturePage, "角标 提示 符号 显示 上方 干净 干净模式 简洁 隐藏"),
         SettingsSearchEntry("下方角标提示", gestures, gesturePage, "角标 提示 符号 显示 下方 干净 干净模式 简洁 隐藏"),
         SettingsSearchEntry("角标不透明度", theme, SettingsRoutes.Theme, "角标 透明度 不透明度 淡 变淡 减淡 颜色 灰 玻璃 层次 突出 主字"),

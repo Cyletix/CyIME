@@ -217,6 +217,12 @@ data class KeyboardInputPreferences(
     val glidePreview: Boolean = false,
     /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
     val letterLongPressMenu: Boolean = false,
+    /**
+     * 上下滑（和「长按输入」的长按）输入角标符号；默认开，和以前一样（用户 11-14：要能真的关掉）。
+     * 和「上方/下方角标提示」各管各的：提示只管键上画不画。关掉时直接上屏的角标都不出，
+     * 用户给字母设的上下滑动作（撤销、复制这类）不算角标，照旧。
+     */
+    val cornerSymbolInput: Boolean = true,
     /** 九键拂动选字母（左上右下），数字改为长按。 */
     val t9FlickLetters: Boolean = false,
     val t9GlideTyping: Boolean = false,
@@ -292,6 +298,8 @@ data class KeyboardInputPreferences(
         const val DELETE_CHINESE_GLIDE_CHARACTER_KEY = "delete_chinese_glide_word"
         /** 滑行实时预览；新键，读不到就是关。 */
         const val GLIDE_PREVIEW_KEY = "glide_preview"
+        /** 新键（11-14），没存过就是开：老用户升级后行为不变。 */
+        const val CORNER_SYMBOL_INPUT_KEY = "corner_symbol_input"
         /** 双拼键位提示开关；设置在「双拼方案」页。 */
         const val DOUBLE_PINYIN_KEY_HINTS_KEY = "double_pinyin_key_hints"
         /** 双拼键位提示和角标一起显示；设置在「双拼方案」页。新键，读不到就是关。 */
@@ -330,7 +338,7 @@ data class KeyboardInputPreferences(
         const val CORNER_HINT_OPACITY_KEY = "corner_hint_opacity"
         const val HIDE_FUNCTION_KEY_HINTS_KEY = "hide_function_key_hints"
         internal val watchedKeys: Set<String> by lazy {
-            setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
+            setOf(CORNER_SYMBOL_INPUT_KEY, KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
@@ -456,6 +464,7 @@ data class KeyboardInputPreferences(
                 deleteChineseGlideCharacter = prefs.getBoolean(DELETE_CHINESE_GLIDE_CHARACTER_KEY, false),
                 glidePreview = prefs.getBoolean(GLIDE_PREVIEW_KEY, false),
                 letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
+                cornerSymbolInput = prefs.getBoolean(CORNER_SYMBOL_INPUT_KEY, true),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
                 t9GlideTyping = prefs.getBoolean("t9_glide_typing", false),
                 keyTextScale = prefs.getFloat("key_text_scale", DEFAULT_KEY_TEXT_SCALE)
@@ -517,6 +526,7 @@ data class KeyboardInputPreferences(
             .putBoolean("flick_direction_disc", flickDirectionDisc)
             .putBoolean("glide_typing_v2", glideTyping)
             .putBoolean("letter_long_press_menu", letterLongPressMenu)
+            .putBoolean(CORNER_SYMBOL_INPUT_KEY, cornerSymbolInput)
             .putBoolean("glide_typing", glideTyping)
             .putBoolean(CHINESE_GLIDE_KEY, chineseGlideTyping)
             .putBoolean(DELETE_CHINESE_GLIDE_CHARACTER_KEY, deleteChineseGlideCharacter)
