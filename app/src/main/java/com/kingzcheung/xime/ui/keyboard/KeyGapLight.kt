@@ -212,6 +212,21 @@ internal class KeyGapLightField {
      */
     private val voiceLevels = IntArray(GAP_LIGHT_VOICE_MAX_ROWS)
     private var voiceActive = false
+    /**
+     * 每来一次音量，各条从现在画着的宽度用 [GAP_LIGHT_VOICE_GLIDE_MS] 匀速长到新宽度，接上下一次音量：
+     * 原来音量每 80 ms 才跳一下，看着一顿一顿（用户 11-14：帧率太低）。只在这段时间里走帧钟，没声音时不出帧。
+     */
+    private val voiceFrom = FloatArray(GAP_LIGHT_VOICE_MAX_ROWS)
+    private var voiceGliding = false
+    /** 这一段从哪一帧开始；帧钟还没走到是 -1，这时按起点画。 */
+    private var voiceGlideStart = -1L
+
+    private fun voiceProgress(): Float =
+        if (!voiceGliding || voiceGlideStart < 0L) (if (voiceGliding) 0f else 1f)
+        else ((now - voiceGlideStart).toFloat() / (GAP_LIGHT_VOICE_GLIDE_MS * 1_000_000f)).coerceIn(0f, 1f)
+
+    private fun voiceShown(row: Int, progress: Float): Float =
+        voiceFrom[row] + (voiceLevels[row] - voiceFrom[row]) * progress
     /** 两排键之间的键缝中线（像素），从下往上。 */
     private var gutters = FloatArray(0)
 
@@ -422,7 +437,7 @@ internal class KeyGapLightField {
 
     /**
      * 听写时每来一次音量调一次（音量本身每 80 ms 才报一次）；[level] 是 0～1，0 = 没在听或没声音，音量条收掉。
-     * 不走帧钟：量化后的级数变了才重画一次，没声音时一帧都不多画。
+     * 量化后的级数变了才动：接着用 [GAP_LIGHT_VOICE_GLIDE_MS] 匀速长过去（走帧钟，只重画光层），级数没变、没声音时不出帧。
      */
     internal fun voice(level: Float) {
         val config = config
@@ -430,6 +445,8 @@ internal class KeyGapLightField {
         if (!on) {
             if (voiceActive) {
                 voiceLevels.fill(0)
+                voiceFrom.fill(0f)
+                voiceGliding = false
                 voiceActive = false
                 stamp.intValue++
             }
@@ -437,15 +454,22 @@ internal class KeyGapLightField {
         }
         val newest = gapLightVoiceLevel(level)
         var changed = voiceLevels[0] != newest
+        for (row in voiceLevels.size - 1 downTo 1) if (voiceLevels[row] != voiceLevels[row - 1]) changed = true
+        if (!changed) return
+        // 从现在画着的样子接着长，上一段没走完也不跳。
+        val progress = voiceProgress()
+        for (row in voiceFrom.indices) voiceFrom[row] = voiceShown(row, progress)
         var any = newest != 0
         for (row in voiceLevels.size - 1 downTo 1) {
-            if (voiceLevels[row] != voiceLevels[row - 1]) changed = true
             voiceLevels[row] = voiceLevels[row - 1]
             if (voiceLevels[row] != 0) any = true
         }
         voiceLevels[0] = newest
-        voiceActive = any
-        if (changed) stamp.intValue++
+        voiceActive = any || voiceFrom.any { it > 0f }
+        voiceGliding = true
+        voiceGlideStart = -1L
+        running = true
+        stamp.intValue++
     }
 
     /**
@@ -552,8 +576,16 @@ internal class KeyGapLightField {
             if (beadEndStart < 0L) beadEndStart = frameNanos
             else if (frameNanos - beadEndStart >= GAP_LIGHT_BEAD_FADE_NANOS) beadState = BEAD_OFF
         }
+        if (voiceGliding) {
+            if (voiceGlideStart < 0L) voiceGlideStart = frameNanos
+            else if (frameNanos - voiceGlideStart >= GAP_LIGHT_VOICE_GLIDE_MS * 1_000_000L) {
+                voiceGliding = false
+                voiceActive = voiceLevels.any { it != 0 }
+            }
+        }
         // 色块停着不动时不用出帧：位置变了由 [bead] 自己叫重画。
-        if (pulses.isEmpty() && bands.isEmpty() && holds.isEmpty() && ticks.isEmpty() && beadState != BEAD_ENDING) running = false
+        if (pulses.isEmpty() && bands.isEmpty() && holds.isEmpty() && ticks.isEmpty() && beadState != BEAD_ENDING &&
+            !voiceGliding) running = false
         stamp.intValue++
     }
 
@@ -591,9 +623,10 @@ internal class KeyGapLightField {
         val rows = min(gutters.size, voiceLevels.size)
         val inset = if (gapY > 2f) 1f else 0f
         val center = size.width / 2f
+        val progress = voiceProgress()
         for (row in 0 until rows) {
-            val level = voiceLevels[row]
-            if (level == 0) continue
+            val level = voiceShown(row, progress)
+            if (level <= 0f) continue
             val half = center * level / GAP_LIGHT_VOICE_LEVELS
             val y = gutters[row]
             fill(center - half, y - gapY + inset, center + half, y + gapY - inset, color,

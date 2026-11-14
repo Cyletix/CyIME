@@ -200,14 +200,16 @@ internal const val GAP_LIGHT_TAIL_STEPS = 5
 /** 按键、删除一次动效的时长（速度为 1 时）。 */
 internal const val GAP_LIGHT_PRESS_MS = 200
 
-/** 音量条的半宽分多少级：量化以后小的抖动不引起重画。 */
-internal const val GAP_LIGHT_VOICE_LEVELS = 16
+/** 音量条的半宽分多少级：分得细一些，加上两次更新之间的过渡，长短变化看起来是连续的。 */
+internal const val GAP_LIGHT_VOICE_LEVELS = 48
+/** 音量变了以后，条从旧长度过渡到新长度用多久（和上游音量更新间隔一样）。 */
+internal const val GAP_LIGHT_VOICE_GLIDE_MS = 80L
 /** 最多几条音量条（两排键之间一条）。 */
 internal const val GAP_LIGHT_VOICE_MAX_ROWS = 8
 
 /** 音量（0～1）量化成 0～[GAP_LIGHT_VOICE_LEVELS] 级。 */
 internal fun gapLightVoiceLevel(level: Float): Int =
-    Math.round(level.coerceIn(0f, 1f) * GAP_LIGHT_VOICE_LEVELS)
+    (level.coerceIn(0f, 1f) * GAP_LIGHT_VOICE_LEVELS).toInt()
 
 /**
  * 两排键之间的键缝中线，从下往上。[grid] 每个键四个数（键格的左、上、右、下，没进网的键第一个数是 NaN）：
