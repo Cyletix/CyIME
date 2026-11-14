@@ -17,7 +17,8 @@ namespace rime {
 
 namespace {
 // Whether the typed letters read in full syllables without any correction, the last syllable included
-// (aniu reads a'niu, so the corrected 按钮 never leads 阿牛). Abbreviated or unreadable letters do not count.
+// (aniu reads a'niu, so the corrected 按钮 never leads 阿牛). Abbreviated or unreadable letters do not count,
+// except a mixed word's syllable typed whole (bzhan for B站), which is spelled as an abbreviation.
 bool TypedReadsInFull(const SyllableGraph& graph) {
   const size_t end = graph.interpreted_length;
   if (end == 0) return false;
@@ -26,7 +27,9 @@ bool TypedReadsInFull(const SyllableGraph& graph) {
     if (!reached.count(from.first)) continue;
     for (const auto& to : from.second)
       for (const auto& spelling : to.second)
-        if (spelling.second.type <= kFuzzySpelling && !spelling.second.is_correction) {
+        if (!spelling.second.is_correction &&
+            (spelling.second.type <= kFuzzySpelling ||
+             spelling.second.cyime_whole_mixed)) {
           reached.insert(to.first);
           break;
         }
@@ -123,6 +126,29 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
         at.push_back(std::min(i, text.size()));
       }
       const size_t n = at.size() - 1;
+      // The word model has no Latin letters, so a mixed word (B站, C盘, AI) would be scored as an unseen
+      // letter and the sentence lose to any Han reading (不站上面的视频). Such a word is scored once whole, by
+      // its dictionary weight (ln of its frequency, as Rime weighs it) brought to the model's scale, besides the
+      // splits of its text. The two scales differ by about this much: over the 305,851 base.dict words (weight
+      // ≥ 20) the model has, ln P(word) − Rime's ln(weight / 1e8) has median −3.75 (p25 −4.67, p75 −2.41).
+      constexpr double kDictionaryToModel = -3.75;
+      struct Whole { size_t start, end; double weight; };
+      vector<Whole> wholes;
+      {
+        size_t byte = 0;
+        for (const auto& word : sentence.components()) {
+          const size_t from = byte;
+          byte += word.text.size();
+          if (std::none_of(word.text.begin(), word.text.end(),
+                           [](char ch) { return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z'); }))
+            continue;
+          const auto first = std::lower_bound(at.begin(), at.end(), from);
+          const auto last = std::lower_bound(at.begin(), at.end(), byte);
+          if (first == at.end() || last == at.end() || *first != from || *last != byte) continue;
+          wholes.push_back({static_cast<size_t>(first - at.begin()), static_cast<size_t>(last - at.begin()),
+                            word.weight + kDictionaryToModel});
+        }
+      }
       struct State { double value; int32_t prev2, prev1; bool started; };
       constexpr size_t kStates = 4;
       auto log_add = [](double a, double b) {
@@ -138,9 +164,12 @@ void T9RescoreSentences(const T9ScriptQuery& q, const T9NgramModel* ngram, bool 
         for (size_t start = end > 8 ? end - 8 : 0; start < end; ++start) {
           if (states[start].empty()) continue;
           const int32_t id = word_id(text.substr(at[start], at[end] - at[start]));
-          if (id == ::T9NgramModel::kUnseen && end - start > 1) continue;
+          const auto whole = id == ::T9NgramModel::kUnseen
+              ? std::find_if(wholes.begin(), wholes.end(), [&](const Whole& w) { return w.start == start && w.end == end; })
+              : wholes.end();
+          if (id == ::T9NgramModel::kUnseen && end - start > 1 && whole == wholes.end()) continue;
           for (const State& from : states[start]) {
-            const double value = from.value + (from.started
+            const double value = from.value + (whole != wholes.end() ? whole->weight : from.started
                 ? ngram->LogProb3(from.prev2, from.prev1, id) : ngram->Start(id, ngram_sentence_start));
             const State next{value, from.started ? from.prev1 : root, id, true};
             // One state per last word (it decides the next transition), the best kStates kept.

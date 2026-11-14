@@ -14,7 +14,7 @@ index 5242f6d5..38314ca8 100644
    // 疊加運算規則, 將運算規則產生的屬性應用到當前拼寫上
    void Compose(const SpellingProperties& delta);
 diff --git a/src/rime/algo/syllabifier.cc b/src/rime/algo/syllabifier.cc
-index a575178..632182f 100644
+index a5751781..8163df1f 100644
 --- a/src/rime/algo/syllabifier.cc
 +++ b/src/rime/algo/syllabifier.cc
 @@ -6,6 +6,7 @@
@@ -171,7 +171,13 @@ index a575178..632182f 100644
    for (int i = farthest - 1; i >= 0; --i) {
      if (graph->vertices.find(i) == graph->vertices.end())
        continue;
-@@ -229,9 +324,30 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -224,14 +319,43 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+       // remove disqualified syllables (eg. matching abbreviated spellings)
+       // when there is a path of more favored type
+       SpellingType edge_type = kInvalidSpelling;
++      int whole_mixed_edge = -1;  // IsWholeMixedSpan for this edge, once asked
+       for (auto k = j->second.begin(); k != j->second.end();) {
+         if (k->second.is_correction) {
            ++k;
            continue;  // Don't care correction edges
          }
@@ -190,8 +196,15 @@ index a575178..632182f 100644
 +            input[j->first - 1] >= 'A' && input[j->first - 1] <= 'Z';
 +        const bool final_ne_abbreviation = k->first == final_ne && k->second.type == kAbbreviation &&
 +            j->first == farthest && static_cast<size_t>(i) + 1 == farthest;
++        // CyIME: a mixed word's syllable typed whole (bzhan, agu for A股) is no initial: it stays when the
++        // letters also read in full (a'gu), and its word competes by weight (IsWholeMixedSpan).
++        auto whole_mixed = [&] {
++          if (k->second.type != kAbbreviation) return false;
++          if (whole_mixed_edge < 0) whole_mixed_edge = IsWholeMixedSpan(input, i, j->first) ? 1 : 0;
++          return whole_mixed_edge == 1;
++        };
 +        if (k->second.type > last_type && !t9_tail_abbreviation && !merged_tail_abbreviation &&
-+            !final_ne_abbreviation) {
++            !final_ne_abbreviation && !whole_mixed()) {
            j->second.erase(k++);
          } else {
 +          // The initial reading is kept only behind the full syllable: a word through it must be 20 times
@@ -203,7 +216,7 @@ index a575178..632182f 100644
            if (k->second.type < edge_type)
              edge_type = k->second.type;
            ++k;
-@@ -245,7 +361,9 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -245,7 +369,9 @@ int Syllabifier::BuildSyllableGraph(const string& input,
          ++j;
        }
      }
@@ -214,18 +227,31 @@ index a575178..632182f 100644
        DLOG(INFO) << "remove stale vertex at " << i;
        graph->vertices.erase(i);
        graph->edges.erase(i);
-@@ -298,6 +416,10 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -298,6 +424,23 @@ int Syllabifier::BuildSyllableGraph(const string& input,
      }
    }
  
++  // CyIME: a mixed word's syllable typed whole is typed in full, so it costs nothing, unlike an initial (b for 不).
++  graph->cyime_mixed_starts.clear();
++  for (auto& from : graph->edges)
++    for (auto& to : from.second) {
++      if (!IsWholeMixedSpan(input, from.first, to.first)) continue;
++      for (auto& s : to.second)
++        if (s.second.type == kAbbreviation && !s.second.is_correction) {
++          s.second.credibility = 0;
++          s.second.cyime_whole_mixed = true;
++          graph->cyime_mixed_starts.insert(from.first);
++        }
++    }
++
 +  graph->cyime_stray_initials = false;
 +  if (corrector_ && corrector_->CorrectsStrayInitials())
-+    MarkStrayInitials(graph, farthest);
++    MarkStrayInitials(input, graph, farthest);
 +
    graph->input_length = input.length();
    graph->interpreted_length = farthest;
    DLOG(INFO) << "input length: " << graph->input_length;
-@@ -427,7 +549,10 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
+@@ -427,7 +570,10 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
    set<int> good;
    good.insert(farthest);
    SpellingType last_type =
@@ -237,7 +263,7 @@ index a575178..632182f 100644
    for (int i = farthest - 1; i >= 0; --i) {
      if (graph->vertices.find(i) == graph->vertices.end())
        continue;
-@@ -442,9 +567,27 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
+@@ -442,9 +588,27 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
            ++k;
            continue;
          }
@@ -266,7 +292,7 @@ index a575178..632182f 100644
            if (k->second.type < edge_type)
              edge_type = k->second.type;
            ++k;
-@@ -458,7 +601,9 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
+@@ -458,7 +622,9 @@ bool Syllabifier::TryExtendSyllableGraph(const string& input,
          ++j;
        }
      }
@@ -277,7 +303,7 @@ index a575178..632182f 100644
        graph->vertices.erase(i);
        graph->edges.erase(i);
        continue;
-@@ -541,6 +686,65 @@ void Syllabifier::CheckOverlappedSpellings(SyllableGraph* graph,
+@@ -541,6 +707,90 @@ void Syllabifier::CheckOverlappedSpellings(SyllableGraph* graph,
    }
  }
  
@@ -311,11 +337,16 @@ index a575178..632182f 100644
 +// and corrections can, such an initial costs as much as a correction and the sentence is chosen by weight.
 +// Input the typed letters read in full is never touched, nor is the last syllable (still being typed), nor input
 +// that stays abbreviated with corrections too (nihaobzd).
-+void Syllabifier::MarkStrayInitials(SyllableGraph* graph, size_t farthest) {
++// A mixed word's syllable (B站 typed bzhan) is spelled as an abbreviation (rime_ice speller), and such a whole
++// syllable reads in full here; only a lone initial (b, or zh/ch/sh) is a stray one.
++void Syllabifier::MarkStrayInitials(const string& input, SyllableGraph* graph, size_t farthest) {
 +  if (farthest == 0) return;
-+  auto full = [](const SpellingMap& spellings, bool corrections) {
++  auto full = [&](size_t start, size_t end, const SpellingMap& spellings, bool corrections) {
 +    for (const auto& s : spellings)
-+      if (s.second.type <= kFuzzySpelling && (corrections || !s.second.is_correction)) return true;
++      if ((corrections || !s.second.is_correction) &&
++          (s.second.type <= kFuzzySpelling ||
++           (s.second.type == kAbbreviation && IsWholeMixedSpan(input, start, end))))
++        return true;
 +    return false;
 +  };
 +  // Whether the end is reached through full spellings; the last syllable may be any reading.
@@ -324,14 +355,14 @@ index a575178..632182f 100644
 +    for (const auto& from : graph->edges) {
 +      if (!reached.count(from.first)) continue;
 +      for (const auto& to : from.second)
-+        if (to.first == farthest || full(to.second, corrections)) reached.insert(to.first);
++        if (to.first == farthest || full(from.first, to.first, to.second, corrections)) reached.insert(to.first);
 +    }
 +    return reached.count(farthest) > 0;
 +  };
 +  if (reaches_end(false) || !reaches_end(true)) return;
 +  for (auto& from : graph->edges)
 +    for (auto& to : from.second) {
-+      if (to.first >= farthest) continue;
++      if (to.first >= farthest || IsWholeMixedSpan(input, from.first, to.first)) continue;
 +      for (auto& s : to.second)
 +        if (s.second.type == kAbbreviation && !s.second.is_correction) {
 +          s.second.credibility += kCorrectionCredibility;
@@ -340,11 +371,31 @@ index a575178..632182f 100644
 +    }
 +}
 +
++// CyIME: whether an abbreviation spelling over [start, end) is a mixed word's whole syllable (Bzhan for B站, Agu for
++// A股, ADgai for AD钙奶; the rime_ice speller spells such a syllable as its lowercase letters, an abbreviation, so
++// that initials-only input keeps its graph: bzd, xgp). rime_ice's own abbreviations are one initial or zh/ch/sh,
++// so an abbreviation over two or more lowercase letters other than those is a whole syllable. Nine-key digits and
++// 14-key merged capitals never are.
++bool Syllabifier::IsWholeMixedSpan(const string& input, size_t start, size_t end) const {
++  if (end < start + 2) return false;  // most abbreviation edges: one initial
++  size_t letters = 0;
++  char first = 0, second = 0;
++  for (size_t i = start; i < end && i < input.length(); ++i) {
++    const char ch = input[i];
++    if (delimiters_.find(ch) != string::npos) continue;
++    if (ch < 'a' || ch > 'z') return false;
++    if (letters == 0) first = ch; else if (letters == 1) second = ch;
++    ++letters;
++  }
++  if (letters < 2) return false;
++  return !(letters == 2 && second == 'h' && (first == 'z' || first == 'c' || first == 's'));
++}
++
  void Syllabifier::Transpose(SyllableGraph* graph) {
    for (const auto& start : graph->edges) {
      auto& index(graph->indices[start.first]);
 diff --git a/src/rime/algo/syllabifier.h b/src/rime/algo/syllabifier.h
-index 1d7b77a7..e2d49052 100644
+index 1d7b77a7..ac3a4a39 100644
 --- a/src/rime/algo/syllabifier.h
 +++ b/src/rime/algo/syllabifier.h
 @@ -9,6 +9,7 @@
@@ -355,17 +406,28 @@ index 1d7b77a7..e2d49052 100644
  #include <rime_api.h>
  #include <rime/common.h>
  #include "spelling.h"
-@@ -42,6 +43,9 @@ struct SyllableGraph {
+@@ -25,6 +26,8 @@ struct EdgeProperties : SpellingProperties {
+   EdgeProperties() = default;
+   // 切分歧義編碼段的起始位置
+   set<size_t> ambiguous_source_positions;
++  // CyIME: a mixed word's syllable typed whole (Syllabifier::IsWholeMixedSpan).
++  bool cyime_whole_mixed = false;
+ };
+ 
+ using SpellingMap = map<SyllableId, EdgeProperties>;
+@@ -42,6 +45,11 @@ struct SyllableGraph {
    VertexMap vertices;
    EdgeMap edges;
    SpellingIndices indices;
 +  // CyIME: the typed letters read only with a stray initial and corrections read them in full; those
 +  // initials then cost as much as a correction (Syllabifier::MarkStrayInitials).
 +  bool cyime_stray_initials = false;
++  // CyIME: where a mixed word's syllable (Bzhan for B站, typed bzhan) starts; see Syllabifier::IsWholeMixedSpan.
++  set<size_t> cyime_mixed_starts;
  };
  
  // ── T9（九键）增量音节图缓存 ──
-@@ -85,6 +89,7 @@ class Syllabifier {
+@@ -85,6 +93,7 @@ class Syllabifier {
                                    SyllableGraph* graph,
                                    SyllableGraphCache* cache);
    RIME_DLL void EnableCorrection(Corrector* corrector);
@@ -373,11 +435,12 @@ index 1d7b77a7..e2d49052 100644
  
   protected:
    bool TryExtendSyllableGraph(const string& input,
-@@ -97,11 +102,14 @@ class Syllabifier {
+@@ -97,11 +106,15 @@ class Syllabifier {
                                 size_t farthest,
                                 SyllableGraphCache* cache);
    void CheckOverlappedSpellings(SyllableGraph* graph, size_t start, size_t end);
-+  void MarkStrayInitials(SyllableGraph* graph, size_t farthest);
++  void MarkStrayInitials(const string& input, SyllableGraph* graph, size_t farthest);
++  bool IsWholeMixedSpan(const string& input, size_t start, size_t end) const;
 +  bool ReadsInFull(Prism& prism, std::string_view input);
    void Transpose(SyllableGraph* graph);
  
@@ -2010,7 +2073,7 @@ index 459f31d..ba242ab 100644
  
  }  // namespace rime
 diff --git a/src/rime/gear/script_translator.cc b/src/rime/gear/script_translator.cc
-index 99e4511..b8563a7 100644
+index 99e45117..a046f5b5 100644
 --- a/src/rime/gear/script_translator.cc
 +++ b/src/rime/gear/script_translator.cc
 @@ -7,6 +7,8 @@
@@ -2788,7 +2851,7 @@ index 99e4511..b8563a7 100644
                  (!user_phrase_ || user_phrase_iter_ == user_phrase_->rend()));
    return exhausted();
  }
-@@ -733,15 +1200,59 @@ bool ScriptTranslation::CheckEmpty() {
+@@ -733,15 +1200,80 @@ bool ScriptTranslation::CheckEmpty() {
  template <class QueryResult>
  void ScriptTranslation::EnrollEntries(
      map<int, DictEntryList>& entries_by_end_pos,
@@ -2821,8 +2884,8 @@ index 99e4511..b8563a7 100644
               !y.second.exhausted()) {
          homophones.push_back(y.second.Peek());
 +        ++enrolled;
-+        if (!y.second.Next())
-+          break;
+         if (!y.second.Next())
+           break;
 +        skip_doubled();
 +      }
 +      // Extra single-character homophones for sentence making (see sentence_char_homophones_).
@@ -2836,8 +2899,8 @@ index 99e4511..b8563a7 100644
 +      while (homophones.size() < chars && !y.second.exhausted() &&
 +             is_char(y.second.Peek()->text)) {
 +        homophones.push_back(y.second.Peek());
-         if (!y.second.Next())
-           break;
++        if (!y.second.Next())
++          break;
 +        skip_doubled();
 +      }
 +      if (enable_correction_) {
@@ -2847,10 +2910,31 @@ index 99e4511..b8563a7 100644
 +            });
 +        const size_t keep = std::max(limit, chars);
 +        if (homophones.size() > keep) homophones.resize(keep);
++      }
++      // CyIME: a mixed word typed whole (B站 for bzhan, C盘 for cpan) also gets a place in the sentence graph: with
++      // max_homophones places per span, 裁判 always took cpan and 我C盘红了 was never made. The most common mixed
++      // word of the span is added; which sentence leads stays the weights' and the word model's choice.
++      if (syllabifier_->syllable_graph().cyime_mixed_starts.count(start)) {
++        const auto latin = [](const string& text) {
++          return std::any_of(text.begin(), text.end(),
++                             [](char ch) { return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z'); });
++        };
++        const bool has_one = std::any_of(homophones.begin(), homophones.end(),
++                                         [&](const an<DictEntry>& entry) { return latin(entry->text); });
++        // Entries come by weight; a mixed word is among the first few of its span (C盘 5th for cpan).
++        constexpr int kMixedScan = 64;
++        for (int scanned = 0; !has_one && scanned < kMixedScan && !y.second.exhausted(); ++scanned) {
++          const auto entry = y.second.Peek();
++          if (latin(entry->text) && !(enable_correction_ && syllabifier_->IsCorrection(entry->code, y.first, start))) {
++            homophones.push_back(entry);
++            break;
++          }
++          if (!y.second.Next()) break;
++        }
        }
      }
    }
-@@ -761,16 +1272,66 @@ static bool has_completion_edge(const SyllableGraph& graph) {
+@@ -761,16 +1293,66 @@ static bool has_completion_edge(const SyllableGraph& graph) {
  }
  
  // 九键输入特征：纯数字串（用于限定增量回退诊断日志的输出范围）
@@ -2919,7 +3003,7 @@ index 99e4511..b8563a7 100644
  bool ScriptTranslator::TryBeginIncremental(const string& input,
                                             UserDictionary* user_dict,
                                             size_t* old_interpreted) {
-@@ -806,7 +1367,7 @@ bool ScriptTranslator::TryBeginIncremental(const string& input,
+@@ -806,7 +1388,7 @@ bool ScriptTranslator::TryBeginIncremental(const string& input,
    if (miss) {
      // 仅诊断九键场景的回退（字母输入每键都会 miss，不打扰）；
      // glog 不进 logcat，用 android log 直出（tag 与 [TIMING] 一致）
@@ -2928,7 +3012,7 @@ index 99e4511..b8563a7 100644
        T9_INC_LOG("T9 incremental MISS (%s): '%s'", miss, input.c_str());
      return false;
    }
-@@ -841,6 +1402,34 @@ void ScriptTranslator::CommitIncremental(const string& input,
+@@ -841,6 +1423,34 @@ void ScriptTranslator::CommitIncremental(const string& input,
      inc->lattice.reset();
  }
  
@@ -2963,7 +3047,7 @@ index 99e4511..b8563a7 100644
  an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
                                               UserDictionary* user_dict) {
    const auto& syllable_graph = syllabifier_->syllable_graph();
-@@ -851,10 +1440,11 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
+@@ -851,10 +1461,11 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
    auto* inc = translator_->incremental_state();
    size_t old_interpreted = 0;
    const bool use_incremental =
@@ -2977,7 +3061,7 @@ index 99e4511..b8563a7 100644
  
    if (use_incremental) {
      DLOG(INFO) << "T9 incremental MakeSentence: " << old_interpreted
-@@ -883,6 +1473,7 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
+@@ -883,6 +1494,7 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
    }
  
    WordGraph graph = PrepareForMakingSentence(dict, user_dict);
@@ -2985,7 +3069,7 @@ index 99e4511..b8563a7 100644
    an<Sentence> sentence;
    if (inc) {
      if (cacheable) {
-@@ -915,10 +1506,11 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
+@@ -915,10 +1527,11 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
    auto* inc = translator_->incremental_state();
    size_t old_interpreted = 0;
    const bool use_incremental =
@@ -2999,7 +3083,7 @@ index 99e4511..b8563a7 100644
  
    if (use_incremental) {
      // 多句 Poet 算法的 states 列表没有增量接口，但它在缓存图上整体
-@@ -928,7 +1520,8 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
+@@ -928,7 +1541,8 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
      T9IncTimer t("stage-inc-poet-multi");
      auto sentences = poet_->MakeSentences(
          inc->graph, interpreted, preceding,
@@ -3009,7 +3093,7 @@ index 99e4511..b8563a7 100644
      for (auto& sentence : sentences) {
        sentence->Offset(start_);
        sentence->set_syllabifier(syllabifier_);
-@@ -939,6 +1532,7 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
+@@ -939,6 +1553,7 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
    }
  
    WordGraph graph = PrepareForMakingSentence(dict, user_dict);
@@ -3017,7 +3101,7 @@ index 99e4511..b8563a7 100644
    if (inc && cacheable)
      inc->graph = std::move(graph);
    if (inc)
-@@ -946,7 +1540,13 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
+@@ -946,7 +1561,13 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
                                     cacheable);
    auto sentences = poet_->MakeSentences(
        inc && cacheable ? inc->graph : graph, interpreted, preceding,
@@ -3032,7 +3116,7 @@ index 99e4511..b8563a7 100644
    for (auto& sentence : sentences) {
      sentence->Offset(start_);
      sentence->set_syllabifier(syllabifier_);
-@@ -1011,24 +1611,42 @@ WordGraph ScriptTranslation::PrepareForMakingSentence(
+@@ -1011,24 +1632,42 @@ WordGraph ScriptTranslation::PrepareForMakingSentence(
      UserDictionary* user_dict) {
    const int kMaxSyllablesForUserPhraseQuery = 5;
    const auto& syllable_graph = syllabifier_->syllable_graph();

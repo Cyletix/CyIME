@@ -94,9 +94,13 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("idleSpellingEdits", 3)
     inputs.property("candidatePolicy", 4)
     inputs.property("learnedMixedWords", 2)
+    inputs.property("sentenceMixedWords", 3)
     // 中英混合词按公开语料词频排（2026-11-11「都按权重算」），不再全是 1000。
     val mixedWordCounts = file("data/cyime_mixed_word_counts.tsv")
     inputs.file(mixedWordCounts)
+    // cn_en 没有的混合词（AI漫剧、PPT、PDF），2026-11-13。
+    val extraMixedWords = file("data/cyime_mixed_words.tsv")
+    inputs.file(extraMixedWords)
     inputs.property("particleShortcuts", 2)
     inputs.property("pinyinFinalNe", 1)
     inputs.property("pinyin26WordModel", 5)
@@ -407,10 +411,22 @@ val prepareChineseDictionaries by tasks.registering {
             }
         }
         check((mixedWeights["B站"] ?: 0) > 1000) { "Mixed word counts missing or rescaled" }
-        fun mixedWeight(word: String) = mixedWeights[word] ?: 1L
+        // Words upstream's cn_en lacks (data/cyime_mixed_words.tsv: text, code as in cn_en.txt, least weight). The
+        // public corpora predate them or seldom talk office software (AI漫剧 0 times in LCCC), so a floor as in
+        // cyime_domain_terms.tsv keeps them typable; a larger corpus count still wins.
+        val extraMixed: List<List<String>> = extraMixedWords.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split('\t') }
+        check(extraMixed.all { it.size == 3 && it[1].all { c -> c in 'a'..'z' } && it[2].toLong() > 0 }) {
+            "Bad row in data/cyime_mixed_words.tsv"
+        }
+        val mixedFloors = extraMixed.associate { it[0] to it[2].toLong() }
+        fun mixedWeight(word: String) = maxOf(mixedWeights[word] ?: 1L, mixedFloors[word] ?: 1L)
+        // cn_en.txt's lines, then the words it lacks, as "text<TAB>code".
+        fun mixedSourceLines(): List<String> =
+            File(root, "en_dicts/cn_en.txt").readLines() + extraMixed.map { it[0] + "\t" + it[1] }
         // Mixed Latin + Chinese words (B站, T恤, A股, 卡拉OK) from upstream's 26-key cn_en table (letters + full pinyin),
         // encoded the same way, so 九键 and 14 键 type them like English words and learn them the same way.
-        File(root, "en_dicts/cn_en.txt").useLines { lines ->
+        mixedSourceLines().let { lines ->
             lines.forEach { line ->
                 if (line.startsWith("#")) return@forEach
                 val fields = line.split('\t')
@@ -429,7 +445,7 @@ val prepareChineseDictionaries by tasks.registering {
         // the cyime_cn_en table with a user dictionary, compiled by its own dependency schema like cyime_t9_english;
         // weights from data/cyime_mixed_word_counts.tsv (above); a picked word gains weight like any learned word.
         val cnEnWords = linkedSetOf<String>()
-        File(root, "en_dicts/cn_en.txt").useLines { lines ->
+        mixedSourceLines().let { lines ->
             lines.forEach { line ->
                 if (line.startsWith("#")) return@forEach
                 val fields = line.split('\t')
@@ -439,6 +455,69 @@ val prepareChineseDictionaries by tasks.registering {
             }
         }
         check(cnEnWords.any { it.startsWith("B站\tbzhan\t") }) { "Upstream cn_en table changed" }
+        // Mixed words inside a sentence (2026-11-13 group chat: 「B站上面的视频很好看」「我C盘红了」): the cn_en table
+        // matches only on its own, so the sentence maker never had B站 and read bzhan… as 不站…. Its acronym words
+        // (capital letters and Chinese: B站, X光片, AD钙奶) also go into the pinyin dictionary with the same weights.
+        // Capitals join the syllable after them (B站 = Bzhan, AD钙奶 = ADgai nai), or the one before when they end the
+        // word; such a syllable is typed as its lowercase letters, spelled as an abbreviation (rime_ice speller
+        // below): input of initials keeps the same syllable graph (bzd, xgp), and B站 against 霸占 for bzhan is
+        // decided by weight. librime's stray-initial check counts such a long abbreviation as typed in full.
+        val hanReadings = HashMap<Int, MutableSet<String>>()
+        run {
+            var body = false
+            File(root, "cn_dicts/8105.dict.yaml").forEachLine { line ->
+                if (line.trim() == "...") { body = true; return@forEachLine }
+                val f = line.split('\t')
+                if (body && f.size >= 2 && f[0].codePointCount(0, f[0].length) == 1 && f[1].matches(Regex("[a-z]+")))
+                    hanReadings.getOrPut(f[0].codePointAt(0)) { linkedSetOf() }.add(f[1])
+            }
+        }
+        fun capitalSyllables(text: String, code: String): String? {
+            val points = text.codePoints().toArray()
+            // Each character's piece of the code: a capital its own letter, a Chinese character one of its readings.
+            fun walk(i: Int, at: Int): List<String>? {
+                if (i == points.size) return if (at == code.length) emptyList() else null
+                val c = points[i]
+                if (c in 'A'.code..'Z'.code) {
+                    if (at >= code.length || code[at] != c.toChar().lowercaseChar()) return null
+                    return walk(i + 1, at + 1)?.let { listOf(c.toChar().toString()) + it }
+                }
+                for (s in hanReadings[c].orEmpty())
+                    if (code.startsWith(s, at)) walk(i + 1, at + s.length)?.let { return listOf(s) + it }
+                return null
+            }
+            val pieces = walk(0, 0) ?: return null
+            val syllables = mutableListOf<String>()
+            var capitals = ""
+            for (piece in pieces) {
+                if (piece[0] in 'A'..'Z') capitals += piece
+                else { syllables += capitals + piece; capitals = "" }
+            }
+            if (capitals.isNotEmpty()) { if (syllables.isEmpty()) syllables += capitals else syllables[syllables.lastIndex] += capitals }
+            return syllables.joinToString(" ")
+        }
+        val sentenceMixedWords = cnEnWords.mapNotNull { row ->
+            val (text, code, weight) = row.split('\t')
+            // Capitals and Chinese (B站), or an acronym of capitals only (PPT), which no pinyin spells.
+            val acronym = text.length >= 2 && text.all { it in 'A'..'Z' }
+            if (code != code.lowercase(java.util.Locale.ROOT) || text.none { it in 'A'..'Z' } ||
+                (!acronym && text.none { Character.isIdeographic(it.code) })) return@mapNotNull null
+            // Only words that start with capitals, each capital at the start of its syllable (B站 = Bzhan, AI漫剧 =
+            // AIman ju): nine keys share this dictionary, and such a syllable has no spelling in digits or a digit
+            // prefix, so nine-key lookups never reach it. 维生素C (wei sheng suC) or 阿Q精神 (a Qjing shen) would
+            // hang under wei/a, and 维C (weiC, nine keys 934C) completes 934: both lengthened every nine-key lookup
+            // (table_edges +0.69%). They stay whole words in cyime_cn_en, typed on their own as before.
+            capitalSyllables(text, code)?.takeIf { s ->
+                s[0] in 'A'..'Z' && s.split(' ').all { syllable -> syllable[0] in 'A'..'Z' || syllable.none { it in 'A'..'Z' } }
+            }?.let { "$text\t$it\t$weight" }
+        }.distinct()
+        check(sentenceMixedWords.any { it.startsWith("B站\tBzhan\t") } && sentenceMixedWords.size > 150) {
+            "Mixed words for sentences missing"
+        }
+        File(root, "cyime_mixed.dict.yaml").writeText(
+            "# Generated from bundled rime-ice en_dicts/cn_en.txt; licenses retained alongside sources.\n" +
+            "---\nname: cyime_mixed\nversion: \"1\"\nsort: by_weight\n...\n" +
+            sentenceMixedWords.joinToString("\n", postfix = "\n"))
         File(root, "cyime_cn_en.dict.yaml").writeText(
             "# Generated from bundled rime-ice en_dicts/cn_en.txt; licenses retained alongside sources.\n" +
             "---\nname: cyime_cn_en\nversion: \"1\"\nsort: by_weight\n...\n" +
@@ -580,7 +659,9 @@ val prepareChineseDictionaries by tasks.registering {
             // ü typed as u (nusheng 女生, luxing 旅行, meinu 美女): nü and lü also read nu and lu as a fuzzy spelling
             // at half weight, so 路 努 keep lu and nu where they make the word (lushang 路上, nuli 努力). nu alone now
             // shows 女 first (was 怒). 2026-11-01 host bench: ü-as-u 1/12 -> 11/12, nothing else changed.
-            .replace(vuRule, vuRule + "    - fuzz/^([nl])v\$/\$1u/\n")
+            .replace(vuRule, vuRule + "    - fuzz/^([nl])v\$/\$1u/\n" +
+                // A mixed word's syllable (B站 = Bzhan, cyime_mixed above) is typed in lowercase.
+                "    - abbrev/^(.*[A-Z].*)\$/\\L\$1/\n")
             .also { check(it.split(vuRule).size == 2) { "Upstream v/u spelling rules changed" } }
             .let { withUserPhraseForms(withGreekLetters(withSymbolNames(withDatetimeHints(it)))) } +
             "\ncyime:\n  candidate_policy: true\n" +
@@ -852,7 +933,7 @@ val prepareChineseDictionaries by tasks.registering {
         val iceDict = File(root, "rime_ice.dict.yaml")
         val othersImport = "  - cn_dicts/others   # 一些杂项\n"
         check(iceDict.readText().split(othersImport).size == 2) { "Upstream rime_ice import list changed" }
-        iceDict.writeText(iceDict.readText().replace(othersImport, othersImport + "  - cyime_terms\n  - cyime_di\n"))
+        iceDict.writeText(iceDict.readText().replace(othersImport, othersImport + "  - cyime_terms\n  - cyime_di\n  - cyime_mixed\n"))
         // Minority readings for the joint decoder (t9/reading_table), same rule as tools/ime_lab/reading_table.py:
         // ln(count / count of the text's main reading) when below -1. The word model scores words, not readings,
         // so 的 (also di, as in 目的) took momodi from 默默地. The first imported table wins, as in Rime;
