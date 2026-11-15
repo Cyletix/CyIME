@@ -1,0 +1,17 @@
+id: com.cyime.plugin.syncclipboard
+name: SyncClipboard 剪贴板同步
+icon: "📋"
+description: 经 SyncClipboard 服务端（Docker 或 WebDAV 网盘）与电脑等设备双向同步文本；需要 SyncClipboard 3.1.1 及以上。
+version: 0.1.0
+type: clipboard_sync
+activation: single
+entry: main.lua
+minHostVersion: 1.3.20
+capabilities:
+  clipboard_sync:
+    protocols: [syncclipboard-v3]
+    foreground_poll_interval_ms: 2000
+    max_text_bytes: 1048576
+network:
+  hosts: []
+  allowCustomHosts: true
