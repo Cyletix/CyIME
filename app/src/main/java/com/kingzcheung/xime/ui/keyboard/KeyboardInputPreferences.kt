@@ -56,7 +56,7 @@ internal fun normalizeCandidateDragPercent(value: Float): Float =
 
 /** 手写公式上屏时两边加的 LaTeX 标记。 */
 enum class FormulaDelimiter(val label: String, val open: String, val close: String) {
-    NONE("不加", "", ""), DOLLAR("\$…\$", "\$", "\$"), DISPLAY("\\[ … \\]", "\\[", "\\]");
+    NONE("不加", "", ""), DOLLAR("\\$…\\$", "\\$", "\\$"), DISPLAY("\\\\[ … \\\\]", "\\\\[", "\\\\]");
     fun wrap(latex: String): String = open + latex + close
 }
 
@@ -70,7 +70,7 @@ enum class CursorGestureMode(val label: String) {
 }
 
 data class KeyboardInputPreferences(
-    /** Only key arrangement; never changes language, scheme, theme or symbol pages. */
+    /** 仅控制键盘表面布局，不改变语言、方案、主题或符号页。 */
     val layoutStyle: KeyboardLayoutStyle = KeyboardLayoutStyle.DEFAULT,
     val spaceHold: SpaceHoldAction = SpaceHoldAction.CURSOR,
     val cursorStepDp: Float = 10f,
@@ -89,6 +89,8 @@ data class KeyboardInputPreferences(
     val fixedSymbols: String = "",
     val keyGlowEnabled: Boolean = false,
     val keyAnimationEnabled: Boolean = false,
+    /** 键缝动效（默认关）；各项细调见 [com.kingzcheung.xime.settings.KeyGapLightConfig]。 */
+    val gapLight: com.kingzcheung.xime.settings.KeyGapLightConfig = com.kingzcheung.xime.settings.KeyGapLightConfig(),
     val handwritingPauseSeconds: Float = 0.5f,
     /** 手写边写边识别：每写完一笔就在后台先认，停顿一到直接出候选（默认关，见 HandwritingInputSession）。 */
     val handwritingRecognizeWhileWriting: Boolean = false,
@@ -217,6 +219,12 @@ data class KeyboardInputPreferences(
     val glidePreview: Boolean = false,
     /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
     val letterLongPressMenu: Boolean = false,
+    /**
+     * 上下滑（和「长按输入」的长按）输入角标符号；默认开，和以前一样（用户 11-14：要能真的关掉）。
+     * 和「上方/下方角标提示」各管各的：提示只管键上画不画。关掉时直接上屏的角标都不出，
+     * 用户给字母设的上下滑动作（撤销、复制这类）不算角标，照旧。
+     */
+    val cornerSymbolInput: Boolean = true,
     /** 九键拂动选字母（左上右下），数字改为长按。 */
     val t9FlickLetters: Boolean = false,
     val t9GlideTyping: Boolean = false,
@@ -265,10 +273,13 @@ data class KeyboardInputPreferences(
      */
     val glideHoldMs: Long get() = if (CornerInputChoice.of(this) == CornerInputChoice.LONG_PRESS)
         minOf(com.kingzcheung.xime.glide.GlideTracker.HOLD_MS, symbolLongPressMs) else com.kingzcheung.xime.glide.GlideTracker.HOLD_MS
+
     companion object {
-        /** 中英混输开关；输入法每次按字母键读它（ImeKeyRouter），改了下一键就生效。 */
         const val LAYOUT_STYLE_KEY = "keyboard_layout_style"
+        /** 兼容旧版仅有百度布局布尔开关的存储。 */
         const val BAIDU_TRADITIONAL_LAYOUT_KEY = "baidu_traditional_layout"
+
+        /** 中英混输开关；输入法每次按字母键读它（ImeKeyRouter），改了下一键就生效。 */
         const val MIXED_INPUT_KEY = "mixed_input"
         /** 生僻字开关；同繁体输出，输入法按字母、数字键前读它（ImeKeyRouter）。 */
         const val RARE_CHARACTERS_KEY = "rare_characters"
@@ -295,6 +306,8 @@ data class KeyboardInputPreferences(
         const val DELETE_CHINESE_GLIDE_CHARACTER_KEY = "delete_chinese_glide_word"
         /** 滑行实时预览；新键，读不到就是关。 */
         const val GLIDE_PREVIEW_KEY = "glide_preview"
+        /** 新键（11-14），没存过就是开：老用户升级后行为不变。 */
+        const val CORNER_SYMBOL_INPUT_KEY = "corner_symbol_input"
         /** 双拼键位提示开关；设置在「双拼方案」页。 */
         const val DOUBLE_PINYIN_KEY_HINTS_KEY = "double_pinyin_key_hints"
         /** 双拼键位提示和角标一起显示；设置在「双拼方案」页。新键，读不到就是关。 */
@@ -332,21 +345,107 @@ data class KeyboardInputPreferences(
         /** 角标不透明度；新键，读不到就是 1（原样）。 */
         const val CORNER_HINT_OPACITY_KEY = "corner_hint_opacity"
         const val HIDE_FUNCTION_KEY_HINTS_KEY = "hide_function_key_hints"
+
         internal val watchedKeys: Set<String> by lazy {
-            setOf(LAYOUT_STYLE_KEY, BAIDU_TRADITIONAL_LAYOUT_KEY, KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
-                SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
+            setOf(
+                LAYOUT_STYLE_KEY,
+                BAIDU_TRADITIONAL_LAYOUT_KEY,
+                CORNER_SYMBOL_INPUT_KEY,
+                KeyEffectPreferences.GLOW,
+                KeyEffectPreferences.ANIMATION,
+                SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
+                SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW,
+                SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW,
+                SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY,
-                com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, DELETE_CHINESE_GLIDE_CHARACTER_KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY, CYLM_LONG_ALTERNATIVE_KEY,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "symbol_long_press_seconds", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
-                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent",
-                SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2", "bottom_punctuation_swipe_up_v3", com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS,
-                DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
-                SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
+                com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE,
+                com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD,
+                SettingsPreferences.KEY_SPLIT_RIGHT_G,
+                SettingsPreferences.KEY_FILL_KEYBOARD_BLANK,
+                SettingsPreferences.KEY_WIDE_KEYS,
+                SettingsPreferences.KEY_EVEN_MERGED_KEYS,
+                SettingsPreferences.KEY_NUMBER_ROW,
+                SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT,
+                SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
+                CHINESE_GLIDE_KEY,
+                DELETE_CHINESE_GLIDE_CHARACTER_KEY,
+                GLIDE_PREVIEW_KEY,
+                ENGLISH_AUTO_SPACE_KEY,
+                ENGLISH_PUNCTUATION_SPACE_KEY,
+                EMAIL_SUFFIXES_KEY,
+                ADDRESS_FIELDS_ENGLISH_KEY,
+                SYMBOL_NAMES_KEY,
+                GREEK_LETTERS_KEY,
+                CYLM_LONG_ALTERNATIVE_KEY,
+                "space_hold_action",
+                "cursor_gesture_mode",
+                "cursor_hold_seconds",
+                "neighbor_correction",
+                com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY,
+                MIXED_INPUT_KEY,
+                RARE_CHARACTERS_KEY,
+                TRADITIONAL_OUTPUT_KEY,
+                CANDIDATE_EMOJI_KEY,
+                DATETIME_CANDIDATES_KEY,
+                "symbol_input_mode",
+                "symbol_long_press_seconds",
+                "cursor_step_dp",
+                "cursor_swipe_lines",
+                "cursor_step_haptic",
+                "cursor_step_sound",
+                "key_text_scale",
+                CORNER_HINT_OPACITY_KEY,
+                HIDE_FUNCTION_KEY_HINTS_KEY,
+                UPPERCASE_KEY_LABELS_KEY,
+                CHINESE_UPPERCASE_KEY_LABELS_KEY,
+                "fixed_symbols",
+                "fourteen_letter_swipe",
+                "fourteen_letter_swipe_dp",
+                "reverse_symbol_swipe",
+                CLEAR_ALL_WHILE_COMPOSING_KEY,
+                CLEAR_BEFORE_CURSOR_ONLY_KEY,
+                SWIPE_DISTANCE_DELETE_KEY,
+                com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY,
+                REVERSE_DELETE_SWIPE_KEY,
+                CLEAR_SWIPE_PERCENT_KEY,
+                JAPANESE_LONG_VOWEL_KEY,
+                "syllable_split_key",
+                "shift_syllable_split",
+                "kana_direction_hints",
+                "flick_direction_disc",
+                "flick_direction_disc_v2",
+                "glide_typing",
+                "glide_typing_v2",
+                "letter_long_press_menu",
+                "t9_flick_letters",
+                "t9_glide_typing",
+                "language_key_hold_seconds",
+                "language_key_hold_seconds_v2",
+                LANGUAGE_KEY_IME_PICKER_KEY,
+                "symbol_key_hold_seconds",
+                "t9_candidate_drag_percent",
+                SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS,
+                "qwerty_stagger_mode",
+                "qwerty_stagger_custom",
+                "qwerty_comma_key",
+                "qwerty_period_key",
+                "qwerty_period_key_v2",
+                "bottom_punctuation_swipe_up_v3",
+                com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS,
+                DOUBLE_PINYIN_KEY_HINTS_KEY,
+                DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY,
+                DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
+                SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED,
+                SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
-                BOTTOM_LIFT_CURSOR_KEY, VOICE_SWIPE_CANCEL_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
-                "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
+                BOTTOM_LIFT_CURSOR_KEY,
+                VOICE_SWIPE_CANCEL_KEY,
+                HANDWRITING_RECOGNIZE_EARLY_KEY,
+                "handwriting_pause_seconds",
+                "handwriting_pause_seconds_v2",
+                "handwriting_formula_delimiter",
+            ) + FrostedGlassPreferences.keys + com.kingzcheung.xime.settings.KeyGapLightPreferences.keys
         }
 
         fun read(context: Context, isDark: Boolean = FrostedGlassPreferences.isDark(context)): KeyboardInputPreferences {
@@ -362,13 +461,18 @@ data class KeyboardInputPreferences(
             val numberRow = SettingsPreferences.isNumberRowEnabled(context)
             // 开关一变，26 键第一排的角标跟着换（见 QwertySwipeSymbols.numberRowUp）；键盘随后按新设置重画。
             com.kingzcheung.xime.settings.KeysConfigHelper.numberRowCorners = numberRow
+
             return KeyboardInputPreferences(
                 layoutStyle = prefs.getString(LAYOUT_STYLE_KEY, null)?.let { name ->
                     KeyboardLayoutStyle.entries.firstOrNull { it.name == name }
-                } ?: if (prefs.getBoolean(BAIDU_TRADITIONAL_LAYOUT_KEY, false)) KeyboardLayoutStyle.BAIDU_TRADITIONAL
-                    else KeyboardLayoutStyle.DEFAULT,
+                } ?: if (prefs.getBoolean(BAIDU_TRADITIONAL_LAYOUT_KEY, false)) {
+                    KeyboardLayoutStyle.BAIDU_TRADITIONAL
+                } else {
+                    KeyboardLayoutStyle.DEFAULT
+                },
                 keyGlowEnabled = KeyEffectPreferences.glowEnabled(prefs),
                 keyAnimationEnabled = KeyEffectPreferences.animationEnabled(prefs),
+                gapLight = com.kingzcheung.xime.settings.KeyGapLightPreferences.read(prefs),
                 // 过透时自动加深到在白底和黑底上都看得清键面文字。
                 frostedGlass = FrostedGlassPreferences.read(context, isDark)
                     .legibleForTheme(SettingsPreferences.getKeyboardTheme(context), isDark),
@@ -461,6 +565,7 @@ data class KeyboardInputPreferences(
                 deleteChineseGlideCharacter = prefs.getBoolean(DELETE_CHINESE_GLIDE_CHARACTER_KEY, false),
                 glidePreview = prefs.getBoolean(GLIDE_PREVIEW_KEY, false),
                 letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
+                cornerSymbolInput = prefs.getBoolean(CORNER_SYMBOL_INPUT_KEY, true),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
                 t9GlideTyping = prefs.getBoolean("t9_glide_typing", false),
                 keyTextScale = prefs.getFloat("key_text_scale", DEFAULT_KEY_TEXT_SCALE)
@@ -524,6 +629,7 @@ data class KeyboardInputPreferences(
             .putBoolean("flick_direction_disc", flickDirectionDisc)
             .putBoolean("glide_typing_v2", glideTyping)
             .putBoolean("letter_long_press_menu", letterLongPressMenu)
+            .putBoolean(CORNER_SYMBOL_INPUT_KEY, cornerSymbolInput)
             .putBoolean("glide_typing", glideTyping)
             .putBoolean(CHINESE_GLIDE_KEY, chineseGlideTyping)
             .putBoolean(DELETE_CHINESE_GLIDE_CHARACTER_KEY, deleteChineseGlideCharacter)
@@ -555,7 +661,8 @@ data class KeyboardInputPreferences(
             .putBoolean("syllable_split_key", syllableSplitKey)
             .putBoolean("shift_syllable_split", shiftSyllableSplit)
             .putString(JAPANESE_LONG_VOWEL_KEY, japaneseLongVowelKey.name)
-            .putBoolean("qwerty_period_key", qwertyPeriodKey).apply()
+            .putBoolean("qwerty_period_key", qwertyPeriodKey)
+            .apply()
     }
 
     /** 某个固定栏的自定义内容；该栏未单独设置时沿用旧的共用列表，都没有则为 null（用默认）。 */
