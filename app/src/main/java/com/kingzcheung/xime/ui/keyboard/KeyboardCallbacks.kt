@@ -23,6 +23,7 @@ data class KeyboardCallbacks(
     val onGlidePreviewCode: ((String, Long, Int) -> Unit)? = null,
     val onGlidePreviewEnd: (() -> Unit)? = null,
     val onGlidePreviewHold: (() -> Long?)? = null,
+    val onEnglishGlidePreviewHold: (() -> Long?)? = null,
     val onGlidePreviewFinish: ((Long, Boolean) -> Unit)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },
     val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },

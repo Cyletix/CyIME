@@ -480,7 +480,7 @@ fun KeyboardLayout(
     }
     val onGlideTrace: (FloatArray, FloatArray) -> Unit = trace@{ xs, ys ->
         glidePreview.stop()
-        val heldPreview = if (chineseGlide) callbacks.onGlidePreviewHold?.invoke() else null
+        val heldPreview = if (chineseGlide) callbacks.onGlidePreviewHold?.invoke() else callbacks.onEnglishGlidePreviewHold?.invoke()
         if (heldPreview == null) callbacks.onGlidePreviewEnd?.invoke()
         val keys = geometry.snapshot()
         if (keys.size < 26) { heldPreview?.let { callbacks.onGlidePreviewFinish?.invoke(it, false) }; return@trace }
@@ -520,6 +520,7 @@ fun KeyboardLayout(
             val case: (String) -> String = { word -> com.kingzcheung.xime.glide.glideCased(word, shift.isShifted,
                 shift == com.kingzcheung.xime.viewmodel.ShiftMode.CAPS) }
             kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideWord?.invoke(candidates, case) }
+            handedOff = heldPreview != null && callbacks.onGlideWord != null
             } finally {
                 if (!handedOff) heldPreview?.let { callbacks.onGlidePreviewFinish?.invoke(it, false) }
             }

@@ -4774,10 +4774,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     internal fun showGlideEnglishPreview(preview: com.kingzcheung.xime.ui.keyboard.GlideEnglishPreview, session: Long) {
         if (session != uiState.value.inputSessionId) return
+        if (englishGlidePreviewHeld) { glidePreviewSequence++; englishGlidePreviewHeld = false }
         glideEnglishPreview.value = preview
         glidePreviewRouter.show(preview.text, session)
     }
     @Volatile private var glidePreviewSequence = 0L
+    private var englishGlidePreviewHeld = false
     private var glidePreviewGesture = -1
     private var glidePreviewRevision = 0L
     internal fun showGlidePreviewCode(code: String, session: Long, gesture: Int) {
@@ -4819,6 +4821,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         glidePreviewGesture = -1
         glideRimePreview.value = null
         glideEnglishPreview.value = null
+        englishGlidePreviewHeld = false
         glidePreviewRouter.end()
     }
 
@@ -4827,12 +4830,28 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return token.takeIf { glideRimePreview.value != null }
     }
 
+    internal fun holdEnglishGlidePreview(): Long? {
+        if (glideEnglishPreview.value == null) return null
+        val token = ++glidePreviewSequence
+        englishGlidePreviewHeld = true
+        return token
+    }
+
+    internal fun heldEnglishGlidePreview(): Long? =
+        glidePreviewSequence.takeIf { englishGlidePreviewHeld && glideEnglishPreview.value != null }
+
+    internal fun clearHeldEnglishGlideInput(token: Long) {
+        if (englishGlidePreviewHeld && token == glidePreviewSequence) glidePreviewRouter.end()
+    }
+
     internal fun isGlidePreviewHeld(token: Long): Boolean = token == glidePreviewSequence
 
     internal fun finishGlidePreview(token: Long, keepComposition: Boolean) {
         if (token != glidePreviewSequence) return
         if (keepComposition) glideInputPreview.release() else glideInputPreview.end()
         glideRimePreview.value = null
+        glideEnglishPreview.value = null
+        englishGlidePreviewHeld = false
         glidePreviewGesture = -1
         glidePreviewSequence++
     }

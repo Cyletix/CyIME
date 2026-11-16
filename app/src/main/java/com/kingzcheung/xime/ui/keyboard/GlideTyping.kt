@@ -56,7 +56,7 @@ internal class GlidePreviewJob {
     fun stop() { job?.cancel(); job = null; points = null }
 }
 
-data class GlideEnglishPreview(val text: String, val candidates: List<String>)
+data class GlideEnglishPreview(val text: String, val candidates: List<String>, val sentenceStart: Boolean? = null)
 
 /** 实时预览两次识别之间至少隔这么久；手机上一次中文识别约十几到三十毫秒。 */
 internal const val GLIDE_PREVIEW_INTERVAL_MS = 60L

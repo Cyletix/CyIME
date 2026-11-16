@@ -722,28 +722,45 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 上屏后记为当前英文词，其余候选沿用英文候选的回删替换；整对候选连上一个词一起替换。
      */
     internal fun commitGlideWord(candidates: List<com.kingzcheung.xime.glide.GlideCandidate>, case: (String) -> String) {
-        if (candidates.isEmpty() || hasPendingCandidateCommit) return
+        val previewToken = service.heldEnglishGlidePreview()
+        if (candidates.isEmpty() || hasPendingCandidateCommit) {
+            previewToken?.let { service.finishGlidePreview(it, false) }
+            return
+        }
         postRimeJob {
             withEditor {
+                val connection = service.editorConnection()
+                val batched = previewToken != null && runCatching { connection?.beginBatchEdit() == true }.getOrDefault(false)
+                try {
                 if (!service.uiState.value.isAsciiMode) return@withEditor
                 service.predictionManager.invalidatePendingPredictions()
                 val state = service.candidateState.value
-                val textBefore = service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+                val held = previewToken?.takeIf { service.isGlidePreviewHeld(it) }
+                val sentenceStart = service.glideEnglishPreview.value?.sentenceStart
+                val previewContext = if (held != null && sentenceStart != null)
+                    service.glideInputPreview.textBeforePreview(64) else null
+                if (previewContext == null) held?.let { service.clearHeldEnglishGlideInput(it) }
+                val textBefore = previewContext ?: service.editorConnection()?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
                 val replaceSupported = service.supportsEnglishCandidateReplace()
                 val previous = previousGlide(state, textBefore, replaceSupported)
-                val wordCase = glideCase(case, previous == null && capitalizeEnglishHere())
+                val wordCase = glideCase(case, previous == null && (if (previewContext != null) sentenceStart == true else capitalizeEnglishHere()))
                 fun planFor(previous: com.kingzcheung.xime.glide.PreviousGlide?) = com.kingzcheung.xime.glide.planGlideCommit(
                     candidates, wordCase, previous,
                     com.kingzcheung.xime.glide.glideContextWord(if (previous != null) textBefore.dropLast(previous.text.length) else textBefore),
                     com.kingzcheung.xime.glide.GlideLexicon.loadedBigrams(), com.kingzcheung.xime.glide.GlideLexicon.loadedContractions())
                 var plan = planFor(previous)
+                // Replacing an earlier word requires the temporary composition to be
+                // removed first; the ordinary case can commit straight over it.
+                val commitOverPreview = previewContext != null && plan.replacePrevious == null
+                if (previewContext != null && !commitOverPreview) held?.let { service.clearHeldEnglishGlideInput(it) }
                 val head = if (previous == null) null else plan.replacePrevious?.let { replacement ->
                     if (service.replaceBeforeCursor(previous.text, replacement)) replacement else null
                 } ?: previous?.text
                 // 换上一个词没成功（宿主拒绝）就只选这一笔，不留整对候选。
                 if (previous != null && plan.replacePrevious != null && head == previous.text) plan = planFor(null)
                 val word = plan.word
-                val before = service.editorConnection()?.getTextBeforeCursor(1, 0)?.lastOrNull()
+                val before = if (commitOverPreview) textBefore.lastOrNull()
+                    else service.editorConnection()?.getTextBeforeCursor(1, 0)?.lastOrNull()
                 val text = com.kingzcheung.xime.glide.glideCommitText(word, before)
                 if (!service.commitTextAndPredict(text, isPaste = false, allowPrediction = false).accepted) return@withEditor
                 lastGlide = com.kingzcheung.xime.glide.PreviousGlide(word, candidates.take(com.kingzcheung.xime.glide.PAIR_TOP), wordCase)
@@ -755,6 +772,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     englishReplaceSupported = replaceSupported,
                     hasNextPage = false, hasPrevPage = false, isShowingRecentClipboard = false,
                 )
+                } finally {
+                    previewToken?.let { service.finishGlidePreview(it, false) }
+                    if (batched) runCatching { connection?.endBatchEdit() }
+                }
             }
         }
     }
@@ -782,7 +803,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             com.kingzcheung.xime.ui.keyboard.GlideEnglishPreview(
                 if (plan.replacePrevious != null) plan.preview
                 else com.kingzcheung.xime.glide.glideCommitText(plan.word, textBefore.lastOrNull()),
-                listOf(plan.word) + plan.alternatives)
+                listOf(plan.word) + plan.alternatives, sentenceStart)
         }
     }
 
