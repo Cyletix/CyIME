@@ -370,7 +370,7 @@ internal fun ClipboardBoardView(
     val gridState = key(tab.key, searchQuery, listLayout) { rememberLazyStaggeredGridState() }
     // Near the end of what is loaded, read the next page of older history (again after each page
     // arrives, so a sparse category keeps filling until the whole history is read).
-    val nearEnd by remember { derivedStateOf {
+    val nearEnd by remember(gridState) { derivedStateOf {
         val info = gridState.layoutInfo
         info.totalItemsCount > 0 && (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - 30
     } }
