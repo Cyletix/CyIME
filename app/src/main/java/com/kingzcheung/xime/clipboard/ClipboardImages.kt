@@ -61,6 +61,9 @@ class ClipboardImages private constructor(private val context: Context) {
     val preview = previewState.preview
     private val _recentScreenshotsEnabled = MutableStateFlow(false)
     val photoAccess = _recentScreenshotsEnabled.asStateFlow()
+    // Feed source configuration is observable even when the image list stays unchanged.
+    private val _galleryPhotosEnabled = MutableStateFlow(prefs.getBoolean(KEY_RECENT_PHOTOS_ALL, false))
+    val galleryPhotosEnabled = _galleryPhotosEnabled.asStateFlow()
     // 最近截图默认开（11-02：用户找不到截图）；还没给相册权限时剪贴板里出一行「允许」，关掉或拒绝权限后不再出。
     private val _screenshotsNeedAccess = MutableStateFlow(false)
     val screenshotsNeedAccess = _screenshotsNeedAccess.asStateFlow()
@@ -157,6 +160,7 @@ class ClipboardImages private constructor(private val context: Context) {
 
     fun includeRecentPhotos(on: Boolean) {
         prefs.edit().putBoolean(KEY_RECENT_PHOTOS_ALL, on).apply()
+        _galleryPhotosEnabled.value = on
         refresh()
     }
 
