@@ -82,10 +82,12 @@ internal fun ConnectedClipboardBoard(
     val context = LocalContext.current
     val store = remember(context) { ClipboardImages.getInstance(context) }
     val prefs = remember(context) { context.getSharedPreferences("clipboard_board", Context.MODE_PRIVATE) }
-    val images by store.images.collectAsState()
-    val galleryPhotosEnabled by store.galleryPhotosEnabled.collectAsState()
+    // Image items and their source mode must reach Compose atomically.
+    val imageBoard by store.boardSnapshot.collectAsState()
+    val images = imageBoard.images
+    val galleryPhotosEnabled = imageBoard.galleryPhotosEnabled
+    val photoAccess = imageBoard.screenshotsEnabled
     val failure by store.pasteFailure.collectAsState()
-    val photoAccess by store.photoAccess.collectAsState()
     val screenshotsNeedAccess by store.screenshotsNeedAccess.collectAsState()
     var storedPins by remember { mutableStateOf(prefs.getStringSet("pins", emptySet()).orEmpty().toSet()) }
     var pendingTextPins by remember { mutableStateOf(emptyMap<Long, Boolean>()) }
@@ -200,7 +202,7 @@ internal fun ConnectedClipboardBoard(
         },
         groups = groups, initialTabKey = returnTab,
         // Source changes must not reuse grid animation state from the text-only board.
-        galleryPhotosEnabled = photoAccess && galleryPhotosEnabled,
+        galleryPhotosEnabled = galleryPhotosEnabled,
         onAssignGroup = groupStore::assign,
         onManageGroups = { record ->
             groupStore.setKeyboardEntry(record)
