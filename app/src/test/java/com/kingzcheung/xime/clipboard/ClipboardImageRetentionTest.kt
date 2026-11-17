@@ -117,6 +117,17 @@ class ClipboardImageRetentionTest {
         assertEquals((14..limit + 13).reversed().map { image(it) }, published)
     }
 
+    @Test fun failedRefreshCannotBringBackDisabledGalleryPhotos() {
+        val screenshot = image(10).copy(label = "截图")
+        val gallery = image(11).copy(label = ScreenshotImageSource.PHOTO_LABEL)
+        val pinnedGallery = image(12).copy(label = ScreenshotImageSource.PHOTO_LABEL)
+        val pins = setOf("image:${pinnedGallery.uri}")
+        val actual = clipboardMediaAfterRefreshFailure(
+            listOf(screenshot, gallery, pinnedGallery), true, pins, emptySet(),
+            includeGalleryPhotos = false)
+        assertEquals(listOf(screenshot, pinnedGallery), actual)
+    }
+
     @Test fun cacheOverBudgetEvictsOldestUnfixedCopiesOnly() {
         val mb = 1024L * 1024
         val files = (1..12).map { CachedImageFile("f$it.png", 50 * mb, it.toLong()) }
