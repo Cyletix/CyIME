@@ -29,8 +29,11 @@ internal fun clipboardImageEvictions(files: List<CachedImageFile>, protectedName
 internal fun clipboardMediaAfterRefreshFailure(
     previous: List<ClipboardImage>, includeRecent: Boolean,
     pinnedKeys: Set<String>, hiddenUris: Set<String>,
+    includeGalleryPhotos: Boolean = true,
 ): List<ClipboardImage> = previous.filter {
-    it.uri !in hiddenUris && (includeRecent || "image:${it.uri}" in pinnedKeys)
+    val pinned = "image:${it.uri}" in pinnedKeys
+    it.uri !in hiddenUris && (includeRecent || pinned) &&
+        (includeGalleryPhotos || it.label != ScreenshotImageSource.PHOTO_LABEL || pinned)
 }
 
 internal fun isMediaImageUri(uri: String): Boolean = uri.startsWith("content://media/")
