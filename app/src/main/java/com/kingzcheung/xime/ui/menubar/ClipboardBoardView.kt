@@ -365,7 +365,9 @@ internal fun ClipboardBoardView(
     }
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, tab.key) { mutableStateOf<String?>(null) }
-    val gridState = rememberLazyStaggeredGridState()
+    // A category/search/layout switch must not reuse the previous grid's item animator.
+    // Keep one state while folding pins so in-category item animations still work.
+    val gridState = key(tab.key, searchQuery, listLayout) { rememberLazyStaggeredGridState() }
     // Near the end of what is loaded, read the next page of older history (again after each page
     // arrives, so a sparse category keeps filling until the whole history is read).
     val nearEnd by remember { derivedStateOf {
@@ -648,7 +650,10 @@ internal fun ClipboardBoardView(
                     onToggle = { key -> selected = if (key in selected) selected - key else selected + key },
                     onToggleAll = { selected = toggleClipboardSection(selected, cards.mapTo(mutableSetOf()) { it.key }) },
                     onSave = { onReorderGroup?.invoke(sortGroup, it) })
-                else LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
+                // Exiting animateItem cards may still paint above incoming cards. A new result
+                // set must also get a fresh lazy composition, not just different item keys.
+                else key(tab.key, searchQuery, listLayout) {
+                    LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
                     state = gridState,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalItemSpacing = 6.dp) {
@@ -738,6 +743,7 @@ internal fun ClipboardBoardView(
                             }
                         }
                         records(strip.after, fixedRecords = false)
+                    }
                     }
                 }
             }
