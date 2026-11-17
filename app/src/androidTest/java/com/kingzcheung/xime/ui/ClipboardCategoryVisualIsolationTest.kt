@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
@@ -84,6 +85,112 @@ class ClipboardCategoryVisualIsolationTest {
             rule.waitForIdle()
             file.delete()
         }
+    }
+
+    /**
+     * Models the first opt-in: text-only history, then screenshots, then gallery photos.
+     * The synthetic feeds avoid touching the device's real clipboard or photo library.
+     */
+    @Test fun enablingScreenshotAndGalleryFeedsDoesNotCarryOldPixelsIntoTextCategory() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        fun imageFixture(prefix: String, color: Int, timestamp: Long, label: String): Pair<File, ClipboardImage> {
+            val file = File.createTempFile(prefix, ".png", context.cacheDir)
+            val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+            try {
+                bitmap.eraseColor(color)
+                file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            } finally {
+                bitmap.recycle()
+            }
+            return file to ClipboardImage(Uri.fromFile(file).toString(), "image/png", timestamp, label)
+        }
+
+        val (screenshotFile, screenshot) = imageFixture(
+            "clipboard-screenshot-", Color.rgb(255, 12, 12), 400L, "截图")
+        val (galleryFile, galleryPhoto) = imageFixture(
+            "clipboard-gallery-", Color.rgb(12, 12, 255), 500L, "照片")
+        val screenshotsEnabled = mutableStateOf(false)
+        val galleryEnabled = mutableStateOf(false)
+        val feed = mutableStateOf<List<ClipboardImage>>(emptyList())
+        val textTag = "clipboard-card:text:81"
+        val screenshotTag = "clipboard-card:image:${screenshot.uri}"
+        val galleryTag = "clipboard-card:image:${galleryPhoto.uri}"
+
+        try {
+            rule.setContent {
+                MaterialTheme {
+                    Box(Modifier.requiredSize(360.dp, 450.dp)) {
+                        ClipboardBoardView(
+                            textItems = listOf(ClipboardItem(81L, "TEXT_ONLY_START", timestamp = 200L)),
+                            images = feed.value, initialImages = false, expanded = true,
+                            pins = emptySet(), photoAccess = screenshotsEnabled.value, failure = null,
+                            onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {},
+                            onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {},
+                            onRemove = {}, onPhotoAccess = {}, onPick = {},
+                            onSystemPaste = {}, onShare = { _, _ -> }, onPullRemote = null,
+                            galleryPhotosEnabled = galleryEnabled.value,
+                        )
+                    }
+                }
+            }
+            rule.onNodeWithTag(textTag, useUnmergedTree = true).assertExists()
+            rule.runOnIdle {
+                screenshotsEnabled.value = true
+                feed.value = listOf(screenshot)
+            }
+            rule.waitUntil(10_000) { redPixelCount() > 100 }
+            rule.runOnIdle {
+                galleryEnabled.value = true
+                feed.value = listOf(galleryPhoto, screenshot)
+            }
+            rule.waitUntil(10_000) { bluePixelCount() > 100 }
+            rule.onNodeWithTag("clipboard-filter:IMAGE").performScrollTo().performClick()
+            rule.onNodeWithTag(screenshotTag, useUnmergedTree = true).assertExists()
+            rule.onNodeWithTag(galleryTag, useUnmergedTree = true).assertExists()
+
+            // The real failure could persist longer than a normal 180 ms exit transition.
+            rule.mainClock.autoAdvance = false
+            repeat(3) {
+                rule.onNodeWithTag("clipboard-filter:TEXT").performScrollTo().performClick()
+                rule.mainClock.advanceTimeByFrame()
+                rule.onNodeWithTag(textTag, useUnmergedTree = true).assertExists()
+                assertTrue("图片离场第一帧不能覆盖文本", redPixelCount() == 0 && bluePixelCount() == 0)
+                rule.mainClock.advanceTimeBy(450L)
+                assertTrue("图片残影不能持续到动画结束后", redPixelCount() == 0 && bluePixelCount() == 0)
+
+                rule.onNodeWithTag("clipboard-filter:IMAGE").performScrollTo().performClick()
+                rule.mainClock.advanceTimeByFrame()
+                rule.onNodeWithTag(screenshotTag, useUnmergedTree = true).assertExists()
+                rule.onNodeWithTag(galleryTag, useUnmergedTree = true).assertExists()
+                rule.onNodeWithTag(textTag, useUnmergedTree = true).assertDoesNotExist()
+            }
+
+            // A source switch inside the same category must drop the outgoing photo too.
+            rule.runOnIdle {
+                galleryEnabled.value = false
+                feed.value = listOf(screenshot)
+            }
+            rule.mainClock.advanceTimeByFrame()
+            rule.onNodeWithTag(galleryTag, useUnmergedTree = true).assertDoesNotExist()
+            assertTrue("关闭相册来源后蓝色照片不能残留", bluePixelCount() == 0)
+        } finally {
+            rule.mainClock.autoAdvance = true
+            rule.waitForIdle()
+            screenshotFile.delete()
+            galleryFile.delete()
+        }
+    }
+
+    private fun bluePixelCount(): Int {
+        val snapshot = rule.onNodeWithTag("clipboard-records-region").captureToImage().asAndroidBitmap()
+        var count = 0
+        for (y in 0 until snapshot.height step 4) {
+            for (x in 0 until snapshot.width step 4) {
+                val color = snapshot.getPixel(x, y)
+                if (Color.blue(color) > 205 && Color.red(color) < 90 && Color.green(color) < 90) count++
+            }
+        }
+        return count
     }
 
     private fun redPixelCount(): Int {
