@@ -356,7 +356,8 @@ class ClipboardImages private constructor(private val context: Context) {
             // Disabling the automatic feed does not discard explicitly pinned images.
             val includeRecent = recentScreenshotsEnabled()
             media = if (hasPhotoAccess()) runCatching { queryRecentScreenshots(includeRecent) }
-                .getOrElse { clipboardMediaAfterRefreshFailure(media, includeRecent, pinnedKeys(), hidden) }
+                .getOrElse { clipboardMediaAfterRefreshFailure(media, includeRecent, pinnedKeys(), hidden,
+                    includeGalleryPhotos = includeRecent && recentPhotosWanted()) }
                 else emptyList()
             // A screenshot taken in the last minute gets the same paste hint as a copied image.
             // It is read locally only; it enters clipboard history only if the user pastes it.
