@@ -198,6 +198,8 @@ internal fun ConnectedClipboardBoard(
             prefs.edit().putBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, value).apply()
         },
         groups = groups, initialTabKey = returnTab,
+        // Source changes must not reuse grid animation state from the text-only board.
+        galleryPhotosEnabled = photoAccess && store.recentPhotosWanted(),
         onAssignGroup = groupStore::assign,
         onManageGroups = { record ->
             groupStore.setKeyboardEntry(record)
@@ -314,6 +316,8 @@ internal fun ClipboardBoardView(
     onFormOpen: (ClipboardTab, Boolean) -> Unit = { _, _ -> },
     /** Saves the order a group's records were dragged to while selecting (group id, record keys); null: no sorting. */
     onReorderGroup: ((String, List<String>) -> Unit)? = null,
+    /** Whether recent gallery photos are included in the screenshot feed. */
+    galleryPhotosEnabled: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val appContext = LocalContext.current.applicationContext
@@ -365,16 +369,18 @@ internal fun ClipboardBoardView(
     }
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, tab.key) { mutableStateOf<String?>(null) }
-    // A category/search/layout switch must not reuse the previous grid's item animator.
-    // Keep one state while folding pins so in-category item animations still work.
-    val gridState = key(tab.key, searchQuery, listLayout) { rememberLazyStaggeredGridState() }
+    // Switching categories or photo feeds must discard outgoing lazy item animations.
+    // Keep the grid alive for ordinary history updates and in-category pin folding.
+    val gridState = key(tab.key, searchQuery, listLayout, photoAccess, galleryPhotosEnabled) {
+        rememberLazyStaggeredGridState()
+    }
     // Near the end of what is loaded, read the next page of older history (again after each page
     // arrives, so a sparse category keeps filling until the whole history is read).
     val nearEnd by remember(gridState) { derivedStateOf {
         val info = gridState.layoutInfo
         info.totalItemsCount > 0 && (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - 30
     } }
-    LaunchedEffect(nearEnd, textItems.size) { if (nearEnd) onLoadMore() }
+    LaunchedEffect(gridState, nearEnd, textItems.size) { if (nearEnd) onLoadMore() }
     val scope = rememberCoroutineScope()
     fun menuPosition(anchorInRoot: Rect, preferSide: Boolean): ClipboardMenuAnchor {
         val boardOrigin = boardCoordinates[0]?.boundsInRoot()?.topLeft ?: Offset.Zero
@@ -650,9 +656,9 @@ internal fun ClipboardBoardView(
                     onToggle = { key -> selected = if (key in selected) selected - key else selected + key },
                     onToggleAll = { selected = toggleClipboardSection(selected, cards.mapTo(mutableSetOf()) { it.key }) },
                     onSave = { onReorderGroup?.invoke(sortGroup, it) })
-                // Exiting animateItem cards may still paint above incoming cards. A new result
-                // set must also get a fresh lazy composition, not just different item keys.
-                else key(tab.key, searchQuery, listLayout) {
+                // A different category or photo feed must own a different lazy composition.
+                // Merely clearing records does not immediately clear fade-out item layers.
+                else key(tab.key, searchQuery, listLayout, photoAccess, galleryPhotosEnabled) {
                     LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
                     state = gridState,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
