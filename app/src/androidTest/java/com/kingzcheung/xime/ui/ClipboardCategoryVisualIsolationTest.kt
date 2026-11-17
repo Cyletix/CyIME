@@ -128,7 +128,8 @@ class ClipboardCategoryVisualIsolationTest {
                             onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {},
                             onRemove = {}, onPhotoAccess = {}, onPick = {},
                             onSystemPaste = {}, onShare = { _, _ -> }, onPullRemote = null,
-                            galleryPhotosEnabled = galleryEnabled.value,
+                            // In list mode text is one column, while IMAGE remains a masonry grid.
+                            listLayout = true, galleryPhotosEnabled = galleryEnabled.value,
                         )
                     }
                 }
