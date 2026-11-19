@@ -991,6 +991,8 @@ fun KeyboardView(
                     })
                     ToolbarButton.SCHEMA -> ({ viewModel.toggleOverlay(OverlayRoute.SchemaList) })
                     ToolbarButton.SYMBOL -> ({ viewModel.toggleOverlay(OverlayRoute.Symbol) })
+                    // 内置 AI 助手：面板自己读配置、发请求，宿主只管开与关。
+                    ToolbarButton.AI -> ({ viewModel.toggleOverlay(OverlayRoute.AiAssistant) })
                     ToolbarButton.FLOAT -> ({ viewModel.closeOverlay(); callbacks.onKeyboardResize?.invoke() })
                     ToolbarButton.HANDWRITING_LOOKUP -> ({
                         if (!state.isHandwritingMode && !viewModel.hasTemporaryHandwriting) {
@@ -2643,6 +2645,15 @@ fun KeyboardView(
                         onConfirmText = { text -> callbacks.onCommitText?.invoke(text) },
                         bottomPaddingDp = renderedBottomPaddingDp,
                         modifier = panelMaterial.fillMaxWidth().fillMaxHeight()
+                    )
+                    // 内置 AI 助手：左输入、右输出；输入焦点走工具面板同一条路由。
+                    is OverlayRoute.AiAssistant -> AiAssistantPanel(
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        keyBgColor = keyBgColor,
+                        onClose = { viewModel.returnToTextKeyboard() },
+                        onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                        modifier = Modifier.fillMaxSize().background(keyboardBgColor),
                     )
                     is OverlayRoute.ToolPanel -> InfoPanel(
                         title = state.toolPanelTitle,

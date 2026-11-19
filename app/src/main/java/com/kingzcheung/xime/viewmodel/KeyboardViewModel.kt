@@ -636,6 +636,10 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         _syncViewState()
     }
 
+    /** 内置 AI 助手面板开着时，回车由服务层转成「发送」（见 XimeInputMethodService.triggerToolPanelGenerate）。 */
+    val isAiAssistantOpen: Boolean
+        get() = (_page.value as? KeyboardPage.Overlay)?.route == OverlayRoute.AiAssistant
+
     /** Both secondary modes return directly to the original text keyboard. */
     fun returnToTextKeyboard() {
         val mainType = _page.value.textMainType()

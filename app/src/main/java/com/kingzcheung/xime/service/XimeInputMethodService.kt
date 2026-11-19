@@ -1989,6 +1989,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 代际号防旧结果回填：新请求/重开会递增 epoch，旧结果回来时检测到已过期则丢弃。
      */
     internal fun triggerToolPanelGenerate() {
+        // 内置 AI 助手面板：回车=发送这一句。面板自己在右侧边收边显示，不经插件生成链路。
+        if (keyboardViewModel.isAiAssistantOpen) {
+            val editor = ToolPanelEditTextHolder.editText
+            com.kingzcheung.xime.ai.AiAssistant.send(this, editor?.text?.toString().orEmpty())
+            editor?.setText("")
+            return
+        }
         val pluginId = uiState.value.toolPanelPluginId
         // passive 纯展示面板：无生成语义，enter 不触发（数据由事件驱动 + InfoPanel 点击 action 刷新）
         if (uiState.value.toolPanelDisplay == ToolResult.PASSIVE.name) {

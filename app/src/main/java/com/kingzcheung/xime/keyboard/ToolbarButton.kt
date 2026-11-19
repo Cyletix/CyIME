@@ -3,6 +3,7 @@ package com.kingzcheung.xime.keyboard
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.Assignment
 import androidx.compose.material.icons.twotone.EmojiEmotions
+import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.KeyboardAlt
 import androidx.compose.material.icons.twotone.LastPage
 import androidx.compose.material.icons.twotone.Paid
@@ -37,6 +38,8 @@ enum class ToolbarButton(
     OCR("ocr", "拍照识别", Icons.Default.DocumentScanner),
     SCHEMA("schema", "输入方式", Icons.TwoTone.KeyboardAlt),
     SYMBOL("symbol", "符号", Icons.TwoTone.Paid),
+    // 内置 AI 助手：点开左输入、右输出的面板（接口地址/密钥在设置›AI 助手里填）。
+    AI("ai", "AI 助手", Icons.TwoTone.AutoAwesome),
     // 保留已保存的旧 ID，悬浮模式统一在键盘调节中设置。
     FLOAT("float", "键盘调节", Icons.TwoTone.Tune),
     HANDWRITING_LOOKUP("handwriting_lookup", "手写", Icons.Outlined.Gesture),
@@ -70,7 +73,7 @@ enum class ToolbarButton(
 
         /** 菜单默认一页 8 项（另加末尾的“排列”）：只放打字时会临时调整的入口，其余可在“排列”中加入。 */
         // 字幕不在这份清单里：它是「字幕」插件的按钮，插件装上并启用时才放进菜单（CaptionPlugin）。
-        val DEFAULT_MENU = listOf(SETTINGS, FLOAT, OCR, SOUND, GLASS, INCOGNITO, FULL_SHAPE, ARRANGE)
+        val DEFAULT_MENU = listOf(SETTINGS, AI, FLOAT, OCR, SOUND, GLASS, INCOGNITO, FULL_SHAPE, ARRANGE)
         /** 布局手势开关：默认排在菜单的“排列”之前（见 QuickActionLayout.defaultMenu），每个布局只显示适用的一两个。 */
         val LAYOUT_GESTURES = listOf(GLIDE, T9_FLICK, FOURTEEN_SWIPE, KANA_HINTS, FLICK_DISC)
         /** 开关类入口：菜单中显示开/关状态，工具栏中开启时高亮。 */

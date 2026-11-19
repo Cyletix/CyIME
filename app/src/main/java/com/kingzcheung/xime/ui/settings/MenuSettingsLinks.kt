@@ -10,6 +10,8 @@ import com.kingzcheung.xime.keyboard.ToolbarButtonItem
  */
 internal val MenuSettingsTitles: Map<ToolbarButton, String> = mapOf(
     ToolbarButton.SCHEMA to "语言与方案",
+    // 内置 AI 助手：长按进设置 › AI 助手，填接口地址、密钥、模型。
+    ToolbarButton.AI to "AI 助手",
     ToolbarButton.CLIPBOARD to "剪贴板",
     ToolbarButton.OCR to "已安装的模型",
     ToolbarButton.FLOAT to "键盘尺寸与位置",

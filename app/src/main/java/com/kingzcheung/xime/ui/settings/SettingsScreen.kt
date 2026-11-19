@@ -331,6 +331,9 @@ fun SettingsScreen(
         composable(SettingsRoutes.Backup) {
             BackupSettingsContent(onBack = { navController.popBackStack() })
         }
+        composable(SettingsRoutes.AiAssistant) {
+            AiAssistantSettingsContent(onBack = { navController.popBackStack() })
+        }
         composable(SettingsRoutes.About) {
             AboutContent(
                 onBack = { navController.popBackStack() },

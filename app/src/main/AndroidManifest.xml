@@ -276,6 +276,12 @@
         </activity-alias>
 
         <activity android:name="com.kingzcheung.xime.CustomLayoutActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <!-- DeepSeek 网页版问答：没有接口密钥时登录网页提问，取最后一条 AI 回复交给键盘面板。 -->
+        <activity
+            android:name="com.kingzcheung.xime.ui.ai.DeepSeekWebActivity"
+            android:exported="false"
+            android:label="DeepSeek 网页版"
+            android:theme="@style/Theme.Xime" />
         <!-- 整屏实时字幕：常亮、横竖屏切换不重建（老人页面不能因为转屏丢字幕） -->
         <activity android:name="com.kingzcheung.xime.ui.caption.CaptionActivity"
             android:exported="false" android:launchMode="singleTask"

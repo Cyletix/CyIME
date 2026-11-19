@@ -151,6 +151,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("扩展", system, SettingsRoutes.Market, "下载 输入方案 模型 插件 商店 扩展商店"),
         page("其他设置", system, SettingsRoutes.Other, "其他 更多 备份 性能 省电 界面语言 显示语言 Language"),
         page("备份与恢复", other, SettingsRoutes.Backup, "备份 恢复 导出 导入 本地备份 换机 迁移"),
+        page("AI 助手", other, SettingsRoutes.AiAssistant, "AI 助手 模型 密钥 接口地址 API 服务商 DeepSeek OpenAI 测试连接 获取模型 同步码 网页版 大模型 聊天"),
         page("性能与省电", other, SettingsRoutes.Performance, "性能 省电 内存 卡顿 高配 中配 低配 自动 动效 炫光 语音常驻 释放 SenseVoice Paraformer"),
         page("按设备推荐配置", "配置选择", SettingsRoutes.SetupGuide, "推荐 自动 检测 手机 平板 配置 引导 向导 不会设置 不懂 省空间 删模型 体积 太大 占空间 语音模型 九键模型 怎么选 打字习惯 全拼 双拼 小鹤 自然码 微软双拼 五笔 模糊音 平翘舌 前后鼻音 字幕 桌面图标"),
         page("关于 CyIME", system, SettingsRoutes.About, "版本 开发者 联系 许可 检查更新 最新版本 源代码 更新内容"),

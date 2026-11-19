@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.Backup
 import androidx.compose.material.icons.twotone.Speed
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +62,18 @@ fun OtherSettingsContent(onBack: () -> Unit, onNavigateToRoute: (String) -> Unit
                     title = stringResource(R.string.item_backup_title), searchKey = "备份与恢复",
                     subtitle = stringResource(R.string.item_backup_summary),
                     onClick = { onNavigateToRoute(SettingsRoutes.Backup) },
+                    showArrow = true
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 56.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+                SettingsItem(
+                    icon = Icons.TwoTone.AutoAwesome,
+                    title = "AI 助手", searchKey = "AI 助手",
+                    subtitle = "接口地址、密钥、模型，以及网页版",
+                    onClick = { onNavigateToRoute(SettingsRoutes.AiAssistant) },
                     showArrow = true
                 )
                 HorizontalDivider(

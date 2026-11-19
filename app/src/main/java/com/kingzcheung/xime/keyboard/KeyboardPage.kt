@@ -44,4 +44,6 @@ sealed interface OverlayRoute {
     data object Emoji : OverlayRoute
     data object Edit : OverlayRoute
     data object ToolPanel : OverlayRoute
+    /** 内置 AI 助手面板：左输入、右输出，见 AiAssistantPanel。 */
+    data object AiAssistant : OverlayRoute
 }
