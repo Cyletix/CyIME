@@ -1460,7 +1460,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     clearInputStateForKeys()
                     needsUIUpdate = true
                 }
-                "clear_all" -> {
+                "clear_all", "clear_composition_undoable" -> {
                     // 上滑清空 = 多次退格快捷方式（对标主流输入法）：输入态只清输入态，空闲态清空全部已上屏。
                     // 引擎繁忙时不把未知状态当成空闲，更不能清正文。
                     if (service.rimeEngine.compositionActiveForDeletion() == null) return@command
@@ -1473,7 +1473,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.CLEAR_BEFORE_CURSOR_ONLY_KEY, false)
                     // 「退格直接删字」同时管滑动清空（原「滑动清空时跳过联想」11-08 并入）。
                     val skipAssociation = SettingsPreferences.isDeleteSkipsAssociation(service)
-                    val scope = ClearAllScope.of(hasInputState(candState, includeAssociation = !skipAssociation), wholeField)
+                    val scope = if (key == "clear_composition_undoable") ClearAllScope.COMPOSITION
+                        else ClearAllScope.of(hasInputState(candState, includeAssociation = !skipAssociation), wholeField)
                     service.lastClearedComposition = null
                     service.rimeEngine.discardClearUndo()
                     val savedPartials = service.t9PartialSegments.toList()
