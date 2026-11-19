@@ -959,23 +959,41 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 GlideAlternatives.Choice(text, next, nextCaret)
             }
             if (choices.isEmpty()) return@postRimeJob
-            val (typed, typedCaret) = GlideAlternatives.inserted(input, caret, code)
-            holder.entry = GlideAlternatives.Entry(typed, typedCaret, schema, session, choices)
+            val typed = GlideAlternatives.inserted(input, caret, code).first
+            holder.entry = GlideAlternatives.Entry(typed, schema, session, choices)
         }
     }
 
-    /** 点了滑行备选：把这一笔的编码换成它，组合留着。换不了（组合已经变了）时不上屏，什么也不做。 */
-    private fun applyGlideAlternative(input: String, snapshot: CandidateState) {
+    /** Apply the alternative code, then select the same word through Rime. */
+    private suspend fun applyGlideAlternative(input: String, snapshot: CandidateState) {
         val holder = service.candidateTransform.glideAlternatives
         val before = holder.entry ?: return
         val state = service.uiState.value
         if (before.schema != state.currentSchemaId || before.session != state.inputSessionId) return
-        val choice = holder.choose(input, snapshot.candidates.firstOrNull()) ?: return
-        if (!service.rimeEngine.applyPinyinEdit(before.input, choice.input, choice.caret, expectedSchema = before.schema)) {
-            holder.entry = before
+        val choice = holder.find(input) ?: return
+        if (!service.rimeEngine.applyPinyinEdit(before.input, choice.input, choice.caret, expectedSchema = before.schema)) return
+        holder.clear()
+        val updated = service.rimeEngine.readQueuedResult() ?: return
+        val index = updated.candidates.indexOfFirst { it.text == choice.text }
+        if (index < 0) {
+            // The live engine can differ from the earlier preview; never commit another word.
+            sendTransformedResult(updated)
             return
         }
-        service.rimeEngine.readQueuedResult()?.let { sendTransformedResult(it) }
+        val selection = service.rimeEngine.selectCandidateAtRevision(index, updated.engineRevision)
+        if (selection == null) { sendTransformedResult(updated); return }
+        com.kingzcheung.xime.stats.TypingStats.onCandidatePicked(index,
+            snapshot.correctedCandidates[choice.text].orEmpty())
+        if (selection.committedText.isNotEmpty()) {
+            val text = selection.committedText
+            val autoSpace = wordsAutoSpaceAfter(text)
+            val delivered = deliverCandidateCommit(PendingCandidateCommit(
+                InputCommandOwner.requireOwner(), if (autoSpace) "$text " else text, false
+            ))
+            if (autoSpace && delivered.accepted) englishAutoSpace.arm(text)
+        } else {
+            withEditor { service.updateUI() }
+        }
     }
 
     /**
