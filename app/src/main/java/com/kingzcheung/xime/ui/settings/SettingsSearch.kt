@@ -813,13 +813,8 @@ internal fun TypingTrialKeepsPosition(state: LazyListState) {
         }
         val (index, offset) = saved ?: return@LaunchedEffect
         saved = null
-        val start = withFrameNanos { it }
-        var now = start
-        while (now - start < TYPING_TRIAL_RESTORE_MS * 1_000_000) {
-            if (state.firstVisibleItemIndex != index || state.firstVisibleItemScrollOffset != offset) {
-                state.scrollToItem(index, offset)
-            }
-            now = withFrameNanos { it }
+        if (state.firstVisibleItemIndex != index || state.firstVisibleItemScrollOffset != offset) {
+            state.scrollToItem(index, offset)
         }
     }
 }
