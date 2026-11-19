@@ -6,12 +6,12 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 
-/** #294：中文滑行除首选外再给几个编码的备选，插在首选之后；点它换掉这一笔的编码。 */
+/** #294：中文滑行除首选外再给几个编码的备选，插在首选之后；点选时按对应编码交给引擎。 */
 class GlideAlternativesTest {
     private val engine = listOf(RimeCandidate("当", ""), RimeCandidate("党", ""), RimeCandidate("但", ""))
 
     private fun holder() = GlideAlternatives().apply {
-        entry = GlideAlternatives.Entry("dh", 2, "double_pinyin_flypy", 7L,
+        entry = GlideAlternatives.Entry("dh", "double_pinyin_flypy", 7L,
             listOf(GlideAlternatives.Choice("但", "dj", 2), GlideAlternatives.Choice("等", "dg", 2)))
     }
 
@@ -43,13 +43,14 @@ class GlideAlternativesTest {
         assertSame(base, holder().inject(base, "dh", engine, true, "double_pinyin_flypy", 8L))
     }
 
-    @Test fun choosingSwapsTheFirstCandidateIntoTheChoices() {
+    @Test fun findingAnAlternativeDoesNotReplaceTheActiveEntry() {
         val holder = holder()
-        val choice = holder.choose("dj", "当")!!
-        assertEquals("dj", choice.input)
-        assertEquals(listOf("当" to "dh", "等" to "dg"), holder.entry!!.choices.map { it.text to it.input })
-        assertEquals("dj", holder.entry!!.input)
-        assertNull(holder.choose("xx", "但"))
+        val before = holder.entry
+        assertEquals("dj", holder.find("dj")!!.input)
+        assertSame(before, holder.entry)
+        assertNull(holder.find("xx"))
+        holder.clear()
+        assertNull(holder.find("dj"))
     }
 
     @Test fun theStrokeIsInsertedAtTheCaretWithASeparator() {
