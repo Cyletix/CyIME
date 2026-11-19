@@ -110,6 +110,18 @@ class SymbolInputModeTest {
         assertNotNull(mapped.onDown)
     }
 
+    @Test fun `top row glide gives digit on upward exit and defaults long press to lower symbol`() {
+        val events = mutableListOf<String>()
+        val mapped = actions(events).withGlideCornerMenu("1", "!", 300L, topRowDigitSwipe = true)
+        assertEquals(listOf("!", "1"), mapped.longPressItems)
+        mapped.glideTopUp!!()
+        mapped.onLongPressSelect!!(mapped.longPressItems.first())
+        assertEquals(listOf("symbol:1", "down:!"), events)
+        assertTrue(isUnclaimedTopRowFlick(androidx.compose.ui.geometry.Offset(25f, 25f), androidx.compose.ui.geometry.Offset(25f, -10f), 50f, 8f))
+        assertFalse(isUnclaimedTopRowFlick(androidx.compose.ui.geometry.Offset(25f, 25f), androidx.compose.ui.geometry.Offset(55f, 12f), 50f, 8f))
+        assertFalse(isUnclaimedTopRowFlick(androidx.compose.ui.geometry.Offset(25f, 25f), androidx.compose.ui.geometry.Offset(25f, 12f), 50f, 8f))
+    }
+
     private fun actions(events: MutableList<String>) = KeyGestureActions(
         text = "ABC", onTap = { events += "tap" }, onPress = {}, onRelease = {}, onPreview = {},
         onUp = { events += "symbol:$it" }, onDown = { events += "down:$it" },

@@ -68,6 +68,7 @@ internal fun KeyGestureActions.withSymbolInput(
  */
 internal fun KeyGestureActions.withGlideCornerMenu(
     upper: String?, lower: String?, timeoutMillis: Long = DEFAULT_SYMBOL_LONG_PRESS_MS,
+    topRowDigitSwipe: Boolean = false,
 ): KeyGestureActions {
     if (onLongPress != null || longPressDrawableIds.isNotEmpty()) return this
     val commitUpper = onUp
@@ -75,13 +76,14 @@ internal fun KeyGestureActions.withGlideCornerMenu(
     val top = upper?.takeIf { it.isNotBlank() && commitUpper != null }
     val bottom = lower?.takeIf { it.isNotBlank() && commitLower != null && it != top }
     if (top == null && longPressItems.isNotEmpty()) return this
-    val items = listOfNotNull(top, bottom)
+    val items = if (topRowDigitSwipe && bottom != null) listOfNotNull(bottom, top) else listOfNotNull(top, bottom)
     if (items.isEmpty()) return this
     val pick: (String) -> Unit = { chosen ->
         if (top != null && chosen == top) commitUpper?.invoke(top) else commitLower?.invoke(bottom.orEmpty())
     }
     return copy(
         onUp = null, blockUpSwipe = true, onDown = null, blockDownSwipe = true,
+        glideTopUp = if (topRowDigitSwipe && top != null) ({ commitUpper?.invoke(top); Unit }) else null,
         longPressTimeoutMillis = timeoutMillis,
         longPressItems = if (items.size > 1) items else emptyList(),
         onLongPressSelect = if (items.size > 1) pick else null,

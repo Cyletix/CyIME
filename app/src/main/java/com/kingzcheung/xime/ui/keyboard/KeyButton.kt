@@ -319,6 +319,8 @@ fun SwipeableKeyButton(
     symbolInputText: String? = null,
     /** 下角标直接上屏的那个符号（不受「下方角标提示」开关影响）；26 键滑行时放进长按弹出的两格，见 [withGlideCornerMenu]。 */
     symbolInputDownText: String? = null,
+    /** Topmost alphabetic row can use an unclaimed upward flick for its digit. */
+    glideTopRow: Boolean = false,
     onSwipe: ((String) -> Unit)? = null,
     onSwipeDown: ((String) -> Unit)? = null,
     onSwipeLeft: (() -> Unit)? = null,
@@ -529,7 +531,8 @@ fun SwipeableKeyButton(
         // 「上下滑输入符号」关着：长按也不出角标（「长按输入」、滑行时的两格角标、底排标点长按都不加）。
         if (!cornerSymbols) actions
         // 26 键滑行开着时字母键的滑动给了滑行：长按弹出上下两个角标，挪过去松手选（设置页锁在「长按输入」）。
-        else if (letterGlideOwnsDrag) actions.withGlideCornerMenu(symbolInputText, symbolInputDownText, inputPreferences.symbolLongPressMs)
+        else if (letterGlideOwnsDrag) actions.withGlideCornerMenu(symbolInputText, symbolInputDownText,
+            inputPreferences.symbolLongPressMs, topRowDigitSwipe = glideTopRow && symbolInputText?.singleOrNull()?.isDigit() == true)
         // 底排标点固定上滑（空格两侧标点、数字键盘点键）：上滑和长按都输入角标（用户 11-09：键在底边，长按更顺手）。
         else actions.withSymbolInput(if (keepSymbolSwipeOnLongPress) SymbolInputMode.LONG_PRESS else symbolInputMode,
             symbolInputText, keepSymbolSwipeOnLongPress, inputPreferences.symbolLongPressMs)

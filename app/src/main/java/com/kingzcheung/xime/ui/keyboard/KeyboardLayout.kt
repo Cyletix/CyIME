@@ -738,6 +738,7 @@ fun KeyboardLayout(
                             val row0 = renderRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
                             KeyboardRowWithConfig(
                                 keys = row0,
+                                glideTopRow = true,
                                 keySpans = renderSpans?.getOrNull(0),
                                 edgeInset = if (honeycomb) (splitCellDp / 2f).dp else 0.dp,
                                 onKeyPress = onKeyPress,
@@ -1668,6 +1669,7 @@ fun KeyboardRowWithConfig(
     splitRow: Int = 0,
     /** 分体中排右半开头再放一个 G（设置「右半边也放 G 键」），见 [SplitKeyboardGeometry.homeRowWithRightG]。 */
     splitRightG: Boolean = false,
+    glideTopRow: Boolean = false,
 ) {
     val customLayout = LocalCustomLayout.current
     // 14 键合并键与自定义布局一样按字母数占位，和 26 键同一网格对齐。
@@ -1785,6 +1787,7 @@ fun KeyboardRowWithConfig(
                 symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction)
                     .takeUnless { longPressLabels != null && KeysConfigHelper.longPressLetters(isAsciiMode).isNotEmpty() },
                 symbolInputDownText = symbolInputValue(swipeDownLabel, swipeDownAction),
+                glideTopRow = glideTopRow,
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = boundDownLabel?.takeIf { swipeDownHintsEnabled }
