@@ -97,6 +97,10 @@ data class CandidatePageState(
     val candidates: List<CandidateEntry> = emptyList(),
     val engineRevision: Long = 0L,
     val associationCandidates: List<String> = emptyList(),
+    val strokeInputActive: Boolean = false,
+    val onStroke: ((Char) -> Unit)? = null,
+    val onStrokeDrawing: ((Boolean) -> Unit)? = null,
+    val onStrokeInk: ((androidx.compose.ui.geometry.Offset?) -> Unit)? = null,
     val backgroundColor: Color,
     val textColor: Color,
     val keyBackgroundColor: Color = Color.Unspecified,
@@ -139,6 +143,7 @@ data class CandidatePageCallbacks(
     val onRailPinyinSelect: ((Int) -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val onDelete: (() -> Unit)? = null,
+    val onClearStrokeFilter: (() -> Unit)? = null,
     val onClear: (() -> Unit)? = null,
     val onEnter: (() -> Unit)? = null,
     val onKeyPressDown: ((String) -> Unit)? = null,
@@ -146,6 +151,14 @@ data class CandidatePageCallbacks(
     val onClearComposition: (() -> Unit)? = null,
     val onUndoClear: (() -> Unit)? = null,
 )
+
+/** One horizontal gesture clears the filter once and never deletes underlying input. */
+internal fun strokeFilterDeleteDrag(clear: () -> Unit): DeleteDragSession {
+    var cleared = false
+    return DeleteDragSession(move = { distance ->
+        if (!cleared && distance != 0) { cleared = true; clear() }
+    }, finish = {})
+}
 
 /** 左栏快捷符号（对齐主流输入法候选展开页的符号栏）。 */
 private val QUICK_SYMBOLS = listOf("？", "！", "……", "~")
@@ -383,9 +396,12 @@ private fun CandidatePageContent(
                     }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize()
+                            .candidateStrokeGesture(state.strokeInputActive, { state.onStroke?.invoke(it) },
+                                { state.onStrokeDrawing?.invoke(it) }, { state.onStrokeInk?.invoke(it) })
                             .onSizeChanged { viewportHeightPx = it.height }
                             .testTag("expanded-candidates"),
                         state = listState,
+                        userScrollEnabled = !state.strokeInputActive,
                         flingBehavior = rememberCandidateFlingBehavior(),
                         contentPadding = PaddingValues(vertical = 6.dp)
                     ) {
@@ -472,21 +488,25 @@ private fun CandidatePageContent(
                         LocalKeyboardKeyVisualMetrics provides if (matchKeyboard) LocalKeyboardKeyVisualMetrics.current else KeyVisualMetrics.Unspecified,
                         LocalKeyboardKeyContentScale provides if (matchKeyboard) LocalKeyboardKeyContentScale.current else 1f,
                     ) {
+                        val parentDeleteDrag = LocalDeleteDrag.current
+                        val clearStrokes = callbacks.onClearStrokeFilter
+                        val deleteDrag = if (clearStrokes != null) ({ strokeFilterDeleteDrag(clearStrokes) }) else parentDeleteDrag
+                        CompositionLocalProvider(LocalDeleteDrag provides deleteDrag) {
                         SwipeableIconKeyButton(
                             icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                             onClick = { callbacks.onDelete?.invoke() },
                             onLongClick = callbacks.onDelete,
                             onPress = { callbacks.onKeyPressDown?.invoke("delete") },
                             onRelease = { callbacks.onKeyRelease?.invoke("delete") },
-                            onSwipe = callbacks.onClearComposition,
-                            onSwipeUp = callbacks.onClear,
-                            onSwipeDown = callbacks.onUndoClear,
+                            onSwipe = clearStrokes ?: callbacks.onClearComposition,
+                            onSwipeUp = clearStrokes ?: callbacks.onClear,
+                            onSwipeDown = clearStrokes ?: callbacks.onUndoClear,
                             distanceDelete = true,
                             followSymbolSwipeDirection = true,
                             upFeedback = KeyFlickFeedback.DELETE,
-                            swipeUpLabel = "清空",
-                            downFeedback = KeyFlickFeedback.UNDO,
-                            swipeDownLabel = "撤回",
+                            swipeUpLabel = if (clearStrokes != null) "清除笔画" else "清空",
+                            downFeedback = if (clearStrokes != null) KeyFlickFeedback.DELETE else KeyFlickFeedback.UNDO,
+                            swipeDownLabel = if (clearStrokes != null) "清除笔画" else "撤回",
                             backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
                             iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
                             modifier = railKeyModifier.then(if (deleteWidth != null) Modifier.width(deleteWidth)
@@ -496,6 +516,7 @@ private fun CandidatePageContent(
                             shadowEnabled = false,
                             visualPadding = if (matchKeyboard) null else PaddingValues(0.dp),
                         )
+                        }
                         CandidatePagingButton(
                             onClick = { onHapticFeedback?.invoke(); scrollPage(-1) },
                             enabled = listState.canScrollBackward,
