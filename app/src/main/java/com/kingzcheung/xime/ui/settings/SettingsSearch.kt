@@ -334,6 +334,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("空格上屏联想候选", prediction, SettingsRoutes.SmartPrediction, "空格 联想 上屏", section = "功能开关"),
         SettingsSearchEntry("退格直接删字", gestures, gesturePage, "退格 删除 删除键 删字 联想 收起联想 按两下 清空 正文 上滑 下滑 滑动清空时跳过联想 跳过联想", section = "删除键"),
         SettingsSearchEntry("删字后给同音字", gestures, gesturePage, "退格 删除 删除键 删错 恢复 撤销 同音字 纠错", section = "删除键"),
+        SettingsSearchEntry("删空字符后恢复联想", prediction, SettingsRoutes.SmartPrediction, "删空 字符 恢复 联想", section = "联想行为"),
         SettingsSearchEntry("连续联想", prediction, SettingsRoutes.SmartPrediction, "连续 联想 推理", section = "功能开关"),
         SettingsSearchEntry("单次联想", prediction, SettingsRoutes.SmartPrediction, "单次 联想 停止", section = "功能开关"),
         SettingsSearchEntry("无痕模式", prediction, SettingsRoutes.SmartPrediction, "无痕 隐私 不学习 不记录 剪贴板 私密 密码"),
