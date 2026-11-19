@@ -4376,9 +4376,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         val bgType = theme.keyboardBackground?.type
                         val glass = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(this, isDark).frostedGlass
                         val rounded = SettingsPreferences.roundedKeyboardBottom(this)
-                        val transparentNav = glass.enabled || rounded || bgType == "image" || bgType == "gradient"
+                        val iosGradient = state.themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID
+                        val transparentNav = glass.enabled || rounded || bgType == "image" || (bgType == "gradient" && !iosGradient)
                         win.setNavigationBarColor(if (transparentNav) android.graphics.Color.TRANSPARENT
-                            else bgColor.copy(alpha = 1f).toArgb())
+                            else (if (iosGradient) com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark).surface else bgColor)
+                                .copy(alpha = 1f).toArgb())
                     } else {
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }

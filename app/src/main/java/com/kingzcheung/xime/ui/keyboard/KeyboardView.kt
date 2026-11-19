@@ -1963,7 +1963,8 @@ fun KeyboardView(
                 else -> null
             }
             Column(Modifier.clipboardUnderlaySize(clipboardPanel, state.keyboardHeightDp).fillMaxSize()
-                .cySwapFadeIn(underlaySwapKey, instantKey = listOf(state.isAsciiMode, state.inputProfile.language))
+                .then(if (state.themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID) Modifier
+                    else Modifier.cySwapFadeIn(underlaySwapKey, instantKey = listOf(state.isAsciiMode, state.inputProfile.language)))
                 .excludeRevealedKeyboardPanels(panelsSeeKeyboardBackground, candidateReveal, overlayReveal).then(
                 if (candidatePageExpanded || overlayVisible) Modifier.clearAndSetSemantics {} else Modifier
             // 全屏手写开着工具面板时书写区仍露在面板上方，照旧不动它。
@@ -2446,8 +2447,9 @@ fun KeyboardView(
                 revealState = overlayReveal,
             ) {
             // 面板里换页（菜单进剪贴板、表情和符号互换等）新页快速淡入；符号页打开没有揭幕，打开本身也淡入。
-            Box(Modifier.fillMaxSize().cySwapFadeIn(retainedOverlay?.route?.let { it::class },
-                fadeOnFirst = symbolPageSwap)) {
+            Box(Modifier.fillMaxSize().then(if (state.themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID &&
+                retainedOverlay?.route is OverlayRoute.Symbol) Modifier else Modifier.cySwapFadeIn(retainedOverlay?.route?.let { it::class },
+                fadeOnFirst = symbolPageSwap))) {
             when (val p = retainedOverlay) {
                 is KeyboardPage.Overlay -> when (p.route) {
                     is OverlayRoute.Menu -> MenuBar(
