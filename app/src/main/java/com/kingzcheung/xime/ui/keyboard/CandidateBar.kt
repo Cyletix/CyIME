@@ -233,6 +233,7 @@ fun CandidateBar(
     state: CandidateBarState,
     page: KeyboardPage = KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL),
     candidatePageExpanded: Boolean = false,
+    strokeFilterLabel: String = "",
     toolbarActions: List<ToolbarAction> = emptyList(),
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
@@ -319,7 +320,7 @@ fun CandidateBar(
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
+    val showCompositionCancel = (showCancelButton || strokeFilterLabel.isNotEmpty()) && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     // 候选栏两端最多两个按钮（用户 11-03）：左边取消，最右展开候选，位置固定。左边打字和联想都是「<」，
     // 设置「联想关闭键用叉号」打开后联想时才是 ⊗（用户 11-03：两种状态图标不一样）；
     // 收起键盘只在空闲（没有候选）时有。手写候选也是纯联想态，但那里的取消是撤销当前字，仍用「<」。
@@ -531,7 +532,13 @@ fun CandidateBar(
                 .cySwapFadeIn(state is CandidateBarState.Idle),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (showCompositionCancel && closesAssociation && associationCancelCross) {
+            if (showCompositionCancel && strokeFilterLabel.isNotEmpty()) {
+                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
+                    slotWidth = edgeSlot, restingFill = edgeButtonFill, cornerRadius = edgeCorner, continuousPill = true) {
+                    Text(strokeFilterLabel, color = protectedVisuals.textColor, fontSize = 10.sp, lineHeight = 10.sp, maxLines = 2)
+                }
+                Spacer(Modifier.width(4.dp).fillMaxHeight().candidateGapTaps())
+            } else if (showCompositionCancel && closesAssociation && associationCancelCross) {
                 KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
                     modifier = Modifier.testTag("association-cancel-cross"), restingFill = edgeButtonFill,
                     slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
@@ -623,7 +630,7 @@ fun CandidateBar(
 
             if (state is CandidateBarState.ChineseCandidates || (isGlidePreview && state is CandidateBarState.AssociationOnly) ||
                 (splitGapX != null && state !is CandidateBarState.Idle) ||
-                (candidatePageExpanded && state is CandidateBarState.AssociationOnly && state.hasMore)) {
+                (candidatePageExpanded && state is CandidateBarState.AssociationOnly && (state.hasMore || strokeFilterLabel.isNotEmpty()))) {
                 val previewAssociations = isGlidePreview && state is CandidateBarState.AssociationOnly
                 val stripCallbacks = if (isGlidePreview) callbacks.copy(
                     onVisibleCandidatesChanged = null,
@@ -644,7 +651,7 @@ fun CandidateBar(
                     highlightIndex = (state as? CandidateBarState.ChineseCandidates)?.highlightIndex ?: 0,
                     showNumberLabels = showNumberLabels,
                     gapWindowX = splitGapX,
-                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview,
+                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview && !candidatePageExpanded,
                     onUserScroll = callbacks.onCandidateStripScrolled,
                     onNearEnd = callbacks.onCandidateStripNearEnd,
                     scrollKey = (state as? CandidateBarState.ChineseCandidates)?.let { it.inputText to it.candidates.firstOrNull() },
