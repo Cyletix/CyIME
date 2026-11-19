@@ -240,6 +240,7 @@ fun CandidateBar(
     state: CandidateBarState,
     page: KeyboardPage = KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL),
     candidatePageExpanded: Boolean = false,
+    strokeFilterLabel: String = "",
     toolbarActions: List<ToolbarAction> = emptyList(),
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
@@ -339,7 +340,7 @@ fun CandidateBar(
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
+    val showCompositionCancel = (showCancelButton || strokeFilterLabel.isNotEmpty()) && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     // 开了「候选滑到头回弹展开」又选了「关闭键位置：右边」（11-22 他）：取消／关联想画成「×」放在右边收起键盘那一格，
     // 左边不放；打字时点它取消、出联想时点它关联想、回到空闲后同一个位置是收起键盘。开关关着时和 1.15.101 一样。
     val closeAtRight = swipeExpand && closeOnRight && showCompositionCancel
@@ -608,7 +609,13 @@ fun CandidateBar(
                 .then(if (directEnglishInput) Modifier else Modifier.cySwapFadeIn(state is CandidateBarState.Idle)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (cancelAtLeft && closesAssociation && associationCancelCross) {
+            if (cancelAtLeft && strokeFilterLabel.isNotEmpty()) {
+                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
+                    slotWidth = edgeSlot, restingFill = edgeButtonFill, cornerRadius = edgeCorner, continuousPill = true) {
+                    Text(strokeFilterLabel, color = protectedVisuals.textColor, fontSize = 10.sp, lineHeight = 10.sp, maxLines = 2)
+                }
+                Spacer(Modifier.width(4.dp).fillMaxHeight().candidateGapTaps())
+            } else if (cancelAtLeft && closesAssociation && associationCancelCross) {
                 KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
                     modifier = Modifier.testTag("association-cancel-cross"), restingFill = edgeButtonFill,
                     slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
@@ -693,7 +700,7 @@ fun CandidateBar(
             // 展开靠右边 ▾。往左拉展开只是附加，设置「候选滑到头回弹展开」打开才有：滑到头再往左拉过门槛松手展开（[PullToExpandCandidates]）。
             if (state is CandidateBarState.ChineseCandidates || (isGlidePreview && state is CandidateBarState.AssociationOnly) ||
                 (splitGapX != null && state !is CandidateBarState.Idle) ||
-                (candidatePageExpanded && state is CandidateBarState.AssociationOnly && state.hasMore)) {
+                (candidatePageExpanded && state is CandidateBarState.AssociationOnly && (state.hasMore || strokeFilterLabel.isNotEmpty()))) {
                 val previewAssociations = isGlidePreview && state is CandidateBarState.AssociationOnly
                 val stripCallbacks = if (isGlidePreview) callbacks.copy(
                     onVisibleCandidatesChanged = null,
@@ -723,7 +730,7 @@ fun CandidateBar(
                         ?.takeUnless { previewAssociations },
                     showNumberLabels = showNumberLabels,
                     gapWindowX = splitGapX,
-                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview,
+                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview && (swipeExpand || !candidatePageExpanded),
                     // 开了「候选滑到头回弹展开」：栏里只排一屏（11-22 他：「一个屏幕就是一页」）——一开始露出来的候选，
                     // 加上栏尾露半截的那一个；把它露全就到头，再往左拉就展开。不用滑完「每页候选词数」那 20 个（群里：「划到头太费时间」）。
                     // 一屏没排满（平板宽屏）时接上展开列表把这一屏填满，多出来的照样不排，尾巴不会越滑越远。
