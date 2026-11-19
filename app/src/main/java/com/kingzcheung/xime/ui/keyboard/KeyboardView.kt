@@ -725,8 +725,8 @@ fun KeyboardView(
                 }
             }
         }
-        fun closeSentenceEdit() {
-            sentenceEdit?.let { callbacks.onEndSentencePreview?.invoke(it) }
+        fun closeSentenceEdit(restorePreview: Boolean = true) {
+            sentenceEdit?.let { callbacks.onEndSentencePreview?.invoke(it, restorePreview) }
             sentenceEdit = null
             callbacks.onSentenceHorizontalDelete = null
             sentenceWords = emptyList()
@@ -874,15 +874,30 @@ fun KeyboardView(
                     sentenceApplying -> true
                     key == "space" || key == "enter" -> { applySentenceEdit(false); true }
                     key == "clear_all" || key == "clear_composition" -> {
-                        sentenceCode = ""
-                        sentenceWord = ""
-                        sentenceWordCode = ""
-                        sentenceConfirmed = emptyList()
-                        sentenceReplaceOnType = false
-                        sentenceJustSelected = false
-                        previewSentenceCode(owner)
-                        refreshSentenceWords(owner)
-                        if (!callbacks.isDeleteDragging()) viewModel.setCandidatePageExpanded(false)
+                        if (!viewModel.candidatePageExpanded.value && sentenceCode.isEmpty() && sentenceConfirmed.isEmpty()) {
+                            // Local text is already empty and the keyboard is visible: clear the
+                            // underlying composition, without clearing committed host text.
+                            sentenceApplying = true
+                            callbacks.onPrepareEmptySentenceClear?.invoke(owner) { applied ->
+                                if (sentenceEdit === owner) {
+                                    if (applied) {
+                                        closeSentenceEdit(restorePreview = false)
+                                        callbacks.onPreeditKeyInput = null
+                                        callbacks.onKeyPress("clear_composition_undoable", false)
+                                    } else sentenceApplying = false
+                                }
+                            } ?: run { sentenceApplying = false }
+                        } else {
+                            sentenceCode = ""
+                            sentenceWord = ""
+                            sentenceWordCode = ""
+                            sentenceConfirmed = emptyList()
+                            sentenceReplaceOnType = false
+                            sentenceJustSelected = false
+                            previewSentenceCode(owner)
+                            refreshSentenceWords(owner)
+                            if (!callbacks.isDeleteDragging()) viewModel.setCandidatePageExpanded(false)
+                        }
                         true
                     }
                     key == "delete" -> {
@@ -1622,7 +1637,8 @@ fun KeyboardView(
                     onSentenceSelection = if (sentenceEdit == null && !showHandwritingCandidates && !glossSwap &&
                         !state.isAsciiMode && usesSentenceDragEdit(state.inputProfile) &&
                         !expandedDataMode && (cs.candidates.firstOrNull()?.length ?: 0) >= 2) { start, end ->
-                        callbacks.onOpenSentenceEdit?.invoke(start, end, cs.engineRevision) { owner ->
+                        val cachedOwner = sentenceDragOwner?.takeIf { it.start == start && it.end == end && it.snapshot.revision == cs.engineRevision }
+                        val openSelection: (com.kingzcheung.xime.service.SentenceEditSession?) -> Unit = { owner ->
                             if (owner != null && callbacks.isCandidateSnapshotCurrent(cs)) {
                                 closePreeditEditor()
                                 sentenceEdit = owner
@@ -1638,6 +1654,8 @@ fun KeyboardView(
                                 android.widget.Toast.makeText(quickContext, "这句话暂时无法按字对应编码", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         }
+                        if (cachedOwner != null) openSelection(cachedOwner)
+                        else callbacks.onOpenSentenceEdit?.invoke(start, end, cs.engineRevision, openSelection)
                     } else null,
                     onClearAssociation = {
                         toolbarFeedback()

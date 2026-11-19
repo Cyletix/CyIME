@@ -110,6 +110,7 @@ internal fun rememberImeKeyboardCallbacks(
             onSentencePreview = sentenceEditor::preview,
             onSentenceDragPreview = sentenceEditor::dragPreview,
             onEndSentencePreview = sentenceEditor::endPreview,
+            onPrepareEmptySentenceClear = sentenceEditor::prepareEmptyClear,
             onLivePreeditEdit = preeditEditor::edit,
             onRequestPinyinSyllables = syllableSelector::request,
             onSelectPinyinSyllable = syllableSelector::select,

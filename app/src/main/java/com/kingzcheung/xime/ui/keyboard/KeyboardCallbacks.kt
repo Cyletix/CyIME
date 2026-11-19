@@ -46,7 +46,8 @@ data class KeyboardCallbacks(
     val onApplySentenceEdit: ((com.kingzcheung.xime.service.SentenceEditSession, List<com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate>, Boolean, (Boolean) -> Unit) -> Unit)? = null,
     val onSentencePreview: ((com.kingzcheung.xime.service.SentenceEditSession, String) -> Unit)? = null,
     val onSentenceDragPreview: ((com.kingzcheung.xime.service.SentenceEditSession?) -> Unit)? = null,
-    val onEndSentencePreview: ((com.kingzcheung.xime.service.SentenceEditSession) -> Unit)? = null,
+    val onEndSentencePreview: ((com.kingzcheung.xime.service.SentenceEditSession, Boolean) -> Unit)? = null,
+    val onPrepareEmptySentenceClear: ((com.kingzcheung.xime.service.SentenceEditSession, (Boolean) -> Unit) -> Unit)? = null,
     var onT9RefreshAfterPreeditEdit: (() -> Unit)? = null,
     /** Installed by the visible editor; the IME service consumes Back before hiding. */
     var onDismissPreeditEditor: (() -> Unit)? = null,

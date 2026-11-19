@@ -158,7 +158,7 @@ data class CandidateBarVisuals(
     val glassControlBackground: Color? = null,
 )
 
-internal val LocalSentenceSelection = androidx.compose.runtime.staticCompositionLocalOf<com.kingzcheung.xime.service.SentenceEditSession?> { null }
+internal val LocalSentenceSelection = androidx.compose.runtime.compositionLocalOf<com.kingzcheung.xime.service.SentenceEditSession?> { null }
 
 /** Highlight the replacement in the first sentence while its local editor is open. */
 internal data class SentenceCandidateHighlight(val sentence: String, val start: Int, val end: Int)
@@ -719,6 +719,7 @@ fun CandidateBar(
                             textColor = protectedVisuals.textColor,
                             comment = if (showComments) displayComments.getOrElse(index) { "" } else "",
                             isSelected = assocState?.highlightIndex == index,
+                            selectedTextBold = !isGlidePreview,
                             accentColor = protectedVisuals.accentColor,
                             selectedTextColor = protectedVisuals.selectedTextColor,
                             opaqueComment = protectedVisuals.opaqueComments,
@@ -1170,6 +1171,7 @@ fun CandidateItem(
     correction: String = "",
     /** Shift 拖动指着别的候选时由候选栏统一画底色，这里先不画，保证只亮一个。 */
     selectionFill: Boolean = true,
+    selectedTextBold: Boolean = true,
     /** 候选栏还没滑动时藏起来的候选：不能点，也不接 Shift 拖动。 */
     interactive: Boolean = true,
     /** 左右留白（含在点按范围和选中底色里），见 [rememberCandidateItemPadding]。 */
@@ -1211,7 +1213,7 @@ fun CandidateItem(
     ) {
         val textSize = fit?.fontSize ?: fontSize
         val twoLineWidth = fit?.takeIf { it.twoLines }?.textWidth
-        val primaryStyle = candidatePrimaryTextStyle(textSize, candidateFontFamily, isSelected).let {
+        val primaryStyle = candidatePrimaryTextStyle(textSize, candidateFontFamily, isSelected && selectedTextBold).let {
             if (twoLineWidth != null) candidateTwoLineTextStyle(it, textSize) else it
         }.copy(shadow = textShadow).withInputTextLocale()
         Text(
@@ -1248,19 +1250,20 @@ fun CandidateItem(
                         }
                         magnifierPosition = change.position
                         change.consume()
-                    } while (change.pressed) } finally {
+                    } while (change.pressed)
+                        if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                        else currentLongClick?.invoke()
+                    } finally {
                         dragSelection = null
                         currentSentenceSelectionEnd?.invoke()
                         magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
                     }
-                    if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
-                    else currentLongClick?.invoke()
                 }
             } else Modifier),
             onTextLayout = { textLayout = it },
             color = if (isSelected) selectedTextColor else textColor,
             fontSize = textSize,
-            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+            fontWeight = if (isSelected && selectedTextBold) FontWeight.Medium else FontWeight.Normal,
             maxLines = if (twoLineWidth != null) 2 else 1,
             fontFamily = candidateFontFamily,
             style = primaryStyle,
