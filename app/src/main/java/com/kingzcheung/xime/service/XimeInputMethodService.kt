@@ -4869,7 +4869,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 return@postRimeJob
             }
             val transformed = candidateTransform.transformFor(result)
-            val shown = transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result
+            val shown = (transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result).let {
+                it.copy(preeditText = com.kingzcheung.xime.rime.editablePreeditText(
+                    it.preeditText, uiState.value.currentSchemaId, it.isAsciiMode))
+            }
             withContext(Dispatchers.Main) {
                 if (seq != glidePreviewSequence || session != uiState.value.inputSessionId ||
                     !rimeEngine.isCandidateRevisionCurrent(revision)) return@withContext
