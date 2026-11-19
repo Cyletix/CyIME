@@ -30,6 +30,8 @@ internal data class KeyGestureActions(
     val horizontalThresholdDp: Float = 50f,
     val verticalThresholdDp: Float = 50f,
     val reserveHorizontalSwipe: Boolean = false,
+    /** Top-row digit, used only if letter glide did not claim the gesture. */
+    val glideTopUp: (() -> Unit)? = null,
     val longPressItems: List<String> = emptyList(),
     val longPressDrawableIds: List<Int> = emptyList(),
     val keyWidth: Float = 1f,
@@ -264,6 +266,9 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
                         left -> actions.onLeft?.invoke()
                         right -> actions.onRight?.invoke()
+                        letterGlide && actions.glideTopUp != null &&
+                            isUnclaimedTopRowFlick(down.position, change.position, size.height.toFloat(), viewConfiguration.touchSlop) ->
+                            actions.glideTopUp.invoke()
                         reserveDragForGlide && moved ->
                             if (glideDriftIsTap(down.position, change.position, size.width.toFloat(), size.height.toFloat(),
                                     viewConfiguration.touchSlop, letterGlide)) actions.onTap()
@@ -289,6 +294,13 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
             actions.onPreview(SwipeState())
         }
     } }
+}
+
+/** Only a deliberate upward exit gets the digit; a claimed glide never reaches this handler. */
+internal fun isUnclaimedTopRowFlick(down: Offset, up: Offset, keyHeight: Float, slop: Float): Boolean {
+    val dx = up.x - down.x
+    val dy = up.y - down.y
+    return up.y < 0f && -dy >= maxOf(slop * 1.5f, keyHeight * 0.25f) && abs(dx) <= -dy
 }
 
 /** 旧算法：整条按键宽均分，从第一项起（两项的上下角标还用它，手感不变）。 */
