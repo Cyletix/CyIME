@@ -1140,7 +1140,11 @@ object SchemaManager {
         val current = SettingsPreferences.getCurrentSchema(context)
         if (current !in available) {
             val fallback = remaining.firstOrNull() ?: fallbackNativeSchema(available).firstOrNull()
-            if (fallback != null) SettingsPreferences.setCurrentSchema(context, fallback)
+            if (fallback != null) {
+                SettingsPreferences.setCurrentSchema(context, fallback)
+                // 下次启动按「该语言选中的方案」恢复（InputProfile），只回退 currentSchema 会继续指向已删的包。
+                InputModes.selectProfile(context, fallback)
+            }
         }
         return result
     }

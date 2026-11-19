@@ -41,7 +41,7 @@ class RemovedSchemaRestoreTest {
         assertTrue("rime_ice" in menu)
         assertFalse(imported in menu)
         val restored = selectableWithStored(imported, listOf(imported, "rime_ice"),
-            SchemaManager.getEnabledSchemas(app), { false }, { SchemaManager.isSchemaCompiled(app, it) })
+            { SchemaManager.getEnabledSchemas(app) }, { false }, { SchemaManager.isSchemaCompiled(app, it) })
         assertEquals(listOf("rime_ice"), restored)
     }
 }
