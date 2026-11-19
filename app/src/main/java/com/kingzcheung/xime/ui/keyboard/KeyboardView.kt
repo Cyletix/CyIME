@@ -1374,7 +1374,7 @@ fun KeyboardView(
                 CandidateGlossary.swapHeld(shiftModeNow == com.kingzcheung.xime.viewmodel.ShiftMode.HELD)
             val candidateBarState = remember(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
-                cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
+                cs.associationCandidates, cs.pendingEnglishText, cs.englishFirstCompletionPending, cs.isShowingRecentClipboard, cs.hasNextPage,
                 cs.calculatorCandidates, handwritingCandidates, handwritingComments, showHandwritingCandidates,
                 railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage, cs.clipboardExtractedCount,
                 cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
@@ -1411,6 +1411,9 @@ fun KeyboardView(
                         inputText = liveGlide.inputText, preeditText = liveGlide.preeditText,
                         hasMore = liveGlide.hasNextPage,
                     )
+                } else if (cs.englishFirstCompletionPending && cs.pendingEnglishText.isNotEmpty() &&
+                    (state.isAsciiMode || state.inputProfile.typesLettersDirectly)) {
+                    CandidateBarState.Idle
                 } else {
                     // 计算器结果只看候选状态自己带的标记（GitHub #289），不受展开页数据影响。
                     val calculator = cs.showsCalculator
@@ -1500,6 +1503,7 @@ fun KeyboardView(
                     CandidateBarState.Idle else if (holdingBar) previousBar!! else candidateBarState,
                 glidePreviewText = glideCandidatePreview.value,
                 isGlidePreview = liveGlide != null || englishGlide != null,
+                directEnglishInput = state.isAsciiMode || state.inputProfile.typesLettersDirectly,
                 page = barPage,
                 candidatePageExpanded = candidatePageExpanded,
                 commentsAreGlosses = glossChinese && CandidateGlossary.isLoaded,
