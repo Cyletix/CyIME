@@ -137,13 +137,15 @@ internal val LocalDeleteDrag = staticCompositionLocalOf<(() -> DeleteDragSession
 internal const val DEPLOY_NOTICE_DELAY_MS = 600L
 
 /**
- * 首选上拖选改局部（PR #363）：26 键全拼和双拼都有（11-18 全拼也接上，原来只有双拼，全拼上找不到）；
- * 九键、14 键等其它方案照旧用长按首选里的拆词重选，两种入口不同时出现。
+ * 首选上拖选改局部（PR #363）：在 26 键全拼/双拼以及无双字母合并键的自定义单字母键盘布局（如乱序十七）启用；
+ * 14/17/18 键等双字母合并布局与九键继续沿用原有入口约束。
  */
 internal fun usesSentenceDragEdit(profile: com.kingzcheung.xime.settings.InputProfile): Boolean =
     (profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN ||
         profile.scheme == com.kingzcheung.xime.settings.InputScheme.PINYIN) &&
-        profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC
+        (profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC ||
+            (profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.MERGED &&
+                com.kingzcheung.xime.settings.KeysConfigHelper.isSingleLetterSection(profile.layout.id)))
 
 /** Keep choices for the unconfirmed suffix when an earlier candidate is selected. */
 internal fun remainingSentenceSyllables(
