@@ -545,6 +545,9 @@ private fun T9KeyboardContent(
                     maxLines = 1, softWrap = false)
                 val availableTextWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
                 val candidateFontSize = metrics.fontSizeSp * minOf(1f, availableTextWidth / sample.size.width.coerceAtLeast(1))
+                val pinyinFontSize = if (showCandidates) rememberUniformRailFontSize(
+                    displayItems, metrics.pinyinFontSizeSp.sp, maxWidth - 12.dp
+                ) else metrics.pinyinFontSizeSp.sp
                 // 超出四格时右缘显示滚动条；空闲的符号列末尾放「编辑」，点开这一栏的符号设置。
                 val railState = androidx.compose.foundation.lazy.rememberLazyListState()
                 // 符号列滑下去后开始打字，拼音列要从第一个起；读音换了（选完一段到下一段、又按了键）也回到第一个
@@ -578,11 +581,11 @@ private fun T9KeyboardContent(
                             textColor = keyTextColor,
                             backgroundColor = keyBackgroundColor,
                             accentColor = accentColor,
-                            // 读音和候选字一样大，每个各自缩到放得下；符号列表小一号。
-                            fontSize = (if (option != null) metrics.pinyinFontSizeSp else candidateFontSize).sp,
+                            // 读音整列共用同一个字号（按最宽读音缩放），避免同列长短音节大小不一致；符号列表照旧。
+                            fontSize = if (option != null) pinyinFontSize else candidateFontSize.sp,
                             isSelected = isSelected,
                             approximate = option?.near == true,
-                            fitWidth = option != null,
+                            fitWidth = false,
                             modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp)
                                 .testTag("t9-pinyin-option:$index")
                         )
@@ -1099,6 +1102,29 @@ internal fun T9CandidateItem(
 
 /** 相近读音的字色：同一字色淡一些，配下划线；选中时仍用强调色。 */
 internal fun approximateRailColor(textColor: Color): Color = textColor.copy(alpha = textColor.alpha * 0.62f)
+
+/**
+ * 为整列音节/读音选择计算统一字号：以最宽条目按选中态字重测宽，整列同比例缩小到不溢出，
+ * 保证短音节与长音节（如 i 与 zhuang）、选中与未选中条目字母大小完全一致。
+ */
+@Composable
+internal fun rememberUniformRailFontSize(
+    items: List<String>,
+    baseFontSize: androidx.compose.ui.unit.TextUnit,
+    maxWidth: Dp,
+): androidx.compose.ui.unit.TextUnit {
+    if (items.isEmpty()) return baseFontSize
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val usable = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+    val style = TextStyle(fontSize = baseFontSize, fontFamily = AppFonts.candidateFontFamily, fontWeight = FontWeight.Medium)
+    val widest = remember(items, baseFontSize, density.fontScale, AppFonts.candidateFontFamily) {
+        items.maxOfOrNull { item ->
+            measurer.measure(item, style = style, maxLines = 1, softWrap = false).size.width
+        } ?: 0
+    }
+    return baseFontSize * minOf(1f, usable / widest.coerceAtLeast(1))
+}
 
 /**
  * 左栏一行字：给了 [maxWidth] 时按实际字体量宽，放不下就缩小字号直到整行放得下（长读音 zhuang 也完整显示，
