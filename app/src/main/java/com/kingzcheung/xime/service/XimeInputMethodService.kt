@@ -4374,17 +4374,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         win.isNavigationBarContrastEnforced = SettingsPreferences.roundedKeyboardBottom(this)
                     }
                     if (AndroidPlatform.navBarColorIgnored) {
-                        // Android 15 起（targetSdk 35）这个颜色系统不再画，导航区照旧由 Compose 画；只是把键盘底色报出去，
-                        // 小米「输入法全面屏优化」（含 LSP 模块开的）用它给键盘下面那条系统栏上色，不报就是系统默认色（#144）。
-                        // 图片/渐变背景没有单一颜色可报，玻璃效果（半透明）及底部圆角都需要保持透明导航栏。
-                        val bgType = theme.keyboardBackground?.type
-                        val glass = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(this, isDark).frostedGlass
+                        // Android 15 起（targetSdk 35）这个颜色系统不再画，导航区照旧由 Compose 画；只是把底色报出去，
+                        // 小米「输入法全面屏优化」用它给键盘下面那条系统抬高栏上色。
+                        // 无论是否开启玻璃特效，渐变皮肤取底边衔接色、大漠流金取底部偏深沙影色；底部圆角及其他图片保持透明。
                         val rounded = SettingsPreferences.roundedKeyboardBottom(this)
-                        val iosGradient = state.themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID
-                        val transparentNav = glass.enabled || rounded || bgType == "image" || (bgType == "gradient" && !iosGradient)
-                        win.setNavigationBarColor(if (transparentNav) android.graphics.Color.TRANSPARENT
-                            else (if (iosGradient) com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark).surface else bgColor)
-                                .copy(alpha = 1f).toArgb())
+                        val navSurface = if (rounded) null
+                            else com.kingzcheung.xime.ui.theme.resolveNavigationBarSurfaceColor(
+                                state.themeId, theme.keyboardBackground, isDark, bgColor)
+                        win.setNavigationBarColor(navSurface?.copy(alpha = 1f)?.toArgb() ?: android.graphics.Color.TRANSPARENT)
                     } else {
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }

@@ -74,6 +74,41 @@ fun resolveSolidColor(config: BackgroundConfig, isDark: Boolean): Color? {
     return resolveSolidColorHex(config, isDark)?.let { Color(0xFF000000 or it) }
 }
 
+/** 采样线性渐变在键盘底边中心 `(0.5f, 1.0f)` 的颜色，让系统底部抬高栏与渐变皮肤底边无缝衔接。 */
+internal fun gradientBottomEdgeColor(config: BackgroundConfig, isDark: Boolean): Color? {
+    val stops = gradientColors(config, isDark) ?: return null
+    val (start, end) = angleToFractionalPoints(config.angle ?: 0)
+    val dx = end.x - start.x
+    val dy = end.y - start.y
+    val lenSq = dx * dx + dy * dy
+    val t = if (lenSq <= 1e-6f) 1f else (((0.5f - start.x) * dx + (1f - start.y) * dy) / lenSq).coerceIn(0f, 1f)
+    val scaled = t * (stops.size - 1)
+    val index = scaled.toInt().coerceIn(0, stops.size - 2)
+    val fraction = (scaled - index).coerceIn(0f, 1f)
+    return androidx.compose.ui.graphics.lerp(stops[index], stops[index + 1], fraction)
+}
+
+/**
+ * 上报给系统导航栏/小米底部抬高栏的颜色：
+ * - 纯色：主题底色；
+ * - 渐变（落日余晖、极光青蓝、iOS 渐变及自定义渐变）：取底边颜色（iOS 渐变落在左下 123 键下方青色 #9DCCCC / #1B2626）；
+ * - 大漠流金：取底部偏深沙影叠加主题遮罩后的颜色；
+ * - 其他图片主题：返回 null（保持透明）。
+ */
+internal fun resolveNavigationBarSurfaceColor(
+    themeId: String,
+    config: BackgroundConfig?,
+    isDark: Boolean,
+    fallbackColor: Color,
+): Color? = when (config?.type) {
+    "gradient" -> gradientBottomEdgeColor(config, isDark) ?: fallbackColor
+    "image" -> when (themeId) {
+        "olivcelso_desert" -> if (isDark) Color(0xFF3E3111) else Color(0xFFDCCEAC)
+        else -> null
+    }
+    else -> fallbackColor
+}
+
 /**
  * 应用 BackgroundConfig 背景到 Composable。
  *
