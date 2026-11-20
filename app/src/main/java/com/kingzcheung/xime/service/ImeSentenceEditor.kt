@@ -4,6 +4,20 @@ import com.kingzcheung.xime.rime.RimeEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+internal const val SENTENCE_CODE_HIGHLIGHT_COLOR = 0x663399ff
+
+/** Use parcelable system spans and keep the same character boundaries for each selection. */
+internal fun sentenceCodeHighlight(text: String, from: Int, to: Int): android.text.SpannableString =
+    android.text.SpannableString(text).apply {
+        setSpan(android.text.style.UnderlineSpan(), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        var index = 0
+        while (index < text.length) {
+            val next = index + Character.charCount(text.codePointAt(index))
+            val color = if (index < to && next > from) SENTENCE_CODE_HIGHLIGHT_COLOR else android.graphics.Color.TRANSPARENT
+            setSpan(android.text.style.BackgroundColorSpan(color), index, next, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            index = next
+        }
+    }
 /** An isolated candidate lookup; the live composition changes only on confirmation. */
 data class SentenceEditSession(
         val inputSessionId: Long,
@@ -94,10 +108,7 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         // （忙的应用上百毫秒），拖动每换一个字都问一次，放大镜和高亮就一顿一顿（1.15.100 用户反馈）。
         // 拖动中手指在键盘上，应用里的选区不会变。
         if (dragOwner == null && runCatching { !ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(true)) return
-        val styled = android.text.SpannableString(text).apply {
-            setSpan(android.text.style.BackgroundColorSpan(0x663399ff), range.first, range.last + 1,
-                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
+        val styled = sentenceCodeHighlight(text, range.first, range.last + 1)
         ic.beginBatchEdit()
         try {
             if (ic.setComposingText(styled, 1)) {
@@ -147,9 +158,8 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         }
         val caret = if (code.isNotEmpty()) start + shownCode.length else before.trimEnd(' ', '\'').length.coerceAtMost(text.length)
         if (code.isEmpty() && text == previewWritten && caret == previewCaret) return
-        val styled = android.text.SpannableString(text)
-        if (code.isNotEmpty()) styled.setSpan(android.text.style.BackgroundColorSpan(0x663399ff), start,
-            start + shownCode.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val styled = if (code.isNotEmpty()) sentenceCodeHighlight(text, start, start + shownCode.length)
+            else if (text.isNotEmpty()) sentenceCodeHighlight(text, 0, 0) else text
         ic.beginBatchEdit()
         try {
             if (runCatching { ic.setComposingText(styled, 1) }.getOrDefault(false)) {
