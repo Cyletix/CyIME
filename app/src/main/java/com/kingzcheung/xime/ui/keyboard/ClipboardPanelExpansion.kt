@@ -35,6 +35,8 @@ internal class ClipboardPanelExpansion(
     // Only endpoint changes resize fixed cards; intermediate drag heights resize the viewport.
     var contentHeight by mutableIntStateOf(bounds.collapsed)
         private set
+    val settledOrExpandedHeight: Int
+        get() = if (isInMotion || contentHeight > bounds.collapsed) bounds.expanded else bounds.collapsed
     var isInMotion by mutableStateOf(false)
         private set
     private var motionGeneration = 0L

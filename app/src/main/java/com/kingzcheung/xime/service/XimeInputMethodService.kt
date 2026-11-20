@@ -673,6 +673,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE
         set(value) { keyboardReportsChinese = value }
     internal var currentEffectiveKeyboardHeight: Int = 0
+    private var clipboardMotionActive: Boolean = false
+    private var clipboardFrozenInsetsTopPx: Int? = null
     private var floatingCardBounds: android.graphics.Rect? = null
     /** 悬浮卡片外四角角标把手（亮着时）：露在卡片外的部分也要能按到。 */
     private var floatingCornerHandleBounds: List<android.graphics.Rect> = emptyList()
@@ -2322,6 +2324,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 ) { expanded ->
                     uiState.value = uiState.value.copy(clipboardImagesExpanded = expanded)
                 }
+                com.kingzcheung.xime.ui.keyboard.HighRefreshWhile(clipboardExpansion?.isInMotion == true)
+                LaunchedEffect(clipboardExpansion?.isInMotion) {
+                    if (clipboardExpansion != null && !clipboardExpansion.isInMotion) {
+                        clipboardMotionActive = false
+                        clipboardFrozenInsetsTopPx = null
+                        window.window?.decorView?.requestApplyInsets()
+                    }
+                }
                 // Clipboard search keeps the keyboard as it is: the results take the space the clipboard
                 // would take when pulled up, above the keyboard and the search bar.
                 // The container takes that height at once; the results slide in inside it (drawing only).
@@ -2336,7 +2346,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))
-                    clipboardExpansion != null -> clipboardExpansion.height.roundToInt()
+                    clipboardExpansion != null -> clipboardExpansion.settledOrExpandedHeight
                     else -> keyboardHeight
                 }
                 val floatingCardContentHeight = effectiveKeyboardHeight + floatingDragBarHeight
@@ -2421,6 +2431,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             // 无需 +1dp hack 强制造型变化。
                             handwritingNormalInsetDp = keyboardHeight + state.keyboardBottomPaddingDp + activeBottomDp
                             handwritingOverlayActive = handwritingExpanded
+                            clipboardMotionActive = clipboardExpansion?.isInMotion == true
                             keyboardContainer.updateHeight(totalDp)
                             currentEffectiveKeyboardHeight = if (state.isFloatingMode) floatingCardContentHeight + overlayPanelExtra
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
@@ -5695,8 +5706,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         SettingsPreferences.isKeyboardBlankFilled(this),
                         editor.left - decorOnScreen[0], editor.right - decorOnScreen[0])
                 }
+                val settledTopPx = if (clipboardMotionActive) (clipboardFrozenInsetsTopPx ?: topPx)
+                    else topPx.also { clipboardFrozenInsetsTopPx = it }
                 val reportedTop = if (editorBeside)
-                    window.window?.decorView?.height ?: resources.displayMetrics.heightPixels else topPx
+                    window.window?.decorView?.height ?: resources.displayMetrics.heightPixels else settledTopPx
                 outInsets.contentTopInsets = reportedTop
                 outInsets.visibleTopInsets = reportedTop
                 // Transparent side gutters must not swallow touches to the host app.

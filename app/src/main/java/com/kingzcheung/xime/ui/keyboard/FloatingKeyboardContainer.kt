@@ -191,6 +191,11 @@ internal fun FloatingKeyboardContainer(
         seenResizing = resizing
     }
 
+    val clipboardExpansion = LocalClipboardPanelExpansion.current
+    fun clipboardDropPx(): Float = clipboardExpansion?.let {
+        (it.settledOrExpandedHeight - it.height).coerceAtLeast(0f) * density.density
+    } ?: 0f
+
     // 调节模式下固定键盘也放进稳定的全屏宿主里，previewRect 直接决定它的真实区域。
     // 这样控制面板可以放在键盘外面，边框也不会因为宿主高度变化而漂移。
     if (!isFloatingMode) {
@@ -209,19 +214,34 @@ internal fun FloatingKeyboardContainer(
                 val undockPull = remember { UndockPullState() }
                 Box(Modifier.align(Alignment.TopCenter)
                     .absoluteOffset(x = shift.dp)
-                    .width(width).fillMaxSize().clip(cardShape(touchesLeft, touchesRight)).testTag("fixed-keyboard-card")
-                    .then(if (onUndock != null) Modifier.undockPull(undockPull, onUndock) else Modifier)
+                    .width(width).fillMaxSize().testTag("fixed-keyboard-slot")
                     .onGloballyPositioned { coords ->
-                        undockPull.card = coords
-                        val pos = coords.positionInWindow()
-                        onCardPositioned(pos.x.roundToInt(), pos.y.roundToInt(),
-                            (pos.x + coords.size.width).roundToInt(), (pos.y + coords.size.height).roundToInt())
+                        if (clipboardExpansion != null) {
+                            val pos = coords.positionInWindow()
+                            val drop = clipboardDropPx().roundToInt()
+                            val bottom = (pos.y + coords.size.height).roundToInt()
+                            onCardPositioned(pos.x.roundToInt(), (pos.y + drop).roundToInt().coerceAtMost(bottom),
+                                (pos.x + coords.size.width).roundToInt(), bottom)
+                        }
                     }) {
+                    Box(Modifier.fillMaxSize()
+                        .offset { IntOffset(0, clipboardDropPx().roundToInt()) }
+                        .clip(cardShape(touchesLeft, touchesRight)).testTag("fixed-keyboard-card")
+                        .then(if (onUndock != null) Modifier.undockPull(undockPull, onUndock) else Modifier)
+                        .onGloballyPositioned { coords ->
+                            undockPull.card = coords
+                            if (clipboardExpansion == null) {
+                                val pos = coords.positionInWindow()
+                                onCardPositioned(pos.x.roundToInt(), pos.y.roundToInt(),
+                                    (pos.x + coords.size.width).roundToInt(), (pos.y + coords.size.height).roundToInt())
+                            }
+                        }) {
                     CompositionLocalProvider(LocalKeyboardCardTopCorner provides cardTopCorner(touchesLeft, touchesRight)) {
                         LanguageMenuPanel { keyboardContent() }
                     }
-                    if (onUndock != null) UndockHandle(Modifier.align(Alignment.TopCenter), undockPull,
-                        dragIndicatorColor, highlightColor)
+                        if (onUndock != null) UndockHandle(Modifier.align(Alignment.TopCenter), undockPull,
+                            dragIndicatorColor, highlightColor)
+                    }
                 }
             }
         } else {
