@@ -298,4 +298,12 @@ class FixedKeyboardBottomInsetTest {
         SettingsPreferences.setKeyboardBottomPosition(activity, SettingsPreferences.KeyboardBottomPosition.KEEP_BUTTONS)
         assertEquals(48, measureQ(48))
     }
+
+    @Test fun switchingToAutoClearsPositiveManualLiftPadding() {
+        SettingsPreferences.setKeyboardBottomPaddingDp(activity, 48)
+        assertEquals(48, SettingsPreferences.getKeyboardBottomPaddingDp(activity))
+        SettingsPreferences.setKeyboardBottomPosition(activity, SettingsPreferences.KeyboardBottomPosition.AUTO)
+        assertEquals(0, SettingsPreferences.getKeyboardBottomPaddingDp(activity))
+        assertEquals(0, SettingsPreferences.getKeyboardBottomAdjustmentDp(activity))
+    }
 }

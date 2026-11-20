@@ -721,6 +721,10 @@ private fun FixedBottomCalibrationSettings() {
     val context = LocalContext.current
     var bottomPosition by remember(context) { mutableStateOf(SettingsPreferences.keyboardBottomPosition(context)) }
     var adjustment by remember(context) { mutableIntStateOf(SettingsPreferences.getKeyboardBottomAdjustmentDp(context)) }
+    var systemHeightDp by remember(context) {
+        mutableIntStateOf(SettingsPreferences.getKeyboardBottomSystemHeightDp(context)
+            ?: SettingsPreferences.DEFAULT_SYSTEM_LIFT_HEIGHT_DP)
+    }
     var diagnostic by remember(context) { mutableStateOf(SettingsPreferences.getKeyboardBottomDiagnostic(context)) }
     DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
@@ -729,6 +733,8 @@ private fun FixedBottomCalibrationSettings() {
                 SettingsPreferences.isBottomCalibrationKey(key)) {
                 bottomPosition = SettingsPreferences.keyboardBottomPosition(context)
                 adjustment = SettingsPreferences.getKeyboardBottomAdjustmentDp(context)
+                systemHeightDp = SettingsPreferences.getKeyboardBottomSystemHeightDp(context)
+                    ?: SettingsPreferences.DEFAULT_SYSTEM_LIFT_HEIGHT_DP
                 diagnostic = SettingsPreferences.getKeyboardBottomDiagnostic(context)
             }
         }
@@ -772,6 +778,11 @@ private fun FixedBottomCalibrationSettings() {
                     enabled = value > lowest) { Text("调低") }
                 OutlinedButton(onClick = { SettingsPreferences.setKeyboardBottomAdjustmentDp(context, (value + 2).coerceAtMost(80)) },
                     enabled = value < 80) { Text("抬高") }
+                OutlinedButton(
+                    onClick = { SettingsPreferences.setKeyboardBottomAdjustmentDp(context, systemHeightDp) },
+                    enabled = value != systemHeightDp,
+                    modifier = Modifier.testTag("bottom-calibration-system-height"),
+                ) { Text("系统高度") }
             }
             TextButton(onClick = { SettingsPreferences.resetKeyboardBottomCalibration(context) },
                 enabled = bottomPosition != SettingsPreferences.KeyboardBottomPosition.AUTO || adjustment != 0) { Text("恢复默认（自动、留白 0）") }

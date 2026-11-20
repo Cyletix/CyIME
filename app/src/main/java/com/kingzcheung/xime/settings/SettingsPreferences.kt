@@ -923,6 +923,13 @@ object SettingsPreferences {
      * 联想模式：false = 连续联想（联想上屏后继续推理，可连续上屏），true = 单次联想（只推理一次）。
      * 没存过值时算单次（老用户照旧）；2026-11-08 起新装由 [com.kingzcheung.xime.model.DeviceDefaults] 写入连续。
      */
+    fun isRestorePreviousAssociationsEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean("restore_previous_associations", false)
+
+    fun setRestorePreviousAssociationsEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean("restore_previous_associations", enabled).apply()
+    }
+
     fun isSingleAssociationMode(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_ASSOCIATION_SINGLE_MODE, true)
     }
@@ -1326,6 +1333,9 @@ object SettingsPreferences {
     fun setKeyboardBottomPosition(context: Context, position: KeyboardBottomPosition) {
         getPrefs(context).edit().putString(KEY_KEYBOARD_BOTTOM_POSITION, position.name)
             .putBoolean(KEY_EDGE_TO_EDGE_KEYBOARD, position != KeyboardBottomPosition.KEEP_BUTTONS).apply()
+        if (position == KeyboardBottomPosition.AUTO && getKeyboardBottomPaddingDp(context) > 0) {
+            setKeyboardBottomPaddingDp(context, 0)
+        }
     }
 
     private const val DEFAULT_KEYBOARD_BOTTOM_PADDING_DP = 0
@@ -1344,7 +1354,8 @@ object SettingsPreferences {
     /** 改的是底部留白或调低（哪个方向都算）：键盘和设置页要重新量。 */
     internal fun isBottomCalibrationKey(key: String?): Boolean =
         when (key?.removeSuffix(BOTTOM_PORTRAIT_SUFFIX)?.removeSuffix(BOTTOM_LANDSCAPE_SUFFIX)) {
-            KEY_KEYBOARD_BOTTOM_PADDING_DP, KEY_KEYBOARD_BOTTOM_LOWERING_DP, KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP -> true
+            KEY_KEYBOARD_BOTTOM_PADDING_DP, KEY_KEYBOARD_BOTTOM_LOWERING_DP, KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP,
+            KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP -> true
             else -> false
         }
 
@@ -1389,6 +1400,25 @@ object SettingsPreferences {
         val suffix = bottomOrientationSuffix(context)
         getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_PADDING_DP + suffix, adjustmentDp.coerceAtLeast(0))
             .putInt(KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP + suffix, (-adjustmentDp).coerceAtLeast(0)).apply()
+    }
+
+    internal const val DEFAULT_SYSTEM_LIFT_HEIGHT_DP = 48
+    private const val KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP = "keyboard_bottom_system_height_dp"
+
+    internal fun getKeyboardBottomSystemHeightDp(context: Context): Int? {
+        val prefs = getPrefs(context)
+        val suffix = bottomOrientationSuffix(context)
+        val value = prefs.getInt(KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP + suffix,
+            prefs.getInt(KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP, -1))
+        return value.takeIf { it > 0 }
+    }
+
+    internal fun setKeyboardBottomSystemHeightDp(context: Context, heightDp: Int) {
+        val value = heightDp.coerceIn(1, 80)
+        val suffix = bottomOrientationSuffix(context)
+        if (getKeyboardBottomSystemHeightDp(context) != value) {
+            getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP + suffix, value).apply()
+        }
     }
 
     /** 键盘上次量到的「最多还能调低多少 dp」（系统建议值减安全下限，按当前方向）；没量过为 null。 */
