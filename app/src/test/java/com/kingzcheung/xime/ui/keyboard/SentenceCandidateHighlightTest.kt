@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,5 +33,31 @@ class SentenceCandidateHighlightTest {
         val second = com.kingzcheung.xime.rime.PinyinSyllableOption(2, "hao", 3, 5, true)
         assertEquals(listOf(second.copy(start = 0, end = 2)), remainingSentenceSyllables(listOf(first, second), 3))
         assertTrue(remainingSentenceSyllables(listOf(first, second), 5).isEmpty())
+    }
+
+    @Test fun magnifierAvoidsPreeditDisplayedAboveKeyboard() {
+        assertEquals(
+            Offset.Unspecified,
+            sentenceMagnifierCenter(
+                sourceCenter = Offset(60f, 20f),
+                textTopInWindow = 1000f,
+                avoidTopInWindow = null,
+                magnifierHalfHeightPx = 56f,
+                clearancePx = 12f,
+                minimumTopPaddingPx = 16f,
+            ),
+        )
+        // 气泡顶边在 900px，文本顶边在 1000px，放大镜中心放回到 900 - 56 - 12 = 832px（相对文本 y = -168px）。
+        assertEquals(
+            Offset(60f, -168f),
+            sentenceMagnifierCenter(
+                sourceCenter = Offset(60f, 20f),
+                textTopInWindow = 1000f,
+                avoidTopInWindow = 900f,
+                magnifierHalfHeightPx = 56f,
+                clearancePx = 12f,
+                minimumTopPaddingPx = 16f,
+            ),
+        )
     }
 }

@@ -580,6 +580,7 @@ private fun CandidatePageItem(
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,
+                longPressTimeoutMillis = CANDIDATE_LONG_PRESS_TIMEOUT_MS,
                 onLongClick = onLongClick,
                 onClick = onClick
             )

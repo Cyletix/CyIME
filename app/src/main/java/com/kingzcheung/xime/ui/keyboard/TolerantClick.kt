@@ -15,7 +15,6 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 宽容点击：语义同 Modifier.clickable，但点击判定改为「抬起时累计位移仍在
@@ -39,6 +38,7 @@ fun Modifier.tolerantClick(
     enabled: Boolean = true,
     showRipple: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    longPressTimeoutMillis: Long? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
@@ -55,10 +55,10 @@ fun Modifier.tolerantClick(
     }
 
     indicationModifier.then(
-        Modifier.pointerInput(currentEnabled, onLongClick != null) {
+        Modifier.pointerInput(currentEnabled, onLongClick != null, longPressTimeoutMillis) {
             if (!currentEnabled) return@pointerInput
             val slopPx = maxOf(2f * viewConfiguration.touchSlop, 12.dp.toPx())
-            val longPressTimeoutMs = viewConfiguration.longPressTimeoutMillis
+            val longPressTimeoutMs = longPressTimeoutMillis ?: viewConfiguration.longPressTimeoutMillis
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 val press = PressInteraction.Press(down.position)
@@ -92,6 +92,7 @@ fun Modifier.tolerantClick(
                     travelled += (pressedChange ?: upChange)?.positionChange()?.getDistance() ?: 0f
                     if (pressedChange == null) {
                         if (upChange != null && !longPressFired && travelled <= slopPx) {
+                            upChange.consume()
                             currentOnClick()
                             source.tryEmit(PressInteraction.Release(press))
                         } else {

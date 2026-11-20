@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.magnifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 
 import com.kingzcheung.xime.ui.theme.VisualStyles
@@ -95,6 +96,8 @@ import androidx.compose.ui.layout.FirstBaseline
 import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick as semanticsOnClick
+import androidx.compose.ui.semantics.onLongClick as semanticsOnLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
@@ -167,6 +170,28 @@ internal val LocalSentenceSelection =
 /** Highlight the replacement in the first sentence while its local editor is open. */
 internal data class SentenceCandidateHighlight(val sentence: String, val start: Int, val end: Int)
 internal val LocalSentenceCandidateHighlight = androidx.compose.runtime.staticCompositionLocalOf<SentenceCandidateHighlight?> { null }
+/** 编码显示在键盘上方气泡或候选上方拼音行时的顶边窗口 Y 坐标；null 表示编码在输入框中，无需上移放大镜。 */
+internal val LocalSentenceMagnifierAvoidTop = androidx.compose.runtime.compositionLocalOf<Float?> { null }
+
+internal fun sentenceMagnifierCenter(
+    sourceCenter: Offset,
+    textTopInWindow: Float,
+    avoidTopInWindow: Float?,
+    magnifierHalfHeightPx: Float,
+    clearancePx: Float,
+    minimumTopPaddingPx: Float,
+): Offset {
+    if (sourceCenter == Offset.Unspecified || avoidTopInWindow == null || textTopInWindow.isNaN()) {
+        return Offset.Unspecified
+    }
+    val targetWindowY = maxOf(
+        avoidTopInWindow - magnifierHalfHeightPx - clearancePx,
+        minimumTopPaddingPx + magnifierHalfHeightPx,
+    )
+    return Offset(sourceCenter.x, targetWindowY - textTopInWindow)
+}
+
+internal const val CANDIDATE_LONG_PRESS_TIMEOUT_MS = 1000L
 
 internal fun sentenceCandidateText(text: String, index: Int, drag: IntRange?,
                                    active: SentenceCandidateHighlight?, color: Color): AnnotatedString =
@@ -451,6 +476,7 @@ fun CandidateBar(
     }
     var barOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var barTopInWindow by remember { mutableStateOf<Float?>(null) }
+    var preeditBubbleTopInWindow by remember { mutableStateOf<Float?>(null) }
     // 根布局坐标：Shift 拖线和候选位置都用这个坐标系。
     val dragSpace = LocalKeyDragSpace.current
     var barDragOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
@@ -489,9 +515,16 @@ fun CandidateBar(
             .glassTextHalo(textSurface?.halo),
         verticalArrangement = if (topLineMode) Arrangement.Top else Arrangement.Center,
     ) {
-        PreeditBubbleHost(showPreedit && !previewPrefs.preeditInsideKeyboard) { hidden ->
+        val preeditBubbleShown = showPreedit && !previewPrefs.preeditInsideKeyboard
+        PreeditBubbleHost(preeditBubbleShown) { hidden ->
             PreeditPreview(preeditText, protectedVisuals, onEditPreedit,
-                floatingPreeditColor(themeSurface, visuals.preeditBackgroundColor), hidden)
+                floatingPreeditColor(themeSurface, visuals.preeditBackgroundColor), hidden,
+                onBubbleTopInWindow = { top -> preeditBubbleTopInWindow = top })
+        }
+        val avoidTopInWindow = when {
+            preeditBubbleShown -> preeditBubbleTopInWindow ?: barTopInWindow?.minus(with(LocalDensity.current) { 46.dp.toPx() })
+            showPreedit && topLineMode -> barTopInWindow
+            else -> null
         }
         if (topLineMode) {
             // 联想态（已上屏）这一行留空，候选行不跟着上下跳。
@@ -552,7 +585,10 @@ fun CandidateBar(
                 androidx.compose.ui.unit.lerp(edgeSlot ?: 40.dp, idleToolbarCell, blend)
             }
         }
-        androidx.compose.runtime.CompositionLocalProvider(LocalCandidateRowHeight provides candidateRowHeight) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            LocalCandidateRowHeight provides candidateRowHeight,
+            LocalSentenceMagnifierAvoidTop provides avoidTopInWindow,
+        ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1243,16 +1279,28 @@ fun CandidateItem(
                 if (isSelected && selectionFill) accentColor.copy(alpha = 0.2f)
                 else Color.Transparent
             )
-            .semantics { selected = isSelected }
-            .then(if (interactive) Modifier.combinedClickable(
+            .semantics {
+                selected = isSelected
+                if (interactive) {
+                    semanticsOnClick { currentClick(); true }
+                    if (onSentenceSelection == null && currentLongClick != null) {
+                        semanticsOnLongClick { currentLongClick?.invoke(); true }
+                    }
+                }
+            }
+            .then(if (interactive) Modifier.tolerantClick(
+                longPressTimeoutMillis = CANDIDATE_LONG_PRESS_TIMEOUT_MS,
+                onLongClick = if (onSentenceSelection == null) onLongClick else null,
                 onClick = onClick,
-                onLongClick = if (onSentenceSelection == null) onLongClick else null
             ) else Modifier)
             .padding(horizontal = horizontalPadding, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val textSize = fit?.fontSize ?: fontSize
         val twoLineWidth = fit?.takeIf { it.twoLines }?.textWidth
+        val avoidTopInWindow = LocalSentenceMagnifierAvoidTop.current
+        val barScale = LocalCandidateBarScale.current
+        var textTopInWindow by remember { mutableStateOf(Float.NaN) }
         val primaryStyle = candidatePrimaryTextStyle(textSize, candidateFontFamily, isSelected).let {
             if (twoLineWidth != null) candidateTwoLineTextStyle(it, textSize) else it
         }.copy(shadow = textShadow).withInputTextLocale()
@@ -1260,7 +1308,20 @@ fun CandidateItem(
             text = sentenceCandidateText(text, index, dragSelection, LocalSentenceCandidateHighlight.current, accentColor),
             modifier = (if (twoLineWidth != null) Modifier.width(with(LocalDensity.current) { twoLineWidth.toDp() })
                 else Modifier.candidateBaseline(textSize)).then(if (interactive && onSentenceSelection != null && text.isNotEmpty()) Modifier
-                .magnifier(sourceCenter = { magnifierPosition })
+                .onGloballyPositioned { textTopInWindow = it.positionInWindow().y }
+                .magnifier(
+                    sourceCenter = { magnifierPosition },
+                    magnifierCenter = {
+                        sentenceMagnifierCenter(
+                            sourceCenter = magnifierPosition,
+                            textTopInWindow = textTopInWindow,
+                            avoidTopInWindow = avoidTopInWindow,
+                            magnifierHalfHeightPx = 28.dp.toPx() / barScale,
+                            clearancePx = 6.dp.toPx() / barScale,
+                            minimumTopPaddingPx = 8.dp.toPx() / barScale,
+                        )
+                    },
+                )
                 .pointerInput(text) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -1273,30 +1334,59 @@ fun CandidateItem(
                     val first = characterAt(down.position)
                     var last = first
                     var dragged = false
+                    var longPressTriggered = false
+                    val dragThresholdMs = viewConfiguration.longPressTimeoutMillis
+                    var elapsedFromDownMs = dragThresholdMs
+                    val popupTimeoutMs = maxOf(CANDIDATE_LONG_PRESS_TIMEOUT_MS, dragThresholdMs)
                     dragSelection = first..first
                     currentSentenceSelectionChange?.invoke(first, first + 1)
                     magnifierPosition = held.position
-                    try { do {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if ((change.position - down.position).getDistance() >= viewConfiguration.touchSlop) dragged = true
-                        if (dragged) {
-                            val next = characterAt(change.position)
-                            if (next != last) {
-                                last = next
-                                dragSelection = minOf(first, last)..maxOf(first, last)
-                                currentSentenceSelectionChange?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                    var released = false
+                    try {
+                        while (true) {
+                            val event = if (!dragged && !longPressTriggered && currentLongClick != null) {
+                                val remaining = (popupTimeoutMs - elapsedFromDownMs).coerceAtLeast(0L)
+                                if (remaining == 0L) null else withTimeoutOrNull(remaining) { awaitPointerEvent() }
+                            } else {
+                                awaitPointerEvent()
+                            }
+                            if (event == null) {
+                                longPressTriggered = true
+                                dragSelection = null
+                                currentSentenceSelectionEnd?.invoke()
+                                magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
+                                currentLongClick?.invoke()
+                                continue
+                            }
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            elapsedFromDownMs = maxOf(elapsedFromDownMs, change.uptimeMillis - down.uptimeMillis)
+                            if (!longPressTriggered && (change.position - down.position).getDistance() >= viewConfiguration.touchSlop) {
+                                dragged = true
+                            }
+                            if (dragged) {
+                                val next = characterAt(change.position)
+                                if (next != last) {
+                                    last = next
+                                    dragSelection = minOf(first, last)..maxOf(first, last)
+                                    currentSentenceSelectionChange?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                                }
+                                magnifierPosition = change.position
+                            }
+                            change.consume()
+                            if (!change.pressed) {
+                                released = true
+                                break
                             }
                         }
-                        magnifierPosition = change.position
-                        change.consume()
-                    } while (change.pressed) } finally {
+                    } finally {
                         dragSelection = null
-                        currentSentenceSelectionEnd?.invoke()
+                        if (!released || longPressTriggered) currentSentenceSelectionEnd?.invoke()
                         magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
                     }
-                    if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
-                    else currentLongClick?.invoke()
+                    if (released && !longPressTriggered) {
+                        currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                        currentSentenceSelectionEnd?.invoke()
+                    }
                 }
             } else Modifier),
             onTextLayout = { textLayout = it },
@@ -1493,7 +1583,8 @@ private fun Modifier.glassStripBoost(alpha: Float): Modifier {
 @Composable
 private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?, bubbleColor: Color,
     /** 编码刚清空、窗口还没拆：气泡画成全透明，不能点，模糊也同时调成全透明（见 [PreeditBubbleHost]）。 */
-    hidden: Boolean = false) {
+    hidden: Boolean = false,
+    onBubbleTopInWindow: (Float?) -> Unit = {}) {
     val density = LocalDensity.current
     // 放大后的候选栏里 dp 变大了，按屏宽限宽要换回同样的像素宽度。
     val screenWidth = (LocalConfiguration.current.screenWidthDp / LocalCandidateBarScale.current).dp
@@ -1502,12 +1593,14 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val rotation = LocalFloatingKeyboardRotation.current
     if (isFloatingRotated(rotation)) {
         RotatedPreeditPreview(text, visuals, onEdit.takeUnless { hidden }, rotation, gap, screenWidth, bubbleColor,
-            if (hidden) HiddenPreeditBubble else Modifier)
+            if (hidden) HiddenPreeditBubble else Modifier, onBubbleTopInWindow = onBubbleTopInWindow)
         return
     }
     // 气泡在键盘外面（上方），键盘的玻璃模糊盖不到它：开玻璃时给气泡单独垫一块同样的实时模糊（用户反馈 10-31
     // 「字母显示栏的模糊会消失」：气泡底色和按键一样半透明，后面却是没模糊的应用）。区域按气泡在输入法窗口里的位置算。
     val bubbleBounds = remember { mutableStateOf<IntRect?>(null) }
+    val currentOnBubbleTop by rememberUpdatedState(onBubbleTopInWindow)
+    DisposableEffect(Unit) { onDispose { currentOnBubbleTop(null) } }
     // 气泡贴着键盘左边（用户 10-20 要求恢复）：不跟光标，所有应用位置一样。
     val positionProvider = remember(margin, gap) {
         object : PopupPositionProvider {
@@ -1521,6 +1614,7 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
                 ).also { offset ->
                     val bounds = IntRect(offset, popupContentSize)
                     if (bubbleBounds.value != bounds) bubbleBounds.value = bounds
+                    currentOnBubbleTop(offset.y.toFloat())
                 }
             }
         }
@@ -1636,15 +1730,19 @@ internal fun PreeditBubbleBlur(region: IntRect?, blurRadiusDp: Float, cornerRadi
 @Composable
 private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?,
     rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp, bubbleColor: Color,
-    labelModifier: Modifier = Modifier) {
+    labelModifier: Modifier = Modifier, onBubbleTopInWindow: (Float?) -> Unit = {}) {
     val labelSize = remember { IntArray(2) }
+    val currentOnBubbleTop by rememberUpdatedState(onBubbleTopInWindow)
+    DisposableEffect(Unit) { onDispose { currentOnBubbleTop(null) } }
     val positionProvider = remember(rotation, gap) {
         object : PopupPositionProvider {
             override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
                 layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
                 val (cx, cy) = rotatePoint(labelSize[0] / 2f, -(labelSize[1] / 2f + gap), 0f, 0f, rotation)
                 return IntOffset((anchorBounds.left + cx - popupContentSize.width / 2f).roundToInt(),
-                    (anchorBounds.top + cy - popupContentSize.height / 2f).roundToInt())
+                    (anchorBounds.top + cy - popupContentSize.height / 2f).roundToInt()).also { offset ->
+                    currentOnBubbleTop(offset.y.toFloat())
+                }
             }
         }
     }
