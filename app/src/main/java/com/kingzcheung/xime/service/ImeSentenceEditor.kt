@@ -219,15 +219,21 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
      */
     fun clearAfterEdit(owner: SentenceEditSession, reply: (Boolean) -> Unit) {
         service.keyRouter.postRimeJob("sentence_edit_clear_all") {
-            val result = if (current(owner)) service.rimeEngine.applySentenceEdit(
+            val applied = if (current(owner)) service.rimeEngine.applySentenceEdit(
                 owner.snapshot, owner.start, owner.end, emptyList(),
             ) else null
-            if (result == null) {
+            if (applied == null) {
                 withContext(Dispatchers.Main) { reply(false) }
                 return@postRimeJob
             }
+            val remainingInput = applied.inputText
+            val result = if (remainingInput.isNotEmpty()) {
+                service.rimeEngine.resetRawInputAndReadState(remainingInput) ?: applied
+            } else {
+                service.rimeEngine.discardClearUndo()
+                applied
+            }
             val hasRemaining = result.inputText.isNotEmpty() || result.candidates.isNotEmpty()
-            if (!hasRemaining) service.rimeEngine.discardClearUndo()
             withContext(Dispatchers.Main) {
                 if (previewOwner === owner) {
                     previewOwner = null; previewConnection = null; previewBase = null; previewWritten = null; previewCaret = 0
