@@ -30,6 +30,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -160,16 +161,17 @@ onKeyPressDown: ((String) -> Unit)?,
     val isLandscape = !isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     val swipeBubble = rememberSwipeBubbleController()
-    var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val keyboardBounds = remember { arrayOf(Rect.Zero) }
+    var keyboardWidthPx by remember { mutableFloatStateOf(0f) }
     val liveKeyboardBounds = remember { LiveBounds() }
-    val longPressMenuKeyboard: () -> Rect = remember(liveKeyboardBounds) { { liveKeyboardBounds.current(keyboardBounds, "keyboard") } }
+    val longPressMenuKeyboard: () -> Rect = remember(liveKeyboardBounds) { { liveKeyboardBounds.current(keyboardBounds[0], "keyboard") } }
 
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
 
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         // 按键和键盘都按这一刻的位置算，见 [LiveBounds]。
-        val origin = liveKeyboardBounds.current(keyboardBounds, "keyboard")
+        val origin = liveKeyboardBounds.current(keyboardBounds[0], "keyboard")
         val newState = if (state.isSwipeDown && state.swipeText != null) {
             state.copy(charInfos = SubcharHelper.parseSwipeDownText(state.swipeText))
         } else {
@@ -194,14 +196,16 @@ onKeyPressDown: ((String) -> Unit)?,
     Box(
         modifier = modifier
             .onGloballyPositioned { coordinates ->
-                keyboardBounds = coordinates.boundsInRoot()
+                keyboardBounds[0] = coordinates.boundsInRoot()
+                val width = coordinates.size.width.toFloat()
+                if (keyboardWidthPx != width) keyboardWidthPx = width
                 liveKeyboardBounds.coordinates = coordinates
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
         // 键缝动效的光层：最先画 = 在所有键帽底下，只从键缝里露出来。
         KeyGapLightLayer(gapLight, Modifier.matchParentSize())
-        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
+        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardWidthPx)
         if (isLandscape) {
             // 横屏：去除原左侧符号面板（符号走符号键盘），
             // 笔画布局撑满键盘区域（与全键盘横屏同款 50dp 边距）

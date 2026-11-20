@@ -20,19 +20,38 @@ internal fun floatingDockEdge(
     horizontalTravel: Float,
     maxOffsetY: Float,
     bottomInset: Float = 0f,
-    tolerance: Float = 12f,
+    tolerance: Float = FLOATING_DOCK_ENTER_DP,
 ): FloatingDockEdge? {
     return if ((offsetY - bottomInset).coerceAtLeast(0f) <= tolerance) FloatingDockEdge.BOTTOM else null
 }
 
+/** 进入底部贴边恢复区的阈值（dp）。 */
+internal const val FLOATING_DOCK_ENTER_DP = 12f
+/** 已经准备贴底后，向上离开超过该阈值（dp）才取消准备，避免松手微抖丢状态。 */
+internal const val FLOATING_DOCK_EXIT_DP = 28f
+/** 卡片顶到底边后允许记录的虚拟下顶缓冲（dp），手指向下顶后再轻微回弹不会立刻拉离底边。 */
+internal const val FLOATING_DOCK_OVERSHOOT_CUSHION_DP = 10f
+
 /**
- * 卡片顶在底边、手指再往下顶过 [FLOATING_DOCK_ARM_PUSH_DP] 后，要停这么久才变回固定，渐变框也用这么久从卡片变成固定键盘。
- * 0.75 秒（用户 10-23：0.5 秒会误贴底，1 秒太慢）。11-03 改成 0.3 秒、还把拖到底之前的行程算进去，
- * 一路往下拖到底就直接满了，松手瞬间变固定、看不到渐变，也容易误贴底（用户 11-10）。
+ * 进入底部贴边恢复状态并保持不松开时，显示最终定位框并可松手还原的等待时长（ms）。
+ * 由 450ms 大幅缩短为 150ms，配合最低驻留保护 [FLOATING_DOCK_MIN_DWELL_MILLIS]，
+ * 兼顾贴底快速响应与快速拖到底不误取消悬浮窗。
  */
-internal const val FLOATING_DOCK_DURATION_MILLIS = 750L
-/** 卡片已经到底边后，手指还得再往下顶这么多才开始准备贴底；只是把卡片挪到底边附近不会贴底。 */
-internal const val FLOATING_DOCK_ARM_PUSH_DP = 8f
+internal const val FLOATING_DOCK_DURATION_MILLIS = 150L
+/** 快速拖到底过冲时也不得在进入底边区后的极短时间内立即满格，避免误取消悬浮。 */
+internal const val FLOATING_DOCK_MIN_DWELL_MILLIS = 110L
+/** 卡片原本就停在底边贴边区内时，需要净向下再顶这么多（dp）才准备贴底，防止纯横移误触发。 */
+internal const val FLOATING_DOCK_ARM_PUSH_DP = 4f
+/** 从上方拖入底边区前，有效的向下接近行程（dp）；达到后一进底边区即刻进入准备状态。 */
+internal const val FLOATING_DOCK_APPROACH_DOWN_DP = 12f
+/** 已经准备贴底后，相对进入点横向偏离超过这么多（dp）才取消准备。 */
+internal const val FLOATING_DOCK_ARMED_LATERAL_CANCEL_DP = 40f
+/** 已经准备贴底后，继续往下顶过死区再走完这段行程（dp）也可提前满格，适配屏底剩余行程有限的手机。 */
+internal const val FLOATING_DOCK_PUSH_DEAD_ZONE_DP = 8f
+internal const val FLOATING_DOCK_PUSH_SPAN_DP = 24f
+
+internal fun floatingDockPushProgress(pushDp: Float): Float =
+    ((pushDp - FLOATING_DOCK_PUSH_DEAD_ZONE_DP) / FLOATING_DOCK_PUSH_SPAN_DP).coerceIn(0f, 1f)
 
 /**
  * Releasing docks exactly when the preview shows the docked shape: the outline has reached it and the
@@ -61,64 +80,146 @@ internal fun floatingDragAreaHeightDp(contentPaddingDp: Int, keyClearanceDp: Flo
         .coerceAtMost(totalHeightDp.coerceAtLeast(0f))
 
 /**
- * 贴底变回固定只看卡片到底边以后的那一段：拖到底之前走了多远都不算（用户 11-10：一路拖到底就瞬间变固定）。
- * [move] 的纵向量是「手指往下、卡片却已经动不了」的那部分，卡片跟着动的不算；卡片离开底边贴边区就作废，再回来从头算。
+ * 贴底变回固定只看进入底边区后的阶段：拖到底之前走了多远都不算入进度条（progress 从 0 开始）。
+ * - 从上方有效下拖进底边区时会立即进入准备状态（[armed]），避免被屏底手势区或斜向接近累积的横向位移卡住；
+ * - 本来就在底边区内时，需要净向下顶过 [FLOATING_DOCK_ARM_PUSH_DP] 才准备，纯横移不误触；
+ * - 准备后具备纵向迟滞（[FLOATING_DOCK_EXIT_DP]）与横向容差（[FLOATING_DOCK_ARMED_LATERAL_CANCEL_DP]），微抖不丢状态。
  */
 internal class FloatingDockGesture {
-    private var x = 0f
-    private var y = 0f
+    private var approachDownY = 0f
+    private var armPushX = 0f
+    private var armPushY = 0f
+    private var armedPushY = 0f
+    private var armedLateralX = 0f
     private var pull by mutableFloatStateOf(0f)
     private var hold by mutableFloatStateOf(0f)
+    private var heldMillis = 0L
     var armed by mutableStateOf(false)
         private set
     var epoch by mutableIntStateOf(0)
         private set
-    val progress get() = if (armed) maxOf(pull, hold) else 0f
+    val progress: Float
+        get() {
+            if (!armed) return 0f
+            val raw = maxOf(pull, hold)
+            return if (heldMillis >= FLOATING_DOCK_MIN_DWELL_MILLIS) raw else minOf(raw, 0.99f)
+        }
 
-    /** [dx] 手指横向位移，[pushDy] 卡片到底后手指继续往下顶出去的距离（dp），[onBottom] 卡片在底边贴边区。 */
-    fun move(dx: Float, pushDy: Float, onBottom: Boolean) {
-        if (!onBottom) {
-            // 离开底边：这次贴底作废，再次靠近要从新的行程开始。
-            x = 0f
-            y = 0f
-            pull = 0f
-            if (armed) {
-                armed = false
-                hold = 0f
-                epoch++
+    /**
+     * [dx] 手指横向位移（dp），[dy] 手指纵向位移（向下为正，dp），
+     * [pushDy] 卡片顶在底边时手指继续往下顶出的位移（dp），
+     * [distanceToBottomDp] 卡片底边距离底边限位的距离（dp），
+     * [canDock] 是否具备可还原的固定目标（未旋转且有目标尺寸）。
+     */
+    fun move(
+        dx: Float,
+        dy: Float,
+        pushDy: Float,
+        distanceToBottomDp: Float,
+        canDock: Boolean,
+    ) {
+        if (!canDock) {
+            resetAll(bumpEpoch = armed)
+            return
+        }
+        if (armed) {
+            if (distanceToBottomDp > FLOATING_DOCK_EXIT_DP) {
+                resetAll(bumpEpoch = true)
+                return
+            }
+            armedLateralX += dx
+            if (abs(armedLateralX) > FLOATING_DOCK_ARMED_LATERAL_CANCEL_DP) {
+                resetAll(bumpEpoch = true)
+                return
+            }
+            if (dy > 0f && pushDy > 0f) {
+                armedPushY += pushDy
+                pull = maxOf(pull, floatingDockPushProgress(armedPushY))
+            } else if (dy < 0f) {
+                // 防止在缓冲区间内上下高频微晃叠加进度；已达到的最高进度保留，避免回弹抖动掉落。
+                armedPushY = (armedPushY + dy).coerceAtLeast(0f)
             }
             return
         }
-        x += dx
-        y += pushDy.coerceAtLeast(0f)
-        pull = modeSwitchPullProgress(y, x)
-        // 准备好以后手指在底边轻微晃动、往回一点点都不作废，横着滑出去比往下顶的还多才作废。
-        val reach = y - abs(x)
-        val next = if (armed) reach >= 0f else reach >= FLOATING_DOCK_ARM_PUSH_DP
-        if (armed != next) {
-            if (!next) {
-                x = 0f
-                y = 0f
-                pull = 0f
+
+        if (distanceToBottomDp > FLOATING_DOCK_ENTER_DP) {
+            armPushX = 0f
+            armPushY = 0f
+            if (dy < 0f) {
+                approachDownY = (approachDownY + dy).coerceAtLeast(0f)
+            } else if (dy > 0f && dy * 3f >= abs(dx)) {
+                approachDownY = (approachDownY + dy).coerceAtMost(FLOATING_DOCK_APPROACH_DOWN_DP * 2f)
             }
-            armed = next
-            hold = 0f
-            epoch++
+            return
+        }
+
+        // 处理单帧快速从进入区上方跨入底边区的情况。
+        val beforeDistance = distanceToBottomDp + (dy - pushDy.coerceAtLeast(0f)).coerceAtLeast(0f)
+        if (beforeDistance > FLOATING_DOCK_ENTER_DP && dy > 0f && dy * 3f >= abs(dx)) {
+            approachDownY = (approachDownY + (beforeDistance - FLOATING_DOCK_ENTER_DP))
+                .coerceAtMost(FLOATING_DOCK_APPROACH_DOWN_DP * 2f)
+        }
+
+        if (approachDownY >= FLOATING_DOCK_APPROACH_DOWN_DP) {
+            arm(initialPushDy = pushDy.coerceAtLeast(0f))
+            return
+        }
+
+        // 本来就在底边区内（或横向偏离取消后重新尝试）：需要明显向下顶动，横向移动不积累负债。
+        if (dy > 0f) {
+            armPushY += dy
+            armPushX += abs(dx)
+            val net = armPushY - armPushX
+            if (net <= 0f) {
+                armPushY = 0f
+                armPushX = 0f
+            } else if (net >= FLOATING_DOCK_ARM_PUSH_DP) {
+                arm(initialPushDy = pushDy.coerceAtLeast(0f))
+            }
+        } else if (dy < 0f) {
+            armPushY = (armPushY + dy).coerceAtLeast(0f)
+            if (armPushY == 0f) armPushX = 0f
+        } else if (abs(dx) > 0f) {
+            armPushY = 0f
+            armPushX = 0f
         }
     }
 
+    private fun arm(initialPushDy: Float) {
+        armed = true
+        hold = 0f
+        heldMillis = 0L
+        armedLateralX = 0f
+        armedPushY = initialPushDy
+        pull = floatingDockPushProgress(armedPushY)
+        approachDownY = 0f
+        armPushX = 0f
+        armPushY = 0f
+        epoch++
+    }
+
+    private fun resetAll(bumpEpoch: Boolean) {
+        approachDownY = 0f
+        armPushX = 0f
+        armPushY = 0f
+        armedPushY = 0f
+        armedLateralX = 0f
+        pull = 0f
+        hold = 0f
+        heldMillis = 0L
+        armed = false
+        if (bumpEpoch) epoch++
+    }
+
     fun advanceHold(elapsedMillis: Long, startedEpoch: Int) {
-        if (armed && epoch == startedEpoch)
+        if (armed && epoch == startedEpoch) {
+            heldMillis = maxOf(heldMillis, elapsedMillis.coerceAtLeast(0L))
             hold = (elapsedMillis.toFloat() / FLOATING_DOCK_DURATION_MILLIS).coerceIn(0f, 1f)
+        }
     }
 
     fun cancel() {
-        x = 0f
-        y = 0f
-        pull = 0f
-        hold = 0f
-        armed = false
-        epoch++
+        resetAll(bumpEpoch = true)
     }
 }
 

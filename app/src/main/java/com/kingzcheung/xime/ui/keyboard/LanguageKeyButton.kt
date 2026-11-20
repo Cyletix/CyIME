@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
@@ -157,10 +158,11 @@ fun LanguageKeyButton(
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val suppressCursorMove = LocalSuppressCursorMove.current
-    var keyWindowBounds by remember { mutableStateOf(Rect.Zero) }
-    var keyScreenPosition by remember { mutableStateOf(Offset.Zero) }
+    val keyBounds = remember { LanguageKeyBounds() }
+    var observedKeyWindowBounds by remember { mutableStateOf(Rect.Zero) }
     var menuSchemas by remember { mutableStateOf<List<SchemaInfo>>(emptyList()) }
     var menuOpen by remember { mutableStateOf(false) }
+    val menuOpenNow by rememberUpdatedState(menuOpen)
     var pointer by remember { mutableStateOf(Offset.Unspecified) }
     var viewport by remember { mutableStateOf(Rect.Zero) }
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -171,13 +173,18 @@ fun LanguageKeyButton(
     var edgeScrollArmed by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
     val density = LocalDensity.current
-    val panelBounds = LocalLanguageMenuPanel.current
+    val panelHost = LocalLanguageMenuPanel.current
+    val panelBounds = if (menuOpen) panelHost?.rememberObservedBounds() ?: Rect.Zero else Rect.Zero
     val fallbackBounds = Rect(0f, 0f, view.width.toFloat(), view.height.toFloat())
     // 语言多时菜单往上长出键盘，最高到状态栏下沿（键盘窗口比键盘高，上面是透明的）。
     val windowCeiling = remember(view, menuOpen) { languageMenuWindowCeiling(view) }
-    val menuGeometry = languageMenuGeometry(
+    val activeKeyWindowBounds = if (menuOpen) {
+        observedKeyWindowBounds.takeIf { it.width > 0f && it.height > 0f } ?: keyBounds.currentWindowBounds()
+    } else Rect.Zero
+    val menuGeometry = if (menuOpen) languageMenuGeometry(
         panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds,
-        keyWindowBounds, density.density, menuSchemas.size, windowCeiling)
+        activeKeyWindowBounds, density.density, menuSchemas.size, windowCeiling)
+    else LanguageMenuGeometry(Rect.Zero, 44f * density.density)
     val rowHeight = menuGeometry.rowHeightPx
     // 下面的按键手势只在 hasMenu 变化时重建：直接用 rowHeight 会停在菜单还没打开时（0 种语言）算的行高。
     // 语言多、键上方放不下时菜单把行高压低，手指越往下滑，命中的行就差得越多（GitHub #40：差半行）。
@@ -262,8 +269,11 @@ fun LanguageKeyButton(
     Box(
         modifier.fillMaxWidth().fillMaxHeight()
             .onGloballyPositioned {
-                keyWindowBounds = it.boundsInWindow()
-                keyScreenPosition = it.positionOnScreen()
+                keyBounds.update(it)
+                if (menuOpenNow) {
+                    val next = keyBounds.windowBounds
+                    if (observedKeyWindowBounds != next) observedKeyWindowBounds = next
+                }
             }
             .pointerInput(hasMenu) {
                 awaitEachGesture {
@@ -284,6 +294,7 @@ fun LanguageKeyButton(
                         imm?.showInputMethodPicker()
                     } else if (hasMenu) scope.launch {
                         delay((menuHoldSeconds * 1000).roundToLong())
+                        observedKeyWindowBounds = keyBounds.currentWindowBounds()
                         menuSchemas = schemas
                         selectedId = null
                         viewport = Rect.Zero
@@ -305,7 +316,7 @@ fun LanguageKeyButton(
                                 if (!change.pressed) break
                             } else if (menuOpen) {
                                 change.consume()
-                                pointer = keyScreenPosition + change.position
+                                pointer = keyBounds.currentScreenPosition() + change.position
                                 selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, currentRowHeight, selectedId)
                                 if (!change.pressed) {
                                     chosenId = selectedId
@@ -563,4 +574,21 @@ internal fun LanguageMenuCard(
             }
         }
     }
+}
+
+/** 缓存语言键的窗口/屏幕坐标，避免平移期间每次布局都触发重组。 */
+private class LanguageKeyBounds {
+    var coordinates: LayoutCoordinates? = null
+    var windowBounds: Rect = Rect.Zero
+    var screenPosition: Offset = Offset.Zero
+
+    fun update(coords: LayoutCoordinates) {
+        coordinates = coords
+        windowBounds = coords.boundsInWindow()
+        screenPosition = coords.positionOnScreen()
+    }
+
+    fun currentWindowBounds(): Rect = coordinates?.takeIf { it.isAttached }?.boundsInWindow() ?: windowBounds
+
+    fun currentScreenPosition(): Offset = coordinates?.takeIf { it.isAttached }?.positionOnScreen() ?: screenPosition
 }

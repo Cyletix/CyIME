@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -383,7 +384,8 @@ fun SwipeableKeyButton(
     var longPressShown by remember { mutableStateOf(false) }
     // 方向圆盘只在手指拂出去或按住一会儿后出现；快速点按不弹（用户 11-03：只点不拂时轮盘让打字发卡）。
     var discRevealed by remember { mutableStateOf(false) }
-    var buttonBounds by remember { mutableStateOf(Rect.Zero) }
+    val buttonBounds = remember { arrayOf(Rect.Zero) }
+    var keyWidthPx by remember { mutableFloatStateOf(0f) }
     // 浮标按这一刻按键的位置画，见 [LiveBounds]。
     val liveBounds = remember { LiveBounds() }
 
@@ -405,7 +407,7 @@ fun SwipeableKeyButton(
     // 不两个叠着；长按到点换成角标气泡。
     fun forwardPreview(state: SwipeState) {
         val discOwnsPress = discRevealed && state.isPressed && !state.isLongPress && state.keyFlick == null
-        onSwipeStateChange?.invoke(if (discOwnsPress) SwipeState() else state, liveBounds.current(buttonBounds, "key $text"))
+        onSwipeStateChange?.invoke(if (discOwnsPress) SwipeState() else state, liveBounds.current(buttonBounds[0], "key $text"))
     }
     // In flick mode the held key's own value (the digit) is a one-item long-press popup: it shows
     // what will be entered and commits only on release, like every other long-press choice.
@@ -458,7 +460,7 @@ fun SwipeableKeyButton(
     val menuKeyboard = LocalLongPressMenuKeyboard.current
     // 长按选项条在本键坐标里的位置，和气泡按同样的键、键盘位置算（见 processSwipeState 换成键盘坐标那一步）。
     val longPressMenuCells: (Int, Boolean) -> LongPressMenuCells = { count, iconMenu ->
-        val key = liveBounds.current(buttonBounds, "key $text")
+        val key = liveBounds.current(buttonBounds[0], "key $text")
         val keyboard = menuKeyboard?.invoke()
         val keyLeft = if (keyboard != null) key.left - keyboard.left else 0f
         val cells = KeyboardKeyMetrics.longPressMenuCells(keyLeft, key.width, count, iconMenu,
@@ -484,7 +486,7 @@ fun SwipeableKeyButton(
         verticalThresholdDp = flickThresholdDp,
         reserveHorizontalSwipe = true,
         freeDirection = true,
-        keyWidth = buttonBounds.width,
+        keyWidth = keyWidthPx,
         longPressItems = if (flickLongPressNow) emptyList() else listOfNotNull(flickLongPressLabel),
         onLongPressSelect = if (flickLongPressNow) null else { _ -> onFlickLongPress?.invoke() },
         onLongPress = if (flickLongPressNow) { { onFlickLongPress?.invoke() } } else null,
@@ -520,7 +522,7 @@ fun SwipeableKeyButton(
         // 横滑动作（如九键 0 键左滑「上一项」）和上下滑一样在键内渐变，不再弹旧的滑动浮窗（用户 10-24）。
         inlineHorizontalPreview = true,
         longPressDrawableIds = longPressDrawableIds.orEmpty(),
-        keyWidth = buttonBounds.width,
+        keyWidth = keyWidthPx,
         longPressMenuCells = longPressMenuCells,
         onLongPressSelect = onLongPressSelect,
         longPressTimeoutMillis = longPressTimeoutMillis,
@@ -587,7 +589,7 @@ fun SwipeableKeyButton(
         if (isPressed) {
             delay(FLICK_DISC_HOLD_MS)
             discRevealed = true
-            if (!longPressShown) onSwipeStateChange?.invoke(SwipeState(), liveBounds.current(buttonBounds, "key $text"))
+            if (!longPressShown) onSwipeStateChange?.invoke(SwipeState(), liveBounds.current(buttonBounds[0], "key $text"))
         }
     }
     val showDisc = inputPreferences.flickDirectionDisc && isPressed && discRevealed && !longPressShown &&
@@ -694,14 +696,17 @@ fun SwipeableKeyButton(
             }
             .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
-                buttonBounds = coordinates.boundsInRoot()
+                val rootBounds = coordinates.boundsInRoot()
+                buttonBounds[0] = rootBounds
+                val width = coordinates.size.width.toFloat()
+                if (keyWidthPx != width) keyWidthPx = width
                 liveBounds.coordinates = coordinates
-                if (shiftTargets != null) dragBounds = if (dragSpace.card == null) buttonBounds else dragSpace.bounds(coordinates)
+                if (shiftTargets != null) dragBounds = if (dragSpace.card == null) rootBounds else dragSpace.bounds(coordinates)
                 // 手势里的坐标从加 edgeContentPadding 之前的外框量起：减掉左、上边距才是键盘坐标的原点。
                 slideOrigin[0] = dragBounds.left - with(density) { edgeContentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr).toPx() }
                 slideOrigin[1] = dragBounds.top - with(density) { edgeContentPadding.calculateTopPadding().toPx() }
                 // 滑行的键位与轨迹同在键盘卡片坐标里：悬浮键盘旋转后 boundsInRoot 是斜放键的外接框，滑行会落到别的键。
-                letterGeometry?.place(text, if (dragSpace.card == null) buttonBounds else dragSpace.bounds(coordinates))
+                letterGeometry?.place(text, if (dragSpace.card == null) rootBounds else dragSpace.bounds(coordinates))
             }
             .padding(scaledKeyVisualPadding())
             .then(if (hexagonal) Modifier.honeycombCap() else Modifier)
@@ -1140,7 +1145,7 @@ fun SwipeableIconKeyButton(
         !LocalKeyboardInputPreferences.current.let { if (deleteKey) it.deleteSwipeReversed else it.reverseSymbolSwipe })
     var isPressed by remember { mutableStateOf(false) }
     var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
-    var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val buttonBounds = remember { arrayOf(Rect.Zero) }
     val liveBounds = remember { LiveBounds() }
     val keyLabelFontFamily = AppFonts.keyLabelFontFamily
     val density = LocalDensity.current
@@ -1213,13 +1218,13 @@ fun SwipeableIconKeyButton(
                         actionDistanceDp = actionDistanceDp,
                         onPreview = { state ->
                             flickPreview = state.keyFlick
-                            currentOnSwipeStateChange?.invoke(state, liveBounds.current(buttonBounds, "function key"))
+                            currentOnSwipeStateChange?.invoke(state, liveBounds.current(buttonBounds[0], "function key"))
                         },
                     ).let { if (swapVertical) it.withSymbolSwipeDirection(reverse = false) else it }
                 }
             }
             .onGloballyPositioned { coordinates ->
-                buttonBounds = coordinates.boundsInRoot()
+                buttonBounds[0] = coordinates.boundsInRoot()
                 liveBounds.coordinates = coordinates
             }
             .padding(visualPadding ?: scaledKeyVisualPadding())

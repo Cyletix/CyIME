@@ -96,7 +96,10 @@ internal fun ReorderableToolbar(
                     if (ToolbarPressMenuGate.open) return@launch
                     pointer = rowBounds.topLeft + down.position
                     dragged = order.firstOrNull { bounds[it]?.contains(pointer) == true }
-                    if (dragged != null) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (dragged != null) {
+                        ToolbarPressMenuGate.reordering = true
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                 }
                 try {
                     while (true) {
@@ -115,12 +118,13 @@ internal fun ReorderableToolbar(
                 } finally {
                     timer.cancel()
                     dragged = null
+                    ToolbarPressMenuGate.reordering = false
                 }
             }
         }) {
         // 每个图标占等宽一格，整格可点；放不下时按最小格宽横向滚动。
         val slotWidth = maxOf(maxWidth / displayedOrder.size.coerceAtLeast(1), 36.dp)
-        Row(Modifier.horizontalScroll(scroll, enabled = inlineEditor?.dragging == null).widthIn(min = maxWidth),
+        Row(Modifier.horizontalScroll(scroll, enabled = inlineEditor?.dragging == null && scroll.maxValue > 0).widthIn(min = maxWidth),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             displayedOrder.forEach { id ->
                 val action = actions.firstOrNull { it.item.id == id } ?: return@forEach
