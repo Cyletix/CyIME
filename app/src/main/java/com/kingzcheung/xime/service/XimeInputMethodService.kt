@@ -368,9 +368,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             fixedKeyboardBottomInsetPx(insets, win, normal, minimum) else normal
         if (reading != null) SettingsPreferences.setKeyboardBottomDiagnostic(this, bottomNavDiagnostic(this, reading, position,
             SettingsPreferences.getKeyboardBottomAdjustmentDp(this), fixedBottomInsetPxState.value))
-        // 设置页的「底部留白校准」看不到输入法窗口，记下这次量到的可调低范围，调低按到下限就停。
-        if (insets != null) SettingsPreferences.setKeyboardBottomLoweringLimitDp(this,
-            suggestedBottomDp() - imeBottomSpaceDp(minimum, resources.displayMetrics.density))
+        // 设置页的「底部留白校准」看不到输入法窗口，记下这次量到的可调低范围与系统抬高高度。
+        if (insets != null) {
+            SettingsPreferences.setKeyboardBottomLoweringLimitDp(this,
+                suggestedBottomDp() - imeBottomSpaceDp(minimum, resources.displayMetrics.density))
+            val navButtonsDp = imeBottomSpaceDp(reading?.imeButtonsPx ?: 0, resources.displayMetrics.density)
+            val measuredSystemLiftDp = maxOf(suggestedBottomDp(), navButtonsDp)
+            val resolvedSystemLiftDp = if (measuredSystemLiftDp >= 28) measuredSystemLiftDp
+                else SettingsPreferences.DEFAULT_SYSTEM_LIFT_HEIGHT_DP
+            SettingsPreferences.setKeyboardBottomSystemHeightDp(this, resolvedSystemLiftDp)
+        }
         val state = uiState.value
         if (state.isFloatingMode && !state.showKeyboardResize && previousSuggestion != suggestedBottomDp() &&
             SettingsPreferences.getFloatingOffsetY(this, resources.configuration.screenWidthDp > resources.configuration.screenHeightDp, -1) < 0) {
@@ -1018,7 +1025,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
             }
             // 底部留白、调低按横竖屏分开存（键名带方向后缀），哪个方向的改了都重新量。
-            if (key == SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD || SettingsPreferences.isBottomCalibrationKey(key)) {
+            if (key == SettingsPreferences.KEY_EDGE_TO_EDGE_KEYBOARD ||
+                key == SettingsPreferences.KEY_KEYBOARD_BOTTOM_POSITION ||
+                SettingsPreferences.isBottomCalibrationKey(key)) {
                 val decor = window.window?.decorView
                 refreshKeyboardBottomPadding()
                 updateKeyboardBottomInsets(decor?.rootWindowInsets)
