@@ -5,7 +5,11 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.magnifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
@@ -220,10 +224,11 @@ internal fun ToolbarItemsRow(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val scroll = rememberScrollState()
     BoxWithConstraints(modifier) {
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
+                .horizontalScroll(scroll, enabled = scroll.maxValue > 0)
                 .widthIn(min = maxWidth),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -465,11 +470,17 @@ fun CandidateBar(
         (state is CandidateBarState.ChineseCandidates || state is CandidateBarState.AssociationOnly)
     val candidateRowHeight = if (topLineMode) 44.dp - topLineHeight else 44.dp
     val cardTopCorner = LocalKeyboardCardTopCorner.current
+    val toolbarDragSession = LocalFloatingKeyboardDrag.current
+    val toolbarInlineEditor = LocalInlineQuickActionEditor.current
     Column(
         modifier = modifier
             .fillMaxWidth()
             .then(if (state is CandidateBarState.ClipboardDisplay) Modifier.heightIn(min = 44.dp)
                 else Modifier.height(44.dp))
+            .floatingToolbarDrag(
+                session = toolbarDragSession,
+                enabled = state is CandidateBarState.Idle && toolbarInlineEditor?.dragging == null,
+            )
             .onGloballyPositioned {
                 barOrigin = it.positionInWindow()
                 barTopInWindow = barOrigin.y
@@ -2324,6 +2335,58 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.revealItem(in
             null -> { scrollToItem(index); return }
             0 -> return
             else -> scrollBy(delta.toFloat())
+        }
+    }
+}
+
+/** 悬浮模式下拖动任务栏（空闲工具栏）即可移动键盘，轻点图标、长按弹窗与长按重排均保持原样。 */
+private fun Modifier.floatingToolbarDrag(
+    session: FloatingKeyboardDragSession?,
+    enabled: Boolean,
+): Modifier = composed {
+    if (session == null || !enabled) return@composed this
+    val currentSession by rememberUpdatedState(session)
+    pointerInput(session.geometryLocked) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.isConsumed) return@awaitEachGesture
+            var dragging = false
+            try {
+                while (true) {
+                    val initialEvent = awaitPointerEvent(PointerEventPass.Initial)
+                    val initialChange = initialEvent.changes.firstOrNull { it.id == down.id } ?: break
+                    if (initialChange.isConsumed || ToolbarPressMenuGate.open || ToolbarPressMenuGate.reordering) {
+                        if (dragging) {
+                            dragging = false
+                            currentSession.onCancel()
+                        }
+                        break
+                    }
+                    if (!initialChange.pressed) {
+                        if (dragging) initialChange.consume()
+                        break
+                    }
+                    if (dragging) {
+                        val delta = initialChange.positionChange()
+                        initialChange.consume()
+                        if (delta != Offset.Zero) currentSession.onMove(delta)
+                    } else if ((initialChange.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                        if (currentSession.geometryLocked) {
+                            currentSession.onLockedDrag()
+                            break
+                        }
+                        dragging = true
+                        currentSession.onStart()
+                        val delta = initialChange.position - down.position
+                        initialChange.consume()
+                        if (delta != Offset.Zero) currentSession.onMove(delta)
+                    }
+                }
+                if (dragging) currentSession.onEnd()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                if (dragging) currentSession.onCancel()
+                throw cancelled
+            }
         }
     }
 }

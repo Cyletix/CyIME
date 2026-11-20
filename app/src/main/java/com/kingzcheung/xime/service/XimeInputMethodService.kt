@@ -363,7 +363,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         fixedMinimumInsetPxState.value = minimum
         // 「底部位置」只管固定键盘：悬浮键盘的最低位置按系统按钮和手势区算。
         floatingMinimumInsetPxState.value = if (win != null && insets != null && reading != null)
-            floatingMinimumInsetPx(win, insets, normal, reading) else minimum
+            floatingMinimumInsetPx(win, insets, normal, reading)
+        else fallbackFloatingMinimumInsetPx(this, minimum)
         fixedBottomInsetPxState.value = if (win != null && insets != null)
             fixedKeyboardBottomInsetPx(insets, win, normal, minimum) else normal
         if (reading != null) SettingsPreferences.setKeyboardBottomDiagnostic(this, bottomNavDiagnostic(this, reading, position,
@@ -674,6 +675,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         set(value) { keyboardReportsChinese = value }
     internal var currentEffectiveKeyboardHeight: Int = 0
     private var floatingCardBounds: android.graphics.Rect? = null
+    /** 悬浮键盘拖动或调大小期间（关闭玻璃特效时）跳过每帧 requestLayout 与毛玻璃重建，松手后统一刷新。 */
+    private var floatingDragging = false
     /** 悬浮卡片外四角角标把手（亮着时）：露在卡片外的部分也要能按到。 */
     private var floatingCornerHandleBounds: List<android.graphics.Rect> = emptyList()
     private var fixedCardBounds: android.graphics.Rect? = null
@@ -2421,7 +2424,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             // 无需 +1dp hack 强制造型变化。
                             handwritingNormalInsetDp = keyboardHeight + state.keyboardBottomPaddingDp + activeBottomDp
                             handwritingOverlayActive = handwritingExpanded
-                            keyboardContainer.updateHeight(totalDp)
+                            if (state.isFloatingMode || state.showKeyboardResize || state.isCompact) {
+                                keyboardContainer.updateMatchParentHeight()
+                            } else {
+                                keyboardContainer.updateHeight(totalDp)
+                            }
                             currentEffectiveKeyboardHeight = if (state.isFloatingMode) floatingCardContentHeight + overlayPanelExtra
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
                                 else effectiveKeyboardHeight + overlayPanelExtra
@@ -3008,12 +3015,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 // 语义与按键按下反馈完全一致（模式/时长/振幅走同一配置）
                                 onHapticFeedback = { feedbackManager.hapticFeedback(hapticView) },
                                 onCardPositioned = { left: Int, top: Int, right: Int, bottom: Int ->
-                                    // 毛玻璃窗口只能是直角矩形，盖不住转过的卡片；转着时不放玻璃。
-                                    keyboardGlassCard = if (state.isFloatingMode && com.kingzcheung.xime.ui.keyboard
-                                            .isFloatingRotated(state.floatingRotation)) null
-                                        else android.graphics.Rect(left, top, right, bottom)
-                                    keyboardGlassCardOrigin = glassAnchorOrigin()
-                                    updateKeyboardGlass()
+                                    if (!floatingDragging) {
+                                        // 毛玻璃窗口只能是直角矩形，盖不住转过的卡片；转着时不放玻璃。
+                                        keyboardGlassCard = if (state.isFloatingMode && com.kingzcheung.xime.ui.keyboard
+                                                .isFloatingRotated(state.floatingRotation)) null
+                                            else android.graphics.Rect(left, top, right, bottom)
+                                        keyboardGlassCardOrigin = glassAnchorOrigin()
+                                        updateKeyboardGlass()
+                                    }
                                     if (!state.isFloatingMode) navigationStripCard.value = androidx.compose.ui.geometry.Rect(
                                         left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
                                     val cardHeightPx = bottom - top
@@ -3032,7 +3041,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         val bounds = android.graphics.Rect(left, top, right, bottom)
                                         if (floatingCardBounds != bounds) {
                                             floatingCardBounds = bounds
-                                            keyboardContainer.requestLayout()
+                                            if (!floatingDragging) keyboardContainer.requestLayout()
                                         }
                                     }
                                 },
@@ -3040,6 +3049,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     if (floatingCornerHandleBounds != rects) {
                                         floatingCornerHandleBounds = rects
                                         if (::keyboardContainer.isInitialized) keyboardContainer.requestLayout()
+                                    }
+                                },
+                                onFloatingDragStateChange = { dragging ->
+                                    if (floatingDragging != dragging) {
+                                        floatingDragging = dragging
+                                        if (!dragging) {
+                                            floatingCardBounds?.let { b ->
+                                                keyboardGlassCard = if (uiState.value.isFloatingMode && com.kingzcheung.xime.ui.keyboard
+                                                        .isFloatingRotated(uiState.value.floatingRotation)) null
+                                                    else android.graphics.Rect(b)
+                                                keyboardGlassCardOrigin = glassAnchorOrigin()
+                                            }
+                                            updateKeyboardGlass()
+                                            if (::keyboardContainer.isInitialized) keyboardContainer.requestLayout()
+                                        }
                                     }
                                 },
                             )
@@ -3068,21 +3092,70 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         win.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
+    private var inputAreaHooked = false
+
+    private fun findFullscreenArea(decorView: View?): View? {
+        val id = resources.getIdentifier("fullscreenArea", "id", "android")
+        return if (id != 0) decorView?.findViewById(id) else null
+    }
+
+    private fun ensureInputAreaFits(decorView: View? = window.window?.decorView) {
+        val area = decorView?.findViewById<FrameLayout>(android.R.id.inputArea) ?: return
+        val parent = area.parent as? android.view.ViewGroup
+        if (parent != null) {
+            if (parent.clipChildren) parent.clipChildren = false
+            if (parent.clipToPadding) parent.clipToPadding = false
+        }
+        if (area.clipChildren) area.clipChildren = false
+        if (area.clipToPadding) area.clipToPadding = false
+        area.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        if (!isFullscreenMode) {
+            findFullscreenArea(decorView)?.let { fs ->
+                if (fs.visibility == View.INVISIBLE) fs.visibility = View.GONE
+            }
+        }
+        val lp = area.layoutParams
+        val isWeightFill = lp is android.widget.LinearLayout.LayoutParams && lp.height == 0 && lp.weight > 0f
+        val shrunkBelowChild = ::keyboardContainer.isInitialized &&
+            area.height > 0 && keyboardContainer.height > area.height
+        val needsExpand = lp != null && lp.height != android.view.ViewGroup.LayoutParams.MATCH_PARENT && !isWeightFill
+        if (needsExpand || shrunkBelowChild) {
+            if (shrunkBelowChild) {
+                val fsVis = findFullscreenArea(decorView)?.visibility
+                FileLogger.w(TAG, "ensureInputAreaFits: areaH=${area.height} lpH=${lp?.height} kbH=${keyboardContainer.height} fsVis=$fsVis")
+            }
+            if (lp is android.widget.LinearLayout.LayoutParams) {
+                if (shrunkBelowChild) {
+                    lp.height = 0
+                    lp.weight = 1f
+                } else {
+                    lp.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                }
+                area.layoutParams = lp
+            } else if (lp != null) {
+                lp.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                area.layoutParams = lp
+            }
+            area.requestLayout()
+        }
+        if (!inputAreaHooked) {
+            inputAreaHooked = true
+            area.addOnLayoutChangeListener { v, _, top, _, bottom, _, _, _, _ ->
+                val areaH = bottom - top
+                val kbH = if (::keyboardContainer.isInitialized) keyboardContainer.height else 0
+                val fs = findFullscreenArea(decorView)
+                if ((kbH > areaH && areaH > 0) || (!isFullscreenMode && fs?.visibility == View.INVISIBLE)) {
+                    v.post { ensureInputAreaFits(decorView) }
+                }
+            }
+        }
+    }
+
     override fun setInputView(view: View) {
+        inputAreaHooked = false
         super.setInputView(view)
         try {
-            window.window?.decorView
-                ?.findViewById<FrameLayout>(android.R.id.inputArea)
-                ?.let { area ->
-                    area.updateLayoutParams<android.view.ViewGroup.LayoutParams> {
-                        height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                    }
-                    // 栏外编码气泡越出容器顶边后进入 inputArea 空白区，
-                    // inputArea 默认 clipChildren=true 会把越界部分裁掉。
-                    area.clipChildren = false
-                    // Only the keyboard card and navigation strip paint a background.
-                    area.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
+            ensureInputAreaFits()
             // 容器在 inputArea 内底部对齐（gravity BOTTOM）：
             // 容器物理高度 = Compose 内容总高，小于全屏窗口时若默认 top-left
             // 对齐会让键盘跑到屏顶。高度由 SideEffect 的 updateHeight 动态设置。
@@ -3331,6 +3404,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 模式变化立即撤销旧卡片的高度/触摸区域，避免宿主缓存上一帧的浮动留白。 */
     internal fun refreshKeyboardGeometry() {
+        if (!uiState.value.isFloatingMode) floatingDragging = false
         floatingCardBounds = null
         fixedCardBounds = null
         clearHardwareSurfaceBounds()
@@ -3342,20 +3416,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val config = resources.configuration
             val screenHeight = config.screenHeightDp
             val activeBottom = keyboardBottomSpaceDp(state)
-            // 悬浮模式必须让输入法宿主保持“物理可见全高”。
-            // 不能在确认后又退回 configuration.screenHeightDp；那会把卡片上半部裁出 IME 宿主。
-            val physicalScreenDp = (resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt()
-            val statusBarDp = tryGetStatusBarHeightDp(this, window.window)
-            val floatingHostHeight = (physicalScreenDp - statusBarDp).coerceAtLeast(1)
-            val height = when {
-                state.isFloatingMode || state.showKeyboardResize || state.isCompact -> floatingHostHeight
-                else -> {
-                    val content = resolveKeyboardSize(config.screenWidthDp, screenHeight,
-                        state.keyboardBottomPaddingDp + activeBottom, state).height
-                    content + state.keyboardBottomPaddingDp + activeBottom
-                }
+            if (state.isFloatingMode || state.showKeyboardResize || state.isCompact) {
+                keyboardContainer.updateMatchParentHeight()
+            } else {
+                val content = resolveKeyboardSize(config.screenWidthDp, screenHeight,
+                    state.keyboardBottomPaddingDp + activeBottom, state).height
+                keyboardContainer.updateHeight(content + state.keyboardBottomPaddingDp + activeBottom)
             }
-            keyboardContainer.updateHeight(height)
             keyboardContainer.requestLayout()
         }
         window.window?.decorView?.requestApplyInsets()
@@ -4040,6 +4107,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        ensureInputAreaFits()
         KeyboardPanelLaunch.previewVisible = settingsPreviewEditor
         // 动态背景开着才查应用类别（每个包名只查一次，见 HardwareGamePackages）。
         backgroundMotionGame.value = com.kingzcheung.xime.settings.BackgroundMotionPreferences.read(this).enabled &&
@@ -4359,6 +4427,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     win.setDimAmount(0f)
                     win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                 } else if (state.isFloatingMode) {
+                    androidx.core.view.WindowCompat.setDecorFitsSystemWindows(win, false)
                     win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                     win.setDimAmount(0f)
                     win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)

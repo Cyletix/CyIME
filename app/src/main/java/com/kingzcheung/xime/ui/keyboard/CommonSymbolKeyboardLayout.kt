@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -95,13 +96,14 @@ fun CommonSymbolKeyboardLayout(
     val isLandscape = !isFloatingMode && configuration.screenWidthDp > configuration.screenHeightDp
     val isDarkTheme = keyTextColor == Color(0xFFE8EAED)
     val swipeBubble = rememberSwipeBubbleController()
-    var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val keyboardBounds = remember { arrayOf(Rect.Zero) }
+    var keyboardWidthPx by remember { mutableFloatStateOf(0f) }
     val liveKeyboardBounds = remember { LiveBounds() }
-    val longPressMenuKeyboard: () -> Rect = remember(liveKeyboardBounds) { { liveKeyboardBounds.current(keyboardBounds, "keyboard") } }
+    val longPressMenuKeyboard: () -> Rect = remember(liveKeyboardBounds) { { liveKeyboardBounds.current(keyboardBounds[0], "keyboard") } }
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         // 按键和键盘都按这一刻的位置算，见 [LiveBounds]。
-        val origin = liveKeyboardBounds.current(keyboardBounds, "keyboard")
+        val origin = liveKeyboardBounds.current(keyboardBounds[0], "keyboard")
         swipeBubble.update(
             state,
             Rect(
@@ -124,14 +126,16 @@ fun CommonSymbolKeyboardLayout(
             .fillMaxWidth()
             .fillMaxHeight()
             .onGloballyPositioned { coordinates ->
-                keyboardBounds = coordinates.boundsInRoot()
+                keyboardBounds[0] = coordinates.boundsInRoot()
+                val width = coordinates.size.width.toFloat()
+                if (keyboardWidthPx != width) keyboardWidthPx = width
                 liveKeyboardBounds.coordinates = coordinates
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
         // 键缝动效的光层：最先画 = 在所有键帽底下，只从键缝里露出来。
         KeyGapLightLayer(gapLight, Modifier.matchParentSize())
-        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardBounds.width)
+        KeyboardSwipeBubbleOverlay(swipeBubble, bubbleBackgroundColor, keyTextColor, specialKeyTextColor, keyboardWidthPx)
         Column(Modifier.fillMaxSize()) {
         LocalKeyboardInputPreferences.current.symbolsFor(SideSymbolTarget.COMMON)?.let { symbols ->
             FixedSymbolStrip(symbols, LocalKeyboardInputActions.current.onCommitExactText

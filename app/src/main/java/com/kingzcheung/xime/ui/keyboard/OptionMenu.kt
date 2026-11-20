@@ -62,6 +62,7 @@ import com.kingzcheung.xime.ui.theme.LocalKeyboardPalette
 /** 工具栏长按列表开着：工具栏按住两秒换位置的手势让开，不在选语言时把按钮拖走。 */
 internal object ToolbarPressMenuGate {
     @Volatile var open: Boolean = false
+    @Volatile var reordering: Boolean = false
 }
 
 /**

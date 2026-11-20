@@ -386,6 +386,22 @@ internal fun floatingMinimumInsetPx(window: Window, insets: WindowInsets, normal
 /** 手势导航时底部手势区至少按这么高（dp）算；系统没报或报得比这小时用它。 */
 internal const val GESTURE_ZONE_MIN_DP = 32f
 
+/** 首次窗口尚未收到 WindowInsets 时，手势导航下先按手势区估算，避免首帧被默认 48dp 导航栏高度顶高再回落。 */
+internal fun fallbackFloatingMinimumInsetPx(context: Context, fallbackPx: Int): Int {
+    if (!AndroidPlatform.gestureInsets) return fallbackPx
+    val resolver = context.contentResolver
+    val navigationMode = readSetting { android.provider.Settings.Secure.getInt(resolver, "navigation_mode") }
+    val vendorGesture = vendorGestureNavigationOn(AndroidPlatform.vendor) { global, key ->
+        readSetting {
+            if (global) android.provider.Settings.Global.getInt(resolver, key)
+            else android.provider.Settings.Secure.getInt(resolver, key)
+        }
+    }
+    return if (navigationMode == 2 || vendorGesture == true) {
+        (GESTURE_ZONE_MIN_DP * context.resources.displayMetrics.density).roundToInt()
+    } else fallbackPx
+}
+
 /**
  * 反馈底部问题时要的一行（11-19：以前的反馈几乎都没有机型、系统版本、导航方式），设置页「底部留白校准」显示、可复制。
  */

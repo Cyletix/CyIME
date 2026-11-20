@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -15,6 +17,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -207,5 +210,95 @@ class FloatingCornerResizeTest {
         advance(100)
         assertEquals(1, taps)
         assertEquals(0, resized.size)
+    }
+
+    @Test fun draggingALitCornerNotifiesDragStateWithoutRemeasuringContentMidDrag() {
+        val draggingStates = mutableListOf<Boolean>()
+        val contentSizes = mutableListOf<Pair<Int, Int>>()
+        rule.setContent {
+            density = LocalDensity.current.density
+            MaterialTheme {
+                Box(Modifier.size(600.dp, 600.dp)) {
+                    FloatingKeyboardContainer(
+                        isFloatingMode = true, scaleFactor = 0.6f, contentHeightDp = 250,
+                        offsetX = 0, offsetY = 60, onDrag = { _, _ -> }, onDragEnd = { dragEnds++ },
+                        onDragStateChange = { draggingStates += it },
+                        onCornerResize = { resized += it }, onCornerTap = { taps++ },
+                    ) {
+                        Box(Modifier.fillMaxSize().onSizeChanged { contentSizes += it.width to it.height })
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        lightUpCorners()
+        val initialSizes = contentSizes.toList()
+        val initialCornersWidth = rule.onNodeWithTag("floating-position-corners", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot().let { it.right - it.left }
+
+        rule.onNodeWithTag("floating-corner-handle-top_left").performTouchInput {
+            down(center)
+            for (step in 1..6) moveTo(center + Offset(-6f * step * density, -6f * step * density))
+        }
+        advance(32)
+        val midCornersWidth = rule.onNodeWithTag("floating-position-corners", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot().let { it.right - it.left }
+        assertTrue("corner drag notifies drag active: $draggingStates", true in draggingStates)
+        assertTrue("corners grow mid-drag: $initialCornersWidth -> $midCornersWidth", midCornersWidth > initialCornersWidth)
+        assertEquals("content must not remeasure mid-drag", initialSizes, contentSizes)
+
+        // 短时间停留（超过 100ms）后不松手也应重排一次以显示清晰按键状态。
+        advance(120)
+        assertTrue("content settles after short pause: $contentSizes", contentSizes.last().first > initialSizes.last().first)
+        assertEquals("resize not persisted before release", 0, resized.size)
+
+        rule.onNodeWithTag("floating-corner-handle-top_left").performTouchInput { up() }
+        advance(100)
+        assertEquals(1, resized.size)
+        assertEquals(false, draggingStates.last())
+    }
+
+    @Test fun livePreviewRectScalesCardWithoutRemeasuringUntilCommittedRectChanges() {
+        val committed = mutableStateOf(ResizeRect(120f, 262f, 480f, 540f))
+        val live = mutableStateOf(ResizeRect(120f, 262f, 480f, 540f))
+        val externalDragging = mutableStateOf(false)
+        val draggingStates = mutableListOf<Boolean>()
+        val contentSizes = mutableListOf<Pair<Int, Int>>()
+        rule.setContent {
+            density = LocalDensity.current.density
+            MaterialTheme {
+                Box(Modifier.size(600.dp, 600.dp)) {
+                    FloatingKeyboardContainer(
+                        isFloatingMode = true, scaleFactor = 0.6f, contentHeightDp = 250,
+                        offsetX = 0, offsetY = 60, onDrag = { _, _ -> }, onDragEnd = {},
+                        onDragStateChange = { draggingStates += it },
+                        previewRectState = committed,
+                        livePreviewRectState = live,
+                        externalDragging = externalDragging.value,
+                    ) {
+                        Box(Modifier.fillMaxSize().onSizeChanged { contentSizes += it.width to it.height })
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val initialSize = contentSizes.last()
+
+        rule.runOnUiThread {
+            externalDragging.value = true
+            live.value = ResizeRect(80f, 200f, 520f, 540f)
+        }
+        rule.waitForIdle()
+        assertTrue("external drag notifies drag active: $draggingStates", true in draggingStates)
+        assertEquals("live preview must not remeasure content", initialSize, contentSizes.last())
+
+        rule.runOnUiThread {
+            committed.value = ResizeRect(80f, 200f, 520f, 540f)
+            externalDragging.value = false
+        }
+        rule.waitForIdle()
+        assertTrue("committed rect updates content width", contentSizes.last().first > initialSize.first)
+        assertTrue("committed rect updates content height", contentSizes.last().second > initialSize.second)
+        assertEquals(false, draggingStates.last())
     }
 }

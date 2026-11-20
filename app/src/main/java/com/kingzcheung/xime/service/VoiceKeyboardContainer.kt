@@ -46,6 +46,15 @@ class VoiceKeyboardContainer(
         }
     }
 
+    fun updateMatchParentHeight() {
+        val params = layoutParams ?: return
+        if (params.height != android.view.ViewGroup.LayoutParams.MATCH_PARENT) {
+            params.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            layoutParams = params
+            requestLayout()
+        }
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         // Android may deliver old touches only after a blocked main thread resumes.
         // Consume the whole stale gesture, including its UP, rather than replaying a key.

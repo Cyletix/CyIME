@@ -5,17 +5,49 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import kotlin.math.roundToInt
 
-internal val LocalLanguageMenuPanel = staticCompositionLocalOf { Rect.Zero }
+/** 语言菜单宿主坐标持有者：拖动期间只更新普通缓存，仅在语言菜单真正打开时才驱动重组。 */
+@Stable
+internal class LanguageMenuPanelHost {
+    private var coordinates: LayoutCoordinates? = null
+    private var cachedBounds: Rect = Rect.Zero
+    private var observedBounds by mutableStateOf(Rect.Zero)
+    private var observers = 0
+
+    internal fun update(coords: LayoutCoordinates) {
+        coordinates = coords
+        val rect = coords.boundsInWindow()
+        cachedBounds = rect
+        if (observers > 0 && observedBounds != rect) observedBounds = rect
+    }
+
+    fun currentBounds(): Rect = coordinates?.takeIf { it.isAttached }?.boundsInWindow() ?: cachedBounds
+
+    @Composable
+    fun rememberObservedBounds(): Rect {
+        val observed = observedBounds
+        DisposableEffect(this) {
+            observers++
+            val current = currentBounds()
+            if (observedBounds != current) observedBounds = current
+            onDispose { observers = (observers - 1).coerceAtLeast(0) }
+        }
+        val live = if (observers > 0) observed else currentBounds()
+        return live.takeIf { it.width > 0f && it.height > 0f } ?: currentBounds()
+    }
+}
+
+internal val LocalLanguageMenuPanel = staticCompositionLocalOf<LanguageMenuPanelHost?> { null }
 
 @Composable
 internal fun LanguageMenuPanel(content: @Composable () -> Unit) {
-    var bounds by remember { mutableStateOf(Rect.Zero) }
-    Box(Modifier.fillMaxSize().onGloballyPositioned { bounds = it.boundsInWindow() }) {
-        CompositionLocalProvider(LocalLanguageMenuPanel provides bounds, content = content)
+    val host = remember { LanguageMenuPanelHost() }
+    Box(Modifier.fillMaxSize().onGloballyPositioned { host.update(it) }) {
+        CompositionLocalProvider(LocalLanguageMenuPanel provides host, content = content)
     }
 }
 
