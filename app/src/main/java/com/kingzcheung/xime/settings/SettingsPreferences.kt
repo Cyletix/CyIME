@@ -1423,6 +1423,9 @@ object SettingsPreferences {
     fun setKeyboardBottomPosition(context: Context, position: KeyboardBottomPosition) {
         getPrefs(context).edit().putString(KEY_KEYBOARD_BOTTOM_POSITION, position.name)
             .putBoolean(KEY_EDGE_TO_EDGE_KEYBOARD, position != KeyboardBottomPosition.KEEP_BUTTONS).apply()
+        if (position == KeyboardBottomPosition.AUTO && getKeyboardBottomPaddingDp(context) > 0) {
+            setKeyboardBottomPaddingDp(context, 0)
+        }
     }
 
     private const val DEFAULT_KEYBOARD_BOTTOM_PADDING_DP = 0

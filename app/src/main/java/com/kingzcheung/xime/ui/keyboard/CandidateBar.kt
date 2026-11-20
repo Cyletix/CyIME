@@ -168,6 +168,28 @@ internal val LocalSentenceSelection =
 /** Highlight the replacement in the first sentence while its local editor is open. */
 internal data class SentenceCandidateHighlight(val sentence: String, val start: Int, val end: Int)
 internal val LocalSentenceCandidateHighlight = androidx.compose.runtime.staticCompositionLocalOf<SentenceCandidateHighlight?> { null }
+/** 编码显示在键盘上方气泡或候选上方拼音行时的顶边窗口 Y 坐标；null 表示编码在输入框中，无需上移放大镜。 */
+internal val LocalSentenceMagnifierAvoidTop = androidx.compose.runtime.compositionLocalOf<Float?> { null }
+
+internal fun sentenceMagnifierCenter(
+    sourceCenter: Offset,
+    textTopInWindow: Float,
+    avoidTopInWindow: Float?,
+    magnifierHalfHeightPx: Float,
+    clearancePx: Float,
+    minimumTopPaddingPx: Float,
+): Offset {
+    if (sourceCenter == Offset.Unspecified || avoidTopInWindow == null || textTopInWindow.isNaN()) {
+        return Offset.Unspecified
+    }
+    val targetWindowY = maxOf(
+        avoidTopInWindow - magnifierHalfHeightPx - clearancePx,
+        minimumTopPaddingPx + magnifierHalfHeightPx,
+    )
+    return Offset(sourceCenter.x, targetWindowY - textTopInWindow)
+}
+
+internal const val CANDIDATE_LONG_PRESS_TIMEOUT_MS = 1000L
 
 internal fun sentenceCandidateText(text: String, index: Int, drag: IntRange?,
                                    active: SentenceCandidateHighlight?, color: Color): AnnotatedString =
