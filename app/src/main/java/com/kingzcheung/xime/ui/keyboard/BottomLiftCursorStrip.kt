@@ -75,12 +75,14 @@ internal fun BottomLiftSpacer(
 
     val resolvedIconColor = if (iconColor.isSpecified) iconColor else LocalContentColor.current.copy(alpha = 0.78f)
     val iconSize = minOf(20f, heightDp * 0.62f).dp
+    // 按键区底缘还有约 10dp（KeyboardGridBottomMargin + 键帽下内边距）留白，下侧补同等视觉偏置使图标在底键与底边之间垂直居中。
+    val visualCenterBottomPadding = minOf(KeyboardGridBottomMargin.value + 2f, (heightDp - 24).coerceAtLeast(0).toFloat()).dp
 
     Box(base.then(cursorModifier)) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = visualCenterBottomPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -211,4 +211,37 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
             }
         }
     }
+
+    /**
+     * 局部删除已空后再执行「清空全部编码」：先把局部删除写进引擎，
+     * 剩余部分仍有编码时继续交由 clear_all 记录撤销并清空（撤回恢复局部删除后的编码），
+     * 整句已删空时只丢弃旧撤销并刷新，避免把局部删除前的编码误存进撤销栈。
+     */
+    fun clearAfterEdit(owner: SentenceEditSession, reply: (Boolean) -> Unit) {
+        service.keyRouter.postRimeJob("sentence_edit_clear_all") {
+            val result = if (current(owner)) service.rimeEngine.applySentenceEdit(
+                owner.snapshot, owner.start, owner.end, emptyList(),
+            ) else null
+            if (result == null) {
+                withContext(Dispatchers.Main) { reply(false) }
+                return@postRimeJob
+            }
+            val hasRemaining = result.inputText.isNotEmpty() || result.candidates.isNotEmpty()
+            if (!hasRemaining) service.rimeEngine.discardClearUndo()
+            withContext(Dispatchers.Main) {
+                if (previewOwner === owner) {
+                    previewOwner = null; previewConnection = null; previewBase = null; previewWritten = null; previewCaret = 0
+                }
+                if (current(owner)) service.sessionController.updateUIWithResult(result)
+                reply(true)
+                if (hasRemaining) {
+                    service.keyRouter.handleKeyPress("clear_all", false)
+                } else {
+                    service.lastClearedComposition = null
+                    service.lastClearedDocument = null
+                    service.lastClearedText = ""
+                }
+            }
+        }
+    }
 }
