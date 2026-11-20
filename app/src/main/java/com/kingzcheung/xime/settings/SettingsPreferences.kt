@@ -1441,7 +1441,8 @@ object SettingsPreferences {
     /** 改的是底部留白或调低（哪个方向都算）：键盘和设置页要重新量。 */
     internal fun isBottomCalibrationKey(key: String?): Boolean =
         when (key?.removeSuffix(BOTTOM_PORTRAIT_SUFFIX)?.removeSuffix(BOTTOM_LANDSCAPE_SUFFIX)) {
-            KEY_KEYBOARD_BOTTOM_PADDING_DP, KEY_KEYBOARD_BOTTOM_LOWERING_DP, KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP -> true
+            KEY_KEYBOARD_BOTTOM_PADDING_DP, KEY_KEYBOARD_BOTTOM_LOWERING_DP, KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP,
+            KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP -> true
             else -> false
         }
 
@@ -1486,6 +1487,25 @@ object SettingsPreferences {
         val suffix = bottomOrientationSuffix(context)
         getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_PADDING_DP + suffix, adjustmentDp.coerceAtLeast(0))
             .putInt(KEY_KEYBOARD_BOTTOM_EDGE_LOWERING_DP + suffix, (-adjustmentDp).coerceAtLeast(0)).apply()
+    }
+
+    internal const val DEFAULT_SYSTEM_LIFT_HEIGHT_DP = 48
+    private const val KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP = "keyboard_bottom_system_height_dp"
+
+    internal fun getKeyboardBottomSystemHeightDp(context: Context): Int? {
+        val prefs = getPrefs(context)
+        val suffix = bottomOrientationSuffix(context)
+        val value = prefs.getInt(KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP + suffix,
+            prefs.getInt(KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP, -1))
+        return value.takeIf { it > 0 }
+    }
+
+    internal fun setKeyboardBottomSystemHeightDp(context: Context, heightDp: Int) {
+        val value = heightDp.coerceIn(1, 80)
+        val suffix = bottomOrientationSuffix(context)
+        if (getKeyboardBottomSystemHeightDp(context) != value) {
+            getPrefs(context).edit().putInt(KEY_KEYBOARD_BOTTOM_SYSTEM_HEIGHT_DP + suffix, value).apply()
+        }
     }
 
     /** 键盘上次量到的「最多还能调低多少 dp」（系统建议值减安全下限，按当前方向）；没量过为 null。 */
