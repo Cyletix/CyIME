@@ -320,4 +320,35 @@ class InlineQuickActionRenderTest {
             assertEquals(listOf("emoji", "settings"), saved?.menu)
         }
     }
+
+    @Test fun menuCardBoundsStayIdenticalBeforeAndDuringEdit() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        KeysConfigHelper.loadConfig(app)
+        KeyboardThemes.initFromConfig(app)
+        AppFonts.initialize(app)
+        val vm = spy(KeyboardViewModel(app))
+        vm.showOverlay(OverlayRoute.Menu)
+        val callbacks = KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}, onUpdateQuickActions = {})
+        doReturn(mock<T9InputController>()).whenever(vm).bindT9Controller(callbacks)
+        rule.setContent {
+            MaterialTheme {
+                KeyboardView(
+                    vm,
+                    KeyboardUiState(
+                        toolbarButtons = listOf("emoji", "clipboard"),
+                        menuButtons = com.kingzcheung.xime.keyboard.ToolbarButton.DEFAULT_MENU.map { it.id },
+                    ),
+                    callbacks,
+                    Modifier.width(360.dp).height(276.dp),
+                    inputSessionManagedByHost = true,
+                )
+            }
+        }
+        val before = rule.onNodeWithTag("menu-item:settings").fetchSemanticsNode().boundsInRoot
+        rule.onNodeWithContentDescription("编辑排列").performClick()
+        val duringEdit = rule.onNodeWithTag("menu-item:settings").fetchSemanticsNode().boundsInRoot
+        assertEquals(before.width, duringEdit.width, 0.5f)
+        assertEquals(before.height, duringEdit.height, 0.5f)
+        assertEquals(before.top, duringEdit.top, 0.5f)
+    }
 }
