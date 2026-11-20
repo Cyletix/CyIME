@@ -301,6 +301,9 @@ private fun CandidatePageContent(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     var railListHeightPx by remember { mutableIntStateOf(0) }
+                    val uniformPinyinSize = if (isPinyinRail) rememberUniformRailFontSize(
+                        railItems, 13.sp, leftRailWidth - 12.dp
+                    ) else null
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -325,6 +328,7 @@ private fun CandidatePageContent(
                                     accentColor = state.railAccentColor,
                                     isPinyin = isPinyinRail,
                                     approximate = isPinyinRail && state.railPinyinNear.getOrNull(index) == true,
+                                    uniformFontSize = uniformPinyinSize,
                                 )
                             }
                         } else {
@@ -349,6 +353,7 @@ private fun CandidatePageContent(
                                         accentColor = state.railAccentColor,
                                         isPinyin = isPinyinRail,
                                         approximate = isPinyinRail && state.railPinyinNear.getOrNull(index) == true,
+                                        uniformFontSize = uniformPinyinSize,
                                     )
                                 }
                             }
@@ -789,6 +794,7 @@ private fun CandidateRailSymbolKey(
     accentColor: Color = Color.Unspecified,
     isPinyin: Boolean = false,
     approximate: Boolean = false,
+    uniformFontSize: androidx.compose.ui.unit.TextUnit? = null,
 ) {
     val cornerRadius = LocalKeyCornerRadius.current
     val shape = RoundedCornerShape(
@@ -821,10 +827,12 @@ private fun CandidateRailSymbolKey(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // 读音完整显示：放不下就缩小（用户 11-13）；相近读音下划线、浅色。
+        // 读音整列共用统一字号（按最宽项计算）；相近读音下划线、浅色。
         BoxWithConstraints(contentAlignment = Alignment.Center) {
             val meaning = if (approximate) Modifier.semantics { contentDescription = "相近读音 $text" } else Modifier
             val railWidth = maxWidth
+            val targetSize = uniformFontSize ?: if (isPinyin) 13.sp else 16.sp
+            val fitCap = if (uniformFontSize == null && isPinyin) railWidth - (if (isSelected) 12.dp else 6.dp) else null
             if (isSelected) {
                 Box(
                     modifier = meaning
@@ -832,13 +840,11 @@ private fun CandidateRailSymbolKey(
                         .background(pillColor.copy(alpha = 0.2f))
                         .padding(horizontal = 3.dp, vertical = 1.dp)
                 ) {
-                    FittedRailText(text, pillColor, 13.sp, FontWeight.Medium, approximate,
-                        if (isPinyin) railWidth - 12.dp else null)
+                    FittedRailText(text, pillColor, targetSize, FontWeight.Medium, approximate, fitCap)
                 }
             } else {
                 FittedRailText(text, if (approximate) approximateRailColor(textColor) else textColor,
-                    if (isPinyin) 13.sp else 16.sp, FontWeight.Normal, approximate,
-                    if (isPinyin) railWidth - 6.dp else null, meaning)
+                    targetSize, FontWeight.Normal, approximate, fitCap, meaning)
             }
         }
     }
@@ -934,8 +940,11 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
             val textWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
             val font = (metrics.fontSizeSp * minOf(1f, textWidth / sample.size.width.coerceAtLeast(1))).sp
             val rowHeight = if (state.choosingMergedLetter && items.isNotEmpty()) maxHeight / items.size else metrics.rowHeightDp.dp
-            // 九键读音（不是 14 键挑字母）和候选字一样大，各自缩到放得下（用户 11-13、11-15）。
+            // 读音整列共用统一字号（按最宽项缩放），保证同列音节字母大小一致。
             val pinyin = state.railPinyinOptions.isNotEmpty() && !state.choosingMergedLetter
+            val pinyinFont = if (pinyin) rememberUniformRailFontSize(
+                items, metrics.pinyinFontSizeSp.sp, maxWidth - 12.dp
+            ) else font
             LazyColumn(Modifier.fillMaxSize().testTag("expanded-pinyin-options")) {
                 itemsIndexed(items) { index, item ->
                     T9CandidateItem(text = item, onClick = {
@@ -943,9 +952,9 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
                         else callbacks.onCommitText?.invoke(item)
                     }, onPress = { callbacks.onKeyPressDown?.invoke(item) }, textColor = state.textColor,
                         backgroundColor = keyBg, accentColor = state.railAccentColor,
-                        fontSize = if (pinyin) metrics.pinyinFontSizeSp.sp else font,
+                        fontSize = if (pinyin) pinyinFont else font,
                         isSelected = index == state.railSelectedPinyinIndex,
-                        approximate = state.railPinyinNear.getOrNull(index) == true, fitWidth = pinyin,
+                        approximate = state.railPinyinNear.getOrNull(index) == true, fitWidth = false,
                         modifier = Modifier.fillMaxWidth().height(rowHeight))
                 }
             }

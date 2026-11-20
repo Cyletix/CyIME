@@ -1394,6 +1394,7 @@ fun CandidateItem(
                     dragSelection = first..first
                     currentSentenceSelectionChange?.invoke(first, first + 1)
                     magnifierPosition = held.position
+                    var completed = false
                     try { do {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -1408,13 +1409,17 @@ fun CandidateItem(
                         }
                         magnifierPosition = change.position
                         change.consume()
-                    } while (change.pressed) } finally {
+                    } while (change.pressed)
+                        completed = true
+                    } finally {
                         dragSelection = null
-                        currentSentenceSelectionEnd?.invoke()
+                        if (!completed || !dragged) currentSentenceSelectionEnd?.invoke()
                         magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
                     }
-                    if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
-                    else currentLongClick?.invoke()
+                    if (dragged) {
+                        currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                        currentSentenceSelectionEnd?.invoke()
+                    } else currentLongClick?.invoke()
                 }
             } else Modifier),
             onTextLayout = { textLayout = it },
