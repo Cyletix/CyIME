@@ -211,14 +211,15 @@ object SchemaManifestManager {
         try {
             for (name in targets.distinct()) {
                 if (isProtectedSystemFile(name)) continue
+                val destRelative = isolatedInstallRelativePath(name, schemeId, targets)
                 val source = safeTarget(staged, name)
-                val dest = safeTarget(rimeDir, name)
+                val dest = safeTarget(rimeDir, destRelative)
                 if (!source.isFile) continue
-                if (isUserDataFile(name) && dest.exists() && !(overwriteUserConfig && isImportableUserConfig(name))) continue
+                if (isUserDataFile(destRelative) && dest.exists() && !(overwriteUserConfig && isImportableUserConfig(destRelative))) continue
                 val previousHash = if (dest.isFile) keepVersion(context, dest) else null
-                priorFiles[name] = previousHash
+                priorFiles[destRelative] = previousHash
                 if (previousHash != null) {
-                    val entry = entries.optJSONObject(name) ?: JSONObject().apply {
+                    val entry = entries.optJSONObject(destRelative) ?: JSONObject().apply {
                         put("claimedBy", JSONArray(listOf(LOCAL_OWNER)))
                     }
                     // 用户修改过当前文件：另存为本地层，卸载市场版本时可还原这些修改。
@@ -230,13 +231,13 @@ object SchemaManifestManager {
                     }
                     entry.put("sha256", previousHash)
                     entry.put("size", dest.length())
-                    entries.put(name, entry)
+                    entries.put(destRelative, entry)
                 }
                 if (previousHash != fileSha256(source)) {
                     dest.parentFile!!.mkdirs()
                     source.copyTo(dest, overwrite = true)
                 }
-                installed.add(name)
+                installed.add(destRelative)
             }
             registry.put("files", entries)
             saveRegistry(context, registry)
@@ -676,6 +677,22 @@ object SchemaManifestManager {
      * 用户主动导入时可以覆盖的个人配置：方案补丁 *.custom.yaml（含 xime.custom.yaml 键盘/皮肤配置）和 themes/ 背景图。
      * default.custom.yaml 记着启用的方案列表，不随压缩包覆盖；学习记录、installation.yaml、编译产物一律不覆盖。
      */
+    internal const val PACKAGE_XIME_DIR = ".pkg_xime"
+
+    internal fun packageCustomConfigRelative(packageId: String): String = "$PACKAGE_XIME_DIR/$packageId.yaml"
+
+    /**
+     * 随方案压缩包一起导入的 `xime.custom.yaml` 单独落入包隔离目录，
+     * 避免覆盖用户全局 `xime.custom.yaml` 并支持随方案卸载一并清理；
+     * 仅单文件导入自定义配置（不含 `.schema.yaml`）时才写入全局 `xime.custom.yaml`。
+     */
+    internal fun isolatedInstallRelativePath(name: String, packageId: String, targets: Collection<String>): String =
+        if (name == "xime.custom.yaml" && targets.any { it.endsWith(".schema.yaml") }) {
+            packageCustomConfigRelative(packageId)
+        } else {
+            name
+        }
+
     internal fun isImportableUserConfig(relPath: String): Boolean =
         (relPath.endsWith(".custom.yaml") && relPath != "default.custom.yaml") || relPath.startsWith("themes/")
 
