@@ -2420,7 +2420,7 @@ internal fun FixedCandidateStrip(
                         // 分体时中缝两边各自从头排，中缝那里不画竖线。
                         .then(if (showDividers && position > 0) Modifier.candidateLeadingDivider(itemDividerColor,
                             itemSpacing, fontSize) else Modifier)
-                        .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
+                        .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot(); focusedOnScreen = true } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     onSentenceSelection = callbacks.onSentenceSelection.takeIf { index == 0 && !showNumberLabels },
                     onSentenceSelectionChange = callbacks.onSentenceSelectionChange.takeIf { index == 0 && !showNumberLabels },
