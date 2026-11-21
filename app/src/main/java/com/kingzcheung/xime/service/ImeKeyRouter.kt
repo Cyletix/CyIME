@@ -626,6 +626,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 return@command
             }
             if (englishAutoSpace.isArmed && consumeEnglishAutoSpace(key)) return@command
+            // 纯大写组字（Shift 直接打出、全为大写字母，如 N / H / AGENTS）后按数字或句点：
+            // 数字不能当选词键（否则 N1、H2、B12 打不出来——1 会选走 N 开头的英文候选），
+            // 句点也不能被补全/标点规则吞掉（AGENTS.MD 打不出点）。把大写组字连同该键原样上屏，
+            // 之后数字键回到常规字面输入。混合大小写组字（zuogeDNAjiance）不受影响（issue #528）。
+            // 先判键位再读组字区：compositionIsAllCapitals 要拿引擎锁，不能每个按键都读。
+            if (key.length == 1 && (key[0] in '0'..'9' || key == ".") && compositionIsAllCapitals()) {
+                commitHardwareLiteral(key)
+                return@command
+            }
             if (hardwareEvent != null) {
                 // Idle Tab belongs to the editor: single-line fields move focus (Shift+Tab backwards),
                 // multi-line ones insert a tab. Only an unfinished composition keeps Tab in the IME.
@@ -1571,6 +1580,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             withEditor { service.commitText(key) }
         }
         return true
+    }
+
+    /** 组字区是否全是纯大写字母：只有雾凇系 26 键方案把 Shift 大写字母送进编码时才会出现
+     *  （capitalsInRime，见 routeKeyPress）。用于判断后续数字/句点应原样上屏而非选词（issue #528）。
+     *  混合大小写组字（zuogeDNAjiance、DNA 夹在拼音中）返回 false，行为不变。 */
+    private fun compositionIsAllCapitals(): Boolean {
+        if (service.uiState.value.isAsciiMode) return false
+        if (!isRimeIceCapitalSchema(service.uiState.value.currentSchemaId)) return false
+        val input = service.rimeEngine.readQueuedComposition()?.input.orEmpty()
+        return input.isNotEmpty() && input.all { it in 'A'..'Z' }
     }
 
     /** Finish unfinished raw input without choosing a word; clear only after acceptance. */
