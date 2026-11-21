@@ -4,6 +4,21 @@ import com.kingzcheung.xime.rime.RimeEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+internal const val SENTENCE_CODE_HIGHLIGHT_COLOR = 0x663399ff
+
+/** Use parcelable system spans and keep the same character boundaries for each selection. */
+internal fun sentenceCodeHighlight(text: String, from: Int, to: Int): android.text.SpannableString =
+    android.text.SpannableString(text).apply {
+        setSpan(android.text.style.UnderlineSpan(), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        var index = 0
+        while (index < text.length) {
+            val next = index + Character.charCount(text.codePointAt(index))
+            val color = if (index < to && next > from) SENTENCE_CODE_HIGHLIGHT_COLOR else android.graphics.Color.TRANSPARENT
+            setSpan(android.text.style.BackgroundColorSpan(color), index, next, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            index = next
+        }
+    }
+
 /** An isolated candidate lookup; the live composition changes only on confirmation. */
 data class SentenceEditSession(
         val inputSessionId: Long,
@@ -54,6 +69,12 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
     private var dragText: String? = null
     private var dragCaret = 0
     private var dragOwner: SentenceEditSession? = null
+    private var pendingDragOwner: SentenceEditSession? = null
+    private var dragPreviewScheduled = false
+    private val dragPreviewTask = Runnable {
+        dragPreviewScheduled = false
+        pendingDragOwner?.let(::applyDragPreview)
+    }
 
     private fun current(owner: SentenceEditSession): Boolean = service.uiState.value.let {
         it.inputSessionId == owner.inputSessionId && it.currentSchemaId == owner.schema && !it.isAsciiMode
@@ -61,10 +82,25 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
 
     /** Highlight existing composing text without changing its characters or final cursor position. */
     fun dragPreview(owner: SentenceEditSession?) {
+        if (owner == null) {
+            service.mainHandler.removeCallbacks(dragPreviewTask)
+            pendingDragOwner = null
+            dragPreviewScheduled = false
+            applyDragPreview(null)
+        } else {
+            pendingDragOwner = owner
+            if (!dragPreviewScheduled) {
+                dragPreviewScheduled = true
+                service.mainHandler.postDelayed(dragPreviewTask, 16)
+            }
+        }
+    }
+
+    private fun applyDragPreview(owner: SentenceEditSession?) {
         val ic = service.currentInputConnection
         if (owner == null) {
             val text = dragText
-            if (ic != null && ic === dragConnection && text != null && service.inlinePinyinText() == text &&
+            if (previewOwner == null && ic != null && ic === dragConnection && text != null && service.inlinePinyinText() == text &&
                 service.inlinePinyinCaret() == dragCaret && dragOwner?.let(::current) == true &&
                 runCatching { ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(false)) {
                 ic.beginBatchEdit()
@@ -90,14 +126,8 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         val range = owner.displaySelection(text) ?: return
         val shown = dragOwner?.let { it.displaySelection(text) }
         if (shown == range) { dragOwner = owner; return }
-        // 只在第一次写之前问一次应用里有没有选中文字。这是同步跨进程调用，应用刚收到上一次改写、正在排版时要等它
-        // （忙的应用上百毫秒），拖动每换一个字都问一次，放大镜和高亮就一顿一顿（1.15.100 用户反馈）。
-        // 拖动中手指在键盘上，应用里的选区不会变。
         if (dragOwner == null && runCatching { !ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(true)) return
-        val styled = android.text.SpannableString(text).apply {
-            setSpan(android.text.style.BackgroundColorSpan(0x663399ff), range.first, range.last + 1,
-                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
+        val styled = sentenceCodeHighlight(text, range.first, range.last + 1)
         ic.beginBatchEdit()
         try {
             if (ic.setComposingText(styled, 1)) {
@@ -113,6 +143,11 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         if (!current(owner) || service.uiState.value.inputTarget.isInternal ||
             TerminalEditor.inputTextLocation(service) != com.kingzcheung.xime.settings.SettingsPreferences.INPUT_TEXT_INPUT_BOX) return
         val ic = service.currentInputConnection ?: return
+        if (previewOwner == null) {
+            service.mainHandler.removeCallbacks(dragPreviewTask)
+            pendingDragOwner = null
+            dragPreviewScheduled = false
+        }
         if (previewOwner !== owner) {
             val base = service.inlinePinyinText() ?: return
             fun keys(s: String) = s.filterNot { it == '\'' || it.isWhitespace() }.lowercase()
@@ -136,18 +171,19 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         if (start !in 0..end || end > base.length) return
         val before = base.take(start)
         val after = base.drop(end)
-        val text = if (code.isNotEmpty()) before + code + after else {
+        // Keep the original syllable separators while the selected code is unchanged.
+        val shownCode = if (code == owner.originalCode) base.substring(start, end) else code
+        val text = if (code.isNotEmpty()) before + shownCode + after else {
             val left = before.trimEnd(' ', '\'')
             val right = after.trimStart(' ', '\'')
             val separator = before.lastOrNull()?.takeIf { it == ' ' || it == '\'' }
                 ?: after.firstOrNull()?.takeIf { it == ' ' || it == '\'' }
             left + (if (left.isNotEmpty() && right.isNotEmpty()) separator?.toString().orEmpty() else "") + right
         }
-        val caret = if (code.isNotEmpty()) start + code.length else before.trimEnd(' ', '\'').length.coerceAtMost(text.length)
+        val caret = if (code.isNotEmpty()) start + shownCode.length else before.trimEnd(' ', '\'').length.coerceAtMost(text.length)
         if (code.isEmpty() && text == previewWritten && caret == previewCaret) return
-        val styled = android.text.SpannableString(text)
-        if (code.isNotEmpty()) styled.setSpan(android.text.style.BackgroundColorSpan(0x663399ff), start,
-            start + code.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val styled = if (code.isNotEmpty()) sentenceCodeHighlight(text, start, start + shownCode.length)
+            else if (text.isNotEmpty()) sentenceCodeHighlight(text, 0, 0) else text
         ic.beginBatchEdit()
         try {
             if (runCatching { ic.setComposingText(styled, 1) }.getOrDefault(false)) {
@@ -160,9 +196,20 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         }
     }
 
-    fun endPreview(owner: SentenceEditSession) {
+    /** Rebuild the remaining keys as ordinary, unselected composing input. */
+    fun prepareEmptyClear(owner: SentenceEditSession, reply: (Boolean) -> Unit) {
+        service.keyRouter.postRimeJob("sentence_edit_empty_clear") {
+            val snapshot = owner.snapshot
+            val remaining = snapshot.input.removeRange(snapshot.boundaries[owner.start], snapshot.boundaries[owner.end])
+            val applied = current(owner) && service.rimeEngine.isCandidateRevisionCurrent(snapshot.revision) &&
+                service.rimeEngine.setInput(remaining)
+            withContext(Dispatchers.Main) { reply(applied && current(owner)) }
+        }
+    }
+
+    fun endPreview(owner: SentenceEditSession, restore: Boolean) {
         val ic = service.currentInputConnection
-        if (previewOwner === owner && previewConnection === ic && ic != null && current(owner) &&
+        if (restore && previewOwner === owner && previewConnection === ic && ic != null && current(owner) &&
             service.inlinePinyinText() == previewWritten && service.inlinePinyinCaret() == previewCaret &&
             runCatching { ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(false)) {
             previewWritten?.let { service.placeInlinePinyinCaret(it, it.length) }

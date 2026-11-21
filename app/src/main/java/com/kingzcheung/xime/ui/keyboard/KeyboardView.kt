@@ -727,8 +727,8 @@ fun KeyboardView(
                 }
             }
         }
-        fun closeSentenceEdit() {
-            sentenceEdit?.let { callbacks.onEndSentencePreview?.invoke(it) }
+        fun closeSentenceEdit(restorePreview: Boolean = true) {
+            sentenceEdit?.let { callbacks.onEndSentencePreview?.invoke(it, restorePreview) }
             sentenceEdit = null
             callbacks.onSentenceHorizontalDelete = null
             sentenceWords = emptyList()
@@ -876,15 +876,30 @@ fun KeyboardView(
                     sentenceApplying -> true
                     key == "space" || key == "enter" -> { applySentenceEdit(false); true }
                     key == "clear_all" || key == "clear_composition" -> {
-                        sentenceCode = ""
-                        sentenceWord = ""
-                        sentenceWordCode = ""
-                        sentenceConfirmed = emptyList()
-                        sentenceReplaceOnType = false
-                        sentenceJustSelected = false
-                        previewSentenceCode(owner)
-                        refreshSentenceWords(owner)
-                        if (!callbacks.isDeleteDragging()) viewModel.setCandidatePageExpanded(false)
+                        if (!viewModel.candidatePageExpanded.value && sentenceCode.isEmpty() && sentenceConfirmed.isEmpty()) {
+                            // 局部内容已删空且展开页已收起：用剩余原始编码重建未选词输入态后清空，
+                            // 既不误清宿主正文，下滑撤回也能恢复局部删除后的未选词编码。
+                            sentenceApplying = true
+                            callbacks.onPrepareEmptySentenceClear?.invoke(owner) { applied ->
+                                if (sentenceEdit === owner) {
+                                    if (applied) {
+                                        closeSentenceEdit(restorePreview = false)
+                                        callbacks.onPreeditKeyInput = null
+                                        callbacks.onKeyPress("clear_composition_undoable", false)
+                                    } else sentenceApplying = false
+                                }
+                            } ?: run { sentenceApplying = false }
+                        } else {
+                            sentenceCode = ""
+                            sentenceWord = ""
+                            sentenceWordCode = ""
+                            sentenceConfirmed = emptyList()
+                            sentenceReplaceOnType = false
+                            sentenceJustSelected = false
+                            previewSentenceCode(owner)
+                            refreshSentenceWords(owner)
+                            if (!callbacks.isDeleteDragging()) viewModel.setCandidatePageExpanded(false)
+                        }
                         true
                     }
                     key == "delete" -> {
