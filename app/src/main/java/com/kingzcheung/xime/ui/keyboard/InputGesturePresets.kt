@@ -23,7 +23,7 @@ enum class CornerInputChoice(val label: String) {
     companion object {
         /** 角标“长按”时长按总是出角标，气泡出不来；加锁以前两个都开着的，照实际效果认作「长按输入」。 */
         fun of(settings: KeyboardInputPreferences): CornerInputChoice = when {
-            // 开着 26 键滑行时字母键的滑动都给了滑行，角标只能长按出（键盘也按长按处理，见 KeyButton）。
+            // 开着九键滑行时 2～9 键的滑动给了滑行，角标只能长按出。
             InputGestureLocks.glideCornerLock(settings) != null -> LONG_PRESS
             settings.symbolInputMode == SymbolInputMode.LONG_PRESS -> LONG_PRESS
             settings.letterLongPressMenu -> SWIPE_BUBBLE
@@ -126,13 +126,10 @@ object InputGestureLocks {
         } else if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS) {
             add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "按键角标的符号和数字：长按输入"))
         }
-        // 26 键滑行开着时字母键往任何方向滑都是滑行，角标的滑动输入用不了：锁在「长按输入」，写明是哪个滑行锁的（11-08）。
-        // 九键滑行同样占了 2～9 键的滑动（上滑出数字也滑不出来）：一样锁成长按（用户 11-11「只有九键不会跳转」）。
-        when {
-            settings.glideTyping -> add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP, "英文滑行"))
-            settings.chineseGlideTyping -> add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP, "中文滑行"))
-            settings.t9GlideTyping && settings.cursorGesture != CursorGestureMode.KEYBOARD ->
-                add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP, T9_GLIDE_LOCK))
+        // 九键滑行占了 2～9 键的滑动（上滑出数字也滑不出来）：锁成长按（用户 11-11「只有九键不会跳转」）。
+        // 26 键滑行（英文、中文）已支持短时快速拂动上下滑输入角标，不与滑词冲突，不再锁滑动输入。
+        if (settings.t9GlideTyping && settings.cursorGesture != CursorGestureMode.KEYBOARD) {
+            add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.SWIPE_UP, T9_GLIDE_LOCK))
         }
         if (settings.glideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "英文滑行"))

@@ -532,9 +532,11 @@ fun SwipeableKeyButton(
     ).let { actions ->
         // 「上下滑输入符号」关着：长按也不出角标（「长按输入」、滑行时的两格角标、底排标点长按都不加）。
         if (!cornerSymbols) actions
-        // 26 键滑行开着时字母键的滑动给了滑行：长按弹出上下两个角标，挪过去松手选（设置页锁在「长按输入」）。
-        else if (letterGlideOwnsDrag) actions.withGlideCornerMenu(symbolInputText, symbolInputDownText,
-            inputPreferences.symbolLongPressMs, topRowDigitSwipe = glideTopRow && symbolInputText?.singleOrNull()?.isDigit() == true)
+        // 26 键滑行开着时字母键若处于长按模式：长按弹出上下两个角标，挪过去松手选；
+        // 若处于滑动模式：保留上下滑动作供快速拂动触发（不与滑词冲突），长按出字母气泡或无。
+        else if (letterGlideOwnsDrag && symbolInputMode == SymbolInputMode.LONG_PRESS)
+            actions.withGlideCornerMenu(symbolInputText, symbolInputDownText,
+                inputPreferences.symbolLongPressMs, topRowDigitSwipe = glideTopRow && symbolInputText?.singleOrNull()?.isDigit() == true)
         // 底排标点固定上滑（空格两侧标点、数字键盘点键）：上滑和长按都输入角标（用户 11-09：键在底边，长按更顺手）。
         else actions.withSymbolInput(if (keepSymbolSwipeOnLongPress) SymbolInputMode.LONG_PRESS else symbolInputMode,
             symbolInputText, keepSymbolSwipeOnLongPress, inputPreferences.symbolLongPressMs)

@@ -52,12 +52,11 @@ class SetupMoreTest {
         assertEquals(true, now.cancelButton)
     }
 
-    @Test fun glideMakesCornersLongPress() {
+    @Test fun glideDoesNotLockCorners() {
         val glide = now.copy(glide = GlideChoice.BOTH)
-        assertEquals(CornerInputChoice.LONG_PRESS, SetupMore.effectiveCorner(glide))
-        assertEquals(listOf("滑行输入改成「中文、英文都滑行」。", "按键角标改成「长按输入」(开着滑行，字母键的滑动用来滑词)。"),
-            SetupMore.changes(now, glide))
-        // 关掉滑行回到存着的方式，不另写角标。
+        assertEquals(CornerInputChoice.SWIPE, SetupMore.effectiveCorner(glide))
+        assertEquals(listOf("滑行输入改成「中文、英文都滑行」。"), SetupMore.changes(now, glide))
+        // 存着的方式原样生效。
         val stored = now.copy(corner = CornerInputChoice.SWIPE_BUBBLE)
         assertEquals(CornerInputChoice.SWIPE_BUBBLE, SetupMore.effectiveCorner(stored))
     }

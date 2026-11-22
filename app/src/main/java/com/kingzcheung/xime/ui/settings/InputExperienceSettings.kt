@@ -88,10 +88,11 @@ internal fun InputExperienceSettings(
             Column(Modifier.settingsSearchAnchor("按键角标的符号和数字", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
                 val corner = com.kingzcheung.xime.ui.keyboard.CornerInputChoice.of(settings)
-                // 26 键滑行开着时角标的滑动输入用不了：两张「滑动」卡置灰，下面写明是哪个滑行锁的，点名字跳过去关掉。
+                // 开着九键滑行时九键 2～9 键的滑动输入用不了：两张「滑动」卡置灰，写明九键滑行锁定，点名字跳过去关掉。
                 val glideLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.glideCornerLock(settings)
                 // 只开着九键滑行：锁的是九键 2～9 键，字母键照常（长按卡照画下滑那一行，说明写九键的）。
                 val t9OnlyLock = glideLock?.by == com.kingzcheung.xime.ui.keyboard.InputGestureLocks.T9_GLIDE_LOCK
+                val letterGlideOn = settings.glideTyping || settings.chineseGlideTyping
                 // 图例跟上面两个角标提示开关走（用户 11-08）：关掉的角标不画、不列。
                 val hints = com.kingzcheung.xime.ui.keyboard.rememberSwipeHintsEnabled()
                 Row(Modifier.fillMaxWidth().choiceCardRowHeight(176.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -102,8 +103,8 @@ internal fun InputExperienceSettings(
                             modifier = Modifier.weight(1f).then(if (choice == com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE)
                                 Modifier.settingsSearchAnchor("长按弹出字母气泡") else Modifier),
                             tag = "corner-input:${choice.name}", titleMaxLines = 2, illustrationPadding = 2.dp) {
-                            // 被滑行锁成长按时字母键下滑用来滑词：长按卡不画「下滑出下角标」那一行，下角标改在长按弹出的两格里选（用户 11-11）。
-                            val lowerReachable = glideLock == null || t9OnlyLock || choice != com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS
+                            // 被九键滑行锁成长按或长按模式且开着 26 键滑行：长按弹出两格选下角标。
+                            val lowerReachable = (glideLock == null && !letterGlideOn) || t9OnlyLock || choice != com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS
                             CornerInputIllustration(choice, settings.reverseSymbolSwipe, hints.up, hints.down && lowerReachable)
                         }
                     }
@@ -112,10 +113,11 @@ internal fun InputExperienceSettings(
                 val hiddenNote = if (hints.up && hints.down) "" else "隐藏的角标照样能输入。"
                 Text(when (corner) {
                     // 空格两边的标点键长按也输入角标（用户 11-09），写出来，和执行一致（用户 11-14）。
-                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE -> "滑动输入角标，松手上屏。"
+                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE ->
+                        if (letterGlideOn) "快速上下滑动输入角标，不影响滑词。" else "滑动输入角标，松手上屏。"
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE ->
-                        "长按字母弹出大小写和带声调的字母。"
-                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS -> (if (glideLock != null && !t9OnlyLock)
+                        (if (letterGlideOn) "快速上下滑动输入角标；" else "") + "长按字母弹出大小写和带声调的字母。"
+                    com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS -> (if (letterGlideOn || (glideLock != null && !t9OnlyLock))
                         "长按弹出上下两个角标，松手出上角标，右移一格出下角标。"
                         else "长按输入上方角标。") +
                             "九键长按出数字。"

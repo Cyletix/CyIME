@@ -788,7 +788,7 @@ private fun MoreQuestions(facts: SetupMoreFacts, answers: SetupMoreChoices, onAn
             com.kingzcheung.xime.model.GlideChoice.ENGLISH -> "英文 26 键手指划过字母出整词"
             com.kingzcheung.xime.model.GlideChoice.CHINESE -> "中文全拼、双拼 26 键划一个词的拼音"
             com.kingzcheung.xime.model.GlideChoice.BOTH -> "英文划出整词，中文全拼、双拼 26 键划一个词的拼音"
-        } + if (choice != com.kingzcheung.xime.model.GlideChoice.OFF) "；字母键的滑动都用来滑词，角标改成长按输入" else "")
+        })
     }, answers.glide, "setup-more-glide") { onAnswers(answers.copy(glide = it)) }
 
     val upper = if (answers.reverseSwipe) "上滑" else "下滑"

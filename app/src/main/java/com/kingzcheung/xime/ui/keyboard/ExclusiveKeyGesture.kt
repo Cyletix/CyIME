@@ -266,6 +266,12 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
                         left -> actions.onLeft?.invoke()
                         right -> actions.onRight?.invoke()
+                        letterGlide && actions.onUp != null &&
+                            isUnclaimedFastFlickUp(down.position, change.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat(), viewConfiguration.touchSlop) ->
+                            actions.onUp.invoke(actions.upText.orEmpty())
+                        letterGlide && actions.onDown != null &&
+                            isUnclaimedFastFlickDown(down.position, change.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat(), viewConfiguration.touchSlop) ->
+                            actions.onDown.invoke(actions.downText.orEmpty())
                         letterGlide && actions.glideTopUp != null &&
                             isUnclaimedTopRowFlick(down.position, change.position, size.height.toFloat(), viewConfiguration.touchSlop) ->
                             actions.glideTopUp.invoke()
@@ -294,6 +300,38 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
             actions.onPreview(SwipeState())
         }
     } }
+}
+
+/**
+ * 26 键滑行开启时，短时快速拂动（小于识别时限且位移足够）触发上下角标，识别时间做短使其不与滑行冲突。
+ * 滑词需要跨键移动接管；单键短时拂动未被滑行接管（!tracker.claimed）时在抬手时触发对应角标输入。
+ */
+internal const val FAST_FLICK_TIMEOUT_MS = 250L
+
+internal fun isUnclaimedFastFlickUp(
+    down: Offset, up: Offset,
+    downTime: Long, upTime: Long,
+    keyHeight: Float, slop: Float,
+    timeoutMs: Long = FAST_FLICK_TIMEOUT_MS,
+): Boolean {
+    if (upTime - downTime > timeoutMs) return false
+    val dx = up.x - down.x
+    val dy = up.y - down.y
+    val minDistance = maxOf(slop * 1.5f, keyHeight * 0.25f)
+    return dy < 0f && -dy >= minDistance && abs(dx) <= -dy
+}
+
+internal fun isUnclaimedFastFlickDown(
+    down: Offset, up: Offset,
+    downTime: Long, upTime: Long,
+    keyHeight: Float, slop: Float,
+    timeoutMs: Long = FAST_FLICK_TIMEOUT_MS,
+): Boolean {
+    if (upTime - downTime > timeoutMs) return false
+    val dx = up.x - down.x
+    val dy = up.y - down.y
+    val minDistance = maxOf(slop * 1.5f, keyHeight * 0.25f)
+    return dy > 0f && dy >= minDistance && abs(dx) <= dy
 }
 
 /** Only a deliberate upward exit gets the digit; a claimed glide never reaches this handler. */
