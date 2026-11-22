@@ -70,8 +70,8 @@ class SymbolInputModeTest {
             val events = mutableListOf<String>()
             val mapped = actions(events).copy(longPressItems = emptyList(), onLongPressSelect = null)
                 .withGlideCornerMenu("1", "!", 300L).withSymbolSwipeDirection(reverse)
-            // 上下滑都给了滑行：两个方向都不出角标。
-            assertNull(mapped.onUp); assertNull(mapped.onDown)
+            // 保留上下滑动作供快速拂动触发上下角标
+            assertNotNull(mapped.onUp); assertNotNull(mapped.onDown)
             assertTrue(mapped.blockUpSwipe && mapped.blockDownSwipe)
             assertEquals(listOf("1", "!"), mapped.longPressItems)
             assertNull(mapped.onLongPress)

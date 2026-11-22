@@ -54,7 +54,12 @@ class GlideTracker(
         if (claimed) return false
         val spanX = (maxX - minX) / keyWidth
         val spanY = (maxY - minY) / keyHeight
-        claimed = moved && visited.size >= 2 && kotlin.math.hypot(spanX, spanY) >= MIN_SPAN_KEYS
+        val horizontal = abs(x - startX) > abs(y - startY)
+        claimed = moved && (
+            (visited.size >= 3 && (spanX >= MIN_SPAN_KEYS || spanY >= MIN_ROWS)) ||
+            (visited.size >= 2 && horizontal && spanX >= MIN_SPAN_KEYS) ||
+            (visited.size >= 2 && spanY >= MIN_SPAN_KEYS && (eventTime - downTime > FLICK_HOLD_MS))
+        )
         return claimed
     }
 
@@ -72,8 +77,10 @@ class GlideTracker(
 
     companion object {
         const val HOLD_MS = 300L
-        // 不低于解码器的最短轨迹，否则接管后会吞掉没有候选的短划。
+        /** 快速上下滑角标识别时限（<=260ms），在此时间内的单列竖向滑动留给上下滑符号。 */
+        const val FLICK_HOLD_MS = 260L
         const val MIN_SPAN_KEYS = GlideDecoder.MIN_PATH_KEYS
+        const val MIN_ROWS = 1.8f
     }
 }
 

@@ -82,8 +82,13 @@ internal fun KeyGestureActions.withGlideCornerMenu(
         if (top != null && chosen == top) commitUpper?.invoke(top) else commitLower?.invoke(bottom.orEmpty())
     }
     return copy(
-        onUp = null, blockUpSwipe = true, onDown = null, blockDownSwipe = true,
-        glideTopUp = if (topRowDigitSwipe && top != null) ({ commitUpper?.invoke(top); Unit }) else null,
+        onUp = if (top != null) ({ commitUpper?.invoke(top) }) else null,
+        onDown = if (bottom != null) ({ commitLower?.invoke(bottom) }) else null,
+        upText = top,
+        downText = bottom,
+        blockUpSwipe = true,
+        blockDownSwipe = true,
+        glideTopUp = if (topRowDigitSwipe && top != null) ({ commitUpper?.invoke(top) }) else null,
         longPressTimeoutMillis = timeoutMillis,
         longPressItems = if (items.size > 1) items else emptyList(),
         onLongPressSelect = if (items.size > 1) pick else null,

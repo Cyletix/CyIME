@@ -73,11 +73,15 @@ class GlideDecoderTest {
         assertTrue(decoder.decode(xs, ys).isEmpty())
     }
 
-    @Test fun verticalStrokeToTheNextLetterIsClaimed() {
+    @Test fun shortVerticalFlickIsNotClaimed() {
         val (fx, fy) = center('f')
         val (rx, ry) = center('r')
         val tracker = GlideTracker(keys, 8f, fx, fy, 0)
+        // 上滑一行到 r：只经过两个键且纯竖向移动——留给上滑符号。
         tracker.move(rx, ry, 90)
+        assertFalse(tracker.claimed)
+        // 停在 r 超过拂动时限后确认为滑行。
+        tracker.move(rx, ry, 280)
         assertTrue(tracker.claimed)
     }
 

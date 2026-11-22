@@ -430,7 +430,7 @@ fun SwipeableKeyButton(
         if (ctrlTargets?.ctrlTap(pick) != true) onClick()
     }
     val letterGlideOwnsDrag = LocalLetterGlide.current && letterGroup?.singleOrNull()?.lowercaseChar()?.let { it in 'a'..'z' } == true
-    val reserveDragForGlide = letterGlideOwnsDrag || t9GlideOwnsDrag
+    val reserveDragForGlide = (letterGlideOwnsDrag && symbolInputMode == SymbolInputMode.LONG_PRESS) || t9GlideOwnsDrag
     // 九键滑行接管拖动的数字键往下滑打不出下角标：左下角不画（用户 11-11）。26 键字母滑行改成长按弹出上下两个角标
     // （[withGlideCornerMenu]），下角标打得到，照旧画（用户 11-11「关闭数字行滑行打不出 !@#」）。
     // 「上下滑输入符号」关着时（用户 11-14：关了提示还能滑出符号，要能真关）：直接上屏的角标不接上下滑、也不接长按。
