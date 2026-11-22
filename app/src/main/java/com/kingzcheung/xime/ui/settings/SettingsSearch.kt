@@ -636,8 +636,8 @@ internal fun searchTextFor(
     english: com.kingzcheung.xime.ui.i18n.UiTranslations? = null,
 ): String {
     val committed = committedSearchText(text, composition)
-    if (committed == text || text.isBlank() || searchSettings(text, english = english).isNotEmpty()) return text
-    return committed
+    if (composition != null && !composition.collapsed) return committed
+    return text
 }
 
 @Composable

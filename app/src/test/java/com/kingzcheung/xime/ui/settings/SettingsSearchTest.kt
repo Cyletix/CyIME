@@ -252,11 +252,12 @@ class SettingsSearchTest {
         assertEquals("无痕", committedSearchText("无痕", TextRange(2, 2)))
         // 输入法给的范围越界也不崩。
         assertEquals("无", committedSearchText("无h", TextRange(1, 9)))
-        // 实际搜的词：拼音搜不到就不拿去搜；整段能搜到（别的输入法边拼英文边搜）照旧。
+        // 实际搜的词：输入法组词中（composition != null）绝不拿未上屏的编码/拼音去搜，避免误撞英文关键词（如 vo 撞 SenseVoice）打断输入法。
         assertEquals("", searchTextFor("wu'hen", TextRange(0, 6)))
+        assertEquals("", searchTextFor("vo", TextRange(0, 2)))
+        assertEquals("字", searchTextFor("字号", TextRange(1, 2)))
         assertEquals("字号", searchTextFor("字号", null))
         assertTrue(searchSettings("字号").isNotEmpty())
-        assertEquals("字号", searchTextFor("字号", TextRange(1, 2)))
     }
 
     @Test fun `english screen finds settings by the English names it shows`() {
