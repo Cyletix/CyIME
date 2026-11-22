@@ -84,5 +84,13 @@ class DoublePinyinCaretMapTest {
         assertEquals(3, snapDoublePinyinCaret("woxl", "", flypy, 3))
         // Separators the user typed are boundaries on both sides.
         assertEquals(3, snapDoublePinyinCaret("wo'xl", "wo'xiang", flypy, 3))
+        // 两个分词符号中间的两个编码：点在中间光标留着，删的是前面的编码不是后面的（11-22 用户反馈）。
+        assertEquals(4, snapDoublePinyinCaret("wo'xl'vi", "wo'xiang'zhi", flypy, 4))
+        assertEquals(2, snapDoublePinyinCaret("'xl'", "'xiang'", flypy, 2))
+        assertEquals(4, snapDoublePinyinCaret("wo'xl", "wo'xiang", flypy, 4))
+        assertEquals(1, snapDoublePinyinCaret("xl'vi", "xiang'zhi", flypy, 1))
+        // 滑动或步进仍按方向跳音节分界。
+        assertEquals(3, snapDoublePinyinCaret("wo'xl'vi", "wo'xiang'zhi", flypy, 4, direction = -1))
+        assertEquals(5, snapDoublePinyinCaret("wo'xl'vi", "wo'xiang'zhi", flypy, 4, direction = 1))
     }
 }
