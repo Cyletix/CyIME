@@ -109,6 +109,7 @@ data class SwipeState(
     val isLongPress: Boolean = false,
     val longPressItems: List<String> = emptyList(),
     val selectedLongPressIndex: Int = 0,
+    val longPressDefaultIndex: Int = -1,
     val longPressDrawableIds: List<Int> = emptyList(),
     val keyFlick: KeyFlickPreview? = null,
 )
@@ -338,6 +339,7 @@ fun SwipeableKeyButton(
     onRelease: (() -> Unit)? = null,
     onLongPressSelect: ((String) -> Unit)? = null,
     longPressItems: List<String>? = null,
+    longPressDefaultIndex: Int = -1,
     longPressDrawableIds: List<Int>? = null,
     /** 拂动选字母：依次为左、上、右、下（缺的方向保留原手势），长按执行 [onFlickLongPress]。 */
     flickLetters: List<String>? = null,
@@ -463,7 +465,7 @@ fun SwipeableKeyButton(
         val keyboard = menuKeyboard?.invoke()
         val keyLeft = if (keyboard != null) key.left - keyboard.left else 0f
         val cells = KeyboardKeyMetrics.longPressMenuCells(keyLeft, key.width, count, iconMenu,
-            keyboard?.width, with(density) { KeyboardKeyMetrics.LongPressMenuMargin.toPx() })
+            keyboard?.width, with(density) { KeyboardKeyMetrics.LongPressMenuMargin.toPx() }, longPressDefaultIndex)
         cells.copy(left = cells.left - keyLeft)
     }
     val gestureActions = if (flick != null) KeyGestureActions(
@@ -510,6 +512,7 @@ fun SwipeableKeyButton(
         onUp = keyOnSwipe,
         onDown = keyOnSwipeDown,
         longPressItems = longPressItems.orEmpty(),
+        longPressDefaultIndex = longPressDefaultIndex,
         onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
         // 「字母键显示大写」只改显示：方向提示跟键帽一样大写，送出的仍是 letters 原样。
         leftText = letters?.first?.let { if (inputPreferences.uppercaseKeyLabels) it.uppercase() else it } ?: swipeLeftText,

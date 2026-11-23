@@ -34,6 +34,7 @@ internal data class KeyGestureActions(
     val glideTopUp: (() -> Unit)? = null,
     val longPressItems: List<String> = emptyList(),
     val longPressDrawableIds: List<Int> = emptyList(),
+    val longPressDefaultIndex: Int = -1,
     val keyWidth: Float = 1f,
     /**
      * 长按选项条在这个键自己坐标里的位置（左边相对按键左边），和气泡画的同一份
@@ -154,21 +155,26 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         var slid = false
         var selectedIndex = 0
         val items = actions.longPressItems
-        // 三项以上的长按菜单（西欧字母、拼音声调，七八个变音）：每格按画出来的格宽算，起点是手指下的那格。
-        // 以前整条挤在一个键宽里，八项时手指挪八分之一个键就换一格（用户 11-15）。两项（上下角标）照旧。
-        val cellsFor = actions.longPressMenuCells?.takeIf { items.size > 2 }
+        val defaultIdx = actions.longPressDefaultIndex.takeIf { it in items.indices }
+        // 三项以上或显式指定默认项（如首选项居中的大写字母）的长按菜单：每格按画出来的格宽算，起点对齐默认项/手指下那格。
+        val cellsFor = actions.longPressMenuCells?.takeIf { items.size > 2 || defaultIdx != null }
         var menuCells: LongPressMenuCells? = null
         var lastX = down.position.x
+        var longPressAnchorX = down.position.x
         val longPressDelay = actions.longPressDelayMillis(viewConfiguration.longPressTimeoutMillis)
         val longPressJob = if (longPressDelay != null) gestureScope.launch {
             delay(longPressDelay)
             longPressed = true
             actions.onLongPressFeedback()
             if (items.isNotEmpty()) {
+                longPressAnchorX = lastX
                 menuCells = cellsFor?.invoke(items.size, actions.longPressDrawableIds.isNotEmpty())
-                menuCells?.let { selectedIndex = KeyboardKeyMetrics.longPressMenuIndex(lastX, it, items.size) }
+                selectedIndex = defaultIdx
+                    ?: menuCells?.let { KeyboardKeyMetrics.longPressMenuIndex(lastX, it, items.size) }
+                    ?: 0
                 actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                     longPressItems = items, selectedLongPressIndex = selectedIndex,
+                    longPressDefaultIndex = actions.longPressDefaultIndex,
                     longPressDrawableIds = actions.longPressDrawableIds))
             } else {
                 actions.onLongPress?.invoke()
@@ -233,10 +239,16 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 crossedSwipeThreshold = if (actions.freeDirection) outsideCentre
                     else crossedSwipeThreshold || up || downSwipe || left || right || blockedUp || blockedDown
                 if (longPressed && items.isNotEmpty()) {
-                    selectedIndex = menuCells?.let { KeyboardKeyMetrics.longPressMenuIndex(change.position.x, it, items.size) }
-                        ?: longPressIndexByKeyWidth(dx, actions.keyWidth, items.size)
+                    selectedIndex = menuCells?.let { cells ->
+                        val selectionX = if (defaultIdx != null) {
+                            val defaultCenterX = cells.left + (defaultIdx + 0.5f) * cells.cellWidth
+                            defaultCenterX + (change.position.x - longPressAnchorX)
+                        } else change.position.x
+                        KeyboardKeyMetrics.longPressMenuIndex(selectionX, cells, items.size)
+                    } ?: longPressIndexByKeyWidth(dx, actions.keyWidth, items.size)
                     actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                         longPressItems = items, selectedLongPressIndex = selectedIndex,
+                        longPressDefaultIndex = actions.longPressDefaultIndex,
                         longPressDrawableIds = actions.longPressDrawableIds))
                 } else if (!longPressed) {
                     val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else if (right) actions.rightText else null
