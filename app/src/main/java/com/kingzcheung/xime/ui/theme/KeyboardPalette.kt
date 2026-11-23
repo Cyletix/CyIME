@@ -42,6 +42,10 @@ fun resolveKeyboardPalette(themeId: String, dark: Boolean): KeyboardPalette {
     )
 }
 
+/** 候选栏、展开候选页与键盘内输入框共用的 iOS 中性配色，不随键盘皮肤改变。 */
+fun resolveNeutralCandidateInputPalette(dark: Boolean): KeyboardPalette =
+    resolveKeyboardPalette(TransparentGlassTheme.ID, dark)
+
 private fun visibleBackground(config: com.kingzcheung.xime.settings.BackgroundConfig?, dark: Boolean): Color? =
     when (config?.type) {
         "solid" -> resolveSolidColor(config, dark)

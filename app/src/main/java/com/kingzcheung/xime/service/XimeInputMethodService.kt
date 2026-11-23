@@ -2408,6 +2408,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
                 val isDark = isDarkTheme
                 val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
+                val neutralHardwarePalette = com.kingzcheung.xime.ui.theme.resolveNeutralCandidateInputPalette(isDark)
                 val cardBg = hardwarePalette.background
                 val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
                 val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
@@ -2581,10 +2582,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     cursorAnchor = state.cursorAnchor.takeIf { state.hardwareOptions.followCursor },
                                     highlightIndex = hardwareHighlight,
                                     cardBackgroundColor = cardBg,
-                                    candidateTextColor = hardwarePalette.candidateText,
-                                    activeColor = hardwarePalette.accent,
-                                    selectedTextColor = hardwarePalette.selectedText,
-                                    preeditBackgroundColor = hardwarePalette.key,
+                                    candidateTextColor = neutralHardwarePalette.candidateText,
+                                    activeColor = neutralHardwarePalette.accent,
+                                    selectedTextColor = neutralHardwarePalette.selectedText,
+                                    preeditBackgroundColor = neutralHardwarePalette.key,
                                     comments = hardwareCandidates.comments,
                                     commentsAreGlosses = hardwareGlosses && !hardwareCandidates.association,
                                     onPrevious = previousHardwareCandidate.takeUnless { hardwareCandidates.association },
@@ -2608,8 +2609,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             }
                             HardwareKeyboardToolbar(
                                 frostedGlass = glass,
-                                selectedTextColor = hardwarePalette.selectedText,
-                                accentColor = hardwarePalette.accent,
+                                selectedTextColor = neutralHardwarePalette.selectedText,
+                                accentColor = neutralHardwarePalette.accent,
                                 onShowKeyboard = { showScreenKeyboardFromHardware() },
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
@@ -2644,8 +2645,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         else hardwareCandidates.words, hardwareCandidates.comments,
                                         hardwareHighlight,
                                         hardwareCandidates.hasPreviousPage, hardwareCandidates.hasNextPage,
-                                        CandidateBarVisuals(cardBg, hardwarePalette.candidateText, Color.Transparent,
-                                            hardwarePalette.accent, hardwarePalette.selectedText),
+                                        CandidateBarVisuals(cardBg, neutralHardwarePalette.candidateText, Color.Transparent,
+                                            neutralHardwarePalette.accent, neutralHardwarePalette.selectedText,
+                                            isDarkTheme = isDark, preeditBackgroundColor = neutralHardwarePalette.key),
                                         selectHardwareCandidate,
                                         previousHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         nextHardwareCandidate.takeUnless { hardwareCandidates.association },
@@ -2665,7 +2667,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     cand.shownPreedit(state.inputProfile).ifEmpty { cand.inputText } else "",
                                 overlapFaded = cardCoversTyping,
                                 onCoversTyping = { toolbarCoversTyping = it },
-                                contentColor = hardwarePalette.candidateText,
+                                contentColor = neutralHardwarePalette.candidateText,
                                 position = position,
                                 onPositionChange = { hardwareToolbarPosition.value = it },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },

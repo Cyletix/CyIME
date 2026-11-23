@@ -543,8 +543,10 @@ fun CandidateBar(
         androidx.compose.runtime.CompositionLocalProvider(LocalPreeditToneText provides toneText) {
             // 气泡：默认；选了小签但悬浮键盘转了角度时也用气泡（「候选栏左侧」11-20 他要求去掉）。
             PreeditBubbleHost(showPreedit && (!previewPrefs.preeditOnTopLine || tabRotated)) { hidden ->
+                val preeditBubbleSurface = visuals.preeditBackgroundColor
+                    .takeUnless { it == Color.Unspecified || it.alpha == 0f } ?: themeSurface
                 PreeditPreview(preeditText, protectedVisuals, onEditPreedit,
-                    floatingPreeditColor(themeSurface, visuals.preeditBackgroundColor), hidden, previewPrefs.preeditAlign)
+                    floatingPreeditColor(preeditBubbleSurface, visuals.preeditBackgroundColor), hidden, previewPrefs.preeditAlign)
             }
             PreeditBubbleHost(pinyinTabMode) { hidden ->
                 // 首选是纠错来的：小签显示纠正后的读音，改动的字母标红。

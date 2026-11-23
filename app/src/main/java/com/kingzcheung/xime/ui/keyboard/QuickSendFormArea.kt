@@ -50,9 +50,10 @@ fun QuickSendFormArea(
 ) {
     val glass = LocalKeyboardInputPreferences.current.frostedGlass.enabled
     // Drafts overlay other content, so they need their own opaque theme surface and matching text.
-    val popupBackground = if (glass) MaterialTheme.colorScheme.surface.copy(alpha = 1f)
+    val solidCardBg = cardBgColor.takeUnless { it == Color.Unspecified || it.alpha == 0f }?.copy(alpha = 1f)
+    val popupBackground = if (glass) solidCardBg ?: MaterialTheme.colorScheme.surface.copy(alpha = 1f)
         else if (backgroundColor.alpha > 0f) backgroundColor else cardBgColor
-    val popupText = if (glass) MaterialTheme.colorScheme.onSurface.copy(alpha = 1f) else textColor
+    val popupText = if (glass && solidCardBg == null) MaterialTheme.colorScheme.onSurface.copy(alpha = 1f) else textColor
     val currentOnFocusChange by rememberUpdatedState(onFocusChange)
     val currentOnCodeFocusChange by rememberUpdatedState(onCodeFocusChange)
     val density = LocalDensity.current

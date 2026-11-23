@@ -336,8 +336,12 @@ fun KeyboardView(
     }
     val specialKeyBgColor = palette.function
     val specialKeyTextColor = palette.functionText
-    val candidateTextColor = palette.candidateText
-    val candidateSelectedTextColor = palette.selectedText
+    val neutralUiPalette = com.kingzcheung.xime.ui.theme.resolveNeutralCandidateInputPalette(state.isDarkTheme)
+    val candidateTextColor = neutralUiPalette.candidateText
+    val candidateSelectedTextColor = neutralUiPalette.selectedText
+    val candidateAccentColor = neutralUiPalette.accent
+    val neutralInputBgColor = neutralUiPalette.key
+    val neutralInputTextColor = neutralUiPalette.text
     val dividerColor = if (state.isDarkTheme) androidx.compose.ui.graphics.Color(0xFF3C4043) else androidx.compose.ui.graphics.Color(0xFFDADCE0)
 
     val clipboardTab = (page as? KeyboardPage.Overlay)?.let {
@@ -1268,7 +1272,7 @@ fun KeyboardView(
             if (state.showQuickSendForm && state.ocrDraft) {
                 val ocrContext = LocalContext.current
                 com.kingzcheung.xime.ocr.OcrReviewEditor(
-                    text = state.quickSendEditingItemText, textColor = keyTextColor, background = keyBgColor, accent = accentColor,
+                    text = state.quickSendEditingItemText, textColor = neutralInputTextColor, background = neutralInputBgColor, accent = candidateAccentColor,
                     onFocus = { callbacks.onQuickSendFormFocusChange?.invoke(it) },
                     onSave = { text ->
                         val result = com.kingzcheung.xime.ocr.saveOcrDraft(ocrContext, text)
@@ -1288,12 +1292,12 @@ fun KeyboardView(
                 QuickSendFormArea(
                     title = formTitle,
                     backgroundColor = Color.Transparent,
-                    textColor = keyTextColor,
-                    accentColor = accentColor,
+                    textColor = neutralInputTextColor,
+                    accentColor = candidateAccentColor,
                     isFocused = state.quickSendFormFocused,
                     initialText = state.quickSendEditingItemText,
                     initialCode = state.quickSendEditingItemCode,
-                    cardBgColor = keyBgColor,
+                    cardBgColor = neutralInputBgColor,
                     editingItemId = state.quickSendEditingItemId,
                     onClose = { text: String, code: String ->
                         android.util.Log.d("QuickSendForm", "onClose: textLen=${text.length}, editingId=${state.quickSendEditingItemId}, showForm=${state.showQuickSendForm}")
@@ -1338,9 +1342,9 @@ fun KeyboardView(
                     hint = hintNode?.value ?: state.toolPanelTitle,
                     isFocused = state.toolPanelInputFocused,
                     isLoading = state.toolPanelLoading,
-                    textColor = keyTextColor,
-                    accentColor = accentColor,
-                    cardBgColor = keyBgColor,
+                    textColor = neutralInputTextColor,
+                    accentColor = candidateAccentColor,
+                    cardBgColor = neutralInputBgColor,
                     onChipClick = { chip?.key?.let { callbacks.onToolPanelAction?.invoke(it) } },
                     onClose = { callbacks.onToolPanelClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
@@ -1360,9 +1364,9 @@ fun KeyboardView(
                     isLoading = state.toolPanelLoading,
                     initialText = state.toolPanelPrefillText,
                     backgroundColor = Color.Transparent,
-                    textColor = keyTextColor,
-                    accentColor = accentColor,
-                    cardBgColor = keyBgColor,
+                    textColor = neutralInputTextColor,
+                    accentColor = candidateAccentColor,
+                    cardBgColor = neutralInputBgColor,
                     onClose = { callbacks.onToolPanelClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
                     // 手机横屏：一行的面板（高度和窗口用同一个数，见 toolPanelExtraHeight）。
@@ -1387,9 +1391,9 @@ fun KeyboardView(
                     title = "搜索剪贴板",
                     isFocused = true,
                     backgroundColor = Color.Transparent,
-                    textColor = keyTextColor,
-                    accentColor = accentColor,
-                    cardBgColor = keyBgColor,
+                    textColor = neutralInputTextColor,
+                    accentColor = candidateAccentColor,
+                    cardBgColor = neutralInputBgColor,
                     onClose = { callbacks.onClipboardSearchClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
                     heightDp = clipboardSearchPanelHeight(state.clipboardSearchInline),
@@ -1406,7 +1410,7 @@ fun KeyboardView(
             val preeditOrigin = remember { mutableStateOf<PreeditOrigin?>(null) }
             val drawPreeditEditor: (@Composable () -> Unit)? = if (editFrame == null) null else ({
                 DisposableEffect(Unit) { onDispose { preeditOrigin.value = null } }
-                PreeditEditorBar(editFrame, keyBgColor, candidateTextColor, accentColor,
+                PreeditEditorBar(editFrame, neutralInputBgColor, candidateTextColor, candidateAccentColor,
                     onClose = { closePreeditEditor() },
                     onCaret = { editPreedit(caret = it) },
                     onReplace = { editPreedit(text = it) },
@@ -1636,10 +1640,10 @@ fun KeyboardView(
                     backgroundColor = Color.Transparent,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
-                    accentColor = accentColor,
+                    accentColor = candidateAccentColor,
                     selectedTextColor = candidateSelectedTextColor,
                     isDarkTheme = state.isDarkTheme,
-                    preeditBackgroundColor = keyBgColor,
+                    preeditBackgroundColor = neutralInputBgColor,
                 ),
                 callbacks = CandidateBarCallbacks(
                     onVisibleCandidatesChanged = {
@@ -1946,6 +1950,10 @@ fun KeyboardView(
                 // 栏里的联想序号：英文打字时第一个是已打的原词（[associationWordAt] 同一规矩），展开页接着往下排。
                 val barAssociationWords = if (cs.pendingEnglishText.isNotEmpty() && cs.englishReplaceSupported)
                     listOf(cs.pendingEnglishText) + visibleAssociations else visibleAssociations
+                CompositionLocalProvider(
+                    LocalFunctionKeyColors provides KeyboardKeyColors(neutralUiPalette.function, neutralUiPalette.functionText),
+                    LocalEnterKeyColors provides KeyboardKeyColors(neutralUiPalette.enter, neutralUiPalette.functionText),
+                ) {
                 CandidatePage(
                     state = CandidatePageState(
                         candidates = sentenceEdit?.let {
@@ -1961,7 +1969,7 @@ fun KeyboardView(
                         onStrokeInk = ::updateCandidateStrokeInk,
                         backgroundColor = keyboardBgColor,
                         textColor = candidateTextColor,
-                        keyBackgroundColor = keyBgColor,
+                        keyBackgroundColor = neutralInputBgColor,
                         bottomPaddingDp = renderedBottomPaddingDp,
                         singleCharFilter = singleCharFilter,
                         railSymbols = if (sentenceEdit != null || canChooseSyllable && merged14) emptyList() else customRailSymbols?.takeIf { it.isNotEmpty() },
@@ -1969,7 +1977,7 @@ fun KeyboardView(
                         railPinyinNear = railPinyinNear,
                         choosingMergedLetter = syllableChoices?.letterGroup != null,
                         railSelectedPinyinIndex = if (sentenceEdit != null) sentenceOptions.indexOfFirst { it.selected } else railSelectedPinyinIndex,
-                        railAccentColor = accentColor,
+                        railAccentColor = candidateAccentColor,
                         enterKeyText = state.enterKeyText,
                         matchT9Geometry = isT9Layout,
                         qwertyGeometry = candidateQwerty,
@@ -2115,6 +2123,7 @@ fun KeyboardView(
                     onHapticFeedback = onHapticFeedback,
                     modifier = panelMaterial.fillMaxSize()
                 )
+                }
             }
             Box(Modifier.weight(1f).fillMaxWidth().testTag("keyboard-underlay")) {
             val clipboardPanel = LocalClipboardPanelExpansion.current

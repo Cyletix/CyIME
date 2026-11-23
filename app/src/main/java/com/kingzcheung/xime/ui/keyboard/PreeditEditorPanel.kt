@@ -93,7 +93,9 @@ internal fun PreeditEditorBar(
     // 浮在应用上时和拼音气泡同一个底色、同一个不透明度，开玻璃时下面同样垫实时模糊（用户 11-16：
     // 气泡是实底、一点拼音编辑条就变透，不统一）。放在键盘内（inline）时仍是原来的键帽色淡底。
     val floatingColor = if (inline) null else floatingPreeditColor(
-        com.kingzcheung.xime.ui.theme.LocalMaterialPalette.current?.surface ?: keyColor, keyColor)
+        keyColor.takeUnless { it == Color.Unspecified || it.alpha == 0f }
+            ?: com.kingzcheung.xime.ui.theme.LocalMaterialPalette.current?.surface ?: keyColor,
+        keyColor)
     val codeColor = floatingColor?.let { readableThemeText(textColor, it.copy(alpha = 1f)) } ?: textColor.copy(alpha = 0.9f)
     val iconColor = floatingColor?.let { codeColor } ?: textColor
     val halo = remember(codeColor, floatingColor) { floatingPreeditHalo(codeColor, floatingColor) }
