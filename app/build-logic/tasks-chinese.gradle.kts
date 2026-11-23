@@ -199,6 +199,31 @@ val prepareChineseDictionaries by tasks.registering {
                 }
             }
         }
+        // 候选里显示表情只给表情（#496）。雾凇的 emoji.json 还套着 others.txt（英文月份、偏旁、化学式、数学和单位符号……），
+        // 只开表情也出符号，开着「打符号名出符号」时加号、平方这些出两遍。只留 emoji.txt，再去掉里面的货币符号和 © ® ™
+        // （符号表里有人民币符号、版权符号这些）。
+        File(root, "opencc/emoji.json").writeText("""
+            {
+              "name": "Chinese to Emoji (CyIME: emoji only)",
+              "segmentation": { "type": "mmseg", "dict": { "type": "text", "file": "emoji.txt" } },
+              "conversion_chain": [ { "dict": { "type": "text", "file": "emoji.txt" } } ]
+            }
+        """.trimIndent() + "\n")
+        val emojiTable = File(root, "opencc/emoji.txt")
+        fun isEmoji(value: String) = value.codePoints().anyMatch {
+            it >= 0x1F000 || it in 0x2190..0x2BFF || it == 0xFE0F || it == 0x3030 || it == 0x303D || it == 0x3297 || it == 0x3299
+        }
+        var droppedSymbols = 0
+        emojiTable.writeText(emojiTable.readLines().mapNotNull { line ->
+            val tab = line.indexOf('\t')
+            if (tab < 0) return@mapNotNull line.takeIf { it.isNotEmpty() }
+            // 第一个值是词本身，留着；后面只留表情，一个表情都不剩的行整行不要。
+            val values = line.substring(tab + 1).split(' ')
+            val kept = values.take(1) + values.drop(1).filter(::isEmoji)
+            droppedSymbols += values.size - kept.size
+            if (kept.size < 2) null else line.substring(0, tab + 1) + kept.joinToString(" ")
+        }.joinToString("\n", postfix = "\n"))
+        check(droppedSymbols in 1..100) { "Upstream emoji table changed: $droppedSymbols non-emoji values" }
         fun reweight(name: String, table: File) {
             val estimated = java.util.zip.GZIPInputStream(table.inputStream()).bufferedReader().useLines { lines ->
                 lines.associate { line -> line.substringBeforeLast('\t') to line.substringAfterLast('\t') }
