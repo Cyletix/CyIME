@@ -1538,6 +1538,8 @@ fun KeyboardView(
                 }
             }
             val correctionMarks = if (correctionVisible) allCorrectionMarks else emptyMap()
+            // 贴边拼音的纠正读音可以关（#586）：关掉时照打的字母显示，和气泡一样。
+            val lineCorrected = rememberPreeditLineCorrected()
             // 「拼音显示声调」：双拼显示按键时拼音是按键不是拼法，不标。
             val preeditToneData = rememberPreeditToneData(inputPreferences.preeditTones &&
                 !(correctionScheme != null && doublePinyinKeysShown))
@@ -1546,7 +1548,7 @@ fun KeyboardView(
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalLearnedCandidates provides if (learnedMarkVisible) cs.learnedCandidates else emptySet(),
                 LocalCorrectedCandidates provides correctionMarks,
-                LocalPreeditLineCorrections provides allCorrectionMarks,
+                LocalPreeditLineCorrections provides if (lineCorrected) allCorrectionMarks else emptyMap(),
                 LocalPreeditToneData provides preeditToneData,
                 // 笔画方案的编码在组字区里自己画（11-23）。
                 LocalStrokeGlyphDrawing provides (!state.isAsciiMode &&

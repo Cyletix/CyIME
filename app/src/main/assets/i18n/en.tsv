@@ -2288,6 +2288,8 @@ settings-fold:语言键切换方式	=
 气泡	Bubble
 拼音浮在键盘上面，会挡住一点输入框。透明度可调。	Pinyin floats above the keyboard and can cover part of the text field. Opacity is adjustable.
 拼音显示声调	Show tones on pinyin
+拼音显示改正后的读音	Show corrected pinyin
+首选是纠错来的词时，拼音换成改正后的读音，改动的字母标红。关掉时照打的字母显示	When the first candidate comes from a correction, the pinyin shows the corrected reading with changed letters in red. Off: shows the letters as typed
 按首选字的读音标调，如 jiù'shì'zhè'yàng；只是显示，上屏的还是字母。简拼、双拼显示按键时不标。	Marks tones from the first candidate's reading, e.g. jiù'shì'zhè'yàng. Display only; letters are still what gets entered. Not shown for initials-only input or double pinyin keys.
 拼音气泡不透明度：{0}%	Pinyin bubble opacity: {0}%
 键盘上方拼音气泡的底色。100% 是实底，后面有画面也看得清；调低更透。	Background of the pinyin bubble above the keyboard. 100% is solid and readable over anything; lower is more transparent.

@@ -522,6 +522,14 @@ object SettingsPreferences {
     fun preeditTones(context: Context) = getPrefs(context).getBoolean(KEY_PREEDIT_TONES, false)
     fun setPreeditTones(context: Context, enabled: Boolean) =
         getPrefs(context).edit().putBoolean(KEY_PREEDIT_TONES, enabled).apply()
+    /**
+     * 小标签、方块、整行里的拼音在首选是纠错来的词时显示改正后的读音、改动的字母标红（#586）。默认开 = 原来的样子；
+     * 关掉时照打的字母显示，和气泡一样。不管候选旁边的纠错标记（那个是「显示纠错标记」）。
+     */
+    const val KEY_PREEDIT_LINE_CORRECTED = "preedit_line_corrected"
+    fun preeditLineCorrected(context: Context) = getPrefs(context).getBoolean(KEY_PREEDIT_LINE_CORRECTED, true)
+    fun setPreeditLineCorrected(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_PREEDIT_LINE_CORRECTED, enabled).apply()
 
     fun showPreeditPreview(context: Context) = getPrefs(context).getBoolean(KEY_SHOW_PREEDIT_PREVIEW, true)
     fun setShowPreeditPreview(context: Context, show: Boolean) =

@@ -424,6 +424,13 @@ private fun LayoutDisplayPage(
                                     }
                                 }
                             }
+                            // 贴边拼音显示纠正读音（#586，默认开 = 原来的样子）：只在小标签、方块、整行时显示，气泡本来就照打的字母。
+                            if (preeditStyle != SettingsPreferences.PREEDIT_STYLE_BUBBLE) {
+                                var lineCorrected by remember { mutableStateOf(SettingsPreferences.preeditLineCorrected(context)) }
+                                SettingsToggleItem(Icons.TwoTone.Spellcheck, "拼音显示改正后的读音",
+                                    "首选是纠错来的词时，拼音换成改正后的读音，改动的字母标红。关掉时照打的字母显示",
+                                    lineCorrected, { lineCorrected = it; SettingsPreferences.setPreeditLineCorrected(context, it) })
+                            }
                             // 拼音气泡底色可调透明（用户 11-01「我就喜欢透明度」）；点开的编辑条用同一个值（11-16）。只在键盘上方会浮出气泡时显示。
                             val bubblePrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
                             // 选「显示在输入框」时没有气泡；页面上的选择先于键盘偏好刷新，所以也看本页的选择。
