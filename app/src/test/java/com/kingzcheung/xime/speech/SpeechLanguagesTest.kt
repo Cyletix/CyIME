@@ -75,9 +75,12 @@ class SpeechLanguagesTest {
         assertFalse(SpeechLanguages.supports(SpeechModelCatalog.TWO_PASS, InputLanguage.JAPANESE))
         assertTrue(SpeechLanguages.supports(SpeechModelCatalog.TWO_PASS, InputLanguage.ENGLISH))
         InputLanguage.speech.forEach { assertTrue(SpeechLanguages.supports(SpeechModelCatalog.SENSEVOICE, it)) }
-        // 没有西班牙、德、法、俄、韩语识别器：不能交给 SenseVoice 当中文识别。
+        // 没有西班牙、德、法、俄语识别器：不能交给 SenseVoice 当中文识别。韩语只有 SenseVoice（#453）。
         for (letters in com.kingzcheung.xime.settings.LetterLanguage.entries)
-            SpeechModelSelection.primaryIds.forEach { assertFalse(SpeechLanguages.supports(it, letters.language)) }
+            SpeechModelSelection.primaryIds.forEach {
+                assertEquals(letters == com.kingzcheung.xime.settings.LetterLanguage.KOREAN && it == SpeechModelCatalog.SENSEVOICE,
+                    SpeechLanguages.supports(it, letters.language))
+            }
         InputLanguage.entries.forEach { assertFalse(SpeechLanguages.supports("unknown-model", it)) }
         SpeechModelSelection.primaryIds.forEach { assertFalse(SpeechLanguages.supports(it, InputLanguage.UNSPECIFIED)) }
     }
@@ -147,5 +150,23 @@ class SpeechLanguagesTest {
             AsrModelManager(context).selection(SpeechModelCatalog.ZIPFORMER_TWO_PASS, InputLanguage.JAPANESE)
         }
         verifyNoInteractions(context)
+    }
+
+    @Test fun koreanUsesSenseVoiceDecodedAsKorean() {
+        val context = mock<Context>()
+        val prefs = mock<SharedPreferences>()
+        whenever(context.filesDir).thenReturn(files.root)
+        whenever(context.getSharedPreferences(any(), any())).thenReturn(prefs)
+        whenever(prefs.getString(any(), anyOrNull())).thenAnswer {
+            if (it.getArgument<String>(0) == "selected_model") SpeechModelCatalog.TWO_PASS else it.getArgument<String?>(1)
+        }
+        val manager = AsrModelManager(context)
+        // 没下载 SenseVoice 时也指向它（只是指向，不写设置）。
+        assertEquals(SpeechModelCatalog.SENSEVOICE, manager.getSelectedModelId(InputLanguage.KOREAN))
+        assertEquals("ko", manager.selection(SpeechModelCatalog.SENSEVOICE, InputLanguage.KOREAN).recognitionLanguage)
+        assertThrows(IllegalArgumentException::class.java) { manager.selection(SpeechModelCatalog.TWO_PASS, InputLanguage.KOREAN) }
+        assertEquals(SpeechModelCatalog.SENSEVOICE,
+            SpeechLanguages.select(InputLanguage.KOREAN, SpeechModelCatalog.PARAFORMER) { it == SpeechModelCatalog.SENSEVOICE })
+        verify(prefs, never()).edit()
     }
 }

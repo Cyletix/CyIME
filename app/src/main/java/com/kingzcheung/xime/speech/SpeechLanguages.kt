@@ -24,6 +24,7 @@ object SpeechLanguages {
             InputLanguage.CHINESE -> listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.SENSEVOICE)
             InputLanguage.ENGLISH -> listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
             InputLanguage.JAPANESE -> listOf(SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA, SpeechModelCatalog.SENSEVOICE)
+            in InputLanguage.senseVoiceOnly -> listOf(SpeechModelCatalog.SENSEVOICE)
             else -> emptyList()
         }
         // A selected two-pass mode may already have a suitable multilingual second recognizer.

@@ -104,6 +104,8 @@ class AsrModelManager(private val context: Context) {
         // voice language is explicitly Japanese or English (one shared engine for both, as before).
         val languageId = when (language) {
             InputLanguage.JAPANESE, InputLanguage.ENGLISH -> "auto"
+            // 韩语只走 SenseVoice（#453），按韩语解，不自动判断语言、不当中文。
+            InputLanguage.KOREAN -> "ko"
             else -> "zh"
         }
         fun dir(id: String): File {
@@ -170,6 +172,7 @@ class AsrModelManager(private val context: Context) {
                 // 一个日语模型都没下载时：指向 153 MB 的轻量版（和自动选择、开箱引导的先后一致），不是 586 MB 的原版。
                 InputLanguage.JAPANESE -> SpeechModelCatalog.ZIPFORMER_JA_INT8
                 InputLanguage.ENGLISH -> SpeechModelCatalog.PARAFORMER
+                in InputLanguage.senseVoiceOnly -> SpeechModelCatalog.SENSEVOICE
                 else -> com.kingzcheung.xime.model.DeviceDefaults.voiceModel(context)
             }
         }

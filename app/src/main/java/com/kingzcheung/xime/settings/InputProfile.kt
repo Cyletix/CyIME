@@ -17,8 +17,13 @@ enum class InputLanguage(val id: String, val displayName: String) {
          */
         val supported = if (com.kingzcheung.xime.BuildConfig.ELDER) listOf(CHINESE, ENGLISH)
             else listOf(CHINESE, ENGLISH, JAPANESE, SPANISH, GERMAN, FRENCH, ITALIAN, RUSSIAN, KOREAN, VIETNAMESE, MALAY)
-        /** Languages a shipped speech recognizer can transcribe. The [LetterLanguage]s have none yet. */
-        val speech: List<InputLanguage> get() = supported.filter { LetterLanguage.of(it) == null }
+        /**
+         * Languages a shipped speech recognizer can transcribe. Of the [LetterLanguage]s only Korean has one:
+         * SenseVoice also recognizes Korean (GitHub #453), so it is the only Korean recognizer.
+         */
+        val speech: List<InputLanguage> get() = supported.filter { LetterLanguage.of(it) == null || it in senseVoiceOnly }
+        /** Speech only through SenseVoice, decoded in this language (never as Chinese). */
+        val senseVoiceOnly: Set<InputLanguage> = setOf(KOREAN)
         fun fromId(id: String): InputLanguage? = entries.firstOrNull { it.id == id }
         /** Compatibility boundary for stored Rime IDs. New business code uses InputProfile. */
         fun forSchema(id: String): InputLanguage = InputProfiles.describe(id).language
