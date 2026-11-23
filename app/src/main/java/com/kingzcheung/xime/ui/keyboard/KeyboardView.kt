@@ -2842,7 +2842,8 @@ fun KeyboardView(
             density = resizeControlDensity,
             aspectLimits = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind, splitActive, splitGapFraction),
             squareSnap = KeyboardSquareSnap.forLayout(state.inputProfile.layout.kind, splitActive, splitGapFraction,
-                inputPreferences.wideKeys, numberRow = inputPreferences.numberRow)
+                inputPreferences.wideKeys, numberRow = inputPreferences.numberRow,
+                numberRowFullHeight = inputPreferences.numberRowFullHeight)
                 ?.copy(candidateZoom = candidateTextZoom(rememberCandidateTextSize())),
             splitGapFraction = splitGapSetting,
             splitPitchDp = splitPitchDp,

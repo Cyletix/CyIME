@@ -208,7 +208,7 @@ fun KeyboardLayout(
     val numberKeys = remember(numberRowPrefs.numberRow, zhuyin, numberRowPrefs.sideSymbols) {
         if (numberRowShown(numberRowPrefs.numberRow, zhuyin)) numberRowPrefs.numberRowKeys() else emptyList()
     }
-    val numberRowWeight = if (numberKeys.isEmpty()) 0f else NUMBER_ROW_HEIGHT_WEIGHT
+    val numberRowWeight = if (numberKeys.isEmpty()) 0f else numberRowHeightWeight(numberRowPrefs.numberRowFullHeight)
     val metricContext = LocalContext.current
     val metricDisplay = LocalView.current.display
     val metricConfiguration = LocalConfiguration.current

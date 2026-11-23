@@ -274,7 +274,8 @@ private fun LayoutDisplayPage(
                         showArrow = true, searchKey = "数字键盘左栏符号")
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     // 数字行（默认关）：点开关打开，点这一行进「按键符号 → 数字行」改键和顺序。
-                    val numberRow = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().numberRow
+                    val numberRowPrefs = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences()
+                    val numberRow = numberRowPrefs.numberRow
                     SettingsToggleItem(Icons.TwoTone.FormatListNumbered, "数字行",
                         "在 26 键、14 键字母上方加一排数字",
                         checked = numberRow, onCheckedChange = { SettingsPreferences.setNumberRowEnabled(context, it) },
@@ -282,6 +283,14 @@ private fun LayoutDisplayPage(
                             com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.NUMBER_ROW) },
                         showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    // 数字行和字母一样高（#444，默认关）：只在数字行开着时显示。
+                    if (numberRow) {
+                        SettingsToggleItem(Icons.TwoTone.FormatListNumbered, "数字行和字母一样高",
+                            "关着时数字行矮一点。键盘总高不变",
+                            checked = numberRowPrefs.numberRowFullHeight,
+                            onCheckedChange = { SettingsPreferences.setNumberRowFullHeight(context, it) })
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    }
                     // 打数字出短语（别人请求，默认关）：见 service/DigitPhrases.kt。
                     var digitPhrases by remember { mutableStateOf(com.kingzcheung.xime.service.DigitPhrases.isEnabled(context)) }
                     SettingsToggleItem(Icons.TwoTone.Dialpad, "数字出短语",

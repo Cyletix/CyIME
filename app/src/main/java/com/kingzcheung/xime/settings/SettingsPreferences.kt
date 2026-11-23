@@ -254,6 +254,15 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_NUMBER_ROW, enabled).apply()
     }
 
+    /** 「数字行和字母一样高」（#444，默认关）：数字行和字母行一样高，键盘总高不变，每排一样分。 */
+    const val KEY_NUMBER_ROW_FULL_HEIGHT = "number_row_full_height"
+
+    fun isNumberRowFullHeight(context: Context): Boolean = getPrefs(context).getBoolean(KEY_NUMBER_ROW_FULL_HEIGHT, false)
+
+    fun setNumberRowFullHeight(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_NUMBER_ROW_FULL_HEIGHT, enabled).apply()
+    }
+
     const val KEY_NUMBER_PAD_TOP_789 = "number_pad_top_789"
 
     /**
