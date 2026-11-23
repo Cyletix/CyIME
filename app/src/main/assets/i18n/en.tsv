@@ -3823,6 +3823,7 @@ Shift、Ctrl、空格、删除键的小技巧	Tips for Shift, Ctrl, Space and De
 布局、语音和手写会按这个语言。	Layout, voice and handwriting will follow this language.
 带底板时和其他图标大小一致	With a background, it matches other icons in size
 应用支持时，回车直接发送消息	Enter sends the message when the app supports it
+应用支持时，回车直接发送消息，长按回车换行	Enter sends the message when the app supports it; hold Enter for a new line
 应用本身另占 {0}	The app itself takes another {0}
 底下空太多就调低，底排被挡住就抬高	Lower it if there's too much space below; raise it if the bottom row is covered
 底部圆角，导航栏透明	Rounded bottom, transparent navigation bar

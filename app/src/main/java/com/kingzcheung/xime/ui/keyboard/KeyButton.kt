@@ -1016,11 +1016,15 @@ fun IconKeyButton(
     contentDescription: String? = null,
     /** 键缝动效里这个键画什么（回车：点一下整排往上扫；删除：往里收）。 */
     gapLight: GapLightKind = GapLightKind.PRESS,
+    /** 长按做的事；为空时长按松手照旧算点一下（和以前一样）。 */
+    onLongClick: (() -> Unit)? = null,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnRelease by rememberUpdatedState(keyReleaseOrShared(onRelease, onPress != null))
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    val hasLongClick = onLongClick != null
     // 键缝动效：这个键点了一下并且生效时告诉光层（回车整排往上扫）。
     val gapLightTrigger = remember { KeyGapLightTrigger() }
     val density = LocalDensity.current
@@ -1058,7 +1062,7 @@ fun IconKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .fillMaxWidth()
-            .pointerInput(Unit) {
+            .pointerInput(hasLongClick) {
                 detectTapGestures(
                     onPress = {
                         isPressed = true
@@ -1067,6 +1071,7 @@ fun IconKeyButton(
                         isPressed = false
                         currentOnRelease?.invoke()
                     },
+                    onLongPress = if (hasLongClick) ({ currentOnLongClick?.invoke() }) else null,
                     onTap = {
                         // 比这个键早按下、还没抬的键先出字（按着最后一个字母就点了回车），见 KeyPressOrder。
                         KeyPressOrder.settleAll()

@@ -1503,6 +1503,8 @@ fun KeyboardLayout(
                                 shadowEnabled = shadowEnabled,
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
+                                // 「回车发送」时长按换行（#169）；按着 !@# 时照旧 Ctrl+回车。
+                                onLongClick = enterLongPressNewline(enterKeyText) { if (!shiftSlideTargets.ctrlEnter()) shiftEnter() },
                             )
                         }
                     }

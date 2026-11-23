@@ -914,6 +914,10 @@ private fun T9KeyboardContent(
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
+                // 「回车发送」时长按换行（#169），和 26 键同一条 Shift+回车。
+                onLongClick = enterLongPressNewline(uiState.enterKeyText, onGestureAction?.let { action ->
+                    { if (!ctrlTargets.ctrlEnter()) action(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.SHIFT_ENTER_COMMAND) }
+                }),
             )
         }
     }

@@ -178,7 +178,7 @@ private fun LayoutDisplayPage(
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     var enterSends by remember { mutableStateOf(SettingsPreferences.isEnterSendsEnabled(context)) }
                     SettingsToggleItem(Icons.AutoMirrored.TwoTone.Send, "回车发送",
-                        "应用支持时，回车直接发送消息",
+                        "应用支持时，回车直接发送消息，长按回车换行",
                         checked = enterSends, onCheckedChange = {
                             enterSends = it; SettingsPreferences.setEnterSendsEnabled(context, it)
                         })
