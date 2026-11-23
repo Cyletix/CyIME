@@ -266,6 +266,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("按键区挡住屏幕边缘手势", gestures, gesturePage, "边缘 侧滑 返回 手势 防误触 误触 丢字 吞字 侧边栏 分屏 荣耀 华为 贴边 a键", section = "屏幕边缘"),
         SettingsSearchEntry("长按空格多久开始", gestures, gesturePage, "长按空格 时长 秒 延迟 移动光标 连续输入空格 开关语音 说话", section = "时长与距离"),
         SettingsSearchEntry("从中间滑到边缘走几行", gestures, gesturePage, "光标 一行 行数 灵敏 灵敏度 速度 平板 大屏 滑到边缘", section = "时长与距离"),
+        SettingsSearchEntry("上下滑输入符号的距离", gestures, gesturePage, "上滑 下滑 符号 角标 误触 灵敏 灵敏度 距离 滑动距离 打拼音 不小心", section = "时长与距离"),
         SettingsSearchEntry("光标每移动一字所需距离", gestures, gesturePage, "光标 距离 灵敏 灵敏度 速度 dp 毫米", section = "时长与距离"),
         SettingsSearchEntry("移动光标时振动", gestures, gesturePage, "光标 振动 震动 触感", section = "光标与空格"),
         SettingsSearchEntry("移动光标时播放按键音", gestures, gesturePage, "光标 声音 按键音", section = "光标与空格"),

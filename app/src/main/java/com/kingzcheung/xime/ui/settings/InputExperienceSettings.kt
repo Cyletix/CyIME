@@ -34,7 +34,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 internal enum class InputExperiencePart { SYMBOLS, DELETE, FLICK_DISC, KANA, CURSOR, EDGE, TIMING, HANDWRITING, KEY_TEXT }
 
 /** 「时长与距离」里的几项（设置搜索点中其中一项时自动展开，见 [InputExperienceSettings] 的 collapsedSummary）。 */
-internal val TIMING_SEARCH_KEYS = setOf("长按空格多久开始", "从中间滑到边缘走几行", "光标每移动一字所需距离",
+internal val TIMING_SEARCH_KEYS = setOf("长按空格多久开始", "从中间滑到边缘走几行", "光标每移动一字所需距离", "上下滑输入符号的距离",
     "长按语言键弹出列表", "长按语言键切换输入法", "符号键松手打开符号的时限", "时长与距离")
 
 @Composable
@@ -458,6 +458,14 @@ internal fun InputExperienceSettings(
                 Slider(value = settings.languageMenuHoldSeconds, modifier = Modifier.testTag("language-menu-hold-slider"),
                     onValueChange = { settings = settings.copy(languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.05f..1f, steps = 18)
+            }
+            // #426：打拼音时手指一偏就滑出符号，可以调远一点。
+            Column(Modifier.settingsSearchAnchor("上下滑输入符号的距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("上下滑输入符号的距离：${settings.symbolSwipeDp.toInt()} dp")
+                Text("越大越不容易误触", style = MaterialTheme.typography.bodySmall)
+                Slider(value = settings.symbolSwipeDp, modifier = Modifier.testTag("symbol-swipe-distance-slider"),
+                    onValueChange = { settings = settings.copy(symbolSwipeDp = com.kingzcheung.xime.ui.keyboard.normalizeSymbolSwipeDistance(it)) },
+                    onValueChangeFinished = { settings.save(context) }, valueRange = 30f..90f, steps = 14)
             }
             Column(Modifier.settingsSearchAnchor("符号键松手打开符号的时限", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("符号键松手打开符号的时限：${"%.1f".format(settings.symbolKeyHoldSeconds)} 秒")

@@ -233,6 +233,8 @@ data class KeyboardInputPreferences(
     val cursorStepSound: Boolean = false,
     val fourteenLetterSwipe: Boolean = true,
     val fourteenLetterSwipeDp: Float = 24f,
+    /** 上下滑输入符号要滑多远（#426，dp）；新加，默认 50 和原来写死的一样。 */
+    val symbolSwipeDp: Float = DEFAULT_SYMBOL_SWIPE_DP,
     val kanaDirectionHints: Boolean = false,
     /**
      * 拂动时在按键上方显示四向圆盘并在键上显示方向箭头（日语假名、九键拂动、14 键字母对）；关闭时与 26 键一样在键内渐变提示。
@@ -379,6 +381,8 @@ data class KeyboardInputPreferences(
         const val EMAIL_SUFFIXES_KEY = "email_suffix_candidates_on"
         /** 网址、邮箱框自动切英文开关；输入法进输入框时读它。新键，读不到就是开。 */
         const val ADDRESS_FIELDS_ENGLISH_KEY = "address_fields_english"
+        /** 上下滑输入符号的触发距离（#426）。 */
+        const val SYMBOL_SWIPE_DP_KEY = "symbol_swipe_dp"
         /** 候选里显示表情开关；同繁体输出，输入法按键前读它（ImeKeyRouter）。 */
         const val CANDIDATE_EMOJI_KEY = "candidate_emoji"
         /** 打符号名出符号开关；同表情，输入法按键前读它（ImeKeyRouter），写 Rime 选项 cyime_symbol_names。
@@ -415,7 +419,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_NUMBER_PAD_TOP_789, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, DELETE_CHINESE_GLIDE_CHARACTER_KEY, com.kingzcheung.xime.glide.ExternalGlideEncodings.KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY, CYLM_LONG_ALTERNATIVE_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "symbol_long_press_seconds", "symbol_long_press_seconds_v2", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 JAPANESE_KANJI_KEY, KOREAN_HANJA_KEY, CANTONESE_CHARACTERS_KEY,
-                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", SHIFT_TAP_LOCKS_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
+                "fourteen_letter_swipe", "fourteen_letter_swipe_dp", SYMBOL_SWIPE_DP_KEY, "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", SHIFT_TAP_LOCKS_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent", T9_MERGE_ZERO_ENTER_KEY, STROKE_MERGE_ZERO_ENTER_KEY, T9_SPACE_UP_ZERO_KEY,
                 SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2", "bottom_punctuation_swipe_up_v3", com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS,
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
@@ -526,6 +530,7 @@ data class KeyboardInputPreferences(
                 cylmLongAlternative = prefs.getBoolean(CYLM_LONG_ALTERNATIVE_KEY, false),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
                 fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),
+                symbolSwipeDp = normalizeSymbolSwipeDistance(prefs.getFloat(SYMBOL_SWIPE_DP_KEY, DEFAULT_SYMBOL_SWIPE_DP)),
                 symbolInputMode = SymbolInputMode.entries.firstOrNull {
                     it.name == prefs.getString("symbol_input_mode", null)
                 } ?: SymbolInputMode.SWIPE_UP,
@@ -606,6 +611,7 @@ data class KeyboardInputPreferences(
             .putBoolean(CYLM_LONG_ALTERNATIVE_KEY, cylmLongAlternative)
             .putBoolean("fourteen_letter_swipe", fourteenLetterSwipe)
             .putFloat("fourteen_letter_swipe_dp", normalizeLetterSwipeDistance(fourteenLetterSwipeDp))
+            .putFloat(SYMBOL_SWIPE_DP_KEY, normalizeSymbolSwipeDistance(symbolSwipeDp))
             .putString("symbol_input_mode", symbolInputMode.name)
             .putFloat("symbol_long_press_seconds_v2", normalizeSymbolLongPressSeconds(symbolLongPressSeconds))
             .putBoolean("reverse_symbol_swipe", reverseSymbolSwipe)

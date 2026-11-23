@@ -519,6 +519,8 @@ fun SwipeableKeyButton(
         onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } } ?: onSwipeRight,
         rightText = letters?.second?.let { if (inputPreferences.uppercaseKeyLabels) it.uppercase() else it } ?: swipeRightText,
         horizontalThresholdDp = if (letters != null) normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp) else 50f,
+        // 上下滑输入符号要滑多远（#426，默认 50dp 和原来一样）；拂动键（上面那支）照旧用拂动距离。
+        verticalThresholdDp = normalizeSymbolSwipeDistance(inputPreferences.symbolSwipeDp),
         reserveHorizontalSwipe = letters != null,
         // 14 键双字母键四个方向都有东西：不管开不开方向盘，都按松手时落在哪个 45° 扇区算，和日语假名、九键拂动一样。
         // 以前键内模式沿用 26 键的锁轴：先往上拖就一直算上，要先拖回中线附近才换成左右，同一个位置出什么取决于刚才怎么拖，
