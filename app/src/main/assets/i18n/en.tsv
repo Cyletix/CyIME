@@ -2849,6 +2849,8 @@ CommentDisplayCard - 显示注释	=
 屏蔽外放音	Mute other audio
 语音输入	Voice input
 连续语音	Continuous voice
+用蓝牙耳机的麦克风	Use the Bluetooth headset mic
+连着蓝牙耳机时用耳机收音；说话时耳机里的音乐会暂时变成通话音质	With a Bluetooth headset connected, listen through its mic; music in the headset drops to call quality while you talk
 隔空输入	Remote typing
 保存语音调优录音	Save voice tuning recordings
 中文语音	Chinese voice

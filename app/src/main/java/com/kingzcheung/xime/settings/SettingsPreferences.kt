@@ -1264,6 +1264,13 @@ object SettingsPreferences {
      * 开车连续语音：语音悬浮条听写时发出消息或离开输入框，回到同一应用的输入框自动接着听。
      * 别人提的需求，默认关（用户 10-30 规则）；见 VoicePillResume。
      */
+    /** 「用蓝牙耳机的麦克风」（#309）：默认关，用手机麦克风。 */
+    const val KEY_STT_BLUETOOTH_MIC = "stt_bluetooth_mic"
+    fun isSttBluetoothMic(context: Context): Boolean = getPrefs(context).getBoolean(KEY_STT_BLUETOOTH_MIC, false)
+    fun setSttBluetoothMic(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_STT_BLUETOOTH_MIC, enabled).apply()
+    }
+
     fun isSttPillResume(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_STT_PILL_RESUME, false)
     }

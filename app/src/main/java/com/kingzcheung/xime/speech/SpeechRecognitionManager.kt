@@ -336,9 +336,15 @@ class SpeechRecognitionManager(
         spectrumCallback = onSpectrum
     }
 
+    /** 「用蓝牙耳机的麦克风」（#309），默认关；见 [BluetoothMicRoute]。 */
+    private val bluetoothMic by lazy { BluetoothMicRoute(context) }
+    private fun bluetoothMicWanted() = com.kingzcheung.xime.settings.SettingsPreferences.isSttBluetoothMic(context)
+
     fun startPreStart() {
         releasePreStart()
         if (released || recordingThread != null) return
+        // 要用蓝牙耳机麦克风时不先开手机麦克风：先开的那支会被这次录音接着用。
+        if (bluetoothMicWanted() && bluetoothMic.input() != null) return
         val record = createAudioRecord(PRE_START_BUFFER_SECS) ?: return
         try {
             record.startRecording()
@@ -505,7 +511,7 @@ class SpeechRecognitionManager(
             .append(" aec=").append(android.media.audiofx.AcousticEchoCanceler.isAvailable())
     }
 
-    private fun createAudioRecord(bufferSecs: Float = 2.0f): AudioRecord? {
+    private fun createAudioRecord(bufferSecs: Float = 2.0f, preferred: android.media.AudioDeviceInfo? = null): AudioRecord? {
         audioRecordFactory?.let { return it() }
         val bufferSize = (SAMPLE_RATE * bufferSecs).toInt()
         return try {
@@ -520,6 +526,7 @@ class SpeechRecognitionManager(
                 record.release()
                 null
             } else {
+                preferred?.let { runCatching { record.setPreferredDevice(it) } }
                 record
             }
         } catch (e: Exception) {
@@ -725,8 +732,13 @@ class SpeechRecognitionManager(
 
         override fun run() {
             var deliveryStarted = false
+            var bluetoothRouted = false
             try {
-                val audioRecord = microphone.acquire { createAudioRecord() }
+                val audioRecord = microphone.acquire {
+                    val headset = if (bluetoothMicWanted()) bluetoothMic.begin() else null
+                    bluetoothRouted = headset != null
+                    createAudioRecord(preferred = headset)
+                }
                     ?: if (stopRequested) return else error("麦克风打不开：请检查 CyIME 的录音权限，或关掉正在用麦克风的应用")
                 if (stopRequested) return
                 // 麦克风启动失败不能悄无声息地结束：报给用户（键盘上会显示）。
@@ -814,6 +826,7 @@ class SpeechRecognitionManager(
                 // 这次收到的电平（只记数字）：说话电平、底噪、低频占比、削顶。
                 levels?.let { FileLogger.i(TAG, "Microphone level session=$session ${it.summary()}") }
                 microphone.close()
+                if (bluetoothRouted) bluetoothMic.end()
                 audioFocus.release(otherAudioOwner)
                 captureEnded = true
                 watchShutdown()

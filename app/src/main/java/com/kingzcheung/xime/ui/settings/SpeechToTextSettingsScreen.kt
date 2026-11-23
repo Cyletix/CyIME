@@ -164,6 +164,11 @@ fun SpeechToTextSettingsContent(
                     SettingsToggleItem(icon = Icons.TwoTone.RecordVoiceOver, title = "连续语音",
                         subtitle = "点麦克风说话时，发完消息在同一个输入框里接着听；收成悬浮条时回到这个应用也接着听",
                         checked = pillResume, onCheckedChange = { pillResume = it; SettingsPreferences.setSttPillResume(context, it) })
+                    // #309：骑车等手不方便时戴蓝牙耳机说话。默认关，用手机麦克风。
+                    var bluetoothMic by remember { mutableStateOf(SettingsPreferences.isSttBluetoothMic(context)) }
+                    SettingsToggleItem(icon = Icons.TwoTone.RecordVoiceOver, title = "用蓝牙耳机的麦克风",
+                        subtitle = "连着蓝牙耳机时用耳机收音；说话时耳机里的音乐会暂时变成通话音质",
+                        checked = bluetoothMic, onCheckedChange = { bluetoothMic = it; SettingsPreferences.setSttBluetoothMic(context, it) })
                     // 隔空输入（用户 11-02 要的，参照微信）：默认关；走剪贴板同步已配对的电脑。
                     var remoteTyping by remember { mutableStateOf(SettingsPreferences.isSttRemoteTyping(context)) }
                     val computers = com.kingzcheung.xime.clipboard.sync.WindowsDevices.saved.value
