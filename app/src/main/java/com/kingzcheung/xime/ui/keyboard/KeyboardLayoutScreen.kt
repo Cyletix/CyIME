@@ -233,6 +233,7 @@ fun KeyboardLayoutScreen(
                     candidateState = candidateState,
                     callbacks = callbacks,
                     inputProfile = uiState.inputProfile,
+                    enterKeyText = uiState.enterKeyText,
                 )
             }
 

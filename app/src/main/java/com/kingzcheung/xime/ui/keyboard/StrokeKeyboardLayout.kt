@@ -102,6 +102,8 @@ fun StrokeKeyboardLayout(
     candidateState: State<CandidateState>? = null,
     callbacks: KeyboardCallbacks? = null,
     inputProfile: InputProfile? = null,
+    /** 回车键的动作名（[EnterKeyAction.label]）；键面照旧写「确定」，只用来判断长按回车换行（#418）。 */
+    enterKeyText: String = "确定",
 ) {
     KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
         policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true,
@@ -683,6 +685,10 @@ private fun StrokeKeyboardContent(
             ) else ActionKeyButton(
                 text = "确定",
                 onClick = { onKeyPress("enter") },
+                // 「回车发送」开着、回车会发送时，长按回车换行，和 26 键、九键一样（#418 笔画用户在微信里换不了行）。
+                onLongClick = enterLongPressNewline(enterKeyText) {
+                    onGestureAction?.invoke(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.SHIFT_ENTER_COMMAND)
+                },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
                 modifier = Modifier.weight(1f).testTag("stroke-enter-key"),
