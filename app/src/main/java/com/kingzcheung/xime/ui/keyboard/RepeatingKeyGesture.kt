@@ -60,9 +60,22 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
         down.consume()
         actions.onPress()
         actions.onPreview(SwipeState(isPressed = true))
+        // 和字母键排同一队（[KeyPressOrder]）：这个键还按着、后按的键先抬手出字时，还是点按（没连发、没滑动）就先出这一下，
+        // 之后只等手指抬起；这个键要动作时，比它早按下还没抬的键先出。
+        var settled = false
+        val press = KeyPressOrder.begin {
+            if (!settled && !repeated && !crossed) {
+                settled = true
+                repeat.stop()
+                actions.onTap()
+                actions.onPreview(SwipeState())
+            }
+        }
         val timer = actions.onRepeat?.let { onRepeat -> scope.launch {
             delay(viewConfiguration.longPressTimeoutMillis)
+            if (settled) return@launch
             repeated = true
+            KeyPressOrder.settleOlderThan(press)
             while (repeat.isActive) {
                 actions.onPress()
                 repeat.dispatch(onRepeat)
@@ -73,6 +86,11 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
             while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (settled) {
+                    change.consume()
+                    if (!change.pressed) break
+                    continue
+                }
                 if (change.isConsumed) break
                 val dx = change.position.x - down.position.x
                 val dy = change.position.y - down.position.y
@@ -87,6 +105,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                         if (abs(dx) >= dragStart) {
                             repeat.stop()
                             forwardDrag = dx > 0
+                            KeyPressOrder.settleOlderThan(press)
                             drag = actions.startDeleteDrag.invoke()
                             actions.onPreview(SwipeState(isPressed = true))
                         }
@@ -134,6 +153,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                     // Stop queued repetitions before committing a release action.
                     repeat.stop()
                     timer?.cancel()
+                    KeyPressOrder.settleOlderThan(press)
                     when {
                         up -> actions.onUp?.invoke()
                         downSwipe -> actions.onDown?.invoke()
@@ -144,6 +164,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                 }
             }
         } finally {
+            KeyPressOrder.end(press)
             try {
                 if (!released && lastCount != 0) drag?.move?.invoke(0)
             } finally {

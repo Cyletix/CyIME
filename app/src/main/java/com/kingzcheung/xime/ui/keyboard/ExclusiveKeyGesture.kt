@@ -162,6 +162,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         val cellsFor = actions.longPressMenuCells?.takeIf { items.size > 2 }
         var menuCells: LongPressMenuCells? = null
         var lastX = down.position.x
+        var lastY = down.position.y
         val longPressDelay = actions.longPressDelayMillis(viewConfiguration.longPressTimeoutMillis)
         val longPressJob = if (longPressDelay != null) gestureScope.launch {
             delay(longPressDelay)
@@ -185,13 +186,37 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 }
             }
         } else null
+        // 后按下的键先抬手出字时，这一下已经提前按点按出过了：之后这根手指只等抬起，不再出字。
+        var settled = false
+        val press = KeyPressOrder.begin {
+            // 这一下还是点按（没到长按、没滑出方向、没滑到别的键）才提前出；别的照旧等它自己抬手。
+            // 留给滑行的键挪过了触摸阈值时，按手指现在的位置照抬手的算法判（[glideDriftIsTap]）：后一根手指按下时
+            // 滑行已经改跟后一根，这一根不会再变成滑行。
+            if (!settled && !longPressed && !slid && !crossedSwipeThreshold && verticalDrag == null && !flickClaimed &&
+                if (reserveDragForGlide && moved) glideDriftIsTap(down.position, Offset(lastX, lastY), size.width.toFloat(),
+                    size.height.toFloat(), viewConfiguration.touchSlop, letterGlide)
+                else actions.freeDirection || abs(lastX - down.position.x) < horizontalCancelThreshold) {
+                settled = true
+                longPressJob?.cancel()
+                actions.onTap()
+                actions.onPreview(SwipeState())
+            }
+        }
         try {
             while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (settled) {
+                    // 字已经出过。同一个键上又按下一根手指时照旧换手，否则等这根手指抬起。
+                    change.consume()
+                    handover = event.changes.firstOrNull { it.id != down.id && it.changedToDown() && !it.isConsumed }
+                    if (!change.pressed || handover != null) break
+                    continue
+                }
                 if (change.isConsumed) break
                 val dx = change.position.x - down.position.x
                 lastX = change.position.x
+                lastY = change.position.y
                 val dy = change.position.y - down.position.y
                 if (!longPressed && (abs(dx) > viewConfiguration.touchSlop || abs(dy) > viewConfiguration.touchSlop)) {
                     moved = true
@@ -267,6 +292,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 if (!change.pressed || nextDown != null) {
                     change.consume()
                     handover = nextDown
+                    KeyPressOrder.settleOlderThan(press)
                     when {
                         longPressed -> items.getOrNull(selectedIndex)?.let { actions.onLongPressSelect?.invoke(it) }
                         slid -> actions.slideRelease?.invoke()
@@ -293,6 +319,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 }
             }
         } finally {
+            KeyPressOrder.end(press)
             longPressJob?.cancel()
             if (slid) actions.slideCancel()
             actions.onRelease()

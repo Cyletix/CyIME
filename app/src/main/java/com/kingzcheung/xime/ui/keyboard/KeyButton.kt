@@ -1068,6 +1068,8 @@ fun IconKeyButton(
                         currentOnRelease?.invoke()
                     },
                     onTap = {
+                        // 比这个键早按下、还没抬的键先出字（按着最后一个字母就点了回车），见 KeyPressOrder。
+                        KeyPressOrder.settleAll()
                         gapLightTrigger.tap()
                         currentOnClick()
                     }
