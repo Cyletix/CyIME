@@ -779,7 +779,7 @@ public:
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
         return session && cyime::pinyin_selection::Select(session->context(), session->schema(), session->engine(),
             expectedInput, expectedSchema, static_cast<size_t>(start),
-            static_cast<size_t>(end), static_cast<rime::SyllableId>(syllable));
+            static_cast<size_t>(end), static_cast<rime::SyllableId>(syllable), /* keep_fuzzy = */ true);
     }
 
     int pinyinSyllablesChosen() {
