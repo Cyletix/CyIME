@@ -138,7 +138,7 @@ private fun ClipboardPanelDisplaySettings(onNavigateToGroups: () -> Unit) {
             Text("卡片显示行数", style = MaterialTheme.typography.titleSmall)
             Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            listOf(2, 4, 8).forEach { option ->
+            com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_LINE_CHOICES.forEach { option ->
                 Row(Modifier.fillMaxWidth().testTag("clipboard-card-lines:$option")
                     .selectable(lines == option, role = Role.RadioButton) {
                         lines = option

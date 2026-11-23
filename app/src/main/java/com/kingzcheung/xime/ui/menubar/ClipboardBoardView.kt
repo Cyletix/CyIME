@@ -244,7 +244,10 @@ internal fun clipboardSectionKeys(cards: List<ClipboardCard>, pins: Set<String>,
 internal fun toggleClipboardSection(selected: Set<String>, section: Set<String>): Set<String> =
     if (section.isNotEmpty() && selected.containsAll(section)) selected - section else selected + section
 
-internal fun clipboardCardMaxLines(stored: Int): Int = if (stored in setOf(2, 4, 8)) stored else 4
+internal fun clipboardCardMaxLines(stored: Int): Int = if (stored in CLIPBOARD_CARD_LINE_CHOICES) stored else 4
+
+/** 卡片显示行数能选的几档；1 行是 #300 要的像搜狗那样一条一行（默认仍是 4 行）。 */
+internal val CLIPBOARD_CARD_LINE_CHOICES = listOf(1, 2, 4, 8)
 
 /**
  * Preference (board prefs): close the clipboard after a text record is put into the text. On by
