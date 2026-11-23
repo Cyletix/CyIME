@@ -464,7 +464,7 @@ internal fun InputExperienceSettings(
                 Text("按住符号键超过这个时间就变成 Ctrl", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.symbolKeyHoldSeconds, modifier = Modifier.testTag("symbol-key-hold-slider"),
                     onValueChange = { settings = settings.copy(symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(it)) },
-                    onValueChangeFinished = { settings.save(context) }, valueRange = 0.3f..2f, steps = 16)
+                    onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..2f, steps = 18)
             }
             }
             if (InputExperiencePart.HANDWRITING in parts) {

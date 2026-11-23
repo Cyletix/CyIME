@@ -28,9 +28,12 @@ internal fun normalizeCursorSwipeLines(value: Float): Float =
 internal fun normalizeLanguageMenuHoldSeconds(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.15f).coerceIn(0.05f, 1f) * 20).roundToInt() / 20f
 
-/** 26 键符号键点按的时限：0.3–2 秒，每档 0.1 秒，默认 1 秒；不拖动且在时限内松手才打开符号。 */
+/**
+ * 26 键符号键点按的时限：0.1–2 秒，每档 0.1 秒，默认 1 秒；不拖动且在时限内松手才打开符号。
+ * 最短原来 0.3 秒，#362 要两手同时按 !@# 和字母当 Ctrl 组合键，放到 0.1 秒；默认不变。
+ */
 internal fun normalizeSymbolKeyHoldSeconds(value: Float): Float =
-    ((value.takeIf { it.isFinite() } ?: 1f).coerceIn(0.3f, 2f) * 10).roundToInt() / 10f
+    ((value.takeIf { it.isFinite() } ?: 1f).coerceIn(0.1f, 2f) * 10).roundToInt() / 10f
 
 /**
  * 「长按输入」角标时按住多久输入：0.1–1 秒，每档 0.05 秒，默认 0.5 秒（用户 11-15 定；原来 0.3 秒，11-08 起可调）。
