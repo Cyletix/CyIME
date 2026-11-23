@@ -1,8 +1,10 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,9 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -38,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.keyboard.ToolbarButton
 import kotlin.math.abs
 
 internal const val BOTTOM_LIFT_ACTION_BUTTON_MIN_HEIGHT_DP = 28
@@ -57,13 +59,17 @@ internal fun BottomLiftSpacer(
     onCursorMove: ((Int) -> Unit)?,
     isAsciiMode: Boolean = false,
     iconColor: Color = Color.Unspecified,
+    showActionButtons: Boolean = true,
     actionsEnabled: Boolean = true,
     onSwitchLanguage: (() -> Unit)? = null,
+    onOpenSchemaList: (() -> Unit)? = null,
     onOpenClipboard: (() -> Unit)? = null,
+    onOpenFavorites: (() -> Unit)? = null,
 ) {
     if (heightDp <= 0) return
     val base = Modifier.fillMaxWidth().height(heightDp.dp)
-    val showButtons = heightDp >= BOTTOM_LIFT_ACTION_BUTTON_MIN_HEIGHT_DP &&
+    val showButtons = showActionButtons &&
+        heightDp >= BOTTOM_LIFT_ACTION_BUTTON_MIN_HEIGHT_DP &&
         onSwitchLanguage != null &&
         onOpenClipboard != null
     val cursorModifier = rememberBottomLiftCursorModifier(cursorEnabled, onCursorMove)
@@ -74,15 +80,15 @@ internal fun BottomLiftSpacer(
     }
 
     val resolvedIconColor = if (iconColor.isSpecified) iconColor else LocalContentColor.current.copy(alpha = 0.78f)
-    val iconSize = minOf(20f, heightDp * 0.62f).dp
+    val iconSize = minOf(24f, heightDp * 0.72f).dp
     // 按键区底缘还有约 10dp（KeyboardGridBottomMargin + 键帽下内边距）留白，下侧补同等视觉偏置使图标在底键与底边之间垂直居中。
-    val visualCenterBottomPadding = minOf(KeyboardGridBottomMargin.value + 2f, (heightDp - 24).coerceAtLeast(0).toFloat()).dp
+    val visualCenterBottomPadding = minOf(KeyboardGridBottomMargin.value + 2f, (heightDp - iconSize.value - 4f).coerceAtLeast(0f)).dp
 
     Box(base.then(cursorModifier)) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 20.dp, end = 20.dp, bottom = visualCenterBottomPadding),
+                .padding(start = 15.dp, end = 15.dp, bottom = visualCenterBottomPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -93,21 +99,24 @@ internal fun BottomLiftSpacer(
                 iconSize = iconSize,
                 enabled = actionsEnabled,
                 testTag = "bottom-lift-language-switch",
+                onLongClick = onOpenSchemaList,
                 onClick = onSwitchLanguage,
             )
             BottomLiftActionIcon(
-                icon = Icons.Default.ContentPaste,
+                icon = ToolbarButton.CLIPBOARD.icon,
                 contentDescription = "打开剪贴板",
                 tint = resolvedIconColor,
                 iconSize = iconSize,
                 enabled = actionsEnabled,
                 testTag = "bottom-lift-clipboard",
+                onLongClick = onOpenFavorites,
                 onClick = onOpenClipboard,
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BottomLiftActionIcon(
     icon: ImageVector,
@@ -116,30 +125,40 @@ private fun BottomLiftActionIcon(
     iconSize: Dp,
     enabled: Boolean,
     testTag: String,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val rippleSize = (iconSize.value + 12f).dp
     Box(
         modifier = Modifier
             .testTag(testTag)
-            .width(44.dp)
+            .width(54.dp)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(
+            .combinedClickable(
                 enabled = enabled,
                 role = Role.Button,
                 interactionSource = interactionSource,
-                indication = ripple(bounded = false, radius = 20.dp),
+                indication = null,
+                onLongClick = onLongClick,
                 onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(iconSize),
-        )
+        Box(
+            modifier = Modifier
+                .size(rippleSize)
+                .clip(CircleShape)
+                .indication(interactionSource, ripple(bounded = true)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 

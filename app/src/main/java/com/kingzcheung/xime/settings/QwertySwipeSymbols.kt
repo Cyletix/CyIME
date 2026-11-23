@@ -118,6 +118,35 @@ internal object QwertySwipeSymbols {
         "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
         "`", "~", "·", "—", "…", "°", "{", "}", "|",
         "=", "+", "-", "×", "÷", "<", ">")).toMap()
+    const val COMMA_KEY = "comma"
+    const val PERIOD_KEY = "period"
+    val bottomPunctuationKeys = listOf(COMMA_KEY, PERIOD_KEY)
+    private fun bottomPunctuationPrefKey(english: Boolean, id: String) =
+        "qwerty_bottom_punct_${if (english) "en" else "zh"}_$id"
+
+    fun loadBottomPunctuation(context: Context, english: Boolean): Map<String, String> {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        return buildMap {
+            for (key in bottomPunctuationKeys) for (direction in listOf("up", "down")) {
+                val id = "$direction.$key"
+                val prefKey = bottomPunctuationPrefKey(english, id)
+                if (prefs.contains(prefKey)) put(id, prefs.getString(prefKey, "").orEmpty())
+            }
+        }
+    }
+
+    fun saveBottomPunctuation(context: Context, english: Boolean, values: Map<String, String>) {
+        val edit = SettingsPreferences.getPrefsPublic(context).edit()
+        for (key in bottomPunctuationKeys) for (direction in listOf("up", "down")) {
+            val id = "$direction.$key"
+            val prefKey = bottomPunctuationPrefKey(english, id)
+            val value = values[id]
+            if (value == null) edit.remove(prefKey) else edit.putString(prefKey, value)
+        }
+        check(edit.commit()) { "无法保存底排标点符号设置" }
+        KeysConfigHelper.loadConfig(context)
+    }
+
     private fun prefix(english: Boolean, variant: CornerVariant = CornerVariant.BOTH) =
         "qwerty_symbols_${if (english) "en" else "zh"}_" + if (variant.id.isEmpty()) "" else "${variant.id}:"
 

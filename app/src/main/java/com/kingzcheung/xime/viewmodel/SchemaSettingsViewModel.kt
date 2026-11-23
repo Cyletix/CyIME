@@ -43,6 +43,7 @@ data class SchemaUiState(
     /** 上次部署没生效的方案和原因。 */
     val schemaProblems: Map<String, String> = emptyMap(),
     val importReport: String? = null,
+    val isLoaded: Boolean = false,
 )
 
 class SchemaSettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -95,6 +96,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                     currentSchema = currentSchema,
                     deployedSchemas = deployed,
                     schemaProblems = problems,
+                    isLoaded = true,
                 )
             }
         }

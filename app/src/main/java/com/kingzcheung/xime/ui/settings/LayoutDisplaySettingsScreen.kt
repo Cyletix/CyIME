@@ -859,6 +859,14 @@ private fun FixedBottomCalibrationSettings() {
             ?: SettingsPreferences.DEFAULT_SYSTEM_LIFT_HEIGHT_DP)
     }
     var diagnostic by remember(context) { mutableStateOf(SettingsPreferences.getKeyboardBottomDiagnostic(context)) }
+    var bottomLiftActions by remember(context) {
+        mutableStateOf(SettingsPreferences.getPrefsPublic(context)
+            .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_ACTIONS_KEY, true))
+    }
+    var bottomLiftCompactBottomRow by remember(context) {
+        mutableStateOf(SettingsPreferences.getPrefsPublic(context)
+            .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY, false))
+    }
     DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -869,6 +877,14 @@ private fun FixedBottomCalibrationSettings() {
                 systemHeightDp = SettingsPreferences.getKeyboardBottomSystemHeightDp(context)
                     ?: SettingsPreferences.DEFAULT_SYSTEM_LIFT_HEIGHT_DP
                 diagnostic = SettingsPreferences.getKeyboardBottomDiagnostic(context)
+            }
+            if (key == com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_ACTIONS_KEY) {
+                bottomLiftActions = prefs.getBoolean(
+                    com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_ACTIONS_KEY, true)
+            }
+            if (key == com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY) {
+                bottomLiftCompactBottomRow = prefs.getBoolean(
+                    com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY, false)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -919,6 +935,64 @@ private fun FixedBottomCalibrationSettings() {
             }
             TextButton(onClick = { SettingsPreferences.resetKeyboardBottomCalibration(context) },
                 enabled = bottomPosition != SettingsPreferences.KeyboardBottomPosition.AUTO || adjustment != 0) { Text("恢复默认（自动、留白 0）") }
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        Row(
+            Modifier.settingsSearchAnchor("底部留白快捷按钮", bleed = 16.dp, bleedVertical = 6.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("底部留白快捷按钮", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "底部留白足够高时，在左右两侧显示切换中英文与剪贴板按钮",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = bottomLiftActions,
+                modifier = Modifier.testTag("bottom-lift-actions-switch"),
+                onCheckedChange = { enabled ->
+                    bottomLiftActions = enabled
+                    SettingsPreferences.getPrefsPublic(context).edit()
+                        .putBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_ACTIONS_KEY, enabled)
+                        .apply()
+                },
+            )
+        }
+        HorizontalDivider(Modifier.padding(start = 32.dp, end = 16.dp))
+        Row(
+            Modifier.settingsSearchAnchor("合并符号数字并隐藏切换键", bleed = 16.dp, bleedVertical = 6.dp)
+                .fillMaxWidth()
+                .padding(start = 32.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "合并符号数字并隐藏切换键",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (bottomLiftActions) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "将底排符号与数字合并为 123（保留拖动功能），去掉切换中英文键并居中延长空格",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = bottomLiftCompactBottomRow && bottomLiftActions,
+                enabled = bottomLiftActions,
+                modifier = Modifier.testTag("bottom-lift-compact-bottom-row-switch"),
+                onCheckedChange = { enabled ->
+                    bottomLiftCompactBottomRow = enabled
+                    SettingsPreferences.getPrefsPublic(context).edit()
+                        .putBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY, enabled)
+                        .apply()
+                },
+            )
         }
         // 底部诊断（11-19）：反馈「被挡住」「底下有缝」时把这一行一起发来，就知道是哪种手机、系统报了什么、按哪一步判断的。
         diagnostic?.let { line ->
