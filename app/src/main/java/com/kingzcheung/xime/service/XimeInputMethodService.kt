@@ -1886,7 +1886,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun closeClipboardSearch(openBoard: Boolean, keepQuery: Boolean = false) {
         if (!uiState.value.clipboardSearchVisible) return
         stopVoiceForClosedEditor(ToolPanelEditTextHolder.editText)
-        if (!keepQuery) clipboardManager.boardQuery.value = ""
+        val favoriteStore = if (applicationContext != null) com.kingzcheung.xime.clipboard.ClipboardFavoriteStore.getInstance(this) else null
+        if (!keepQuery) {
+            clipboardManager.boardQuery.value = ""
+            favoriteStore?.setSearchInFavorites(false)
+        }
+        if (!openBoard) {
+            favoriteStore?.setSearchInFavorites(false)
+            favoriteStore?.setReturnToFavorites(false)
+        }
         if (candidateState.value.isComposing) {
             keyRouter.postRimeJob { keyRouter.endQueuedComposition(); withContext(Dispatchers.Main) { updateUI() } }
         }
@@ -1896,6 +1904,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         privacy.setClipboardSearch(false)
         restoreDisplayAfterClipboardSearch()
         if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
+    }
+
+    internal fun dismissQuickSendFormToClipboard() {
+        if (!uiState.value.showQuickSendForm) return
+        if (applicationContext != null) {
+            com.kingzcheung.xime.clipboard.ClipboardFavoriteStore.getInstance(this).clearPendingForm()
+        }
+        closeQuickSend()
+        keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
     }
 
     /** Enter in the search bar: the keyboard goes away and the clipboard keeps showing the matches. */
@@ -3762,7 +3779,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) return true
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)) {
-            if (event?.isCanceled != true) keyboardCallbacks?.onHideQuickSendForm?.invoke()
+            if (event?.isCanceled != true) dismissQuickSendFormToClipboard()
             return true
         }
         if (glossShiftKeys.remove(keyCode)) return true

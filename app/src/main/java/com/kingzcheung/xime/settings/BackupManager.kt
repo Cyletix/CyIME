@@ -40,11 +40,14 @@ object BackupManager {
     /** 设置项 SharedPreferences 文件名（SettingsPreferences.PREFS_NAME，此处避免依赖私有常量）。 */
     private const val PREFS_NAME_SETTINGS = "kime_settings"
 
-    /** 除 kime_settings 外随备份保存的设置文件（字幕显示、手写公式模式、模型下载源）。 */
-    internal val SETTINGS_PREFS = listOf("caption_mode", "handwriting", "model_download_source")
+    /** 除 kime_settings 外随备份保存的设置文件（字幕显示、手写公式模式、模型下载源、收藏夹、语音模型与纠错选择）。 */
+    internal val SETTINGS_PREFS = listOf("caption_mode", "handwriting", "model_download_source", "clipboard_favorites", "asr_model")
 
-    /** 只带其中几个键的设置文件：clipboard_board 里还存着固定条目（pins），备份只带卡片行数、图片高度、图片张数、平铺/列表和图片占用上限。 */
-    internal val PARTIAL_PREFS = mapOf("clipboard_board" to setOf("card_max_lines", "image_height", "recent_image_count", "list_layout", "image_cache_mb"))
+    /** 含敏感配置（如在线语音 API 密钥）的设置文件：仅在勾选「包含个人词库与学习数据」时打包。 */
+    internal val PERSONAL_PREFS = listOf("online_speech_api")
+
+    /** 只带其中几个键的设置文件：clipboard_board 里还存着固定条目（pins），备份只带面板设置键。 */
+    internal val PARTIAL_PREFS = mapOf("clipboard_board" to setOf("card_max_lines", "image_height", "recent_image_count", "list_layout", "image_cache_mb", "close_after_paste"))
 
     /** 只留 [keys] 里的键（[prefsToJson] 格式）。 */
     internal fun keepKeys(json: String, keys: Set<String>): String {
@@ -62,7 +65,7 @@ object BackupManager {
 
     private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
 
-    private val BACKUP_SUBDIRS = setOf("learning-profiles", "handwriting_templates", "handwriting_training")
+    private val BACKUP_SUBDIRS = setOf("learning-profiles", "handwriting_templates", "handwriting_training", "clipboard_favorites")
 
     private val HANDWRITING_FILES = setOf(
         "handwriting_templates/latin.json", "handwriting_templates/kana_och.json", "handwriting_training/samples.jsonl")
@@ -71,6 +74,8 @@ object BackupManager {
     internal fun isFilesEntry(relative: String, personal: Boolean): Boolean = when {
         relative == "custom-keyboard-layouts.json" -> true
         relative == DoublePinyinSchemes.FILE -> true
+        relative == "typing_stats.txt" -> true
+        relative.startsWith("clipboard_favorites/") && relative.count { it == '/' } == 1 -> true
         relative == "user_ngram_cache.json" -> personal
         relative.startsWith("learning-profiles/") && relative.endsWith(".json") &&
             relative.count { it == '/' } == 1 -> personal
@@ -177,16 +182,24 @@ object BackupManager {
         return result.sortedBy { it.first }
     }
 
-    internal fun stripDeviceState(json: String): String {
+    internal fun stripDeviceState(json: String, preserveBuiltinOnlineStt: Boolean = false): String {
         val root = org.json.JSONObject(json)
         root.keys().asSequence().toList()
-            .filter { it in DEVICE_STATE_KEYS || it.startsWith("device_") }
+            .filter { key ->
+                if (preserveBuiltinOnlineStt && key == SettingsPreferences.KEY_STT_ONLINE_PLUGIN_ID) {
+                    val value = root.optJSONObject(key)?.optString("v")
+                    value != com.kingzcheung.xime.speech.OnlineSpeechApi.BUILTIN_ID
+                } else {
+                    key in DEVICE_STATE_KEYS || key.startsWith("device_")
+                }
+            }
             .forEach { root.remove(it) }
         return root.toString()
     }
 
     /** 写本地备份包到 [output]，返回写入的文件数（不含设置 JSON）。[clipboard]：剪贴板记录 JSON，null 不写。 */
     fun writeLocalBackup(context: Context, output: OutputStream, includePersonal: Boolean, clipboard: String? = null): Int {
+        runCatching { com.kingzcheung.xime.stats.TypingStats.flushSync(context) }
         val files = localBackupFiles(context.filesDir, includePersonal)
         ZipOutputStream(output).use { zos ->
             fun put(name: String, bytes: ByteArray) {
@@ -201,10 +214,16 @@ object BackupManager {
                 .put("personalData", includePersonal)
                 .toString(2).toByteArray(Charsets.UTF_8))
             val settings = prefsToJson(context.getSharedPreferences(PREFS_NAME_SETTINGS, Context.MODE_PRIVATE))
-            put(META_PREFIX + "settings.json", stripDeviceState(settings).toByteArray(Charsets.UTF_8))
+            put(META_PREFIX + "settings.json", stripDeviceState(settings, preserveBuiltinOnlineStt = includePersonal).toByteArray(Charsets.UTF_8))
             SETTINGS_PREFS.forEach { name ->
                 val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
                 if (prefs.all.isNotEmpty()) put(META_PREFIX + "prefs/$name.json", prefsToJson(prefs).toByteArray(Charsets.UTF_8))
+            }
+            if (includePersonal) {
+                PERSONAL_PREFS.forEach { name ->
+                    val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+                    if (prefs.all.isNotEmpty()) put(META_PREFIX + "prefs/$name.json", prefsToJson(prefs).toByteArray(Charsets.UTF_8))
+                }
             }
             PARTIAL_PREFS.forEach { (name, keys) ->
                 val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
@@ -266,6 +285,10 @@ object BackupManager {
         }.onFailure { Log.w(TAG, "restore clipboard failed", it) }
         runCatching { CustomKeyboardLayouts.load(context) }
             .onFailure { Log.w(TAG, "reload custom layouts failed", it) }
+        runCatching { com.kingzcheung.xime.clipboard.ClipboardFavoriteStore.getInstance(context).reload() }
+            .onFailure { Log.w(TAG, "reload clipboard favorites failed", it) }
+        runCatching { com.kingzcheung.xime.stats.TypingStats.reload(context) }
+            .onFailure { Log.w(TAG, "reload typing stats failed", it) }
         // 自定义双拼只备份键位表，方案文件按它重新生成。
         runCatching { DoublePinyinSchemes.install(context, SchemaManager.getRimeDir(context)) }
             .onFailure { Log.w(TAG, "regenerate double pinyin schemes failed", it) }
@@ -284,7 +307,7 @@ object BackupManager {
                 // 回滚快照（replace）原样写回；备份内容不覆盖本机部署状态
                 val data = when {
                     replace -> json
-                    name == PREFS_NAME_SETTINGS -> stripDeviceState(json.toString(Charsets.UTF_8)).toByteArray(Charsets.UTF_8)
+                    name == PREFS_NAME_SETTINGS -> stripDeviceState(json.toString(Charsets.UTF_8), preserveBuiltinOnlineStt = true).toByteArray(Charsets.UTF_8)
                     // 只认允许的键，备份包写不进固定条目
                     name in PARTIAL_PREFS -> keepKeys(json.toString(Charsets.UTF_8), PARTIAL_PREFS.getValue(name)).toByteArray(Charsets.UTF_8)
                     else -> json

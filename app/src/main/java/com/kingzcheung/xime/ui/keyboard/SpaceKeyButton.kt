@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -197,9 +198,12 @@ fun SpaceKeyButton(
         flashAlpha.animateTo(0f, tween(fadeLeft.coerceIn(1L, SpaceLanguageFlash.FADE_MS).toInt(), easing = LinearEasing))
     }
     val flashVisible by remember { derivedStateOf { flashAlpha.value > 0f } }
+    val spaceStroke by rememberUpdatedState(LocalSpaceStrokeController.current)
+    var spaceCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
             .onGloballyPositioned {
+                spaceCoords = it
                 it.positionInRoot().let { p -> spaceOrigin[0] = p.x; spaceOrigin[1] = p.y }
                 spaceBounds = it.boundsInRoot()
             }
@@ -207,6 +211,15 @@ fun SpaceKeyButton(
                 settings.voiceSwipeCancel) {
                 val step = settings.cursorStepDp * cursorUnitPx
                 val tapTolerance = maxOf(viewConfiguration.touchSlop, 24.dp.toPx())
+                val verticalStrokeSlop = maxOf(viewConfiguration.touchSlop, 8.dp.toPx())
+                val horizontalStrokeSlop = maxOf(viewConfiguration.touchSlop * 2f, 16.dp.toPx())
+                val strokePoints = ArrayList<Offset>()
+                fun appendStrokePoint(point: Offset) {
+                    strokePoints.add(point)
+                    spaceCoords?.takeIf { it.isAttached }?.localToRoot(point)?.let { rootPt ->
+                        spaceStroke?.onInkPoint?.invoke(rootPt)
+                    }
+                }
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     down.consume()
@@ -220,6 +233,7 @@ fun SpaceKeyButton(
                     val swipeUp = currentSwipeUp?.takeIf { !endsLock && !guarded }
                     var held = false
                     var movedBeforeHold = false
+                    var drawingStroke = false
                     // 按住说话（用户 10-30：长按开了语音松手不停，和点麦克风是两回事）：这次长按开的语音，松手就结束并上屏。
                     var startedVoice = false
                     var lastX = down.position.x
@@ -301,12 +315,37 @@ fun SpaceKeyButton(
                                     if (armed) view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                                 }
                             }
-                            // 拇指点空格常带几毫米横移：在约 4 mm 内仍算一次点击（三星、Gboard 偏移 3.6 mm 仍上屏），
-                            // 超出才算滑动。系统 touchSlop 只有约 8 dp，曾让 2.4 mm 的偏移把空格吞掉（1.12.36 实测）。
-                            if (!held && (abs(change.position.x - down.position.x) > tapTolerance ||
-                                abs(change.position.y - down.position.y) > tapTolerance)) {
+                            // 拇指点空格常带几毫米横移：在约 4 mm 内仍算一次点击（三星、Gboard 偏移 3.6 mm 仍上屏）；
+                            // 有候选可做笔画筛选时，滑动超过 touchSlop 即停掉长按计时，达到纵向 8dp / 横向 16dp 即进入画笔模式，
+                            // 避免较矮的空格条或稍微慢一点的起笔被点击容差或 0.2s 长按吞掉。
+                            val canStroke = swipeUp == null && spaceStroke?.canTrigger?.invoke() == true
+                            val offsetX = abs(change.position.x - down.position.x)
+                            val offsetY = abs(change.position.y - down.position.y)
+                            if (!held && canStroke && (offsetX > viewConfiguration.touchSlop || offsetY > viewConfiguration.touchSlop)) {
+                                timer.cancel()
+                            }
+                            val movedEnough = if (canStroke) {
+                                offsetY > verticalStrokeSlop || offsetX > horizontalStrokeSlop
+                            } else {
+                                offsetX > tapTolerance || offsetY > tapTolerance
+                            }
+                            if (!held && !movedBeforeHold && movedEnough) {
                                 movedBeforeHold = true
                                 timer.cancel()
+                                // 候选栏未展开且存在候选词或组词态时，从空格滑动起笔触发笔画筛选。
+                                if (canStroke) {
+                                    drawingStroke = true
+                                    pressed = false
+                                    strokePoints.clear()
+                                    spaceStroke?.onDrawingChanged?.invoke(true)
+                                    spaceStroke?.onInkPoint?.invoke(null)
+                                    appendStrokePoint(down.position)
+                                    change.historical.forEach { appendStrokePoint(it.position) }
+                                    appendStrokePoint(change.position)
+                                }
+                            } else if (drawingStroke) {
+                                change.historical.forEach { appendStrokePoint(it.position) }
+                                appendStrokePoint(change.position)
                             }
                             if (cursorActive) {
                                 cursorSteps.stepPx = lineCursorStepPx(view.rootView.width / 2f, settings.cursorSwipeLines,
@@ -327,6 +366,13 @@ fun SpaceKeyButton(
                                 } else if (swipeUp != null && swipeUpArmed && !held) {
                                     gapLightTrigger.tap()
                                     swipeUp()
+                                } else if (drawingStroke) {
+                                    val ch = classifyCandidateStroke(strokePoints, density.density)
+                                    spaceStroke?.onInkPoint?.invoke(null)
+                                    spaceStroke?.onDrawingChanged?.invoke(false)
+                                    drawingStroke = false
+                                    strokePoints.clear()
+                                    if (ch != null) spaceStroke?.onStrokeTriggered?.invoke(ch)
                                 } else if (!held && !movedBeforeHold && !guarded) {
                                     gapLightTrigger.tap()
                                     currentClick()
@@ -335,6 +381,12 @@ fun SpaceKeyButton(
                             }
                         }
                     } finally {
+                        if (drawingStroke) {
+                            spaceStroke?.onInkPoint?.invoke(null)
+                            spaceStroke?.onDrawingChanged?.invoke(false)
+                            drawingStroke = false
+                            strokePoints.clear()
+                        }
                         if (cursorActive) {
                             SpaceAfterCursorGuard.mark(android.os.SystemClock.uptimeMillis())
                             SpaceCursorShift.end()
