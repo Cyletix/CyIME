@@ -92,6 +92,12 @@ internal object PinyinEditBuffer {
         return if (lead == 0) text to caret else text.drop(lead) to (caret - lead).coerceAtLeast(0)
     }
 
+    /** 去掉末尾的分隔符；删光后面的音节时不留悬空的末尾分隔符。 */
+    fun dropTrailingSeparators(text: String, caret: Int): Pair<String, Int> {
+        val trail = text.takeLastWhile { it == '\'' }.length
+        return if (trail == 0) text to caret else text.dropLast(trail) to caret.coerceAtMost(text.length - trail)
+    }
+
     fun mergeSeparators(text: String, caret: Int): Pair<String, Int> {
         val result = StringBuilder()
         var newCaret = 0

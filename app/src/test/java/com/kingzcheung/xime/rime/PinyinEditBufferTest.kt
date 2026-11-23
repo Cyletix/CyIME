@@ -28,6 +28,13 @@ class PinyinEditBufferTest {
         assertEquals("n'hao" to 1, PinyinEditBuffer.dropLeadingSeparators("n'hao", 1))
         assertEquals("ni'" to 3, PinyinEditBuffer.dropLeadingSeparators("ni'", 3))
     }
+    @Test fun trailingSeparatorsLeftByDeletingAreDropped() {
+        assertEquals("ni" to 2, PinyinEditBuffer.dropTrailingSeparators("ni'", 3))
+        assertEquals("ni" to 2, PinyinEditBuffer.dropTrailingSeparators("ni''", 3))
+        assertEquals("ni" to 1, PinyinEditBuffer.dropTrailingSeparators("ni'", 1))
+        assertEquals("" to 0, PinyinEditBuffer.dropTrailingSeparators("'", 1))
+        assertEquals("n'hao" to 1, PinyinEditBuffer.dropTrailingSeparators("n'hao", 1))
+    }
     @Test fun mapsCaretOnBothSidesOfASeparator() {
         assertEquals(2, mapCodeOffset("ni'hao", "ni'hao", 2))
         assertEquals(3, mapCodeOffset("ni'hao", "ni'hao", 3))

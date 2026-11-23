@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.composed
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -119,3 +120,20 @@ internal fun Modifier.candidateStrokeGesture(
 internal fun candidateStrokeLabel(code: String): String = code.map {
     when (it) { 'h' -> '一'; 's' -> '丨'; 'p' -> '丿'; 'n', 'N' -> '丶'; else -> '乛' }
 }.joinToString("")
+
+/**
+ * 候选栏未展开时从空格起笔触发笔画筛选的控制器。
+ * [canTrigger] 在滑动瞬间按需读取候选态，避免把候选更新扩散到整块键盘重组。
+ */
+internal class SpaceStrokeController(
+    val canTrigger: () -> Boolean,
+    val onDrawingChanged: (Boolean) -> Unit,
+    val onInkPoint: (Offset?) -> Unit,
+    val onStrokeTriggered: (Char) -> Unit,
+)
+
+internal val LocalSpaceStrokeController = staticCompositionLocalOf<SpaceStrokeController?> { null }
+
+internal val LocalStrokeFilterBackspace = staticCompositionLocalOf<(() -> Boolean)?> { null }
+
+internal val LocalStrokeDeleteRelease = staticCompositionLocalOf<(() -> Unit)?> { null }
