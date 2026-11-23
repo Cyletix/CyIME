@@ -227,11 +227,11 @@ internal class EditorCursor(private val clock: () -> Long = { System.nanoTime() 
             val target = if (moved == abs(remaining)) extracted.startOffset + next
                 else (extendedHorizontalTarget(ic, extracted, from, remaining) ?: (extracted.startOffset + next))
                     .also { dropDragText() }
-            // 读得到文字、已经到头：原地不动就停。不交给方向键：有的应用不收原地 setSelection、
-            // 读光标后面的字又给 null，方向键会把焦点移出输入框，键盘跟着收起（#403，小米笔记滑到句末）。
-            if (!collapsed && target == extracted.startOffset + from) return false
             if (setSelection(ic, target, selecting))
                 return target != extracted.startOffset + from || collapsed
+            // 读得到文字、已经到头：宿主不收原地 setSelection 也停在这里，不交给方向键。有的应用读光标后面的字
+            // 又给 null，方向键会把焦点移出输入框，键盘跟着收起（#403，小米笔记滑到句末）。
+            if (!collapsed && target == extracted.startOffset + from) return false
         }
         // 下面交给宿主按方向键移动，缓存的文字和选区都不再可信；这一步也不用缓存。
         dropDragText()
