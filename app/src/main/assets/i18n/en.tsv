@@ -1638,6 +1638,8 @@ CyIME 自己的格式，拼音按字用空格隔开：	CyIME's own format, with 
 也显示相册照片	Also show photos
 先打开「最近截图」	Turn on “Recent screenshots” first
 上屏后自动关闭剪贴板	Close clipboard after pasting
+粘贴后移到最前	Move to top after pasting
+点一条记录上屏后，这条排到最前面	A record you tap to paste moves to the top
 同步	Sync
 剪贴板同步	Clipboard sync
 扫码连接电脑，和其他手机、平板互相同步	Scan to connect a computer, and sync with other phones and tablets

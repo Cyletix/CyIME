@@ -148,6 +148,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         }
         // 标记为已消费：候选栏/剪贴板点选上屏后不再重复出现在候选栏
         service.clipboardManager.markConsumed(source)
+        if (com.kingzcheung.xime.ui.menubar.clipboardMovesPastedToTop(service)) service.clipboardManager.moveToTop(source)
         if (com.kingzcheung.xime.clipboard.clipboardPasteMode(source, service.clipboardManager.quickSendItems.value +
                 service.clipboardManager.clipboardItems.value.filter { it.sensitive }) ==
             com.kingzcheung.xime.clipboard.ClipboardPasteMode.PRIVATE) {

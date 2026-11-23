@@ -270,6 +270,12 @@ internal fun clipboardClosesAfterPaste(prefs: android.content.SharedPreferences)
 internal fun clipboardClosesAfterPaste(context: Context): Boolean =
     clipboardClosesAfterPaste(context.getSharedPreferences("clipboard_board", Context.MODE_PRIVATE))
 
+/** 「粘贴后移到最前」（#299）：点一条历史记录上屏后，这条排回最前面。默认关，顺序照复制时间。 */
+internal const val CLIPBOARD_PASTE_TO_TOP_KEY = "paste_to_top"
+
+internal fun clipboardMovesPastedToTop(context: Context): Boolean =
+    context.getSharedPreferences("clipboard_board", Context.MODE_PRIVATE).getBoolean(CLIPBOARD_PASTE_TO_TOP_KEY, false)
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ClipboardBoardView(

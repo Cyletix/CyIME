@@ -55,6 +55,7 @@ import com.kingzcheung.xime.clipboard.ClipboardRecentImageCounts
 import com.kingzcheung.xime.clipboard.clipboardRecentImageCount
 import com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_MAX_LINES_KEY
 import com.kingzcheung.xime.ui.menubar.CLIPBOARD_CLOSE_AFTER_PASTE_KEY
+import com.kingzcheung.xime.ui.menubar.CLIPBOARD_PASTE_TO_TOP_KEY
 import com.kingzcheung.xime.ui.menubar.clipboardCardMaxLines
 import com.kingzcheung.xime.ui.menubar.clipboardClosesAfterPaste
 
@@ -223,6 +224,7 @@ private fun ClipboardPasteSettings() {
     // Same switch as the clipboard's own ⋯ menu (same preference).
     var closeAfterPaste by remember { mutableStateOf(clipboardClosesAfterPaste(prefs)) }
     var showInBar by remember { mutableStateOf(clipboardShowsInCandidateBar(context)) }
+    var pasteToTop by remember { mutableStateOf(prefs.getBoolean(CLIPBOARD_PASTE_TO_TOP_KEY, false)) }
     SettingsSection(title = "粘贴", content = {
         // 用户 11-20 转来的反馈：最新复制的内容要能选不显示。默认开，和以前一样。
         SettingsToggleItem(
@@ -243,6 +245,17 @@ private fun ClipboardPasteSettings() {
             onCheckedChange = {
                 closeAfterPaste = it
                 prefs.edit().putBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, it).apply()
+            },
+        )
+        // #299：点选上屏后这条排回最前。默认关，顺序照复制时间。
+        SettingsToggleItem(
+            icon = Icons.TwoTone.ContentPaste,
+            title = "粘贴后移到最前",
+            subtitle = "点一条记录上屏后，这条排到最前面",
+            checked = pasteToTop,
+            onCheckedChange = {
+                pasteToTop = it
+                prefs.edit().putBoolean(CLIPBOARD_PASTE_TO_TOP_KEY, it).apply()
             },
         )
     })
