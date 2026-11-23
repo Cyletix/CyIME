@@ -57,7 +57,7 @@ internal object TouchStatsStore {
         val metrics = context.resources.displayMetrics
         File(dir, "device.txt").writeText(buildString {
             append("model=").append(Build.MODEL).append('\n')
-            append("sdk=").append(Build.VERSION.SDK_INT).append('\n')
+            append("sdk=").append(com.kingzcheung.xime.platform.AndroidPlatform.sdk).append('\n')
             append("version=").append(BuildConfig.VERSION_NAME).append('\n')
             append("version_code=").append(BuildConfig.VERSION_CODE).append('\n')
             append("density=").append(metrics.density).append('\n')

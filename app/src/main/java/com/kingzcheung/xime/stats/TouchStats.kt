@@ -11,7 +11,7 @@ object TouchStats {
     /** 现在记不记；null 是这个包里没有这项统计。 */
     @Volatile internal var gate: (() -> Boolean)? = null
     /** 和触摸事件同一个钟的现在（Android 上是 SystemClock.uptimeMillis）。 */
-    @Volatile internal var clock: () -> Long = { System.nanoTime() / 1_000_000L }
+    @Volatile internal var clock: () -> Long = { android.os.SystemClock.uptimeMillis() }
     /** 接在输入方式 ID 后面的区分（横屏）。 */
     @Volatile internal var boardSuffix: () -> String = { "" }
 
