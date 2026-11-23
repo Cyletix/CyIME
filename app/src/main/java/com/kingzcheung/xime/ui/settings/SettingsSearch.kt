@@ -283,6 +283,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("底部候选", hardware, SettingsRoutes.HardwareKeyboard, "三星 通栏 三星式通栏 底边使用三星式通栏 底部 底边 候选栏 整宽 编号 停靠", section = "靠边停靠"),
         SettingsSearchEntry("锁定浮窗位置", hardware, SettingsRoutes.HardwareKeyboard, "锁定 固定 不能拖 拖不动 误拖 浮窗 浮条 工具条 位置"),
         SettingsSearchEntry("游戏直通", hardware, SettingsRoutes.HardwareKeyboard, "游戏 打游戏 玩游戏 wasd 按键被吞 收不到 不弹键盘 蓝牙键盘 otg 外接键盘 实体键盘"),
+        SettingsSearchEntry("按应用直通", hardware, SettingsRoutes.HardwareKeyboard, "直通 应用 远程桌面 投屏 模拟器 方向键 按键被吞 实体键盘"),
         // 外观 › 主题与外观
         SettingsSearchEntry("显示模式", theme, SettingsRoutes.Theme, "深色 浅色 跟随系统 夜间 暗色 黑色 白色 明暗 日间"),
         SettingsSearchEntry("玻璃效果", theme, SettingsRoutes.Theme, "玻璃 毛玻璃 透明 材质 磨砂", section = "材质效果"),

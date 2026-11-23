@@ -484,7 +484,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 游戏直通生效中：键盘不显示，实体按键不经过 CyIME（见 [HardwareGamePassthrough]）。 */
     private val hardwareGamePassthrough: Boolean get() = HardwareGamePassthrough.active(
         uiState.value.hardwareOptions.gamePassthrough, hasHardwareKeyboard,
-        hardwareGamePackages.isGame(currentInputEditorInfo?.packageName)) && !gameShowExplicit
+        hardwareGamePackages.isGame(currentInputEditorInfo?.packageName),
+        listed = currentInputEditorInfo?.packageName in uiState.value.hardwareOptions.passthroughApps) && !gameShowExplicit
+    /** 最近记下的实体键盘打字应用；换了应用才写一次设置（见 [com.kingzcheung.xime.settings.HardwareKeyboardPreferences.noteLastApp]）。 */
+    private var hardwareLastNotedPackage: String? = null
     /**
      * 游戏直通开着时应用显式要键盘（showSoftInput 带 SHOW_EXPLICIT，如启动器自己的「调用输入法」键，#157）：
      * 这一次照常显示键盘、按键照常经过 CyIME；键盘收起或离开输入框后恢复直通。点输入框的普通请求仍不弹。
@@ -3627,6 +3630,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return if (event?.isSystem == true) super.onKeyDown(keyCode, event) else true
         }
         if (hardwareGamePassthrough) return super.onKeyDown(keyCode, event)
+        // 记下用实体键盘打字的应用，设置 › 物理键盘 里给这个应用单独开直通（#265）。
+        if (hasHardwareKeyboard && event != null && event.deviceId != android.view.KeyCharacterMap.VIRTUAL_KEYBOARD) {
+            currentInputEditorInfo?.packageName?.takeIf { it != packageName && it != hardwareLastNotedPackage }?.let {
+                hardwareLastNotedPackage = it
+                com.kingzcheung.xime.settings.HardwareKeyboardPreferences.noteLastApp(this, it)
+            }
+        }
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
         if (hasHardwareKeyboard) event?.let { feedbackManager.playHardwareKeySound(it) }
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {

@@ -1976,6 +1976,8 @@ Ctrl + .：切换中英文标点(英文模式固定半角)。\nCtrl + 回车：�
 底部候选	Bottom candidates
 游戏	Games
 游戏直通	Game pass-through
+按应用直通	Per-app pass-through
+打开的应用里不弹键盘，按键直接给应用。先在那个应用里用实体键盘打几个字，再回到这里打开。	In apps turned on here the keyboard stays hidden and keys go straight to the app. Type a few keys in that app with the physical keyboard first, then come back here to turn it on.
 屏幕底部	Bottom of screen
 你好	=
 拟好	=

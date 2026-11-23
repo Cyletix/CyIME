@@ -81,6 +81,10 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             Text("游戏", style = MaterialTheme.typography.titleMedium)
             HardwareOption("游戏直通", "在游戏里不弹键盘，按键直接给游戏",
                 options.gamePassthrough) { save("game_passthrough", it) }
+            PassthroughAppsSection(options.passthroughApps) { app, on ->
+                HardwareKeyboardPreferences.setPassthroughApp(context, app, on)
+                options = HardwareKeyboardPreferences.read(context)
+            }
         }
     }
 }
@@ -156,6 +160,44 @@ private fun HardwareOption(title: String, detail: String, checked: Boolean,
         }
     }
 }
+
+/**
+ * 按应用直通（#265）：游戏直通认不出的应用（远程桌面、没标成游戏的模拟器）单独打开。
+ * 列出最近用实体键盘打字的那个应用和已经打开直通的应用，每个一行开关；不读手机上装了哪些应用。
+ */
+@Composable
+private fun PassthroughAppsSection(selected: Set<String>, onChange: (String, Boolean) -> Unit) {
+    val context = LocalContext.current
+    // 进这一页时记下的最近应用；开关以后行不挪位置。
+    val last = remember { HardwareKeyboardPreferences.lastApp(context) }
+    val apps = remember(selected) { (listOfNotNull(last) + selected.sorted()).distinct() }
+    Text("按应用直通", style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.settingsSearchAnchor("按应用直通", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
+    Text("打开的应用里不弹键盘，按键直接给应用。先在那个应用里用实体键盘打几个字，再回到这里打开。",
+        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    apps.forEach { app ->
+        val checked = app in selected
+        val label = remember(app) { passthroughAppLabel(context, app) }
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
+            Row(Modifier.fillMaxWidth().testTag("hardware-passthrough-app:$app")
+                .toggleable(checked, role = Role.Switch) { onChange(app, it) }
+                .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    androidx.compose.material3.Text(label, style = MaterialTheme.typography.titleSmall)
+                    androidx.compose.material3.Text(app, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = checked, onCheckedChange = null)
+            }
+        }
+    }
+}
+
+/** 应用名；查不到（看不到这个应用、已卸载）时用包名。 */
+private fun passthroughAppLabel(context: android.content.Context, packageName: String): String = runCatching {
+    val pm = context.packageManager
+    pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
+}.getOrDefault(packageName)
 
 @Composable
 private fun CandidatePageOption(title: String, detail: String, key: String, checked: Boolean, onChange: (Boolean) -> Unit) {
