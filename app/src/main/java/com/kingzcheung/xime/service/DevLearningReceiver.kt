@@ -38,6 +38,9 @@ import kotlin.concurrent.thread
  * - `op=cell_set --es ids a,b --ez english false`：把开着的导入词库设成正好这几个（目录里的搜狗词库没下载的先下载），
  *   再像点「应用更改」一样应用。应用要几分钟，所以立刻回 `cell_set: started`，脚本用 cell_state 等 applying=false。
  * - `op=cell_remove --es ids a,b`：删掉这几个没在用的下载词库（脚本测完删掉它为测量下载的，原来就有的不动）。
+ * - `op=touch_stats`：把按键落点统计（[com.kingzcheung.xime.stats.TouchStatsData]：每个键的落点格、没出字的原因、
+ *   几根手指交叠、删掉重打的键对等，只有计数）连同打字统计、屏幕密度写到 Android/data/<包名>/files/cyime-dev/touch-stats-<时间>/，
+ *   给 tools/ime_lab/touch_stats_report.py 出报告。不含任何打过的文字。
  * - `op=enter_info`：当前输入框的 EditorInfo（包名、回车动作、「回车不做动作」标记、类型、actionId），不含文字。
  * - `op=enter_probe --es method <做法> --es marker t01`：清空当前输入框，上屏标记，用这一种做法回车，
  *   回 `result=sent|newline|nothing|other`（只报长度）。做法见 [EnterProbe.methods]；给 QQ、微信试哪种回车发送、哪种换行。
@@ -88,6 +91,19 @@ class DevLearningReceiver : BroadcastReceiver() {
                     val dict = RimeEngine.getInstance().exportUserDict(File(dir, "user_dict.userdb.txt").path)
                     val cylm = File(rime, "cylm_learned.tsv").takeIf { it.isFile }?.copyTo(File(dir, "cylm_learned.tsv"), true) != null
                     "export: ${dir.path} userdb=$dict cylm_learned=$cylm"
+                }
+            }
+            "touch_stats" -> {
+                val dir = File(app.getExternalFilesDir(null), "cyime-dev/touch-stats-" +
+                    java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ROOT).format(java.util.Date()))
+                // 不碰引擎，不用等部署的锁。
+                val pending = goAsync()
+                thread(name = "dev-touch-stats") {
+                    val message = runCatching { com.kingzcheung.xime.stats.TouchStatsStore.export(app, dir) }
+                        .getOrElse { "touch_stats failed: ${it.message}" }
+                    Log.i(TAG, message)
+                    pending.resultData = message
+                    pending.finish()
                 }
             }
             "snapshot" -> background {

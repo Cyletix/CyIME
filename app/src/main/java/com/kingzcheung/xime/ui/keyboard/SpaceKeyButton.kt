@@ -213,7 +213,11 @@ fun SpaceKeyButton(
                     pressed = true
                     // 刚移完光标的这一下不输入空格，也就不该有按键音和振动（按住照常进入移动光标）。
                     val guarded = SpaceAfterCursorGuard.blocksSpace(down.uptimeMillis)
+                    // 按键落点统计（只有自用包在记）：空格只记落点，不跟手势。
+                    com.kingzcheung.xime.stats.TouchStats.landing(down.position.x, down.position.y, size.width, size.height,
+                        1.dp.toPx(), down.uptimeMillis, tracked = false)
                     if (!guarded) currentPress?.invoke()
+                    com.kingzcheung.xime.stats.TouchStats.landed()
                     // 已锁定在听：这一下（点或按住都算）就是结束，松手结束并上屏，不输入空格、不再长按。
                     val endsLock = voiceLock?.locked == true && voiceOn
                     // 这一下按下时有没有上滑动作：整个手势按按下时的算，中途候选变了也不换。
@@ -258,6 +262,7 @@ fun SpaceKeyButton(
                         if (!settled && !endsLock && !guarded && !held && !movedBeforeHold && !(swipeUp != null && swipeUpArmed)) {
                             settled = true
                             timer.cancel()
+                            com.kingzcheung.xime.stats.TouchStats.count(com.kingzcheung.xime.stats.TouchStatsData.Count.EARLY_SPACE)
                             gapLightTrigger.tap()
                             currentClick()
                         }

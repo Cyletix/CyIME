@@ -58,7 +58,11 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
         var released = false
         var verticalClaimed = false
         down.consume()
+        // 按键落点统计（只有自用包在记）：删除键这类只记落点，不跟手势。
+        com.kingzcheung.xime.stats.TouchStats.landing(down.position.x, down.position.y, size.width, size.height, density,
+            down.uptimeMillis, tracked = false)
         actions.onPress()
+        com.kingzcheung.xime.stats.TouchStats.landed()
         actions.onPreview(SwipeState(isPressed = true))
         // 和字母键排同一队（[KeyPressOrder]）：这个键还按着、后按的键先抬手出字时，还是点按（没连发、没滑动）就先出这一下，
         // 之后只等手指抬起；这个键要动作时，比它早按下还没抬的键先出。
@@ -67,6 +71,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
             if (!settled && !repeated && !crossed) {
                 settled = true
                 repeat.stop()
+                com.kingzcheung.xime.stats.TouchStats.count(com.kingzcheung.xime.stats.TouchStatsData.Count.EARLY_REPEAT)
                 actions.onTap()
                 actions.onPreview(SwipeState())
             }

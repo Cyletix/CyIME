@@ -18,12 +18,19 @@ internal object KeyPressOrder {
     }
 
     private val pending = ArrayList<Press>(4)
+    /** 开始了还没结束的按下有几个（出没出过字都算），只给按键落点统计用。 */
+    private var held = 0
 
     /** 手指按下：排到最后。这次按下结束时（生效没生效都算）必须调 [end]。 */
-    fun begin(settleNow: () -> Unit): Press = Press(settleNow).also { pending.add(it) }
+    fun begin(settleNow: () -> Unit): Press {
+        com.kingzcheung.xime.stats.TouchStats.pressBegan(held)
+        held++
+        return Press(settleNow).also { pending.add(it) }
+    }
 
     /** 这次按下结束了：出队，之后不会再被结算。 */
     fun end(press: Press) {
+        if (!press.ended) held--
         press.ended = true
         pending.remove(press)
     }

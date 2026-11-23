@@ -7,6 +7,8 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.stats.TouchStats
+import com.kingzcheung.xime.stats.TouchStatsData.Outcome
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -143,7 +145,13 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         val swipeThreshold = actions.verticalThresholdDp.dp.toPx()
         val horizontalThreshold = actions.horizontalThresholdDp.dp.toPx()
         down.consume()
+        // 按键落点统计（只有自用包在记，见 [TouchStats]）：落点在按下回调之前给，回调里报了键名才有这一下的号。
+        TouchStats.landing(down.position.x, down.position.y, size.width, size.height, density, down.uptimeMillis)
         actions.onPress()
+        val touch = TouchStats.landed()
+        // 这一下最后的结果，只给统计用。长按动作已经执行、已经提前出字的，手指之后被上层拿走也不改。
+        var outcome = Outcome.NONE_LOST
+        var lastAt = down.uptimeMillis
         actions.onPreview(SwipeState(isPressed = true, pressedText = actions.text))
         var longPressed = false
         var moved = false
@@ -180,6 +188,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     longPressItems = items, selectedLongPressIndex = selectedIndex,
                     longPressDrawableIds = actions.longPressDrawableIds))
             } else {
+                outcome = Outcome.LONG
                 actions.onLongPress?.invoke()
                 actions.longPressBubbleText?.takeIf { it.isNotEmpty() }?.let { shown ->
                     actions.onPreview(SwipeState(isPressed = true, isLongPress = true, longPressItems = listOf(shown)))
@@ -197,7 +206,9 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     size.height.toFloat(), viewConfiguration.touchSlop, letterGlide)
                 else actions.freeDirection || abs(lastX - down.position.x) < horizontalCancelThreshold) {
                 settled = true
+                outcome = Outcome.TAP_EARLY
                 longPressJob?.cancel()
+                TouchStats.early(touch)
                 actions.onTap()
                 actions.onPreview(SwipeState())
             }
@@ -206,6 +217,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
             while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                lastAt = change.uptimeMillis
                 if (settled) {
                     // 字已经出过。同一个键上又按下一根手指时照旧换手，否则等这根手指抬起。
                     change.consume()
@@ -213,7 +225,10 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     if (!change.pressed || handover != null) break
                     continue
                 }
-                if (change.isConsumed) break
+                if (change.isConsumed) {
+                    if (outcome != Outcome.LONG) outcome = Outcome.NONE_TAKEN
+                    break
+                }
                 val dx = change.position.x - down.position.x
                 lastX = change.position.x
                 lastY = change.position.y
@@ -293,17 +308,21 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     change.consume()
                     handover = nextDown
                     KeyPressOrder.settleOlderThan(press)
-                    when {
-                        longPressed -> items.getOrNull(selectedIndex)?.let { actions.onLongPressSelect?.invoke(it) }
-                        slid -> actions.slideRelease?.invoke()
-                        up -> actions.onUp?.invoke(actions.upText.orEmpty())
-                        downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
-                        left -> actions.onLeft?.invoke()
-                        right -> actions.onRight?.invoke()
+                    val tap = if (nextDown != null) Outcome.TAP_HANDOVER else Outcome.TAP
+                    outcome = when {
+                        longPressed -> { items.getOrNull(selectedIndex)?.let { actions.onLongPressSelect?.invoke(it) }; Outcome.LONG }
+                        slid -> { actions.slideRelease?.invoke(); Outcome.SLIDE }
+                        up -> { actions.onUp?.invoke(actions.upText.orEmpty()); Outcome.SWIPE }
+                        downSwipe -> { actions.onDown?.invoke(actions.downText.orEmpty()); Outcome.SWIPE }
+                        left -> { actions.onLeft?.invoke(); Outcome.SWIPE }
+                        right -> { actions.onRight?.invoke(); Outcome.SWIPE }
                         reserveDragForGlide && moved ->
                             if (glideDriftIsTap(down.position, change.position, size.width.toFloat(), size.height.toFloat(),
-                                    viewConfiguration.touchSlop, letterGlide)) actions.onTap()
-                        !crossedSwipeThreshold && (actions.freeDirection || abs(dx) < horizontalCancelThreshold) -> actions.onTap()
+                                    viewConfiguration.touchSlop, letterGlide)) { actions.onTap(); tap } else Outcome.NONE_DRIFT
+                        !crossedSwipeThreshold && (actions.freeDirection || abs(dx) < horizontalCancelThreshold) -> { actions.onTap(); tap }
+                        // 没出字：滑过了阈值（那个方向没有动作），或者横着拖出了取消的距离。
+                        crossedSwipeThreshold -> Outcome.NONE_BLOCKED
+                        else -> Outcome.NONE_FAR
                     }
                     break
                 }
@@ -315,13 +334,17 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     // 父层光标/滚动手势可能在 Main 后半段消费；取消后不得补出普通字符。
                     val finalChange = awaitPointerEvent(PointerEventPass.Final)
                         .changes.firstOrNull { it.id == down.id }
-                    if (finalChange == null || finalChange.isConsumed) break
+                    if (finalChange == null || finalChange.isConsumed) {
+                        if (finalChange != null) outcome = Outcome.NONE_TAKEN
+                        break
+                    }
                 }
             }
         } finally {
             KeyPressOrder.end(press)
             longPressJob?.cancel()
             if (slid) actions.slideCancel()
+            TouchStats.finish(touch, outcome, lastX - down.position.x, lastY - down.position.y, density, lastAt)
             actions.onRelease()
             actions.onPreview(SwipeState())
         }

@@ -124,6 +124,8 @@ internal fun rememberImeKeyboardCallbacks(
                     service.noteInputDropped("key_not_ready")
                     return@keyPress
                 }
+                // 按键落点统计（只有自用包在记）：空格、删除、回车这些键靠这里知道哪一下出了字。
+                com.kingzcheung.xime.stats.TouchStats.keyEmit(key)
                 if (service.keyRouter.usesDirectFieldInput) {
                     service.keyRouter.handleKeyPress(key, isShifted)
                     return@keyPress

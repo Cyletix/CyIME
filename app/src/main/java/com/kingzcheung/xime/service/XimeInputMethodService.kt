@@ -292,7 +292,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             "editorAgeMs=${android.os.SystemClock.uptimeMillis() - editorStartedAt} " +
             "app=${editor?.packageName} inputType=0x${Integer.toHexString(editor?.inputType ?: 0)} " +
             "connection=${currentInputConnection != null} shown=$isInputViewShown"
-    }
+    }.also { com.kingzcheung.xime.stats.TouchStats.dropped(reason) }
     
     internal lateinit var clipboardManager: ClipboardManager
 
