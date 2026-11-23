@@ -15,7 +15,10 @@ import androidx.compose.material.icons.twotone.SpaceBar
 import androidx.compose.material.icons.twotone.Translate
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -134,6 +137,20 @@ private fun ChineseOutputSection() {
     }
 }
 
+/** #101 英文下一词（默认关）；输入法每次按空格时读这个开关，改了马上生效。 */
+@Composable
+private fun EnglishNextWordToggle() {
+    val context = LocalContext.current
+    val prefs = remember { com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context) }
+    var on by remember { mutableStateOf(prefs.getBoolean(com.kingzcheung.xime.service.EnglishNextWords.PREF_KEY, false)) }
+    SettingsToggleItem(Icons.TwoTone.Translate, "英文下一词",
+        "英文打完一个词按空格后，候选栏给出常跟在后面的词",
+        checked = on, onCheckedChange = {
+            on = it
+            prefs.edit().putBoolean(com.kingzcheung.xime.service.EnglishNextWords.PREF_KEY, it).apply()
+        })
+}
+
 @Composable
 private fun EnglishInputSection() {
     val context = LocalContext.current
@@ -147,6 +164,8 @@ private fun EnglishInputSection() {
             "英文选词后自动加一个空格",
             checked = input.englishAutoSpace, onCheckedChange = { input.copy(englishAutoSpace = it).save(context) })
         AutoSpaceLegend("english-auto-space-legend", "点 world", "hello world", "|", input.englishAutoSpace)
+        HorizontalDivider()
+        EnglishNextWordToggle()
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.SpaceBar, "标点后自动加空格",
             "英文打 , . ? ! 后自动加一个空格",

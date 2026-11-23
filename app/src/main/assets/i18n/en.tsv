@@ -3953,6 +3953,8 @@ Shift、Ctrl、空格、删除键的小技巧	Tips for Shift, Ctrl, Space and De
 英文打出短语编码时，候选里给出「我的短语」	Typing a phrase code in English suggests the entry from “My phrases”
 英文等拉丁字母键盘上，句首字母自动大写	Capitalize the first letter of each sentence on English and other Latin keyboards
 英文选词后自动加一个空格	Add a space after picking an English word
+英文下一词	Next-word suggestions
+英文打完一个词按空格后，候选栏给出常跟在后面的词	After you type an English word and a space, suggest words that often come next
 补全词表还没下载(约 {0})，暂时没有单词补全。	The completion word list isn't downloaded yet (about {0}), so there's no word completion.
 角标、删除键、空格、光标	Corner symbols, Delete, Space, cursor
 角标的输入方式见「按键与手势 › 按键角标的符号和数字」	How hints are typed: see “Keys & gestures › Key hint symbols and digits”

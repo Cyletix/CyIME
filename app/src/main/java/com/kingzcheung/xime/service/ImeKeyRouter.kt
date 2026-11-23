@@ -614,6 +614,40 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /** 正在候选栏里的英文下一词（#101）；选词时据此认出是它，选了或换了内容就作废。只在主线程读写。 */
+    private var englishNextWordList: List<String>? = null
+
+    /**
+     * #101 英文下一词（默认关）：英文打完 [word] 后光标前是「词 + 空格」时，候选栏给出常跟在后面的词。
+     * 只管英文（直接上屏的英文、中文键盘切的英文），别的拉丁语言没有双词表；密码、网址邮箱框、面板里的输入框不出。
+     * 查表在后台；查完光标前已不是「词 + 空格」、已经在打别的或候选栏有别的东西时不出。
+     */
+    private fun requestEnglishNextWords(word: String) {
+        if (!EnglishNextWords.isEnabled(service) || service.isSecretEditor()) return
+        val ui = service.uiState.value
+        val english = ui.isAsciiMode || ui.inputProfile.typesLettersDirectly &&
+            ui.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
+        if (!english || ui.inputTarget.isInternal || service.editorInputPolicy.field.scoped) return
+        if (EnglishNextWords.key(word) == null) return
+        val session = ui.inputSessionId
+        val context = runCatching { captureInputContext() }.getOrNull() ?: return
+        service.serviceScope.launch(context) {
+            val words = withContext(Dispatchers.IO) {
+                runCatching { EnglishNextWords.predict(service, word) }.getOrDefault(emptyList())
+            }
+            if (words.isEmpty()) return@launch
+            withEditor {
+                val current = service.candidateState.value
+                if (service.uiState.value.inputSessionId != session || current.pendingEnglishText.isNotEmpty() ||
+                    current.isComposing || current.associationCandidates.isNotEmpty() || current.isShowingRecentClipboard) return@withEditor
+                val before = runCatching { service.currentInputConnection?.getTextBeforeCursor(word.length + 1, 0)?.toString() }.getOrNull()
+                if (before != "$word ") return@withEditor
+                englishNextWordList = words
+                service.candidateState.value = current.copy(associationCandidates = words)
+            }
+        }
+    }
+
     /**
      * 打单词时的撇号（Shift 键分词、逗号键分词、角标、长按都走这里）：光标前是正在打的词时，' 像字母一样上屏并接进这个词，
      * 补全接着按 what'、l'e 找（what's、l'eau）。没在打词、或不是用撇号的语言时返回 false，照旧当标点。
@@ -1800,6 +1834,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 associationCandidates = emptyList()
                             )
                         }
+                        if (hardwareEvent == null) requestEnglishNextWords(pendingEnglish)
                     } else if (candState.isComposing) {
                         if (candState.candidates.isNotEmpty()) {
                             val index = candState.spaceCandidateIndex(state.inputProfile)
@@ -2534,13 +2569,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         englishAutoSpace.disarm()
         // 邮箱后缀：上屏后不补空格，也不接着联想。
         val emailSuffix = EmailSuffixes.isSuggestionList(state.associationCandidates)
+        // 英文下一词（#101）：和补全词一样跟「选词后自动加空格」。
+        val nextWordPick = englishNextWordList != null && englishNextWordList == state.associationCandidates
+        englishNextWordList = null
         // 英文选词后自动加空格（默认关）：只跟在英文补全词后面，中文联想、邮箱后缀不加。
-        val autoSpace = state.pendingEnglishText.isNotEmpty() && !emailSuffix &&
+        val autoSpace = (state.pendingEnglishText.isNotEmpty() || nextWordPick) && !emailSuffix &&
             service.uiState.value.let { (it.isAsciiMode || it.inputProfile.typesLettersDirectly) && !it.inputTarget.isInternal } &&
             SettingsPreferences.getPrefsPublic(service).getBoolean(EnglishAutoSpace.PREF_KEY, false)
         val accepted = commitAssociationSelection(state, index,
             commit = { text ->
-                service.commitTextAndPredict(text, isPaste = false,
+                service.commitTextAndPredict(if (nextWordPick && autoSpace) "$text " else text, isPaste = false,
                     allowPrediction = !emailSuffix && !SettingsPreferences.isSingleAssociationMode(service),
                     chained = true).accepted
             },
@@ -2552,10 +2590,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (!accepted) return false
         associationWordAt(state, index)?.let(com.kingzcheung.xime.stats.TypingStats::onAssociationPicked)
         if (autoSpace) associationWordAt(state, index)?.let(englishAutoSpace::arm)
+        val picked = associationWordAt(state, index)
+        // 英文下一词没自动加空格：选的词当作刚打的词，接着打字母是在改它，按空格再出下一批。
+        val pending = if (nextWordPick && !autoSpace && picked != null && EnglishNextWords.key(picked) != null) picked else ""
         service.candidateState.value = service.candidateState.value.copy(
-            pendingEnglishText = "", associationCandidates = emptyList())
+            pendingEnglishText = pending, associationCandidates = emptyList())
         hardwareNavigation.clear()
         publishHardwareCandidateSelection()
+        // 自动加了空格：光标前已是「词 + 空格」，直接出下一批（补全词也一样）。
+        if (autoSpace && picked != null && EnglishNextWords.key(picked) != null) requestEnglishNextWords(picked)
         return true
     }
 
