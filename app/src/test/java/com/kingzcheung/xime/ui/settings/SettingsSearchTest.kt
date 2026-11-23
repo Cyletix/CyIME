@@ -73,7 +73,7 @@ class SettingsSearchTest {
     /** 「时长与距离」默认收起：里面每一项搜到都要能让它自动展开（用户 10-31）。 */
     @Test fun foldedTimingItemsExpandOnSearch() {
         val folded = SettingsSearchIndex.filter { it.section == "时长与距离" }.map { it.title }
-        assertEquals(6, folded.size)
+        assertEquals(7, folded.size)
         assertTrue("没登记自动展开：${folded - TIMING_SEARCH_KEYS}", TIMING_SEARCH_KEYS.containsAll(folded))
     }
 
