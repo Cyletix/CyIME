@@ -448,7 +448,7 @@ private fun T9KeyboardContent(
         { letter: Char -> action(GestureAction.COMMAND, com.kingzcheung.xime.keyboard.CtrlShortcuts.command(letter)) }
     }
 
-    fun swipesFor(id: String): T9KeySwipes {
+    fun configSwipesFor(id: String): T9KeySwipes {
         // 读一次版本号：手势配置热重载时本层重组。以前靠每次按键顺带重组才更新。
         if (configVersion < 0) return T9KeySwipes()
         val gesture = KeysConfigHelper.getT9KeyGesture(id) ?: return T9KeySwipes()
@@ -477,6 +477,12 @@ private fun T9KeyboardContent(
                 gesture.swipeDown?.display != DisplayMode.BUBBLE) downHint else null,
         )
     }
+
+    // 设置 › 九键手势 里给数字键设的动作（#297），盖过 xime.yaml 里下方角标那一滑。
+    val t9SwipeBindings = LocalKeyboardInputPreferences.current.t9Swipes
+    val t9SwipeAction = LocalKeyboardInputActions.current.onLetterSwipeAction
+    fun swipesFor(id: String): T9KeySwipes = configSwipesFor(id)
+        .withLowerAction(t9SwipeBindings["$id.lower"], swipeHints.down && hintsActive, t9SwipeAction)
 
     // 九键字母跟「键帽字母大小写」走，和 26/14 键同一条规则（用户 11-05：选小写九键仍是 ABC）。只改显示。
     val upperLetters = letterLabelsUppercase(LocalKeyboardInputPreferences.current, uiState.isAsciiMode, uiState.inputProfile)
@@ -977,6 +983,17 @@ internal data class T9KeySwipes(
     val swipeUpKeyLabel: String? = null,
     val swipeDownKeyLabel: String? = null,
 )
+
+/**
+ * 用户给这个数字键下方角标那一滑设的动作（#297）：换掉配置里的下方角标，键面写动作名，滑动执行动作。
+ * 没设或没有执行入口时原样返回。
+ */
+internal fun T9KeySwipes.withLowerAction(action: String?, showKeyLabel: Boolean, execute: ((String) -> Unit)?): T9KeySwipes {
+    if (action == null || execute == null) return this
+    val label = com.kingzcheung.xime.settings.LetterSwipeBindings.label(action) ?: return this
+    return copy(symbolInputDownText = null, onSwipeDown = { execute(action) }, swipeDownText = label,
+        swipeDownKeyLabel = if (showKeyLabel) label else null)
+}
 
 /**
  * 九键数字键，复用 [SwipeableKeyButton] 的长按弹出逻辑。

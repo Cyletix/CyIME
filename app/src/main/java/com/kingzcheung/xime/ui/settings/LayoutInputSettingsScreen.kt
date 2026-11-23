@@ -200,6 +200,8 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, false)
                                 ?.takeIf { settings.t9FlickLetters }?.message)
                         HorizontalDivider()
+                        T9SwipeActionEditor(settings.reverseSymbolSwipe, settings.t9FlickLetters || settings.t9GlideTyping)
+                        HorizontalDivider()
                         Column(Modifier.settingsSearchAnchor("拖到候选选词的距离").padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Text("拖到候选选词的距离：键盘的 ${settings.candidateDragPercent.toInt()}%", style = MaterialTheme.typography.titleSmall)
                             Slider(value = settings.candidateDragPercent,
@@ -658,3 +660,63 @@ internal fun StrokeGlyphPreeditToggle() {
             scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
         })
 }
+
+/**
+ * 九键数字键另一方向滑动做的事（#297，森林集那种下滑全选、复制、粘贴）。上方角标那一滑是数字，不动；
+ * 这里设的是下方角标那一滑（默认上滑，「反转上下滑方向」时下滑），存在 [com.kingzcheung.xime.settings.LetterSwipeBindings.T9]。
+ * 默认都不设，和以前一样。
+ */
+@Composable
+private fun T9SwipeActionEditor(reverseSymbolSwipe: Boolean, gestureTaken: Boolean) {
+    val context = LocalContext.current
+    val bindings = com.kingzcheung.xime.settings.LetterSwipeBindings
+    var swipes by remember { mutableStateOf(bindings.loadT9(context)) }
+    var digit by remember { mutableStateOf("2") }
+    var chooseDigit by remember { mutableStateOf(false) }
+    var chooseAction by remember { mutableStateOf(false) }
+    val direction = bindings.directions.getValue(bindings.lowerDirection(reverseSymbolSwipe))
+    val slot = "$digit.lower"
+    Column(Modifier.settingsSearchAnchor("九键滑动动作").padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text("九键滑动动作", style = MaterialTheme.typography.titleSmall)
+        Text(t9SwipeActionSubtitle(direction, gestureTaken),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box {
+                OutlinedButton(onClick = { chooseDigit = true }, modifier = Modifier.testTag("t9-swipe-digit")) { Text(digit) }
+                DropdownMenu(chooseDigit, onDismissRequest = { chooseDigit = false }) {
+                    bindings.t9Digits.forEach { d ->
+                        DropdownMenuItem(text = { Text(d) }, onClick = { digit = d; chooseDigit = false })
+                    }
+                }
+            }
+            Box {
+                OutlinedButton(onClick = { chooseAction = true }, modifier = Modifier.testTag("t9-swipe-action")) {
+                    Text(bindings.actions[swipes[slot]] ?: "不设")
+                }
+                DropdownMenu(chooseAction, onDismissRequest = { chooseAction = false }) {
+                    (mapOf("" to "不设") + bindings.actions).forEach { (id, title) ->
+                        DropdownMenuItem(text = { Text(title) }, onClick = {
+                            swipes = if (id.isEmpty()) swipes - slot else swipes + (slot to id)
+                            bindings.saveT9(context, swipes)
+                            chooseAction = false
+                        })
+                    }
+                }
+            }
+        }
+        t9SwipeActionSummary(swipes)?.let {
+            androidx.compose.material3.Text(it, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+internal fun t9SwipeActionSubtitle(direction: String, gestureTaken: Boolean): String =
+    if (gestureTaken) "拂动选字母或九键滑行开着时，这一滑可能被字母或滑行占用"
+    else "选一个数字键，设${direction}做什么；数字照旧在另一个方向"
+
+/** 已设的动作，一行写完，如「2 复制　3 粘贴」；都没设时为 null。 */
+internal fun t9SwipeActionSummary(swipes: Map<String, String>): String? =
+    com.kingzcheung.xime.settings.LetterSwipeBindings.t9Digits.mapNotNull { d ->
+        swipes["$d.lower"]?.let { com.kingzcheung.xime.settings.LetterSwipeBindings.actions[it] }?.let { "$d $it" }
+    }.takeIf { it.isNotEmpty() }?.joinToString("　")

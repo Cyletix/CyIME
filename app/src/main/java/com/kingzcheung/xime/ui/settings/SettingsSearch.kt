@@ -242,6 +242,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长音键", qwertyPath, qwerty, "长音 ー 伸ばし棒 日语 日文 罗马字 L 键 Shift 大写键 コーヒー"),
         SettingsSearchEntry("拖到候选选词的距离", ninePath, nine, "九键 0键 零键 拖动 拖拽 托转 选词 候选 距离 阈值 Shift 百分比 拖线"),
         SettingsSearchEntry("拂动选字母", ninePath, nine, "九键 拂动 滑动 长按 数字 字母 字母菜单 上下左右"),
+        SettingsSearchEntry("九键滑动动作", ninePath, nine, "九键 下滑 上滑 全选 复制 粘贴 剪切 撤销 剪贴板 快捷 森林集"),
         SettingsSearchEntry("左右滑动选字母", ninePath, nine, "14键 双字母键 滑动 选字母 小鹤 双拼 左滑 右滑 自建 合并 18键"),
         SettingsSearchEntry("滑动触发距离", ninePath, nine, "距离 灵敏度 误触 拂动 滑动 假名 dp"),
         SettingsSearchEntry("拂动时显示方向圆盘", ninePath, nine, "圆盘 方向 箭头 拂动 提示 假名 日语"),

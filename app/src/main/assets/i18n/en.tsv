@@ -2329,6 +2329,10 @@ Shift 键分词	Shift key separator
 去掉 0 键，回车加高	Remove the 0 key, taller Enter
 九键手势	9-key gestures
 拂动选字母	Flick to choose letters
+九键滑动动作	9-key swipe actions
+选一个数字键，设{0}做什么；数字照旧在另一个方向	Pick a number key and choose what {0} does; the digit stays on the other direction
+拂动选字母或九键滑行开着时，这一滑可能被字母或滑行占用	With flick letters or 9-key glide on, this swipe may be taken by letters or glide
+不设	None
 拖到候选选词的距离：键盘的 {0}%	Distance to drag onto candidates: {0}% of the keyboard
 双字母键	Double-letter keys
 左右滑动选字母	Swipe left/right to choose the letter
