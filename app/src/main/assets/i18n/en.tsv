@@ -2328,6 +2328,8 @@ settings-fold:语言键切换方式	=
 关闭后空格向左加宽。	When off, space extends to the left.
 空格右侧句号键	Period key right of space
 开启后空格让出一个键宽。	When on, space gives up one key width.
+123 和 !@# 对调	Swap 123 and !@#
+底排 123 在左、!@# 在右，符号页和数字页跟着对调	123 on the left and !@# on the right; the symbol and number pages follow
 底排标点固定上滑	Bottom-row punctuation always swipes up
 逗号键分词	Comma key separator
 没在打拼音时输入 '。九键照旧用 1 键分词。	types ' when not typing pinyin. 9-key still uses the 1 key as separator.

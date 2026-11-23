@@ -1175,7 +1175,7 @@ fun KeyboardLayout(
                                 modifier = Modifier.weight(bottom.punctuation)
                             )
                         } else {
-                            for (slot in 1..2) {
+                            for (slot in com.kingzcheung.xime.keyboard.modeSlotOrder(numberRowPrefs.swapModeKeys)) {
                                 KeyboardModeKey(
                                     slot = slot, onKeyPress = onKeyPress,
                                     backgroundColor = specialKeyBackgroundColor,

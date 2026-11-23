@@ -227,7 +227,7 @@ fun SymbolKeyboardLayout(
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            for (slot in 1..2) {
+            for (slot in com.kingzcheung.xime.keyboard.modeSlotOrder(LocalKeyboardInputPreferences.current.swapModeKeys)) {
                 KeyboardModeKey(
                     slot = slot, page = KeyboardInputPage.SYMBOLS,
                     onKeyPress = { action -> if (action == "abc") onBack() else onNumber() },

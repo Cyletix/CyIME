@@ -138,6 +138,8 @@ data class KeyboardInputPreferences(
     val qwertyPeriodKey: Boolean = true,
     /** 空格两侧标点键、数字键盘点键的角标固定上滑/长按（11-09 起默认开：键在屏幕底边，往下滑不出去）。 */
     val bottomPunctuationSwipeUp: Boolean = true,
+    /** 底排 123 在左、!@# 在右（#499，默认关），见 [com.kingzcheung.xime.keyboard.modeSlotOrder]。 */
+    val swapModeKeys: Boolean = false,
     val handwritingWubiHints: Boolean = false,
     val englishSentenceCaps: Boolean = false,
     /** 逗号键分词（默认关）：空格旁的标点键左下角放 '，打拼音时它和字母键角标里的 ' 都是分词，见 [syllableSplitActive]。 */
@@ -387,6 +389,7 @@ data class KeyboardInputPreferences(
         const val SYMBOL_SWIPE_DP_KEY = "symbol_swipe_dp"
         /** 候选里显示表情开关；同繁体输出，输入法按键前读它（ImeKeyRouter）。 */
         const val CANDIDATE_EMOJI_KEY = "candidate_emoji"
+        const val SWAP_MODE_KEYS_KEY = "swap_mode_keys"
         /** 打符号名出符号开关；同表情，输入法按键前读它（ImeKeyRouter），写 Rime 选项 cyime_symbol_names。
          *  默认由关改开（11-18）只改读不到时的默认：存过的值（包括 save() 顺手写下的旧默认 false）一律照旧，不把关掉的翻回开。 */
         const val SYMBOL_NAMES_KEY = "symbol_name_candidates"
@@ -423,7 +426,7 @@ data class KeyboardInputPreferences(
                 JAPANESE_KANJI_KEY, KOREAN_HANJA_KEY, CANTONESE_CHARACTERS_KEY,
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", SYMBOL_SWIPE_DP_KEY, "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", SHIFT_TAP_LOCKS_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "t9_glide_typing", "language_key_hold_seconds", "language_key_hold_seconds_v2", LANGUAGE_KEY_IME_PICKER_KEY, "symbol_key_hold_seconds", "t9_candidate_drag_percent", T9_MERGE_ZERO_ENTER_KEY, STROKE_MERGE_ZERO_ENTER_KEY, T9_SPACE_UP_ZERO_KEY,
-                SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2", "bottom_punctuation_swipe_up_v3", com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS,
+                SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2", "bottom_punctuation_swipe_up_v3", SWAP_MODE_KEYS_KEY, com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS,
                 DOUBLE_PINYIN_KEY_HINTS_KEY, DOUBLE_PINYIN_KEY_HINTS_WITH_CORNERS_KEY, DOUBLE_PINYIN_SEMICOLON_ON_SHIFT_KEY,
                 com.kingzcheung.xime.settings.SpellingPatches.AUX_CODE_KEY,
                 SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
@@ -479,6 +482,7 @@ data class KeyboardInputPreferences(
                 qwertyStaggerCustom = prefs.getFloat("qwerty_stagger_custom", 0.5f).takeIf { it.isFinite() }?.coerceIn(QWERTY_STAGGER_MIN, QWERTY_STAGGER_MAX) ?: 0.5f,
                 // 11-09 起默认开。旧键 v2 会被 save() 连同其他设置写成旧默认 false，分不出是不是用户自己关的，只认新键。
                 bottomPunctuationSwipeUp = prefs.getBoolean("bottom_punctuation_swipe_up_v3", true),
+                swapModeKeys = prefs.getBoolean(SWAP_MODE_KEYS_KEY, false),
                 handwritingWubiHints = prefs.getBoolean(SettingsPreferences.KEY_HANDWRITING_WUBI_HINTS, false),
                 englishSentenceCaps = prefs.getBoolean(com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS, false),
                 qwertyCommaKey = prefs.getBoolean("qwerty_comma_key", true),
@@ -661,6 +665,7 @@ data class KeyboardInputPreferences(
             .putString("qwerty_stagger_mode", qwertyStagger.name)
             .putFloat("qwerty_stagger_custom", qwertyStaggerCustom.coerceIn(QWERTY_STAGGER_MIN, QWERTY_STAGGER_MAX))
             .putBoolean("bottom_punctuation_swipe_up_v3", bottomPunctuationSwipeUp)
+            .putBoolean(SWAP_MODE_KEYS_KEY, swapModeKeys)
             .putBoolean(com.kingzcheung.xime.service.ENGLISH_SENTENCE_CAPS, englishSentenceCaps)
             .putBoolean("qwerty_comma_key", qwertyCommaKey)
             .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)

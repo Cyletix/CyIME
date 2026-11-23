@@ -273,7 +273,8 @@ private fun NumberRows(
             }
         }
         Row(Modifier.fillMaxWidth().weight(1f)) {
-            for (slot in 1..2) KeyboardModeKey(slot = slot, page = KeyboardInputPage.NUMBERS,
+            for (slot in com.kingzcheung.xime.keyboard.modeSlotOrder(LocalKeyboardInputPreferences.current.swapModeKeys))
+                KeyboardModeKey(slot = slot, page = KeyboardInputPage.NUMBERS,
                 onKeyPress = onKeyPress, backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor, modifier = Modifier.weight(modeWeight),
                 onKeyPressDown = onKeyPressDown, shadowEnabled = shadowEnabled,

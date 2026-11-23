@@ -120,6 +120,12 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             settings = settings.copy(qwertyPeriodKey = it); settings.save(context)
                         })
                     HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.SpaceBar, "123 和 !@# 对调",
+                        "底排 123 在左、!@# 在右，符号页和数字页跟着对调",
+                        checked = settings.swapModeKeys, onCheckedChange = {
+                            settings = settings.copy(swapModeKeys = it); settings.save(context)
+                        })
+                    HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.Gesture, "底排标点固定上滑",
                         "空格两侧的标点键总是上滑输入角标",
                         checked = settings.bottomPunctuationSwipeUp, onCheckedChange = {
