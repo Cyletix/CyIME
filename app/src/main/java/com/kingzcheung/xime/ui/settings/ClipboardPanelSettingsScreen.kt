@@ -118,6 +118,8 @@ private fun ClipboardPanelDisplaySettings(onNavigateToGroups: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("clipboard_board", Context.MODE_PRIVATE) }
     var lines by remember { mutableStateOf(clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4))) }
+    var textPercent by remember { mutableStateOf(com.kingzcheung.xime.ui.menubar.clipboardCardTextPercent(
+        prefs.getInt(com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_TEXT_SIZE_KEY, 100))) }
     var imageHeight by remember { mutableStateOf(clipboardImageHeight(prefs.getString(CLIPBOARD_IMAGE_HEIGHT_KEY, null))) }
     var imageCount by remember { mutableStateOf(clipboardRecentImageCount(prefs.getInt(CLIPBOARD_RECENT_IMAGE_COUNT_KEY, 4))) }
     val groups by remember(context) { ClipboardGroupStore.getInstance(context) }.state.collectAsState()
@@ -147,6 +149,23 @@ private fun ClipboardPanelDisplaySettings(onNavigateToGroups: () -> Unit) {
                     RadioButton(selected = lines == option, onClick = null)
                     Spacer(Modifier.width(12.dp))
                     Text("$option 行", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+        // #497：给老人用时卡片的字太小。只放大卡片里的字，候选、按键的字不变。
+        Column(Modifier.settingsSearchAnchor("卡片文字大小").fillMaxWidth().padding(16.dp)) {
+            Text("卡片文字大小", style = MaterialTheme.typography.titleSmall)
+            Text("只改剪贴板记录里的字，候选和按键不变", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_TEXT_SIZE_CHOICES.forEach { option ->
+                Row(Modifier.fillMaxWidth().testTag("clipboard-card-text:$option")
+                    .selectable(textPercent == option, role = Role.RadioButton) {
+                        textPercent = option
+                        prefs.edit().putInt(com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_TEXT_SIZE_KEY, option).apply()
+                    }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = textPercent == option, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text(if (option == 100) "标准" else "$option%", style = MaterialTheme.typography.titleSmall)
                 }
             }
         }

@@ -1634,6 +1634,9 @@ CyIME 自己的格式，拼音按字用空格隔开：	CyIME's own format, with 
 卡片显示行数	Card lines
 每条记录最多显示几行文字	Maximum lines of text shown per record
 {0} 行	{0} lines
+卡片文字大小	Card text size
+只改剪贴板记录里的字，候选和按键不变	Only the text in clipboard records; candidates and keys stay the same
+标准	Standard
 图片高度	Image height
 也显示相册照片	Also show photos
 先打开「最近截图」	Turn on “Recent screenshots” first

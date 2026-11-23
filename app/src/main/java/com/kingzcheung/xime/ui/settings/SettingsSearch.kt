@@ -413,6 +413,8 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
             "剪贴板 候选栏 最新复制 刚复制 最近复制 自动显示 弹出 不显示 隐私 关掉"),
         SettingsSearchEntry("卡片显示行数", clipboard, SettingsRoutes.ClipboardPanel,
             "剪贴板 卡片 行数 几行 显示 记录 折叠 最多显示 剪贴板卡片最多显示 卡片最多显示"),
+        SettingsSearchEntry("卡片文字大小", clipboard, SettingsRoutes.ClipboardPanel,
+            "剪贴板 字号 字体大小 字太小 看不清 老人 放大 文字大小"),
         SettingsSearchEntry("图片高度", clipboard, SettingsRoutes.ClipboardPanel,
             "剪贴板 图片 高度 太矮 比例 长图 截图 卡片"),
         SettingsSearchEntry("显示几张图片", clipboard, SettingsRoutes.ClipboardPanel,

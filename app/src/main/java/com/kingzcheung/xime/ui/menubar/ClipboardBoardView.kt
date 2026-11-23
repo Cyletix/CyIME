@@ -109,6 +109,7 @@ internal fun ConnectedClipboardBoard(
     // Older history is read page by page while open; closing returns to the first page.
     DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
     val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
+    val cardTextPercent = remember(prefs) { clipboardCardTextPercent(prefs.getInt(CLIPBOARD_CARD_TEXT_SIZE_KEY, 100)) }
     val imageHeight = remember(prefs) { clipboardImageHeight(prefs.getString(CLIPBOARD_IMAGE_HEIGHT_KEY, null)) }
     val recentImageCount = remember(prefs) { clipboardRecentImageCount(prefs.getInt(CLIPBOARD_RECENT_IMAGE_COUNT_KEY, 4)) }
     // 平铺 / 列表，顶栏按钮切换，记住上次选的（用户 11-14）。
@@ -184,7 +185,7 @@ internal fun ConnectedClipboardBoard(
             // Clearing means all unfixed history in the database, not only the pages read so far.
             manager.clearAll()
             store.removeImages(images.filterIsInstance<ClipboardCard.Image>().map { it.item.uri }.toSet())
-        }, cardMaxLines = cardMaxLines, imageHeight = imageHeight, recentImageCount = recentImageCount,
+        }, cardMaxLines = cardMaxLines, cardTextPercent = cardTextPercent, imageHeight = imageHeight, recentImageCount = recentImageCount,
         listLayout = listLayout,
         onListLayoutChange = { value ->
             listLayout = value
@@ -246,6 +247,12 @@ internal fun toggleClipboardSection(selected: Set<String>, section: Set<String>)
 
 internal fun clipboardCardMaxLines(stored: Int): Int = if (stored in CLIPBOARD_CARD_LINE_CHOICES) stored else 4
 
+/** 剪贴板卡片字号（#497，默认 100 = 和现在一样）：给老人看的放大几档，只放大卡片里的字。 */
+internal const val CLIPBOARD_CARD_TEXT_SIZE_KEY = "card_text_percent"
+internal val CLIPBOARD_CARD_TEXT_SIZE_CHOICES = listOf(100, 115, 130, 150)
+
+internal fun clipboardCardTextPercent(stored: Int): Int = if (stored in CLIPBOARD_CARD_TEXT_SIZE_CHOICES) stored else 100
+
 /** 卡片显示行数能选的几档；1 行是 #300 要的像搜狗那样一条一行（默认仍是 4 行）。 */
 internal val CLIPBOARD_CARD_LINE_CHOICES = listOf(1, 2, 4, 8)
 
@@ -300,6 +307,8 @@ internal fun ClipboardBoardView(
     /** Clears all unfixed history; receives the unfixed images to remove. Null deletes [textItems] only. */
     onClearUnpinned: ((List<ClipboardCard>) -> Unit)? = null,
     cardMaxLines: Int = 4,
+    /** 记录卡片的字号，100 = 跟键盘一样（#497）。只放大卡片里的字，顶栏、分栏不变。 */
+    cardTextPercent: Int = 100,
     imageHeight: ClipboardImageHeight = ClipboardImageHeight.STANDARD,
     /** 「全部」shows only this many of the newest unfixed pictures; 0 shows them all. */
     recentImageCount: Int = 0,
@@ -663,6 +672,9 @@ internal fun ClipboardBoardView(
                 @Composable
                 fun RecordCard(card: ClipboardCard, fixedRecords: Boolean, previewHeight: Dp?, modifier: Modifier) {
                     val chosen = card.key in selected
+                    val cardDensity = if (cardTextPercent == 100) density
+                        else androidx.compose.ui.unit.Density(density.density, density.fontScale * cardTextPercent / 100f)
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides cardDensity) {
                     ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen, maxLines = cardMaxLines,
                         masked = card is ClipboardCard.Text && card.item.sensitive && card.key !in revealed,
                         selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
@@ -681,6 +693,7 @@ internal fun ClipboardBoardView(
                                 selected = if (chosen) selected - card.key else selected + card.key
                             } else openItemMenu(card, fixedRecords)
                         })
+                    }
                 }
                 // 多选时在自定义分组里：记录排成「排列」面板那样的一条一行，点选、长按拖动排序（用户 11-14）。
                 val sortGroup = (tab as? ClipboardTab.Group)?.group?.id?.takeIf { selecting && onReorderGroup != null }
