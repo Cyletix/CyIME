@@ -395,7 +395,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 自用包里贡献题并进「手写训练」的题库菜单，搜索只留上面那条
         SettingsSearchEntry("贡献手写样本", handwriting, SettingsRoutes.HandwritingContribute, "手写 贡献 样本 上传 分享 训练 改进 认不出", anchor = null),
         // 系统 › 剪贴板 › 剪贴板同步（同步插件的页面）
-        page("剪贴板同步", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 同步 电脑 Windows 互联 插件"),
+        page("剪贴板同步", clipboard, SettingsRoutes.ClipboardSync, "剪贴板 同步 电脑 Windows 互联 插件 WebDAV 拉取间隔"),
         SettingsSearchEntry("连接状态", clipboardSync, SettingsRoutes.ClipboardSync, "扫码连接电脑 连接电脑 Windows 配对 连接码 二维码 互联"),
         SettingsSearchEntry("同步剪贴板", clipboardSync, SettingsRoutes.ClipboardSync, "同步 剪贴板 电脑 Windows 我的设备", section = "连接状态"),
         SettingsSearchEntry("让其他手机或平板连接本机", clipboardSync, SettingsRoutes.ClipboardSync, "手机 平板 互相同步 二维码 允许其他设备连接"),

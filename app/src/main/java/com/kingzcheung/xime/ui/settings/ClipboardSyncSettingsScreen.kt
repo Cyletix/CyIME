@@ -199,10 +199,48 @@ fun ClipboardSyncSettingsContent(
                     }
                 )
             })
+            if (activePlugin != null && activePlugin?.first != com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID) ClipboardPullIntervalSetting()
             }
             // 用户 11-15：验证码、敏感内容、导出导入挪到「剪贴板」页，这页只管同步。
         }
     }
+}
+
+/** #45：其他同步服务（WebDAV 等）多久拉一次，键盘开着时要不要一直拉。电脑同步靠推送，不用这两项。 */
+@Composable
+private fun ClipboardPullIntervalSetting() {
+    val context = LocalContext.current
+    var seconds by remember { mutableStateOf(SettingsPreferences.getClipboardSyncPullIntervalS(context)) }
+    var keepPulling by remember { mutableStateOf(SettingsPreferences.isClipboardSyncKeepPulling(context)) }
+    SettingsSection(title = "自动拉取", content = {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("拉取间隔", style = MaterialTheme.typography.titleSmall)
+            Text("打开键盘时，离上次拉取满这个时间才再拉", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            com.kingzcheung.xime.clipboard.sync.PULL_INTERVAL_CHOICES_S.forEach { option ->
+                Row(Modifier.fillMaxWidth().testTag("clipboard-sync-pull-interval:$option")
+                    .selectable(seconds == option, role = androidx.compose.ui.semantics.Role.RadioButton) {
+                        seconds = option
+                        SettingsPreferences.setClipboardSyncPullIntervalS(context, option)
+                    }
+                    .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = seconds == option, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("$option 秒", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+        SettingsToggleItem(
+            icon = Icons.TwoTone.Download,
+            title = "键盘开着时一直拉取",
+            subtitle = "按上面的间隔反复拉，请求会变多",
+            checked = keepPulling,
+            onCheckedChange = {
+                keepPulling = it
+                SettingsPreferences.setClipboardSyncKeepPulling(context, it)
+            },
+        )
+    })
 }
 
 /**

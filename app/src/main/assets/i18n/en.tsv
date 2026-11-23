@@ -1654,6 +1654,12 @@ CyIME 自己的格式，拼音按字用空格隔开：	CyIME's own format, with 
 同步开关	Sync switch
 启用所选兼容服务	Enable the selected compatible service
 请先选择同步服务并完成连接配置。	Choose a sync service and finish connecting it first.
+自动拉取	Auto pull
+拉取间隔	Pull interval
+打开键盘时，离上次拉取满这个时间才再拉	When the keyboard opens, pull again only after this long since the last pull
+{0} 秒	{0} s
+键盘开着时一直拉取	Keep pulling while the keyboard is open
+按上面的间隔反复拉，请求会变多	Pulls repeatedly at the interval above; more requests
 已导出 {0} 条	Exported {0}
 导出剪贴板	Export clipboard
 导出格式	Export format

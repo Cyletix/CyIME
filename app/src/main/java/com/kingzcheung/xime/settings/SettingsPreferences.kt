@@ -1766,4 +1766,23 @@ object SettingsPreferences {
     fun setClipboardSyncPluginId(context: Context, pluginId: String) {
         getPrefs(context).edit().putString(KEY_CLIPBOARD_SYNC_PLUGIN_ID, pluginId).apply()
     }
+
+    /** 其他同步服务（WebDAV 等）的自动拉取间隔，秒（#45）。默认 30，和以前一样。 */
+    const val KEY_CLIPBOARD_SYNC_PULL_INTERVAL_S = "clipboard_sync_pull_interval_s"
+    /** 键盘开着时按上面的间隔一直拉取（#45），默认关。 */
+    const val KEY_CLIPBOARD_SYNC_KEEP_PULLING = "clipboard_sync_keep_pulling"
+
+    fun getClipboardSyncPullIntervalS(context: Context): Int =
+        getPrefs(context).getInt(KEY_CLIPBOARD_SYNC_PULL_INTERVAL_S, 30).coerceIn(5, 60)
+
+    fun setClipboardSyncPullIntervalS(context: Context, seconds: Int) {
+        getPrefs(context).edit().putInt(KEY_CLIPBOARD_SYNC_PULL_INTERVAL_S, seconds.coerceIn(5, 60)).apply()
+    }
+
+    fun isClipboardSyncKeepPulling(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_CLIPBOARD_SYNC_KEEP_PULLING, false)
+
+    fun setClipboardSyncKeepPulling(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CLIPBOARD_SYNC_KEEP_PULLING, enabled).apply()
+    }
 }

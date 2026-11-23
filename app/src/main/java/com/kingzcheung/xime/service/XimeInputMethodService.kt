@@ -1166,6 +1166,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     stopClipboardSync()
                     updateClipboardSync()
                 }
+                // 拉取间隔在建同步时定下，改了就重建；电脑同步不用这两个设置，不必重连。
+                SettingsPreferences.KEY_CLIPBOARD_SYNC_PULL_INTERVAL_S, SettingsPreferences.KEY_CLIPBOARD_SYNC_KEEP_PULLING -> {
+                    if (clipboardSyncBridge != null &&
+                        clipboardSyncBridge?.pluginId != com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID) {
+                        stopClipboardSync()
+                        updateClipboardSync()
+                    }
+                }
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(sharedPrefsListener)
@@ -1565,6 +1573,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 pluginId = selected.first,
                 foregroundPollIntervalMs = if (nativeWindows) 2000 else syncCapabilities?.foregroundPollIntervalMs ?: 0,
                 maxTextBytes = if (nativeWindows) 65536 else syncCapabilities?.maxTextBytes ?: 0,
+                pullIntervalMs = SettingsPreferences.getClipboardSyncPullIntervalS(this) * 1_000L,
+                keepPulling = SettingsPreferences.isClipboardSyncKeepPulling(this),
             )
             clipboardSyncBridge?.start()
             // 电脑同步只在键盘显示时找电脑、查连接：键盘正显示时下一行立刻连上，收起时不在后台跑。
