@@ -3908,7 +3908,7 @@ Shift、Ctrl、空格、删除键的小技巧	Tips for Shift, Ctrl, Space and De
 未上屏的编码显示在哪里	Where uncommitted input is shown
 本地模型会占用内存和 CPU，手机可能发热。	On-device models use memory and CPU and may warm up your phone.
 桌面图标可能稍后才更新，位置可能会变。	The home screen may take a moment to update, and the icon may move.
-横屏和竖屏各用各的布局	Landscape and portrait each keep their own layout
+横屏、竖屏和折叠屏的两块屏各用各的布局	Landscape, portrait and each foldable screen keep their own layout
 正在准备同步服务…	Preparing sync service…
 正在编辑「{0}」这一套。	Editing the “{0}” set.
 每写一笔就识别，不用等停顿	Recognize after every stroke without waiting for a pause

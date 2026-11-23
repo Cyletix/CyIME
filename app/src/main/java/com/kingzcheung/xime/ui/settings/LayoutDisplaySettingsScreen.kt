@@ -143,7 +143,7 @@ private fun LayoutDisplayPage(
                         mutableStateOf(com.kingzcheung.xime.settings.OrientationLayouts.isEnabled(context))
                     }
                     SettingsToggleItem(Icons.TwoTone.ScreenRotation, "横竖屏分开记布局",
-                        "横屏和竖屏各用各的布局",
+                        "横屏、竖屏和折叠屏的两块屏各用各的布局",
                         checked = perOrientation, onCheckedChange = {
                             perOrientation = it; com.kingzcheung.xime.settings.OrientationLayouts.setEnabled(context, it)
                         })
