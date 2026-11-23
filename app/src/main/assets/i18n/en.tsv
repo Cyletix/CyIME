@@ -1762,6 +1762,9 @@ CyIME 基于它开发	CyIME is built on it
 查词	Look up
 搜索短语或编码	Search phrases or codes
 还没有短语，点 + 添加	No phrases yet. Tap + to add one
+从文件导入短语	Import phrases from a file
+Gboard 导出的个人词库，或每行「短语 Tab 编码」的文本	A Gboard personal dictionary export, or text with one "phrase Tab code" per line
+已导入 {0} 条短语	Imported {0} phrases
 没有找到	Not found
 删除{0}	Delete {0}
 固定的词	Pinned words
