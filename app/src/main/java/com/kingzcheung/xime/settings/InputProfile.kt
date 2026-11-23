@@ -137,6 +137,12 @@ object InputProfiles {
      */
     private val shapeCodeIds = setOf("flypy")
     private val wubiPinyinIds = setOf("wubi86_pinyin", "wubi86_trad_pinyin")
+    /**
+     * 万象拼音的四个版本（Base / Pro / Lite / Pure）：是拼音方案，但全拼还是哪种双拼由方案自己切换（/pinyin、/flypy 等），
+     * 方案文件里也没写 input_scheme，CyIME 看不出当前是哪种，所以仍算「自定义编码」，纠错、模糊音、滑行这些都不碰它；
+     * 只是组字区的编码可以点开改（#565）：改的是方案收到的字母本身，不按全拼或双拼重排。
+     */
+    private val editableExternalIds = setOf("wanxiang", "wanxiang_pro", "wanxiang_lite", "wanxiang_pure")
 
     fun describe(id: String, language: InputLanguage? = null, scheme: InputScheme? = null): InputProfile {
         // Built-in descriptions are reused on every key; custom layouts remain live after edits.
@@ -146,7 +152,7 @@ object InputProfiles {
         if ((language == null || language == base.language) && (scheme == null || scheme == base.scheme) && actualLayout == base.layout) return base
         val actualScheme = scheme ?: base.scheme
         return base.copy(language = language ?: base.language, scheme = actualScheme,
-            layout = actualLayout, capabilities = capabilities(actualScheme))
+            layout = actualLayout, capabilities = capabilities(actualScheme, id))
     }
 
     internal fun builtin(id: String): InputProfile = descriptions.getOrPut(id) { describeBackend(id) }
@@ -157,12 +163,13 @@ object InputProfiles {
         installed = entries.associate { entry ->
             val base = builtin(entry.schemaId)
             entry.schemaId to base.copy(language = entry.language, scheme = entry.scheme,
-                capabilities = capabilities(entry.scheme))
+                capabilities = capabilities(entry.scheme, entry.schemaId))
         }
     }
 
-    private fun capabilities(scheme: InputScheme) = InputCapabilities(
-        editablePinyin = scheme == InputScheme.PINYIN || scheme == InputScheme.DOUBLE_PINYIN || scheme == InputScheme.WORDS,
+    private fun capabilities(scheme: InputScheme, id: String) = InputCapabilities(
+        editablePinyin = scheme == InputScheme.PINYIN || scheme == InputScheme.DOUBLE_PINYIN || scheme == InputScheme.WORDS ||
+            (scheme == InputScheme.EXTERNAL && id in editableExternalIds),
         editableStrokeCode = scheme == InputScheme.STROKE,
         caseSensitiveCode = scheme == InputScheme.WORDS,
         kanaCase = scheme == InputScheme.ROMAJI,
@@ -209,7 +216,7 @@ object InputProfiles {
         }
         return InputProfile(inputLanguage, inputScheme, layout,
             if (id == InputModes.ENGLISH) EngineProfile.Direct else EngineProfile.Rime(id),
-            capabilities = capabilities(inputScheme)).let { if (id == "handwriting") it.handwriting() else it }
+            capabilities = capabilities(inputScheme, id)).let { if (id == "handwriting") it.handwriting() else it }
     }
 
     internal fun customLayout(layout: CustomKeyboardLayout) = InputLayout(layout.id, layout.name,
