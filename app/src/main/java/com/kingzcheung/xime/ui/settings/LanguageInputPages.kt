@@ -151,6 +151,20 @@ private fun EnglishNextWordToggle() {
         })
 }
 
+/** #404 打开键盘时退出英文（默认关）；输入法每次进输入框时读这个开关。 */
+@Composable
+private fun LeaveEnglishOnOpenToggle() {
+    val context = LocalContext.current
+    val prefs = remember { com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context) }
+    var on by remember { mutableStateOf(prefs.getBoolean(com.kingzcheung.xime.settings.LeaveEnglishOnOpen.PREF_KEY, false)) }
+    SettingsToggleItem(Icons.TwoTone.Translate, "打开键盘时退出英文",
+        "换输入框或回到应用时，从英文切回中文等原来的语言",
+        checked = on, onCheckedChange = {
+            on = it
+            prefs.edit().putBoolean(com.kingzcheung.xime.settings.LeaveEnglishOnOpen.PREF_KEY, it).apply()
+        })
+}
+
 @Composable
 private fun EnglishInputSection() {
     val context = LocalContext.current
@@ -159,6 +173,8 @@ private fun EnglishInputSection() {
         SettingsToggleItem(Icons.TwoTone.Link, "网址、邮箱框自动切英文",
             "在网址和邮箱输入框里自动用英文",
             checked = input.addressFieldsEnglish, onCheckedChange = { input.copy(addressFieldsEnglish = it).save(context) })
+        HorizontalDivider()
+        LeaveEnglishOnOpenToggle()
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.SpaceBar, "选词后自动加空格",
             "英文选词后自动加一个空格",

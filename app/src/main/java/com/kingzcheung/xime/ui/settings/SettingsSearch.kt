@@ -170,6 +170,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("时间日期候选", chinesePath, chinese, "时间 日期 星期 今天 几点 当前时间 当前日期 年月日 联想 候选 ts 时间戳 unix"),
         SettingsSearchEntry("网址、邮箱框自动切英文", englishPath, english, "网址 邮箱 链接 地址栏 url email 自动英文 自动切英文 切成英文 变英文 中文 换软件 输入框"),
         SettingsSearchEntry("选词后自动加空格", englishPath, english, "英文 英语 空格 自动空格 自动加空格 补全 标点 iOS 苹果 西班牙语"),
+        SettingsSearchEntry("打开键盘时退出英文", englishPath, english, "英文 中文 切回中文 回到中文 默认中文 固定中文 打开键盘 弹出键盘 换应用 回到应用 换输入框 中英 每次"),
         SettingsSearchEntry("英文下一词", englishPath, english, "英文 英语 联想 下一个词 下一词 预测 联想词 next word 候选 Gboard"),
         SettingsSearchEntry("标点后自动加空格", englishPath, english, "英文 英语 空格 自动空格 自动加空格 标点 逗号 句号 问号 英文标点 标点空格 西班牙语"),
         SettingsSearchEntry("打 @ 时给邮箱后缀", englishPath, english, "邮箱 邮件 电子邮件 email 后缀 @ 艾特 qq.com 163 gmail 补全 联想 域名"),
