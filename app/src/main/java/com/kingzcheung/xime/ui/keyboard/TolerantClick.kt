@@ -92,6 +92,7 @@ fun Modifier.tolerantClick(
                     travelled += (pressedChange ?: upChange)?.positionChange()?.getDistance() ?: 0f
                     if (pressedChange == null) {
                         if (upChange != null && !longPressFired && travelled <= slopPx) {
+                            upChange.consume()
                             currentOnClick()
                             source.tryEmit(PressInteraction.Release(press))
                         } else {

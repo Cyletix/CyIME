@@ -95,9 +95,19 @@ internal fun letterKeyboardColumns(rows: List<List<String>>, fourteenKey: Boolea
     letterKeyboardFrame(rows)?.columns ?: if (isHoneycomb(rows)) 7f
     else if (fourteenKey) 10f else rows.firstOrNull()?.size?.toFloat() ?: 10f
 
-internal fun letterKeyboardBottomRow(rows: List<List<String>>, fourteenKey: Boolean): QwertyBottomRowWeights =
-    if (fourteenKey || letterKeyboardFrame(rows) != null || isHoneycomb(rows) || rows.firstOrNull()?.size == 10)
-        QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy
+internal fun letterKeyboardBottomRow(
+    rows: List<List<String>>,
+    fourteenKey: Boolean,
+    compact: Boolean = false,
+): QwertyBottomRowWeights {
+    val standard = fourteenKey || letterKeyboardFrame(rows) != null || isHoneycomb(rows) || rows.firstOrNull()?.size == 10
+    return when {
+        compact && standard -> QwertyBottomRowWeights.Compact
+        compact -> QwertyBottomRowWeights.LegacyCompact
+        standard -> QwertyBottomRowWeights.Standard
+        else -> QwertyBottomRowWeights.Legacy
+    }
+}
 
 /**
  * 第一行一格的宽度（dp），给 xime.custom.yaml 的 geometry.middle_row_inset 当单位：

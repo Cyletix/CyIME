@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.magnifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 
 import com.kingzcheung.xime.ui.theme.VisualStyles
@@ -168,6 +169,28 @@ internal val LocalSentenceSelection =
 /** Highlight the replacement in the first sentence while its local editor is open. */
 internal data class SentenceCandidateHighlight(val sentence: String, val start: Int, val end: Int)
 internal val LocalSentenceCandidateHighlight = androidx.compose.runtime.staticCompositionLocalOf<SentenceCandidateHighlight?> { null }
+/** 编码显示在键盘上方气泡或候选上方拼音行时的顶边窗口 Y 坐标；null 表示编码在输入框中，无需上移放大镜。 */
+internal val LocalSentenceMagnifierAvoidTop = androidx.compose.runtime.compositionLocalOf<Float?> { null }
+
+internal fun sentenceMagnifierCenter(
+    sourceCenter: Offset,
+    textTopInWindow: Float,
+    avoidTopInWindow: Float?,
+    magnifierHalfHeightPx: Float,
+    clearancePx: Float,
+    minimumTopPaddingPx: Float,
+): Offset {
+    if (sourceCenter == Offset.Unspecified || avoidTopInWindow == null || textTopInWindow.isNaN()) {
+        return Offset.Unspecified
+    }
+    val targetWindowY = maxOf(
+        avoidTopInWindow - magnifierHalfHeightPx - clearancePx,
+        minimumTopPaddingPx + magnifierHalfHeightPx,
+    )
+    return Offset(sourceCenter.x, targetWindowY - textTopInWindow)
+}
+
+internal const val CANDIDATE_LONG_PRESS_TIMEOUT_MS = 1000L
 
 internal fun sentenceCandidateText(text: String, index: Int, drag: IntRange?,
                                    active: SentenceCandidateHighlight?, color: Color): AnnotatedString =
@@ -240,6 +263,7 @@ fun CandidateBar(
     state: CandidateBarState,
     page: KeyboardPage = KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL),
     candidatePageExpanded: Boolean = false,
+    strokeFilterLabel: String = "",
     toolbarActions: List<ToolbarAction> = emptyList(),
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
@@ -258,6 +282,7 @@ fun CandidateBar(
     commentsAreGlosses: Boolean = false,
     glidePreviewText: String = "",
     isGlidePreview: Boolean = false,
+    directEnglishInput: Boolean = false,
 ) {
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val glassEnabled = glass.enabled
@@ -338,7 +363,7 @@ fun CandidateBar(
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
+    val showCompositionCancel = (showCancelButton || strokeFilterLabel.isNotEmpty()) && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     // 开了「候选滑到头回弹展开」又选了「关闭键位置：右边」（11-22 他）：取消／关联想画成「×」放在右边收起键盘那一格，
     // 左边不放；打字时点它取消、出联想时点它关联想、回到空闲后同一个位置是收起键盘。开关关着时和 1.15.101 一样。
     val closeAtRight = swipeExpand && closeOnRight && showCompositionCancel
@@ -541,8 +566,10 @@ fun CandidateBar(
         androidx.compose.runtime.CompositionLocalProvider(LocalPreeditToneText provides toneText) {
             // 气泡：默认；选了小签但悬浮键盘转了角度时也用气泡（「候选栏左侧」11-20 他要求去掉）。
             PreeditBubbleHost(showPreedit && (!previewPrefs.preeditOnTopLine || tabRotated)) { hidden ->
+                val preeditBubbleSurface = visuals.preeditBackgroundColor
+                    .takeUnless { it == Color.Unspecified || it.alpha == 0f } ?: themeSurface
                 PreeditPreview(preeditText, protectedVisuals, onEditPreedit,
-                    floatingPreeditColor(themeSurface, visuals.preeditBackgroundColor), hidden, previewPrefs.preeditAlign)
+                    floatingPreeditColor(preeditBubbleSurface, visuals.preeditBackgroundColor), hidden, previewPrefs.preeditAlign)
             }
             PreeditBubbleHost(pinyinTabMode) { hidden ->
                 // 首选是纠错来的：小签显示纠正后的读音，改动的字母标红。
@@ -604,10 +631,16 @@ fun CandidateBar(
                 .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } }
                 // 工具栏和候选互换（开始打字、上屏回到空闲）时新内容快速淡入，和键盘换页同一套；
                 // 只淡这一行的图标和字，不淡栏底色，候选从第一帧起就能点。
-                .cySwapFadeIn(state is CandidateBarState.Idle),
+                .then(if (directEnglishInput) Modifier else Modifier.cySwapFadeIn(state is CandidateBarState.Idle)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (cancelAtLeft && closesAssociation && associationCancelCross) {
+            if (cancelAtLeft && strokeFilterLabel.isNotEmpty()) {
+                KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
+                    slotWidth = edgeSlot, restingFill = edgeButtonFill, cornerRadius = edgeCorner, continuousPill = true) {
+                    Text(strokeFilterLabel, color = protectedVisuals.textColor, fontSize = 10.sp, lineHeight = 10.sp, maxLines = 2)
+                }
+                Spacer(Modifier.width(4.dp).fillMaxHeight().candidateGapTaps())
+            } else if (cancelAtLeft && closesAssociation && associationCancelCross) {
                 KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,
                     modifier = Modifier.testTag("association-cancel-cross"), restingFill = edgeButtonFill,
                     slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true) {
@@ -692,7 +725,7 @@ fun CandidateBar(
             // 展开靠右边 ▾。往左拉展开只是附加，设置「候选滑到头回弹展开」打开才有：滑到头再往左拉过门槛松手展开（[PullToExpandCandidates]）。
             if (state is CandidateBarState.ChineseCandidates || (isGlidePreview && state is CandidateBarState.AssociationOnly) ||
                 (splitGapX != null && state !is CandidateBarState.Idle) ||
-                (candidatePageExpanded && state is CandidateBarState.AssociationOnly && state.hasMore)) {
+                (candidatePageExpanded && state is CandidateBarState.AssociationOnly && (state.hasMore || strokeFilterLabel.isNotEmpty()))) {
                 val previewAssociations = isGlidePreview && state is CandidateBarState.AssociationOnly
                 val stripCallbacks = if (isGlidePreview) callbacks.copy(
                     onVisibleCandidatesChanged = null,
@@ -722,7 +755,7 @@ fun CandidateBar(
                         ?.takeUnless { previewAssociations },
                     showNumberLabels = showNumberLabels,
                     gapWindowX = splitGapX,
-                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview,
+                    scrollable = state is CandidateBarState.ChineseCandidates && !isGlidePreview && (swipeExpand || !candidatePageExpanded),
                     // 开了「候选滑到头回弹展开」：栏里只排一屏（11-22 他：「一个屏幕就是一页」）——一开始露出来的候选，
                     // 加上栏尾露半截的那一个；把它露全就到头，再往左拉就展开。不用滑完「每页候选词数」那 20 个（群里：「划到头太费时间」）。
                     // 一屏没排满（平板宽屏）时接上展开列表把这一屏填满，多出来的照样不排，尾巴不会越滑越远。
@@ -1384,6 +1417,7 @@ fun CandidateItem(
                     dragSelection = first..first
                     currentSentenceSelectionChange?.invoke(first, first + 1)
                     magnifierPosition = held.position
+                    var completed = false
                     try { do {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -1398,13 +1432,17 @@ fun CandidateItem(
                         }
                         magnifierPosition = change.position
                         change.consume()
-                    } while (change.pressed) } finally {
+                    } while (change.pressed)
+                        completed = true
+                    } finally {
                         dragSelection = null
-                        currentSentenceSelectionEnd?.invoke()
+                        if (!completed || !dragged) currentSentenceSelectionEnd?.invoke()
                         magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
                     }
-                    if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
-                    else currentLongClick?.invoke()
+                    if (dragged) {
+                        currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                        currentSentenceSelectionEnd?.invoke()
+                    } else currentLongClick?.invoke()
                 }
             } else Modifier),
             onTextLayout = { textLayout = it },
@@ -2383,7 +2421,7 @@ internal fun FixedCandidateStrip(
                         // 分体时中缝两边各自从头排，中缝那里不画竖线。
                         .then(if (showDividers && position > 0) Modifier.candidateLeadingDivider(itemDividerColor,
                             itemSpacing, fontSize) else Modifier)
-                        .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
+                        .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot(); focusedOnScreen = true } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     onSentenceSelection = callbacks.onSentenceSelection.takeIf { index == 0 && !showNumberLabels },
                     onSentenceSelectionChange = callbacks.onSentenceSelectionChange.takeIf { index == 0 && !showNumberLabels },

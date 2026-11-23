@@ -30,8 +30,11 @@ internal data class KeyGestureActions(
     val horizontalThresholdDp: Float = 50f,
     val verticalThresholdDp: Float = 50f,
     val reserveHorizontalSwipe: Boolean = false,
+    /** Top-row digit, used only if letter glide did not claim the gesture. */
+    val glideTopUp: (() -> Unit)? = null,
     val longPressItems: List<String> = emptyList(),
     val longPressDrawableIds: List<Int> = emptyList(),
+    val longPressDefaultIndex: Int = -1,
     val keyWidth: Float = 1f,
     /**
      * 长按选项条在这个键自己坐标里的位置（左边相对按键左边），和气泡画的同一份
@@ -152,21 +155,26 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         var slid = false
         var selectedIndex = 0
         val items = actions.longPressItems
-        // 三项以上的长按菜单（西欧字母、拼音声调，七八个变音）：每格按画出来的格宽算，起点是手指下的那格。
-        // 以前整条挤在一个键宽里，八项时手指挪八分之一个键就换一格（用户 11-15）。两项（上下角标）照旧。
-        val cellsFor = actions.longPressMenuCells?.takeIf { items.size > 2 }
+        val defaultIdx = actions.longPressDefaultIndex.takeIf { it in items.indices }
+        // 三项以上或显式指定默认项（如首选项居中的大写字母）的长按菜单：每格按画出来的格宽算，起点对齐默认项/手指下那格。
+        val cellsFor = actions.longPressMenuCells?.takeIf { items.size > 2 || defaultIdx != null }
         var menuCells: LongPressMenuCells? = null
         var lastX = down.position.x
+        var longPressAnchorX = down.position.x
         val longPressDelay = actions.longPressDelayMillis(viewConfiguration.longPressTimeoutMillis)
         val longPressJob = if (longPressDelay != null) gestureScope.launch {
             delay(longPressDelay)
             longPressed = true
             actions.onLongPressFeedback()
             if (items.isNotEmpty()) {
+                longPressAnchorX = lastX
                 menuCells = cellsFor?.invoke(items.size, actions.longPressDrawableIds.isNotEmpty())
-                menuCells?.let { selectedIndex = KeyboardKeyMetrics.longPressMenuIndex(lastX, it, items.size) }
+                selectedIndex = defaultIdx
+                    ?: menuCells?.let { KeyboardKeyMetrics.longPressMenuIndex(lastX, it, items.size) }
+                    ?: 0
                 actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                     longPressItems = items, selectedLongPressIndex = selectedIndex,
+                    longPressDefaultIndex = actions.longPressDefaultIndex,
                     longPressDrawableIds = actions.longPressDrawableIds))
             } else {
                 actions.onLongPress?.invoke()
@@ -231,10 +239,16 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 crossedSwipeThreshold = if (actions.freeDirection) outsideCentre
                     else crossedSwipeThreshold || up || downSwipe || left || right || blockedUp || blockedDown
                 if (longPressed && items.isNotEmpty()) {
-                    selectedIndex = menuCells?.let { KeyboardKeyMetrics.longPressMenuIndex(change.position.x, it, items.size) }
-                        ?: longPressIndexByKeyWidth(dx, actions.keyWidth, items.size)
+                    selectedIndex = menuCells?.let { cells ->
+                        val selectionX = if (defaultIdx != null) {
+                            val defaultCenterX = cells.left + (defaultIdx + 0.5f) * cells.cellWidth
+                            defaultCenterX + (change.position.x - longPressAnchorX)
+                        } else change.position.x
+                        KeyboardKeyMetrics.longPressMenuIndex(selectionX, cells, items.size)
+                    } ?: longPressIndexByKeyWidth(dx, actions.keyWidth, items.size)
                     actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                         longPressItems = items, selectedLongPressIndex = selectedIndex,
+                        longPressDefaultIndex = actions.longPressDefaultIndex,
                         longPressDrawableIds = actions.longPressDrawableIds))
                 } else if (!longPressed) {
                     val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else if (right) actions.rightText else null
@@ -264,6 +278,15 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
                         left -> actions.onLeft?.invoke()
                         right -> actions.onRight?.invoke()
+                        letterGlide && actions.onUp != null &&
+                            isUnclaimedFastFlickUp(down.position, change.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat(), viewConfiguration.touchSlop) ->
+                            actions.onUp.invoke(actions.upText.orEmpty())
+                        letterGlide && actions.onDown != null &&
+                            isUnclaimedFastFlickDown(down.position, change.position, down.uptimeMillis, change.uptimeMillis, size.height.toFloat(), viewConfiguration.touchSlop) ->
+                            actions.onDown.invoke(actions.downText.orEmpty())
+                        letterGlide && actions.glideTopUp != null &&
+                            isUnclaimedTopRowFlick(down.position, change.position, size.height.toFloat(), viewConfiguration.touchSlop) ->
+                            actions.glideTopUp.invoke()
                         reserveDragForGlide && moved ->
                             if (glideDriftIsTap(down.position, change.position, size.width.toFloat(), size.height.toFloat(),
                                     viewConfiguration.touchSlop, letterGlide)) actions.onTap()
@@ -289,6 +312,45 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
             actions.onPreview(SwipeState())
         }
     } }
+}
+
+/**
+ * 26 键滑行开启时，短时快速拂动（小于识别时限且位移足够）触发上下角标，识别时间做短使其不与滑行冲突。
+ * 滑词需要跨键移动接管；单键短时拂动未被滑行接管（!tracker.claimed）时在抬手时触发对应角标输入。
+ */
+internal const val FAST_FLICK_TIMEOUT_MS = 260L
+
+internal fun isUnclaimedFastFlickUp(
+    down: Offset, up: Offset,
+    downTime: Long, upTime: Long,
+    keyHeight: Float, slop: Float,
+    timeoutMs: Long = FAST_FLICK_TIMEOUT_MS,
+): Boolean {
+    if (upTime - downTime > timeoutMs) return false
+    val dx = up.x - down.x
+    val dy = up.y - down.y
+    val minDistance = maxOf(slop * 1.2f, keyHeight * 0.2f)
+    return dy < 0f && -dy >= minDistance && abs(dx) <= -dy
+}
+
+internal fun isUnclaimedFastFlickDown(
+    down: Offset, up: Offset,
+    downTime: Long, upTime: Long,
+    keyHeight: Float, slop: Float,
+    timeoutMs: Long = FAST_FLICK_TIMEOUT_MS,
+): Boolean {
+    if (upTime - downTime > timeoutMs) return false
+    val dx = up.x - down.x
+    val dy = up.y - down.y
+    val minDistance = maxOf(slop * 1.2f, keyHeight * 0.2f)
+    return dy > 0f && dy >= minDistance && abs(dx) <= dy
+}
+
+/** Only a deliberate upward exit gets the digit; a claimed glide never reaches this handler. */
+internal fun isUnclaimedTopRowFlick(down: Offset, up: Offset, keyHeight: Float, slop: Float): Boolean {
+    val dx = up.x - down.x
+    val dy = up.y - down.y
+    return up.y < 0f && -dy >= maxOf(slop * 1.5f, keyHeight * 0.25f) && abs(dx) <= -dy
 }
 
 /** 旧算法：整条按键宽均分，从第一项起（两项的上下角标还用它，手感不变）。 */

@@ -120,11 +120,11 @@ class InputGesturePresetsTest {
         assertNull(InputGestureLocks.lockFor(base, InputGestureLock.Option.DOUBLE_PINYIN_AUX_CODE, true))
     }
 
-    @Test fun `twenty six key glide locks corner symbols to long press and says which glide`() {
+    @Test fun `twenty six key glide does not lock corner symbols and nine key glide locks to long press`() {
         val glide = base.copy(glideTyping = true)
-        assertEquals(CornerInputChoice.LONG_PRESS, CornerInputChoice.of(glide))
-        assertEquals("已被「英文滑行」锁定", InputGestureLocks.glideCornerLock(glide)?.message)
-        assertEquals("已被「中文滑行」锁定", InputGestureLocks.glideCornerLock(base.copy(chineseGlideTyping = true))?.message)
+        assertEquals(CornerInputChoice.SWIPE, CornerInputChoice.of(glide))
+        assertNull(InputGestureLocks.glideCornerLock(glide))
+        assertNull(InputGestureLocks.glideCornerLock(base.copy(chineseGlideTyping = true)))
         // 用户 11-11「只有九键不会跳转」：九键滑行占了 2～9 键的滑动，同样锁成长按；整个键盘滑动移光标时九键不滑行，不锁。
         val nine = base.copy(t9GlideTyping = true)
         assertEquals("已被「九键滑行」锁定", InputGestureLocks.glideCornerLock(nine)?.message)

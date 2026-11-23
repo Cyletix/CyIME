@@ -47,6 +47,52 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     private val glideBatch = ThreadLocal<Boolean>()
     private val chineseGlideDeletes = ChineseGlideDeleteHistory()
 
+    private data class PreviousAssociations(
+        val words: List<String>,
+        val connection: android.view.inputmethod.InputConnection,
+        val session: Long,
+        val schema: String,
+        val before: String,
+        val after: String,
+    )
+
+    @Volatile private var previousAssociations: PreviousAssociations? = null
+
+    internal fun discardPreviousAssociations() { previousAssociations = null }
+
+    private fun capturePreviousAssociations(state: CandidateState): PreviousAssociations? {
+        if (!SettingsPreferences.isRestorePreviousAssociationsEnabled(service) ||
+            state.associationCandidates.isEmpty() || state.isDeletionRecovery || state.isDigitPhraseList ||
+            state.isShowingRecentClipboard || state.pendingEnglishText.isNotEmpty() ||
+            EmailSuffixes.isSuggestionList(state.associationCandidates)) return null
+        val connection = service.currentInputConnection ?: return null
+        val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull() ?: return null
+        val after = runCatching { connection.getTextAfterCursor(25, 0)?.toString() }.getOrNull() ?: return null
+        if (!runCatching { connection.getSelectedText(0).isNullOrEmpty() }.getOrDefault(false)) return null
+        val ui = service.uiState.value
+        return PreviousAssociations(state.associationCandidates.toList(), connection, ui.inputSessionId,
+            ui.currentSchemaId, before, after)
+    }
+
+    private fun restorePreviousAssociations(snapshot: PreviousAssociations) {
+        if (previousAssociations !== snapshot) return
+        previousAssociations = null
+        val ui = service.uiState.value
+        val current = service.candidateState.value
+        val connection = service.currentInputConnection
+        if (!SettingsPreferences.isRestorePreviousAssociationsEnabled(service) ||
+            connection !== snapshot.connection || ui.inputSessionId != snapshot.session ||
+            ui.currentSchemaId != snapshot.schema || ui.isAsciiMode || current.isComposing ||
+            current.inputText.isNotEmpty() || current.associationCandidates.isNotEmpty()) return
+        val sameContext = runCatching {
+            connection.getSelectedText(0).isNullOrEmpty() &&
+                connection.getTextBeforeCursor(25, 0)?.toString() == snapshot.before &&
+                connection.getTextAfterCursor(25, 0)?.toString() == snapshot.after
+        }.getOrDefault(false)
+        if (sameContext) service.candidateState.value = current.copy(associationCandidates = snapshot.words)
+    }
+
+
     private fun chineseGlideDeleteEnabled(): Boolean = SettingsPreferences.getPrefsPublic(service).getBoolean(
         com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.DELETE_CHINESE_GLIDE_CHARACTER_KEY, false)
 
@@ -598,17 +644,46 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         return commandOwner(admission).context()
     }
 
+    @Volatile private var englishCompletionPending: String? = null
+    private val englishCompletionSequence = java.util.concurrent.atomic.AtomicLong()
+    private var englishCacheSession = -1L
+    private var englishCacheMode: Pair<String, Boolean>? = null
+    private val englishCompletionCache = object : LinkedHashMap<String, List<String>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>?) = size > 8
+    }
+
+    private fun cachedEnglishCompletions(pending: String): List<String>? {
+        val session = service.uiState.value.inputSessionId
+        val mode = service.uiState.value.let { it.currentSchemaId to it.isAsciiMode }
+        if (englishCacheSession != session || englishCacheMode != mode) {
+            englishCompletionCache.clear(); englishCacheSession = session; englishCacheMode = mode
+        }
+        return englishCompletionCache[pending]
+    }
+
     /** 英文（西、德、法、意…）打了一个字母或撇号后，按整个词要补全。 */
-    private fun requestEnglishCompletions(next: CandidateState) {
-        if (service.isSecretEditor() || !next.englishReplaceSupported) return
+    internal fun requestEnglishCompletions(next: CandidateState) {
+        val sequence = englishCompletionSequence.incrementAndGet()
+        if (service.isSecretEditor() || !next.englishReplaceSupported) {
+            englishCompletionPending = null
+            val current = service.candidateState.value
+            if (current.englishFirstCompletionPending && current.pendingEnglishText == next.pendingEnglishText)
+                service.candidateState.value = current.copy(englishFirstCompletionPending = false)
+            return
+        }
         val pending = next.pendingEnglishText
-        service.serviceScope.launch(InputCommandOwner.requireOwner().context()) {
+        val session = service.uiState.value.inputSessionId
+        englishCompletionPending = pending
+        service.serviceScope.launch {
             val words = service.predictionManager.getEnglishAssociations(pending)
-            withEditor {
+            withContext(Dispatchers.Main) {
                 val current = service.candidateState.value
-                if (current.pendingEnglishText == pending && service.uiState.value.let {
+                if (englishCompletionSequence.get() == sequence && current.pendingEnglishText == pending && service.uiState.value.inputSessionId == session && service.uiState.value.let {
                         it.isAsciiMode || it.inputProfile.typesLettersDirectly }) {
-                    service.candidateState.value = current.copy(associationCandidates = words)
+                    if (englishCompletionPending == pending) englishCompletionPending = null
+                    cachedEnglishCompletions(pending)
+                    englishCompletionCache[pending] = words
+                    service.candidateState.value = current.copy(associationCandidates = words, englishFirstCompletionPending = false)
                 }
             }
         }
@@ -626,14 +701,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val current = service.candidateState.value
             if (!markJoinsWord(mark, language, current.pendingEnglishText)) return@withEditor null
             service.predictionManager.invalidatePendingPredictions()
-            val cleared = current.copy(associationCandidates = emptyList())
-            service.candidateState.value = cleared
-            val committed = commitEnglishLetter(cleared, mark, false, service::supportsEnglishCandidateReplace) {
+            val committed = commitEnglishLetter(current, mark, false, service::supportsEnglishCandidateReplace) {
                 service.commitTextAndPredict(it, isPaste = false, allowPrediction = false).accepted
             }
-            if (committed != null) service.candidateState.value = committed
+            if (committed != null) {
+                englishCompletionSequence.incrementAndGet()
+                englishCompletionPending = committed.pendingEnglishText.takeIf { committed.englishReplaceSupported && !service.isSecretEditor() }
+                service.candidateState.value = committed
+            }
             // 编辑框没收下也算处理过了，不再当标点补打一次。
-            committed ?: cleared
+            committed ?: current
         } ?: return false
         if (next.pendingEnglishText.endsWith(mark)) requestEnglishCompletions(next)
         return true
@@ -979,23 +1056,41 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 GlideAlternatives.Choice(text, next, nextCaret)
             }
             if (choices.isEmpty()) return@postRimeJob
-            val (typed, typedCaret) = GlideAlternatives.inserted(input, caret, code)
-            holder.entry = GlideAlternatives.Entry(typed, typedCaret, schema, session, choices)
+            val typed = GlideAlternatives.inserted(input, caret, code).first
+            holder.entry = GlideAlternatives.Entry(typed, schema, session, choices)
         }
     }
 
-    /** 点了滑行备选：把这一笔的编码换成它，组合留着。换不了（组合已经变了）时不上屏，什么也不做。 */
-    private fun applyGlideAlternative(input: String, snapshot: CandidateState) {
+    /** Apply the alternative code, then select the same word through Rime. */
+    private suspend fun applyGlideAlternative(input: String, snapshot: CandidateState) {
         val holder = service.candidateTransform.glideAlternatives
         val before = holder.entry ?: return
         val state = service.uiState.value
         if (before.schema != state.currentSchemaId || before.session != state.inputSessionId) return
-        val choice = holder.choose(input, snapshot.candidates.firstOrNull()) ?: return
-        if (!service.rimeEngine.applyPinyinEdit(before.input, choice.input, choice.caret, expectedSchema = before.schema)) {
-            holder.entry = before
+        val choice = holder.find(input) ?: return
+        if (!service.rimeEngine.applyPinyinEdit(before.input, choice.input, choice.caret, expectedSchema = before.schema)) return
+        holder.clear()
+        val updated = service.rimeEngine.readQueuedResult() ?: return
+        val index = updated.candidates.indexOfFirst { it.text == choice.text }
+        if (index < 0) {
+            // The live engine can differ from the earlier preview; never commit another word.
+            sendTransformedResult(updated)
             return
         }
-        service.rimeEngine.readQueuedResult()?.let { sendTransformedResult(it) }
+        val selection = service.rimeEngine.selectCandidateAtRevision(index, updated.engineRevision)
+        if (selection == null) { sendTransformedResult(updated); return }
+        com.kingzcheung.xime.stats.TypingStats.onCandidatePicked(index,
+            snapshot.correctedCandidates[choice.text].orEmpty())
+        if (selection.committedText.isNotEmpty()) {
+            val text = selection.committedText
+            val autoSpace = wordsAutoSpaceAfter(text)
+            val delivered = deliverCandidateCommit(PendingCandidateCommit(
+                InputCommandOwner.requireOwner(), if (autoSpace) "$text " else text, false
+            ))
+            if (autoSpace && delivered.accepted) englishAutoSpace.arm(text)
+        } else {
+            withEditor { service.updateUI() }
+        }
     }
 
     /**
@@ -1426,12 +1521,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (letterLanguage == com.kingzcheung.xime.settings.LetterLanguage.KOREAN && routeHangulKey(key, isShifted)) return@command
             if (english && isDirectLetter(key, letterLanguage?.extraLetters.orEmpty())) {
                 val next = withEditor {
-                    // Clear and commit in the same Main visit, including when the
-                    // previous letter already has completions on screen.
                     service.predictionManager.invalidatePendingPredictions()
                     // 候选栏上是邮箱后缀（刚打了 @）：接着打的字母是后缀的开头，下面只留对得上的。
                     val emailDomainTyping = EmailSuffixes.isSuggestionList(service.candidateState.value.associationCandidates)
-                    service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
                     val current = service.candidateState.value
                     // 滑行出词后直接点字母：光标仍紧跟那个词时自动补空格；空格、删除或标点之后不补。
                     // 连着划两个词时当前英文词是整对（I'm done），光标仍紧跟这一笔的词就算。
@@ -1462,7 +1554,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         val letter = if (fullWidthLetter) fullWidthLetters(it) else it
                         service.commitTextAndPredict(letter, isPaste = false, allowPrediction = false).accepted
                     }
-                    if (next != null) service.candidateState.value = next
+                    if (next != null) {
+                        englishCompletionSequence.incrementAndGet()
+                        if (current.pendingEnglishText.isEmpty() || afterGlide) englishCompletionCache.clear()
+                        englishCompletionPending = next.pendingEnglishText.takeIf { next.englishReplaceSupported && !service.isSecretEditor() }
+                        service.candidateState.value = next.copy(
+                            englishFirstCompletionPending = englishCompletionPending != null &&
+                                (current.pendingEnglishText.isEmpty() || afterGlide || current.englishFirstCompletionPending) && !emailDomainTyping,
+                            associationCandidates =
+                            if (englishCompletionPending != null) cachedEnglishCompletions(next.pendingEnglishText)
+                                ?: next.associationCandidates else next.associationCandidates)
+                    }
                     // 打邮箱后缀：只给开头对得上的后缀，不出英文补全；都对不上了照常出英文补全。
                     // 按光标前的整段后缀筛（打了点以后 qq.c 的 c 才是一个新词）。
                     val domains = if (next != null && emailDomainTyping && next.englishReplaceSupported && !service.isSecretEditor())
@@ -1470,7 +1572,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             service.currentInputConnection?.getTextBeforeCursor(EmailSuffixes.CONTEXT_LENGTH, 0)
                         }.getOrNull()) else emptyList()
                     if (next != null && domains.isNotEmpty()) {
-                        service.candidateState.value = next.copy(associationCandidates = domains)
+                        englishCompletionPending = null
+                        service.candidateState.value = next.copy(associationCandidates = domains, englishFirstCompletionPending = false)
                         return@withEditor null
                     }
                     next
@@ -1482,6 +1585,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (hardwareEvent == null && schemeCode == null && !mergedKey && typesEmailDomainKey(key) &&
                 withEditor { commitEmailDomainKey(if (isShifted) key.uppercase() else key) }) return@command
             // 下面会先清掉联想（含邮箱后缀）；数字键盘走计算器那条路时要知道按键前是不是正给着后缀。
+            if (key.length == 1 && key[0] in 'a'..'z' && !isShifted && !mergedKey &&
+                !service.uiState.value.isAsciiMode && service.isChineseMode &&
+                SettingsPreferences.isRestorePreviousAssociationsEnabled(service) &&
+                service.rimeEngine.compositionActiveForDeletion() == false) {
+                previousAssociations = withEditor { capturePreviousAssociations(service.candidateState.value) }
+            }
             val priorCandidates = service.candidateState.value
             val emailSuffixesShown = EmailSuffixes.isSuggestionList(priorCandidates.associationCandidates)
             // Keep the old frame until the first double-pinyin result can replace it in one UI update.
@@ -1605,6 +1714,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             candidateComments = emptyList(),
                             associationCandidates = emptyList(),
                             pendingEnglishText = "",
+                            englishFirstCompletionPending = false,
                             inputText = "",
                             isComposing = false,
                             isShowingRecentClipboard = false,
@@ -2086,6 +2196,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     needsUIUpdate = true
                                 } else {
                                     val committed = result.committedText
+                                    if (committed.isNotEmpty()) discardPreviousAssociations()
                                     if (state.isAsciiMode && committed.isNotEmpty() && result.inputText.isEmpty() && result.candidates.isEmpty()) {
                                         val current = candState.pendingEnglishText
                                         val newPending = current + committed
@@ -2202,16 +2313,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         service.uiState.value = service.uiState.value.copy(isAsciiMode = capturedIsAscii)
                         if (pendingEnglish.isNotEmpty() && !secret && service.supportsEnglishCandidateReplace()) {
-                            service.serviceScope.launch(InputCommandOwner.requireOwner().context()) {
-                                val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
-                                withEditor {
-                                    val current = service.candidateState.value
-                                    // 在途联想过期校验：pendingEnglish 已变/已清 → 丢弃迟到回填
-                                    if (current.pendingEnglishText == pendingEnglish) {
-                                        service.candidateState.value = current.copy(associationCandidates = candidates)
-                                    }
-                                }
-                            }
+                            requestEnglishCompletions(service.candidateState.value)
                         }
                         if (service.calculatorEngine.isActive()) {
                             updateCalculatorCandidates()
@@ -2519,6 +2621,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal fun selectAssociation(index: Int): Boolean {
         if (usesDirectFieldInput) return selectDirectFieldEmailSuffix(index)
         val state = service.candidateState.value
+        if (index > 0 && state.pendingEnglishText.isNotEmpty() && englishCompletionPending == state.pendingEnglishText) return false
         if (state.isDigitPhraseList) return selectDigitPhrase(state, index)
         if (EmailSuffixes.isSuggestionList(state.associationCandidates))
             associationWordAt(state, index)?.takeIf { it in EmailSuffixes.DOMAINS }?.let { return selectEmailSuffix(it) }
@@ -2716,31 +2819,29 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             target == DeletionTarget.ENGLISH -> {
                 val newPending = candState.pendingEnglishText.dropLast(1)
                 if (newPending.isNotEmpty()) {
-                    withEditor {
-                        if (owner != service.uiState.value.inputSessionId) return@withEditor
+                    val next = withEditor {
+                        if (owner != service.uiState.value.inputSessionId) return@withEditor null
                         service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-                        service.candidateState.value = service.candidateState.value.copy(
+                        val updated = service.candidateState.value.copy(
                             pendingEnglishText = newPending,
                             candidates = emptyList(),
                             candidateComments = emptyList(),
-                            associationCandidates = emptyList(),
+                            associationCandidates = if (!service.isSecretEditor() && candState.englishReplaceSupported)
+                                cachedEnglishCompletions(newPending) ?: candState.associationCandidates else emptyList(),
                             candidateActions = emptyList()
                         )
+                        englishCompletionSequence.incrementAndGet()
+                        englishCompletionPending = newPending.takeIf { updated.englishReplaceSupported && !service.isSecretEditor() }
+                        service.candidateState.value = updated
+                        updated
                     }
-                    if (!service.isSecretEditor() && service.supportsEnglishCandidateReplace()) {
-                        service.serviceScope.launch(InputCommandOwner.requireOwner().context()) {
-                            val candidates = service.predictionManager.getEnglishAssociations(newPending, PredictionManager.MAX_ASSOCIATION_COUNT)
-                            withEditor {
-                                if (owner != service.uiState.value.inputSessionId) return@withEditor
-                                if (service.candidateState.value.pendingEnglishText == newPending) {
-                                    service.candidateState.value = service.candidateState.value.copy(associationCandidates = candidates)
-                                }
-                            }
-                        }
-                    }
+                    if (next != null) requestEnglishCompletions(next)
                 } else {
                     withEditor {
                         if (owner != service.uiState.value.inputSessionId) return@withEditor
+                        englishCompletionSequence.incrementAndGet()
+                        englishCompletionPending = null
+                        englishCompletionCache.clear()
                         service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                         service.candidateState.value = service.candidateState.value.copy(
                             pendingEnglishText = "",
@@ -2788,7 +2889,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // Undo changes composition only; no user dictionary write.
                     }
                 }
-                sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
+                val associationsToRestore = previousAssociations.takeIf { result.inputText.isEmpty() }
+                sendTransformedResult(result) {
+                    if (associationsToRestore != null) restorePreviousAssociations(associationsToRestore)
+                    if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
+                }
             }
 
             // 3. 联想词或剪贴板：仅清空候选栏，不回删已上屏字符
@@ -2879,6 +2984,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             FileLogger.w("InputLatency", "candidate tap dropped: revision changed")
             return
         }
+        discardPreviousAssociations()
         // 展开页点选（expandedCandidate 非空）：取词/注释以展开页显示的同一份
         // 全量列表为准（所见即所得）。index 是全量索引，不得用于索引引擎当前页的
         // candidates/candidateComments——部分选拼音（SELECTION 态）或候选超页时
@@ -3136,6 +3242,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 输入框模式清 composing 区；T9 方案重置左侧候选区（其他键盘无左栏，跳过）。
      */
     private suspend fun clearInputStateForKeys(keepInlineText: Boolean = false) {
+        discardPreviousAssociations()
         service.predictionManager.invalidatePendingPredictions()
         service.calculatorEngine.clear()
         updateCalculatorCandidates()

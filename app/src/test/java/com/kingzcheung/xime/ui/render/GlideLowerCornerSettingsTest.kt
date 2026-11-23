@@ -41,11 +41,11 @@ class GlideLowerCornerSettingsTest {
     private fun count(text: String, substring: Boolean = false, inLongPressCard: Boolean = false) =
         rule.onAllNodes(if (inLongPressCard) longPressCard and hasText(text, substring) else hasText(text, substring), true)
 
-    @Test fun glideLockExplainsTheTwoCellLongPressAndKeepsTheStoredSwitch() {
+    @Test fun glideEnablesSwipeCornersAndExplainsTwoCellWhenLongPressChosen() {
         AppFonts.initialize(rule.activity)
         SettingsPreferences.setSwipeUpHintsEnabled(rule.activity, true)
         SettingsPreferences.setSwipeDownHintsEnabled(rule.activity, true)
-        // 他的设置：反转上下滑方向开着，下角标原来是「↓下滑 → 1」。
+        // 开启滑行时，默认滑动输入角标可用且不被锁定
         KeyboardInputPreferences(glideTyping = true, reverseSymbolSwipe = true).save(rule.activity)
         rule.setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
@@ -55,23 +55,28 @@ class GlideLowerCornerSettingsTest {
             }
         }
         rule.waitForIdle()
+        count("快速上下滑动输入角标，不影响滑词。", substring = true).assertCountEquals(1)
+        count("角标改为长按输入", substring = true).assertCountEquals(0)
+        rule.onNodeWithTag("settings-search-anchor:下方角标提示").assertIsOn()
+
+        // 选长按输入时，说明两格长按选择
+        rule.runOnIdle {
+            KeyboardInputPreferences.read(rule.activity)
+                .copy(symbolInputMode = com.kingzcheung.xime.ui.keyboard.SymbolInputMode.LONG_PRESS)
+                .save(rule.activity)
+        }
+        rule.waitForIdle()
         count("长按", inLongPressCard = true).assertCountEquals(1)
         count("@", inLongPressCard = true).assertCountEquals(2)
         count("↓下滑", inLongPressCard = true).assertCountEquals(0)
         count("1", inLongPressCard = true).assertCountEquals(0)
-        count("角标改为长按输入", substring = true).assertCountEquals(1)
         count("右移一格出下角标", substring = true).assertCountEquals(1)
-        count("不显示下角标", substring = true).assertCountEquals(0)
-        count("下角标不再显示", substring = true).assertCountEquals(0)
-        rule.onNodeWithTag("settings-search-anchor:下方角标提示").assertIsOn()
+        count("角标改为长按输入", substring = true).assertCountEquals(0)
 
+        // 关掉滑行
         rule.runOnIdle { KeyboardInputPreferences.read(rule.activity).copy(glideTyping = false).save(rule.activity) }
         rule.waitForIdle()
-        count("↓下滑", inLongPressCard = true).assertCountEquals(1)
-        count("1", inLongPressCard = true).assertCountEquals(2)
         count("右移一格", substring = true).assertCountEquals(0)
-        count("角标改为长按输入", substring = true).assertCountEquals(0)
-        rule.onNodeWithTag("settings-search-anchor:下方角标提示").assertIsOn()
         assertTrue("存的开关没被改", SettingsPreferences.isSwipeDownHintsEnabled(rule.activity))
     }
 }

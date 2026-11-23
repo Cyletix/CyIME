@@ -728,7 +728,7 @@ object SchemaManager {
                 description = entry.description ?: "",
                 language = declared ?: builtinLanguage,
                 scheme = entry.inputScheme?.let(InputScheme::fromId) ?: InputProfiles.builtin(entry.schemaId).scheme,
-                languageAssignable = declared == null && builtinLanguage == InputLanguage.UNSPECIFIED,
+                languageAssignable = entry.language.isNullOrBlank() && builtinLanguage == InputLanguage.UNSPECIFIED,
             )
         } catch (e: Exception) {
             try { Log.w(TAG, "Failed to parse schema file: ${file.name}, error=${e.message}, skip", e) } catch (_: Exception) {}

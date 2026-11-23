@@ -6,8 +6,8 @@ import com.kingzcheung.xime.rime.RimeCandidate
  * 中文滑行的备选（#294：只出一个结果；抬手落在两键之间，小鹤 dj 但 出成 dh 当）。
  *
  * 一笔识别出的前几个编码里，首选照常交给 Rime；其后 [MAX] 个各在独立会话里预览一次，
- * 取各自的第一个候选，插在候选栏首选之后。点它把这一笔的编码换成那个编码（组合还在，可以接着打），
- * 原来的首选换到备选里，点错了能点回来。编码一变（接着打字、删字、上屏）就不再给。
+ * 取各自的第一个候选，插在候选栏首选之后。点选时按对应编码交给引擎选词；
+ * 编码一变（接着打字、删字、上屏）就不再给。
  */
 internal class GlideAlternatives {
     /** [input] 是换成这个编码后的整个输入，[caret] 是换完后的光标。 */
@@ -19,7 +19,6 @@ internal class GlideAlternatives {
      */
     data class Entry(
         val input: String,
-        val caret: Int,
         val schema: String,
         val session: Long,
         val choices: List<Choice>,
@@ -59,15 +58,8 @@ internal class GlideAlternatives {
         )
     }
 
-    /** 点了备选：返回要换成的那个，并把原来的首选 [firstText] 换进备选。不是当前这一笔的备选时为空。 */
-    fun choose(input: String, firstText: String?): Choice? {
-        val current = entry ?: return null
-        val choice = current.choices.firstOrNull { it.input == input } ?: return null
-        val original = firstText?.takeIf { it.isNotEmpty() }?.let { Choice(it, current.input, current.caret) }
-        entry = current.copy(input = choice.input, caret = choice.caret, seen = false,
-            choices = listOfNotNull(original) + current.choices.filter { it !== choice })
-        return choice
-    }
+    /** Find the code associated with a displayed alternative without changing the active entry. */
+    fun find(input: String): Choice? = entry?.choices?.firstOrNull { it.input == input }
 
     companion object {
         /** 首选之外最多给几个：每个都要在独立会话里预览一次，抬手到出字会多等一点。 */

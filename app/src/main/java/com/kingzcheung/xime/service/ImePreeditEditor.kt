@@ -124,7 +124,17 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                     }
                 }
             } else if (key == "delete") {
-                if (caret > 0) { text = text.removeRange(caret - 1, caret); keys = keys?.removeRange(caret - 1, caret); caret-- }
+                if (caret > 0) {
+                    if (text[caret - 1] == '\'' && caret > 1 && !PinyinEditBuffer.keepsCase(session.schemaId)) {
+                        text = text.removeRange(caret - 2, caret)
+                        keys = keys?.removeRange(caret - 2, caret)
+                        caret -= 2
+                    } else {
+                        text = text.removeRange(caret - 1, caret)
+                        keys = keys?.removeRange(caret - 1, caret)
+                        caret--
+                    }
+                }
                 else if (!session.isT9 && session.protectedInput.isEmpty()) {
                     // 光标在编码最前面：编码里没有可删的，删输入框里编码前面的字，编码留着接着打
                     // （11-09 平板：原来删除键在这里没反应）。
@@ -156,6 +166,10 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                     keys = keys?.let { PinyinEditBuffer.dropLeadingSeparators(it, caret).first }
                     text = trimmed.first
                     caret = trimmed.second
+                    val trailing = PinyinEditBuffer.dropTrailingSeparators(text, caret)
+                    keys = keys?.let { PinyinEditBuffer.dropTrailingSeparators(it, caret).first }
+                    text = trailing.first
+                    caret = trailing.second
                 }
             }
             val engine = service.rimeEngine

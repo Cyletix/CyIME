@@ -26,14 +26,19 @@ internal object KeyboardKeyMetrics {
      * [keyboardWidth] 不知道时（null）不往里挪。
      */
     fun longPressMenuCells(keyLeft: Float, keyWidth: Float, count: Int, iconMenu: Boolean,
-        keyboardWidth: Float?, margin: Float): LongPressMenuCells {
+        keyboardWidth: Float?, margin: Float, defaultIndex: Int = -1): LongPressMenuCells {
         val n = count.coerceAtLeast(1)
         val cellMin = if (iconMenu) n else maxOf(n, 3)
         val bodyWidth = longPressMenuWidthPx(keyWidth, cellMin, keyboardWidth ?: Float.MAX_VALUE, margin)
-        val centered = keyLeft + keyWidth / 2f - bodyWidth / 2f
-        val left = if (keyboardWidth == null) centered
-            else centered.coerceIn(margin, maxOf(margin, keyboardWidth - bodyWidth - margin))
-        return LongPressMenuCells(left, bodyWidth, bodyWidth / n)
+        val cellWidth = bodyWidth / n
+        val anchored = if (defaultIndex in 0 until n) {
+            keyLeft + keyWidth / 2f - (defaultIndex + 0.5f) * cellWidth
+        } else {
+            keyLeft + keyWidth / 2f - bodyWidth / 2f
+        }
+        val left = if (keyboardWidth == null) anchored
+            else anchored.coerceIn(margin, maxOf(margin, keyboardWidth - bodyWidth - margin))
+        return LongPressMenuCells(left, bodyWidth, cellWidth)
     }
 
     /** 手指在 [x]（和 [cells] 同一坐标）时落在第几格。 */

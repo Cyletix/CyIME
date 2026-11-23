@@ -147,6 +147,36 @@ object TypingStats {
         io.execute { save() }
     }
 
+    /** 备份前同步落盘（须在后台线程调用）。 */
+    fun flushSync(context: Context) {
+        init(context)
+        zone = TimeZone.getDefault()
+        synchronized(lock) {
+            finishBurstLocked()
+            lastTypedAt = 0
+            clearPendingLocked()
+            if (!dirty) return
+        }
+        save()
+    }
+
+    /** 恢复备份后从磁盘重新加载统计数据。 */
+    fun reload(context: Context) {
+        appContext = context.applicationContext
+        enabled = prefs(context).getBoolean(PREF_ENABLED, true)
+        synchronized(loadLock) {
+            val stored = runCatching { file()?.takeIf { it.exists() }?.readText() }.getOrNull()
+                ?.let { runCatching { TypingStatsData.decode(it) }.getOrNull() }
+            synchronized(lock) {
+                data = stored ?: TypingStatsData()
+                dirty = false
+                loaded = true
+                lastTypedAt = 0; burstChars = 0; burstMs = 0
+                clearPendingLocked()
+            }
+        }
+    }
+
     /** 给统计页：读盘（如还没读）后的一份拷贝。在后台线程调用。 */
     fun snapshot(context: Context): TypingStatsData {
         init(context)

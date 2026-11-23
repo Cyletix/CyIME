@@ -126,9 +126,9 @@ class KeyboardInputPreferencesTest {
         val onlyChinese = KeyboardInputPreferences(chineseGlideTyping = true)
         assertEquals("已被「中文滑行」锁定", InputGestureLocks.lockFor(onlyChinese,
             InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD)?.message)
-        // 用户 11-08：开着滑行时字母键的滑动都给滑行，角标锁在「长按输入」，并说明是中文滑行锁的。
-        assertEquals(CornerInputChoice.LONG_PRESS, CornerInputChoice.of(CornerInputChoice.SWIPE.applyTo(onlyChinese)))
-        assertEquals("已被「中文滑行」锁定", InputGestureLocks.glideCornerLock(onlyChinese)?.message)
+        // 26 键滑行支持快速上下滑输入角标，不锁角标方式。
+        assertEquals(CornerInputChoice.SWIPE, CornerInputChoice.of(CornerInputChoice.SWIPE.applyTo(onlyChinese)))
+        assertNull(InputGestureLocks.glideCornerLock(onlyChinese))
     }
 
     @Test fun `comma and period keys are both on by default and the old saved period default does not turn it off`() {
@@ -563,7 +563,9 @@ class KeyboardInputPreferencesTest {
         assertEquals(300L, KeyboardInputPreferences(symbolLongPressSeconds = 0.15f).glideHoldMs)
         assertEquals(150L, KeyboardInputPreferences(symbolInputMode = SymbolInputMode.LONG_PRESS, symbolLongPressSeconds = 0.15f).glideHoldMs)
         assertEquals(300L, KeyboardInputPreferences(symbolInputMode = SymbolInputMode.LONG_PRESS, symbolLongPressSeconds = 0.8f).glideHoldMs)
-        // 开着 26 键滑行时角标被锁成长按输入，同样跟着时长走。
-        assertEquals(150L, KeyboardInputPreferences(glideTyping = true, symbolLongPressSeconds = 0.15f).glideHoldMs)
+        // 26 键滑行不再锁角标为长按输入，保持原设定；开着九键滑行时锁成长按输入。
+        assertEquals(300L, KeyboardInputPreferences(glideTyping = true, symbolLongPressSeconds = 0.15f).glideHoldMs)
+        assertEquals(150L, KeyboardInputPreferences(glideTyping = true, symbolInputMode = SymbolInputMode.LONG_PRESS, symbolLongPressSeconds = 0.15f).glideHoldMs)
+        assertEquals(150L, KeyboardInputPreferences(t9GlideTyping = true, symbolLongPressSeconds = 0.15f).glideHoldMs)
     }
 }

@@ -102,6 +102,11 @@ internal fun snapDoublePinyinCaret(raw: String, reading: String, scheme: DoubleP
     if (position in boundaries || position > boundaries.last()) return position
     val before = boundaries.floor(position) ?: 0
     val after = boundaries.ceiling(position) ?: return position
+    // 点在两个分词符号中间的两个编码之间时（或首尾音节有分词符号）：光标留在此处，
+    // 点删除删的是前面的编码而不是后面的（11-22 用户反馈）。滑动或步进仍按方向跳音节分界。
+    if (direction == 0 && ((before > 0 && raw[before - 1] == '\'') || (after < raw.length && raw[after] == '\''))) {
+        return position
+    }
     return when {
         direction > 0 -> after
         direction < 0 -> before

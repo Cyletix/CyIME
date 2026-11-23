@@ -969,6 +969,8 @@ object KeysConfigHelper {
     private var symbolOverridesK14: Map<String, String> = emptyMap()
     /** 自建双字母布局各自的角标修改，按布局 id。 */
     private var symbolOverridesCustom: Map<String, Map<String, String>> = emptyMap()
+    @Volatile private var bottomPunctuationZh: Map<String, String> = emptyMap()
+    @Volatile private var bottomPunctuationEn: Map<String, String> = emptyMap()
 
     private fun loadXimeConfig(context: Context) {
         try {
@@ -994,6 +996,8 @@ object KeysConfigHelper {
             symbolOverridesK14 = FourteenKeySymbols.load(context)
             symbolOverridesCustom = customLayouts.filter(CustomLayoutSymbols::editable)
                 .associate { it.id to CustomLayoutSymbols.load(context, it) }
+            bottomPunctuationZh = QwertySwipeSymbols.loadBottomPunctuation(context, english = false)
+            bottomPunctuationEn = QwertySwipeSymbols.loadBottomPunctuation(context, english = true)
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
             _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
@@ -1913,6 +1917,11 @@ object KeysConfigHelper {
     /** 获取笔画键手势配置（xime.yaml keyboard.stroke.keys，custom 键级覆盖）。
      *  键 id 为键面标签：一、丨、丿、丶、乛、*、分词、，、。 */
     fun getStrokeKeyGesture(key: String): KeyGestureConfig? = _strokeGestureConfigs[key]
+
+    internal fun bottomPunctuationCustom(key: String, english: Boolean): Pair<String?, String?> {
+        val map = if (english) bottomPunctuationEn else bottomPunctuationZh
+        return map["up.$key"] to map["down.$key"]
+    }
 
     internal fun qwertySymbolEditorValues(context: Context, english: Boolean,
         variant: CornerVariant = cornerVariant): Map<String, String> {

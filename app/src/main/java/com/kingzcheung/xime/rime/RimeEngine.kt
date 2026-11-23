@@ -803,6 +803,16 @@ class RimeEngine {
         }
     }
 
+    /** 以未选词的原始编码重建候选状态，供局部删空后再清空时保存干净的撤回现场。 */
+    internal fun resetRawInputAndReadState(input: String): RimeProcessResult? = mutateLocked {
+        if (!isInitialized || (!nativeHasSession() && !createSession())) return@mutateLocked null
+        val japanese = !nativeIsAsciiMode() && com.kingzcheung.xime.settings.InputProfiles
+            .describe(nativeGetCurrentSchema().orEmpty()).capabilities.japaneseConversion
+        val normalized = if (japanese) canonicalJapaneseRomaji(input) else input
+        if (!nativeSetInput(normalized)) return@mutateLocked null
+        withDisplayPreedit(nativeGetProcessResult(true))
+    }
+
     internal fun saveClearUndo(): Boolean = locked {
         isInitialized && nativeHasSession() && !nativeIsAsciiMode() && nativeSaveClearUndo()
     }

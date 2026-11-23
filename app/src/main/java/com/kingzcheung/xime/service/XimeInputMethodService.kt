@@ -370,9 +370,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             fixedKeyboardBottomInsetPx(insets, win, normal, minimum) else normal
         if (reading != null) SettingsPreferences.setKeyboardBottomDiagnostic(this, bottomNavDiagnostic(this, reading, position,
             SettingsPreferences.getKeyboardBottomAdjustmentDp(this), fixedBottomInsetPxState.value))
-        // 设置页的「底部留白校准」看不到输入法窗口，记下这次量到的可调低范围，调低按到下限就停。
-        if (insets != null) SettingsPreferences.setKeyboardBottomLoweringLimitDp(this,
-            suggestedBottomDp() - imeBottomSpaceDp(minimum, resources.displayMetrics.density))
+        // 设置页的「底部留白校准」看不到输入法窗口，记下这次量到的可调低范围与系统抬高高度。
+        if (insets != null) {
+            SettingsPreferences.setKeyboardBottomLoweringLimitDp(this,
+                suggestedBottomDp() - imeBottomSpaceDp(minimum, resources.displayMetrics.density))
+            val navButtonsDp = imeBottomSpaceDp(reading?.imeButtonsPx ?: 0, resources.displayMetrics.density)
+            val measuredSystemLiftDp = maxOf(suggestedBottomDp(), navButtonsDp)
+            val resolvedSystemLiftDp = if (measuredSystemLiftDp >= 28) measuredSystemLiftDp
+                else SettingsPreferences.DEFAULT_SYSTEM_LIFT_HEIGHT_DP
+            SettingsPreferences.setKeyboardBottomSystemHeightDp(this, resolvedSystemLiftDp)
+        }
         val state = uiState.value
         if (state.isFloatingMode && !state.showKeyboardResize && previousSuggestion != suggestedBottomDp() &&
             SettingsPreferences.getFloatingOffsetY(this, resources.configuration.screenWidthDp > resources.configuration.screenHeightDp, -1) < 0) {
@@ -1879,7 +1886,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun closeClipboardSearch(openBoard: Boolean, keepQuery: Boolean = false) {
         if (!uiState.value.clipboardSearchVisible) return
         stopVoiceForClosedEditor(ToolPanelEditTextHolder.editText)
-        if (!keepQuery) clipboardManager.boardQuery.value = ""
+        val favoriteStore = if (applicationContext != null) com.kingzcheung.xime.clipboard.ClipboardFavoriteStore.getInstance(this) else null
+        if (!keepQuery) {
+            clipboardManager.boardQuery.value = ""
+            favoriteStore?.setSearchInFavorites(false)
+        }
+        if (!openBoard) {
+            favoriteStore?.setSearchInFavorites(false)
+            favoriteStore?.setReturnToFavorites(false)
+        }
         if (candidateState.value.isComposing) {
             keyRouter.postRimeJob { keyRouter.endQueuedComposition(); withContext(Dispatchers.Main) { updateUI() } }
         }
@@ -1889,6 +1904,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         privacy.setClipboardSearch(false)
         restoreDisplayAfterClipboardSearch()
         if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
+    }
+
+    internal fun dismissQuickSendFormToClipboard() {
+        if (!uiState.value.showQuickSendForm) return
+        if (applicationContext != null) {
+            com.kingzcheung.xime.clipboard.ClipboardFavoriteStore.getInstance(this).clearPendingForm()
+        }
+        closeQuickSend()
+        keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
     }
 
     /** Enter in the search bar: the keyboard goes away and the clipboard keeps showing the matches. */
@@ -2408,6 +2432,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
                 val isDark = isDarkTheme
                 val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
+                val neutralHardwarePalette = com.kingzcheung.xime.ui.theme.resolveNeutralCandidateInputPalette(isDark)
                 val cardBg = hardwarePalette.background
                 val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
                 val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
@@ -2581,10 +2606,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     cursorAnchor = state.cursorAnchor.takeIf { state.hardwareOptions.followCursor },
                                     highlightIndex = hardwareHighlight,
                                     cardBackgroundColor = cardBg,
-                                    candidateTextColor = hardwarePalette.candidateText,
-                                    activeColor = hardwarePalette.accent,
-                                    selectedTextColor = hardwarePalette.selectedText,
-                                    preeditBackgroundColor = hardwarePalette.key,
+                                    candidateTextColor = neutralHardwarePalette.candidateText,
+                                    activeColor = neutralHardwarePalette.accent,
+                                    selectedTextColor = neutralHardwarePalette.selectedText,
+                                    preeditBackgroundColor = neutralHardwarePalette.key,
                                     comments = hardwareCandidates.comments,
                                     commentsAreGlosses = hardwareGlosses && !hardwareCandidates.association,
                                     onPrevious = previousHardwareCandidate.takeUnless { hardwareCandidates.association },
@@ -2608,8 +2633,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             }
                             HardwareKeyboardToolbar(
                                 frostedGlass = glass,
-                                selectedTextColor = hardwarePalette.selectedText,
-                                accentColor = hardwarePalette.accent,
+                                selectedTextColor = neutralHardwarePalette.selectedText,
+                                accentColor = neutralHardwarePalette.accent,
                                 onShowKeyboard = { showScreenKeyboardFromHardware() },
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
@@ -2644,8 +2669,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         else hardwareCandidates.words, hardwareCandidates.comments,
                                         hardwareHighlight,
                                         hardwareCandidates.hasPreviousPage, hardwareCandidates.hasNextPage,
-                                        CandidateBarVisuals(cardBg, hardwarePalette.candidateText, Color.Transparent,
-                                            hardwarePalette.accent, hardwarePalette.selectedText),
+                                        CandidateBarVisuals(cardBg, neutralHardwarePalette.candidateText, Color.Transparent,
+                                            neutralHardwarePalette.accent, neutralHardwarePalette.selectedText,
+                                            isDarkTheme = isDark, preeditBackgroundColor = neutralHardwarePalette.key),
                                         selectHardwareCandidate,
                                         previousHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         nextHardwareCandidate.takeUnless { hardwareCandidates.association },
@@ -2665,7 +2691,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     cand.shownPreedit(state.inputProfile).ifEmpty { cand.inputText } else "",
                                 overlapFaded = cardCoversTyping,
                                 onCoversTyping = { toolbarCoversTyping = it },
-                                contentColor = hardwarePalette.candidateText,
+                                contentColor = neutralHardwarePalette.candidateText,
                                 position = position,
                                 onPositionChange = { hardwareToolbarPosition.value = it },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },
@@ -3753,7 +3779,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) return true
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)) {
-            if (event?.isCanceled != true) keyboardCallbacks?.onHideQuickSendForm?.invoke()
+            if (event?.isCanceled != true) dismissQuickSendFormToClipboard()
             return true
         }
         if (glossShiftKeys.remove(keyCode)) return true
@@ -4479,17 +4505,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         win.isNavigationBarContrastEnforced = SettingsPreferences.roundedKeyboardBottom(this)
                     }
                     if (AndroidPlatform.navBarColorIgnored) {
-                        // Android 15 起（targetSdk 35）这个颜色系统不再画，导航区照旧由 Compose 画；只是把键盘底色报出去，
+                        // Android 15 起（targetSdk 35）这个颜色系统不再画，导航区照旧由 Compose 画；只是把底色报出去，
                         // 小米「输入法全面屏优化」（含 LSP 模块开的）用它给键盘下面那条系统栏上色，不报就是系统默认色（#144）。
-                        // 图片/渐变背景没有单一颜色可报，玻璃效果（半透明）及底部圆角都需要保持透明导航栏。
-                        val bgType = theme.keyboardBackground?.type
+                        // 无论是否开启玻璃特效，渐变皮肤取底边衔接色、大漠流金取底部偏深沙影色；底部圆角及其他图片保持透明。
                         val glass = com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(this, isDark).frostedGlass
                         val rounded = SettingsPreferences.roundedKeyboardBottom(this)
-                        val iosGradient = state.themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID
-                        val transparentNav = glass.enabled || rounded || bgType == "image" || (bgType == "gradient" && !iosGradient)
+                        val surfaceMatch = com.kingzcheung.xime.ui.theme.resolveNavigationBarSurfaceColor(
+                            themeId = state.themeId,
+                            config = theme.keyboardBackground,
+                            isDark = isDark,
+                            fallbackColor = bgColor,
+                        )
+                        val matchEvenWhenGlass = state.themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID ||
+                            state.themeId == "olivcelso_desert" ||
+                            theme.keyboardBackground?.type == "gradient"
+                        val transparentNav = rounded || surfaceMatch == null || (glass.enabled && !matchEvenWhenGlass)
                         win.setNavigationBarColor(if (transparentNav) android.graphics.Color.TRANSPARENT
-                            else (if (iosGradient) com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark).surface else bgColor)
-                                .copy(alpha = 1f).toArgb())
+                            else surfaceMatch.copy(alpha = 1f).toArgb())
                     } else {
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }
@@ -4670,6 +4702,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         EnterKeyAction.label(editorInfo.imeOptions, appSend = SettingsPreferences.isEnterSendsEnabled(this))
 
     override fun onFinishInput() {
+        keyRouter.discardPreviousAssociations()
         gameShowExplicit = false
         suspendCompositionForScreenOff()
         endGlidePreview()

@@ -106,9 +106,9 @@ fun ToolPanel(
     inline: Boolean = false,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.primary,
-        0.35f
+        cardBgColor,
+        accentColor,
+        0.22f
     )
 
     CandidateBarOverlayPanel(

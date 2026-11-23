@@ -301,13 +301,14 @@ fun SchemaSettingsContent(
                 orderedInstalledModeIds(context, uiState.allSchemas)
             }
             val enabledIds = uiState.enabledSchemas.toSet()
-            // 按语言分组，语言的先后和「语言与方案」一样（中文、英文、日语…）；同一语言里照旧按拖动的顺序。
             val languageRank = remember(modeOrderRevision) { InputModes.languageRank(context) }
             fun rankOf(id: String) = languageRank(if (id == InputModes.ENGLISH) InputLanguage.ENGLISH
                 else schemaById[id]?.toSchemaInfo()?.profile?.language ?: InputLanguage.UNSPECIFIED)
-            val savedEnabledIds = fullOrder.filter { id ->
+            // 已启用的输入组合严格按用户拖动顺序（fullOrder / input_mode_order）保存与展示，不按语言重排覆盖（如把英文调到第2位）。
+            // 首帧异步加载未完成时不先单独画出「英文」，避免加载完成后「英文」从第1位动画滑到底部。
+            val savedEnabledIds = if (!uiState.isLoaded) emptyList() else fullOrder.filter { id ->
                 (id == InputModes.ENGLISH && englishEnabled) || (id in enabledIds && id in schemaById)
-            }.sortedBy(::rankOf)
+            }
             val dragOrder = rememberDragOrder(savedEnabledIds) { reordered ->
                 if (reorderEnabledModes(context, uiState.allSchemas, enabledIds, englishEnabled, reordered)) modeOrderRevision++
             }
@@ -347,7 +348,7 @@ fun SchemaSettingsContent(
                     SettingsGroupTitle("已启用的输入组合", Modifier.padding(top = 8.dp))
                 }
 
-                if (orderedEnabledIds.isEmpty()) {
+                if (uiState.isLoaded && orderedEnabledIds.isEmpty()) {
                     item {
                         Text(
                             text = "暂未启用任何方案",
@@ -381,7 +382,7 @@ fun SchemaSettingsContent(
                 }
 
                 item {
-                    SettingsNote("长按可在同一语言里排序；语言的先后和默认组合在「语言与方案」里改。",
+                    SettingsNote("长按可调整输入组合先后顺序；语言的先后和默认组合在「语言与方案」里改。",
                         Modifier.padding(top = 4.dp), jumps = listOf("语言与方案"))
                     SettingsNote("安装、启停方案后自动应用，不用再部署。")
                     Spacer(modifier = Modifier.height(8.dp))

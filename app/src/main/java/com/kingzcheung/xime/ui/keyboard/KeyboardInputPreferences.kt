@@ -274,6 +274,10 @@ data class KeyboardInputPreferences(
     val cursorSwipeLines: Float = 1f,
     /** 固定键盘底部留白（调节键盘里往上拖出的那一条）上左右滑动移动光标；默认关（用户 10-31 要求新增）。 */
     val bottomLiftCursor: Boolean = false,
+    /** 固定键盘底部留白达到一定高度时显示「切换中英文」「剪贴板」两个快捷按钮；默认开。 */
+    val bottomLiftActions: Boolean = true,
+    /** 打开底部留白快捷按钮后可选：合并符号与数字为 123（保留拖动功能）、隐藏键盘切换中英文键并居中延长空格；默认关。 */
+    val bottomLiftCompactBottomRow: Boolean = false,
     /** 按住空格说话时上滑取消：手指往上滑出空格约一个键高再松手，这次说的话不上屏（默认关，别人提的需求，11-02）。 */
     val voiceSwipeCancel: Boolean = false,
     /** 固定键盘按键区左右两边不触发系统边缘手势（返回、侧边栏），默认关（11-20 荣耀用户：边缘手势吞掉贴边按键）。 */
@@ -285,6 +289,7 @@ data class KeyboardInputPreferences(
     internal val preeditOnTopLine: Boolean get() = showCodeInCandidateBar && preeditStyle != SettingsPreferences.PREEDIT_STYLE_BUBBLE
     /** 删除键实际是否「上滑清空、下滑撤回」：跟「反转上下滑方向」走，「删除键单独反向」打开再对调一次。 */
     val deleteSwipeReversed: Boolean get() = reverseSymbolSwipe != reverseDeleteSwipe
+    val compactBottomRow: Boolean get() = bottomLiftActions && bottomLiftCompactBottomRow
     /** 删除键上下滑清空、撤回的触发距离（dp）。 */
     val clearSwipeDistanceDp: Float get() = CLEAR_SWIPE_BASE_DP * normalizeClearSwipePercent(clearSwipePercent) / 100f
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
@@ -375,6 +380,10 @@ data class KeyboardInputPreferences(
         const val CYLM_LONG_ALTERNATIVE_KEY = "cylm_long_alternative"
         /** 底部留白滑动移动光标，见 [bottomLiftCursor]。 */
         const val BOTTOM_LIFT_CURSOR_KEY = "bottom_lift_cursor"
+        /** 底部留白显示切换语言/剪贴板快捷按钮，见 [bottomLiftActions]。 */
+        const val BOTTOM_LIFT_ACTIONS_KEY = "bottom_lift_actions"
+        /** 底部留白子开关：合并符号与数字并隐藏键盘语言切换键，见 [bottomLiftCompactBottomRow]。 */
+        const val BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY = "bottom_lift_compact_bottom_row"
         /** 按住说话上滑取消，见 [voiceSwipeCancel]。 */
         const val VOICE_SWIPE_CANCEL_KEY = "voice_swipe_cancel"
         /** 按键区挡住屏幕边缘手势，见 [edgeGestureExclusion]。新键（11-20），读不到就是关。 */
@@ -407,7 +416,7 @@ data class KeyboardInputPreferences(
                 com.kingzcheung.xime.settings.SpellingPatches.AUX_CODE_KEY,
                 SettingsPreferences.KEY_SWIPE_UP_HINTS_ENABLED, SettingsPreferences.KEY_SWIPE_DOWN_HINTS_ENABLED,
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
-                BOTTOM_LIFT_CURSOR_KEY, VOICE_SWIPE_CANCEL_KEY, EDGE_GESTURE_EXCLUSION_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
+                BOTTOM_LIFT_CURSOR_KEY, BOTTOM_LIFT_ACTIONS_KEY, BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY, VOICE_SWIPE_CANCEL_KEY, EDGE_GESTURE_EXCLUSION_KEY, HANDWRITING_RECOGNIZE_EARLY_KEY,
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys +
                 com.kingzcheung.xime.settings.KeyGapLightPreferences.keys
         }
@@ -476,6 +485,8 @@ data class KeyboardInputPreferences(
                 cursorStepHaptic = prefs.getBoolean("cursor_step_haptic", true),
                 cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
                 bottomLiftCursor = prefs.getBoolean(BOTTOM_LIFT_CURSOR_KEY, false),
+                bottomLiftActions = prefs.getBoolean(BOTTOM_LIFT_ACTIONS_KEY, true),
+                bottomLiftCompactBottomRow = prefs.getBoolean(BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY, false),
                 voiceSwipeCancel = prefs.getBoolean(VOICE_SWIPE_CANCEL_KEY, false),
                 edgeGestureExclusion = prefs.getBoolean(EDGE_GESTURE_EXCLUSION_KEY, false),
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
@@ -619,6 +630,8 @@ data class KeyboardInputPreferences(
             .putBoolean("cursor_step_haptic", cursorStepHaptic)
             .putBoolean("cursor_step_sound", cursorStepSound)
             .putBoolean(BOTTOM_LIFT_CURSOR_KEY, bottomLiftCursor)
+            .putBoolean(BOTTOM_LIFT_ACTIONS_KEY, bottomLiftActions)
+            .putBoolean(BOTTOM_LIFT_COMPACT_BOTTOM_ROW_KEY, bottomLiftCompactBottomRow)
             .putBoolean(VOICE_SWIPE_CANCEL_KEY, voiceSwipeCancel)
             .putBoolean(EDGE_GESTURE_EXCLUSION_KEY, edgeGestureExclusion)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))

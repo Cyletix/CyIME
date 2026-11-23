@@ -26,9 +26,24 @@ class GlideShortStrokeTest {
             val tracker = GlideTracker(keys, 8f, a.first, a.second, 0)
             for (step in 1..6) tracker.move(a.first + (b.first - a.first) * step / 6,
                 a.second + (b.second - a.second) * step / 6, step * 20L)
-            assertTrue("快滑到相邻字母即可输入：$w/$h $word", tracker.claimed)
-            tracker.move(b.first, b.second, 220)
+            tracker.move(b.first, b.second, 280)
             assertTrue("停在邻键可滑行：$w/$h $word staggered=$staggered", tracker.claimed)
+        }
+    }
+
+    @Test fun fastVerticalFlicksWithinSingleColumnAreNotClaimedAsGlides() {
+        for ((w, h) in dimensions()) {
+            val keys = keys(w, h, staggered = true)
+            val d = keys.center('d')
+            val tracker = GlideTracker(keys, 8f, d.first, d.second, 0)
+            // 快速向上拂动 1 个键高（跨到相邻按键），用时 120ms
+            for (step in 1..6) tracker.move(d.first, d.second - (h * step / 6), step * 20L)
+            assertFalse("快速竖向拂动不被判定为滑行：$w/$h", tracker.claimed)
+
+            val trackerDown = GlideTracker(keys, 8f, d.first, d.second, 0)
+            // 快速向下拂动 1 个键高，用时 120ms
+            for (step in 1..6) trackerDown.move(d.first, d.second + (h * step / 6), step * 20L)
+            assertFalse("快速向下拂动不被判定为滑行：$w/$h", trackerDown.claimed)
         }
     }
 
@@ -104,8 +119,9 @@ class GlideShortStrokeTest {
         assertTrue(held.abandoned)
         assertFalse(held.claimed)
         // 角标没到点前照常滑行。
+        val s = keys.center('s')
         val quick = GlideTracker(keys, 8f, a.first, a.second, 0, holdMs = 150)
-        quick.move(b.first, b.second, 100)
+        quick.move(s.first, s.second, 100)
         assertTrue(quick.claimed)
     }
 }

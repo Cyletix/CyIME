@@ -32,10 +32,14 @@ internal fun KeyboardModeKey(
     /** 26 键传入：符号键按住当 Ctrl，拖到字母上发 Ctrl+字母（用户 10-24）。 */
     ctrlTargets: ShiftSlideTargets? = null,
     onCtrlShortcut: ((Char) -> Unit)? = null,
+    /** 合并 !@# 和 123 为 123 按钮时保留按住/拖动当 Ctrl 的手势。 */
+    allowMergedCtrlDrag: Boolean = false,
 ) {
     val target = modeSlotTarget(page, slot, LocalTextModeLabel.current)
     androidx.compose.runtime.CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
-    if (ctrlTargets != null && onCtrlShortcut != null && target.action == "symbol") CtrlSymbolKeyButton(
+    val useCtrlDrag = ctrlTargets != null && onCtrlShortcut != null &&
+        (target.action == "symbol" || (allowMergedCtrlDrag && target.action == "number"))
+    if (useCtrlDrag) CtrlSymbolKeyButton(
         text = target.label,
         targets = ctrlTargets,
         holdMillis = LocalKeyboardInputPreferences.current.symbolKeyHoldMs,

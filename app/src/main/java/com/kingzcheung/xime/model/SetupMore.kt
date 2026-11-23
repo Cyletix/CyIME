@@ -77,12 +77,11 @@ object SetupMore {
     fun glideChoices(current: GlideChoice): List<GlideChoice> =
         GlideChoice.entries.filter { it != GlideChoice.CHINESE || current == GlideChoice.CHINESE }
 
-    /** 开着 26 键滑行时字母键的滑动都给了滑行，角标只能长按（同 [com.kingzcheung.xime.ui.keyboard.InputGestureLocks.glideCornerLock]）。 */
-    fun cornerLockedByGlide(glide: GlideChoice): Boolean = glide != GlideChoice.OFF
+    /** 26 键滑行支持快速上下滑输入角标，不再被滑行锁定。 */
+    fun cornerLockedByGlide(glide: GlideChoice): Boolean = false
 
-    /** 实际生效的角标方式：开了滑行就是长按，写设置时也照这个算，不另写一个和键盘行为对不上的值。 */
-    fun effectiveCorner(choices: SetupMoreChoices): CornerInputChoice =
-        if (cornerLockedByGlide(choices.glide)) CornerInputChoice.LONG_PRESS else choices.corner
+    /** 实际生效的角标方式。 */
+    fun effectiveCorner(choices: SetupMoreChoices): CornerInputChoice = choices.corner
 
     fun textSizeOf(candidateSp: Int, keyScale: Float): TextSizeChoice = TextSizeChoice.entries.firstOrNull {
         it != TextSizeChoice.CUSTOM && it.candidateSp == candidateSp && abs(it.keyScale - keyScale) < 0.01f

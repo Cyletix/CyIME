@@ -97,6 +97,10 @@ data class CandidatePageState(
     val candidates: List<CandidateEntry> = emptyList(),
     val engineRevision: Long = 0L,
     val associationCandidates: List<String> = emptyList(),
+    val strokeInputActive: Boolean = false,
+    val onStroke: ((Char) -> Unit)? = null,
+    val onStrokeDrawing: ((Boolean) -> Unit)? = null,
+    val onStrokeInk: ((androidx.compose.ui.geometry.Offset?) -> Unit)? = null,
     val backgroundColor: Color,
     val textColor: Color,
     val keyBackgroundColor: Color = Color.Unspecified,
@@ -139,6 +143,7 @@ data class CandidatePageCallbacks(
     val onRailPinyinSelect: ((Int) -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val onDelete: (() -> Unit)? = null,
+    val onClearStrokeFilter: (() -> Unit)? = null,
     val onClear: (() -> Unit)? = null,
     val onEnter: (() -> Unit)? = null,
     val onKeyPressDown: ((String) -> Unit)? = null,
@@ -148,6 +153,14 @@ data class CandidatePageCallbacks(
     /** 在候选区左右划过门槛：收回展开页，回到键盘（用户 11-20，右边不再有收回按钮）。 */
     val onCollapse: (() -> Unit)? = null,
 )
+
+/** One horizontal gesture clears the filter once and never deletes underlying input. */
+internal fun strokeFilterDeleteDrag(clear: () -> Unit): DeleteDragSession {
+    var cleared = false
+    return DeleteDragSession(move = { distance ->
+        if (!cleared && distance != 0) { cleared = true; clear() }
+    }, finish = {})
+}
 
 /** 左栏快捷符号（对齐主流输入法候选展开页的符号栏）。 */
 private val QUICK_SYMBOLS = listOf("？", "！", "……", "~")
@@ -288,6 +301,9 @@ private fun CandidatePageContent(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     var railListHeightPx by remember { mutableIntStateOf(0) }
+                    val uniformPinyinSize = if (isPinyinRail) rememberUniformRailFontSize(
+                        railItems, 13.sp, leftRailWidth - 12.dp
+                    ) else null
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -312,6 +328,7 @@ private fun CandidatePageContent(
                                     accentColor = state.railAccentColor,
                                     isPinyin = isPinyinRail,
                                     approximate = isPinyinRail && state.railPinyinNear.getOrNull(index) == true,
+                                    uniformFontSize = uniformPinyinSize,
                                 )
                             }
                         } else {
@@ -336,6 +353,7 @@ private fun CandidatePageContent(
                                         accentColor = state.railAccentColor,
                                         isPinyin = isPinyinRail,
                                         approximate = isPinyinRail && state.railPinyinNear.getOrNull(index) == true,
+                                        uniformFontSize = uniformPinyinSize,
                                     )
                                 }
                             }
@@ -385,9 +403,12 @@ private fun CandidatePageContent(
                     }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize()
+                            .candidateStrokeGesture(state.strokeInputActive, { state.onStroke?.invoke(it) },
+                                { state.onStrokeDrawing?.invoke(it) }, { state.onStrokeInk?.invoke(it) })
                             .onSizeChanged { viewportHeightPx = it.height }
                             .testTag("expanded-candidates"),
                         state = listState,
+                        userScrollEnabled = !state.strokeInputActive,
                         flingBehavior = rememberCandidateFlingBehavior(),
                         contentPadding = PaddingValues(vertical = 6.dp)
                     ) {
@@ -474,21 +495,25 @@ private fun CandidatePageContent(
                         LocalKeyboardKeyVisualMetrics provides if (matchKeyboard) LocalKeyboardKeyVisualMetrics.current else KeyVisualMetrics.Unspecified,
                         LocalKeyboardKeyContentScale provides if (matchKeyboard) LocalKeyboardKeyContentScale.current else 1f,
                     ) {
+                        val parentDeleteDrag = LocalDeleteDrag.current
+                        val clearStrokes = callbacks.onClearStrokeFilter
+                        val deleteDrag = if (clearStrokes != null) ({ strokeFilterDeleteDrag(clearStrokes) }) else parentDeleteDrag
+                        CompositionLocalProvider(LocalDeleteDrag provides deleteDrag) {
                         SwipeableIconKeyButton(
                             icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                             onClick = { callbacks.onDelete?.invoke() },
                             onLongClick = callbacks.onDelete,
                             onPress = { callbacks.onKeyPressDown?.invoke("delete") },
                             onRelease = { callbacks.onKeyRelease?.invoke("delete") },
-                            onSwipe = callbacks.onClearComposition,
-                            onSwipeUp = callbacks.onClear,
-                            onSwipeDown = callbacks.onUndoClear,
+                            onSwipe = clearStrokes ?: callbacks.onClearComposition,
+                            onSwipeUp = clearStrokes ?: callbacks.onClear,
+                            onSwipeDown = clearStrokes ?: callbacks.onUndoClear,
                             distanceDelete = true,
                             followSymbolSwipeDirection = true,
                             upFeedback = KeyFlickFeedback.DELETE,
-                            swipeUpLabel = "清空",
-                            downFeedback = KeyFlickFeedback.UNDO,
-                            swipeDownLabel = "撤回",
+                            swipeUpLabel = if (clearStrokes != null) "清除笔画" else "清空",
+                            downFeedback = if (clearStrokes != null) KeyFlickFeedback.DELETE else KeyFlickFeedback.UNDO,
+                            swipeDownLabel = if (clearStrokes != null) "清除笔画" else "撤回",
                             backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
                             iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
                             modifier = railKeyModifier.then(if (deleteWidth != null) Modifier.width(deleteWidth)
@@ -498,6 +523,7 @@ private fun CandidatePageContent(
                             shadowEnabled = false,
                             visualPadding = if (matchKeyboard) null else PaddingValues(0.dp),
                         )
+                        }
                         CandidatePagingButton(
                             onClick = { onHapticFeedback?.invoke(); scrollPage(-1) },
                             enabled = listState.canScrollBackward,
@@ -768,6 +794,7 @@ private fun CandidateRailSymbolKey(
     accentColor: Color = Color.Unspecified,
     isPinyin: Boolean = false,
     approximate: Boolean = false,
+    uniformFontSize: androidx.compose.ui.unit.TextUnit? = null,
 ) {
     val cornerRadius = LocalKeyCornerRadius.current
     val shape = RoundedCornerShape(
@@ -800,10 +827,12 @@ private fun CandidateRailSymbolKey(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // 读音完整显示：放不下就缩小（用户 11-13）；相近读音下划线、浅色。
+        // 读音整列共用统一字号（按最宽项计算）；相近读音下划线、浅色。
         BoxWithConstraints(contentAlignment = Alignment.Center) {
             val meaning = if (approximate) Modifier.semantics { contentDescription = "相近读音 $text" } else Modifier
             val railWidth = maxWidth
+            val targetSize = uniformFontSize ?: if (isPinyin) 13.sp else 16.sp
+            val fitCap = if (uniformFontSize == null && isPinyin) railWidth - (if (isSelected) 12.dp else 6.dp) else null
             if (isSelected) {
                 Box(
                     modifier = meaning
@@ -811,13 +840,11 @@ private fun CandidateRailSymbolKey(
                         .background(pillColor.copy(alpha = 0.2f))
                         .padding(horizontal = 3.dp, vertical = 1.dp)
                 ) {
-                    FittedRailText(text, pillColor, 13.sp, FontWeight.Medium, approximate,
-                        if (isPinyin) railWidth - 12.dp else null)
+                    FittedRailText(text, pillColor, targetSize, FontWeight.Medium, approximate, fitCap)
                 }
             } else {
                 FittedRailText(text, if (approximate) approximateRailColor(textColor) else textColor,
-                    if (isPinyin) 13.sp else 16.sp, FontWeight.Normal, approximate,
-                    if (isPinyin) railWidth - 6.dp else null, meaning)
+                    targetSize, FontWeight.Normal, approximate, fitCap, meaning)
             }
         }
     }
@@ -913,8 +940,11 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
             val textWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
             val font = (metrics.fontSizeSp * minOf(1f, textWidth / sample.size.width.coerceAtLeast(1))).sp
             val rowHeight = if (state.choosingMergedLetter && items.isNotEmpty()) maxHeight / items.size else metrics.rowHeightDp.dp
-            // 九键读音（不是 14 键挑字母）和候选字一样大，各自缩到放得下（用户 11-13、11-15）。
+            // 读音整列共用统一字号（按最宽项缩放），保证同列音节字母大小一致。
             val pinyin = state.railPinyinOptions.isNotEmpty() && !state.choosingMergedLetter
+            val pinyinFont = if (pinyin) rememberUniformRailFontSize(
+                items, metrics.pinyinFontSizeSp.sp, maxWidth - 12.dp
+            ) else font
             LazyColumn(Modifier.fillMaxSize().testTag("expanded-pinyin-options")) {
                 itemsIndexed(items) { index, item ->
                     T9CandidateItem(text = item, onClick = {
@@ -922,9 +952,9 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
                         else callbacks.onCommitText?.invoke(item)
                     }, onPress = { callbacks.onKeyPressDown?.invoke(item) }, textColor = state.textColor,
                         backgroundColor = keyBg, accentColor = state.railAccentColor,
-                        fontSize = if (pinyin) metrics.pinyinFontSizeSp.sp else font,
+                        fontSize = if (pinyin) pinyinFont else font,
                         isSelected = index == state.railSelectedPinyinIndex,
-                        approximate = state.railPinyinNear.getOrNull(index) == true, fitWidth = pinyin,
+                        approximate = state.railPinyinNear.getOrNull(index) == true, fitWidth = false,
                         modifier = Modifier.fillMaxWidth().height(rowHeight))
                 }
             }

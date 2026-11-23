@@ -4,6 +4,20 @@ import com.kingzcheung.xime.rime.RimeEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+internal const val SENTENCE_CODE_HIGHLIGHT_COLOR = 0x663399ff
+
+/** Use parcelable system spans and keep the same character boundaries for each selection. */
+internal fun sentenceCodeHighlight(text: String, from: Int, to: Int): android.text.SpannableString =
+    android.text.SpannableString(text).apply {
+        setSpan(android.text.style.UnderlineSpan(), 0, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        var index = 0
+        while (index < text.length) {
+            val next = index + Character.charCount(text.codePointAt(index))
+            val color = if (index < to && next > from) SENTENCE_CODE_HIGHLIGHT_COLOR else android.graphics.Color.TRANSPARENT
+            setSpan(android.text.style.BackgroundColorSpan(color), index, next, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            index = next
+        }
+    }
 /** An isolated candidate lookup; the live composition changes only on confirmation. */
 data class SentenceEditSession(
         val inputSessionId: Long,
@@ -94,10 +108,7 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         // （忙的应用上百毫秒），拖动每换一个字都问一次，放大镜和高亮就一顿一顿（1.15.100 用户反馈）。
         // 拖动中手指在键盘上，应用里的选区不会变。
         if (dragOwner == null && runCatching { !ic.getSelectedText(0).isNullOrEmpty() }.getOrDefault(true)) return
-        val styled = android.text.SpannableString(text).apply {
-            setSpan(android.text.style.BackgroundColorSpan(0x663399ff), range.first, range.last + 1,
-                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
+        val styled = sentenceCodeHighlight(text, range.first, range.last + 1)
         ic.beginBatchEdit()
         try {
             if (ic.setComposingText(styled, 1)) {
@@ -147,9 +158,8 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
         }
         val caret = if (code.isNotEmpty()) start + shownCode.length else before.trimEnd(' ', '\'').length.coerceAtMost(text.length)
         if (code.isEmpty() && text == previewWritten && caret == previewCaret) return
-        val styled = android.text.SpannableString(text)
-        if (code.isNotEmpty()) styled.setSpan(android.text.style.BackgroundColorSpan(0x663399ff), start,
-            start + shownCode.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val styled = if (code.isNotEmpty()) sentenceCodeHighlight(text, start, start + shownCode.length)
+            else if (text.isNotEmpty()) sentenceCodeHighlight(text, 0, 0) else text
         ic.beginBatchEdit()
         try {
             if (runCatching { ic.setComposingText(styled, 1) }.getOrDefault(false)) {
@@ -208,6 +218,45 @@ internal class ImeSentenceEditor(private val service: XimeInputMethodService) {
             if (result != null && commit && result.candidates.isNotEmpty() && current(owner)) service.keyRouter.selectCandidateAsync(0)
             withContext(Dispatchers.Main) {
                 reply(result != null)
+            }
+        }
+    }
+
+    /**
+     * 局部删除已空后再执行「清空全部编码」：先把局部删除写进引擎，
+     * 剩余部分仍有编码时继续交由 clear_all 记录撤销并清空（撤回恢复局部删除后的编码），
+     * 整句已删空时只丢弃旧撤销并刷新，避免把局部删除前的编码误存进撤销栈。
+     */
+    fun clearAfterEdit(owner: SentenceEditSession, reply: (Boolean) -> Unit) {
+        service.keyRouter.postRimeJob("sentence_edit_clear_all") {
+            val applied = if (current(owner)) service.rimeEngine.applySentenceEdit(
+                owner.snapshot, owner.start, owner.end, emptyList(),
+            ) else null
+            if (applied == null) {
+                withContext(Dispatchers.Main) { reply(false) }
+                return@postRimeJob
+            }
+            val remainingInput = applied.inputText
+            val result = if (remainingInput.isNotEmpty()) {
+                service.rimeEngine.resetRawInputAndReadState(remainingInput) ?: applied
+            } else {
+                service.rimeEngine.discardClearUndo()
+                applied
+            }
+            val hasRemaining = result.inputText.isNotEmpty() || result.candidates.isNotEmpty()
+            withContext(Dispatchers.Main) {
+                if (previewOwner === owner) {
+                    previewOwner = null; previewConnection = null; previewBase = null; previewWritten = null; previewCaret = 0
+                }
+                if (current(owner)) service.sessionController.updateUIWithResult(result)
+                reply(true)
+                if (hasRemaining) {
+                    service.keyRouter.handleKeyPress("clear_all", false)
+                } else {
+                    service.lastClearedComposition = null
+                    service.lastClearedDocument = null
+                    service.lastClearedText = ""
+                }
             }
         }
     }

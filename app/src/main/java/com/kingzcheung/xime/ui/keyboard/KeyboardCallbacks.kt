@@ -44,6 +44,7 @@ data class KeyboardCallbacks(
     val onOpenSentenceEdit: ((Int, Int, Long, (com.kingzcheung.xime.service.SentenceEditSession?) -> Unit) -> Unit)? = null,
     val onSentenceCandidates: ((com.kingzcheung.xime.service.SentenceEditSession, String, List<com.kingzcheung.xime.rime.PinyinSyllableOption>, String, (com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidates) -> Unit) -> Unit)? = null,
     val onApplySentenceEdit: ((com.kingzcheung.xime.service.SentenceEditSession, List<com.kingzcheung.xime.rime.RimeEngine.SentenceEditCandidate>, Boolean, (Boolean) -> Unit) -> Unit)? = null,
+    val onClearAfterSentenceEdit: ((com.kingzcheung.xime.service.SentenceEditSession, (Boolean) -> Unit) -> Unit)? = null,
     val onSentencePreview: ((com.kingzcheung.xime.service.SentenceEditSession, String) -> Unit)? = null,
     val onSentenceDragPreview: ((com.kingzcheung.xime.service.SentenceEditSession?) -> Unit)? = null,
     val onEndSentencePreview: ((com.kingzcheung.xime.service.SentenceEditSession) -> Unit)? = null,

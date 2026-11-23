@@ -24,10 +24,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.*
+import com.kingzcheung.xime.ui.keyboard.QwertyBottomRowWeights
+import com.kingzcheung.xime.ui.keyboard.SYLLABLE_SEPARATOR
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.rememberSwipeHintsEnabled
 import com.kingzcheung.xime.ui.keyboard.SideSymbolTarget
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
+import com.kingzcheung.xime.ui.keyboard.spacePunctuationKeys
+import com.kingzcheung.xime.ui.keyboard.syllableSplitOnPunctuation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -67,7 +71,9 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
     var copying by remember { mutableStateOf(false) }
     // 正在弹框编辑的键；null 表示没有打开编辑框。
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingPunct by rememberSaveable { mutableStateOf<String?>(null) }
     var values by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var bottomPunctOverrides by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var swipes by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var originalOverrides by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var originalValues by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -109,6 +115,7 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
             else if (custom != null) CustomLayoutSymbols.load(context, custom)
             else QwertySwipeSymbols.load(context, english, variant)
         followOverrides = if (merged == null) QwertySwipeSymbols.loadFollows(context, english, variant) else emptyMap()
+        bottomPunctOverrides = QwertySwipeSymbols.loadBottomPunctuation(context, english)
         val boardKeys = if (merged == FOURTEEN) FourteenKeySymbols.keys
             else custom?.let(CustomLayoutSymbols::keys) ?: QwertySwipeSymbols.keys.map(Char::toString)
         if (editing !in boardKeys) editing = null
@@ -118,7 +125,18 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
     }
     fun changeTab(nextEnglish: Boolean, nextSide: String?, nextMerged: String? = null) {
         if (nextEnglish == english && nextSide == sideTarget && nextMerged == merged) return
-        english = nextEnglish; merged = nextMerged; sideTarget = nextSide; message = ""; editing = null
+        english = nextEnglish; merged = nextMerged; sideTarget = nextSide; message = ""; editing = null; editingPunct = null
+    }
+    fun persistBottomPunct(nextOverrides: Map<String, String>) {
+        busy = true
+        val en = english
+        bottomPunctOverrides = nextOverrides
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { QwertySwipeSymbols.saveBottomPunctuation(context, en, nextOverrides) } }
+                .onSuccess { message = "" }
+                .onFailure { message = "保存失败：${it.message}" }
+            busy = false
+        }
     }
     // 改完一个键（或载入一个版本）立刻写入，键盘上马上生效；只存和原来不同的位置，其余仍跟预设走。
     fun persist(next: Map<String, String>, nextSwipes: Map<String, String>, done: String = "",
@@ -157,7 +175,10 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
             runCatching { withContext(Dispatchers.IO) {
                 if (board) FourteenKeySymbols.save(context, preset)
                 else if (custom != null) CustomLayoutSymbols.save(context, custom, preset)
-                else QwertySwipeSymbols.save(context, en, preset, emptyMap(), kind, emptyMap())
+                else {
+                    QwertySwipeSymbols.save(context, en, preset, emptyMap(), kind, emptyMap())
+                    QwertySwipeSymbols.saveBottomPunctuation(context, en, emptyMap())
+                }
             } }
                 .onSuccess { message = "已恢复默认"; reload++ }
                 .onFailure { message = "保存失败：${it.message}" }
@@ -283,7 +304,7 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                         val (boundUp, boundDown) = if (merged == null) LetterSwipeBindings.cornerLabels(swipes, key, reverseSwipe)
                             else null to null
                         Surface(modifier = Modifier.weight(width(key).toFloat()).height(64.dp).testTag("symbol-editor-key:$key")
-                            .clickable(enabled = loaded && !busy) { editing = key; message = "" },
+                            .clickable(enabled = loaded && !busy) { editing = key; editingPunct = null; message = "" },
                             shape = RoundedCornerShape(8.dp),
                             color = if (editing == key) MaterialTheme.colorScheme.secondaryContainer
                                 else MaterialTheme.colorScheme.surfaceVariant) {
@@ -304,6 +325,65 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
                     if (units < rowSlots - 1e-3) Spacer(Modifier.weight(((rowSlots - units) / 2).toFloat()))
                 }
             }
+            val commaOn = inputSettings.qwertyCommaKey
+            val periodOn = inputSettings.qwertyPeriodKey
+            if (commaOn || periodOn) {
+                val (defComma, defPeriod) = spacePunctuationKeys(commaOn, periodOn, fullWidth = true, english = english)
+                val (leftSplit, rightSplit) = syllableSplitOnPunctuation(inputSettings.syllableSplitKey, defComma, defPeriod)
+                val bottomWeights = if (inputSettings.compactBottomRow) QwertyBottomRowWeights.Compact else QwertyBottomRowWeights.Standard
+                val punctCount = (if (commaOn) 1 else 0) + (if (periodOn) 1 else 0)
+                val spaceWeight = bottomWeights.space + bottomWeights.punctuation * (1 - punctCount)
+                @Composable
+                fun RowScope.DimBottomPlaceholder(label: String, weight: Float) {
+                    Surface(Modifier.weight(weight).height(48.dp), shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                @Composable
+                fun RowScope.PunctEditorCard(id: String, primary: String, defUp: String, defDown: String) {
+                    val upShown = bottomPunctOverrides["up.$id"] ?: defUp
+                    val downShown = bottomPunctOverrides["down.$id"] ?: defDown
+                    Surface(
+                        modifier = Modifier.weight(bottomWeights.punctuation).height(48.dp)
+                            .testTag("symbol-editor-key:$id")
+                            .clickable(enabled = loaded && !busy) { editing = null; editingPunct = id; message = "" },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (editingPunct == id) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceEvenly) {
+                            Text(upShown, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                                modifier = Modifier.alpha(if (variant.showsUp) 1f else 0.38f))
+                            Text(primary, style = MaterialTheme.typography.titleMedium)
+                            Text(downShown, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                                modifier = Modifier.alpha(if (variant.showsDown) 1f else 0.38f))
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    DimBottomPlaceholder("123", bottomWeights.mode * bottomWeights.modeCount)
+                    if (defComma != null) PunctEditorCard(
+                        QwertySwipeSymbols.COMMA_KEY,
+                        defComma.primary,
+                        defComma.alternate,
+                        if (leftSplit) SYLLABLE_SEPARATOR else "",
+                    )
+                    DimBottomPlaceholder("空格", spaceWeight)
+                    if (defPeriod != null) PunctEditorCard(
+                        QwertySwipeSymbols.PERIOD_KEY,
+                        defPeriod.primary,
+                        defPeriod.alternate,
+                        if (rightSplit) SYLLABLE_SEPARATOR else "",
+                    )
+                    if (bottomWeights.language > 0f) DimBottomPlaceholder("语言", bottomWeights.language)
+                    DimBottomPlaceholder("回车", bottomWeights.enter)
+                }
+            }
         }
         if (merged == null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { rowInput = true; message = "" }, enabled = loaded && !busy,
@@ -315,6 +395,38 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
     if (message.isNotEmpty()) Text(message, style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    }
+    editingPunct?.takeIf { side == null && loaded }?.let { punctKey ->
+        val commaOn = inputSettings.qwertyCommaKey
+        val periodOn = inputSettings.qwertyPeriodKey
+        val (defComma, defPeriod) = spacePunctuationKeys(commaOn, periodOn, fullWidth = true, english = english)
+        val (leftSplit, rightSplit) = syllableSplitOnPunctuation(inputSettings.syllableSplitKey, defComma, defPeriod)
+        val isComma = punctKey == QwertySwipeSymbols.COMMA_KEY
+        val defPrimary = if (isComma) (defComma?.primary ?: if (english) "," else "，") else (defPeriod?.primary ?: if (english) "." else "。")
+        val defUp = if (isComma) defComma?.alternate.orEmpty() else defPeriod?.alternate.orEmpty()
+        val defDown = if ((isComma && leftSplit) || (!isComma && rightSplit)) SYLLABLE_SEPARATOR else ""
+        val curUp = bottomPunctOverrides["up.$punctKey"] ?: defUp
+        val curDown = bottomPunctOverrides["down.$punctKey"] ?: defDown
+        KeySymbolDialog(
+            key = if (isComma) "逗号 $defPrimary" else "句号 $defPrimary",
+            up = curUp,
+            down = curDown,
+            topGesture = topGesture,
+            bottomGesture = bottomGesture,
+            swipes = null,
+            upperSlot = null,
+            lowerSlot = "down",
+            upShown = variant.showsUp,
+            downShown = variant.showsDown,
+            onDismiss = { editingPunct = null },
+            onDone = { up, down, _, _, _ ->
+                editingPunct = null
+                val next = bottomPunctOverrides.toMutableMap()
+                if (up == defUp) next.remove("up.$punctKey") else next["up.$punctKey"] = up
+                if (down == defDown) next.remove("down.$punctKey") else next["down.$punctKey"] = down
+                if (next != bottomPunctOverrides) persistBottomPunct(next)
+            },
+        )
     }
     editing?.takeIf { side == null && loaded }?.let { key ->
         KeySymbolDialog(key, values["up.$key"].orEmpty(), values["down.$key"].orEmpty(),

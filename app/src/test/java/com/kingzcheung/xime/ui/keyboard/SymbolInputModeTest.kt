@@ -70,8 +70,8 @@ class SymbolInputModeTest {
             val events = mutableListOf<String>()
             val mapped = actions(events).copy(longPressItems = emptyList(), onLongPressSelect = null)
                 .withGlideCornerMenu("1", "!", 300L).withSymbolSwipeDirection(reverse)
-            // 上下滑都给了滑行：两个方向都不出角标。
-            assertNull(mapped.onUp); assertNull(mapped.onDown)
+            // 保留上下滑动作供快速拂动触发上下角标
+            assertNotNull(mapped.onUp); assertNotNull(mapped.onDown)
             assertTrue(mapped.blockUpSwipe && mapped.blockDownSwipe)
             assertEquals(listOf("1", "!"), mapped.longPressItems)
             assertNull(mapped.onLongPress)
@@ -108,6 +108,46 @@ class SymbolInputModeTest {
         assertNull(mapped.onUp)
         assertNull(mapped.upPreviewText)
         assertNotNull(mapped.onDown)
+    }
+
+    @Test fun `top row glide gives digit on upward exit and defaults long press to lower symbol`() {
+        val events = mutableListOf<String>()
+        val mapped = actions(events).withGlideCornerMenu("1", "!", 300L, topRowDigitSwipe = true)
+        assertEquals(listOf("!", "1"), mapped.longPressItems)
+        mapped.glideTopUp!!()
+        mapped.onLongPressSelect!!(mapped.longPressItems.first())
+        assertEquals(listOf("symbol:1", "down:!"), events)
+        assertTrue(isUnclaimedTopRowFlick(androidx.compose.ui.geometry.Offset(25f, 25f), androidx.compose.ui.geometry.Offset(25f, -10f), 50f, 8f))
+        assertFalse(isUnclaimedTopRowFlick(androidx.compose.ui.geometry.Offset(25f, 25f), androidx.compose.ui.geometry.Offset(55f, 12f), 50f, 8f))
+        assertFalse(isUnclaimedTopRowFlick(androidx.compose.ui.geometry.Offset(25f, 25f), androidx.compose.ui.geometry.Offset(25f, 12f), 50f, 8f))
+    }
+
+    @Test fun `fast flick up and down detect quick vertical gestures and reject slow or horizontal drags`() {
+        val down = androidx.compose.ui.geometry.Offset(25f, 25f)
+        val flickUp = androidx.compose.ui.geometry.Offset(25f, 5f)
+        val flickDown = androidx.compose.ui.geometry.Offset(25f, 45f)
+        val horizontal = androidx.compose.ui.geometry.Offset(50f, 20f)
+        val shortDrag = androidx.compose.ui.geometry.Offset(25f, 22f)
+
+        // Fast flick up (< 250ms)
+        assertTrue(isUnclaimedFastFlickUp(down, flickUp, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
+        // Slow flick up (> 250ms) rejected
+        assertFalse(isUnclaimedFastFlickUp(down, flickUp, downTime = 1000L, upTime = 1300L, keyHeight = 50f, slop = 8f))
+        // Downward motion rejected for up flick
+        assertFalse(isUnclaimedFastFlickUp(down, flickDown, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
+        // Horizontal drag rejected
+        assertFalse(isUnclaimedFastFlickUp(down, horizontal, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
+        // Short distance rejected
+        assertFalse(isUnclaimedFastFlickUp(down, shortDrag, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
+
+        // Fast flick down (< 250ms)
+        assertTrue(isUnclaimedFastFlickDown(down, flickDown, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
+        // Slow flick down rejected
+        assertFalse(isUnclaimedFastFlickDown(down, flickDown, downTime = 1000L, upTime = 1300L, keyHeight = 50f, slop = 8f))
+        // Upward motion rejected for down flick
+        assertFalse(isUnclaimedFastFlickDown(down, flickUp, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
+        // Horizontal drag rejected
+        assertFalse(isUnclaimedFastFlickDown(down, horizontal, downTime = 1000L, upTime = 1150L, keyHeight = 50f, slop = 8f))
     }
 
     private fun actions(events: MutableList<String>) = KeyGestureActions(

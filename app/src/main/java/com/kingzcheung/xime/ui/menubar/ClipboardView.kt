@@ -79,6 +79,7 @@ fun ClipboardView(
     onRecognizeDocument: (() -> Unit)? = null,
     onOpenSearch: (() -> Unit)? = null,
     onTranslateText: ((String) -> Unit)? = null,
+    initialFavorites: Boolean = false,
 ) {
     // Old tab 1 bookmarks now open the same pinned clipboard records.
     ConnectedClipboardBoard(clipboardItems, selectedTab == 2, imagesExpanded,
@@ -94,6 +95,7 @@ fun ClipboardView(
         onRecognizeDocument = onRecognizeDocument,
         onOpenSearch = onOpenSearch,
         onTranslateText = onTranslateText,
+        initialFavorites = initialFavorites,
         modifier = modifier.padding(bottom = bottomPaddingDp.dp))
 }
 
