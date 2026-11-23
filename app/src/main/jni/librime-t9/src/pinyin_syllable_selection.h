@@ -267,8 +267,20 @@ inline bool ConstrainGraph(rime::SyllableGraph* graph, size_t start, size_t end,
       if (edge->first <= start || source->first >= end) {
         ++edge;
       } else if (source->first == start && edge->first == end) {
-        edge->second.clear();
-        edge->second.emplace(syllable, chosen);
+        // 锁定只决定排序，不丢弃同一编码段上的其它正常读音。合并键布局里一个码本就对应
+        // 多个音节（小鹤 18 键 jj = jing / kan / kuai），模糊音又让 jin 也落到 jj 上；
+        // 原来清空重建会把 jin / kan / kuai 整批删掉，点一下 jing 就再也出不来“金”。
+        decltype(edge->second) kept;
+        kept.emplace(syllable, chosen);
+        for (const auto& item : edge->second) {
+          if (item.first == syllable) continue;
+          if (item.second.type != rime::kNormalSpelling &&
+              item.second.type != rime::kFuzzySpelling) continue;
+          rime::EdgeProperties relaxed = item.second;
+          relaxed.credibility -= 1.0;
+          kept.emplace(item.first, relaxed);
+        }
+        edge->second = std::move(kept);
         ++edge;
       } else {
         edge = source->second.erase(edge);
