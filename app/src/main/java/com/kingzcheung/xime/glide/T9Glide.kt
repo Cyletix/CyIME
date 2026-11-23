@@ -154,6 +154,27 @@ object T9Glide {
         return keys.toString()
     }
 
+    /** 左栏里一笔滑行带出的读音：点了先把打入的数字串换成 [code]，再选这个读音（占 [digits] 个键）。 */
+    data class LineReading(val pinyin: String, val spelling: String, val code: String, val digits: Int)
+
+    /**
+     * 滑行的左栏读音（#582）：打入的是 [typed]，和它划出来是同一条线（只差连按同一个键）的编码 [codes]
+     * 开头能拼出、[typed] 自己拼不出的读音（[typed] 拼得出的左栏本来就有）。
+     * xing 9464 和 xiong 94664 划出来一样，打入 94664 时左栏也要有 xing。九键双拼按 [doublePinyin] 的两键换码。
+     */
+    internal fun lineReadings(typed: String, codes: List<String>, doublePinyin: DoublePinyinScheme? = null): List<LineReading> {
+        val line = GlideDecoder.collapseRepeats(typed)
+        val syllables = DoublePinyinScheme.SYLLABLES.mapNotNull { syllable ->
+            val spelling = (if (doublePinyin == null) syllable else doublePinyin.code(syllable)) ?: return@mapNotNull null
+            digits(spelling)?.let { Triple(syllable, spelling, it) }
+        }
+        return codes.asSequence().filter { it != typed && GlideDecoder.collapseRepeats(it) == line }.distinct().flatMap { code ->
+            syllables.filter { (_, _, keys) -> code.startsWith(keys) && !typed.startsWith(keys) }
+                .sortedByDescending { it.third.length }
+                .map { (syllable, spelling, keys) -> LineReading(syllable, spelling, code, keys.length) }
+        }.distinctBy { it.pinyin }.take(MAX_LINE_READINGS).toList()
+    }
+
     /** 九键的键比宽高都不小，坐标单位取宽、高中位数的平均，横竖方向一样敏感。 */
     fun keyboard(keys: Map<Char, LetterKeyRect>): GlideKeyboard {
         val widths = keys.values.map { it.width }.sorted()
@@ -222,4 +243,6 @@ object T9Glide {
     const val MIN_JOINT_PREFIX = 2
     /** 前面最多看几个数字（词表里最长的词也就五六个音节）。 */
     const val MAX_JOINT_PREFIX = 18
+    /** 一笔滑行最多往左栏加几个读音，见 [lineReadings]。 */
+    const val MAX_LINE_READINGS = 6
 }

@@ -301,9 +301,15 @@ private fun T9KeyboardSwipeOverlay(
                         // 同一笔的其他词（#214）：先登记，打入后整个组合（前面已有的 + 这一笔）出现时候选栏在首选之后给出。
                         callbacks.onT9GlideAlternatives?.invoke(before + digits,
                             glide?.alternatives.orEmpty().takeIf { glide?.digits == digits }.orEmpty())
+                        var typedIntoEngine = true
                         for (digit in digits) {
                             val key = digit.toString()
-                            if (callbacks.onPreeditKeyInput?.invoke(key) != true) controller.onDigitPressed(key)
+                            if (callbacks.onPreeditKeyInput?.invoke(key) == true) typedIntoEngine = false
+                            else controller.onDigitPressed(key)
+                        }
+                        // 同一笔的其他读音进左栏（#582）；改的是编码中间时不给。
+                        if (typedIntoEngine && glide != null && glide.digits == digits) {
+                            controller.offerGlideLine(digits, glide.codes, doublePinyin)
                         }
                     }
                 }

@@ -226,7 +226,11 @@ object GlideLexicon {
                     T9Glide.alternativesWithSyllable(ranked, before, alternatives, { codes.lines[it].orEmpty() },
                         { codes.shapes[it].orEmpty() }, t9WordOf(context, doublePinyin)) { syllableWords[it] }.map { it.second }
                 }.getOrElse { emptyList() }
-                return T9GlideResult(ranked.first(), words)
+                // 左栏读音用的编码（#582）：和打入的划出来是同一条线的那些，按常用程度。
+                val lineCodes = if (alternatives <= 0) emptyList() else runCatching {
+                    t9Codes(context, doublePinyin).lines[GlideDecoder.collapseRepeats(ranked.first())].orEmpty()
+                }.getOrElse { emptyList() }
+                return T9GlideResult(ranked.first(), words, lineCodes)
             }
         }
         return T9GlideResult(T9Glide.turnDigits(xs, ys, keys), emptyList())
@@ -289,8 +293,11 @@ object GlideLexicon {
     }
 }
 
-/** 九键滑行一笔的结果：打入的数字串 [digits]，和同一笔其后几个编码最常用的词 [alternatives]（可为空）。 */
-data class T9GlideResult(val digits: String, val alternatives: List<String>)
+/**
+ * 九键滑行一笔的结果：打入的数字串 [digits]，同一笔其后几个编码最常用的词 [alternatives]（可为空），
+ * 和划出来是同一条线的编码 [codes]（左栏读音用，见 [T9Glide.lineReadings]）。
+ */
+data class T9GlideResult(val digits: String, val alternatives: List<String>, val codes: List<String> = emptyList())
 
 /** 词的音节连成要划的字母串；同一字母串只留最常用的一次（xi an 与 xian 划法相同，交给 Rime 区分）。 */
 internal fun pinyinCodes(entries: List<List<String>>, doublePinyin: DoublePinyinScheme?): List<String> =
