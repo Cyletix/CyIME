@@ -3528,6 +3528,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     private var clipboardRestoreCompact = false
     private var microphoneRestoreCompact = false
+    private var symbolRestoreCompact = false
     private val clipboardNavigationKeys = mutableSetOf<Int>()
     private val hardwareCandidateNavigationKeys = mutableSetOf<Int>()
     /** Shift 加数字或空格已用来选候选（上屏英文）的键，松开时一并吞掉。 */
@@ -3552,6 +3553,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     clipboardRestoreCompact = uiState.value.isCompact
                     clipboardKeyboard.open()
                     showScreenKeyboardFromHardware(OverlayRoute.Clipboard())
+                }
+            }
+            HardwareToolShortcut.SYMBOL -> {
+                // 再按一次 SYM 收起；打开前是浮条就回到浮条。
+                if ((keyboardViewModel.page.value as? KeyboardPage.Overlay)?.route is OverlayRoute.Symbol) {
+                    keyboardViewModel.closeOverlay()
+                    if (symbolRestoreCompact) collapseScreenKeyboardToHardwareToolbar()
+                    symbolRestoreCompact = false
+                } else {
+                    symbolRestoreCompact = uiState.value.isCompact
+                    showScreenKeyboardFromHardware(OverlayRoute.Symbol)
                 }
             }
             HardwareToolShortcut.MICROPHONE -> {
@@ -4078,6 +4090,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
         clipboardRestoreCompact = false
         microphoneRestoreCompact = false
+        symbolRestoreCompact = false
         uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
         // A hardware keyboard can switch editors without starting the soft input view.
         // Never keep the previous editor's position while waiting for this connection.

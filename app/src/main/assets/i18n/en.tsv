@@ -1964,7 +1964,7 @@ Ctrl + 空格	Ctrl + Space
 工具快捷键	Tool shortcuts
 Ctrl / Alt 组合键	Ctrl / Alt shortcuts
 关闭后下面这些组合键交给应用	When off, the shortcuts below go to the app
-Ctrl + .：切换中英文标点(英文模式固定半角)。\nCtrl + 回车：发送。\nAlt + V：打开或关闭剪贴板，方向键选择，回车粘贴并关闭，Esc 取消。\nAlt + H：开始或停止语音输入。	Ctrl + .: toggle Chinese/English punctuation (English mode is always half-width).\nCtrl + Enter: send.\nAlt + V: open or close the clipboard; arrow keys to choose, Enter to paste and close, Esc to cancel.\nAlt + H: start or stop voice input.
+Ctrl + .：切换中英文标点(英文模式固定半角)。\nCtrl + 回车：发送。\nAlt + V：打开或关闭剪贴板，方向键选择，回车粘贴并关闭，Esc 取消。\nAlt + H：开始或停止语音输入。\nSYM 键（有的全键盘手机）：打开或关闭符号页。	Ctrl + .: toggle Chinese/English punctuation (English mode is always half-width).\nCtrl + Enter: send.\nAlt + V: open or close the clipboard; arrow keys to choose, Enter to paste and close, Esc to cancel.\nAlt + H: start or stop voice input.\nSYM key (on some keyboard phones): open or close the symbol page.
 候选翻页	Candidate paging
 减号和等号	Minus and equals
 − 上一页 / = 下一页	− previous page / = next page
