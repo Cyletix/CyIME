@@ -968,7 +968,7 @@ zh、ch、sh 需要三个不同的键	zh, ch and sh need three different keys
 未标注语言	No language set
 双拼编码	Shuangpin codes
 {0}没有{1}，已换成{2}	{0} has no {1}; switched to {2}
-合并键布局只能用中文26键和内置、自建双拼	Merged-key layouts only work with Chinese 26-key and built-in or custom double pinyin
+合并键布局只能用中文26键和双拼方案	Merged-key layouts only work with Chinese 26-key and double pinyin schemes
 设置日语引擎路径失败	Failed to set the Japanese engine path
 日语词库解压失败	Failed to unpack the Japanese dictionary
 词条文字或拼音格式有误	Entry text or pinyin is malformed

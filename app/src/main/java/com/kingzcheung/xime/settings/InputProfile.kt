@@ -148,6 +148,7 @@ object InputProfiles {
 
     /** Publish after discovery, outside the key path. Removing metadata also removes its old meaning. */
     internal fun updateInstalled(entries: List<SchemaMeta>) {
+        DoublePinyinSchemes.noteImportedLayoutVariants(entries)
         installed = entries.associate { entry ->
             val base = builtin(entry.schemaId)
             entry.schemaId to base.copy(language = entry.language, scheme = entry.scheme,
