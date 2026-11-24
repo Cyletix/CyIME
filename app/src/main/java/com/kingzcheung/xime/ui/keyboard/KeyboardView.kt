@@ -161,6 +161,15 @@ internal fun usesT9DragReselect(profile: com.kingzcheung.xime.settings.InputProf
         profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.T9
 
 /**
+ * 首选上拖选改局部只给长句（11-24 他的要求）：拖选占着首选的长按，五六个字的短句长按要能调词频、删词、固定位置，
+ * 所以首选不到 [SENTENCE_DRAG_MIN_CHARS] 个字时不接拖选，长按照旧出调词频的卡片，卡片里照旧拆词重选。
+ */
+internal const val SENTENCE_DRAG_MIN_CHARS = 8
+
+internal fun sentenceDragApplies(firstCandidate: String?): Boolean =
+    (firstCandidate?.length ?: 0) >= SENTENCE_DRAG_MIN_CHARS
+
+/**
  * 拖选改局部时按下的键接到编码后面的样子；不是编码键时为 null。26 键是小写字母；内置 14 键的合并键（qw）
  * 换成大写代表字母（Q），同打字时送给引擎的一样，l、m 和点选的单个字母照旧小写。
  */
@@ -1700,7 +1709,7 @@ fun KeyboardView(
                     onSentenceSelectionEnd = ::endSentenceDrag,
                     onSentenceSelection = if (sentenceEdit == null && !showHandwritingCandidates && !glossSwap &&
                         !state.isAsciiMode && usesSentenceDragEdit(state.inputProfile) &&
-                        !expandedDataMode && (cs.candidates.firstOrNull()?.length ?: 0) >= 2) { start, end ->
+                        !expandedDataMode && sentenceDragApplies(cs.candidates.firstOrNull())) { start, end ->
                         callbacks.onOpenSentenceEdit?.invoke(start, end, cs.engineRevision) { owner ->
                             if (owner != null && callbacks.isCandidateSnapshotCurrent(cs)) {
                                 closePreeditEditor()
@@ -1719,7 +1728,7 @@ fun KeyboardView(
                         }
                     } else if (sentenceEdit == null && !showHandwritingCandidates && !glossSwap && !state.isAsciiMode &&
                         usesT9DragReselect(state.inputProfile) && callbacks.onReselectSentenceRange != null &&
-                        !expandedDataMode && (cs.candidates.firstOrNull()?.length ?: 0) >= 2) { start, end ->
+                        !expandedDataMode && sentenceDragApplies(cs.candidates.firstOrNull())) { start, end ->
                         val sentence = cs.candidates.firstOrNull()
                         if (sentence != null && callbacks.isCandidateSnapshotCurrent(cs))
                             callbacks.onReselectSentenceRange?.invoke(sentence, start, end)
@@ -3149,7 +3158,8 @@ private class SentenceParts(val words: List<String>, val reselect: (Int) -> Unit
 private fun sentenceParts(callbacks: KeyboardCallbacks, cs: com.kingzcheung.xime.service.CandidateState,
     word: String, first: Boolean, profile: com.kingzcheung.xime.settings.InputProfile): SentenceParts? {
     val reselect = callbacks.onReselectSentenceWord ?: return null
-    if (usesSentenceDragEdit(profile) || usesT9DragReselect(profile)) return null
+    // 有拖选的方案只在长句上拖选；短句没有拖选，回到卡片里拆词重选，两种入口仍不同时出现。
+    if ((usesSentenceDragEdit(profile) || usesT9DragReselect(profile)) && sentenceDragApplies(word)) return null
     if (!first || !cs.isComposing || cs.candidates.firstOrNull() != word) return null
     val words = callbacks.sentenceWords(word)?.takeIf { it.size >= 2 } ?: return null
     return SentenceParts(words) { target ->
