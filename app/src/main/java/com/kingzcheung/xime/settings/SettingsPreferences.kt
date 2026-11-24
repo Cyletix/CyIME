@@ -1593,6 +1593,48 @@ object SettingsPreferences {
     private const val KEY_FLOATING_WIDTH_DP_LANDSCAPE = "floating_width_dp_landscape"
     private const val KEY_KEYBOARD_OPACITY = "keyboard_opacity"
 
+    // ---- 九键自造词记忆（0 = 关闭；位置与召回比例只在开启时生效） ----
+    private const val KEY_T9_MEMORY_THRESHOLD = "t9_raw_memory_threshold"
+    private const val KEY_T9_MEMORY_POSITION = "t9_raw_memory_position"
+    private const val KEY_T9_MEMORY_RATIO = "t9_raw_memory_ratio_percent"
+
+    fun t9MemoryThreshold(context: Context): Int {
+        val stored = getPrefs(context).getInt(KEY_T9_MEMORY_THRESHOLD, T9RawWordMemory.DEFAULT_THRESHOLD)
+        return if (stored in T9RawWordMemory.THRESHOLD_STEPS) stored else T9RawWordMemory.DEFAULT_THRESHOLD
+    }
+
+    fun setT9MemoryThreshold(context: Context, threshold: Int) {
+        val safe = if (threshold in T9RawWordMemory.THRESHOLD_STEPS) threshold else T9RawWordMemory.DEFAULT_THRESHOLD
+        getPrefs(context).edit().putInt(KEY_T9_MEMORY_THRESHOLD, safe).apply()
+    }
+
+    fun t9MemoryPosition(context: Context): T9RawWordMemory.Position =
+        T9RawWordMemory.Position.of(getPrefs(context).getString(KEY_T9_MEMORY_POSITION, null))
+
+    fun setT9MemoryPosition(context: Context, position: T9RawWordMemory.Position) {
+        getPrefs(context).edit().putString(KEY_T9_MEMORY_POSITION, position.name).apply()
+    }
+
+    fun t9MemoryRatioPercent(context: Context): Int {
+        val stored = getPrefs(context).getInt(KEY_T9_MEMORY_RATIO, T9RawWordMemory.DEFAULT_RATIO_PERCENT)
+        val step = T9RawWordMemory.RATIO_STEP_PERCENT
+        val clamped = stored.coerceIn(T9RawWordMemory.MIN_RATIO_PERCENT, T9RawWordMemory.MAX_RATIO_PERCENT)
+        // 对齐到 10% 档，手改过的旧值也能落在滑块的刻度上。
+        return (clamped / step) * step
+    }
+
+    fun setT9MemoryRatioPercent(context: Context, percent: Int) {
+        val step = T9RawWordMemory.RATIO_STEP_PERCENT
+        val clamped = percent.coerceIn(T9RawWordMemory.MIN_RATIO_PERCENT, T9RawWordMemory.MAX_RATIO_PERCENT)
+        getPrefs(context).edit().putInt(KEY_T9_MEMORY_RATIO, (clamped / step) * step).apply()
+    }
+
+    fun t9RawWordMemoryPolicy(context: Context) = T9RawWordMemory.Policy(
+        threshold = t9MemoryThreshold(context),
+        position = t9MemoryPosition(context),
+        ratioPercent = t9MemoryRatioPercent(context),
+    )
+
     fun getKeyboardOpacity(context: Context): Float {
         val landscape = context.resources.configuration.screenWidthDp > context.resources.configuration.screenHeightDp
         // 横屏新装和竖屏一样固定、不透明（用户 10-31）。早先版本第一次横屏时写入了半透明悬浮（landscape_layout_v2），

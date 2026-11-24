@@ -1746,6 +1746,24 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     if (wordsAutoCapped && typesEnglishWords(state.inputProfile, state.isAsciiMode))
                                         spellingWithoutAutoCap(input) else input)
                             }
+                            // 九键强行上屏的原样英文（拂动/角标敲字母后回车）：只记数字码和次数。
+                            // 引擎 input 是字母说明不是数字码解码出的拼音，避免把普通拼音串算成自造词。
+                            if (isT9 && !state.isAsciiMode && service.isChineseMode &&
+                                !com.kingzcheung.xime.settings.IncognitoState.active &&
+                                com.kingzcheung.xime.settings.SettingsPreferences
+                                    .t9RawWordMemoryPolicy(service).enabled &&
+                                engineInput.isNotEmpty() &&
+                                engineInput.all { it.isLetter() || it == '\'' } &&
+                                com.kingzcheung.xime.settings.T9RawWordMemory.isForcedWord(input)
+                            ) {
+                                val memory = com.kingzcheung.xime.settings.T9RawWordMemory
+                                val digits = memory.digitsFor(input)
+                                if (digits.length >= 2) {
+                                    memory.remember(
+                                        com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service),
+                                        digits, input)
+                                }
+                            }
                         }
                         // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。
                         if (isT9) service.t9PartialSegments.clear()
@@ -2900,6 +2918,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         pendingAction?.glideInput?.let { input ->
             if (isT9Schema(service.uiState.value.currentSchemaId)) commitT9GlideAlternative(input, pendingAction.commitText)
             else applyGlideAlternative(input, snapshot)
+            return
+        }
+        // 九键自造词记忆候选：不是 Rime Phrase，没有可捕获的码，不能走引擎选词。
+        // 按 T9 全清上屏，并把这次点选算作一次使用，下一次排序升位。
+        val rememberedDigits = pendingAction?.rememberedDigits
+        val rememberedText = if (rememberedDigits != null) {
+            snapshot.candidates.getOrNull(index)
+        } else null
+        if (rememberedDigits != null && rememberedText != null) {
+            postRimeJob("select") {
+                if (service.candidateState.value.candidates.getOrNull(index) == rememberedText) {
+                    com.kingzcheung.xime.settings.T9RawWordMemory.remember(
+                        com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service),
+                        rememberedDigits, rememberedText)
+                    deliverCandidateCommit(PendingCandidateCommit(
+                        InputCommandOwner.requireOwner(), rememberedText, t9 = true,
+                        learnSelection = false))
+                }
+            }
             return
         }
         if (pendingAction != null && pendingAction.isPluginCandidate) {

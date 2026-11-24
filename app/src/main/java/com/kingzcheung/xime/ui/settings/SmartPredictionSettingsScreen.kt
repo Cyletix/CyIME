@@ -43,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -59,13 +60,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.T9RawWordMemory
 import com.kingzcheung.xime.viewmodel.SmartPredictionSettingsViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -275,6 +279,108 @@ fun SmartPredictionSettingsContent(
             }
 
             item {
+                // 九键自造词记忆（用户 11-22）：次数 0 = 关闭，位置与召回比例只在开启时可用。
+                var t9Threshold by remember { mutableStateOf(SettingsPreferences.t9MemoryThreshold(context)) }
+                var t9Position by remember { mutableStateOf(SettingsPreferences.t9MemoryPosition(context)) }
+                var t9Ratio by remember { mutableStateOf(SettingsPreferences.t9MemoryRatioPercent(context)) }
+                val t9Enabled = t9Threshold > 0
+                val t9Steps = T9RawWordMemory.THRESHOLD_STEPS
+                SettingsSection(title = "九键自造词记忆", content = {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.settingsSearchAnchor("记住自造词的次数"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("记住自造词的次数", style = MaterialTheme.typography.titleSmall)
+                                Text("打这么多遍之后，这个词才进候选；默认关闭，0 也为关闭",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(if (t9Threshold == 0) "关闭" else "$t9Threshold 次",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                        // 档位不是等差的：0 之后直接跳到 3，所以按索引滑，不走原值。
+                        Slider(
+                            value = t9Steps.indexOf(t9Threshold).coerceAtLeast(0).toFloat(),
+                            onValueChange = { t9Steps.getOrNull(it.roundToInt())?.let { v -> t9Threshold = v } },
+                            onValueChangeFinished = { SettingsPreferences.setT9MemoryThreshold(context, t9Threshold) },
+                            valueRange = 0f..(t9Steps.size - 1).toFloat(),
+                            steps = t9Steps.size - 2,
+                            modifier = Modifier.testTag("t9-memory-threshold-slider"),
+                        )
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    Column(
+                        Modifier.settingsSearchAnchor("插入位置").fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("插入位置", style = MaterialTheme.typography.titleSmall)
+                        Text(if (t9Enabled) "记忆词在候选里的位置" else "先打开上面的次数",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    T9MemoryPositionRow("首位", "插在候选第一个",
+                        t9Position == T9RawWordMemory.Position.TOP, enabled = t9Enabled) {
+                        t9Position = T9RawWordMemory.Position.TOP
+                        SettingsPreferences.setT9MemoryPosition(context, t9Position)
+                    }
+                    T9MemoryPositionRow("二位", "插在候选第二个",
+                        t9Position == T9RawWordMemory.Position.SECOND, enabled = t9Enabled) {
+                        t9Position = T9RawWordMemory.Position.SECOND
+                        SettingsPreferences.setT9MemoryPosition(context, t9Position)
+                    }
+                    T9MemoryPositionRow("第六位", "不翻页时首行大致能看到最后一格",
+                        t9Position == T9RawWordMemory.Position.SIXTH, enabled = t9Enabled) {
+                        t9Position = T9RawWordMemory.Position.SIXTH
+                        SettingsPreferences.setT9MemoryPosition(context, t9Position)
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.settingsSearchAnchor("打几成码就提前出词"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("打几成码就提前出词", style = MaterialTheme.typography.titleSmall)
+                                Text(if (t9Enabled) "打满全码的这么多比例就召回，至少 4 位" else "先打开上面的次数",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text("$t9Ratio%", style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                        Slider(
+                            value = t9Ratio.toFloat(),
+                            onValueChange = { t9Ratio = it.roundToInt() / 10 * 10 },
+                            onValueChangeFinished = { SettingsPreferences.setT9MemoryRatioPercent(context, t9Ratio) },
+                            valueRange = T9RawWordMemory.MIN_RATIO_PERCENT.toFloat()..
+                                T9RawWordMemory.MAX_RATIO_PERCENT.toFloat(),
+                            steps = (T9RawWordMemory.MAX_RATIO_PERCENT - T9RawWordMemory.MIN_RATIO_PERCENT) /
+                                T9RawWordMemory.RATIO_STEP_PERCENT - 1,
+                            enabled = t9Enabled,
+                            modifier = Modifier.testTag("t9-memory-ratio-slider"),
+                        )
+                    }
+                })
+            }
+
+            item {
                 LearningDataControls(
                     unique = uiState.cacheSize, observations = uiState.observations,
                     profileSize = uiState.profileSize, busy = uiState.isSaving,
@@ -318,6 +424,42 @@ private fun AssociationModeRow(
             )
         }
         RadioButton(selected = isSelected, onClick = onClick)
+    }
+}
+
+/** 九键自造词插入位置：只在开启时可选，置灰逻辑内联在这里，不动通用的 [AssociationModeRow]。 */
+@Composable
+private fun T9MemoryPositionRow(
+    title: String,
+    subtitle: String,
+    isSelected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = when {
+                    !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        RadioButton(selected = isSelected, onClick = onClick, enabled = enabled)
     }
 }
 
