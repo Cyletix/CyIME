@@ -1117,6 +1117,12 @@ class RimeEngine {
             mergedAlphabet = null
             if (switched) schemaAppliedGeneration = sessionGeneration.get()
             if (switched) mergedSpellerAlphabet()
+            // 九键的上文只有九键键盘会更新（每次开始组词时重设）。换到别的布局后它还留在引擎里，
+            // 14 键停手后拼整句会把九键最后上屏的那句当成上文。换方案就清掉，九键下次开始组词会重新设。
+            if (switched && t9LeftContext != null) {
+                t9LeftContext = null
+                nativeSetT9LeftContext(null)
+            }
             if (!switched) {
                 // 常见于方案未部署（不在 schema_list，如老版本升级残留）：
                 // 留证便于反馈日志定位（用户症状：键盘已切换但按键无候选）
