@@ -34,6 +34,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +72,8 @@ fun SpaceKeyButton(
      */
     onSwipeUp: (() -> Unit)? = null,
     swipeUpLabel: String? = null,
+    /** 右上角的角标，如九键开了「空格上滑输入 0」时的「0」；null 时不画。 */
+    cornerLabel: String? = null,
 ) {
     val settings = LocalKeyboardInputPreferences.current
     val actions = LocalKeyboardInputActions.current
@@ -487,6 +490,16 @@ fun SpaceKeyButton(
                     fontFamily = AppFonts.keyFontFamily,
                     modifier = Modifier.testTag("space-language-flash").graphicsLayer { alpha = flashAlpha.value })
             }
+        }
+        // 角标（11-24 他：开了「空格上滑输入 0」空格上要看得到 0）：和字母键的角标同位置、同字号、同颜色；
+        // 按住说话、上滑写出大字、按住移光标时让开。
+        if (cornerLabel != null && !showVoiceHold && swipeUpProgress == 0f && !cursorActive) {
+            val cornerSize = 10f * adaptiveHintScale(keyContentScale(maxWidth.value, maxHeight.value))
+            Text(cornerLabel, color = keyHintColor(textColor, frostedGlass, 0.5f, settings.cornerHintOpacity),
+                fontSize = cornerSize.sp, lineHeight = (cornerSize * 1.2f).sp, maxLines = 1, softWrap = false,
+                fontFamily = AppFonts.keyFontFamily,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .padding(top = 2.dp, end = 5.dp).testTag("space-corner-label"))
         }
     }
 }

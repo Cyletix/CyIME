@@ -767,6 +767,8 @@ private fun T9KeyboardContent(
                     schemaName = "拼音", isSttEnabled = uiState.isSttEnabled,
                     voiceSticky = uiState.voiceSticky,
                     onSwipeUp = if (spaceUpZero && !typing) ({ commitDirect("0") }) else null,
+                    // 开着就一直写 0 角标（打字时上滑不接，角标照旧在，和别的键角标一样不随状态闪）。
+                    cornerLabel = if (spaceUpZero) "0" else null,
                     onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
                     onVoiceModeChange = callbacks.onVoiceModeChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
@@ -1374,6 +1376,7 @@ private fun T9SpaceKey(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
     onSwipeUp: (() -> Unit)? = null,
+    cornerLabel: String? = null,
 ) {
 
     SpaceKeyButton(onClick = { onKeyPress("space") }, backgroundColor = backgroundColor,
@@ -1381,5 +1384,5 @@ private fun T9SpaceKey(
         onPress = { onKeyPressDown?.invoke("space") }, voiceSticky = voiceSticky,
         isSttEnabled = isSttEnabled, onVoiceModeChange = onVoiceModeChange,
         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-        onSwipeUp = onSwipeUp, swipeUpLabel = if (onSwipeUp != null) "0" else null)
+        onSwipeUp = onSwipeUp, swipeUpLabel = if (onSwipeUp != null) "0" else null, cornerLabel = cornerLabel)
 }
