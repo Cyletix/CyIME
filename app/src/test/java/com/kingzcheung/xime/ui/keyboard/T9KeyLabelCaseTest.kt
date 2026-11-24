@@ -109,15 +109,16 @@ class T9KeyLabelCaseTest {
     }
 
     /**
-     * 用户 11-23：键帽大写 JKL 时长按弹出 J K L，选 K 进的却是拼音 k（出「看/快/开」）。
-     * 长按气泡一律写小写 j k l；送出的仍是原值，进拼音的结果不变。
+     * 11-24 参照图：长按 5 弹出「J K L 5 j k l」，数字默认选中，不挪手松开上屏数字（不进拼音）。
+     * 用户 11-23 的问题（写大写 K 却进拼音 k）也不再有：大写直接上屏大写，小写才进拼音。
      */
-    @Test fun longPressMenuShowsLowercaseEvenWithUppercaseFaces() {
+    @Test fun longPressMenuShowsUpperDigitLowerAndDefaultsToDigit() {
         // 气泡是画在画布上的（SwipeBubble 用 drawText），语义树里找不到字：直接看按键交给气泡的那份列表（同 NumberRowLongPressTest）。
         val menus = mutableListOf<List<String>>()
         val picked = mutableListOf<String>()
+        val committed = mutableListOf<String>()
         AppFonts.initialize(rule.activity.application)
-        val prefs = KeyLabelCaseChoice.UPPER.applyTo(KeyboardInputPreferences(letterLongPressMenu = true))
+        val prefs = KeyLabelCaseChoice.UPPER.applyTo(KeyboardInputPreferences())
         rule.setContent {
             CompositionLocalProvider(LocalKeyboardInputPreferences provides prefs) {
                 MaterialTheme {
@@ -126,7 +127,8 @@ class T9KeyLabelCaseTest {
                             onClick = {}, onLongPressSelect = { picked += it },
                             onSwipeStateChange = { state, _ -> if (state.isLongPress) menus += state.longPressItems },
                             backgroundColor = Color.DarkGray, textColor = Color.White,
-                            modifier = Modifier.requiredSize(120.dp, 60.dp), uppercaseLetters = true)
+                            modifier = Modifier.requiredSize(120.dp, 60.dp), uppercaseLetters = true,
+                            onCommitDirect = { committed += it })
                     }
                 }
             }
@@ -136,8 +138,17 @@ class T9KeyLabelCaseTest {
         rule.onNodeWithText("JKL", useUnmergedTree = true).performTouchInput { longClick(durationMillis = 900L) }
         rule.waitForIdle()
         assertTrue("弹出了气泡：$menus", menus.isNotEmpty())
-        assertTrue("气泡里是小写 j k l：$menus", menus.all { it == listOf("j", "k", "l") })
-        rule.runOnIdle { assertTrue("长按选中后送出原值：$picked", picked.single() in setOf("J", "K", "L")) }
+        assertTrue("气泡里是大写、数字、小写：$menus",
+            menus.all { it.sorted() == listOf("J", "K", "L", "5", "j", "k", "l").sorted() })
+        rule.runOnIdle {
+            assertEquals("不挪手松开上屏数字", listOf("5"), committed.toList())
+            assertTrue("没进拼音：$picked", picked.isEmpty())
+        }
+    }
+
+    @Test fun longPressMenuRowIsUpperDigitLower() {
+        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l"), t9LongPressMenu(listOf("J", "K", "L"), "5"))
+        assertEquals(listOf("P", "Q", "R", "S", "7", "p", "q", "r", "s"), t9LongPressMenu(listOf("P", "Q", "R", "S"), "7"))
     }
 
     @Test fun longPressMenuHelperIsAlwaysLowercase() {
