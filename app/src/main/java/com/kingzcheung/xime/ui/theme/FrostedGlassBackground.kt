@@ -114,17 +114,26 @@ internal fun Modifier.frostedGlassBackground(
                 val image = shared.image?.takeIf { shared.frame.size.width > 0 && shared.frame.size.height > 0 }
                 if (image == null) drawRect(shared.fallback, alpha = shared.opacity)
                 else {
-                    val offset = shared.frame.offsetIn(origin)
-                    // The window/inset frame and this surface may move on different layout passes.
-                    // Tint only uncovered pixels so translucent glass is composited exactly once.
-                    clipRect(offset.x, offset.y, offset.x + shared.frame.size.width,
-                        offset.y + shared.frame.size.height, androidx.compose.ui.graphics.ClipOp.Difference) {
+                    val rawOffset = shared.frame.offsetIn(origin)
+                    // 过渡帧（如锁屏解锁、Insets 切换）若 frame 任意一边滞后于当前表面，将共享图延伸覆盖四边，
+                    // 避免顶部工具栏或底部留白短暂露出纯色 fallback 断层。
+                    val drawLeft = minOf(rawOffset.x, 0f)
+                    val drawTop = minOf(rawOffset.y, 0f)
+                    val drawRight = maxOf(rawOffset.x + shared.frame.size.width.toFloat(), size.width)
+                    val drawBottom = maxOf(rawOffset.y + shared.frame.size.height.toFloat(), size.height)
+                    val offset = Offset(drawLeft, drawTop)
+                    val drawSize = IntSize(
+                        (drawRight - drawLeft).roundToInt().coerceAtLeast(1),
+                        (drawBottom - drawTop).roundToInt().coerceAtLeast(1),
+                    )
+                    clipRect(offset.x, offset.y, offset.x + drawSize.width,
+                        offset.y + drawSize.height, androidx.compose.ui.graphics.ClipOp.Difference) {
                         drawRect(shared.fallback, alpha = shared.opacity)
                     }
                     if (imageSlot == null) clipRect {
                         withSharedBackdropMotion(shared, offset) {
                             translate(offset.x, offset.y) {
-                                drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
+                                drawImage(image, dstSize = drawSize, alpha = shared.opacity,
                                     filterQuality = FilterQuality.Medium)
                             }
                         }
