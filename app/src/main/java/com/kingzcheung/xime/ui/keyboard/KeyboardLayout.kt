@@ -2295,11 +2295,12 @@ internal fun shiftedKeyPress(key: String, shift: com.kingzcheung.xime.viewmodel.
  * 或是字母语言键盘（[accentLetters] 不空：西班牙、德、俄语等，长按要的是 ñ、ä 这类）时不排，照旧。
  */
 internal fun letterMenuCenterItems(key: String, labels: List<String>?, isShifted: Boolean, accentLetters: String): List<String> {
-    if (labels == null || accentLetters.isNotEmpty() || key.length != 1 || key[0].lowercaseChar() !in 'a'..'z') return emptyList()
-    val upper = key.uppercase()
-    val lower = key.lowercase()
-    if (upper !in labels || lower !in labels) return emptyList()
-    return if (isShifted) listOf(lower, upper) else listOf(upper, lower)
+    if (labels == null || accentLetters.isNotEmpty() || key.length !in 1..2 || !key.all { it.lowercaseChar() in 'a'..'z' }) return emptyList()
+    // 14 键合并键（qw）：两个大写在前、两个小写在后，松手不挪是左边那个字母的大写（11-24 长按方案）。
+    val upper = key.map { it.uppercase() }
+    val lower = key.map { it.lowercase() }
+    if (!labels.containsAll(upper) || !labels.containsAll(lower)) return emptyList()
+    return if (isShifted) lower + upper else upper + lower
 }
 
 /**

@@ -118,7 +118,8 @@ class T9KeyLabelCaseTest {
         val picked = mutableListOf<String>()
         val committed = mutableListOf<String>()
         AppFonts.initialize(rule.activity.application)
-        val prefs = KeyLabelCaseChoice.UPPER.applyTo(KeyboardInputPreferences())
+        // 11-24 长按方案：九键跟设置卡走，选「滑动＋字母气泡」才弹这一排。
+        val prefs = KeyLabelCaseChoice.UPPER.applyTo(KeyboardInputPreferences()).copy(letterLongPressMenu = true)
         rule.setContent {
             CompositionLocalProvider(LocalKeyboardInputPreferences provides prefs) {
                 MaterialTheme {
@@ -138,8 +139,7 @@ class T9KeyLabelCaseTest {
         rule.onNodeWithText("JKL", useUnmergedTree = true).performTouchInput { longClick(durationMillis = 900L) }
         rule.waitForIdle()
         assertTrue("弹出了气泡：$menus", menus.isNotEmpty())
-        assertTrue("气泡里是大写、数字、小写：$menus",
-            menus.all { it.sorted() == listOf("J", "K", "L", "5", "j", "k", "l").sorted() })
+        assertTrue("气泡照参照图排：$menus", menus.all { it == listOf("J", "K", "L", "5", "j", "k", "l") })
         rule.runOnIdle {
             assertEquals("不挪手松开上屏数字", listOf("5"), committed.toList())
             assertTrue("没进拼音：$picked", picked.isEmpty())

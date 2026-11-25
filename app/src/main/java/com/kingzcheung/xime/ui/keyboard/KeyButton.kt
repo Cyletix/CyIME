@@ -111,6 +111,8 @@ data class SwipeState(
     val selectedLongPressIndex: Int = 0,
     val longPressDrawableIds: List<Int> = emptyList(),
     val keyFlick: KeyFlickPreview? = null,
+    /** 文字长按菜单的默认项在第几格：气泡把这一格对准按键（[KeyboardKeyMetrics.longPressTextMenuCells]）。 */
+    val longPressAnchorIndex: Int = 0,
 )
 
 private val shadowColorCache = HashMap<Color, Color>()
@@ -339,6 +341,8 @@ fun SwipeableKeyButton(
     longPressItems: List<String>? = null,
     /** 长按到点时排在手指下、默认选中的项（见 [KeyGestureActions.longPressCenterItems]）。 */
     longPressCenterItems: List<String> = emptyList(),
+    /** 长按菜单原样排、不按左右半边翻转（见 [KeyGestureActions.longPressFixedOrder]）。 */
+    longPressFixedOrder: Boolean = false,
     longPressDrawableIds: List<Int>? = null,
     /** 拂动选字母：依次为左、上、右、下（缺的方向保留原手势），长按执行 [onFlickLongPress]。 */
     flickLetters: List<String>? = null,
@@ -468,6 +472,17 @@ fun SwipeableKeyButton(
             keyboard?.width, with(density) { KeyboardKeyMetrics.LongPressMenuMargin.toPx() })
         cells.copy(left = cells.left - keyLeft)
     }
+    // 文字长按菜单：排法、默认项、格宽和气泡（measureSwipeBubble）按同一个键、同一个键盘宽算。
+    val longPressTextMenu: (List<String>, List<String>, Boolean) -> LongPressTextMenu = { items, nearFirst, fixed ->
+        val key = liveBounds.current(buttonBounds, "key $text")
+        val keyboard = menuKeyboard?.invoke()
+        val keyLeft = if (keyboard != null) key.left - keyboard.left else 0f
+        val (ordered, anchor) = KeyboardKeyMetrics.longPressMenuOrder(items, nearFirst, fixed,
+            keyLeft + key.width / 2f, keyboard?.width)
+        val cells = KeyboardKeyMetrics.longPressTextMenuCells(keyLeft, key.width, ordered, anchor, keyboard?.width,
+            with(density) { KeyboardKeyMetrics.LongPressMenuMargin.toPx() }, density.density)
+        LongPressTextMenu(ordered, anchor, cells.cellWidth)
+    }
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -513,6 +528,7 @@ fun SwipeableKeyButton(
         onDown = keyOnSwipeDown,
         longPressItems = longPressItems.orEmpty(),
         longPressCenterItems = longPressCenterItems,
+        longPressFixedOrder = longPressFixedOrder,
         onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
         // 「字母键显示大写」只改显示：方向提示跟键帽一样大写，送出的仍是 letters 原样。
         leftText = letters?.first?.let { if (inputPreferences.uppercaseKeyLabels) it.uppercase() else it } ?: swipeLeftText,
@@ -531,6 +547,7 @@ fun SwipeableKeyButton(
         longPressDrawableIds = longPressDrawableIds.orEmpty(),
         keyWidth = buttonBounds.width,
         longPressMenuCells = longPressMenuCells,
+        longPressTextMenu = longPressTextMenu,
         onLongPressSelect = onLongPressSelect,
         longPressTimeoutMillis = longPressTimeoutMillis,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },

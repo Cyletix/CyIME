@@ -1065,10 +1065,12 @@ internal fun T9DigitKey(
             glideKeys[digit.single()] = dragSpace.bounds(it)
         },
         onPress = { currentOnPress?.invoke() },
-        // 九键长按一直弹「大写 数字 小写」这一排（11-24 他：参照图那样，不另设开关）；拂动模式长按出数字，不受影响。
-        // 拂动模式下长按出的是数字，这里的列表用不上。
-        longPressItems = if (flick) shownItems else menuItems,
+        // 九键长按跟设置里三张卡走（11-24 长按方案）：「滑动＋字母气泡」才弹「大写 数字 小写」这一排，
+        // 「长按输入」长按出数字（withSymbolInput），「滑动输入」长按没反应。拂动模式长按出数字，不受影响。
+        longPressItems = if (flick) shownItems else if (inputPreferences.letterLongPressMenu) menuItems else emptyList(),
         longPressCenterItems = if (flick) emptyList() else listOf(digit),
+        // 照参照图数字居中、大写在左、小写在右，不按左右半边翻转。
+        longPressFixedOrder = !flick,
         onLongPressSelect = { item -> if (flick) currentOnLongPressSelect?.invoke(itemValue(item)) else pickMenuItem(item) },
         // Four-letter keys: P/S on the left/right, Q/R up/down (user layout, 2026-10-18); three letters go left/up/right.
         flickLetters = if (!flick) null else if (shownItems.size == 4)

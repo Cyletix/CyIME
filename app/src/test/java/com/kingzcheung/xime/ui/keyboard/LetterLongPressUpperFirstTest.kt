@@ -47,11 +47,17 @@ class LetterLongPressUpperFirstTest {
         assertEquals(listOf("K", "k"), letterMenuCenterItems("k", listOf("k", "K"), isShifted = false, accentLetters = ""))
     }
 
+    @Test fun `fourteen key merged keys put both capitals first`() {
+        // 11-24 长按方案：14 键 qw 松手不挪是 Q，挨着 W，再是 q w。
+        assertEquals(listOf("Q", "W", "q", "w"), letterMenuCenterItems("qw", listOf("q", "w", "Q", "W"), false, ""))
+        assertEquals(listOf("q", "w", "Q", "W"), letterMenuCenterItems("qw", listOf("q", "w", "Q", "W"), true, ""))
+    }
+
     @Test fun `letter language keyboards and other keys are left alone`() {
         // 西班牙、德、俄语等字母语言键盘长按要的是 ñ、ä 这类，不动。
         assertEquals(emptyList<String>(), letterMenuCenterItems("n", listOf("n", "N", "ñ"), false, accentLetters = "ñ"))
-        // 14 键双字母键、标点键、没有这对大小写的菜单都不动。
-        assertEquals(emptyList<String>(), letterMenuCenterItems("qw", listOf("q", "w", "Q", "W"), false, ""))
+        // 标点键、没有这对大小写的菜单都不动。
+        assertEquals(emptyList<String>(), letterMenuCenterItems("qw", listOf("q", "w"), false, ""))
         assertEquals(emptyList<String>(), letterMenuCenterItems("'", listOf(",", "."), false, ""))
         assertEquals(emptyList<String>(), letterMenuCenterItems("o", listOf("ō", "ó"), false, ""))
         assertEquals(emptyList<String>(), letterMenuCenterItems("o", null, false, ""))

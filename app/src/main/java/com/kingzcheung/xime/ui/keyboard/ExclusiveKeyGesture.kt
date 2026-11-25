@@ -46,6 +46,14 @@ internal data class KeyGestureActions(
      * 第一项放在手指下那格并选中，后面的挨着放，其余项按原顺序从左往右填剩下的格（[arrangeLongPressMenu]）。空的照旧。
      */
     val longPressCenterItems: List<String> = emptyList(),
+    /** 文字长按菜单原样排、不按左右半边翻转（九键「J K L 5 j k l」数字居中），默认项是 [longPressCenterItems] 第一项。 */
+    val longPressFixedOrder: Boolean = false,
+    /**
+     * 文字长按菜单怎么排、每格多宽（[KeyboardKeyMetrics.longPressMenuOrder]、[KeyboardKeyMetrics.longPressTextMenuCells]），
+     * 和气泡画的同一份。参数：原始项、离手指从近到远的项、是否原样排。给了就按「默认项正对按键、手指挪一格换一格」选；
+     * 图标菜单和没给时照旧（[longPressMenuCells]）。
+     */
+    val longPressTextMenu: ((List<String>, List<String>, Boolean) -> LongPressTextMenu)? = null,
     val onLongPress: (() -> Unit)? = null,
     val onLongPressSelect: ((String) -> Unit)? = null,
     val onLongPressFeedback: () -> Unit = {},
@@ -169,6 +177,10 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         // 以前整条挤在一个键宽里，八项时手指挪八分之一个键就换一格（用户 11-15）。两项（上下角标）照旧。
         val cellsFor = actions.longPressMenuCells?.takeIf { items.size > 2 }
         var menuCells: LongPressMenuCells? = null
+        // 文字长按菜单（[KeyGestureActions.longPressTextMenu]）：默认项第几格、每格多宽、长按到点时手指在哪。
+        var menuAnchor = 0
+        var menuCellWidth = 0f
+        var menuAnchorX = 0f
         var lastX = down.position.x
         var lastY = down.position.y
         val longPressDelay = actions.longPressDelayMillis(viewConfiguration.longPressTimeoutMillis)
@@ -177,16 +189,27 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
             longPressed = true
             actions.onLongPressFeedback()
             if (items.isNotEmpty()) {
+                val textMenu = actions.longPressTextMenu?.takeIf { items.size > 1 && actions.longPressDrawableIds.isEmpty() }
+                    ?.invoke(items, actions.longPressCenterItems, actions.longPressFixedOrder)
+                if (textMenu != null) {
+                    // 默认项正对按键、先选中；之后按手指从这一刻起横着挪了几格选（11-24 长按方案）。
+                    items = textMenu.items
+                    menuAnchor = textMenu.anchor
+                    menuCellWidth = textMenu.cellWidth
+                    menuAnchorX = lastX
+                    selectedIndex = menuAnchor
+                } else {
                 menuCells = cellsFor?.invoke(items.size, actions.longPressDrawableIds.isNotEmpty())
                 menuCells?.let { selectedIndex = KeyboardKeyMetrics.longPressMenuIndex(lastX, it, items.size) }
-                if (actions.longPressCenterItems.isNotEmpty()) {
+                }
+                if (textMenu == null && actions.longPressCenterItems.isNotEmpty()) {
                     // 两项（[k, K]）没有分格、从第一项起选：大写排第一就是默认选中，往右滑选小写。
                     items = arrangeLongPressMenu(items, actions.longPressCenterItems, selectedIndex)
                     selectedIndex = items.indexOf(actions.longPressCenterItems.first()).coerceAtLeast(0)
                 }
                 actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                     longPressItems = items, selectedLongPressIndex = selectedIndex,
-                    longPressDrawableIds = actions.longPressDrawableIds))
+                    longPressDrawableIds = actions.longPressDrawableIds, longPressAnchorIndex = menuAnchor))
             } else {
                 outcome = Outcome.LONG
                 actions.onLongPress?.invoke()
@@ -281,11 +304,13 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 crossedSwipeThreshold = if (actions.freeDirection) outsideCentre
                     else crossedSwipeThreshold || up || downSwipe || left || right || blockedUp || blockedDown
                 if (longPressed && items.isNotEmpty()) {
-                    selectedIndex = menuCells?.let { KeyboardKeyMetrics.longPressMenuIndex(change.position.x, it, items.size) }
+                    selectedIndex = if (menuCellWidth > 0f)
+                        KeyboardKeyMetrics.longPressMenuStep(menuAnchor, change.position.x - menuAnchorX, menuCellWidth, items.size)
+                    else menuCells?.let { KeyboardKeyMetrics.longPressMenuIndex(change.position.x, it, items.size) }
                         ?: longPressIndexByKeyWidth(dx, actions.keyWidth, items.size)
                     actions.onPreview(SwipeState(isPressed = true, isLongPress = true,
                         longPressItems = items, selectedLongPressIndex = selectedIndex,
-                        longPressDrawableIds = actions.longPressDrawableIds))
+                        longPressDrawableIds = actions.longPressDrawableIds, longPressAnchorIndex = menuAnchor))
                 } else if (!longPressed) {
                     val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else if (right) actions.rightText else null
                     actions.onPreview(SwipeState(isSwiping = hint != null, swipeText = hint,
@@ -373,6 +398,9 @@ internal fun arrangeLongPressMenu(items: List<String>, center: List<String>, fin
     for (i in 0 until n) if (slots[i] == null) slots[i] = rest.next()
     return slots.map { it!! }
 }
+
+/** 文字长按菜单排好的样子：从左到右的项、默认项第几格、每格多宽（像素）。 */
+internal data class LongPressTextMenu(val items: List<String>, val anchor: Int, val cellWidth: Float)
 
 /** 旧算法：整条按键宽均分，从第一项起（两项的上下角标还用它，手感不变）。 */
 internal fun longPressIndexByKeyWidth(dx: Float, keyWidth: Float, count: Int): Int {

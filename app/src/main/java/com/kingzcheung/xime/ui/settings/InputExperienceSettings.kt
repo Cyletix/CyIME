@@ -114,9 +114,9 @@ internal fun InputExperienceSettings(
                     // 空格两边的标点键长按也输入角标（用户 11-09），写出来，和执行一致（用户 11-14）。
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE -> "滑动输入角标，松手上屏。"
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.SWIPE_BUBBLE ->
-                        "长按字母弹出大小写和带声调的字母。"
+                        "长按字母弹出大小写和声调，九键弹出大写、数字、小写。"
                     com.kingzcheung.xime.ui.keyboard.CornerInputChoice.LONG_PRESS -> (if (glideLock != null && !t9OnlyLock)
-                        "长按弹出上下两个角标，松手出上角标，右移一格出下角标。"
+                        "长按弹出上下角标，松手出上方的，右移一格出下方的。"
                         else "长按输入上方角标。") +
                             "九键长按出数字。"
                 } + hiddenNote, style = MaterialTheme.typography.bodySmall)
