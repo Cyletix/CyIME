@@ -315,6 +315,9 @@ fun CandidateBar(
     var closeOnRight by remember(preferences) {
         mutableStateOf(SettingsPreferences.isCandidateCloseOnRight(context))
     }
+    var hidesOnRight by remember(preferences) {
+        mutableStateOf(preferences.getBoolean(SettingsPreferences.KEY_CANDIDATE_RIGHT_HIDES, false))
+    }
     // 两端按钮按下时的底色。原来「候选栏按钮按压高亮」开着时更深一档；那个开关 11-24 去掉了（关着也亮，他说有没有都一样），
     // 存着的旧值不再读，大家都是原来的默认样子。
     val edgePressedFill = iconButtonContainer
@@ -332,27 +335,36 @@ fun CandidateBar(
             if (key == SettingsPreferences.KEY_CANDIDATE_CLOSE_ON_RIGHT || key == null) {
                 closeOnRight = SettingsPreferences.isCandidateCloseOnRight(context)
             }
+            if (key == SettingsPreferences.KEY_CANDIDATE_RIGHT_HIDES || key == null) {
+                hidesOnRight = preferences.getBoolean(SettingsPreferences.KEY_CANDIDATE_RIGHT_HIDES, false)
+            }
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
+    // 候选栏两端最多两个按钮（用户 11-03）：左边取消，最右展开候选，位置固定。左边打字和联想都是「<」，
+    // 设置「关联想用 ⊗」打开后联想时才是 ⊗（用户 11-03：两种状态图标不一样）；
+    // 收起键盘只在空闲（没有候选）时有。手写候选也是纯联想态，但那里的取消是撤销当前字，仍用「<」。
+    val closesAssociation = state is CandidateBarState.AssociationOnly &&
+        !(page is KeyboardPage.Main && page.type == MainType.HANDWRITING)
+    // 两个开关分开管（11-24 用户反馈：关掉取消键后联想就没办法关了）：「显示 ‹ 取消键」管打字时左边的「‹」，
+    // 「关联想用 ⊗」管联想时左边的 ⊗——取消键关着、⊗ 开着，联想时左边照样有 ⊗。两个都关时联想左边不放键（和以前一样）；
+    // 取消键开着、⊗ 关着时联想左边仍是「‹」（和以前一样）。
+    val showCompositionCancel = state !is CandidateBarState.Idle && callbacks.onCancelInput != null &&
+        (showCancelButton || (closesAssociation && associationCancelCross))
     // 开了「候选滑到头回弹展开」又选了「关闭键位置：右边」（11-22 他）：取消／关联想画成「×」放在右边收起键盘那一格，
     // 左边不放；打字时点它取消、出联想时点它关联想、回到空闲后同一个位置是收起键盘。开关关着时和 1.15.101 一样。
     // 「右边一处关」= 左右滑展开开着且关闭键放右边：右边那一格只用来关，▾/▴ 不放（展开、收回只靠滑）。
     // 其余（「经典」，滑不滑都一样）右边照 1.15.101 放 ▾/▴（11-23 他选：左右滑单独做开关，经典也能滑）。
     val rightCloses = swipeExpand && closeOnRight
-    // 「关闭」不看「候选栏取消按钮」开关：那个开关只管「展开」时左边的「‹」（11-23 设置改版，「关闭」下不显示它）。
+    // 「收键盘」（= 1.15.103，11-24 他：还有人要）：右边打字、联想、展开着都是收起键盘，左边「‹」照取消按钮开关，展开靠滑。
+    val rightHides = swipeExpand && hidesOnRight && !rightCloses
+    // 「经典」不看「显示 ‹ 取消键」「关联想用 ⊗」：那两个开关只管左边（11-23 设置改版，「经典」下不显示它们）。
     val closeAtRight = rightCloses && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     val cancelAtLeft = showCompositionCancel && !rightCloses
     // 「<」右边那 4dp：开了「候选滑到头回弹展开」、后面是候选行时算拉动区的一部分（11-21 平板上按在空白处拉不动）；
     // 开关关着时和 1.15.101 一样画在拉动区外面。
     val pullLeadingGap = if (swipeExpand && cancelAtLeft && inlineSuggestions.isEmpty()) 4.dp else 0.dp
-    // 候选栏两端最多两个按钮（用户 11-03）：左边取消，最右展开候选，位置固定。左边打字和联想都是「<」，
-    // 设置「联想关闭键用叉号」打开后联想时才是 ⊗（用户 11-03：两种状态图标不一样）；
-    // 收起键盘只在空闲（没有候选）时有。手写候选也是纯联想态，但那里的取消是撤销当前字，仍用「<」。
-    val closesAssociation = state is CandidateBarState.AssociationOnly &&
-        !(page is KeyboardPage.Main && page.type == MainType.HANDWRITING)
     // 手写候选的注释是读音，单字也放得下：「自动」在手写里照样显示，只有「隐藏」才不显示
     // （用户 10-31：手机竖屏「自动」把手写读音藏掉了，忘了读音的字正要靠它）。
     val commentsAllowed = rememberCandidateCommentsAllowed().let {
@@ -953,7 +965,7 @@ fun CandidateBar(
             // 「经典」开了左右滑也照旧放 ▾/▴，滑只是多一种展开办法（11-23）。别的宿主（没有「<」时）右边放「清空」，这时不再放收起。
             val rightClearShown = !candidatePageExpanded && displayAssociation.isNotEmpty() &&
                 callbacks.onClearAssociation != null && callbacks.onCancelInput == null
-            if (rightCloses) {
+            if (rightCloses || rightHides) {
                 if (closeAtRight) {
                     // 和下面收起键盘、空闲时的收起键同一格：同一个位置先关候选／联想，再点就收起键盘。
                     KeyboardToolbarButton({ callbacks.onCancelInput?.invoke() }, edgePressedFill,

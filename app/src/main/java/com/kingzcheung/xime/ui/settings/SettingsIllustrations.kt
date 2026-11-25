@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -738,61 +736,3 @@ internal fun JapaneseLongVowelIllustration(mode: com.kingzcheung.xime.ui.keyboar
     }
 }
 
-/**
- * 候选栏两种用法两张卡里的图（11-22 他定功能，11-24 他定名字「默认」「经典」）：小候选栏，右边那一格标出来。
- * [closes] 为假（「默认」）：打字时左「‹」右「▾」，和 1.15.101 一样。
- * 为真（「经典」）：打字时右边「×」，关掉后空闲时同一格是收起键盘「⌄」。
- * 说明里的小图标和字一样大（11-23 他：「一个大一个小…跟文字保持一样」）。
- */
-@Composable
-internal fun CandidateRightKeyIllustration(closes: Boolean) {
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val primary = MaterialTheme.colorScheme.primary
-    val captionSize = 13.sp
-    val captionIcon = with(androidx.compose.ui.platform.LocalDensity.current) { captionSize.toDp() }
-    @Composable
-    fun Dot(icon: ImageVector, highlight: Boolean) {
-        Box(Modifier.size(24.dp).clip(CircleShape)
-            .background(if (highlight) primary.copy(alpha = 0.3f) else onSurface.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = if (highlight) primary else onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.size(18.dp))
-        }
-    }
-    @Composable
-    fun Bar(words: String, typing: Boolean, right: ImageVector) {
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 3.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (typing && !closes) Dot(Icons.AutoMirrored.Filled.KeyboardArrowLeft, highlight = false)
-            if (!typing) Text("☰", fontSize = 13.sp, color = onSurface.copy(alpha = 0.6f), maxLines = 1)
-            Spacer(Modifier.width(8.dp))
-            Text(words, fontSize = 13.sp, color = onSurface, maxLines = 1, overflow = TextOverflow.Clip,
-                modifier = Modifier.weight(1f))
-            Dot(right, highlight = true)
-        }
-    }
-    @Composable
-    fun Caption(before: String, icon: ImageVector, after: String) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(before, fontSize = captionSize, color = primary, maxLines = 1)
-            Icon(icon, contentDescription = null, tint = primary, modifier = Modifier.size(captionIcon))
-            Text(after, fontSize = captionSize, color = primary, maxLines = 1)
-        }
-    }
-    Column(Modifier.fillMaxWidth().testTag("candidate-right-key-illustration:$closes"),
-        verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.Start) {
-        if (closes) {
-            Bar("你好  拟好  你  泥", typing = true, right = Icons.Filled.Close)
-            Bar("", typing = false, right = Icons.Filled.KeyboardArrowDown)
-            Spacer(Modifier.height(1.dp))
-            Caption("右边", Icons.Filled.Close, "：关候选、关联想")
-            Caption("同一处再点", Icons.Filled.KeyboardArrowDown, "：收起键盘")
-            Text("往左拉：展开更多候选", fontSize = captionSize, color = primary, maxLines = 1)
-        } else {
-            Bar("你好  拟好  你  泥", typing = true, right = Icons.Filled.KeyboardArrowDown)
-            Spacer(Modifier.height(1.dp))
-            Caption("左边", Icons.AutoMirrored.Filled.KeyboardArrowLeft, "：取消输入")
-            Caption("右边", Icons.Filled.KeyboardArrowDown, "：展开更多候选")
-        }
-    }
-}

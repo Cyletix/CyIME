@@ -41,6 +41,7 @@ class CandidateCloseRightTest {
     @After fun reset() {
         prefs.edit().remove(SettingsPreferences.KEY_CANDIDATE_SWIPE_EXPAND)
             .remove(SettingsPreferences.KEY_CANDIDATE_CLOSE_ON_RIGHT)
+            .remove(SettingsPreferences.KEY_CANDIDATE_RIGHT_HIDES)
             .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON).commit()
     }
 
@@ -107,6 +108,29 @@ class CandidateCloseRightTest {
         }
         rule.onNodeWithTag("candidate-close-right").assertExistsWithDescription("取消输入")
         rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
+    }
+
+    /** 「收键盘」（= 1.15.103，11-24）：打字、联想时右边都是收起键盘，左边「‹」取消，没有 ▾。 */
+    @Test fun hideModeRightAlwaysHidesTheKeyboard() {
+        SettingsPreferences.setCandidateRightKey(context, com.kingzcheung.xime.settings.CandidateRightKey.HIDE)
+        assertEquals(true, SettingsPreferences.isCandidateSwipeExpand(context))
+        val state = mutableStateOf<CandidateBarState>(typing)
+        var cancels = 0
+        var hides = 0
+        rule.setContent {
+            CandidateBar(state = state.value, visuals = visuals,
+                callbacks = CandidateBarCallbacks(onCandidateSelect = { state.value = association },
+                    onCancelInput = { cancels++ }, onShowMoreCandidates = {}, onHideKeyboard = { hides++ }),
+                showPreeditPreview = false, modifier = Modifier.width(400.dp))
+        }
+        rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
+        rule.onNodeWithTag("candidate-close-right").assertDoesNotExist()
+        rule.onNodeWithContentDescription("取消输入", useUnmergedTree = true).assertExists()
+        rule.onNodeWithTag("candidate-hide").performClick()
+        rule.runOnIdle { assertEquals(1, hides); assertEquals(0, cancels) }
+        rule.onNodeWithTag("bar-candidate:0", useUnmergedTree = true).performClick()
+        rule.onNodeWithTag("candidate-hide").performClick()
+        rule.runOnIdle { assertEquals(2, hides); assertEquals(0, cancels) }
     }
 
     @Test fun rightChoiceDoesNothingWhileSwipeExpandIsOff() {

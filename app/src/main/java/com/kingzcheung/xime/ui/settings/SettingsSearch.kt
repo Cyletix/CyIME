@@ -317,13 +317,19 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("候选字大小", candidates, candidatePage, "候选 字号 字体大小 文字大小"),
         SettingsSearchEntry("候选词间距加宽", candidates, candidatePage, "候选 间距 间隔 太挤 密度 单字 宽松 分隔线 竖线"),
         // 11-09 反馈：有人按「取消候选按钮」「关闭候选按钮」找，记不住「候选栏」在前。
-        SettingsSearchEntry("候选栏取消按钮", candidates, candidatePage, "取消 左箭头 取消输入 取消候选 关闭候选 取消候选按钮 关闭候选按钮 候选时取消按钮 关闭按钮 返回按钮 返回键 退出输入 取消联想 关闭联想"),
-        SettingsSearchEntry("联想关闭键用叉号", candidates, candidatePage, "联想 关闭联想 取消联想 关闭键 关闭按钮 叉 叉号 圆叉 左箭头"),
+        // 11-24 照效果图改名「显示 ‹ 取消键」「关联想用 ⊗」，原来的名字留作关键词；两个开关各管各的。
+        SettingsSearchEntry("显示 ‹ 取消键", candidates, candidatePage, "候选栏取消按钮 取消键 显示取消键 取消 左箭头 取消输入 取消候选 关闭候选 取消候选按钮 关闭候选按钮 候选时取消按钮 关闭按钮 返回按钮 返回键 退出输入 取消联想 关闭联想"),
+        SettingsSearchEntry("关联想用 ⊗", candidates, candidatePage, "联想关闭键用叉号 关联想用叉号 联想 关闭联想 取消联想 关闭键 关闭按钮 叉 叉号 圆叉 左箭头"),
         // 11-24 他定名：两张卡「默认」「经典」（没有小标题），开关「左右滑展开候选」；以前的名字留作关键词。
         // 「经典」这一条也是「左右滑展开候选」锁定说明里「经典」的跳转目标。
         SettingsSearchEntry("经典", candidates, candidatePage, "候选栏右边的键 默认 右边 展开 关闭 关闭键 关闭键位置 叉 叉号 箭头 展开箭头 收起键盘 全面屏手势 关闭联想 右边一处关",
             anchor = "候选栏右边的键"),
+        // 11-24 第三张卡「收键盘」（= 1.15.103）：右边一直收起键盘。
+        SettingsSearchEntry("右侧收起", candidates, candidatePage, "候选栏右边的键 收键盘 103 右边 收起键盘 关闭键盘 隐藏键盘 下箭头 左右滑 取消",
+            anchor = "候选栏右边的键"),
         SettingsSearchEntry("左右滑展开候选", candidates, candidatePage, "候选 滑动展开 左滑 右滑 拉 回弹 弹回 滑到头 候选滑到头回弹展开 展开候选 收起候选 收回候选 手势展开"),
+        // 11-24 他：局部修改默认关，只给长句。
+        SettingsSearchEntry("长句拖选改局部", candidates, candidatePage, "局部修改 改局部 拖选 拖动选择 改一段 重选 长按首选 长句 句子编辑"),
         SettingsSearchEntry("候选注释", candidates, candidatePage, "注释 显示 自动 隐藏 候选显示"),
         SettingsSearchEntry("候选注释内容", candidates, candidatePage, "注释 拼音 释义 翻译 编码 中英 英文意思 词典 英文 单词 英文单词 选英文 出英文 上屏英文 打英文 中译英 下一项 长按下一项 shift"),
         // 九键的「下一项」键：搜「下一项」时排在上面「候选注释内容」后面（同分按先后）
