@@ -868,8 +868,12 @@ fun SwipeableKeyButton(
                         modifier = Modifier.size(mainIconSize)
                     )
                 } else {
+                    val mainLabel = customLayoutLabel(customLayout, punctuationKeyLabel(text), glassLabelSurface ?: resolvedBackground, customAccent, textColor)
+                    // 笔画键 一丨丿丶乛 按同一线宽自己画，不随手机字体变细、粗细不一（见 [keycapStrokeLabel]）。
+                    val strokeLabel = keycapStrokeLabel(mainLabel)
                     Text(
-                        text = customLayoutLabel(customLayout, punctuationKeyLabel(text), glassLabelSurface ?: resolvedBackground, customAccent, textColor),
+                        text = strokeLabel ?: mainLabel,
+                        inlineContent = if (strokeLabel != null) keycapStrokeInlineContent(mainLabel.text, resolvedText) else emptyMap(),
                         // 双拼键位提示的韵母在字母下面：字母上移半个提示高，两者一起居中。
                         modifier = Modifier.fillMaxWidth().offset(y = if (dpCornerLayout != null) dpCornerLayout.letterOffsetDp.dp
                             else if (dpHint != null) (-(dpFinals?.heightDp ?: 0f) / 2f).dp
