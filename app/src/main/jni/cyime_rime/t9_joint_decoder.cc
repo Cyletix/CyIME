@@ -95,7 +95,7 @@ struct T9JointCache {
   hash_set<string> blacklist;
   using Options = std::tuple<size_t, size_t, size_t, size_t, size_t,
                             double, double, double, string, bool, bool, bool,
-                            const void*, double, bool, double, bool, double, double>;
+                            const void*, double, bool, double, bool, double, double, double>;
   Options options;
 };
 
@@ -119,8 +119,11 @@ size_t T9SentenceBytes(const Sentence& sentence) {
 // Tail pass (t9/tail_completion_weight): words looked at for each start, and lines extended from each start.
 constexpr size_t kTailWordsPerStart = 4;
 constexpr size_t kTailLinesPerStart = 8;
-// A completed word from the first key needs this many syllables: 一段时间 for yi duan shi jia, not 时间 for 史嘉.
-constexpr size_t kTailFirstWordSyllables = 3;
+// A completed word from the first key needs this many syllables: 一段时间 for yi duan shi jia. 2026-11-25 two (was
+// three, so 时间 never came for 史嘉): 54684 jin ti showed 近体 and 546842 吉姆哈 while 今天 was being typed, 94432
+// 直达 for 知道; chat replay: 27 typing states turn to the word being typed, no first choice after the last key
+// changes, +0.004% lookups. 常用词被冷门词压住 (他：「这个必须进107修好」).
+constexpr size_t kTailFirstWordSyllables = 2;
 
 bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_numeric_input)(const string&),
                    Dictionary* dict, UserDictionary* user_dict, deque<an<Sentence>>* sentences) {
@@ -267,7 +270,8 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
         o.t9_sentence_weight_, o.t9_sentence_model_, q.translator->enable_completion(),
         q.translator->enable_word_completion(), q.translator->complete_short_prefix(),
         o.t9_ngram_.get(), o.t9_ngram_user_weight_, o.t9_ngram_sentence_start_, o.t9_ngram_eos_weight_,
-        o.t9_ngram_merge_segmentations_, o.t9_ngram_dictionary_prior_, o.t9_ngram_user_input_weight_};
+        o.t9_ngram_merge_segmentations_, o.t9_ngram_dictionary_prior_, o.t9_ngram_user_input_weight_,
+        o.t9_whole_word_weight_margin_};
     if (cache->dict_checksum != prism->dict_file_checksum() ||
         cache->schema_checksum != prism->schema_file_checksum() ||
         cache->user_revision != revision || cache->user_tick != tick ||
@@ -712,8 +716,10 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
     for (const auto& row : syllables.edges) {
       const auto last = row.second.find(total);
       const size_t length = total - row.first;
-      if (row.first == 0 || last == row.second.end() || length < 2 || length > 5) continue;
-      if (std::none_of(last->second.begin(), last->second.end(),
+      if (row.first == 0 || length < 2 || length > 5) continue;
+      // Digits that spell no syllable yet (842: tia, only the start of tian/tiao) are completed too: 546842 showed
+      // 吉姆哈 while 今天 was being typed (2026-11-25).
+      if (last != row.second.end() && std::none_of(last->second.begin(), last->second.end(),
                        [](const auto& spelling) { return spelling.second.type == kNormalSpelling; })) continue;
       vector<Prism::Match> keys;
       prism->ExpandSearch(input.substr(row.first, length), &keys, 64);
@@ -799,6 +805,50 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
     final.emplace_back(rank, line);
   }
   std::stable_sort(final.begin(), final.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+  // One word typed as the whole input (t9/whole_word_weight_margin): the word model scores it as a sentence start,
+  // where 事后 (often as 事 + 后) is likelier than 时候 and 王子 than 样子, though the dictionary has 时候 ten times
+  // more often. When the first sentence reads as a dictionary word of the whole input and another dictionary word of
+  // the same input has a weight higher by more than the margin, that word comes first. Sentences that are no
+  // dictionary word (several words) keep the model's order.
+  if (o.t9_whole_word_weight_margin_ > 0 && !final.empty() && states.count(0) && !states.at(0).empty()) {
+    const auto& top = final.front().second;
+    const auto row = graph.find(0);
+    const DictEntryList* whole = nullptr;
+    if (row != graph.end()) {
+      const auto at_end = row->second.find(static_cast<int>(total));
+      if (at_end != row->second.end()) whole = &at_end->second;
+    }
+    auto system_word = [&](const an<DictEntry>& entry) {
+      return entry && !entry->IsPredictiveMatch() && entry->commit_count <= 0 && std::isfinite(entry->weight) &&
+             entry->quality_len + 1e-9 >= static_cast<double>(total) &&
+             utf8::distance(entry->text.begin(), entry->text.end()) >= 2;
+    };
+    an<DictEntry> shown, best;
+    if (whole && utf8::distance(top->text.begin(), top->text.end()) >= 2)
+      for (const auto& entry : *whole) {
+        if (!system_word(entry)) continue;
+        if (entry->text == top->text) { if (!shown || entry->weight > shown->weight) shown = entry; }
+        else if (!best || entry->weight > best->weight) best = entry;
+      }
+    // The beam seldom keeps 时候 itself (its places at the end go to likelier pairs such as 是 后): the line is made here.
+    if (shown && best && best->weight - shown->weight > o.t9_whole_word_weight_margin_) {
+      auto line = New<T9Line>();
+      line->previous = states.at(0).front();
+      line->entry = best;
+      line->matched_length = best->quality_len;
+      line->end = total;
+      line->text = best->text;
+      line->code = best->code;
+      line->prior = T9WholeTextPrior(o.t9_gram_db_, line->text);
+      line->lm_prev = o.t9_ngram_ && o.t9_ngram_sentence_start_ ? o.t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
+      if (o.t9_ngram_) line->lm_id = lm_entry_of(best).id;
+      // Just above the first sentence: equal weights are ordered by the gram prior, which kept 事后 first.
+      line->score = final.front().first + 1e-3;
+      final.erase(std::remove_if(final.begin(), final.end(),
+                                 [&](const auto& ranked) { return ranked.second->text == line->text; }), final.end());
+      final.insert(final.begin(), {line->score, line});
+    }
+  }
   // Words typed as the whole input (指导 for 944326, 是要) that the user has committed lately: 26 keys order such words by
   // the user dictionary, nine keys only through the small user layer (λ), so 指导 needed four picks to pass 知道
   // and fell back after a few hundred other words. Among the whole-input words of two or more characters, spelled

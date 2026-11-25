@@ -156,6 +156,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     config->GetDouble("t9/ngram_user_weight", &t9_ngram_user_weight_);
     config->GetDouble("t9/ngram_user_input_weight", &t9_ngram_user_input_weight_);
     config->GetDouble("t9/ngram_dictionary_prior", &t9_ngram_dictionary_prior_);
+    config->GetDouble("t9/whole_word_weight_margin", &t9_whole_word_weight_margin_);
     config->GetBool("t9/ngram_sentence_start", &t9_ngram_sentence_start_);
     config->GetDouble("t9/ngram_eos_weight", &t9_ngram_eos_weight_);
     config->GetDouble("t9/particle_eos_weight", &t9_particle_eos_weight_);

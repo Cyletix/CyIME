@@ -63,6 +63,10 @@ struct T9ScriptOptions {
   double t9_ngram_user_input_weight_ = 0;
   double t9_ngram_dictionary_prior_ = 0;
   bool t9_ngram_sentence_start_ = false;
+  // t9/whole_word_weight_margin (ln units, 0 = off): when the first sentence is one dictionary word spelling the whole
+  // input, a word of the same input whose dictionary weight is higher by more than this comes first (744468: 时候
+  // over 事后). 2026-11-25 他：「你直接改词权」.
+  double t9_whole_word_weight_margin_ = 0;
   double t9_ngram_eos_weight_ = 0;
   // Sentence-final particles (t9/final_particles: 吗, 呢, 吧…) and t9/particle_eos_weight: when one of
   // the first whole-input sentences ends with such a particle, every finished sentence is ordered with
