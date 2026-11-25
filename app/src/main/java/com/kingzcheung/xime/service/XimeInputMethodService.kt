@@ -618,7 +618,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         val origin = glassAnchorOrigin()
         if (handwritingGlassControls != bounds || handwritingGlassControlsOrigin != origin) {
+            // 全屏手写报给应用的顶线跟着这块按键的顶边走（computeImeInsets）：顶边变了再排一次版，让系统重算。
+            val topChanged = handwritingGlassControls?.top != bounds?.top
             handwritingGlassControls = bounds
+            if (topChanged && ::keyboardContainer.isInitialized) keyboardContainer.requestLayout()
             handwritingGlassControlsOrigin = origin
             updateKeyboardGlass()
         }
@@ -5873,7 +5876,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             (keyboardViewModel.page.value.underlyingPage() as? KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING) {
             val windowHeight = window.window?.decorView?.height ?: resources.displayMetrics.heightPixels
             val reserve = if (state.isFloatingMode) 0 else (handwritingNormalInsetDp * resources.displayMetrics.density).roundToInt()
-            outInsets.contentTopInsets = (windowHeight - reserve).coerceAtLeast(0)
+            // 固定键盘全屏时应用只让出底下那块按键（候选栏 + 展开栏 + 底排）：以前一直让出平时手写键盘的整高，
+            // 输入框和底下按键之间空出一大截透明书写区（11-25 用户：全屏手写高度不对）。
+            val footerTop = handwritingGlassControls?.top?.takeIf { !state.isFloatingMode && state.handwritingExpanded }
+            outInsets.contentTopInsets = (footerTop?.coerceIn(windowHeight - reserve, windowHeight) ?: (windowHeight - reserve))
+                .coerceAtLeast(0)
             outInsets.visibleTopInsets = outInsets.contentTopInsets
             outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
             return
