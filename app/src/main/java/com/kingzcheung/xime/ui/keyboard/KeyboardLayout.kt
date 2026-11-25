@@ -1137,7 +1137,8 @@ fun KeyboardLayout(
                         CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
                         SwipeableKeyButton(
                             layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
-                            followSymbolSwipeDirection = !keyLabelPrefs.bottomPunctuationSwipeUp,
+                            // 带分词的标点键不跟角标方向翻：' 画在左下角就下滑分词、副标点上滑（11-24 反馈「中文逗号下滑分词失效」）。
+                            followSymbolSwipeDirection = !keyLabelPrefs.bottomPunctuationSwipeUp && !split,
                             keepSymbolSwipeOnLongPress = keyLabelPrefs.bottomPunctuationSwipeUp,
                             text = key.primary,
                             onClick = { commitPunctuation(key.primary) },
