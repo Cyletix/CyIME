@@ -1526,10 +1526,8 @@ fun CandidateItem(
         )
         if (learned) {
             // 不占宽度：画在字的右上角外面、候选自己的留白里，候选之间的距离和没有角标时一样（用户 11-19：编辑按钮太宽）。
-            androidx.compose.material3.Icon(
-                imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
-                contentDescription = null,
-                tint = accentColor,
+            // 11-25 他：小铅笔缩到字高 0.3 看不出是铅笔，像一道斜线，难看；改成一个实心小圆点（同 Windows）。
+            androidx.compose.foundation.layout.Box(
                 modifier = Modifier.align(Alignment.Top)
                     .layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints)
@@ -1540,6 +1538,8 @@ fun CandidateItem(
                         layout(0, placeable.height) { placeable.place(shift, -lift) }
                     }
                     .size(with(LocalDensity.current) { learnedMarkSize(fontSize).toDp() })
+                    .padding(with(LocalDensity.current) { (learnedMarkSize(fontSize) * 0.2f).toDp() })
+                    .background(accentColor, androidx.compose.foundation.shape.CircleShape)
                     .testTag("candidate-learned:$index"),
             )
         }
@@ -1564,7 +1564,7 @@ fun CandidateItem(
 }
 
 /**
- * 「打过的词」小图标的边长（字高的 0.3：四分之一看不清，0.4 挡住字的右上角，用户 11-23）。
+ * 「打过的词」小圆点所在方块的边长（点的直径是它的 0.6）（字高的 0.3：四分之一看不清，0.4 挡住字的右上角，用户 11-23）。
  * 图标不占宽度，只在后面有注释时让出 [learnedCommentGap]。
  */
 internal fun learnedMarkSize(fontSize: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.TextUnit =
