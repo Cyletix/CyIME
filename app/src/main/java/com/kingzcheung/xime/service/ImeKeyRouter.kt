@@ -266,6 +266,23 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         finished?.let { NumberHistory.record(service, it) }
     }
 
+    /**
+     * 英文词后面接着点的数字（Abc 上屏后点 1 2 3，2026-11-25 他问 Abc123 能不能记住）：光标前是「字母 + 数字」时连起来记进
+     * 英文记忆，之后打 abc 由 lua/cyime_en_memory.lua 补全出 Abc123。只在记英文的键盘（雾凇 26 键、英文单词），
+     * 无痕、密码框、键盘里的面板输入框不记。
+     */
+    internal suspend fun rememberEnglishDigits() {
+        if (!typesEnglishCapitals(service.uiState.value.currentSchemaId) ||
+            com.kingzcheung.xime.settings.IncognitoState.active) return
+        val before = withEditor {
+            if (service.uiState.value.inputTarget.isInternal || service.isSecretEditor()) null
+            else runCatching { service.currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() }.getOrNull()
+        } ?: return
+        val (word, digits) = com.kingzcheung.xime.settings.EnglishWordMemory.wordWithDigits(before) ?: return
+        com.kingzcheung.xime.settings.EnglishWordMemory.rememberWithDigits(
+            com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service), word, digits)
+    }
+
     /** 跟着光标前正在打的那串数字，打完才记（见 [NumberHistory]）。主线程用。 */
     private val numberRun = NumberRunTracker()
 

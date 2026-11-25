@@ -6209,6 +6209,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             com.kingzcheung.xime.stats.TypingStats.onCommit(delivered, isPaste, source, softKeyboard = !hasHardwareKeyboard,
                 combo = typingStatsCombo(source, !hasHardwareKeyboard))
         }
+        // 英文记忆（11-25 他：英文直出、九键、14 键里打的 Abc123 也要记住）：一个不是字母的字上屏后看它前面的词，
+        // 带数字或中间有大写的记进 cyime_en_memory.txt，雾凇 26 键、英文单词方案里打开头就补全。
+        if (!isPaste && delivered.length == 1 && !delivered[0].isLetter() && !com.kingzcheung.xime.settings.IncognitoState.active)
+            runCatching { connection.getTextBeforeCursor(64, 0)?.toString() }.getOrNull()
+                ?.takeIf { it.endsWith(delivered) }
+                ?.let { com.kingzcheung.xime.settings.EnglishWordMemory.rememberTyped(SchemaManager.getRimeDir(this), it) }
         if (isChineseMode) {
             val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull()
             // 有的宿主（抖音直播间评论框等）上屏后马上问，回的是空串或上屏前的旧文字：拿它当联想上下文就没有联想。

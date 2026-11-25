@@ -987,7 +987,11 @@ val prepareChineseDictionaries by tasks.registering {
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
             // No force_gc translator, as in full pinyin above.
             .also { check(it.contains("\n    - lua_translator@*force_gc")) { "Upstream double_pinyin_flypy translator list changed" } }
-            .lineSequence().filterNot { it.contains("- lua_translator@*force_gc") }.joinToString("\n")
+            .also { check(it.contains("\n    - lua_filter@*autocap_filter")) { "Upstream double_pinyin_flypy filter list changed" } }
+            // English memory as in full pinyin (11-25 他：双拼里打过的 Abc123 也要能补全): the letters typed are the word's.
+            .lineSequence().filterNot { it.contains("- lua_translator@*force_gc") }
+            .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_en_memory") else sequenceOf(it) }
+            .joinToString("\n")
             .let { withUserPhraseForms(withGreekLetters(withSymbolNames(withDatetimeHints(it)))) }
             // 生僻字 also for double pinyin (GitHub #72, same default-off switch): the Lua translator maps the two keys
             // through this scheme's preedit_format; DoublePinyinScheme copies both lines into every generated scheme.
