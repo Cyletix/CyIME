@@ -135,6 +135,9 @@ val prepareChineseDictionaries by tasks.registering {
     // 游戏名、网络流行语（tools/dictionaries/new_words.py 生成，和 cyime_domain_terms.tsv 一样只往上提）。
     val newWords = file("data/cyime_new_words.tsv")
     inputs.file(newWords)
+    // 口语「动作 + 时长/动量/结果」短语（讲半天、骂一下、问了一下），词典里没有，逐字拼会出 将半天。同样只往上提，选法见文件头。
+    val spokenPhrases = file("data/cyime_spoken_phrases.tsv")
+    inputs.file(spokenPhrases)
     val removedWords = file("data/cyime_removed_words.txt.gz")
     inputs.file(removedWords)
     val removedNames = file("data/cyime_removed_names.txt")
@@ -259,7 +262,7 @@ val prepareChineseDictionaries by tasks.registering {
         // rate the IME's own words near zero (上屏 43, 出词 11), so 只输入声母 came out 只输入圣母 and 每个键
         // 每个见. Raise the existing rime-ice entries here; missing ones are added to cyime_terms below.
         // The user's must-pass words (app/data/cyime_user_fixes.tsv) use the same floor, one code each.
-        val domainFloors = (domainTerms.readLines() + userFixes.readLines() + newWords.readLines()).filter { it.isNotBlank() && !it.startsWith("#") }
+        val domainFloors = (domainTerms.readLines() + userFixes.readLines() + newWords.readLines() + spokenPhrases.readLines()).filter { it.isNotBlank() && !it.startsWith("#") }
             .map { it.split('\t') }.associate { (it[0] + "\t" + it[1]) to it[2].toInt() }.toMutableMap()
         // Sentence pattern verb + 完了/好了 + 吗/没 (user 2026-10-30: 测完了吗 came out 测验了吗 on nine-key): these
         // phrases sat near 200, below 洗澡了吗 and 吃药了吗 on the same keys; each one present gets at least 1000
