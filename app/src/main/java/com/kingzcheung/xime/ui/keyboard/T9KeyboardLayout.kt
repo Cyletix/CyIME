@@ -600,6 +600,7 @@ private fun T9KeyboardContent(
                             isSelected = isSelected,
                             approximate = option?.near == true,
                             fitWidth = option != null,
+                            fitTo = if (showCandidates) displayItems else emptyList(),
                             modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp)
                                 .testTag("t9-pinyin-option:$index")
                         )
@@ -1131,6 +1132,8 @@ internal fun T9CandidateItem(
     approximate: Boolean = false,
     /** 字太宽时缩到放得下（读音一律缩，保证完整显示）；符号列表不缩，照旧。 */
     fitWidth: Boolean = false,
+    /** 同一栏的全部读音，整栏按最宽的一个用同一个字号（见 [FittedRailText]）。 */
+    fitTo: List<String> = emptyList(),
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
@@ -1156,7 +1159,8 @@ internal fun T9CandidateItem(
         contentAlignment = Alignment.Center
     ) {
         val shown = if (preserveWidth) text else punctuationKeyLabel(text)
-        val available = maxWidth - if (isSelected) 12.dp else 6.dp
+        // 选中、没选中按同一个宽度缩（选中的高亮框左右各占 3dp），点一下读音不再变小一号。
+        val available = maxWidth - 12.dp
         val modifierWithMeaning = if (approximate) Modifier.semantics { contentDescription = "相近读音 $text" } else Modifier
         if (isSelected) {
             Box(
@@ -1166,11 +1170,11 @@ internal fun T9CandidateItem(
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
                 FittedRailText(shown, accentColor, fontSize, FontWeight.Medium, approximate,
-                    if (fitWidth) available else null)
+                    if (fitWidth) available else null, fitTo = fitTo)
             }
         } else {
             FittedRailText(shown, if (approximate) approximateRailColor(textColor) else textColor, fontSize,
-                FontWeight.Normal, approximate, if (fitWidth) available else null, modifierWithMeaning)
+                FontWeight.Normal, approximate, if (fitWidth) available else null, modifierWithMeaning, fitTo = fitTo)
         }
     }
 }
@@ -1191,10 +1195,22 @@ internal fun FittedRailText(
     approximate: Boolean,
     maxWidth: Dp?,
     modifier: Modifier = Modifier,
+    /**
+     * 同一栏的全部读音：给了就按其中最宽的一个缩，整栏一个字号（11-24 群里反馈：展开候选里的音节忽大忽小——
+     * 原来每个各自缩，zhuang 比 a 小，点中一个又因为高亮框窄了一点再缩一次）。
+     */
+    fitTo: List<String> = emptyList(),
 ) {
     val style = TextStyle(fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily, fontWeight = fontWeight)
     val fitted = if (maxWidth == null) fontSize else {
-        val measured = rememberTextMeasurer().measure(text, style = style, maxLines = 1, softWrap = false).size.width
+        val measurer = rememberTextMeasurer()
+        // 按加粗（选中时的字重）量，选中、没选中同一个字号。
+        val measureStyle = style.copy(fontWeight = FontWeight.Medium)
+        val measured = remember(text, fitTo, measureStyle) {
+            fitTo.ifEmpty { listOf(text) }.maxOf {
+                measurer.measure(it, style = measureStyle, maxLines = 1, softWrap = false).size.width
+            }
+        }
         val usable = with(LocalDensity.current) { maxWidth.toPx() }.coerceAtLeast(1f)
         fontSize * minOf(1f, usable / measured.coerceAtLeast(1))
     }
