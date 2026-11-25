@@ -105,6 +105,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     config->GetInt("t9/model_sentences", &t9_model_sentences_);
     config->GetBool("t9/model_sentences_on_pause", &t9_model_sentences_on_pause_);
     config->GetDouble("t9/model_sentences_rime_weight", &t9_model_sentences_rime_weight_);
+    config->GetDouble("t9/model_sentences_fuzzy_penalty", &t9_model_sentences_fuzzy_penalty_);
     config->GetDouble("t9/final_g_word_margin", &t9_final_g_word_margin_);
     int keys_per_syllable = 0;
     config->GetInt("t9/rescore_keys_per_syllable", &keys_per_syllable);

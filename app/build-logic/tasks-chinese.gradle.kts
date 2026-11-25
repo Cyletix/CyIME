@@ -810,6 +810,19 @@ val prepareChineseDictionaries by tasks.registering {
             // by the word model alone, and a sentence that also dropped a doubled letter led for being a word shorter:
             // ...butinghuaa 不听话 over 不听话啊). Only matters with translator/cyime_extra_letter_sentences.
             "  extra_corrections_pay_margin: true\n" +
+            // stray_correction_margin: with an initial standing alone before the last syllable
+            // (translator/cyime_stray_initial_correction above) the corrected sentence led whatever the word model
+            // said, so a word typed by its initials inside full pinyin (l for 了, g for 个, d for 打) lost to a
+            // neighbour-key reading of those initials, more often with the word model than without. Now it leads only
+            // when its score (word model + rescore_rime_weight of Rime's weight) beats the typed choice's by this
+            // margin (ln units; unset: always, as before). correction_lead_bias does not shift it: the never-first
+            // level's note (TypoStrength) relies on corrections still leading where the letters do not read in full by
+            // normal spellings. 2026-11-24 cloud engine (107 + this), bundled model, chosen on 2000 held-out real
+            // clauses: one word typed by its initials 34 -> 62 of 160, real typing 1142 -> 1152 (10 fixed, none
+            // broken), touch and clean typing unchanged; real slips break from 3 on (2 at 3, 25 at 9.2). Confirmed on
+            // 6457 others: initials 122 -> 180 of 600, real typing 3680 -> 3697 (22 fixed, 5 broken), touch 4615 ->
+            // 4613, clean typing and the 1193 must-pass unchanged; the tablet's full model alike.
+            "  stray_correction_margin: 2\n" +
             // correction_lead_bias: the keyboard's 邻键纠错强度 (TypoStrength.Lead; ln units), added to the three margins a
             // corrected reading must win by before it leads what was typed: the 2000 times of a corrected word
             // (candidate_policy.cc), slip_correction_margin and tail_correction_margin above. Not applied on the

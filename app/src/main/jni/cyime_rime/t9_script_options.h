@@ -126,6 +126,11 @@ struct T9ScriptOptions {
   // sentence is compared with the typed choice, this share of Rime's own sentence weight is added on both sides. The
   // choice among the typed sentences does not use it.
   double t9_model_sentences_rime_weight_ = 0.0;
+  // t9/model_sentences_fuzzy_penalty (ln units, 2026-11-24): built sentences with syllables read only through a fuzzy
+  // spelling (模糊音, the user's fuzz/ rules) join too, on places of their own, and pay this for each such syllable.
+  // Negative (unset): they do not join, as before. 14 keys with fuzzy pinyin on: a sentence with an accent typo (lao
+  // typed nao) was never rebuilt by the word model after a pause.
+  double t9_model_sentences_fuzzy_penalty_ = -1.0;
   // t9/final_g_word_margin (ln units): a dictionary word that reads the whole input with the final g added
   // (translator/cyime_final_g_correction; yianzhuan: 已安装) leads the sentence of the typed letters (一按转) when the
   // word model finds its text more likely by more than this; 0 keeps the typed sentence first. Uses
