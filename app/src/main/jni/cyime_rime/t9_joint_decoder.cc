@@ -74,7 +74,10 @@ static void T9Collect(map<int, DictEntryList>& destination,
 }
 }  // namespace
 
-struct T9Path { Sentence sentence; double prior; double coverage; };
+// displaced: the model's first sentence when a learned word took its place (t9/ngram_user_input_weight). Only one
+// sentence is shown before the dictionary words, which list every learned word of the spelling first, so it is shown
+// right behind (9464 after picking 鹰: 行 fell from first to ninth, behind 英 银行 信号 星 赢 影 音高).
+struct T9Path { Sentence sentence; double prior; double coverage; bool displaced = false; };
 struct T9JointFrame {
   EdgeMap edges;
   size_t total = 0, bytes = 0;
@@ -217,7 +220,7 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
       const auto& item = order[position];
       const auto& path = paths[item.first];
       bool extra = false;
-      const bool kept_vowel = position == demoted;
+      const bool kept_vowel = position == demoted || path.displaced;
       // t9/display_sentences: whole-input sentences shown before the dictionary words
       // (1 = the best sentence, then shorter words, as stock Rime; 0 = all decoded).
       // When a sentence ending in a particle (吗, 呢, 吧…) is among the first three, one more sentence is
@@ -860,6 +863,7 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
   // every 200 commits), without its long-run commit rate: a word picked 13 times 10,000 commits ago (食补 over
   // 是不) is not what the user is choosing now. A pick just made gets nearly κ, an old one next to nothing; with
   // nothing picked lately nothing changes. It reorders the finished lines only: no lookup, the beam is untouched.
+  const T9Line* displaced_line = nullptr;
   if (o.t9_ngram_user_input_weight_ > 0 && o.t9_ngram_user_input_weight_ < 1 && learned_whole.count(total)) {
     // librime's user dictionary: p = m + (0.5 - m)·dee/kM for dee < 20, m = commits/T·(1 - e^(-T/10000))^10 at
     // tick T, 1/kM = 1 - e^(-0.005). The recent part 0.5·dee/kM; one pick 300 commits ago has dee = e^(-1.5).
@@ -876,8 +880,11 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
       if (!std::isfinite(b)) return a;
       return std::max(a, b) + std::log1p(std::exp(-std::fabs(a - b)));
     };
+    // Single characters count too (2026-11-24, his「选多少次都调不了」: a picked character, 粤语字 and 生僻字 among them,
+    // never moved on nine keys; the user layer λ alone gives a pick 5%). One syllable typed in full is a whole input
+    // like a word is.
     auto spelled_word = [&](const an<DictEntry>& entry) {
-      return utf8::distance(entry->text.begin(), entry->text.end()) >= 2 &&
+      return utf8::distance(entry->text.begin(), entry->text.end()) >= 1 &&
              entry->quality_len + 1e-9 >= static_cast<double>(total);
     };
     // A learned word may be shown through words of the model (是要 = 是 + 要, the better segmentation of the same
@@ -902,15 +909,21 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
       sum += user[i];
     }
     if (sum > 0 && std::isfinite(mass)) {
+      const T9Line* model_top = final.front().second.get();
       const double kappa = o.t9_ngram_user_input_weight_ * sum / (kOldPick + sum);
       const double most = *std::max_element(user.begin(), user.end());
       const double winners = static_cast<double>(std::count(user.begin(), user.end(), most));
       for (size_t i = 0; i < final.size(); ++i) {
         if (!eligible(final[i].second)) continue;
-        final[i].first = log_add(std::log(1 - kappa) + final[i].first,
+        // A single character not picked keeps its score (a whole syllable has dozens of them), so the model's best
+        // character stays next in line behind the picked one and is shown second (T9Path::displaced).
+        const auto& text = final[i].second->text;
+        const bool single = utf8::distance(text.begin(), text.end()) == 1;
+        final[i].first = log_add((single ? 0.0 : std::log(1 - kappa)) + final[i].first,
             user[i] == most ? std::log(kappa / winners) + mass : -std::numeric_limits<double>::infinity());
       }
       std::stable_sort(final.begin(), final.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+      if (final.front().second.get() != model_top) displaced_line = model_top;
     }
   }
   // Input that can end in a sentence-final particle (吗, 呢, 吧…: one of the first sentences ends with one) is
@@ -946,7 +959,7 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
     // Chinese stream (e.g. two keys), without a forced language/source slot.
     sentence->set_quality(coverage + 0.1 *
                            (0.5 + std::atan(rank / 10.0) / 3.141592653589793));
-    paths.push_back({*sentence, line->prior, coverage});
+    paths.push_back({*sentence, line->prior, coverage, line.get() == displaced_line});
     if (paths.size() >= o.t9_result_budget_) break;
   }
   restore(paths);
