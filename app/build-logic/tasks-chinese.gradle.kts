@@ -404,6 +404,36 @@ val prepareChineseDictionaries by tasks.registering {
         check(source.split(commentGate).size == 2) { "Upstream corrector comment gate changed" }
         corrector.writeText(source.replace(commentGate,
             "if env.keep_comment or env.engine.context:get_option(\"_cyime_candidate_comments\") then"))
+        // 按键延迟（11-26）：这三个上游滤镜平常打拼音时原样放行每个候选，却要每个候选进一趟 Lua。
+        // 加上 tags_match：用不上时 Rime 整个跳过滤镜（条件就是各自函数里「原样放行」的那个判断，候选不变）。
+        fun gateLuaFilter(name: String, tail: String, gated: String) {
+            val lua = File(root, "lua/$name.lua")
+            val text = lua.readText()
+            check(text.split(tail).size == 2) { "Upstream $name changed" }
+            lua.writeText(text.replace(tail, gated))
+        }
+        gateLuaFilter("autocap_filter", "return autocap_filter", """
+            -- CyIME：输入不是大写字母开头（或只有一个字符）时这个滤镜原样放行每个候选，让 Rime 整个跳过它，不进 Lua 循环。
+            return { func = autocap_filter, tags_match = function(seg, env)
+                local code = env.engine.context.input
+                return #code > 1 and code:find("^%u") ~= nil
+            end }
+        """.trimIndent())
+        gateLuaFilter("v_filter", "return v_filter", """
+            -- CyIME：只有 v 加一个字符的输入才调整顺序，其余输入让 Rime 整个跳过这个滤镜。
+            return { func = v_filter, tags_match = function(seg, env)
+                local code = env.engine.context.input
+                return #code == 2 and code:find("^v") ~= nil
+            end }
+        """.trimIndent())
+        gateLuaFilter("reduce_english_filter", "return M", """
+            -- CyIME：输入不在降频名单里时这个滤镜原样放行，让 Rime 整个跳过它。
+            function M.tags_match(seg, env)
+                return M.map[env.engine.context.input] == true
+            end
+
+            return M
+        """.trimIndent())
         // Re-index the pinned English word sources; never lowercase the displayed text.
         // Exact whole-word digits only: no abbreviation/completion collisions with Chinese.
         // Words of the bundled frequency-ordered english.txt, upstream's curated internet/brand list and
