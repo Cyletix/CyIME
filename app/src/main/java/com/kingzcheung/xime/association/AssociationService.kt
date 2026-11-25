@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 object AssociationService {
     private const val TAG = "AssociationService"
     private const val CONTRACTIONS_FILE = "english_contractions.txt"
+    private const val ENGLISH_LETTERS = "abcdefghijklmnopqrstuvwxyz"
     
     @Volatile private var trieEngine: TrieAssociationEngine? = null
     /** 英文补全用的缩写表（im → I'm）；读不到就不给缩写，补全照常。 */
@@ -83,7 +84,7 @@ object AssociationService {
             val table = contractions ?: return emptyList()
             return EnglishContractionCompletion.withApostrophe(prefix, table.forms(), topK)
         }
-        val bundled = if (initialize(context)) trieEngine?.predict(prefix, topK).orEmpty().map { it.text }
+        val scored = if (initialize(context)) trieEngine?.predict(prefix, topK).orEmpty().map { it.text }
             else emptyList()
         val imported = withContext(Dispatchers.IO) {
             try {
@@ -96,13 +97,27 @@ object AssociationService {
                 emptyList()
             }
         }
+        // 「拼错时给正确的词」（默认关）：词表和导入词库都补全不出任何词时（打的也就不是词），
+        // 给只差一处的常用词：teh → the、helo → hello（[TypoCorrection]）。
+        val bundled = if (scored.isNotEmpty() || imported.isNotEmpty() ||
+            !englishOption(context, com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ENGLISH_TYPO_CORRECTION_KEY)) scored
+            else trieEngine?.let { engine ->
+                TypoCorrection.corrections(prefix.lowercase(), ENGLISH_LETTERS, completes = false, rank = engine::rankOf)
+                    .map { WordLexicon.cased(it, prefix) }
+            }.orEmpty()
         val words = if (imported.isEmpty()) bundled else
             (bundled.take(1) + imported + bundled.drop(1)).distinctBy { it.lowercase() }.take(topK)
-        val table = contractions ?: return words
-        return EnglishContractionCompletion.apply(prefix, words, topK) { word ->
+        val table = contractions
+        val completed = if (table == null) words else EnglishContractionCompletion.apply(prefix, words, topK) { word ->
             table.display(word).takeIf { it != word } ?: table.offer(word)
         }
+        return completed
     }
+
+    /** 英文补全的开关，默认关；读不到设置（测试里的空 Context）也当关。 */
+    private fun englishOption(context: Context, key: String): Boolean = runCatching {
+        com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context).getBoolean(key, false)
+    }.getOrDefault(false)
     
     private suspend fun getChineseAssociations(
         context: Context,

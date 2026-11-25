@@ -12,6 +12,7 @@ import androidx.compose.material.icons.twotone.Functions
 import androidx.compose.material.icons.twotone.Link
 import androidx.compose.material.icons.twotone.Schedule
 import androidx.compose.material.icons.twotone.SpaceBar
+import androidx.compose.material.icons.twotone.Spellcheck
 import androidx.compose.material.icons.twotone.Translate
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
@@ -187,6 +188,10 @@ private fun EnglishInputSection() {
             "英文打 , . ? ! 后自动加一个空格",
             checked = input.englishPunctuationSpace, onCheckedChange = { input.copy(englishPunctuationSpace = it).save(context) })
         AutoSpaceLegend("english-punctuation-space-legend", "打 ,", "Hello,", "|", input.englishPunctuationSpace)
+        HorizontalDivider()
+        SettingsToggleItem(Icons.TwoTone.Spellcheck, "拼错时给正确的词",
+            "打错时给出常用词，如 teh → the",
+            checked = input.englishTypoCorrection, onCheckedChange = { input.copy(englishTypoCorrection = it).save(context) })
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.AlternateEmail, "打 @ 时给邮箱后缀",
             "打 @ 后给出 gmail.com 等常用后缀",
