@@ -1224,7 +1224,28 @@ public:
         return userDictionary->RestoreExact(rime::path(file));
     }
 
+    // 长按删除：忘掉学习记录（forgetLearning），这个词在当前编码下固定过的也一起取消（11-24：固定的词删了还排在
+    // 原位，看着像删不掉）。返回值同 forgetLearning；取消了固定时至少是 1（仍在候选里）或 3（不再出现）。
     int forgetCandidate(int index, bool global) {
+        if (!rime || !session_id_ || index < 0) return 0;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        auto* context = session ? session->context() : nullptr;
+        if (!context || context->composition().empty() || !context->composition().back().menu) return 0;
+        const auto& seg = context->composition().back();
+        const auto pageSize = std::max(1, session->schema()->page_size());
+        const size_t nativeIndex = global ? static_cast<size_t>(index) : seg.selected_index / pageSize * pageSize + index;
+        const auto shown = seg.menu->GetCandidateAt(nativeIndex);
+        if (!shown) return 0;
+        const std::string text = shown->text();
+        const std::string code = cyime::pins::ActiveCode(context);
+        const bool pinned = !code.empty() && cyime::pins::IsPinned(code, text);
+        const int result = forgetLearning(index, global);
+        if (!pinned || !cyime::pins::UnpinCode(code, text)) return result;
+        context->RefreshNonConfirmedComposition();
+        return stillOffered(context, text) ? 1 : 3;
+    }
+
+    int forgetLearning(int index, bool global) {
         if (!rime || !session_id_ || index < 0) return 0;
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
         if (!session) return 0;
