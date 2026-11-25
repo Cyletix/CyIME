@@ -252,6 +252,22 @@ internal fun mergedDoublePinyinFullPreedit(raw: String, keysReading: String, spe
     return syllables.joinToString("'") + if (rest.isEmpty()) "" else "'$rest"
 }
 
+/** 14 键编码条找读音时，除了首选再往后看几个候选。 */
+internal const val MERGED14_READING_LOOKAHEAD = 8
+
+/**
+ * 依次用 [readings] 里的读音换合并键编码，用第一个把每个键都对上的；都对不上照旧返回 [preedit]（Rime 的原码）。
+ * 首选是英文词、混合词或没有读音的短语时，它的注释对不上，后面候选的读音常能对上，不用再显示大写原码。
+ */
+internal fun merged14PreeditFrom(raw: String, preedit: String, readings: List<String>, groups: List<String> = merged14Groups): String {
+    for (reading in readings) {
+        if (reading.isBlank()) continue
+        val shown = merged14Preedit(raw, preedit, reading, groups)
+        if (shown != preedit) return shown
+    }
+    return preedit
+}
+
 /** Multi-tap exists only in the explicit pinyin editor, never in ordinary composition. */
 internal class PinyinMultiTap {
     private var group = ""
