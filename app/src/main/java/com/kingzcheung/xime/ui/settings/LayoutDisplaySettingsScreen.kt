@@ -291,7 +291,7 @@ private fun LayoutDisplayPage(
                             onCheckedChange = { SettingsPreferences.setNumberRowFullHeight(context, it) })
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     }
-                    // 打数字出短语（别人请求，默认关）：见 service/DigitPhrases.kt。
+                    // 打数字出短语（别人请求；11-24 起默认开）：见 service/DigitPhrases.kt。
                     var digitPhrases by remember { mutableStateOf(com.kingzcheung.xime.service.DigitPhrases.isEnabled(context)) }
                     SettingsToggleItem(Icons.TwoTone.Dialpad, "数字出短语",
                         "打数字时，候选里给出编码相符的「我的短语」",

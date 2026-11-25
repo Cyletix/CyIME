@@ -253,7 +253,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal suspend fun offerEmailSuffixesAfterAt() = withEditor { offerEmailSuffixes() }
 
     /**
-     * 数字上屏之后（数字键盘、数字行、角标）：光标前那串数字对得上「我的短语」的编码开头时把短语放到候选栏（默认关，见 [DigitPhrases]），
+     * 数字上屏之后（数字键盘、数字行、角标）：光标前那串数字对得上「我的短语」的编码开头时把短语放到候选栏（默认开，见 [DigitPhrases]），
      * 打过两次以上的常用数字也放进这一组（默认开，见 [NumberHistory]）。
      * 两个开关都关着时不读短语表也不读输入框。短语表、记下的数字在按键队列里读（只读一次），输入框在主线程读。
      */
@@ -2009,7 +2009,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         if (literal == "@" || literal == "＠" ||
                             emailDomain && literal.isNotEmpty() && literal.all { it == '.' || it == '-' || it in '0'..'9' })
                             offerEmailSuffixesAfterAt()
-                        // 数字键盘打的数字：对得上「我的短语」编码的短语放到候选栏（默认关）。
+                        // 数字键盘打的数字：对得上「我的短语」编码的短语放到候选栏（默认开）。
                         if (isNumberKeyboard && key.length == 1 && key[0] in '0'..'9') offerDigitPhrases()
                         needsUIUpdate = true
                         return@command
