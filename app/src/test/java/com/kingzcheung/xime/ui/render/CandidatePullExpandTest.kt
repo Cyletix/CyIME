@@ -124,7 +124,8 @@ class CandidatePullExpandTest {
         rule.runOnIdle { assertEquals(false, expanded.value) }
     }
 
-    @Test fun leftPullOpensRightPullCloses() {
+    /** 11-24 他：「改成两边滑都可以展开收起」：往左、往右拉过门槛都展开；展开着往左、往右拉都收回。 */
+    @Test fun eitherWayOpensAndEitherWayCloses() {
         val state = mutableStateOf<CandidateBarState>(
             CandidateBarState.ChineseCandidates(listOf("你好", "你"), inputText = "nihao", hasMore = true))
         val expanded = mutableStateOf(false)
@@ -143,29 +144,28 @@ class CandidatePullExpandTest {
         pull.pullAcross(fraction = 0.1f)
         rule.onNodeWithTag("bar-candidate:1", useUnmergedTree = true).performClick()
         rule.runOnIdle { assertEquals(0, opens); assertEquals(1, picked) }
-        // 没展开往右拉：不展开，也不把手指下的候选当成点了。
+        // 往右拉：展开，不把手指下的候选当成点了。
         pull.pullAcross(leftward = false)
-        rule.runOnIdle { assertEquals(0, opens); assertEquals(1, picked) }
-        pull.pullAcross()
-        rule.runOnIdle { assertEquals(1, opens) }
-        // 展开着往左拉：不再展开一次，也不收回。
-        pull.pullAcross()
-        rule.runOnIdle { assertEquals(1, opens); assertEquals(0, closes) }
-        // 展开着往右拉：收回，打的字还在（栏里还是这两个候选）。
+        rule.runOnIdle { assertEquals(1, opens); assertEquals(1, picked) }
+        // 展开着再往右拉：收回，打的字还在（栏里还是这两个候选）。
         pull.pullAcross(leftward = false)
         rule.runOnIdle { assertEquals(1, closes); assertEquals(false, expanded.value); assertEquals(1, picked) }
         rule.onNodeWithTag("bar-candidate:1", useUnmergedTree = true).assertExists()
+        // 往左拉：展开；展开着往左拉：也收回，不会再展开一次。
         pull.pullAcross()
         rule.runOnIdle { assertEquals(2, opens) }
-        // 只有一个候选、没有下一页：拉不开。
-        rule.runOnIdle { expanded.value = false; state.value = CandidateBarState.ChineseCandidates(listOf("你"), inputText = "ni") }
         pull.pullAcross()
+        rule.runOnIdle { assertEquals(2, opens); assertEquals(2, closes); assertEquals(false, expanded.value) }
+        // 只有一个候选、没有下一页：哪边都拉不开。
+        rule.runOnIdle { state.value = CandidateBarState.ChineseCandidates(listOf("你"), inputText = "ni") }
+        pull.pullAcross()
+        pull.pullAcross(leftward = false)
         rule.runOnIdle { assertEquals(2, opens) }
     }
 
     /**
      * 候选多、能左右滑时（真机上打字几乎都是这样）：滑到一屏的尾巴再往左拉就展开，尾巴不会越滑越远
-     * （11-22 他在手机上开着开关：「展不开」）；滑一下也不收起展开页，收回靠往右拉。
+     * （11-22 他在手机上开着开关：「展不开」）；滑一下也不收起展开页，收回靠拉。
      * 一屏没排满时会接上展开列表（见 CandidateFirstScreenWideTest），这里用的是默认的假字宽，排没排满量不准，不数接了几次。
      */
     @Test fun manyCandidatesReachTheEndAndExpand() {

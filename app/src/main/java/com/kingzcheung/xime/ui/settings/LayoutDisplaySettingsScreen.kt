@@ -640,7 +640,7 @@ private fun LayoutDisplayPage(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (swipeExpand) "已开「左右滑展开候选」：候选栏显示多少就是一页，滑到头再往左拉就展开全部。关掉后按这里的数"
+                            text = if (swipeExpand) "已开「左右滑展开候选」：候选栏显示多少就是一页，滑到头再往外拉就展开全部。关掉后按这里的数"
                                 else "下次打字时生效",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
