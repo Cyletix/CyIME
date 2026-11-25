@@ -205,6 +205,8 @@ data class KeyboardInputPreferences(
     val englishPunctuationSpace: Boolean = false,
     /** 英文直接输入打的不是词时给只差一处的常用词（teh → the），默认关；见 association/TypoCorrection.kt。 */
     val englishTypoCorrection: Boolean = false,
+    /** 英文直接输入单独打的 i 给 I：候选第一个是 I，按空格时改成 I，默认关。 */
+    val englishCapitalI: Boolean = false,
     /** 打 @ 时候选栏给常用邮箱后缀（qq.com、gmail.com），默认开（用户 11-03 要求）；见 service/EmailSuffixes.kt。 */
     val emailSuffixes: Boolean = true,
     /** 网址、邮箱框一进去就是英文（默认开，原有行为）；关掉后沿用当前语言，密码框照旧锁英文。见 service/EditorSessionInputPolicy.kt。 */
@@ -384,6 +386,8 @@ data class KeyboardInputPreferences(
         const val ENGLISH_PUNCTUATION_SPACE_KEY = "english_punctuation_space"
         /** 英文拼错时给正确的词；补全时读它，改了下一个字母就生效。新键，读不到就是关。 */
         const val ENGLISH_TYPO_CORRECTION_KEY = "english_typo_correction"
+        /** 英文单独的 i 改成 I；补全和按空格时读它。新键，读不到就是关。 */
+        const val ENGLISH_CAPITAL_I_KEY = "english_capital_i"
         /**
          * 打 @ 时给邮箱后缀开关；输入法打 @ 和后面的字时读它。读不到就是开。
          * 1.15.50/51 默认关，存这一页任何开关都会把旧键 email_suffix_candidates 一起写成关；换新键，旧值不再算数。
@@ -427,7 +431,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY, SettingsPreferences.KEY_PREEDIT_TONES,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.T9,
-                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_NUMBER_ROW_FULL_HEIGHT, SettingsPreferences.KEY_NUMBER_PAD_TOP_789, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, DELETE_CHINESE_GLIDE_CHARACTER_KEY, com.kingzcheung.xime.glide.ExternalGlideEncodings.KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, ENGLISH_TYPO_CORRECTION_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY, CYLM_LONG_ALTERNATIVE_KEY,
+                SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_RIGHT_G, SettingsPreferences.KEY_FILL_KEYBOARD_BLANK, SettingsPreferences.KEY_WIDE_KEYS, SettingsPreferences.KEY_EVEN_MERGED_KEYS, SettingsPreferences.KEY_NUMBER_ROW, SettingsPreferences.KEY_NUMBER_ROW_FULL_HEIGHT, SettingsPreferences.KEY_NUMBER_PAD_TOP_789, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE, CHINESE_GLIDE_KEY, DELETE_CHINESE_GLIDE_CHARACTER_KEY, com.kingzcheung.xime.glide.ExternalGlideEncodings.KEY, GLIDE_PREVIEW_KEY, ENGLISH_AUTO_SPACE_KEY, ENGLISH_PUNCTUATION_SPACE_KEY, ENGLISH_TYPO_CORRECTION_KEY, ENGLISH_CAPITAL_I_KEY, EMAIL_SUFFIXES_KEY, ADDRESS_FIELDS_ENGLISH_KEY, SYMBOL_NAMES_KEY, GREEK_LETTERS_KEY, CYLM_LONG_ALTERNATIVE_KEY,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", com.kingzcheung.xime.settings.SpellingPatches.DOUBLE_PINYIN_CORRECTION_KEY, MIXED_INPUT_KEY, RARE_CHARACTERS_KEY, TRADITIONAL_OUTPUT_KEY, CANDIDATE_EMOJI_KEY, DATETIME_CANDIDATES_KEY, "symbol_input_mode", "symbol_long_press_seconds", "symbol_long_press_seconds_v2", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", CORNER_HINT_OPACITY_KEY, HIDE_FUNCTION_KEY_HINTS_KEY, UPPERCASE_KEY_LABELS_KEY, CHINESE_UPPERCASE_KEY_LABELS_KEY, "fixed_symbols",
                 JAPANESE_KANJI_KEY, KOREAN_HANJA_KEY, CANTONESE_CHARACTERS_KEY,
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", SYMBOL_SWIPE_DP_KEY, "reverse_symbol_swipe", CLEAR_ALL_WHILE_COMPOSING_KEY, CLEAR_BEFORE_CURSOR_ONLY_KEY, SWIPE_DISTANCE_DELETE_KEY, com.kingzcheung.xime.keyboard.DeleteRepeatSpeed.KEY, REVERSE_DELETE_SWIPE_KEY, CLEAR_SWIPE_PERCENT_KEY, JAPANESE_LONG_VOWEL_KEY, "syllable_split_key", "shift_syllable_split", SHIFT_TAP_LOCKS_KEY, "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
@@ -537,6 +541,7 @@ data class KeyboardInputPreferences(
                 englishAutoSpace = prefs.getBoolean(ENGLISH_AUTO_SPACE_KEY, false),
                 englishPunctuationSpace = prefs.getBoolean(ENGLISH_PUNCTUATION_SPACE_KEY, false),
                 englishTypoCorrection = prefs.getBoolean(ENGLISH_TYPO_CORRECTION_KEY, false),
+                englishCapitalI = prefs.getBoolean(ENGLISH_CAPITAL_I_KEY, false),
                 emailSuffixes = prefs.getBoolean(EMAIL_SUFFIXES_KEY, true),
                 addressFieldsEnglish = prefs.getBoolean(ADDRESS_FIELDS_ENGLISH_KEY, true),
                 candidateEmoji = prefs.getBoolean(CANDIDATE_EMOJI_KEY, false),
@@ -619,6 +624,7 @@ data class KeyboardInputPreferences(
             .putBoolean(ENGLISH_AUTO_SPACE_KEY, englishAutoSpace)
             .putBoolean(ENGLISH_PUNCTUATION_SPACE_KEY, englishPunctuationSpace)
             .putBoolean(ENGLISH_TYPO_CORRECTION_KEY, englishTypoCorrection)
+            .putBoolean(ENGLISH_CAPITAL_I_KEY, englishCapitalI)
             .putBoolean(EMAIL_SUFFIXES_KEY, emailSuffixes)
             .putBoolean(ADDRESS_FIELDS_ENGLISH_KEY, addressFieldsEnglish)
             .putBoolean(CANDIDATE_EMOJI_KEY, candidateEmoji)

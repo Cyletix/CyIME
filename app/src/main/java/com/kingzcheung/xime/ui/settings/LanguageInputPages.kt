@@ -193,6 +193,10 @@ private fun EnglishInputSection() {
             "打错时给出常用词，如 teh → the",
             checked = input.englishTypoCorrection, onCheckedChange = { input.copy(englishTypoCorrection = it).save(context) })
         HorizontalDivider()
+        SettingsToggleItem(Icons.TwoTone.FontDownload, "单独的 i 改成 I",
+            "句中单独打的 i 按空格时改成 I",
+            checked = input.englishCapitalI, onCheckedChange = { input.copy(englishCapitalI = it).save(context) })
+        HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.AlternateEmail, "打 @ 时给邮箱后缀",
             "打 @ 后给出 gmail.com 等常用后缀",
             checked = input.emailSuffixes, onCheckedChange = { input.copy(emailSuffixes = it).save(context) })

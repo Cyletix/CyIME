@@ -111,7 +111,11 @@ object AssociationService {
         val completed = if (table == null) words else EnglishContractionCompletion.apply(prefix, words, topK) { word ->
             table.display(word).takeIf { it != word } ?: table.offer(word)
         }
-        return completed
+        // 「单独的 i 改成 I」（默认关）：只打了一个小写 i 时 I 排第一，不再另给小写 i。
+        return if (prefix == "i" &&
+            englishOption(context, com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ENGLISH_CAPITAL_I_KEY))
+            (listOf("I") + completed).distinctBy { it.lowercase() }.take(topK)
+        else completed
     }
 
     /** 英文补全的开关，默认关；读不到设置（测试里的空 Context）也当关。 */
