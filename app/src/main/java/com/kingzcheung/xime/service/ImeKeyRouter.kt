@@ -1092,6 +1092,32 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * alternative_select_keys）由 Rime 定；没在打字时数字照旧直接上屏。九键等数字本来就是编码的键盘不经过这里。
      * 内置笔画方案的通配键 * 也从这里送进 Rime（[strokeWildcardIsCode]）。
      */
+    /**
+     * 打字中按的数字是在接着打「我的短语」里字母开头、带数字的编码（dz1）：这时数字送进 Rime 当编码（方案的 recognizer
+     * 认这些前缀，见 PersonalDictManager.applyPhraseDigitPattern），不在这边当选词键。九键的数字本来就是编码，不经过这里。
+     */
+    internal fun continuesPhraseCode(key: String): Boolean {
+        if (key.length != 1 || key[0] !in '0'..'9') return false
+        val state = service.uiState.value
+        if (state.isAsciiMode || state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.T9) return false
+        val input = service.rimeEngine.readQueuedComposition()?.input.orEmpty()
+        return com.kingzcheung.xime.settings.PersonalDictManager.continuesPhraseCode(service, state.currentSchemaId, input, key[0])
+    }
+
+    /**
+     * 屏幕键盘数字行、角标、长按打的数字平常先上屏候选再接数字（[ImeTextCommit.literalSubmission]）；接着打带数字的短语编码时
+     * 改成把数字送进 Rime（dz → dz1），候选栏出这条短语。返回 false 时照旧。
+     */
+    internal suspend fun typePhraseCodeDigit(literal: String): Boolean {
+        val digit = literal.singleOrNull()?.let { if (it in '０'..'９') '0' + (it - '０') else it } ?: return false
+        if (!continuesPhraseCode(digit.toString())) return false
+        val result = service.rimeEngine.processQueuedKeyAndGetResult(digit.code, 0)
+        if (!result.processed) return false
+        if (result.committedText.isNotEmpty()) withEditor { service.commitText(result.committedText) }
+        sendTransformedResult(result)
+        return true
+    }
+
     internal fun schemeCodeKey(text: String): String? {
         val state = service.uiState.value
         if (auxCodeTrigger(text)) return text
@@ -1416,8 +1442,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     hardwareNavigation.releasePress(HardwareCandidateKey.SPACE)
                     return@command
                 }
-                if (processHardwareCandidateKey(hardwareEvent)) return@command
-                if (hardwareCandidateDigitIndex(hardwareEvent.keyCode, hardwareEvent.isShiftPressed) != null) {
+                // 接着打带数字的短语编码（dz 后按 1，有 dz1 这条短语）：数字照普通键送进 Rime，不选词也不原样上屏。
+                val phraseDigit = hardwareCandidateDigitIndex(hardwareEvent.keyCode, hardwareEvent.isShiftPressed) != null &&
+                    continuesPhraseCode(key)
+                if (!phraseDigit && processHardwareCandidateKey(hardwareEvent)) return@command
+                if (!phraseDigit && hardwareCandidateDigitIndex(hardwareEvent.keyCode, hardwareEvent.isShiftPressed) != null) {
                     // DefaultInput here means no numbered candidate owns this digit.
                     // Never send it back into the active T9 decoder as a new spelling.
                     commitHardwareLiteral(key)
@@ -2041,7 +2070,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // actions 为空（无变换）时保持原生数字选词行为不变。
                     if (!state.isAsciiMode && candState.isComposing &&
                         key.length == 1 && key[0] in '1'..'9' &&
-                        !(isRimeIceCapitalSchema(state.currentSchemaId) && isUnicodeCodeInput(candState.inputText))
+                        !(isRimeIceCapitalSchema(state.currentSchemaId) && isUnicodeCodeInput(candState.inputText)) &&
+                        !continuesPhraseCode(key)
                     ) {
                         val actions = service.candidateState.value.candidateActions
                         val digitIndex = key[0] - '1'
