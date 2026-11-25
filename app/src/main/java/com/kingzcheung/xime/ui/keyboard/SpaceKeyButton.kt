@@ -72,6 +72,11 @@ fun SpaceKeyButton(
      */
     onSwipeUp: (() -> Unit)? = null,
     swipeUpLabel: String? = null,
+    /**
+     * [onSwipeUp] 那一滑改成往下拉（11-25 他：空格出 0 要和别的数字键同方向）：九键数字键的上角标跟「反转上下滑方向」，
+     * 「底排标点固定上滑」开着时底排一律上滑。由调用方按这两个设置算好传进来。
+     */
+    swipeDownward: Boolean = false,
     /** 右上角的角标，如九键开了「空格上滑输入 0」时的「0」；null 时不画。 */
     cornerLabel: String? = null,
 ) {
@@ -316,7 +321,7 @@ fun SpaceKeyButton(
                             // 空格上滑：长按还没开始时，往上比往旁边多、超过点击容差就到位；滑回来或往旁边偏多了就不算。
                             // 长按一开始（光标、语音、连续空格）就不再是上滑，照旧交给长按。
                             if (swipeUp != null) {
-                                val up = down.position.y - change.position.y
+                                val up = if (swipeDownward) change.position.y - down.position.y else down.position.y - change.position.y
                                 val vertical = !held && up > abs(change.position.x - down.position.x)
                                 swipeUpProgress = if (vertical) (up / tapTolerance).coerceIn(0f, 1f) else 0f
                                 val armed = vertical && up > tapTolerance
@@ -408,9 +413,6 @@ fun SpaceKeyButton(
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(cancelColors?.background ?: keyFill)
             .drawBehind {
-                // 空格上滑：往上走时一层强调色跟着变深（键内渐变，不弹气泡），到位时最深。
-                val up = swipeUpProgress
-                if (up > 0f) drawRect(accentColor.copy(alpha = (if (swipeUpArmed) 0.24f else 0.12f) * up))
                 // 开始说话：强调色从按住的地方铺满整个空格，之后随音量轻轻变深；上滑时一点点让给删除色。
                 val spread = voiceSpread.value * (1f - cancelProgress)
                 if (spread > 0f) {
@@ -462,13 +464,15 @@ fun SpaceKeyButton(
                 }
             }
         } else if (swipeUpLabel != null && swipeUpProgress > 0f) {
-            // 往上滑时空格上写要打的字（如「0」），越往上越清楚；到位时用强调色。
+            // 和九键数字键滑出数字同一个动画（11-25 他：上滑动画也没）：右上角的「0」边滑边移到键中央、由小变大。
+            val cornerSize = 10f * adaptiveHintScale(keyContentScale(maxWidth.value, maxHeight.value))
             val size = (maxHeight.value * 0.5f / density.fontScale).coerceIn(10f, 24f)
-            Text(swipeUpLabel, color = if (swipeUpArmed) accentColor else textColor,
-                fontSize = size.sp, lineHeight = (size * 1.2f).sp, maxLines = 1, softWrap = false,
-                fontFamily = AppFonts.keyFontFamily,
-                modifier = Modifier.graphicsLayer { alpha = 0.35f + 0.65f * swipeUpProgress }
-                    .testTag("space-swipe-up-label").semantics { contentDescription = "空格" })
+            val keyW = maxWidth.value
+            val keyH = maxHeight.value
+            Box(Modifier.matchParentSize().testTag("space-swipe-up-label").semantics { contentDescription = "空格" }) {
+                KeyFlickLabel(KeyFlickPreview(swipeUpLabel, swipeUpProgress, KeyFlickOrigin.TOP_END), textColor,
+                    keyW, keyH, cornerSize, size)
+            }
         } else if (cursorActive) {
             SpaceCursorHint(textColor, maxWidth.value, maxHeight.value, density.fontScale, !settings.hideFunctionKeyHints)
         } else if (!settings.hideFunctionKeyHints && SpaceLanguageFlash.isLanguageName(displayName) && labelSize >= 8f) {

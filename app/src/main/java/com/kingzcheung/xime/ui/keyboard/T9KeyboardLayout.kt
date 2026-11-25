@@ -769,6 +769,9 @@ private fun T9KeyboardContent(
                     onSwipeUp = if (spaceUpZero && !typing) ({ commitDirect("0") }) else null,
                     // 开着就一直写 0 角标（打字时上滑不接，角标照旧在，和别的键角标一样不随状态闪）。
                     cornerLabel = if (spaceUpZero) "0" else null,
+                    // 方向和数字键的上角标一样（11-25 他）：底排跟「底排标点固定上滑」，开着就上滑；关着跟「反转上下滑方向」，
+                    // 没反转时上角标是下拉出来的。
+                    swipeDownward = LocalKeyboardInputPreferences.current.let { !it.bottomPunctuationSwipeUp && !it.reverseSymbolSwipe },
                     onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
                     onVoiceModeChange = callbacks.onVoiceModeChange,
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
@@ -1395,6 +1398,7 @@ private fun T9SpaceKey(
     shadowShapeRadius: Dp = 8.dp,
     onSwipeUp: (() -> Unit)? = null,
     cornerLabel: String? = null,
+    swipeDownward: Boolean = false,
 ) {
 
     SpaceKeyButton(onClick = { onKeyPress("space") }, backgroundColor = backgroundColor,
@@ -1402,5 +1406,6 @@ private fun T9SpaceKey(
         onPress = { onKeyPressDown?.invoke("space") }, voiceSticky = voiceSticky,
         isSttEnabled = isSttEnabled, onVoiceModeChange = onVoiceModeChange,
         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-        onSwipeUp = onSwipeUp, swipeUpLabel = if (onSwipeUp != null) "0" else null, cornerLabel = cornerLabel)
+        onSwipeUp = onSwipeUp, swipeUpLabel = if (onSwipeUp != null) "0" else null, cornerLabel = cornerLabel,
+        swipeDownward = swipeDownward)
 }
