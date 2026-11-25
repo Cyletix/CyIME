@@ -4746,6 +4746,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         EnterKeyAction.label(editorInfo.imeOptions, appSend = SettingsPreferences.isEnterSendsEnabled(this))
 
     override fun onFinishInput() {
+        keyRouter.discardPreviousAssociations()
         gameShowExplicit = false
         suspendCompositionForScreenOff()
         endGlidePreview()

@@ -1045,6 +1045,13 @@ object SettingsPreferences {
      * 联想模式：false = 连续联想（联想上屏后继续推理，可连续上屏），true = 单次联想（只推理一次）。
      * 没存过值时算单次（老用户照旧）；2026-11-08 起新装由 [com.kingzcheung.xime.model.DeviceDefaults] 写入连续。
      */
+    fun isRestorePreviousAssociationsEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean("restore_previous_associations", false)
+
+    fun setRestorePreviousAssociationsEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean("restore_previous_associations", enabled).apply()
+    }
+
     fun isSingleAssociationMode(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_ASSOCIATION_SINGLE_MODE, true)
     }
