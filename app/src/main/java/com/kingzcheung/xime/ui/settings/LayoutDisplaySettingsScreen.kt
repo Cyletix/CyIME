@@ -374,7 +374,7 @@ private fun LayoutDisplayPage(
 
                     if (inputTextLocation == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR) {
                         var showPreview by remember { mutableStateOf(SettingsPreferences.showPreeditPreview(context)) }
-                        SettingsToggleItem(Icons.TwoTone.DataObject, "显示拼音编辑栏", "打字时显示编码，支持编辑的方案可点按修改。",
+                        SettingsToggleItem(Icons.TwoTone.DataObject, "显示拼音编辑栏", "打字时显示拼音，部分方案可点按修改",
                             showPreview, { showPreview = it; SettingsPreferences.setShowPreeditPreview(context, it) })
                         if (showPreview) {
                             // 拼音位置三选一（11-19）：默认照旧浮在键盘上方的气泡；「紧贴候选上方」是贴在键盘边框上的小签（11-20 他按微信那张图定的）；
@@ -383,9 +383,9 @@ private fun LayoutDisplayPage(
                             var preeditStyle by remember { mutableStateOf(SettingsPreferences.preeditStyle(context)) }
                             var preeditAlign by remember { mutableStateOf(SettingsPreferences.preeditAlign(context)) }
                             val styles = listOf(
-                                Triple(SettingsPreferences.PREEDIT_STYLE_BUBBLE, "气泡", "拼音浮在键盘上面，会挡住一点输入框。透明度可调。"),
-                                Triple(SettingsPreferences.PREEDIT_STYLE_LINE, "小标签", "拼音贴在键盘上边，只有拼音那么宽。输入框往上让开，不会被挡住。"),
-                                Triple(SettingsPreferences.PREEDIT_STYLE_BLOCK, "方块", "和小标签一样贴着键盘，但更高、字更大，四角是直角。输入框往上让开，不会被挡住。"),
+                                Triple(SettingsPreferences.PREEDIT_STYLE_BUBBLE, "气泡", "浮在键盘上方，会挡住一点输入框"),
+                                Triple(SettingsPreferences.PREEDIT_STYLE_LINE, "小标签", "贴着键盘上边，和拼音一样宽，不挡输入框"),
+                                Triple(SettingsPreferences.PREEDIT_STYLE_BLOCK, "方块", "比小标签更高、字更大，不挡输入框"),
                                 Triple(SettingsPreferences.PREEDIT_STYLE_STRIP, "整行", "键盘加高一行放拼音，和键盘连成一块。"),
                             )
                             val aligns = listOf(
@@ -464,7 +464,7 @@ private fun LayoutDisplayPage(
                             // 拼音标调（用户 11-20「能不能在拼音上显示声调」）：只改气泡／小签里的显示，默认关。
                             var preeditTones by remember { mutableStateOf(SettingsPreferences.preeditTones(context)) }
                             SettingsToggleItem(Icons.TwoTone.RecordVoiceOver, "拼音显示声调",
-                                "按首选字的读音标调，如 jiù'shì'zhè'yàng；只是显示，上屏的还是字母。简拼、双拼显示按键时不标。",
+                                "按首选字标调，如 jiù'shì'zhè'yàng，只改显示",
                                 preeditTones, { preeditTones = it; SettingsPreferences.setPreeditTones(context, it) })
                         }
                     }
@@ -552,7 +552,7 @@ private fun LayoutDisplayPage(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "超过 22 候选栏会整条变高",
+                            text = "超过 22 时候选栏会变高",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -886,14 +886,15 @@ private fun FixedBottomCalibrationSettings() {
                     enabled = value < 80) { Text("抬高") }
             }
             TextButton(onClick = { SettingsPreferences.resetKeyboardBottomCalibration(context) },
-                enabled = bottomPosition != SettingsPreferences.KeyboardBottomPosition.AUTO || adjustment != 0) { Text("恢复默认（自动、留白 0）") }
+                modifier = Modifier.testTag("bottom-calibration-reset"),
+                enabled = bottomPosition != SettingsPreferences.KeyboardBottomPosition.AUTO || adjustment != 0) { Text("恢复默认") }
         }
         // 底部诊断（11-19）：反馈「被挡住」「底下有缝」时把这一行一起发来，就知道是哪种手机、系统报了什么、按哪一步判断的。
         diagnostic?.let { line ->
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             Column(Modifier.fillMaxWidth().settingsSearchAnchor("底部诊断").padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("底部诊断", style = MaterialTheme.typography.titleSmall)
-                Text("反馈底部被挡住或有缝时，把这一行复制一起发来。打开一次键盘后更新。",
+                Text("底部被挡住或有缝时，复制这一行发给作者",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 androidx.compose.foundation.text.selection.SelectionContainer {
                     Text(line, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("bottom-diagnostic"))

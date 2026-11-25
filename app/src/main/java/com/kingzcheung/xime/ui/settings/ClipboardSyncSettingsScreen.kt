@@ -135,7 +135,7 @@ fun ClipboardSyncSettingsContent(
             WindowsDevicesPanel()
             androidx.compose.material3.TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "收起手动连接与其他服务" else "备用：手动连接与其他服务") }
             if (advanced) {
-            Text("连电脑请用上面的“扫码连接电脑”，下面用于其他同步服务。",
+            Text("连电脑用上面的“扫码连接电脑”。",
                 style = MaterialTheme.typography.bodyMedium)
             SettingsSection(title = "同步服务", content = {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -162,7 +162,7 @@ fun ClipboardSyncSettingsContent(
                                         }
                                         selectedPluginId = plugin.id
                                         activePlugin = instance
-                                        if (instance == null) selectionError = "插件未能启动，请在已安装插件中检查状态。"
+                                        if (instance == null) selectionError = "插件没有启动，到已安装的插件里查看。"
                                     } catch (error: Exception) {
                                         activePlugin = null
                                         selectionError = "无法启用服务：${error.message}"
@@ -186,7 +186,7 @@ fun ClipboardSyncSettingsContent(
             if (activePlugin != null && activePlugin?.first != com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID) SettingsSection(title = "同步开关", content = {
                 SettingsToggleItem(
                     icon = Icons.TwoTone.Sync,
-                    title = "启用所选兼容服务",
+                    title = "启用所选服务",
                     subtitle = "开启后剪贴板文字会发送到所选服务",
                     checked = enabled,
                     onCheckedChange = { checked ->

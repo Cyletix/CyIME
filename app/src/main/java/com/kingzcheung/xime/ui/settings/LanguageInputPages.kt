@@ -90,7 +90,7 @@ private fun ChineseOutputSection() {
         HorizontalDivider()
         // 11-20 从生僻字分出来（他：是日语的字就叫日语的字，是什么就叫什么），各自默认关，候选后面注「日」「韩」「粤」。
         SettingsToggleItem(Icons.TwoTone.FontDownload, "日文汉字",
-            "在中文字后面给出日本的字和日本人名地名",
+            "在中文字后面给出日本用字和人名地名",
             checked = input.japaneseKanji, onCheckedChange = { input.copy(japaneseKanji = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.JAPANESE_KANJI)
         CandidateExtraLegend("japanese-kanji-legend", "ze", listOf("泽", "则", "责"), "沢", input.japaneseKanji,
@@ -124,7 +124,7 @@ private fun ChineseOutputSection() {
         CandidateExtraLegend("candidate-emoji-legend", "kaixin", listOf("开心"), "😄", input.candidateEmoji)
         HorizontalDivider()
         SettingsToggleItem(Icons.TwoTone.Functions, "打符号名出符号",
-            "打符号的名字时多给一个符号，如 加号 +、摄氏度 ℃、平方 ²、约等于 ≈",
+            "打符号名时给出符号，如 加号 +、平方 ²",
             checked = input.symbolNames, onCheckedChange = { input.copy(symbolNames = it).save(context) },
             costItem = com.kingzcheung.xime.settings.PerformanceCosts.Item.SYMBOL_NAMES)
         CandidateExtraLegend("symbol-names-legend", "sheshidu", listOf("摄氏度"), "℃", input.symbolNames)

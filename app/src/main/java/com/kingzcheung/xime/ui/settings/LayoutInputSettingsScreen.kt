@@ -89,7 +89,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                 // 邻键纠错、模糊音 11-01 搬到「语言与方案」（跟着方案走，九键和 26 键页不再各放一份）。
                 SettingsSection(title = "大小写", content = {
                     SettingsToggleItem(Icons.TwoTone.Abc, "首字母大写",
-                        "英文等拉丁字母键盘上，句首字母自动大写",
+                        "英文等键盘句首字母自动大写",
                         checked = settings.englishSentenceCaps, onCheckedChange = {
                             settings = settings.copy(englishSentenceCaps = it); settings.save(context)
                         })
@@ -197,7 +197,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         val glideLock = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
                             com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, true)
                         SettingsToggleItem(Icons.TwoTone.OpenWith, "拂动选字母",
-                            "向不同方向拂动直接输入键上的字母，长按输入数字",
+                            "往不同方向滑输入键上的字母，长按输入数字",
                             checked = settings.t9FlickLetters && glideLock == null, onCheckedChange = {
                                 settings = settings.copy(t9FlickLetters = it); settings.save(context)
                             },
@@ -268,7 +268,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     ExternalGlideSchemeItems(settings) { settings = it; it.save(context) }
                     HorizontalDivider()
                     SettingsToggleItem(Icons.TwoTone.Gesture, "九键滑行",
-                        "在九键上一笔划过几个键输入词语。开着时 2～9 键的拖动归滑行，这些键的角标改为长按输入",
+                        "在九键上一笔划过几个键输入词语，2～9 键的角标改为长按输入",
                         checked = settings.t9GlideTyping, onCheckedChange = {
                             settings = settings.copy(t9GlideTyping = it); settings.save(context)
                         },
@@ -524,7 +524,7 @@ internal fun FuzzyPinyinSection() {
                         doublePinyin = on
                         scope.launch(Dispatchers.IO) { runCatching { SpellingPatches.apply(context) } }
                     })
-                if (usingDoublePinyin && !doublePinyin) Text("你在用双拼，打开上面的开关后模糊音才对双拼生效",
+                if (usingDoublePinyin && !doublePinyin) Text("打开上面的开关后，双拼才用模糊音",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp).testTag("fuzzy-double-pinyin-hint"))
             }
@@ -638,8 +638,8 @@ internal fun t9MergeZeroSubtitle(cornerSymbolInput: Boolean, reverseSymbolSwipe:
 
 /** 「空格上滑输入 0」的说明：去掉了 0 键时没有右边那个键，只说空格。 */
 internal fun t9SpaceUpZeroSubtitle(mergeZero: Boolean): String =
-    if (mergeZero) "九键空格往上滑打 0，打字时不接"
-    else "九键空格往上滑打 0，打字时不接；0 键一直是「→」，没有候选时点它光标右移、左滑左移"
+    if (mergeZero) "九键空格上滑打 0"
+    else "九键空格上滑打 0；0 键变成「→」，没有候选时点它移动光标"
 
 /**
  * 笔画编码显示成 一丨丿丶乛（默认关，显示 h s p n z；11-18 贡献者偏向全用字母）。

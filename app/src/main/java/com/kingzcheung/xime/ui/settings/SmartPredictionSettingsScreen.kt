@@ -264,7 +264,7 @@ fun SmartPredictionSettingsContent(
                     SettingsToggleItem(
                         icon = Icons.TwoTone.Edit,
                         title = "显示自造词角标",
-                        subtitle = "学到的词在候选右上角显示小铅笔；关掉只是不显示，照常学习",
+                        subtitle = "学到的词在候选右上角显示小铅笔",
                         checked = showLearnedMark,
                         onCheckedChange = {
                             showLearnedMark = it

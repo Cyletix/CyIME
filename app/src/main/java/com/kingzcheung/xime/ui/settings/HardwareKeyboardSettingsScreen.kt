@@ -100,7 +100,7 @@ private fun FloatingBarEdgeOption(selected: com.kingzcheung.xime.settings.Hardwa
         Column(Modifier.settingsSearchAnchor("浮窗位置", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth()
             .padding(16.dp)) {
             Text("浮窗位置", style = MaterialTheme.typography.titleSmall)
-            Text("固定后工具条停在这一边、不能拖；候选照样出现在正在打字的那一行旁边，不挡这一行。",
+            Text("固定后工具条停在这一边，不能拖动",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val choices = listOf<Pair<com.kingzcheung.xime.settings.HardwareToolbarEdge?, String>>(null to "自由拖动") +
                 com.kingzcheung.xime.settings.HardwareToolbarEdge.entries.map { it to "固定在${it.label}" }

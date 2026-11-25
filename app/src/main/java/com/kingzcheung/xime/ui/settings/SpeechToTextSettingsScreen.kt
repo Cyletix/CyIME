@@ -93,7 +93,7 @@ private fun VoiceOtherAudioItem() {
                     }
                 }
                 // 用户 11-12 转来：抖音暂停后不会接着放。接着放要播放的应用自己做，输入法替不了。
-                Text("暂停播放：说完由播放的应用自己接着放，抖音等部分应用不会接着放，用它们时选「压低音量」。",
+                Text("暂停播放：有的应用说完后不会接着放，这时选「压低音量」。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp))
             }
@@ -162,7 +162,7 @@ fun SpeechToTextSettingsContent(
                     VoiceOtherAudioItem()
                     var pillResume by remember { mutableStateOf(SettingsPreferences.isSttPillResume(context)) }
                     SettingsToggleItem(icon = Icons.TwoTone.RecordVoiceOver, title = "连续语音",
-                        subtitle = "点麦克风说话时，发完消息在同一个输入框里接着听；收成悬浮条时回到这个应用也接着听",
+                        subtitle = "发完消息后在同一个输入框里接着听",
                         checked = pillResume, onCheckedChange = { pillResume = it; SettingsPreferences.setSttPillResume(context, it) })
                     // #309：骑车等手不方便时戴蓝牙耳机说话。默认关，用手机麦克风。
                     var bluetoothMic by remember { mutableStateOf(SettingsPreferences.isSttBluetoothMic(context)) }

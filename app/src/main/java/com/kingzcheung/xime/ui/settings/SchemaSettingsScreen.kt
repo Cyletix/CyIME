@@ -150,7 +150,7 @@ fun SchemaSettingsContent(
                 Column {
                     Text("可以导入：", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "· Rime 方案压缩包(.zip、.tar.gz)，比如从 GitHub 下载的方案仓库\n" +
+                        "· Rime 方案压缩包(.zip、.tar.gz)\n" +
                             "· 单个方案或词库文件(.schema.yaml、.dict.yaml)",
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -170,7 +170,7 @@ fun SchemaSettingsContent(
                     // 九键、生僻词明显更准；雾凇原版、白霜、朙月都不如自带。别让人为了准确率去导入。
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "自带拼音装上词组模型后，首选和万象一样准，九键和生僻词更准；雾凇、白霜都不如自带。",
+                        "推荐自带拼音，装上词组模型后更准。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -248,7 +248,7 @@ fun SchemaSettingsContent(
             onDismissRequest = { localViewModel.cancelConflictInstall() },
             title = { Text("更新共用文件") },
             text = {
-                Text("以下 ${localUiState.conflictingFiles.size} 个同名文件将备份并更新：\n${localUiState.conflictingFiles.joinToString("、") { it.fileName }}\n不会卸载其他输入模式；卸载新方案时可恢复原文件。")
+                Text("以下 ${localUiState.conflictingFiles.size} 个同名文件会先备份再更新：\n${localUiState.conflictingFiles.joinToString("、") { it.fileName }}\n卸载新方案时会恢复原文件。")
             },
             confirmButton = {
                 TextButton(onClick = { localViewModel.confirmInstallWithReplace() }) {
@@ -380,7 +380,7 @@ fun SchemaSettingsContent(
                 item {
                     SettingsNote("长按可在同一语言里排序；语言的先后和默认组合在「语言与方案」里改。",
                         Modifier.padding(top = 4.dp), jumps = listOf("语言与方案"))
-                    SettingsNote("安装、启停方案后自动应用，不用再部署。")
+                    SettingsNote("安装或启停方案后自动生效。")
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 

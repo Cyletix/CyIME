@@ -54,8 +54,8 @@ internal fun keyTipGroups(settings: KeyboardInputPreferences): List<KeyTipGroup>
             add(KeyTip("按住 !@# 点回车", "发送消息，同 Ctrl+回车。"))
             add(KeyTip("按住 !@# 点删除", "删掉前一个词，同 Ctrl+删除。"))
             add(KeyTip("按住 !@# 长按空格拖动", "选中文字，同按住 Shift。"))
-            add(KeyTip("点一下 !@#", "$hold 秒内、没拖动就松手才打开符号面板；时限在「按键与手势 › 符号键松手打开符号的时限」里调。",
-                listOf("按键与手势 › 符号键松手打开符号的时限")))
+            add(KeyTip("点一下 !@#", "$hold 秒内松手打开符号面板；时长在「按键与手势 › 符号键变 Ctrl 的时长」里调。",
+                listOf("按键与手势 › 符号键变 Ctrl 的时长")))
         }),
         KeyTipGroup("九键", buildList {
             add(KeyTip("按住 !@# 拖到数字键上松手", "1 关闭、2 刷新、3 重做、4 全选、5 剪切、6 查找、7 撤销、8 复制、9 粘贴。"))

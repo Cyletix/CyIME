@@ -120,7 +120,7 @@ private fun SpeechPipeline(language: InputLanguage, mode: String, ready: Set<Str
         // 没得选时也写出来，整条流程一眼看全。
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text("说完后：不再校正", style = MaterialTheme.typography.bodyLarge)
-            Text(if (senseVoiceAlone) "SenseVoice 停顿出的字就是定稿" else "${language.displayName}没有二次校正",
+            Text(if (senseVoiceAlone) "停顿时出的字就是结果" else "${language.displayName}没有二次校正",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
@@ -138,7 +138,7 @@ private fun SpeechPipeline(language: InputLanguage, mode: String, ready: Set<Str
         rows.forEach { (finish, finalizer) ->
             val (title, caption) = when (finish) {
                 SpeechModelSelection.Finish.NONE -> "不校正" to
-                    (if (senseVoiceAlone) "每次停顿由 SenseVoice 直接出字" else "直接用说话时出的字")
+                    (if (senseVoiceAlone) "停顿时直接出字" else "直接用说话时出的字")
                 SpeechModelSelection.Finish.SENSEVOICE -> "SenseVoice 校正" to
                     ("每次停顿时再认一遍" + if (senseReady) "" else " (需下载 SenseVoice)")
                 SpeechModelSelection.Finish.WHOLE -> if (finalizer == SpeechModelCatalog.XASR)
@@ -314,9 +314,9 @@ internal fun SpeechPunctuationSettings() {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyLarge)
                 Text(when {
-                    title == "末尾的标点" -> if (kept) "整段话最后保留句号、问号等标点。" else "整段话最后不带标点，中间的照留；口述照样出。"
+                    title == "末尾的标点" -> if (kept) "整段话最后保留句号、问号等标点。" else "整段话最后不带标点，中间的保留。"
                     kept -> "保留模型打的$title。"
-                    else -> "不带$title；口述照样出。"
+                    else -> "不带$title。"
                 },
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

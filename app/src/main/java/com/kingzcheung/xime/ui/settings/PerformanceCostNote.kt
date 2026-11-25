@@ -75,7 +75,7 @@ internal fun PerformanceCostTotalSection(
     SettingsSection(title = "性能开销") {
         Column(Modifier.fillMaxWidth().padding(16.dp).testTag("perf-cost-total"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (source == null || load == null) {
-                Text("读不到开销表(安装包里的 perf_costs.json)，暂时算不出总开销。",
+                Text("暂时算不出总开销。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 return@Column
             }
@@ -143,7 +143,7 @@ internal fun PerformanceCostTotalSection(
             SettingsListRow("导入的词库($dictionaryWords 词)", text, modifier = Modifier.testTag("perf-cost-dictionaries"))
         }
         val missing = PerformanceCosts.Item.entries.filter { it.id in on && it.id !in device.items }
-        if (missing.isNotEmpty()) Text("开着但表里没有：" + missing.joinToString("、") { it.title },
+        if (missing.isNotEmpty()) Text("开着但没测过：" + missing.joinToString("、") { it.title },
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp))
     }
