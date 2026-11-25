@@ -5349,15 +5349,31 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val ic = currentInputConnection
         val last = lastEditorIdentity
         val state = uiState.value
-        if ((!restarting && !afterLock) || attribute == null || ic == null || last == null || code.isNullOrEmpty() || !inlineComposition.active ||
+        if ((!restarting && !afterLock) || attribute == null || ic == null || last == null ||
             attribute.packageName.isNullOrEmpty() || attribute.packageName != last.first || attribute.fieldId != last.second ||
             (afterLock && attribute.inputType != last.third) ||
             editorInputPolicy.field.scoped || EditorFieldPolicy.from(attribute).scoped ||
             EditorInfoClassifier.isSecretEditor(attribute) || EditorInfoClassifier.isTerminalEditor(attribute) ||
-            state.inputTarget.isInternal || state.isVoiceMode || voiceRecordingStarted || !candidateState.value.isComposing ||
-            TerminalEditor.inputTextLocation(this) != SettingsPreferences.INPUT_TEXT_INPUT_BOX) return false
+            state.inputTarget.isInternal || state.isVoiceMode || voiceRecordingStarted) return false
         val selStart = attribute.initialSelStart
         val selEnd = attribute.initialSelEnd
+        val caretContinues = selStart >= 0 && selStart == selEnd && (selStart == voiceHostCaret || selStart == voiceHostCaretBefore ||
+            ((if (AndroidPlatform.initialSurroundingText) attribute.getInitialTextAfterCursor(1, 0) else null)
+                ?: runCatching { ic.getTextAfterCursor(1, 0) }.getOrNull())?.isEmpty() == true)
+        val resume = restartResume(TerminalEditor.inputTextLocation(this) == SettingsPreferences.INPUT_TEXT_INPUT_BOX,
+            inlineComposition.active, code, candidateState.value.isComposing, inputCommands.hasPendingCommands, caretContinues)
+        if (resume == RestartResume.KEEP && !afterLock) {
+            // 框里没有我们写的编码，宿主的初始光标可信：之后的编码、上屏从这里接着写。
+            (ic as? TrackedInputConnection)?.memory?.started(selStart, selEnd, enabled = true)
+            inlineComposition.selectionReported(selStart, selEnd, -1, -1)
+            continueFieldAfterRestart(attribute, restarting)
+            FileLogger.w("InputLifecycle", "composition kept after restart: composing=${candidateState.value.isComposing} " +
+                "queued=${inputCommands.hasPendingCommands}")
+            voiceHostCaretBefore = -1
+            voiceHostCaret = selStart
+            return true
+        }
+        if (resume != RestartResume.ADOPT_INLINE || code == null) return false
         val window = code.length + 1
         val before = (if (AndroidPlatform.initialSurroundingText) attribute.getInitialTextBeforeCursor(window, 0) else null)
             ?: runCatching { ic.getTextBeforeCursor(window, 0) }.getOrNull()
@@ -5380,6 +5396,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             } finally { ic.endBatchEdit() }
         }.getOrDefault(false)
         if (!adopted) return false
+        continueFieldAfterRestart(attribute, restarting)
+        // 只记长度与位置，不记文字内容。
+        FileLogger.w("InputLifecycle", "inline composition resumed after restart: len=${code.length} " +
+            "sel=$selStart/$selEnd at=${region.start}")
+        return true
+    }
+
+    /** 接着用上一个连接里的输入会话：只换成新连接的框属性，拼音、候选、队列都不动。 */
+    private fun continueFieldAfterRestart(attribute: EditorInfo, restarting: Boolean) {
         lastEditorIdentity = Triple(attribute.packageName, attribute.fieldId, attribute.inputType)
         beginEditorField(attribute, restarting)
         englishEditorReadCapability.clear()
@@ -5387,10 +5412,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         updateHardwareKeyboardConnection()
         requestHardwareCursorUpdates()
         updateEnterKeyText(attribute)
-        // 只记长度与位置，不记文字内容。
-        FileLogger.w("InputLifecycle", "inline composition resumed after restart: len=${code.length} " +
-            "sel=$selStart/$selEnd at=${region.start}")
-        return true
     }
 
     /**
