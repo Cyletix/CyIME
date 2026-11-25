@@ -417,6 +417,8 @@ fun KeyboardView(
     // 单独一层后根只录一句「画这一层」，这层本身不动就不重录。不改样子：没有透明度、不离屏。
     val motionIsolation = if (backgroundMotion != null) Modifier.graphicsLayer() else Modifier
     val contentModifier = if (state.handwritingExpanded) previewModifier else motionIsolation.then(previewModifier)
+    // 背景单独一段：悬浮时在卡片里往下画到拖动条底（bleedBottomOut/In），整张卡片一张图。
+    val contentPaint = if (state.handwritingExpanded) null else Modifier
         .keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor,
             imageSlot = backgroundImageSlot)
         .splitGapCutout(splitKeyboardGap)
@@ -619,6 +621,9 @@ fun KeyboardView(
         contentHeightDp = state.keyboardHeightDp + clipboardSearchExtraHeight(
             state.isFloatingMode && state.clipboardSearchVisible, state.clipboardSearchResultsHeight,
             state.clipboardSearchInline) + state.preeditStripDp,
+        temporaryExtraHeightDp = clipboardSearchExtraHeight(
+            state.isFloatingMode && state.clipboardSearchVisible, state.clipboardSearchResultsHeight,
+            state.clipboardSearchInline) + state.preeditStripDp,
         bottomContentPaddingDp = renderedBottomPaddingDp,
         bottomKeyClearance = floatingBottomClearance,
         fixedWidthDp = state.fixedWidthDp,
@@ -682,7 +687,12 @@ fun KeyboardView(
         }
         // 候选栏上面那一截的高度（翻译栏、工具面板、剪贴板搜索、拼音编辑条）；菜单等面板据此让开工具栏，见 belowCandidateBar。
         val aboveCandidateBarPx = remember { mutableIntStateOf(0) }
-        Box(modifier = Modifier.fillMaxSize().then(contentModifier).inlineQuickActionGestures(inlineEditor).onSizeChanged { size ->
+        val backgroundBleed = LocalFloatingBackgroundBleed.current?.takeIf { state.isFloatingMode }
+        val bleedPx = if (contentPaint != null) backgroundBleed?.px ?: 0 else 0
+        SideEffect { backgroundBleed?.consumed = contentPaint != null }
+        Box(modifier = Modifier.fillMaxSize().then(contentModifier)
+            .then(if (contentPaint == null) Modifier else Modifier.bleedBottomOut(bleedPx).then(contentPaint).bleedBottomIn(bleedPx))
+            .inlineQuickActionGestures(inlineEditor).onSizeChanged { size ->
             if (!barScaleFrozen && size.width > 0 && size.height > 0) {
                 candidateBarScaleState.floatValue = candidateBarScale(size.width / resizeControlDensity.density,
                     size.height / resizeControlDensity.density - renderedBottomPaddingDp)
@@ -690,7 +700,7 @@ fun KeyboardView(
         }) {
         if (backgroundMotion != null && backgroundImageSlot != null) {
             KeyboardBackgroundMotionLayer(backgroundImageSlot, backgroundMotion, splitKeyboardGap,
-                glass = inputPreferences.frostedGlass.enabled)
+                glass = inputPreferences.frostedGlass.enabled, bleedPx = bleedPx)
         }
         // 长按候选删除自造词：确认覆盖层状态（键盘视图内渲染，不弹独立
         // 窗口——焦点型弹窗会抢焦点导致 IME 被系统收起）

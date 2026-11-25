@@ -121,6 +121,8 @@ internal fun FloatingKeyboardContainer(
     availableHeightDp: Int = 0,
     /** 非调节态真实键盘内容高度；宿主可以是全屏，但卡片不能再拿宿主高度当自身高度。 */
     contentHeightDp: Int,
+    /** [contentHeightDp] 里临时撑高的那截（剪贴板搜索、拼音条），算按比例缩小时不算它。 */
+    temporaryExtraHeightDp: Int = 0,
     backgroundColor: Color = Color.Transparent,
     /** 拖动条颜色；KeyboardView 按主题背景与文字色算好传入，未传时按调色板折中。 */
     dragIndicatorColor: Color? = null,
@@ -309,7 +311,9 @@ internal fun FloatingKeyboardContainer(
         val cardRect = previewRect ?: cornerRect ?: baseRect
         val cardTotalHeight = with(density) { cardRect.height.toDp() }
         val capInset = remember { mutableFloatStateOf(0f) }
-        val dragAreaHeight = floatingDragAreaHeightDp(bottomContentPaddingDp,
+        // 比正常最矮还矮时键区整块按比例缩小（拖角、调节界面预览时跟着拖出来的大小走）；拖动条不缩，照样好抓。
+        val contentScale = floatingContentScale(cardTotalHeight.value - footerDp - temporaryExtraHeightDp)
+        val dragAreaHeight = floatingDragAreaHeightDp((bottomContentPaddingDp * contentScale).roundToInt(),
             bottomKeyClearance?.value ?: 0f, cardTotalHeight.value, footerDp).dp
         val horizontalTravel = ((maxWidth.value - normalRect.width / density.density) / 2f).coerceAtLeast(0f)
         val minimumY = minOffsetY.coerceIn(0, maxHeight.value.roundToInt()).toFloat()
@@ -425,11 +429,17 @@ internal fun FloatingKeyboardContainer(
                 }
                 .testTag("floating-keyboard-card")
         ) {
+            // 键区背景往下画到拖动条底，整张卡片一张背景（见 FloatingBackgroundBleed）。
+            val footerPx = with(density) { footerDp.dp.roundToPx() }
+            val backgroundBleed = remember(footerPx) { FloatingBackgroundBleed(footerPx) }
             Column {
                 val dragSpace = remember { KeyDragSpace() }
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().onPlaced { dragSpace.card = it }) {
                     CompositionLocalProvider(
-                        LocalDensity provides Density(density = density.density, fontScale = density.fontScale * fontScaleFactor),
+                        LocalDensity provides Density(density = density.density * contentScale,
+                            fontScale = density.fontScale * fontScaleFactor),
+                        LocalFloatingContentScale provides contentScale,
+                        LocalFloatingBackgroundBleed provides backgroundBleed,
                         LocalFloatingKeyboardRotation provides restingRotation,
                         LocalKeyDragSpace provides dragSpace,
                         LocalFloatingKeyCapInset provides capInset,
@@ -445,7 +455,8 @@ internal fun FloatingKeyboardContainer(
             // 再从键帽下沿起叠一层，玻璃、半透明底色时两层叠出一条更亮的横条（11-19 悬浮键盘开玻璃效果）。
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .height(footerDp.dp.coerceAtMost(cardTotalHeight))
-                .testTag("floating-footer-background").keyboardPanelBackground(backgroundColor))
+                .testTag("floating-footer-background")
+                .then(if (backgroundBleed.consumed) Modifier else Modifier.keyboardPanelBackground(backgroundColor)))
             // 拖动区从最下一排的键帽下沿算起，小横条在这一段里居中；键帽下沿以下仍接按键触摸。
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .height((dragAreaHeight + capInset.floatValue.dp).coerceAtMost(cardTotalHeight))
