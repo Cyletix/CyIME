@@ -42,12 +42,13 @@ class SentenceDragEditEntryTest {
         assertNull(sentenceEditKey("1", merged14 = true))
     }
 
-    /** 拖选只给长句：不到 8 个字的首选长按照旧出调词频的卡片（11-24）。 */
-    @Test fun dragEditOnlyForLongSentences() {
-        assertFalse(sentenceDragApplies(null))
-        assertFalse(sentenceDragApplies("甲".repeat(2)))
-        assertFalse(sentenceDragApplies("甲".repeat(SENTENCE_DRAG_MIN_CHARS - 1)))
-        assertTrue(sentenceDragApplies("甲".repeat(SENTENCE_DRAG_MIN_CHARS)))
-        assertEquals(8, SENTENCE_DRAG_MIN_CHARS)
+    /** 拖选默认关；开着也只给超过 6 个字的首选，短句长按照旧出调词频的卡片（11-24）。 */
+    @Test fun dragEditOnlyWhenOnAndForLongSentences() {
+        assertFalse(sentenceDragApplies(null, enabled = true))
+        assertFalse(sentenceDragApplies("甲".repeat(2), enabled = true))
+        assertFalse(sentenceDragApplies("甲".repeat(6), enabled = true))
+        assertTrue(sentenceDragApplies("甲".repeat(7), enabled = true))
+        assertFalse(sentenceDragApplies("甲".repeat(12), enabled = false))
+        assertEquals(7, SENTENCE_DRAG_MIN_CHARS)
     }
 }

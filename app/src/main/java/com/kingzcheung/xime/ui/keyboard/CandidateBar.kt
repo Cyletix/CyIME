@@ -1393,6 +1393,13 @@ internal fun correctionAnnotatedString(marks: String, plain: Color,
         }
     }
 
+/**
+ * 首选上按住后松手：拖到了别的字上（选区至少两个字）才改局部，返回选中的字；否则是长按，返回 null，出调词频、固定、
+ * 删除的卡片。按住时手指抖出一点、还停在同一个字上也算长按（11-24 他：长按点不了固定，长按全是改单字的候选）。
+ */
+internal fun sentenceDragRange(dragged: Boolean, first: Int, last: Int): IntRange? =
+    if (dragged && last != first) minOf(first, last)..maxOf(first, last) else null
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CandidateItem(
@@ -1481,8 +1488,7 @@ fun CandidateItem(
                     val first = characterAt(down.position)
                     var last = first
                     var dragged = false
-                    dragSelection = first..first
-                    currentSentenceSelectionChange?.invoke(first, first + 1)
+                    // 只按住不拖时不标出一个字：那是长按（出卡片），拖到别的字上才开始标选区。
                     magnifierPosition = held.position
                     try { do {
                         val event = awaitPointerEvent()
@@ -1490,7 +1496,8 @@ fun CandidateItem(
                         if ((change.position - down.position).getDistance() >= viewConfiguration.touchSlop) dragged = true
                         if (dragged) {
                             val next = characterAt(change.position)
-                            if (next != last) {
+                            // 回到按下的那个字时保留上一个选区（预览着的就是它），不退回成单字。
+                            if (next != last && next != first) {
                                 last = next
                                 dragSelection = minOf(first, last)..maxOf(first, last)
                                 currentSentenceSelectionChange?.invoke(minOf(first, last), maxOf(first, last) + 1)
@@ -1503,7 +1510,8 @@ fun CandidateItem(
                         currentSentenceSelectionEnd?.invoke()
                         magnifierPosition = androidx.compose.ui.geometry.Offset.Unspecified
                     }
-                    if (dragged) currentSentenceSelection?.invoke(minOf(first, last), maxOf(first, last) + 1)
+                    val range = sentenceDragRange(dragged, first, last)
+                    if (range != null) currentSentenceSelection?.invoke(range.first, range.last + 1)
                     else currentLongClick?.invoke()
                 }
             } else Modifier),

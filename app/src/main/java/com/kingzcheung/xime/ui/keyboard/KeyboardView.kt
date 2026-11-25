@@ -161,13 +161,13 @@ internal fun usesT9DragReselect(profile: com.kingzcheung.xime.settings.InputProf
         profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.T9
 
 /**
- * 首选上拖选改局部只给长句（11-24 他的要求）：拖选占着首选的长按，五六个字的短句长按要能调词频、删词、固定位置，
- * 所以首选不到 [SENTENCE_DRAG_MIN_CHARS] 个字时不接拖选，长按照旧出调词频的卡片，卡片里照旧拆词重选。
+ * 首选上拖选改局部默认开（11-24 他：「默认打开 你只能在6个字以上生效」），只给超过 6 个字的长句：短句长按要能调词频、删词、固定位置，
+ * 所以开关关着或首选不到 [SENTENCE_DRAG_MIN_CHARS] 个字时不接拖选，长按照旧出调词频的卡片，卡片里照旧拆词重选。
  */
-internal const val SENTENCE_DRAG_MIN_CHARS = 8
+internal const val SENTENCE_DRAG_MIN_CHARS = 7
 
-internal fun sentenceDragApplies(firstCandidate: String?): Boolean =
-    (firstCandidate?.length ?: 0) >= SENTENCE_DRAG_MIN_CHARS
+internal fun sentenceDragApplies(firstCandidate: String?, enabled: Boolean): Boolean =
+    enabled && (firstCandidate?.length ?: 0) >= SENTENCE_DRAG_MIN_CHARS
 
 /**
  * 拖选改局部时按下的键接到编码后面的样子；不是编码键时为 null。26 键是小写字母；内置 14 键的合并键（qw）
@@ -1694,7 +1694,7 @@ fun KeyboardView(
                                 com.kingzcheung.xime.handwriting.HandwritingTemplates.forget(handwritingContext, handwritingWord)
                             }
                         } else if (!word.isNullOrEmpty()) {
-                            val parts = sentenceParts(callbacks, cs, word, first = (railEntry?.first ?: index) == 0, state.inputProfile)
+                            val parts = sentenceParts(callbacks, cs, word, first = (railEntry?.first ?: index) == 0, state.inputProfile, inputPreferences.sentenceDragEdit)
                             deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word), parts = parts) {
                                 if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                 if (railEntry != null) {
@@ -1709,7 +1709,7 @@ fun KeyboardView(
                     onSentenceSelectionEnd = ::endSentenceDrag,
                     onSentenceSelection = if (sentenceEdit == null && !showHandwritingCandidates && !glossSwap &&
                         !state.isAsciiMode && usesSentenceDragEdit(state.inputProfile) &&
-                        !expandedDataMode && sentenceDragApplies(cs.candidates.firstOrNull())) { start, end ->
+                        !expandedDataMode && sentenceDragApplies(cs.candidates.firstOrNull(), inputPreferences.sentenceDragEdit)) { start, end ->
                         callbacks.onOpenSentenceEdit?.invoke(start, end, cs.engineRevision) { owner ->
                             if (owner != null && callbacks.isCandidateSnapshotCurrent(cs)) {
                                 closePreeditEditor()
@@ -1728,7 +1728,7 @@ fun KeyboardView(
                         }
                     } else if (sentenceEdit == null && !showHandwritingCandidates && !glossSwap && !state.isAsciiMode &&
                         usesT9DragReselect(state.inputProfile) && callbacks.onReselectSentenceRange != null &&
-                        !expandedDataMode && sentenceDragApplies(cs.candidates.firstOrNull())) { start, end ->
+                        !expandedDataMode && sentenceDragApplies(cs.candidates.firstOrNull(), inputPreferences.sentenceDragEdit)) { start, end ->
                         val sentence = cs.candidates.firstOrNull()
                         if (sentence != null && callbacks.isCandidateSnapshotCurrent(cs))
                             callbacks.onReselectSentenceRange?.invoke(sentence, start, end)
@@ -1958,7 +1958,7 @@ fun KeyboardView(
                                 .getOrNull(entry.globalIndex)?.text
                             if (!word.isNullOrEmpty()) {
                                 onHapticFeedback?.invoke()
-                                val parts = sentenceParts(callbacks, cs, word, first = entry.globalIndex == 0, state.inputProfile)
+                                val parts = sentenceParts(callbacks, cs, word, first = entry.globalIndex == 0, state.inputProfile, inputPreferences.sentenceDragEdit)
                                 deletePending = DeletePendingWord(word, pin = pinChoice(callbacks, cs, word), parts = parts) {
                                     if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                     callbacks.onGlobalCandidateDelete?.invoke(entry.globalIndex)
@@ -3156,10 +3156,10 @@ private class SentenceParts(val words: List<String>, val reselect: (Int) -> Unit
  * 26 键全拼和双拼用首选上的拖选改局部（PR #363），不再出拆词；其它方案还没有拖选，照旧出拆词。
  */
 private fun sentenceParts(callbacks: KeyboardCallbacks, cs: com.kingzcheung.xime.service.CandidateState,
-    word: String, first: Boolean, profile: com.kingzcheung.xime.settings.InputProfile): SentenceParts? {
+    word: String, first: Boolean, profile: com.kingzcheung.xime.settings.InputProfile, dragEdit: Boolean): SentenceParts? {
     val reselect = callbacks.onReselectSentenceWord ?: return null
-    // 有拖选的方案只在长句上拖选；短句没有拖选，回到卡片里拆词重选，两种入口仍不同时出现。
-    if ((usesSentenceDragEdit(profile) || usesT9DragReselect(profile)) && sentenceDragApplies(word)) return null
+    // 开着拖选时只在长句上拖选；短句或开关关着没有拖选，回到卡片里拆词重选，两种入口仍不同时出现。
+    if ((usesSentenceDragEdit(profile) || usesT9DragReselect(profile)) && sentenceDragApplies(word, dragEdit)) return null
     if (!first || !cs.isComposing || cs.candidates.firstOrNull() != word) return null
     val words = callbacks.sentenceWords(word)?.takeIf { it.size >= 2 } ?: return null
     return SentenceParts(words) { target ->

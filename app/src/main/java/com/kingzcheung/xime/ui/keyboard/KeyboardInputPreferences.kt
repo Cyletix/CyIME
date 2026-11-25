@@ -99,6 +99,8 @@ data class KeyboardInputPreferences(
     val showPreeditPreview: Boolean = true,
     /** 候选滑到头回弹展开（默认关）：关着时展开页里左右划不收回，同 1.15.101，见 [SettingsPreferences.isCandidateSwipeExpand]。 */
     val candidateSwipeExpand: Boolean = false,
+    /** 首选上拖选改局部（默认开，只对超过 6 个字的首选），见 [SettingsPreferences.isSentenceDragEdit]。 */
+    val sentenceDragEdit: Boolean = true,
     val inputTextLocation: String = SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR,
     /** 「显示在候选栏」时拼音的位置，见 [SettingsPreferences.preeditStyle]。 */
     val preeditStyle: String = SettingsPreferences.PREEDIT_STYLE_BUBBLE,
@@ -417,7 +419,7 @@ data class KeyboardInputPreferences(
         const val HIDE_FUNCTION_KEY_HINTS_KEY = "hide_function_key_hints"
         internal val watchedKeys: Set<String> by lazy {
             setOf(CORNER_SYMBOL_INPUT_KEY, KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
-                SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_CANDIDATE_SWIPE_EXPAND, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_PREEDIT_STYLE, SettingsPreferences.KEY_PREEDIT_ALIGN, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
+                SettingsPreferences.KEY_SHOW_PREEDIT_PREVIEW, SettingsPreferences.KEY_CANDIDATE_SWIPE_EXPAND, SettingsPreferences.KEY_SENTENCE_DRAG_EDIT, SettingsPreferences.KEY_INLINE_PREEDIT_PREVIEW, SettingsPreferences.KEY_PREEDIT_STYLE, SettingsPreferences.KEY_PREEDIT_ALIGN, SettingsPreferences.KEY_INPUT_TEXT_LOCATION,
                 SettingsPreferences.KEY_PREEDIT_BUBBLE_OPACITY, SettingsPreferences.KEY_PREEDIT_TONES,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.CHINESE, com.kingzcheung.xime.settings.LetterSwipeBindings.ENGLISH,
                 com.kingzcheung.xime.settings.LetterSwipeBindings.T9,
@@ -459,6 +461,7 @@ data class KeyboardInputPreferences(
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
                 showPreeditPreview = SettingsPreferences.showPreeditPreview(context),
                 candidateSwipeExpand = SettingsPreferences.isCandidateSwipeExpand(context),
+                sentenceDragEdit = SettingsPreferences.isSentenceDragEdit(context),
                 inputTextLocation = SettingsPreferences.getInputTextLocation(context),
                 preeditStyle = SettingsPreferences.preeditStyle(context),
                 preeditAlign = SettingsPreferences.preeditAlign(context),
