@@ -100,6 +100,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         // Ctrl+回车在没声明动作的框里执行「发送」；有的应用不理这个动作，见 [sendWithFallback]。
         if (ctrl && !terminal && plan == EnterKeyAction.EditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_SEND))
             return sendWithFallback(ic, info?.packageName)
+        // 数字后面刚上的半角 . ,（[DigitSeparatorGuess]）：回车换行、发送前按句末标点改成 。，（「价格是5。」）。
+        service.digitSeparatorGuess.beforeEnter(ic, newline = plan == EnterKeyAction.Newline,
+            now = android.os.SystemClock.uptimeMillis())
         when (plan) {
             is EnterKeyAction.EditorAction -> ic.performEditorAction(plan.action)
             EnterKeyAction.Newline -> ic.commitText("\n", 1)
@@ -697,6 +700,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             service.rimeEngine.readQueuedComposition()?.input.isNullOrEmpty() &&
             digitSeparatorStaysHalfWidth(key, withEditor {
                 runCatching { service.editorConnection()?.getTextBeforeCursor(1, 0) }.getOrNull() })
+
+    /**
+     * 实体键盘数字后的 . ,：照半角上屏；选的是全角标点时记下来，接着打的不是数字就改成 。，（[DigitSeparatorGuess]，11-25）。
+     * 冒号（12:30）照旧只上半角。
+     */
+    private suspend fun commitDigitSeparator(key: String) {
+        val committed = commitHardwareLiteral(key)
+        if (committed && key.length == 1 && key[0] in ".,") withEditor {
+            if (service.textCommit.digitSeparatorAllowed() && service.textCommit.isFullWidthPunctuation())
+                service.digitSeparatorGuess.arm(key[0])
+        }
+    }
 
     private suspend fun <T> withEditor(block: suspend CoroutineScope.() -> T): T =
         withContext(Dispatchers.Main) {
@@ -1388,7 +1403,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             // 104 里只有 : 变半角（#548）。没在打字、光标前是数字时照半角上屏；打字中照旧翻页。
             if (hardwareEvent == null && hardwarePageDirection != 0 && !zhuyinHardwareActive() &&
                 keepsDigitSeparatorHalfWidth(key)) {
-                commitHardwareLiteral(key)
+                commitDigitSeparator(key)
                 return@command
             }
             // 注音（大千）Shift+数字 / Ctrl+数字：按排在前面的注音键都处理完后的候选，选这一组的第 N 个，和光按数字选词同一条路
@@ -1467,7 +1482,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 // 数字后的 . , :（3.14、12:30）：上面的数字是直接上屏的，没进 Rime，Rime 的数字后半角规则管不到，
                 // 中文模式句号会成「。」（#527）。没在打字、光标前是数字时照半角上屏。
                 if (keepsDigitSeparatorHalfWidth(key)) {
-                    commitHardwareLiteral(key)
+                    commitDigitSeparator(key)
                     return@command
                 }
                 // 打拼音时不按 Shift 的 ; / \ 等：先把字母原样上屏（不上屏首选，Gboard 规则，用户 2026-10-24），
@@ -2757,6 +2772,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             hold?.allowsDeletion(imeContent = true)
             return
         }
+        // 数字后的 . , 刚被自动改成 。，：紧接着这一下退格改回半角（[DigitSeparatorGuess]，11-25）。长按连删不算。
+        if (hold == null && service.t9PartialSegments.isEmpty() && service.candidateState.value.let { !it.isComposing && it.inputText.isEmpty() } &&
+            withEditor { service.currentInputConnection?.let { service.digitSeparatorGuess.undoOnDelete(it, android.os.SystemClock.uptimeMillis()) } == true }) return
         // 退格改变输入上下文：使在途的联想预测结果失效，防止过期结果迟到回填
         // associationCandidates，导致长按退格删除时候选栏在"联想词↔空"之间闪动。
         // 先作废再读候选：联想恰好在两步之间送达时，要么算“在等”，要么已经看得到，不会落成删正文。

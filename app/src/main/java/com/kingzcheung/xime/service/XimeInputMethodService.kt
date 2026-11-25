@@ -993,6 +993,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal val japaneseInputController = JapaneseInputController(this)
 
     internal val textCommit = ImeTextCommit(this)
+
+    /** 数字后面先上半角的 . ,，下一个上屏的不是数字时改成全角（见 [DigitSeparatorGuess]）。主线程读写。 */
+    internal val digitSeparatorGuess = DigitSeparatorGuess()
     
     private val inlineSuggestionManager = if (AndroidPlatform.inlineSuggestions) {
         InlineSuggestionManager(this)
@@ -4029,6 +4032,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         endGlidePreview()
         super.onStartInput(attribute, restarting)
+        digitSeparatorGuess.reset()
         editorStartedAt = android.os.SystemClock.uptimeMillis()
         val preview = KeyboardPanelLaunch.isPreview(attribute, packageName)
         val requestedTool = if (preview) KeyboardPanelLaunch.editorPanel(attribute) else null
@@ -6195,6 +6199,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return TextCommitResult.ACCEPTED_INTERNAL
         }
         val connection = currentInputConnection ?: return TextCommitResult.NO_CONNECTION
+        // 数字后面先上的半角 . ,：接着上屏的不是数字就先改成全角 。，；同一个键再点一次只改不加（11-25）。
+        if (isPaste) digitSeparatorGuess.reset()
+        else if (digitSeparatorGuess.beforeCommit(connection, delivered, android.os.SystemClock.uptimeMillis()))
+            return TextCommitResult.ACCEPTED_HOST
         val committed = when {
             caret != CommitCaret.NONE -> connection.commitTextWithCaret(delivered, caret)
             // 多行短语一行一行上屏（见 commitPhraseLines）。
