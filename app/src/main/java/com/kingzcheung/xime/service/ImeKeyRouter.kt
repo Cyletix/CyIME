@@ -1882,12 +1882,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             val accepted = withEditor { service.submitText(input).accepted }
                             if (!accepted) return@command
                             // English typed by hand (Obsidian) is offered again next time, dictionary or not.
-                            if (!isT9 && typesEnglishCapitals(state.currentSchemaId) &&
-                                !com.kingzcheung.xime.settings.IncognitoState.active) {
-                                com.kingzcheung.xime.settings.EnglishWordMemory.remember(
-                                    com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service),
-                                    if (wordsAutoCapped && typesEnglishWords(state.inputProfile, state.isAsciiMode))
-                                        spellingWithoutAutoCap(input) else input)
+                            if (!isT9 && typesEnglishCapitals(state.currentSchemaId)) {
+                                val rimeDir = com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service)
+                                val word = if (wordsAutoCapped && typesEnglishWords(state.inputProfile, state.isAsciiMode))
+                                    spellingWithoutAutoCap(input) else input
+                                // 无痕时不记新词，但删过的词回车打出来照样回到原位：只是从「排到后面」里拿掉，不记下打了什么。
+                                if (com.kingzcheung.xime.settings.IncognitoState.active)
+                                    com.kingzcheung.xime.settings.EnglishWordMemory.undemote(rimeDir, word)
+                                else com.kingzcheung.xime.settings.EnglishWordMemory.remember(rimeDir, word)
                             }
                         }
                         // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。
@@ -3733,6 +3735,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (!com.kingzcheung.xime.settings.EnglishWordMemory.forget(rimeDir, text)) return false
         // Translate the same input again so the forgotten word leaves the menu.
         service.rimeEngine.setInput(service.rimeEngine.getInput())
+        // 词库里也有这个词（回车打过的 appointment）：忘掉记录后它还在第一个，看起来删了没反应，要再删一次。
+        // 这时直接按词库英文词处理，排到后面（再选它或回车打它就回来）。
+        if (service.rimeEngine.getCandidates().any { it == text } && demoteEnglishWord(text)) return true
         withEditor { service.updateUI() }
         showForgetResult(text, 3)
         return true
