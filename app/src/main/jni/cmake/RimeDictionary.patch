@@ -858,7 +858,7 @@ index f363419f..0b6cb28b 100644
  
  template <class... Cs>
 diff --git a/src/rime/dict/dictionary.cc b/src/rime/dict/dictionary.cc
-index 1dc47f8f..68fe462a 100644
+index 1dc47f8f..0e2a7483 100644
 --- a/src/rime/dict/dictionary.cc
 +++ b/src/rime/dict/dictionary.cc
 @@ -8,6 +8,7 @@
@@ -1135,17 +1135,18 @@ index 1dc47f8f..68fe462a 100644
          } while (a.Next());
        } else {
          (*collector)[end_pos].AddChunk({table, a, cr, q});
-@@ -278,7 +423,8 @@ static void collect_chunks(DictEntryCollector* collector,
+@@ -278,7 +423,9 @@ static void collect_chunks(DictEntryCollector* collector,
                             const SyllableGraph& syllable_graph,
                             bool predict_word,
                             double initial_credibility,
 -                           size_t min_end_pos) {
 +                           size_t min_end_pos,
-+                           bool credit_extra_spelling) {
++                           bool credit_extra_spelling,
++                           size_t skip_end = 0) {
    for (auto& v : result) {
      size_t end_pos = v.first;
      for (TableAccessor& a : v.second) {
-@@ -287,14 +433,16 @@ static void collect_chunks(DictEntryCollector* collector,
+@@ -287,16 +434,20 @@ static void collect_chunks(DictEntryCollector* collector,
        if (a.extra_code()) {
          do {
            dictionary::CodeMatch match = dictionary::match_extra_code(
@@ -1156,15 +1157,20 @@ index 1dc47f8f..68fe462a 100644
              continue;
            if (min_end_pos != 0 && match.end_pos < min_end_pos)
              continue;
++          if (match.end_pos <= skip_end)
++            continue;
            size_t matching_code_size = a.index_code().size() + match.depth;
            (*collector)[match.end_pos].AddChunk(
 -              {table, a.code(), a.entry(), matching_code_size, cr, q});
 +              {table, a.code(), a.entry(), matching_code_size,
 +               cr + match.credibility, q + match.quality_len});
          } while (a.Next());
-       } else {
+-      } else {
++      } else if (end_pos > skip_end) {
          (*collector)[end_pos].AddChunk({table, a, cr, q});
-@@ -320,15 +468,18 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
+       }
+     }
+@@ -320,15 +471,18 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
                                            const hash_set<string>* blacklist,
                                            bool predict_word,
                                            double initial_credibility,
@@ -1187,18 +1193,19 @@ index 1dc47f8f..68fe462a 100644
    }
    if (collector->empty())
      return nullptr;
-@@ -342,7 +493,9 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -342,7 +496,10 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
      const vector<size_t>& start_positions,
      const hash_set<string>* blacklist,
      bool predict_word,
 -    size_t min_end_pos) {
 +    size_t min_end_pos,
 +    size_t sentence_beam_width,
-+    bool credit_extra_spelling) {
++    bool credit_extra_spelling,
++    size_t skip_end) {
    map<int, an<DictEntryCollector>> result;
    if (!loaded() || start_positions.empty())
      return result;
-@@ -350,7 +503,7 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -350,7 +507,7 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
    // start 产生——3 层每层的边跨度 ≤ 图中观测到的最大跨度。
    // 据此把 start 窗口和 advance 下限压到新桶附近，避免全图遍历。
    size_t min_start_pos = 0;
@@ -1207,14 +1214,14 @@ index 1dc47f8f..68fe462a 100644
    if (min_end_pos != 0) {
      size_t max_span = 0;
      for (const auto& x : syllable_graph.edges) {
-@@ -376,15 +529,16 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -376,15 +533,16 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
      if (!table->IsOpen())
        continue;
      map<int, TableQueryResult> per_start;
 -    if (!table->QueryMulti(syllable_graph, starts, &per_start, min_end_pos,
 -                           min_start_pos))
 +    T9_WORK_COUNT(dict_table_queries); if (!table->QueryMulti(syllable_graph, starts, &per_start, min_end_pos,
-+                           min_start_pos, false, sentence_beam_width))
++                           min_start_pos, false, sentence_beam_width, skip_end))
        continue;
      for (auto& sv : per_start) {
 -      auto& collector = result[sv.first];
@@ -1224,12 +1231,12 @@ index 1dc47f8f..68fe462a 100644
 +      T9OriginScope origin(sv.first);
        collect_chunks(collector.get(), table.get(), sv.second, syllable_graph,
 -                     predict_word, 0.0, min_end_pos);
-+                     predict_word, 0.0, min_end_pos, credit_extra_spelling);
++                     predict_word, 0.0, min_end_pos, credit_extra_spelling, skip_end);
      }
    }
    for (auto it = result.begin(); it != result.end();) {
 diff --git a/src/rime/dict/dictionary.h b/src/rime/dict/dictionary.h
-index 8a854007..c8572238 100644
+index 8a854007..cd8eb067 100644
 --- a/src/rime/dict/dictionary.h
 +++ b/src/rime/dict/dictionary.h
 @@ -35,7 +35,13 @@ class RIME_DLL DictEntryIterator : public DictEntryFilterBinder {
@@ -1267,19 +1274,21 @@ index 8a854007..c8572238 100644
    // 多起点查询：一次表查询覆盖全部 start（共享音节树 BFS），
    // 结果按 start 分组。与逐 start 调 Lookup 的结果等价，但把
    // T9 增量 compose 每键 O(N²) 的查询成本降为 O(N)。
-@@ -86,7 +97,9 @@ class Dictionary : public Class<Dictionary, const Ticket&> {
+@@ -86,7 +97,11 @@ class Dictionary : public Class<Dictionary, const Ticket&> {
        const vector<size_t>& start_positions,
        const hash_set<string>* blacklist = nullptr,
        bool predict_word = false,
 -      size_t min_end_pos = 0);
 +      size_t min_end_pos = 0,
 +      size_t sentence_beam_width = 0,
-+      bool credit_extra_spelling = false);
++      bool credit_extra_spelling = false,
++      // CyIME: leave out words ending at or before this position (0 = none); see Table::QueryMulti.
++      size_t skip_end = 0);
    // if predictive is true, do an expand search with limit,
    // otherwise do an exact match.
    // return num of matching keys.
 diff --git a/src/rime/dict/table.cc b/src/rime/dict/table.cc
-index 1b38958e..474e7023 100644
+index 1b38958e..3c71e700 100644
 --- a/src/rime/dict/table.cc
 +++ b/src/rime/dict/table.cc
 @@ -10,6 +10,7 @@
@@ -1421,18 +1430,19 @@ index 1b38958e..474e7023 100644
      return false;
    *result = std::move(per_start[start_pos]);
    return !result->empty();
-@@ -586,7 +614,9 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
+@@ -586,7 +614,10 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
                         const vector<size_t>& start_positions,
                         map<int, TableQueryResult>* result,
                         size_t min_end_pos,
 -                       size_t min_start_pos) {
 +                       size_t min_start_pos,
 +                       bool complete_short_prefix,
-+                       size_t sentence_beam_width) {
++                       size_t sentence_beam_width,
++                       size_t skip_end) {
    if (!result || !index_ || start_positions.empty())
      return false;
    // 多起点 BFS：队列元素携带来源 start（结果分组键）与当前遍历位置。
-@@ -598,8 +628,27 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
+@@ -598,8 +629,27 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
      size_t origin;       // 结果分组的来源 start
      size_t current_pos;  // BFS 当前位置
      TableQuery query;
@@ -1460,7 +1470,7 @@ index 1b38958e..474e7023 100644
    for (size_t start_pos : start_positions) {
      if (start_pos >= syll_graph.interpreted_length)
        continue;
-@@ -609,10 +658,16 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
+@@ -609,10 +659,16 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
    }
    if (q.empty())
      return false;
@@ -1479,7 +1489,7 @@ index 1b38958e..474e7023 100644
      TableQuery query(item.query);
      auto index = syll_graph.indices.find(current_pos);
      if (index == syll_graph.indices.end()) {
-@@ -631,10 +686,18 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
+@@ -631,10 +687,18 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
        }
        continue;
      }
@@ -1500,7 +1510,16 @@ index 1b38958e..474e7023 100644
  
          double penalty = 0.0;
          if (false) {
-@@ -659,11 +722,21 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
+@@ -651,7 +715,7 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
+         bool is_normal_spelling = props->type == kNormalSpelling;
+         double delta_quality_len =
+             (is_normal_spelling ? 1.0 : 0.0) * (end_pos - current_pos);
+-        if (min_end_pos == 0 || end_pos >= min_end_pos) {
++        if ((min_end_pos == 0 || end_pos >= min_end_pos) && end_pos > skip_end) {
+           TableAccessor accessor =
+               query.Access(syll_id, next_credibility, delta_quality_len);
+           if (!accessor.exhausted()) {
+@@ -659,11 +723,21 @@ bool Table::QueryMulti(const SyllableGraph& syll_graph,
                  .push_back(accessor);
            }
          }
@@ -1524,7 +1543,7 @@ index 1b38958e..474e7023 100644
          }
        }
 diff --git a/src/rime/dict/table.h b/src/rime/dict/table.h
-index 56d4eef1..6d057fe2 100644
+index 56d4eef1..0f58b269 100644
 --- a/src/rime/dict/table.h
 +++ b/src/rime/dict/table.h
 @@ -9,6 +9,7 @@
@@ -1600,14 +1619,18 @@ index 56d4eef1..6d057fe2 100644
    // 多起点查询：一次 BFS 覆盖多个 start（共享音节树遍历），
    // 结果按 start 分组。T9 增量 compose 用它把每键 O(N²) 的
    // 逐 start 查询降为 O(N)。min_start_pos > 0 时（T9 增量）：
-@@ -218,7 +231,9 @@ class Table : public MappedFile {
+@@ -218,7 +231,13 @@ class Table : public MappedFile {
                             const vector<size_t>& start_positions,
                             map<int, TableQueryResult>* result,
                             size_t min_end_pos = 0,
 -                           size_t min_start_pos = 0);
 +                           size_t min_start_pos = 0,
 +                           bool complete_short_prefix = false,
-+                           size_t sentence_beam_width = 0);
++                           size_t sentence_beam_width = 0,
++                           // CyIME: entries ending at or before this position are not collected (0 = all).
++                           // Unlike min_end_pos this changes nothing else: the walk, its beam and the
++                           // positions it reports stay as they are, and longer words are still found.
++                           size_t skip_end = 0);
    RIME_DLL string GetEntryText(const table::Entry& entry);
  
    uint32_t dict_file_checksum() const;
@@ -1991,6 +2014,20 @@ index 7886e494..3fe897ce 100644
  };
  
  class UserDictionaryComponent : public UserDictionary::Component {
+diff --git a/src/rime/dict/vocabulary.h b/src/rime/dict/vocabulary.h
+index c7753d94..1396714c 100644
+--- a/src/rime/dict/vocabulary.h
++++ b/src/rime/dict/vocabulary.h
+@@ -55,6 +55,9 @@ struct DictEntry {
+   int commit_count = 0;
+   int remaining_code_length = 0;
+   int matching_code_size = 0;
++  // CyIME: the second dictionary word of its letters, enrolled for sentences because its weight is close to the
++  // first word's (ScriptTranslator::sentence_near_homophone_margin_).
++  bool near_homophone = false;
+ 
+   DictEntry() = default;
+   ShortDictEntry ToShort() const { return {text, code, weight}; }
 diff --git a/src/rime/engine.cc b/src/rime/engine.cc
 index 4a54f64c..5f9010e2 100644
 --- a/src/rime/engine.cc
@@ -4190,17 +4227,3 @@ index a69ae741..76438819 100644
    time_t last_active_time() const { return last_active_time_; }
    const string& commit_text() const { return commit_text_; }
  
-diff --git a/src/rime/dict/vocabulary.h b/src/rime/dict/vocabulary.h
-index c7753d9..1396714 100644
---- a/src/rime/dict/vocabulary.h
-+++ b/src/rime/dict/vocabulary.h
-@@ -55,6 +55,9 @@ struct DictEntry {
-   int commit_count = 0;
-   int remaining_code_length = 0;
-   int matching_code_size = 0;
-+  // CyIME: the second dictionary word of its letters, enrolled for sentences because its weight is close to the
-+  // first word's (ScriptTranslator::sentence_near_homophone_margin_).
-+  bool near_homophone = false;
- 
-   DictEntry() = default;
-   ShortDictEntry ToShort() const { return {text, code, weight}; }

@@ -387,8 +387,10 @@ bool T9DecodeJoint(const T9ScriptQuery& q, const T9ScriptOptions& o, bool (*is_n
   };
   {
     T9LookupScope scope(&system_reach);
+    // The dictionary does not build the chunks of those words either (skip_end): with a previous frame every
+    // end at or before the stable boundary is carried or was dropped, never built here.
     auto buckets = dict->LookupAll(syllables, starts, &q.translator->blacklist(), false, 0, o.t9_dictionary_beam_,
-                                   is_numeric_input(input));
+                                   is_numeric_input(input), previous ? stable : 0);
     for (auto& start : buckets)
       T9Collect(system[start.first], start.second, o.t9_source_budget_,
                 [&](int end) { return carried(static_cast<int>(start.first), end) == 0; });
