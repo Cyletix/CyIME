@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CyIME 输入法</title>
 <meta name="description" content="CyIME 中文输入法：九键、14 键、26 键、双拼、五笔，离线语音、手写、拍照识字和实时字幕。Android 可下载，Windows、Linux 版在做。">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta property="og:title" content="CyIME 输入法">
 <meta property="og:description" content="打字、说话、手写，都在你的设备上完成。">
 <meta property="og:type" content="website">
@@ -69,7 +70,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .01em; }
-.brand svg { width: 28px; height: 28px; }
+.brand img { width: 28px; height: 28px; display: block; }
 .nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
 .nav-links a { text-decoration: none; color: var(--ink-2); }
 .nav-links a:hover { color: var(--ink); }
@@ -239,6 +240,7 @@ footer a:hover { color: var(--ink); }
 <header class="nav">
   <div class="wrap">
     <a class="brand" href="#top" aria-label="CyIME 首页">
+      <img src="favicon.svg" alt="" width="28" height="28">
       CyIME
     </a>
     <nav class="nav-links" aria-label="页面导航">
