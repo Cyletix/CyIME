@@ -114,6 +114,20 @@ class ZhuyinKeysTest {
         assertFalse(ZhuyinKeys.enterSelectsCandidate(zhuyin = false, composing = true, candidateCount = 3))
     }
 
+    /** 注音用户 11-26：直角引号打不出来。注音键盘长按逗号出全形标点，第一个仍是逗号（手指下的默认项）。 */
+    @Test fun `long press on the zhuyin comma key offers full-width punctuation`() {
+        val keys = KeysConfigHelper.parseKeyboardYamlSection(repoFile("src/main/assets/xime.yaml").readText(), "zhuyin")
+            ?: error("xime.yaml 缺少 zhuyin keys")
+        val longPress = keys["'"]?.longPress ?: error("注音逗号键没有长按")
+        assertEquals("bubble", longPress.display)
+        val labels = longPress.values.map { it.label }
+        assertEquals("，", labels.first())
+        for (p in listOf("。", "、", "？", "！", "：", "「", "」", "『", "』")) assertTrue("缺 $p", p in labels)
+        assertEquals(labels.size, labels.toSet().size)
+        // 解析只取前 10 项（parseLongPress take(10)），多写的会悄悄丢掉。
+        assertTrue(labels.size <= 10)
+    }
+
     /** 实体键盘照大千键位打（用户 11-18 jp4wu = ㄨㄣˋㄊㄧ 問題）：数字行和 , . / ; - 都是方案里的注音键码，字母不在这一组。 */
     @Test fun `hardware symbol keys are all zhuyin codes of the schema`() {
         val preedit = preeditMap()
