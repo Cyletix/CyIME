@@ -4109,3 +4109,6 @@ Rime 官方五笔86，支持拼音反查。	Official Rime Wubi 86 with pinyin lo
 上下滑输入符号的距离	Swipe distance for symbols
 长句拖选改局部	Drag to edit long sentences
 首选有 5 个字以上时，按住拖过一段就只改这一段；按住不拖照旧出固定、删除	When the first candidate has 5 or more characters, hold and drag across part of it to change only that part; holding without dragging still opens pin and delete
+，其中 {0} 个没写拼音，按内置词库注上	; {0} had no pinyin and were read from the built-in dictionary
+，{0} 个单字内置词库里已有	; {0} single characters are already in the built-in dictionary
+，跳过 {0} 行（读不出拼音）	, {0} lines skipped (no pinyin could be found)
