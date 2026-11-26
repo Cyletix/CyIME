@@ -668,7 +668,7 @@ object SettingsPreferences {
 
     /**
      * 首选上按住拖选一段改局部。默认开（11-24 他先说默认关，当晚改成「局部修改开开默认打开 你只能在6个字以上生效」），
-     * 只在首选超过 6 个字时接拖选，按住不拖照旧出调词频、固定、删除的卡片；关着时长按首选和别的候选一样。
+     * 只在首选满 5 个字时接拖选（11-26 从超过 6 个字放宽），按住不拖照旧出调词频、固定、删除的卡片；关着时长按首选和别的候选一样。
      */
     fun isSentenceDragEdit(context: Context): Boolean =
         getPrefs(context).getBoolean(KEY_SENTENCE_DRAG_EDIT, true)

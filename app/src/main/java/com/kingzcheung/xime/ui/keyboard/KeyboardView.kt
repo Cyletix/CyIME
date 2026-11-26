@@ -161,10 +161,11 @@ internal fun usesT9DragReselect(profile: com.kingzcheung.xime.settings.InputProf
         profile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.T9
 
 /**
- * 首选上拖选改局部默认开（11-24 他：「默认打开 你只能在6个字以上生效」），只给超过 6 个字的长句：短句长按要能调词频、删词、固定位置，
- * 所以开关关着或首选不到 [SENTENCE_DRAG_MIN_CHARS] 个字时不接拖选，长按照旧出调词频的卡片，卡片里照旧拆词重选。
+ * 首选上拖选改局部默认开（11-24 他：「默认打开 你只能在6个字以上生效」；11-26 他：5 个字也要能改，门槛放到 5 个字），
+ * 只给 5 个字以上的首选：更短的长按要能调词频、删词、固定位置，
+ * 所以开关关着或首选不到 [SENTENCE_DRAG_MIN_CHARS] 个字时不接拖选，长按照旧出调词频的卡片，卡片上面那排分词点哪一段就从哪一段重选。
  */
-internal const val SENTENCE_DRAG_MIN_CHARS = 7
+internal const val SENTENCE_DRAG_MIN_CHARS = 5
 
 internal fun sentenceDragApplies(firstCandidate: String?, enabled: Boolean): Boolean =
     enabled && (firstCandidate?.length ?: 0) >= SENTENCE_DRAG_MIN_CHARS
