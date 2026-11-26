@@ -1008,12 +1008,23 @@ val prepareChineseDictionaries by tasks.registering {
         // character weights alone, 挺感谢 (tkgjxp) came out 听感谢 and 挺 + word could not be typed at all. Double
         // pinyin keys carry no vowels, so the rescoring counts a syllable per two keys (rescore_keys_per_syllable).
         // Without t9_ngram.lm the first sentence stays, as before. Generated double pinyin schemes copy all of it.
+        // 2026-11-26: the word model chooses from as many sentences as in full pinyin. Full pinyin went from four to
+        // sixteen (short input 32), two words per span of short input, other-prefix sentences and the second word of
+        // near weight between 11-12 and 11-17; double pinyin stayed at four sentences of one word per span, so with the
+        // same model the same sentences came out worse than in full pinyin (我吗让我早点回家, 她还在睡觉呢, 要是拖到起点).
+        // Short input is counted in keys here (ScriptTranslation::ShortInput: t9/rescore_keys_per_syllable letters a
+        // syllable; the vowel groups of full pinyin mean nothing in double pinyin). Cloud host engine, 107 lexicon,
+        // public small model, 924 sentences typed clean (hot set both halves, everyday clauses, daily chat): first
+        // choice 649 -> 676 (full model 648 -> 679); 8454 dictionary words and phrases: no first choice changes;
+        // without the model nothing changes. Per key (cloud, rough): median 0.58 -> 0.68 ms, p90 1.03 -> 1.15.
         doublePinyin.writeText(taiwanForms(doublePinyin.readText()).replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
             "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
             "  sentence_position_initial_only: [把, 被]\n" +
-            "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
+            "  max_sentences: 16\n  sentence_cutoff_threshold: 100\n" +
+            "  sentence_word_homophones: 2\n  sentence_word_max_syllables: 4\n  sentence_other_prefixes: 4\n" +
+            "  sentence_near_homophone_margin: 3.5\n  sentence_short_max_sentences: 32\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
             // No force_gc translator, as in full pinyin above.
             .also { check(it.contains("\n    - lua_translator@*force_gc")) { "Upstream double_pinyin_flypy translator list changed" } }
@@ -1030,7 +1041,7 @@ val prepareChineseDictionaries by tasks.registering {
                 schema.replace("    - script_translator\n", "    - script_translator\n    - lua_translator@*cyime_rare_chars\n") +
                     "\ncyime_rare_double_pinyin: true\n" +
                     "\nt9:\n  sentence_rescore: true\n  rescore_keys_per_syllable: 2\n  ngram_model: t9_ngram\n" +
-                    "  ngram_sentence_start: false\n  rescore_rime_weight: 0\n"
+                    "  ngram_sentence_start: false\n  rescore_rime_weight: 0.15\n  near_homophone_penalty: 3.0\n"
             })
         // Double pinyin after a pause (2026-11-16): one key left out, a key pressed twice, two keys swapped. A helper
         // prism spells every two-key code those ways as well; it is read only after a pause, and candidate_policy.cc
