@@ -121,6 +121,34 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
     }
 
+    /**
+     * 九键自造词候选注入：强行上屏过 threshold 次的原样词按数字码插进候选。
+     * 调用点在所有过滤和插件合并之后，位置不会被后续环节重排。
+     */
+    private fun injectRememberedT9Candidates(
+        input: String,
+        isAsciiMode: Boolean,
+        texts: List<String>,
+        comments: List<String>,
+        actions: List<CandidateAction>,
+    ): Triple<List<String>, List<String>, List<CandidateAction>> {
+        // 显式守住九键边界：这是 T9 专属功能，任何非 T9 方案（含笔画、26 键）都不进入。
+        if (!isT9Schema(service.uiState.value.currentSchemaId) ||
+            isAsciiMode || !service.isChineseMode || service.t9PartialSegments.isNotEmpty()) {
+            return Triple(texts, comments, actions)
+        }
+        val policy = com.kingzcheung.xime.settings.SettingsPreferences.t9RawWordMemoryPolicy(service)
+        if (!policy.enabled) return Triple(texts, comments, actions)
+        val rawCode = input.filter { it.isDigit() }
+        if (rawCode.length !in 2..32) return Triple(texts, comments, actions)
+        val memory = com.kingzcheung.xime.settings.T9RawWordMemory
+        val entries = memory.lookup(
+            com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service), rawCode, policy)
+        if (entries.isEmpty()) return Triple(texts, comments, actions)
+        val injected = memory.inject(texts, comments, actions, rawCode, entries, policy)
+        return Triple(injected.texts, injected.comments, injected.actions)
+    }
+
     internal fun applyComposition(
         composition: com.kingzcheung.xime.rime.RimeComposition,
         pluginActions: List<CandidateAction> = emptyList(),
@@ -156,8 +184,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             filteredTexts to filteredComments
         }
         var displayText: String
-        val displayCandidates: List<String>
-        val displayComments: List<String>
+        var displayCandidates: List<String>
+        var displayComments: List<String>
         val isComposing: Boolean
         var t9CandidateActions: List<CandidateAction> = emptyList()
         if (isT9Schema) {
@@ -227,6 +255,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             displayComments = rows.comments
             isComposing = display.isComposing
             t9CandidateActions = rows.actions
+            val injected = injectRememberedT9Candidates(
+                inputText, isAsciiMode, rows.texts, rows.comments, rows.actions)
+            displayCandidates = injected.first
+            displayComments = injected.second
+            t9CandidateActions = injected.third
         } else {
             // 非 T9 方案：preeditText 用引擎回显（带音节分隔符，如全拼 ni'hao）供候选栏展示；
             // inputText 保留原始键入串（无分隔）——空格/切模式等提交路径会把它直接上屏，
@@ -372,9 +405,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             filteredTexts to filteredComments
         }
         var displayText: String
-        val displayCandidates: List<String>
-        val displayComments: List<String>
+        var displayCandidates: List<String>
+        var displayComments: List<String>
         val isComposing: Boolean
+        var t9Actions: List<CandidateAction> = emptyList()
         if (isT9Schema) {
             // 同 applyComposition：T9 编码显示永不回退原始数字 input，
             // preedit 缺失或含未转换数字时保留上一帧字母编码
@@ -390,6 +424,15 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             displayCandidates = display.displayCandidates
             displayComments = display.displayComments
             isComposing = display.isComposing
+            val baseCandidates = displayCandidates
+            val injected = injectRememberedT9Candidates(
+                result.inputText, isAsciiMode, baseCandidates, displayComments,
+                baseCandidates.indices.map { CandidateAction.engine(it) })
+            displayCandidates = injected.first
+            displayComments = injected.second
+            // 原版 T9 的 candidateActions 恒为空（显示 index 即引擎 index）。只有真的插入了
+            // 记忆词、索引发生偏移时才带动作表；关闭/未命中时严格回落空列表，零副作用。
+            t9Actions = if (injected.first.size != baseCandidates.size) injected.third else emptyList()
         } else {
             // 非 T9 方案：preeditText 用引擎回显（带音节分隔符，如全拼 ni'hao），空则回退 input；
             // inputText 保留原始键入串供提交路径直接上屏（见 applyComposition 注释）。
@@ -422,8 +465,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             isShowingRecentClipboard = false,
             hasNextPage = result.hasNextPage,
             hasPrevPage = result.hasPrevPage,
-            // 候选词变换映射（T9 不接入变换，防御清空；ascii 时调用方不产生 actions）
-            candidateActions = if (isT9Schema) emptyList() else pluginActions
+            // 候选词变换映射（T9 不接入变换，只带记忆候选的上屏动作；ascii 时调用方不产生 actions）
+            candidateActions = if (isT9Schema) t9Actions else pluginActions
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
         // 展开态时刷新跨页全量候选并重置页码（编码已变化）

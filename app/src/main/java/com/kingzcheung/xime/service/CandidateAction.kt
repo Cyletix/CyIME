@@ -11,19 +11,25 @@ package com.kingzcheung.xime.service
  * [isPrivate]：通讯录插件的人名、号码。上屏不学习：不进词库、联想、打字统计和插件事件。
  *
  * [glideInput]：中文滑行的备选（[GlideAlternatives]）。点它不上屏，把这一笔的编码换掉、组合留着。
+ *
+ * [rememberedDigits]：九键“强行上屏”自造词的记忆候选。点它按 T9 全清上屏，并给这条记忆加一次计数。
  */
 data class CandidateAction(
     val engineIndex: Int,
     val commitText: String,
     val isPrivate: Boolean = false,
     val glideInput: String? = null,
+    val rememberedDigits: String? = null,
 ) {
     val isPluginCandidate: Boolean get() = engineIndex < 0
+    val isRememberedCandidate: Boolean get() = rememberedDigits != null
 
     companion object {
         fun engine(index: Int) = CandidateAction(engineIndex = index, commitText = "")
         fun plugin(text: String) = CandidateAction(engineIndex = -1, commitText = text)
         fun contact(text: String) = CandidateAction(engineIndex = -1, commitText = text, isPrivate = true)
         fun glide(text: String, input: String) = CandidateAction(engineIndex = -1, commitText = text, glideInput = input)
+        fun remembered(text: String, digits: String) =
+            CandidateAction(engineIndex = -1, commitText = text, rememberedDigits = digits)
     }
 }
