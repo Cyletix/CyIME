@@ -79,7 +79,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 /* hero */
 .hero { padding-block: 64px 56px; }
-.hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 760px); gap: 48px; align-items: center; }
 .hero-text { min-width: 0; display: grid; gap: 22px; }
 .eyebrow { font-size: 13px; letter-spacing: .12em; color: var(--brand); font-weight: 700; }
 .hero h1 { font-family: var(--font-body); font-weight: 900; font-size: clamp(34px, 5.2vw, 58px); letter-spacing: -.01em; }
@@ -268,21 +268,6 @@ footer a:hover { color: var(--ink); }
         <p class="hero-meta">Android 9 及以上 · <span id="reldate">2026 年 11 月 26 日</span>更新</p>
       </div>
 
-      <div class="stage">
-        <div class="phone" aria-label="打字示意动画">
-          <div class="chat">
-            <div class="bubble vid">▶ 视频 · 0:42</div>
-            <div class="bubble me" id="sent" hidden></div>
-          </div>
-          <div class="inputbox"><span id="typed"></span><span class="caret"></span></div>
-          <div class="kb">
-            <div class="preedit" id="preedit">&nbsp;</div>
-            <div class="cands" id="cands"><span>你</span><span>我</span><span>在</span><span>是</span><span class="more">▾</span></div>
-            <div class="keys" id="keys"></div>
-          </div>
-        </div>
-        <div class="stage-note">示意：开启中英混输后，26 键全拼连着打完 zhegeshipindebgmshishenme</div>
-      </div>
     </div>
   </section>
 
@@ -521,103 +506,6 @@ footer a:hover { color: var(--ink); }
   </div>
 </footer>
 
-<script>
-(function () {
-  var rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
-  var keysEl = document.getElementById("keys");
-  var keyMap = {};
-  rows.forEach(function (r, i) {
-    var row = document.createElement("div");
-    row.className = "row" + (i === 1 ? " r2" : "");
-    if (i === 2) row.appendChild(mk("分词", "fn"));
-    r.split("").forEach(function (c) { var k = mk(c, ""); keyMap[c] = k; row.appendChild(k); });
-    if (i === 2) row.appendChild(mk("⌫", "fn"));
-    keysEl.appendChild(row);
-  });
-  var last = document.createElement("div");
-  last.className = "row";
-  last.appendChild(mk("123", "fn"));
-  last.appendChild(mk("，", "fn"));
-  var sp = mk("CyIME", "space"); keyMap[" "] = sp; last.appendChild(sp);
-  last.appendChild(mk("中", "fn"));
-  last.appendChild(mk("发送", "fn"));
-  keysEl.appendChild(last);
-  function mk(t, cls) { var d = document.createElement("div"); d.className = "k " + cls; d.textContent = t; return d; }
-
-  var seq = "zhegeshipindebgmshishenme";
-  var seg = ["zhe", "ge", "shi", "pin", "de", "bgm", "shi", "shen", "me"];
-  var candAt = [
-    [1, ["在", "这", "再", "做"]],
-    [3, ["这", "者", "着", "折"]],
-    [5, ["这个", "这", "者", "着"]],
-    [11, ["这个视频", "这个", "这", "者"]],
-    [13, ["这个视频的", "这个视频", "这个", "这"]],
-    [16, ["这个视频的BGM", "这个视频", "这个", "这"]],
-    [19, ["这个视频的BGM是", "这个视频", "这个", "这"]],
-    [25, ["这个视频的BGM是什么", "这个视频", "这个", "这"]]
-  ];
-  var preedit = document.getElementById("preedit");
-  var cands = document.getElementById("cands");
-  var typed = document.getElementById("typed");
-  var sent = document.getElementById("sent");
-  var idle = ["你", "我", "在", "是"];
-
-  function setCands(list) {
-    cands.innerHTML = list.map(function (w) { return "<span>" + w + "</span>"; }).join("") + '<span class="more">▾</span>';
-  }
-  function segmented(n) {
-    var out = [], used = 0;
-    for (var i = 0; i < seg.length && used < n; i++) {
-      var take = Math.min(seg[i].length, n - used);
-      out.push(seg[i].slice(0, take)); used += take;
-    }
-    return out.join("'");
-  }
-  function candsFor(n) {
-    var pick = candAt[0][1];
-    candAt.forEach(function (c) { if (n >= c[0]) pick = c[1]; });
-    return pick;
-  }
-  function flash(k) { if (!k) return; k.classList.add("on"); setTimeout(function () { k.classList.remove("on"); }, 110); }
-  function finalState() {
-    preedit.textContent = " "; setCands(idle); typed.textContent = "";
-    sent.textContent = "这个视频的BGM是什么"; sent.hidden = false;
-  }
-
-  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { finalState(); return; }
-
-  var t = 0;
-  function run() {
-    sent.hidden = true; typed.textContent = ""; preedit.innerHTML = "&nbsp;"; setCands(idle);
-    var step = 0;
-    function next() {
-      if (step < seq.length) {
-        flash(keyMap[seq[step]]);
-        step++;
-        preedit.textContent = segmented(step);
-        setCands(candsFor(step));
-        t = setTimeout(next, 120);
-      } else {
-        t = setTimeout(function () {
-          var first = cands.querySelector("span");
-          if (first) { first.style.background = "var(--key-press)"; }
-          t = setTimeout(function () {
-            typed.textContent = "这个视频的BGM是什么";
-            preedit.innerHTML = "&nbsp;"; setCands(idle);
-            t = setTimeout(function () {
-              flash(document.querySelector(".row:last-child .k:last-child"));
-              typed.textContent = ""; sent.textContent = "这个视频的BGM是什么"; sent.hidden = false;
-              t = setTimeout(run, 2800);
-            }, 700);
-          }, 260);
-        }, 650);
-      }
-    }
-    t = setTimeout(next, 700);
-  }
-  run();
-})();
-</script>
 <script>
 // 打开页面时读 GitHub 上最新的正式版，换掉版本号、日期、大小和下载链接；读不到就保留页面里写好的版本。
 (function () {
