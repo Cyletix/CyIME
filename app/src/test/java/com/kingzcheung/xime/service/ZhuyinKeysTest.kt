@@ -126,6 +126,12 @@ class ZhuyinKeysTest {
         assertEquals(labels.size, labels.toSet().size)
         // 解析只取前 10 项（parseLongPress take(10)），多写的会悄悄丢掉。
         assertTrue(labels.size <= 10)
+        // 空格左边的逗号键是标点键，不读按键配置：平板实测 11-26 长按只出逗号。要把配置里的这一组接到那个键上，
+        // 只在注音键盘、中文状态；别的布局和英文状态没有长按气泡。
+        val items = com.kingzcheung.xime.ui.keyboard.zhuyinCommaLongPressItems(zhuyin = true, ascii = false, gesture = keys["'"])
+        assertEquals(labels, items)
+        assertEquals(null, com.kingzcheung.xime.ui.keyboard.zhuyinCommaLongPressItems(zhuyin = false, ascii = false, gesture = keys["'"]))
+        assertEquals(null, com.kingzcheung.xime.ui.keyboard.zhuyinCommaLongPressItems(zhuyin = true, ascii = true, gesture = keys["'"]))
     }
 
     /** 实体键盘照大千键位打（用户 11-18 jp4wu = ㄨㄣˋㄊㄧ 問題）：数字行和 , . / ; - 都是方案里的注音键码，字母不在这一组。 */
