@@ -1566,7 +1566,7 @@ fun KeyboardView(
             // 「拼音显示声调」：双拼显示按键时拼音是按键不是拼法，不标。
             val preeditToneData = rememberPreeditToneData(inputPreferences.preeditTones &&
                 !(correctionScheme != null && doublePinyinKeysShown))
-            // 「显示自造词角标」关着时不画小铅笔，候选宽度也按没角标算；学习照常。
+            // 「显示自造词角标」关着时不画小圆点，候选宽度也按没角标算；学习照常。
             val learnedMarkVisible = rememberLearnedMarkVisible()
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalLearnedCandidates provides if (learnedMarkVisible) cs.learnedCandidates else emptySet(),

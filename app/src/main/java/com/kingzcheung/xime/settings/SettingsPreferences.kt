@@ -611,7 +611,7 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SHOW_CORRECTION_MARKS, show).apply()
     }
 
-    /** 学到的词在候选右上角画小铅笔，默认显示（用户 11-19 要一个开关）；关掉只是不画，照常学习。 */
+    /** 学到的词在候选右上角画小圆点（原来是小铅笔），默认显示（用户 11-19 要一个开关）；关掉只是不画，照常学习。 */
     fun showLearnedMark(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SHOW_LEARNED_MARK, true)
 
     fun setShowLearnedMark(context: Context, show: Boolean) {
