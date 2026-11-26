@@ -1,5 +1,36 @@
 # CyIME 词库/排序回归用例。每个新报告先加一行再修。列：id 键盘(26/14/9/win26) 输入 期望(前缀!表示首选不能是它) 名次上限(期望须在前几位) 来源 日期 备注
 id	keyboard	input	expect	top_k	source	date	note
+hc-jidao	26	jidao	记到	2	user	2026-11-26	他报 寄到 几道 挤到 都在 记到 前；语料次数 寄到 2726 > 记到 2332，所以要求前二
+hc-jidao-ctl	26	jidao	寄到	1	对照	2026-11-26	次数最多的仍排第一
+hc-14-jidao	14	JUDAO	记到	2	user	2026-11-26	同上，14 键
+hc-9-jidao	9	54326	记到	3	user	2026-11-26	同上，九键；同键还有 鸡蛋（ji dan），只要求前三
+hc-lianjie	26	lianjie	链接	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-jiguang	26	jiguang	激光	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-shangwan	26	shangwan	上完	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-daofang	26	daofang	倒放	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-shesi	26	shesi	社死	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-suosi	26	suosi	锁死	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-bianxian	26	bianxian	变现	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-peitu	26	peitu	配图	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-shicao	26	shicao	实操	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-linqi	26	linqi	临期	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-hutou	26	hutou	户头	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-gonghao	26	gonghao	功耗	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-wangbao	26	wangbao	网暴	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-zhangfen	26	zhangfen	涨粉	1	对照	2026-11-26	混合压低的同码常用词，补后首选
+hc-ctl-lianjie	26	lianjie	连接	3	对照	2026-11-26	补词后不能被挤下去（链接 后面跟着它的表情 🔗，所以 连接 是第三格、第二个词）
+hc-ctl-jiguang	26	jiguang	极光	2	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-shangwan	26	shangwan	上万	2	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-beizi	26	beizi	被子	1	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-xiadao	26	xiadao	吓到	1	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-qushi	26	qushi	去世	1	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-shengli	26	shengli	胜利	1	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-xiaobian	26	xiaobian	小编	1	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-diyu	26	diyu	地域	2	对照	2026-11-26	补词后不能被挤下去
+hc-ctl-daoshi	26	daoshi	倒是	1	对照	2026-11-26	补词后不能被挤下去
+hc-9-5426543	9	5426543	链接	3	对照	2026-11-26	九键前三
+hc-9-5448264	9	5448264	激光	3	对照	2026-11-26	九键前三
+hc-9-74264926	9	74264926	上完	3	对照	2026-11-26	九键前三
 phrase-xingrong-exact	26	xingrongbushanglai	形容不上来	1	用户反馈目标	2026-11-01	准确拼写对照，反馈未提供原始按键
 phrase-pai-ni-lai	26	tamenpainilai	他们派你来	1	对照	2026-11-01	保护「派你来」的正常读音
 user-zdky	26	zdky	这都可以	1	user	2026-10-17	曾出“在都可以”（邻键纠错把整词挤掉）
