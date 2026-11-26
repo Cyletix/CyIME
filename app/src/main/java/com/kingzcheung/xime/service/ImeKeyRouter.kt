@@ -1859,6 +1859,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // 未处理时保留输入；成功时按结果刷新，不能再 clearComposition 或重复取 commit。
                         return@command
                     }
+                    // 注音（大千）屏幕键盘打字中按回车：上屏高亮的候选，和实体键盘回车（见上面 zhuyinHardwareActive 那条）一样。
+                    // 大千的空格在音节后是第一声，没打声调时不点候选就只能按回车；Rime 注音、Gboard 注音回车都上屏转好的字
+                    // （注音用户 11-26：没打声调按回车要直接出候选）。以前上屏的是注音符号本身。没有候选时照下面原来的路走。
+                    if (ZhuyinKeys.enterSelectsCandidate(zhuyin = hardwareEvent == null && zhuyinHardwareActive(),
+                            composing = candState.isComposing, candidateCount = candState.candidates.size)) {
+                        selectCandidateAsync(candState.spaceCandidateIndex(state.inputProfile), snapshot = candState)
+                        return@command
+                    }
                     val engineInput = service.rimeEngine.getInput()
                     // UI publication may lag the FIFO. Enter consumes unfinished input;
                     // only a subsequent, idle Enter may invoke the editor action.

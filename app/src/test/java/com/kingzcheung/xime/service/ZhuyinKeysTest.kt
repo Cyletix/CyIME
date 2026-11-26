@@ -106,6 +106,14 @@ class ZhuyinKeysTest {
             merged14 = usesMergedLetterKeys(InputLayout.ZHUYIN)))
     }
 
+    /** 注音用户 11-26：屏幕键盘没打声调按回车要直接上屏候选（同 Rime 注音、Gboard 注音），没有候选时才上屏注音符号。 */
+    @Test fun `screen enter picks the highlighted candidate while composing zhuyin`() {
+        assertTrue(ZhuyinKeys.enterSelectsCandidate(zhuyin = true, composing = true, candidateCount = 3))
+        assertFalse(ZhuyinKeys.enterSelectsCandidate(zhuyin = true, composing = true, candidateCount = 0))
+        assertFalse(ZhuyinKeys.enterSelectsCandidate(zhuyin = true, composing = false, candidateCount = 3))
+        assertFalse(ZhuyinKeys.enterSelectsCandidate(zhuyin = false, composing = true, candidateCount = 3))
+    }
+
     /** 实体键盘照大千键位打（用户 11-18 jp4wu = ㄨㄣˋㄊㄧ 問題）：数字行和 , . / ; - 都是方案里的注音键码，字母不在这一组。 */
     @Test fun `hardware symbol keys are all zhuyin codes of the schema`() {
         val preedit = preeditMap()
