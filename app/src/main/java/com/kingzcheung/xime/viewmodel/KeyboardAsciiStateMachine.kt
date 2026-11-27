@@ -1,6 +1,9 @@
 package com.kingzcheung.xime.viewmodel
 
 import com.kingzcheung.xime.ui.keyboard.AsciiKeyboardContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 键盘 ascii 状态机 — 每个键盘上下文（主键盘/数字面板/符号面板）持有独立的 ascii 记忆。
@@ -10,33 +13,35 @@ import com.kingzcheung.xime.ui.keyboard.AsciiKeyboardContext
  * - attach（进入键盘）：返回该键盘的记忆作为目标模式，与引擎不一致时由调用方发起切换
  *
  * 语义：
- * - 面板内的中英切换只影响该面板的记忆，退出面板后主键盘恢复自己的记忆
- * - 面板记忆持久，再次进入面板恢复上次的状态
- * - 符号面板首次进入默认英文
+ * - 数字面板无中英切换键，恒跟随引擎，不保存独立记忆，也不会在切入数字面板时反向切引擎
+ * - 符号面板有面板内中英切换键，默认英文、独立记忆；退出后主键盘恢复自己的记忆
  */
 class KeyboardAsciiStateMachine {
 
-    private var mainAsciiMode: Boolean? = null
-    private var numberAsciiMode: Boolean? = null
+    private val _mainAsciiMode = MutableStateFlow<Boolean?>(null)
+    val mainAsciiModeFlow: StateFlow<Boolean?> = _mainAsciiMode.asStateFlow()
     private var symbolAsciiMode: Boolean? = null
 
-    /** detach：保存当前键盘的引擎状态为该键盘的记忆 */
+    /** 主键盘最近记住的中英状态（供符号面板左下角返回按钮显示真实返回目标，不受面板临时英文态污染）。 */
+    fun rememberedMainAscii(): Boolean? = _mainAsciiMode.value
+
+    /** detach / 外部语言切换同步：保存当前键盘的引擎状态为该键盘的记忆 */
     fun saveMemory(context: AsciiKeyboardContext, engineAscii: Boolean) {
         when (context) {
-            AsciiKeyboardContext.MAIN -> mainAsciiMode = engineAscii
-            AsciiKeyboardContext.NUMBER_PANEL -> numberAsciiMode = engineAscii
+            AsciiKeyboardContext.MAIN -> _mainAsciiMode.value = engineAscii
+            AsciiKeyboardContext.NUMBER_PANEL -> Unit
             AsciiKeyboardContext.SYMBOL_PANEL -> symbolAsciiMode = engineAscii
         }
     }
 
     /**
      * attach：返回目标引擎模式；与引擎一致时返回 null（无需切换）。
-     * 尚未记录记忆的上下文以引擎当前状态为目标（符号面板首次进入默认英文）。
+     * 数字面板恒跟随引擎（返回 null）；符号面板首次进入默认英文。
      */
     fun targetFor(context: AsciiKeyboardContext, engineAscii: Boolean): Boolean? {
         val target = when (context) {
-            AsciiKeyboardContext.MAIN -> mainAsciiMode ?: engineAscii
-            AsciiKeyboardContext.NUMBER_PANEL -> numberAsciiMode ?: engineAscii
+            AsciiKeyboardContext.MAIN -> _mainAsciiMode.value ?: engineAscii
+            AsciiKeyboardContext.NUMBER_PANEL -> return null
             AsciiKeyboardContext.SYMBOL_PANEL -> symbolAsciiMode ?: true
         }
         return if (target != engineAscii) target else null
@@ -44,8 +49,7 @@ class KeyboardAsciiStateMachine {
 
     /** 新输入会话：清空全部记忆，从引擎当前状态重新开始 */
     fun reset() {
-        mainAsciiMode = null
-        numberAsciiMode = null
+        _mainAsciiMode.value = null
         symbolAsciiMode = null
     }
 }

@@ -51,8 +51,13 @@ internal fun shiftKeyColors(
         val b = surface.luminance()
         return (maxOf(a, b) + 0.05f) / (minOf(a, b) + 0.05f)
     }
-    val preferred = if (base.alpha == 0f) accent else foreground
-    val icon = if (contrast(preferred) >= 3f) preferred.copy(alpha = 1f)
+    val icon = if (base.alpha == 0f) {
+        if (contrast(accent) >= 3f) accent.copy(alpha = 1f)
+        else if (contrast(Color.White) >= contrast(Color.Black)) Color.White else Color.Black
+    } else {
+        // 激活态（单次大写/大写锁定）键帽已填充强调色：优先使用白色箭头保持一致；仅浅色/高亮强调色上白色对比度不足 3.0 时回退黑色。
+        if (contrast(Color.White) >= 3f) Color.White
         else if (contrast(Color.Black) > contrast(Color.White)) Color.Black else Color.White
+    }
     return KeyboardKeyColors(fill, icon)
 }

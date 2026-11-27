@@ -1492,8 +1492,19 @@ fun KeyboardLayout(
                             androidx.compose.runtime.SideEffect {
                                 if (enterBounds != Rect.Zero) shiftSlideTargets.putEnter(enterTargetId, enterBounds, shiftEnter)
                             }
+                            // 仅在持续按住 Shift（>= 180ms）时才将回车图标切为换行提示，避免普通点按 Shift 时发送图标闪一下回车。
+                            val isShiftHeld = shiftMode == ShiftMode.HELD
+                            var shiftEnterHint by remember { mutableStateOf(false) }
+                            LaunchedEffect(isShiftHeld) {
+                                if (isShiftHeld) {
+                                    kotlinx.coroutines.delay(180L)
+                                    shiftEnterHint = true
+                                } else {
+                                    shiftEnterHint = false
+                                }
+                            }
                             ActionKeyButton(
-                                text = heldEnterText(enterKeyText, shiftSlideTargets.ctrlFaces, shiftMode == ShiftMode.HELD),
+                                text = heldEnterText(enterKeyText, shiftSlideTargets.ctrlFaces, shiftEnterHint),
                                 onClick = {
                                     if (!shiftSlideTargets.ctrlEnter()) {
                                         if (viewModel.shiftMode.value == ShiftMode.HELD) {

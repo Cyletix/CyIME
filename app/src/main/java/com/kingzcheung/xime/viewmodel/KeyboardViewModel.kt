@@ -24,9 +24,11 @@ import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.rime.T9InputController
+import com.kingzcheung.xime.ui.keyboard.AsciiKeyboardContext
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState
+import com.kingzcheung.xime.ui.keyboard.asciiContext
 import com.kingzcheung.xime.ui.keyboard.transition
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutAction
 import com.kingzcheung.xime.ui.keyboard.KeyboardViewState
@@ -438,14 +440,45 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
             }
             is KeyboardDispatchAction.AsciiModeChanged -> {
                 if (hasTemporaryHandwriting || current is KeyboardViewState.Overlay) {
-                    FileLogger.i("XimeKeyboard", "AsciiModeChanged skipped: current=$current (overlay)")
+                    if (!hasTemporaryHandwriting && current is KeyboardViewState.Overlay &&
+                        current.behind.asciiContext() != AsciiKeyboardContext.SYMBOL_PANEL) {
+                        val nextMain = initialKeyboardLayoutState(action.isAsciiMode, action.schemaId)
+                        asciiStateMachine.saveMemory(AsciiKeyboardContext.MAIN, action.isAsciiMode)
+                        _lastMainLayout.value = nextMain
+                        if (_savedKbStateBeforePanel != null) _savedKbStateBeforePanel = nextMain
+                        if (current.behind.asciiContext() == AsciiKeyboardContext.MAIN &&
+                            current.behind != KeyboardViewState.Handwriting &&
+                            current.behind != KeyboardViewState.Voice) {
+                            val nextBehind = when (nextMain) {
+                                is KeyboardLayoutState.Chinese -> KeyboardViewState.ChineseFull
+                                is KeyboardLayoutState.English -> KeyboardViewState.EnglishFull
+                                is KeyboardLayoutState.T9Pinyin -> KeyboardViewState.T9PinyinFull
+                                is KeyboardLayoutState.Stroke -> KeyboardViewState.StrokeFull
+                                else -> current.behind
+                            }
+                            Triple(current.copy(behind = nextBehind), _page.value, nextMain)
+                        } else {
+                            Triple(current, _page.value, _keyboardState.value)
+                        }
+                    } else {
+                        FileLogger.i("XimeKeyboard", "AsciiModeChanged skipped: current=$current (overlay)")
+                        Triple(current, _page.value, _keyboardState.value)
+                    }
+                } else if (current is KeyboardViewState.NumberPanel) {
+                    val nextMain = initialKeyboardLayoutState(action.isAsciiMode, action.schemaId)
+                    asciiStateMachine.saveMemory(AsciiKeyboardContext.MAIN, action.isAsciiMode)
+                    _lastMainLayout.value = nextMain
+                    _savedKbStateBeforePanel = nextMain
+                    FileLogger.i("XimeKeyboard", "AsciiModeChanged in NumberPanel: updated return target -> $nextMain")
                     Triple(current, _page.value, _keyboardState.value)
-                } else if (current is KeyboardViewState.NumberPanel || current is KeyboardViewState.CommonSymbolPanel) {
-                    FileLogger.i("XimeKeyboard", "AsciiModeChanged skipped: current=$current (panel)")
+                } else if (current is KeyboardViewState.CommonSymbolPanel) {
+                    FileLogger.i("XimeKeyboard", "AsciiModeChanged skipped: current=$current (common symbol panel)")
                     Triple(current, _page.value, _keyboardState.value)
                 } else if (!action.isAsciiMode && isHandwritingSchema(action.schemaId)) {
+                    asciiStateMachine.saveMemory(AsciiKeyboardContext.MAIN, false)
                     Triple(KeyboardViewState.Handwriting, KeyboardPage.Main(MainType.HANDWRITING), KeyboardLayoutState.Chinese)
                 } else {
+                    asciiStateMachine.saveMemory(AsciiKeyboardContext.MAIN, action.isAsciiMode)
                     val kb = initialKeyboardLayoutState(action.isAsciiMode, action.schemaId)
                     val vs = when (kb) {
                         is KeyboardLayoutState.Chinese -> KeyboardViewState.ChineseFull
