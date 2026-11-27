@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -33,8 +34,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.kingzcheung.xime.settings.SettingsPreferences
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -71,8 +74,8 @@ internal const val RELEASE_MS = 150
 /** 手指走的距离只有这么多会变成位移（越拉越紧）。 */
 internal const val PULL_RESISTANCE = 0.5f
 
-/** 被拉出这么多（dp）松手就展开 / 收回。 */
-internal const val PULL_THRESHOLD_DP = 48f
+/** 默认被拉出这么多（dp）松手就展开 / 收回，可在设置里调。 */
+internal const val PULL_THRESHOLD_DP = SettingsPreferences.DEFAULT_CANDIDATE_PULL_THRESHOLD_DP
 
 /** 最多被拉出门槛的这么多倍。 */
 private const val PULL_MAX_FACTOR = 1.5f
@@ -128,7 +131,19 @@ private class RubberBand(private val scope: CoroutineScope, private val haptic: 
 
 @Composable
 private fun rememberRubberBand(): RubberBand {
-    val threshold = with(LocalDensity.current) { PULL_THRESHOLD_DP.dp.toPx() }
+    val context = LocalContext.current
+    var thresholdDp by remember(context) { mutableFloatStateOf(SettingsPreferences.candidatePullThresholdDp(context)) }
+    DisposableEffect(context) {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == SettingsPreferences.KEY_CANDIDATE_PULL_THRESHOLD_DP || key == null) {
+                thresholdDp = SettingsPreferences.candidatePullThresholdDp(context)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    val threshold = with(LocalDensity.current) { thresholdDp.dp.toPx() }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     return remember(threshold, scope, haptic) { RubberBand(scope, haptic, threshold) }
@@ -262,8 +277,9 @@ private fun BoxScope.PullHint(band: RubberBand, hintColor: Color, verb: String) 
     val widthDp = with(LocalDensity.current) { abs(shown).toDp() }
     Box(Modifier.align(if (shown < 0f) Alignment.CenterEnd else Alignment.CenterStart).width(widthDp).fillMaxHeight(),
         contentAlignment = Alignment.Center) {
+        val hintFontSp = if (widthDp < 24.dp) 9.sp else 11.sp
         Text(if (pullReleases(shown, band.threshold)) "松手$verb" else verb, color = hintColor.copy(alpha = 0.75f),
-            fontSize = 11.sp, lineHeight = 12.sp, textAlign = TextAlign.Center, maxLines = 2,
+            fontSize = hintFontSp, lineHeight = (hintFontSp.value + 1f).sp, textAlign = TextAlign.Center, maxLines = 2,
             modifier = Modifier.graphicsLayer { alpha = (abs(band.shown) / band.threshold).coerceIn(0f, 1f) })
     }
 }

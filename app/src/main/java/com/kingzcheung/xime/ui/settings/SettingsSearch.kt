@@ -328,6 +328,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("右侧收起", candidates, candidatePage, "候选栏右边的键 收键盘 103 右边 收起键盘 关闭键盘 隐藏键盘 下箭头 左右滑 取消",
             anchor = "候选栏右边的键"),
         SettingsSearchEntry("左右滑展开候选", candidates, candidatePage, "候选 滑动展开 左滑 右滑 拉 回弹 弹回 滑到头 候选滑到头回弹展开 展开候选 收起候选 收回候选 手势展开"),
+        SettingsSearchEntry("左右滑展开距离", candidates, candidatePage, "左右滑 灵敏 灵敏度 距离 阈值 滑动距离 拉开距离 展开候选 滑动展开 调短 误触"),
         // 11-24 他：局部修改默认关，只给长句。
         SettingsSearchEntry("长句拖选改局部", candidates, candidatePage, "局部修改 改局部 拖选 拖动选择 改一段 重选 长按首选 长句 句子编辑"),
         SettingsSearchEntry("候选注释", candidates, candidatePage, "注释 显示 自动 隐藏 候选显示"),

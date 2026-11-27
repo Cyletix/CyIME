@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.settings.SettingsPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -26,5 +27,13 @@ class CandidatePullGesturesTest {
         assertTrue(pullReleases(-96f, threshold))
         assertFalse(pullReleases(-95f, threshold))
         assertFalse(pullReleases(100f, 0f))
+    }
+
+    @Test fun defaultPullThresholdIsShorterAndConfigurableRangeIsNormalized() {
+        assertEquals(28f, PULL_THRESHOLD_DP, 0f)
+        assertEquals(28f, SettingsPreferences.normalizeCandidatePullThresholdDp(Float.NaN), 0f)
+        assertEquals(16f, SettingsPreferences.normalizeCandidatePullThresholdDp(4f), 0f)
+        assertEquals(64f, SettingsPreferences.normalizeCandidatePullThresholdDp(120f), 0f)
+        assertEquals(24f, SettingsPreferences.normalizeCandidatePullThresholdDp(23f), 0f)
     }
 }
