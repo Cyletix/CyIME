@@ -2,26 +2,503 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CyIME 输入法</title>
+<meta name="description" content="CyIME 中文输入法：九键、14 键、26 键、双拼、五笔，离线语音、手写、拍照识字和实时字幕。Android 可下载，Windows、Linux 版在做。">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="CyIME 输入法">
+<meta property="og:description" content="打字、说话、手写，都在你的设备上完成。">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F6F5FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15161A" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-:root { --bg: #F6F5FB; --fg: #23252B; --mute: #6B6D7A; --link: #6A4FC9; }
-@media (prefers-color-scheme: dark) { :root { --bg: #15161A; --fg: #ECECF1; --mute: #9A9BA8; --link: #A48BF0; color-scheme: dark; } }
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--fg); font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; padding: 24px; box-sizing: border-box; }
-main { text-align: center; display: grid; gap: 14px; justify-items: center; }
-img { width: 72px; height: 72px; }
-h1 { margin: 0; font-size: 28px; }
-p { margin: 0; color: var(--mute); }
-a { color: var(--link); }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+/* Layout: 键帽语言。左文右键盘的首屏，下面是按「怎么打字 → 还能怎么输入 → 哪些设备 → 下载」排的段落，卡片只给需要单独看的东西。 */
+:root {
+  --bg: #F6F5FB;
+  --bg-2: #ECEAF5;
+  --surface: #FFFFFF;
+  --ink: #23252B;
+  --ink-2: #555866;
+  --ink-3: #8A8C99;
+  --line: #DCD9E8;
+  --brand: #7C5FD6;
+  --brand-soft: #E7E0FA;
+  --brand-ink: #FFFFFF;
+  --mark: #2C2F35;
+  --key: #FFFFFF;
+  --key-shadow: #C9C5D9;
+  --key-press: #D9CFF7;
+  --kb: #E3E1EC;
+  --ok: #2F8F5B;
+  --wip: #B7791F;
+  --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15161A; --bg-2: #1C1D23; --surface: #202128; --ink: #ECECF1; --ink-2: #B4B5C0; --ink-3: #7F8090;
+    --line: #2E2F38; --brand: #A48BF0; --brand-soft: #2C2640; --brand-ink: #15161A; --mark: #ECECF1;
+    --key: #3A3B45; --key-shadow: #18181D; --key-press: #5A4A8F; --kb: #26272F; --ok: #5BC48A; --wip: #E2B04A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15161A; --bg-2: #1C1D23; --surface: #202128; --ink: #ECECF1; --ink-2: #B4B5C0; --ink-3: #7F8090;
+  --line: #2E2F38; --brand: #A48BF0; --brand-soft: #2C2640; --brand-ink: #15161A; --mark: #ECECF1;
+  --key: #3A3B45; --key-shadow: #18181D; --key-press: #5A4A8F; --kb: #26272F; --ok: #5BC48A; --wip: #E2B04A;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.7; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.25; }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 6px; }
+
+/* nav */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .01em; }
+.brand img { width: 28px; height: 28px; display: block; }
+.nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
+.nav-links a { text-decoration: none; color: var(--ink-2); }
+.nav-links a:hover { color: var(--ink); }
+.nav-cta { text-decoration: none; background: var(--ink); color: var(--bg); padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+@media (max-width: 720px) { .nav-links { display: none; } .nav-cta { margin-left: auto; } }
+
+/* hero */
+.hero { padding-block: 64px 56px; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 760px); gap: 48px; align-items: center; }
+.hero-text { min-width: 0; display: grid; gap: 22px; }
+.eyebrow { font-size: 13px; letter-spacing: .12em; color: var(--brand); font-weight: 700; }
+.hero h1 { font-family: var(--font-body); font-weight: 900; font-size: clamp(34px, 5.2vw, 58px); letter-spacing: -.01em; }
+.hero h1 em { font-style: normal; color: var(--brand); }
+.lead { font-size: 18px; color: var(--ink-2); max-width: 32em; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 700; font-size: 16px; padding: 12px 20px; border-radius: 10px; border: 1px solid transparent; transition: transform .12s ease, box-shadow .12s ease; }
+.btn-primary { background: var(--brand); color: var(--brand-ink); box-shadow: 0 3px 0 color-mix(in srgb, var(--brand) 55%, var(--mark)); }
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(2px); box-shadow: 0 1px 0 color-mix(in srgb, var(--brand) 55%, var(--mark)); }
+.btn-ghost { border-color: var(--line); background: var(--surface); color: var(--ink); }
+.btn small { font-weight: 500; opacity: .8; font-family: var(--font-mono); font-size: 13px; }
+.hero-meta { font-size: 14px; color: var(--ink-3); }
+
+/* phone mock */
+.stage { min-width: 0; display: grid; justify-items: center; gap: 12px; }
+.phone { width: min(100%, 380px); background: var(--surface); border: 1px solid var(--line); border-radius: 30px; padding: 14px 10px 10px; box-shadow: 0 30px 60px -30px color-mix(in srgb, var(--brand) 45%, transparent); }
+.chat { display: grid; gap: 8px; padding: 6px 8px 14px; min-height: 120px; align-content: end; }
+.bubble { justify-self: start; max-width: 80%; background: var(--bg-2); padding: 7px 12px; border-radius: 14px 14px 14px 4px; font-size: 15px; }
+.bubble.vid { font-family: var(--font-mono); font-size: 13px; padding: 22px 34px; color: var(--ink-2); }
+.stage-note { text-align: center; overflow-wrap: anywhere; }
+.bubble.me { justify-self: end; background: var(--brand); color: var(--brand-ink); border-radius: 14px 14px 4px 14px; }
+.inputbox { margin: 0 4px 10px; border: 1px solid var(--line); border-radius: 18px; padding: 7px 14px; font-size: 15px; min-height: 38px; display: flex; align-items: center; }
+.inputbox .caret { width: 2px; height: 18px; background: var(--brand); margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.kb { background: var(--kb); border-radius: 18px; padding: 6px 5px 8px; }
+.preedit { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); height: 20px; padding: 0 8px; letter-spacing: .02em; }
+.cands { display: flex; gap: 2px; align-items: center; height: 38px; padding: 0 4px; overflow: hidden; border-bottom: 1px solid color-mix(in srgb, var(--ink-3) 25%, transparent); margin-bottom: 6px; }
+.cands span { padding: 4px 9px; font-size: 17px; white-space: nowrap; border-radius: 8px; }
+.cands span:first-child { color: var(--brand); font-weight: 700; }
+.cands .more { margin-left: auto; color: var(--ink-3); font-size: 14px; }
+.keys { display: grid; gap: 7px; }
+.row { display: flex; gap: 5px; justify-content: center; }
+.k { flex: 1 1 0; max-width: 34px; height: 42px; display: grid; place-items: center; background: var(--key); border-radius: 7px; box-shadow: 0 1.5px 0 var(--key-shadow); font-family: var(--font-display); font-size: 17px; font-weight: 500; text-transform: lowercase; color: var(--ink); transition: background .08s, transform .08s; user-select: none; }
+.k.fn { max-width: 48px; font-size: 13px; font-family: var(--font-body); color: var(--ink-2); background: color-mix(in srgb, var(--key) 70%, var(--kb)); }
+.k.space { text-transform: none; max-width: none; flex: 5; font-size: 13px; font-family: var(--font-body); color: var(--ink-3); }
+.k.on { background: var(--key-press); transform: translateY(1px); box-shadow: 0 .5px 0 var(--key-shadow); }
+.row.r2 { padding: 0 16px; }
+.stage-note { font-size: 13px; color: var(--ink-3); }
+
+/* facts strip */
+.facts { border-block: 1px solid var(--line); background: var(--surface); }
+.facts .wrap { display: grid; grid-template-columns: repeat(4, 1fr); padding-block: 26px; gap: 16px; }
+.fact { display: grid; gap: 2px; min-width: 0; }
+.fact b { font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 14px; color: var(--ink-2); }
+@media (max-width: 720px) { .facts .wrap { grid-template-columns: repeat(2, 1fr); } }
+
+/* sections */
+section.block { padding-block: 84px 20px; }
+.sec-head { display: grid; gap: 10px; margin-bottom: 36px; max-width: 40em; }
+.sec-head h2 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 900; }
+.sec-head p { color: var(--ink-2); font-size: 17px; }
+
+/* layouts */
+.layouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.lay { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.lay h3 { font-size: 18px; }
+.lay p { font-size: 14px; color: var(--ink-2); }
+.mini { display: grid; gap: 4px; background: var(--kb); border-radius: 10px; padding: 8px; }
+.mini .mr { display: flex; gap: 4px; justify-content: center; }
+.mini i { font-style: normal; flex: 1 1 0; height: 26px; display: grid; place-items: center; background: var(--key); border-radius: 4px; box-shadow: 0 1px 0 var(--key-shadow); font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); line-height: 1; min-width: 0; }
+.mini.t9 i { height: 32px; font-size: 10px; flex-direction: column; display: flex; justify-content: center; align-items: center; gap: 1px; }
+.mini.t9 i b { font-family: var(--font-display); font-size: 14px; color: var(--ink); }
+.mini.k14 .mr:nth-child(2) { padding: 0 6%; } .mini.k14 .mr:nth-child(3) { padding: 0 14%; }
+.mini.k26 i { font-size: 9.5px; } .mini.k26 .mr:nth-child(2) { padding: 0 5%; } .mini.k26 .mr:nth-child(3) { padding: 0 14%; }
+.sp-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-list span { font-size: 13px; background: var(--brand-soft); color: var(--ink); padding: 3px 9px; border-radius: 999px; }
+.also { margin-top: 18px; font-size: 15px; color: var(--ink-2); }
+.also b { color: var(--ink); font-weight: 700; }
+@media (max-width: 960px) { .layouts { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .layouts { grid-template-columns: 1fr; } }
+
+/* features */
+.feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
+.feat { padding: 26px 24px 28px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; align-content: start; min-width: 0; }
+.feat:not(:nth-child(3n+1)) { padding-left: 24px; border-left: 1px solid var(--line); }
+.feat .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--brand-soft); display: grid; place-items: center; color: var(--brand); }
+.feat .ic svg { width: 20px; height: 20px; }
+.feat h3 { font-size: 18px; }
+.feat p { font-size: 15px; color: var(--ink-2); }
+.feat .tag { font-size: 12px; color: var(--ink-3); font-family: var(--font-mono); }
+@media (max-width: 900px) {
+  .feats { grid-template-columns: repeat(2, 1fr); }
+  .feat:not(:nth-child(3n+1)) { padding-left: 0; border-left: 0; }
+  .feat:nth-child(2n) { padding-left: 20px; border-left: 1px solid var(--line); }
+}
+@media (max-width: 560px) {
+  .feats { grid-template-columns: 1fr; }
+  .feat:nth-child(2n) { padding-left: 0; border-left: 0; }
+}
+
+/* quality note */
+.quality { margin-top: 40px; display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: start; background: var(--bg-2); border-radius: 16px; padding: 22px 24px; }
+.quality .num { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--brand); white-space: nowrap; padding-top: 2px; }
+.quality p { color: var(--ink-2); font-size: 15px; min-width: 0; }
+.quality p b { color: var(--ink); }
+@media (max-width: 560px) { .quality { grid-template-columns: 1fr; gap: 6px; } }
+
+/* platforms */
+.plats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.plat { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.plat-top { display: flex; align-items: center; gap: 12px; }
+.plat-top svg { width: 30px; height: 30px; color: var(--ink); flex: none; }
+.plat h3 { font-size: 22px; font-family: var(--font-display); }
+.status { margin-left: auto; font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.status.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.status.wip { color: var(--wip); background: color-mix(in srgb, var(--wip) 14%, transparent); }
+.plat ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: 15px; color: var(--ink-2); }
+.plat .foot { font-size: 14px; color: var(--ink-3); border-top: 1px dashed var(--line); padding-top: 12px; }
+.plat .foot a { color: var(--brand); text-decoration: none; font-weight: 700; }
+@media (max-width: 900px) { .plats { grid-template-columns: 1fr; } }
+
+/* sync diagram */
+.sync { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; display: grid; gap: 6px; }
+.sync h3 { font-size: 20px; margin-bottom: 6px; }
+.sync p { font-size: 15px; color: var(--ink-2); }
+.sync-fig { overflow-x: auto; }
+.sync-fig svg { width: 100%; min-width: 300px; height: auto; display: block; }
+@media (max-width: 760px) { .sync { grid-template-columns: 1fr; } }
+
+/* download */
+.dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.pkg { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px; display: grid; gap: 10px; align-content: start; min-width: 0; position: relative; }
+.pkg.pick { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.pkg .badge { position: absolute; top: -11px; left: 20px; background: var(--brand); color: var(--brand-ink); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+.pkg h3 { font-size: 20px; }
+.pkg .size { font-family: var(--font-display); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pkg .size small { font-size: 15px; color: var(--ink-3); font-weight: 500; }
+.pkg p { font-size: 14.5px; color: var(--ink-2); }
+.pkg .file { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.pkg .btn { justify-content: center; margin-top: 6px; }
+.dl-notes { margin-top: 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 14.5px; color: var(--ink-2); }
+.dl-notes div { min-width: 0; }
+.dl-notes b { display: block; color: var(--ink); margin-bottom: 2px; }
+.dl-notes a { color: var(--brand); }
+@media (max-width: 900px) { .dl, .dl-notes { grid-template-columns: 1fr; } }
+
+/* footer */
+footer { margin-top: 90px; border-top: 1px solid var(--line); background: var(--surface); }
+footer .wrap { padding-block: 32px 40px; display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: center; font-size: 14px; color: var(--ink-3); }
+footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
+footer a { text-decoration: none; color: var(--ink-2); }
+footer a:hover { color: var(--ink); }
+
+@media (max-width: 900px) {
+  .hero { padding-block: 40px 44px; }
+  .hero .wrap { grid-template-columns: 1fr; gap: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* real screenshots */
+.hero .wrap { grid-template-columns: 1fr !important; gap: 40px; }
+.hero-text { max-width: 760px; }
+.shot { margin: 0; display: grid; gap: 10px; min-width: 0; align-content: start; }
+.shot img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-2); }
+.shot figcaption { font-size: 14.5px; color: var(--ink-2); }
+.shot figcaption b { color: var(--ink); margin-right: 8px; font-size: 16px; }
+.hero-shot img { border-radius: 20px; box-shadow: 0 30px 60px -34px color-mix(in srgb, var(--brand) 55%, transparent); }
+.hero-shot figcaption { font-size: 13.5px; color: var(--ink-3); }
+.gallery { display: grid; gap: 28px 24px; }
+.gallery.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.shot.wide { margin-top: 28px; max-width: 820px; }
+.feats4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; border-top: 1px solid var(--line); padding-top: 24px; }
+.feats4 .feat { padding: 0; border: 0; }
+@media (max-width: 900px) { .feats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .gallery.two, .feats4 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<main>
-  <img src="favicon.svg" alt="">
-  <h1>CyIME</h1>
-  <p>官网正在准备中。</p>
-  <p>安卓版请到 <a href="https://github.com/Cyletix/CyIME/releases/latest">GitHub Releases</a> 下载。</p>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="CyIME 首页">
+      <img src="favicon.svg" alt="" width="28" height="28">
+      CyIME
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="#layouts">打字</a>
+      <a href="#features">功能</a>
+      <a href="#platforms">平台</a>
+      <a href="#download">下载</a>
+      <a href="https://github.com/Cyletix/CyIME" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <a class="nav-cta" href="#download">下载</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-text">
+        <div class="eyebrow">中文输入法 · ANDROID / WINDOWS / LINUX</div>
+        <h1>打字、说话、手写，<br><em>都在你的设备上完成</em></h1>
+        <p class="lead">CyIME 把词库、语音识别、手写和拍照识字放进手机，装上完整版就能离线用。九键、14 键、26 键、双拼、五笔都有，长句一口气打完。</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#download">下载 Android 版 <small class="ver">1.15.108</small></a>
+          <a class="btn btn-ghost" href="#platforms">电脑版进度</a>
+        </div>
+        <p class="hero-meta">Android 9 及以上 · <span id="reldate">2026 年 11 月 26 日</span>更新</p>
+      </div>
+      <figure class="shot hero-shot">
+        <picture>
+          <source srcset="img/hero-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="img/hero-light.webp" width="1600" height="772" alt="CyIME 26 键键盘，候选栏首选是整句「这周的周报我一个字都还没写怎么办」">
+        </picture>
+        <figcaption>平板实拍：26 键全拼打完这一句，第一个候选就是整句。</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="facts">
+    <div class="wrap">
+      <div class="fact"><b>11</b><span>种语言的键盘</span></div>
+      <div class="fact"><b>6</b><span>种内置双拼，可自建</span></div>
+      <div class="fact"><b>4</b><span>种手写：中、英、日、公式</span></div>
+      <div class="fact"><b>3</b><span>种放法：固定、悬浮、分体</span></div>
+    </div>
+  </div>
+
+  <section class="block" id="layouts">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">怎么打都行</div>
+        <h2>四种键盘，同一个词库</h2>
+        <p>全拼用雾凇拼音词库。九键用 CyIME 自己训练的词组模型，长句一口气打完，逐键选词。</p>
+      </div>
+      <div class="gallery two">
+        <figure class="shot"><img src="img/t9.webp" width="1600" height="688" alt="CyIME 九键键盘" loading="lazy"><figcaption><b>九键</b>CyIME 自己训练的词组模型，长句一口气打完，逐键选词。</figcaption></figure>
+        <figure class="shot"><img src="img/k14.webp" width="1600" height="688" alt="CyIME 14 键键盘" loading="lazy"><figcaption><b>14 键</b>一个键两个字母，键更大，单手也好按。</figcaption></figure>
+        <figure class="shot"><img src="img/k26.webp" width="1600" height="688" alt="CyIME 26 键键盘" loading="lazy"><figcaption><b>26 键</b>多打、少打一个字母也能纠正；还能换 Colemak、Cyletix10、蜂窝六边形排列。</figcaption></figure>
+        <figure class="shot"><img src="img/shuangpin.webp" width="1600" height="688" alt="CyIME 小鹤双拼键盘" loading="lazy"><figcaption><b>双拼</b>内置小鹤、首道、自然码、智能ABC、拼音加加、微软，可以复制修改或新建自己的方案。每个双拼方案都有 14 键版本。</figcaption></figure>
+      </div>
+      <figure class="shot wide">
+        <img src="img/switcher.webp" width="1600" height="688" alt="CyIME 键盘上的布局与方案切换面板" loading="lazy">
+        <figcaption><b>随时切换</b>在键盘上直接换布局（26 键、九键、14 键）和方案（拼音、小鹤双拼、首道双拼……）。</figcaption>
+      </figure>
+      <p class="also">另有 <b>五笔 86 / 98</b>、<b>笔画</b>、<b>仓颉</b>、<b>注音</b>，以及 <b>英语、日语、韩语、西班牙语、俄语、法语、德语、意大利语、越南语、马来语</b> 键盘。</p>
+    </div>
+  </section>
+
+  <section class="block" id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">放法和面板</div>
+        <h2>键盘想放哪就放哪</h2>
+        <p>固定、悬浮、分体三种放法，悬浮键盘能拖动、缩放、旋转。多套配色、玻璃效果，也能用自己的图片当背景。</p>
+      </div>
+      <div class="gallery two">
+        <figure class="shot"><img src="img/floating.webp" width="1520" height="880" alt="CyIME 悬浮键盘" loading="lazy"><figcaption><b>悬浮</b>键盘浮在应用上面，拖到哪里都行。</figcaption></figure>
+        <figure class="shot"><img src="img/split.webp" width="1800" height="518" alt="CyIME 分体键盘" loading="lazy"><figcaption><b>分体</b>平板横屏时左右分开，两只手拇指够得着。</figcaption></figure>
+        <figure class="shot"><img src="img/handwriting.webp" width="1600" height="688" alt="CyIME 中文手写面板" loading="lazy"><figcaption><b>手写</b>中文、英文、日语一次写好几个字；数学公式识别成 LaTeX。支持 S Pen。</figcaption></figure>
+        <figure class="shot"><img src="img/cursor.webp" width="1400" height="869" alt="CyIME 编辑面板" loading="lazy"><figcaption><b>编辑面板</b>移动光标、选择、剪切、复制、粘贴、撤销，都在键盘上完成。</figcaption></figure>
+      </div>
+
+      <div class="sec-head" style="margin-top:72px">
+        <div class="eyebrow">不止打字</div>
+        <h2>说、拍、听，也能输入</h2>
+        <p>这些模型都在手机上运行。完整版装上就带，轻量版用到时再下载。</p>
+      </div>
+      <div class="feats4">
+        <div class="feat"><h3>离线语音</h3><p>长按空格说话，SenseVoice 本地识别，带标点。下载 Paraformer 后可以边说边出字。</p></div>
+        <div class="feat"><h3>拍照识字</h3><p>在剪贴板里拍照或选一张图，离线认出上面的文字。</p></div>
+        <div class="feat"><h3>实时字幕</h3><p>把周围的话转成字幕，自动区分说话人，通话时也能用。有人叫你名字时手机会振动。</p></div>
+        <div class="feat"><h3>剪贴板</h3><p>历史、固定、搜索、分组；短信验证码在候选栏提示。和电脑版扫码配对后两边剪贴板互通。</p></div>
+      </div>
+
+      <div class="quality">
+        <div class="num">每一版</div>
+        <p>改词库、解码或排序时，<b>首选率</b>和<b>每键耗时</b>都和上一版对比，任一项变差就不合入。测试题只用来打分，不拿去训练。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="platforms">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">手机和电脑</div>
+        <h2>一套输入法，三个平台</h2>
+        <p>Android 版可以下载。Windows 和 Linux 版正在做，用的是同一套词库和学习数据。</p>
+      </div>
+      <div class="plats">
+        <div class="plat">
+          <div class="plat-top">
+            <h3>Android</h3>
+            <span class="status ok">可以下载</span>
+          </div>
+          <ul>
+            <li>上面写到的功能全部可用</li>
+            <li>轻量版、完整版两种安装包，可保留数据覆盖安装</li>
+            <li>应用里检查更新，国内走魔搭下载</li>
+          </ul>
+          <div class="foot">最新版 <span class="ver">1.15.108</span> · <a href="#download">去下载</a></div>
+        </div>
+        <div class="plat">
+          <div class="plat-top">
+            <h3>Windows</h3>
+            <span class="status wip">内测中</span>
+          </div>
+          <ul>
+            <li>系统原生输入法（TSF），不靠模拟按键</li>
+            <li>和手机版同一套词库、固定词</li>
+            <li>扫码配对手机，剪贴板互通</li>
+            <li>离线语音输入</li>
+          </ul>
+          <div class="foot">还没公开下载，做好后在这里发布</div>
+        </div>
+        <div class="plat">
+          <div class="plat-top">
+            <h3>Linux</h3>
+            <span class="status wip">开发中</span>
+          </div>
+          <ul>
+            <li>IBus 和 Fcitx5 都支持，一个安装包自动识别</li>
+            <li>候选窗和设置窗口与 Windows 版一致</li>
+            <li>先出 Ubuntu / Debian 安装包</li>
+          </ul>
+          <div class="foot">还没公开下载，做好后在这里发布</div>
+        </div>
+      </div>
+
+      <div class="sync">
+        <div>
+          <h3>手机复制，电脑粘贴</h3>
+          <p>手机和电脑在同一个局域网里，用电脑上的二维码配对一次，之后两边复制的文字会出现在对方的剪贴板里，不经过服务器。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="download">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">下载</div>
+        <h2>Android <span class="ver">1.15.108</span></h2>
+        <p>两个包的功能一样，区别只在带不带离线模型。不确定就选完整版。</p>
+      </div>
+      <div class="dl">
+        <div class="pkg pick" data-kind="full">
+          <span class="badge">推荐</span>
+          <h3>完整版</h3>
+          <div class="size">470 <small>MB</small></div>
+          <p>内置语音、手写、声纹、联想和九键词组模型，装上就能离线用。</p>
+          <div class="file">CyIME-1.15.108-full-arm64-v8a.apk</div>
+          <a class="btn btn-primary" href="https://github.com/Cyletix/CyIME/releases/download/1.15.108/CyIME-1.15.108-full-arm64-v8a.apk" target="_blank" rel="noopener">下载完整版</a>
+        </div>
+        <div class="pkg" data-kind="lite">
+          <h3>轻量版</h3>
+          <div class="size">78 <small>MB</small></div>
+          <p>不带模型，用到语音、手写时在「扩展 › 模型」里下载。</p>
+          <div class="file">CyIME-1.15.108-arm64-v8a.apk</div>
+          <a class="btn btn-ghost" href="https://github.com/Cyletix/CyIME/releases/download/1.15.108/CyIME-1.15.108-arm64-v8a.apk" target="_blank" rel="noopener">下载轻量版</a>
+        </div>
+        <div class="pkg" data-kind="v7a">
+          <h3>32 位轻量版</h3>
+          <div class="size">75 <small>MB</small></div>
+          <p>给只支持 32 位的老手机。没有离线翻译，其余和轻量版相同。</p>
+          <div class="file">CyIME-1.15.108-armeabi-v7a.apk</div>
+          <a class="btn btn-ghost" href="https://github.com/Cyletix/CyIME/releases/download/1.15.108/CyIME-1.15.108-armeabi-v7a.apk" target="_blank" rel="noopener">下载 32 位版</a>
+        </div>
+      </div>
+      <div class="dl-notes">
+        <div><b>国内下载</b>GitHub 慢的话，到 <a href="https://www.modelscope.cn/models/Cyletix/cyime-model/files" target="_blank" rel="noopener">魔搭社区</a> 的 app 文件夹下载，安装包相同。</div>
+        <div><b>装好之后</b>在系统设置里启用 CyIME，再把它设为当前输入法。以后在「设置 › 关于 › 检查更新」更新。</div>
+        <div><b>装不上</b>先看系统弹窗的原文，再看 <a href="https://github.com/Cyletix/CyIME#下载与安装" target="_blank" rel="noopener">安装说明</a>，或者 <a href="https://github.com/Cyletix/CyIME/issues" target="_blank" rel="noopener">反馈问题</a>。</div>
+      </div>
+    </div>
+  </section>
 </main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#top" style="font-size:16px">CyIME</a>
+    <nav aria-label="页脚链接">
+      <a href="https://github.com/Cyletix/CyIME" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/Cyletix/CyIME/releases" target="_blank" rel="noopener">所有版本</a>
+      <a href="https://github.com/Cyletix/CyIME/blob/main/docs/usage.md" target="_blank" rel="noopener">使用说明</a>
+      <a href="https://github.com/Cyletix/CyIME/issues" target="_blank" rel="noopener">反馈</a>
+    </nav>
+    <span style="margin-left:auto">© 2026 Cyletix</span>
+  </div>
+</footer>
+
+<script>
+// 打开页面时读 GitHub 上最新的正式版，换掉版本号、日期、大小和下载链接；读不到就保留页面里写好的版本。
+(function () {
+  var repo = "Cyletix/CyIME";
+  var match = {
+    full: /^CyIME-[\d.]+-full-arm64-v8a\.apk$/,
+    lite: /^CyIME-[\d.]+-arm64-v8a\.apk$/,
+    v7a: /^CyIME-[\d.]+-armeabi-v7a\.apk$/
+  };
+  fetch("https://api.github.com/repos/" + repo + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (rel) {
+      if (!rel || !rel.tag_name || !rel.assets) return;
+      document.querySelectorAll(".ver").forEach(function (el) { el.textContent = rel.tag_name; });
+      var d = new Date(rel.published_at);
+      if (!isNaN(d)) document.getElementById("reldate").textContent = d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
+      document.querySelectorAll(".pkg[data-kind]").forEach(function (card) {
+        var re = match[card.dataset.kind];
+        var a = rel.assets.filter(function (x) { return re.test(x.name); })[0];
+        var btn = card.querySelector(".btn"), file = card.querySelector(".file"), size = card.querySelector(".size");
+        if (a) {
+          btn.href = a.browser_download_url;
+          file.textContent = a.name;
+          size.innerHTML = Math.round(a.size / 1e6) + " <small>MB</small>";
+        } else {
+          btn.href = rel.html_url.replace(/\/tag\/.*$/, "");
+          file.textContent = "这一版没有这个包，到历史版本里找";
+          size.innerHTML = "— <small>MB</small>";
+        }
+      });
+    })
+    .catch(function () {});
+})();
+</script>
 </body>
 </html>
