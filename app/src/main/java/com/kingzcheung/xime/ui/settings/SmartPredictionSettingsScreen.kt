@@ -59,11 +59,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kingzcheung.xime.R
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.viewmodel.SmartPredictionSettingsViewModel
 
@@ -149,6 +151,31 @@ fun SmartPredictionSettingsContent(
                                 colors = SwitchDefaults.colors()
                             )
                         }
+                    }
+                    SettingsRowDivider()
+                    Row(
+                        modifier = Modifier.settingsSearchAnchor("英文补全单词")
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.item_english_completion_title),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = stringResource(R.string.item_english_completion_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = uiState.isEnglishCompletionEnabled,
+                            onCheckedChange = viewModel::setEnglishCompletionEnabled,
+                            colors = SwitchDefaults.colors()
+                        )
                     }
                 })
             }

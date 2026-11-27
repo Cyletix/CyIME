@@ -127,6 +127,7 @@ object SettingsPreferences {
     private const val KEY_KEYBOARD_THEME = "keyboard_theme"
     
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
+    const val KEY_ENGLISH_COMPLETION_ENABLED = "english_completion_enabled"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     internal const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     /** 已删的「滑动清空时跳过联想」，只留着给 isDeleteSkipsAssociation 迁移旧值。 */
@@ -1081,9 +1082,18 @@ object SettingsPreferences {
     fun setSmartPredictionEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_SMART_PREDICTION_ENABLED, enabled).apply()
     }
-    
-    
-    
+
+    fun isEnglishCompletionEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_ENGLISH_COMPLETION_ENABLED, true)
+    }
+
+    fun setEnglishCompletionEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ENGLISH_COMPLETION_ENABLED, enabled).apply()
+    }
+
+    internal fun shouldCompleteEnglishWords(context: Context): Boolean =
+        isSmartPredictionEnabled(context) && isEnglishCompletionEnabled(context)
+
     /** 空格上屏联想候选：有联想候选时按空格键直接上屏第一个联想词（而非空格字符） */
     fun isSpaceCommitAssociationEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_SPACE_COMMIT_ASSOCIATION, false)

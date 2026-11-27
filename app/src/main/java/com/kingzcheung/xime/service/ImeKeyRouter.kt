@@ -638,7 +638,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     /** 英文（西、德、法、意…）打了一个字母或撇号后，按整个词要补全。 */
     internal fun requestEnglishCompletions(next: CandidateState) {
         val sequence = englishCompletionSequence.incrementAndGet()
-        if (service.isSecretEditor() || !next.englishReplaceSupported) {
+        val completionOn = SettingsPreferences.shouldCompleteEnglishWords(service)
+        if (service.isSecretEditor() || !next.englishReplaceSupported ||
+            (!completionOn && !EnglishPhrases.isEnabled(service))) {
             englishCompletionPending = null
             val current = service.candidateState.value
             if (current.englishFirstCompletionPending && current.pendingEnglishText == next.pendingEnglishText)
@@ -649,14 +651,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val session = service.uiState.value.inputSessionId
         englishCompletionPending = pending
         service.serviceScope.launch {
-            val words = service.predictionManager.getEnglishAssociations(pending)
+            // 「英文出短语」有自己的开关，关补全时仍可按完整编码查短语。
+            val words = if (completionOn) service.predictionManager.getEnglishAssociations(pending)
+                else withContext(Dispatchers.IO) { EnglishPhrases.matching(pending, EnglishPhrases.phrases(service)) }
             withContext(Dispatchers.Main) {
                 val current = service.candidateState.value
                 if (englishCompletionSequence.get() == sequence && current.pendingEnglishText == pending && service.uiState.value.inputSessionId == session && service.uiState.value.let {
                         it.isAsciiMode || it.inputProfile.typesLettersDirectly }) {
                     if (englishCompletionPending == pending) englishCompletionPending = null
-                    cachedEnglishCompletions(pending)
-                    englishCompletionCache[pending] = words
+                    if (completionOn) {
+                        cachedEnglishCompletions(pending)
+                        englishCompletionCache[pending] = words
+                    }
                     service.candidateState.value = current.copy(associationCandidates = words, englishFirstCompletionPending = false)
                 }
             }
@@ -710,12 +716,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (!markJoinsWord(mark, language, current.pendingEnglishText)) return@withEditor null
             service.predictionManager.invalidatePendingPredictions()
             val committed = commitEnglishLetter(current, mark, false, service::supportsEnglishCandidateReplace,
-                completionOn = SettingsPreferences.isSmartPredictionEnabled(service)) {
+                completionOn = SettingsPreferences.isSmartPredictionEnabled(service) &&
+                    SettingsPreferences.isEnglishCompletionEnabled(service)) {
                 service.commitTextAndPredict(it, isPaste = false, allowPrediction = false).accepted
             }
             if (committed != null) {
                 englishCompletionSequence.incrementAndGet()
-                englishCompletionPending = committed.pendingEnglishText.takeIf { committed.englishReplaceSupported && !service.isSecretEditor() }
+                englishCompletionPending = committed.pendingEnglishText.takeIf {
+                    !committed.englishCompletionOff && committed.englishReplaceSupported && !service.isSecretEditor()
+                }
                 service.candidateState.value = committed
             }
             // 编辑框没收下也算处理过了，不再当标点补打一次。
@@ -1584,14 +1593,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     }
                     val next = commitEnglishLetter(current, key, isShifted || autoCaps,
                         service::supportsEnglishCandidateReplace, afterGlide = afterGlide,
-                        completionOn = SettingsPreferences.isSmartPredictionEnabled(service)) {
+                        completionOn = SettingsPreferences.isSmartPredictionEnabled(service) &&
+                            SettingsPreferences.isEnglishCompletionEnabled(service)) {
                         val letter = if (fullWidthLetter) fullWidthLetters(it) else it
                         service.commitTextAndPredict(letter, isPaste = false, allowPrediction = false).accepted
                     }
                     if (next != null) {
                         englishCompletionSequence.incrementAndGet()
                         if (current.pendingEnglishText.isEmpty() || afterGlide) englishCompletionCache.clear()
-                        englishCompletionPending = next.pendingEnglishText.takeIf { next.englishReplaceSupported && !service.isSecretEditor() }
+                        englishCompletionPending = next.pendingEnglishText.takeIf {
+                            !next.englishCompletionOff && next.englishReplaceSupported && !service.isSecretEditor()
+                        }
                         service.candidateState.value = next.copy(
                             englishFirstCompletionPending = englishCompletionPending != null &&
                                 (current.pendingEnglishText.isEmpty() || afterGlide || current.englishFirstCompletionPending) && !emailDomainTyping,
@@ -2877,16 +2889,20 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val next = withEditor {
                         if (owner != service.uiState.value.inputSessionId) return@withEditor null
                         service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                        val completionOn = SettingsPreferences.shouldCompleteEnglishWords(service)
                         val updated = service.candidateState.value.copy(
                             pendingEnglishText = newPending,
                             candidates = emptyList(),
                             candidateComments = emptyList(),
-                            associationCandidates = if (!service.isSecretEditor() && candState.englishReplaceSupported)
+                            englishCompletionOff = !completionOn,
+                            associationCandidates = if (completionOn && !service.isSecretEditor() && candState.englishReplaceSupported)
                                 cachedEnglishCompletions(newPending) ?: candState.associationCandidates else emptyList(),
                             candidateActions = emptyList()
                         )
                         englishCompletionSequence.incrementAndGet()
-                        englishCompletionPending = newPending.takeIf { updated.englishReplaceSupported && !service.isSecretEditor() }
+                        englishCompletionPending = newPending.takeIf {
+                            completionOn && updated.englishReplaceSupported && !service.isSecretEditor()
+                        }
                         service.candidateState.value = updated
                         updated
                     }

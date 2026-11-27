@@ -40,6 +40,8 @@
     <string name="item_dictionary_summary">我的短語、匯入的詞庫、刪掉的候選、查詞</string>
     <string name="item_prediction_title">智慧聯想</string>
     <string name="item_prediction_summary">基礎聯想、個人學習與可選模型增強</string>
+    <string name="item_english_completion_title">英文單字補全</string>
+    <string name="item_english_completion_summary">關閉後，英文鍵盤只輸入打出的字母，不再補全單字；中文聯想不受影響。</string>
     <string name="item_speech_title">語音轉文字</string>
     <string name="item_speech_summary">語音模型、線上語音、標點、糾錯</string>
     <string name="item_handwriting_title">手寫</string>
