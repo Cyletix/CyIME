@@ -2,7 +2,6 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.LayoutDirection
 internal class KeyboardPanelRevealState(
     val visibility: MutableTransitionState<Boolean>,
     val progress: State<Float>,
+    val instant: Boolean = false,
 ) {
     var boundsInWindow by mutableStateOf(Rect.Zero)
 }
@@ -42,11 +42,15 @@ internal fun rememberKeyboardPanelRevealState(
     instant: Boolean = false,
 ): KeyboardPanelRevealState {
     visibility.targetState = visible
-    val transition = updateTransition(visibility, label = "keyboard-panel")
-    val progress = transition.animateFloat(
-        transitionSpec = { if (instant) snap() else keyboardPanelMotion(targetState) }, label = "downward-reveal",
-    ) { if (it) 1f else 0f }
-    return remember(visibility, progress) { KeyboardPanelRevealState(visibility, progress) }
+    val progress = if (instant) {
+        androidx.compose.runtime.rememberUpdatedState(if (visible) 1f else 0f)
+    } else {
+        val transition = updateTransition(visibility, label = "keyboard-panel")
+        transition.animateFloat(
+            transitionSpec = { keyboardPanelMotion(targetState) }, label = "downward-reveal",
+        ) { if (it) 1f else 0f }
+    }
+    return remember(visibility, progress, instant) { KeyboardPanelRevealState(visibility, progress, instant) }
 }
 
 /** Reveal inside an already measured slot: never resize the IME window or reflow its keys. */
@@ -60,11 +64,12 @@ internal fun KeyboardPanelReveal(
 ) {
     val state = revealState ?: rememberKeyboardPanelRevealState(visible, visibility)
     val active = state.visibility
-    if (!active.isIdle || active.currentState || active.targetState) {
+    val show = if (state.instant) visible else (!active.isIdle || active.currentState || active.targetState)
+    if (show) {
         // Opening blocks the entire slot, including the not-yet-revealed area. Closing gives the
         // uncovered keys back at once: the curtain only takes touches where it is still drawn,
         // so typing right after closing a panel is never eaten by the closing animation.
-        val closing = !active.targetState
+        val closing = !state.instant && !active.targetState
         Box(modifier.then(if (closing) Modifier.graphicsLayer {
             clip = true
             shape = PanelCurtainShape(state.progress.value)
@@ -75,10 +80,10 @@ internal fun KeyboardPanelReveal(
             ) {})
             Box(Modifier.fillMaxSize().onGloballyPositioned {
                 state.boundsInWindow = Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat()))
-            }.drawWithContent {
+            }.then(if (state.instant) Modifier else Modifier.drawWithContent {
                 clipRect(bottom = size.height * state.progress.value) { this@drawWithContent.drawContent() }
-            }) { content() }
-            if (!active.isIdle) {
+            })) { content() }
+            if (!state.instant && !active.isIdle) {
                 // Invisible candidates must not be selectable while the curtain is moving.
                 Box(Modifier.matchParentSize().clickable(
                     interactionSource = remember { MutableInteractionSource() }, indication = null,

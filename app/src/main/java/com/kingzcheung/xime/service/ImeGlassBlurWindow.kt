@@ -126,27 +126,48 @@ internal class ImeGlassBlurWindow(
 
     /** Call after a parent-window replacement or show; repeated unchanged calls do no relayout. */
     fun refresh() {
-        if (disposed || !AndroidPlatform.windowBlur || !enabled || !visible || blurRadiusPx == 0) {
+        val parent = parentDecor()
+        val token = parent?.windowToken
+        if (disposed || !AndroidPlatform.windowBlur || !visible) {
             stopObservingAvailability()
             observeParent(null)
             removeWindow()
             return
         }
+        if (!enabled || blurRadiusPx == 0) {
+            stopObservingAvailability()
+            observeParent(null)
+            // 键盘仍显示在屏幕上时不要调用 Dialog.dismiss() 强拆 TYPE_APPLICATION_MEDIA 子窗：
+            // 拆附着模糊子窗会触发宿主窗口重合成闪白。先静音置透明，等键盘收起或销毁时再拆窗。
+            if (dialog != null && parent != null && parent.isAttachedToWindow && token != null && boundToken == token) {
+                muteWindow()
+            } else {
+                removeWindow()
+            }
+            return
+        }
         observeAvailability()
         if (!blurAvailable && !SamsungWindowBlur.usableFor(context)) {
             observeParent(null)
-            removeWindow()
+            if (dialog != null && parent != null && parent.isAttachedToWindow && token != null && boundToken == token) {
+                muteWindow()
+            } else {
+                removeWindow()
+            }
             return
         }
-        val parent = parentDecor()
         observeParent(parent)
-        val token = parent?.windowToken
         val bounds = region?.let { measured ->
             val shift = blurAnchorShift(regionMeasuredAt, anchorOrigin())
             if (shift == IntOffset.Zero) measured else Rect(measured).apply { offset(shift.x, shift.y) }
         }
-        if (parent == null || !parent.isAttachedToWindow || token == null || bounds == null) {
+        if (parent == null || !parent.isAttachedToWindow || token == null) {
             removeWindow()
+            return
+        }
+        if (bounds == null) {
+            // 悬浮拖动等临时无区域场景：静音隐藏子窗而非销毁重建，避免松手重现或拖动起手闪屏。
+            if (dialog != null && boundToken == token) muteWindow() else removeWindow()
             return
         }
         if (token == failedToken) return
@@ -283,6 +304,9 @@ internal class ImeGlassBlurWindow(
 
     @RequiresApi(Build.VERSION_CODES.S)
     private fun updateWindow(window: Window, bounds: Rect) {
+        if (window.decorView.visibility != View.VISIBLE) {
+            window.decorView.visibility = View.VISIBLE
+        }
         if (appliedRegion != bounds) {
             window.attributes = window.attributes.apply {
                 x = bounds.left
@@ -320,6 +344,26 @@ internal class ImeGlassBlurWindow(
         }
     }
 
+    private fun muteWindow() {
+        val current = dialog ?: return
+        val window = current.window ?: return
+        try {
+            // 仅置 alpha = 0f 隐藏视觉，不设 View.INVISIBLE（会销毁 Surface 导致恢复时重建闪屏），
+            // 也不调用 setBackgroundBlurRadius(0)（拆模糊会触发宿主重合成闪白）。
+            if (appliedOpacity != 0f) {
+                window.attributes = window.attributes.apply { alpha = 0f }
+                appliedOpacity = 0f
+            }
+            if (appliedSamsungBlur) {
+                SamsungWindowBlur.clear(window.decorView)
+                appliedSamsungBlur = false
+            }
+        } catch (error: RuntimeException) {
+            FileLogger.w(TAG, "Unable to mute keyboard blur window; falling back to dismiss", error)
+            removeWindow()
+        }
+    }
+
     private fun removeWindow() {
         val previous = dialog
         dialog = null
@@ -332,9 +376,9 @@ internal class ImeGlassBlurWindow(
         if (previous != null) {
             if (appliedSamsungBlur) previous.window?.decorView?.let(SamsungWindowBlur::clear)
             try {
-                if (AndroidPlatform.windowBlur) previous.window?.setBackgroundBlurRadius(0)
-            } catch (error: RuntimeException) {
-                FileLogger.w(TAG, "Unable to clear detached keyboard blur", error)
+                // 先隐藏子窗再销毁，避免拆窗前调用 setBackgroundBlurRadius(0) 触发 WindowManager 二次重排闪白。
+                previous.window?.decorView?.visibility = View.INVISIBLE
+            } catch (_: RuntimeException) {
             }
             try {
                 previous.dismiss()

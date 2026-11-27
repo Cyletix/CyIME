@@ -455,6 +455,7 @@ fun KeyboardView(
     // 设置里「在菜单里直接编辑」关着时，菜单右上角不出编辑按钮，和以前一样；编辑中被关掉就放弃这次编辑。
     val inlineEditingEnabled = rememberInlineQuickActionEditing()
     LaunchedEffect(inlineEditingEnabled) { if (!inlineEditingEnabled && inlineEditor.active) inlineEditor.cancel() }
+    val rememberedMainAscii by viewModel.asciiStateMachine.mainAsciiModeFlow.collectAsStateWithLifecycle()
     val punctuationFull = !state.isAsciiMode && !state.inputProfile.language.typesLettersDirectly && (state.schemaSwitches.firstOrNull { it.name == "full_shape" }?.currentIndex?.let { it == 1 }
         ?: SettingsPreferences.punctuationFullWidth(androidx.compose.ui.platform.LocalContext.current, true))
     // 打开了「跟随全角半角」的字母键角标按它换写法（KeysConfigHelper.getKeyGesture）；在画键之前更新。
@@ -487,12 +488,29 @@ fun KeyboardView(
             inputTextLocaleTag(state.inputProfile.language, state.inputProfile.scheme, inputPreferences.traditionalOutput)
                 ?.let { base.copy(localeList = remember(it) { androidx.compose.ui.text.intl.LocaleList(it) }) } ?: base
         },
-        LocalTextModeLabel provides when {
-            page.textMainType() == MainType.HANDWRITING -> state.inputProfile.language.displayName
-            textLayout is KeyboardLayoutState.English -> "ABC"
-            state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD ||
-                com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, false) -> "あいう"
-            else -> state.inputProfile.language.displayName
+        LocalTextModeLabel provides run {
+            val inSymbolPanel = viewState.asciiContext() == AsciiKeyboardContext.SYMBOL_PANEL
+            val returnToEnglish = if (inSymbolPanel) {
+                rememberedMainAscii ?: (textLayout is KeyboardLayoutState.English)
+            } else {
+                state.isAsciiMode || state.currentSchemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH
+            }
+            val schemaEntry = state.schemas.firstOrNull { it.schemaId == state.currentSchemaId }
+            val baseLanguage = schemaEntry?.language
+                ?: com.kingzcheung.xime.settings.InputProfiles.describe(state.currentSchemaId).language
+            when {
+                page.textMainType() == MainType.HANDWRITING -> when (baseLanguage) {
+                    com.kingzcheung.xime.settings.InputLanguage.UNSPECIFIED -> "中文"
+                    com.kingzcheung.xime.settings.InputLanguage.ENGLISH -> "ABC"
+                    else -> baseLanguage.displayName
+                }
+                returnToEnglish -> "ABC"
+                state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD ||
+                    com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, false) -> "あいう"
+                baseLanguage == com.kingzcheung.xime.settings.InputLanguage.ENGLISH -> "ABC"
+                baseLanguage == com.kingzcheung.xime.settings.InputLanguage.UNSPECIFIED -> "中文"
+                else -> baseLanguage.displayName
+            }
         },
         LocalKeyboardPunctuation provides if (state.isCalculatorMode &&
             state.inputProfile.language != com.kingzcheung.xime.settings.InputLanguage.JAPANESE) null else KeyboardPunctuation(
