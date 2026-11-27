@@ -45,7 +45,7 @@ internal fun commitEnglishLetter(
     replaceSupported: () -> Boolean,
     /** 光标紧跟刚滑行上屏的词：这个字母开始新词，前面补空格。 */
     afterGlide: Boolean = false,
-    /** 「智能联想」开着：打的词给补全；关着时候选栏什么都不放，见 [showsTypedEnglishWord]。 */
+    /** 关闭补全时，原词也不单独占候选栏，见 [showsTypedEnglishWord]。 */
     completionOn: Boolean = true,
     commit: (String) -> Boolean,
 ): CandidateState? {
@@ -61,7 +61,7 @@ internal fun commitEnglishLetter(
         candidates = emptyList(), candidateComments = emptyList(), candidateActions = emptyList(),
         pendingEnglishText = pending, glidedWord = "",
         // 接着打同一个词：新补全回来前先留着仍对得上的旧补全，不清空重填（#467 连打连删候选闪）。
-        associationCandidates = if (!afterGlide && state.pendingEnglishText.isNotEmpty() && supportsCompletion &&
+        associationCandidates = if (completionOn && !afterGlide && state.pendingEnglishText.isNotEmpty() && supportsCompletion &&
             !EmailSuffixes.isSuggestionList(state.associationCandidates))
             state.associationCandidates.filter { it.startsWith(pending, ignoreCase = true) } else emptyList(),
         englishReplaceSupported = supportsCompletion,

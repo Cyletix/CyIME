@@ -40,6 +40,8 @@
     <string name="item_dictionary_summary">マイフレーズ、取り込んだ辞書、削除した候補、単語の検索</string>
     <string name="item_prediction_title">スマート予測</string>
     <string name="item_prediction_summary">基本の予測、個人学習、オプションのモデル強化</string>
+    <string name="item_english_completion_title">英単語を補完</string>
+    <string name="item_english_completion_summary">オフにすると、英語キーボードで入力した文字だけが確定され、単語は補完されません。中国語の予測には影響しません。</string>
     <string name="item_speech_title">音声入力</string>
     <string name="item_speech_summary">音声モデル・オンライン・句読点・訂正</string>
     <string name="item_handwriting_title">手書き</string>

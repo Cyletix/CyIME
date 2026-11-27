@@ -40,6 +40,8 @@
     <string name="item_dictionary_summary">My phrases, imported dictionaries, removed candidates, word lookup</string>
     <string name="item_prediction_title">Smart prediction</string>
     <string name="item_prediction_summary">Basic prediction, personal learning and optional model boost</string>
+    <string name="item_english_completion_title">Complete English words</string>
+    <string name="item_english_completion_summary">When off, the English keyboard enters only the letters you type. Chinese predictions are unaffected.</string>
     <string name="item_speech_title">Voice to text</string>
     <string name="item_speech_summary">Models, online voice, punctuation, corrections</string>
     <string name="item_handwriting_title">Handwriting</string>

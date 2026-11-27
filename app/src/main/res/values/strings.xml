@@ -45,6 +45,8 @@
     <string name="item_dictionary_summary">我的短语、导入的词库、删掉的候选、查词</string>
     <string name="item_prediction_title">智能联想</string>
     <string name="item_prediction_summary">基础联想、个人学习与可选模型增强</string>
+    <string name="item_english_completion_title">英文补全单词</string>
+    <string name="item_english_completion_summary">关闭后，英文键盘只上屏打出的字母，不再补全单词；中文联想不受影响。</string>
     <string name="item_speech_title">语音转文本</string>
     <string name="item_speech_summary">语音模型、在线语音、标点、纠错</string>
     <string name="item_handwriting_title">手写</string>

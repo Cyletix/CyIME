@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 
 data class SmartPredictionUiState(
     val isEnabled: Boolean = false,
+    val isEnglishCompletionEnabled: Boolean = true,
     val isInitialized: Boolean = false,
     val cacheSize: Int = 0,
     val observations: Long = 0,
@@ -32,6 +33,7 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     
     private val _uiState = MutableStateFlow(SmartPredictionUiState(
         isEnabled = SettingsPreferences.isSmartPredictionEnabled(context),
+        isEnglishCompletionEnabled = SettingsPreferences.isEnglishCompletionEnabled(context),
         isInitialized = AssociationManager.isInitialized()
     ))
     val uiState: StateFlow<SmartPredictionUiState> = _uiState.asStateFlow()
@@ -134,6 +136,11 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
         }
     }
     
+    fun setEnglishCompletionEnabled(enabled: Boolean) {
+        SettingsPreferences.setEnglishCompletionEnabled(context, enabled)
+        _uiState.update { it.copy(isEnglishCompletionEnabled = enabled) }
+    }
+
     private fun loadModel() {
         modelOperation?.cancel()
         modelOperation = viewModelScope.launch {
