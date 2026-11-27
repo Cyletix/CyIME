@@ -33,7 +33,8 @@ class SettingsSearchTest {
     @Test fun chineseAndEnglishInputItemsOpenTheirOwnPages() {
         val chinese = listOf("繁体输出", "生僻字", "日文汉字", "韩文汉字", "粤语字", "时间日期候选", "候选里显示表情", "打符号名出符号", "希腊字母",
             "邻键纠错", "双拼邻键纠错", "九键按数字也模糊", "模糊音也用于双拼", "模糊音")
-        val english = listOf("网址、邮箱框自动切英文", "选词后自动加空格", "标点后自动加空格", "打 @ 时给邮箱后缀")
+        val english = listOf("网址、邮箱框自动切英文", "选词后自动加空格", "标点后自动加空格", "拼错时给正确的词", "单独的 i 改成 I",
+            "打 @ 时给邮箱后缀")
         for (title in chinese) SettingsSearchIndex.single { it.title == title }.let {
             assertEquals(title, SettingsRoutes.ChineseInput, it.target)
             assertEquals(title, "输入 › 语言与方案 › 中文输入", it.path)

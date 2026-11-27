@@ -1939,6 +1939,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (pendingEnglish.isNotEmpty()) {
                         // 直接上屏模式：词已逐字落盘，此处只提交空格并结束本轮英文输入。
                         withEditor {
+                            // 「单独的 i 改成 I」（默认关）：英文里单独打的 i 按空格时改成 I；各字母语言不改。
+                            if (pendingEnglish == "i" && service.predictionManager.completesEnglish() &&
+                                SettingsPreferences.getPrefsPublic(service).getBoolean(
+                                    com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.ENGLISH_CAPITAL_I_KEY, false)) {
+                                if (service.uiState.value.inputTarget.isInternal) service.replaceBeforeCursor("i", "I")
+                                else service.currentInputConnection?.commitEnglishCompletion("i", "I")
+                            }
                             service.commitText(" ")
                             service.candidateState.value = service.candidateState.value.copy(
                                 pendingEnglishText = "",

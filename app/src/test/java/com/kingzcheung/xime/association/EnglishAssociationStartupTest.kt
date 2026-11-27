@@ -10,6 +10,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import com.kingzcheung.xime.service.PredictionManager
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -56,6 +57,46 @@ class EnglishAssociationStartupTest {
         assertEquals("it's", words("its").first())
         assertFalse("its" in words("its"))
         assertEquals("help", words("hel").first())
+    }
+
+    /** 打开「拼错时给正确的词」「单独的 i 改成 I」两个开关。 */
+    private fun withEnglishOptions(app: Context, typo: Boolean, capitalI: Boolean) {
+        val prefs = mock<SharedPreferences>()
+        whenever(prefs.getBoolean(KeyboardInputPreferences.ENGLISH_TYPO_CORRECTION_KEY, false)).thenReturn(typo)
+        whenever(prefs.getBoolean(KeyboardInputPreferences.ENGLISH_CAPITAL_I_KEY, false)).thenReturn(capitalI)
+        whenever(app.getSharedPreferences("kime_settings", Context.MODE_PRIVATE)).thenReturn(prefs)
+    }
+
+    @Test fun misspelledWordsOfferTheCommonWordWhenSwitchedOn() = runBlocking {
+        val app = context { bundledTrie().inputStream() }
+        suspend fun words(prefix: String) = AssociationService.getAssociations(app, prefix, true, 6)
+        // 默认关：和以前一样，不纠正。
+        withEnglishOptions(app, typo = false, capitalI = false)
+        assertFalse("the" in words("teh"))
+        withEnglishOptions(app, typo = true, capitalI = false)
+        assertEquals("the", words("teh").first())
+        assertEquals("The", words("Teh").first())
+        assertEquals("THE", words("TEH").first())
+        assertEquals("their", words("thier").first())
+        assertEquals("because", words("becuase").first())
+        assertTrue("receive" in words("recieve"))
+        assertTrue("hello" in words("helo"))
+        // 还没打完的词照旧先出补全，不夹 he、her。
+        assertEquals("help", words("hel").first())
+        assertFalse("he" in words("hel"))
+    }
+
+    @Test fun loneIOffersCapitalIWhenSwitchedOn() = runBlocking {
+        val app = context { bundledTrie().inputStream() }
+        suspend fun words(prefix: String) = AssociationService.getAssociations(app, prefix, true, 6)
+        withEnglishOptions(app, typo = false, capitalI = false)
+        assertFalse("I" in words("i"))
+        withEnglishOptions(app, typo = false, capitalI = true)
+        assertEquals("I", words("i").first())
+        assertFalse("i" in words("i"))
+        // 只管单独的 i：in、it 照旧补全，打了大写 I 不受影响。
+        assertTrue(words("in").none { it == "I" })
+        assertEquals(words("I").distinct(), words("I"))
     }
 
     @Before fun resetBefore() = AssociationService.release()
