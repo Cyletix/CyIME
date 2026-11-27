@@ -250,6 +250,13 @@ footer a:hover { color: var(--ink); }
 .feats4 .feat { padding: 0; border: 0; }
 @media (max-width: 900px) { .feats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .gallery.two, .feats4 { grid-template-columns: 1fr; } }
+
+/* support */
+.support-codes { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.code { margin: 0; display: grid; gap: 8px; justify-items: center; }
+.code img { display: block; height: 300px; width: auto; max-width: 100%; border-radius: 12px; border: 1px solid var(--line); }
+.code figcaption { font-size: 14px; color: var(--ink-2); }
+.support-link { color: var(--brand); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -265,6 +272,7 @@ footer a:hover { color: var(--ink); }
       <a href="#features">功能</a>
       <a href="#platforms">平台</a>
       <a href="#download">下载</a>
+      <a href="#support">支持</a>
       <a href="https://github.com/Cyletix/CyIME" target="_blank" rel="noopener">GitHub</a>
     </nav>
     <a class="nav-cta" href="#download">下载</a>
@@ -448,6 +456,19 @@ footer a:hover { color: var(--ink); }
         <div><b>国内下载</b>GitHub 慢的话，到 <a href="https://www.modelscope.cn/models/Cyletix/cyime-model/files" target="_blank" rel="noopener">魔搭社区</a> 的 app 文件夹下载，安装包相同。</div>
         <div><b>装好之后</b>在系统设置里启用 CyIME，再把它设为当前输入法。以后在「设置 › 关于 › 检查更新」更新。</div>
         <div><b>装不上</b>先看系统弹窗的原文，再看 <a href="https://github.com/Cyletix/CyIME#下载与安装" target="_blank" rel="noopener">安装说明</a>，或者 <a href="https://github.com/Cyletix/CyIME/issues" target="_blank" rel="noopener">反馈问题</a>。</div>
+      </div>
+    </div>
+  </section>
+  <section class="block" id="support">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">支持作者</div>
+        <h2>请我喝杯咖啡</h2>
+        <p>觉得 CyIME 好用，可以在 <a class="support-link" href="https://afdian.com/a/cyletix" target="_blank" rel="noopener">爱发电</a> 支持我，也可以用微信或支付宝扫下面的码。</p>
+      </div>
+      <div class="support-codes">
+        <figure class="code"><img src="img/wechat-zanshang.png" width="600" height="600" alt="微信赞赏码" loading="lazy"><figcaption>微信赞赏</figcaption></figure>
+        <figure class="code"><img src="img/alipay.jpg" width="400" height="600" alt="作者的支付宝个人收款码" loading="lazy"><figcaption>支付宝</figcaption></figure>
       </div>
     </div>
   </section>
