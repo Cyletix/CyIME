@@ -33,6 +33,7 @@ class SettingsRoundTripTest {
         Case("液态玻璃", true, false, S::setGlassLiquid, S::glassLiquid),
         Case("液态玻璃强度", "strong", "strongest", S::setGlassLiquidStrength, S::glassLiquidStrength),
         Case("数字框自动数字键盘", false, true, S::setAutoNumberKeyboardEnabled, S::isAutoNumberKeyboardEnabled),
+        Case("数字后标点自动半角", false, true, S::setDigitSmartPunctuationEnabled, S::isDigitSmartPunctuationEnabled),
         Case("分体键盘", true, false, S::setSplitKeyboardEnabled, S::isSplitKeyboardEnabled),
         Case("右半边也放 G 键", true, false, S::setSplitRightGEnabled, S::isSplitRightGEnabled),
         Case("数字行", true, false, S::setNumberRowEnabled, S::isNumberRowEnabled),

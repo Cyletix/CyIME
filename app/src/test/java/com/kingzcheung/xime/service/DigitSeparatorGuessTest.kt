@@ -115,4 +115,57 @@ class DigitSeparatorGuessTest {
         guess.beforeEnter(f.ic, newline = false, now = now)
         assertEquals("价格是5。", f.text)
     }
+
+    @Test fun japaneseIdeographicCommaAndPeriodWorkAfterDigits() {
+        fun Field.jpPunct(key: String) {
+            val spec = DigitSeparatorGuess.specFor(key, japanese = true)
+            if (spec != null && DigitSeparatorGuess.digitBefore(text)) {
+                type(spec.half.toString())
+                guess.arm(spec.half, spec.full)
+            } else type(key)
+        }
+        val num = Field("1")
+        num.jpPunct("、"); num.type("0"); num.type("0"); num.type("0")
+        assertEquals("1,000", num.text)
+
+        val prose = Field("3")
+        prose.jpPunct("、"); prose.type("日本")
+        assertEquals("3、日本", prose.text)
+
+        val sameKey = Field("5")
+        sameKey.jpPunct("、"); sameKey.jpPunct("、")
+        assertEquals("5、", sameKey.text)
+        assertTrue(guess.undoOnDelete(sameKey.ic, now))
+        assertEquals("5,", sameKey.text)
+
+        // 中文模式下「、」是顿号，不参与数字后半角规则。
+        assertEquals(null, DigitSeparatorGuess.specFor("、", japanese = false))
+    }
+
+    @Test fun disabledSmartPunctuationCommitsFullWidthDirectlyAndSingleBackspaceTurnsHalfWidth() {
+        val f = Field("3")
+        // 关闭自动半角时：直接上屏全角「。」，紧接着按一次退格改成半角「.」。
+        f.type("。")
+        guess.armDirectFullWidth('。', '.', now)
+        assertEquals("3。", f.text)
+        assertTrue(guess.undoOnDelete(f.ic, now + 500))
+        assertEquals("3.", f.text)
+        // 第二次退格不再拦截，照常删除。
+        assertFalse(guess.undoOnDelete(f.ic, now + 600))
+
+        // 日语「、」同样适用。
+        val jp = Field("1")
+        jp.type("、")
+        guess.armDirectFullWidth('、', ',', now)
+        assertTrue(guess.undoOnDelete(jp.ic, now + 200))
+        assertEquals("1,", jp.text)
+
+        // 直接上屏全角后接着打字，不再触发退格转半角。
+        val keep = Field("3")
+        keep.type("。")
+        guess.armDirectFullWidth('。', '.', now)
+        keep.type("好")
+        assertEquals("3。好", keep.text)
+        assertFalse(guess.undoOnDelete(keep.ic, now + 200))
+    }
 }

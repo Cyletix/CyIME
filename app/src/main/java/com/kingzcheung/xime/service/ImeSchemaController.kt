@@ -391,7 +391,23 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             withContext(Dispatchers.Main) {
                 if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession ||
                     service.uiState.value.currentSchemaId != profileId) return@withContext
-                if (committed.isNotEmpty()) service.commitText(committed.toString())
+                if (committed.isNotEmpty()) {
+                    val text = committed.toString()
+                    val digitSpec = if (before.isEmpty() && service.textCommit.digitSeparatorContextAllowed())
+                        DigitSeparatorGuess.specFor(text, japanese = true)?.takeIf {
+                            DigitSeparatorGuess.digitBefore(runCatching { original.getTextBeforeCursor(1, 0) }.getOrNull())
+                        } else null
+                    if (digitSpec != null && SettingsPreferences.isDigitSmartPunctuationEnabled(service)) {
+                        service.commitText(digitSpec.half.toString())
+                        service.digitSeparatorGuess.arm(digitSpec.half, digitSpec.full)
+                    } else {
+                        service.commitText(text)
+                        if (digitSpec != null) {
+                            service.digitSeparatorGuess.armDirectFullWidth(
+                                digitSpec.full, digitSpec.half, SystemClock.uptimeMillis())
+                        }
+                    }
+                }
                 service.sessionController.updateUIWithResult(
                     transformed?.let { finalResult.copy(candidates = it.candidates.toTypedArray()) } ?: finalResult,
                     transformed?.actions ?: emptyList(),
