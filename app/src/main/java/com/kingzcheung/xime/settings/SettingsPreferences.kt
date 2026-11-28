@@ -509,6 +509,11 @@ object SettingsPreferences {
     const val KEY_CANDIDATE_PRESS_HIGHLIGHT = "candidate_press_highlight"
     /** 候选滑到头回弹展开（11-21 他：默认关，关着时候选栏和 1.15.101 完全一样）。 */
     const val KEY_CANDIDATE_SWIPE_EXPAND = "candidate_swipe_expand"
+    /** 左右滑展开候选的拉出距离门槛（dp），默认 28dp，范围 16–64dp，步进 4dp。 */
+    const val KEY_CANDIDATE_PULL_THRESHOLD_DP = "candidate_pull_threshold_dp"
+    const val DEFAULT_CANDIDATE_PULL_THRESHOLD_DP = 28f
+    const val MIN_CANDIDATE_PULL_THRESHOLD_DP = 16f
+    const val MAX_CANDIDATE_PULL_THRESHOLD_DP = 64f
     /** 首选上拖选改局部（默认开，见 [isSentenceDragEdit]）。 */
     const val KEY_SENTENCE_DRAG_EDIT = "sentence_drag_edit"
     /** 开了「候选滑到头回弹展开」时，取消／关联想键放右边画成「×」（11-22 他：和收起键盘同一个位置）；默认左边。 */
@@ -679,6 +684,17 @@ object SettingsPreferences {
 
     fun setCandidateSwipeExpand(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_CANDIDATE_SWIPE_EXPAND, enabled).apply()
+    }
+
+    fun normalizeCandidatePullThresholdDp(value: Float): Float =
+        if (!value.isFinite()) DEFAULT_CANDIDATE_PULL_THRESHOLD_DP
+        else kotlin.math.round(value.coerceIn(MIN_CANDIDATE_PULL_THRESHOLD_DP, MAX_CANDIDATE_PULL_THRESHOLD_DP) / 4f) * 4f
+
+    fun candidatePullThresholdDp(context: Context): Float =
+        normalizeCandidatePullThresholdDp(getPrefs(context).getFloat(KEY_CANDIDATE_PULL_THRESHOLD_DP, DEFAULT_CANDIDATE_PULL_THRESHOLD_DP))
+
+    fun setCandidatePullThresholdDp(context: Context, dp: Float) {
+        getPrefs(context).edit().putFloat(KEY_CANDIDATE_PULL_THRESHOLD_DP, normalizeCandidatePullThresholdDp(dp)).apply()
     }
 
     /**

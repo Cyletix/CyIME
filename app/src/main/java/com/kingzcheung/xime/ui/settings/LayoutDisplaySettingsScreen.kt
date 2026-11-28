@@ -684,6 +684,41 @@ private fun LayoutDisplayPage(
                     // 锁住时说清是谁锁的，「」里点一下跳到上面那张卡并高亮（11-24 他：找不着在哪改、也跳不过去）。
                     }, lockMessage = if (rightKey != com.kingzcheung.xime.settings.CandidateRightKey.EXPAND)
                         "选了「${candidateRightKeyName(rightKey)}」时只能靠滑展开候选，所以一直开着；点「${candidateRightKeyName(rightKey)}」去改回「默认」就能关" else null)
+                    if (swipeExpand) {
+                        var pullThreshold by remember { mutableStateOf(SettingsPreferences.candidatePullThresholdDp(context)) }
+                        val defaultPullDp = SettingsPreferences.DEFAULT_CANDIDATE_PULL_THRESHOLD_DP
+                        Column(Modifier.settingsSearchAnchor("左右滑展开距离").fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("左右滑展开距离", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.width(12.dp))
+                                Text("${pullThreshold.toInt()} dp", style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("candidate-pull-threshold-value"))
+                                if (pullThreshold == defaultPullDp) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("默认", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(Modifier.weight(1f))
+                                TextButton(
+                                    onClick = {
+                                        pullThreshold = defaultPullDp
+                                        SettingsPreferences.setCandidatePullThresholdDp(context, defaultPullDp)
+                                    },
+                                    enabled = pullThreshold != defaultPullDp,
+                                    modifier = Modifier.testTag("candidate-pull-threshold-reset"),
+                                ) { Text("恢复默认") }
+                            }
+                            Text("拉出这么远松手就展开或收起，越小越灵敏，越大越不易误触",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Slider(
+                                value = pullThreshold,
+                                onValueChange = { pullThreshold = SettingsPreferences.normalizeCandidatePullThresholdDp(it) },
+                                onValueChangeFinished = { SettingsPreferences.setCandidatePullThresholdDp(context, pullThreshold) },
+                                valueRange = SettingsPreferences.MIN_CANDIDATE_PULL_THRESHOLD_DP..SettingsPreferences.MAX_CANDIDATE_PULL_THRESHOLD_DP,
+                                steps = ((SettingsPreferences.MAX_CANDIDATE_PULL_THRESHOLD_DP - SettingsPreferences.MIN_CANDIDATE_PULL_THRESHOLD_DP) / 4f).toInt() - 1,
+                                modifier = Modifier.testTag("candidate-pull-threshold-slider"),
+                            )
+                        }
+                    }
                     // 首选上拖选改局部（11-24 他：默认打开，只给长句；11-26 门槛从超过 6 个字放到 5 个字）；按住不拖、关着时长按首选照旧出固定、删除的卡片。
                     var sentenceDragEdit by remember { mutableStateOf(SettingsPreferences.isSentenceDragEdit(context)) }
                     CandidateSwitchRow("长句拖选改局部", "首选有 5 个字以上时，按住拖过一段就只改这一段；按住不拖照旧出固定、删除",

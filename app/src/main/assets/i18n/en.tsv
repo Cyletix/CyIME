@@ -4077,6 +4077,8 @@ Rime 官方五笔86，支持拼音反查。	Official Rime Wubi 86 with pinyin lo
 经典	Classic
 右侧收起	Hide on right
 左右滑展开候选	Swipe to expand candidates
+左右滑展开距离	Swipe-to-expand distance
+拉出这么远松手就展开或收起，越小越灵敏，越大越不易误触	Pull distance to expand or collapse; smaller is more sensitive, larger avoids accidental triggers
 适合全面屏手势	Suits gesture navigation
 适合三键导航	Suits 3-button navigation
 适合全面屏，随时收键盘	Suits gestures; hide any time

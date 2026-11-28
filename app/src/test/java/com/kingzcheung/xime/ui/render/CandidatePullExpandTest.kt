@@ -44,7 +44,8 @@ class CandidatePullExpandTest {
 
     @After fun resetSwipeExpand() {
         prefs.edit().remove(SettingsPreferences.KEY_CANDIDATE_SWIPE_EXPAND).remove(SettingsPreferences.KEY_CANDIDATE_CLOSE_ON_RIGHT)
-            .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON).commit()
+            .remove(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON)
+            .remove(SettingsPreferences.KEY_CANDIDATE_PULL_THRESHOLD_DP).commit()
     }
 
     /** 「经典」开了左右滑：右边 ▾ 照常展开、▴ 照常收回，往左拉也能展开、往右划也能收回（11-23）。 */
@@ -212,5 +213,30 @@ class CandidatePullExpandTest {
         val startX = (cancel.right + 2f * dp) - pull.left
         pullNode.performTouchInput { swipe(Offset(startX, centerY), Offset(startX + 250f * dp, centerY), durationMillis = 300) }
         rule.runOnIdle { assertEquals(1, closes); assertEquals(0, cancels) }
+    }
+
+    /** 调短左右滑展开距离后，较短的滑动即可触发展开；调大后同样距离不触发。 */
+    @Test fun customPullThresholdControlsTriggerDistance() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val expanded = mutableStateOf(false)
+        var opens = 0
+        SettingsPreferences.setCandidatePullThresholdDp(context, 64f)
+        rule.setContent {
+            CandidateBar(state = CandidateBarState.ChineseCandidates(listOf("你好", "你"), inputText = "nihao", hasMore = true),
+                candidatePageExpanded = expanded.value, visuals = visuals,
+                callbacks = CandidateBarCallbacks(onCandidateSelect = {},
+                    onShowMoreCandidates = { opens++; expanded.value = true },
+                    onCollapseCandidates = { expanded.value = false }),
+                showPreeditPreview = false, modifier = Modifier.width(360.dp))
+        }
+        val pull = rule.onNodeWithTag("candidate-pull-expand", useUnmergedTree = true)
+        val dp = rule.density.density
+        // 手指拉 60dp（含 touchSlop，位移不到 30dp）：64dp 门槛下不展开，调到 16dp 后同样距离即可展开。
+        pull.performTouchInput { swipe(Offset(centerX - 30f * dp, centerY), Offset(centerX + 30f * dp, centerY), durationMillis = 200) }
+        rule.runOnIdle { assertEquals(0, opens) }
+        SettingsPreferences.setCandidatePullThresholdDp(context, 16f)
+        rule.waitForIdle()
+        pull.performTouchInput { swipe(Offset(centerX - 30f * dp, centerY), Offset(centerX + 30f * dp, centerY), durationMillis = 200) }
+        rule.runOnIdle { assertEquals(1, opens) }
     }
 }
