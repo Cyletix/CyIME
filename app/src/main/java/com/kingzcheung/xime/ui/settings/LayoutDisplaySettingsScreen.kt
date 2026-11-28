@@ -169,6 +169,13 @@ private fun LayoutDisplayPage(
                             pairedSymbols = it; SettingsPreferences.setPairedSymbolsEnabled(context, it)
                         })
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    var digitSmartPunctuation by remember { mutableStateOf(SettingsPreferences.isDigitSmartPunctuationEnabled(context)) }
+                    SettingsToggleItem(Icons.TwoTone.Dialpad, "数字后标点自动半角",
+                        "数字后输入「。」「，」「、」先上半角，后续非数字再转全角；关闭则原样上屏，退格一次可转半角",
+                        checked = digitSmartPunctuation, onCheckedChange = {
+                            digitSmartPunctuation = it; SettingsPreferences.setDigitSmartPunctuationEnabled(context, it)
+                        })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     var symbolReturn by remember { mutableStateOf(SettingsPreferences.isSymbolReturnAfterPickEnabled(context)) }
                     SettingsToggleItem(Icons.TwoTone.EmojiSymbols, "选完符号自动返回",
                         "在符号页点一个符号后回到打字键盘",

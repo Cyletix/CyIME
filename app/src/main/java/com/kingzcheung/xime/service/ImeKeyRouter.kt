@@ -725,22 +725,23 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         return true
     }
 
-    /** 实体键盘：中文、没在打字、光标前是数字时，. , : 照半角上屏（#527、#548）。 */
+    /** 实体键盘：非英文、没在打字、光标前是数字时，. , : 照半角上屏（#527、#548；. , 随自动半角开关）。 */
     private suspend fun keepsDigitSeparatorHalfWidth(key: String): Boolean =
         !service.uiState.value.isAsciiMode && service.t9PartialSegments.isEmpty() &&
             service.rimeEngine.readQueuedComposition()?.input.isNullOrEmpty() &&
+            (key == ":" || SettingsPreferences.isDigitSmartPunctuationEnabled(service)) &&
             digitSeparatorStaysHalfWidth(key, withEditor {
                 runCatching { service.editorConnection()?.getTextBeforeCursor(1, 0) }.getOrNull() })
 
     /**
-     * 实体键盘数字后的 . ,：照半角上屏；选的是全角标点时记下来，接着打的不是数字就改成 。，（[DigitSeparatorGuess]，11-25）。
+     * 实体键盘数字后的 . ,：照半角上屏；选的是全角标点且开着开关时记下来，接着打的不是数字就改成 。，、（[DigitSeparatorGuess]，11-25）。
      * 冒号（12:30）照旧只上半角。
      */
     private suspend fun commitDigitSeparator(key: String) {
         val committed = commitHardwareLiteral(key)
         if (committed && key.length == 1 && key[0] in ".,") withEditor {
             if (service.textCommit.digitSeparatorAllowed() && service.textCommit.isFullWidthPunctuation())
-                service.digitSeparatorGuess.arm(key[0])
+                service.digitSeparatorGuess.arm(key[0], DigitSeparatorGuess.fullFor(key[0], service.textCommit.isJapaneseProfile()))
         }
     }
 

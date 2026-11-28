@@ -2198,6 +2198,8 @@ settings-fold:语言键切换方式	=
 横竖屏分开记布局	Separate layouts for portrait and landscape
 标点上屏首选	Commit top candidate on punctuation
 输入成对符号	Type paired symbols
+数字后标点自动半角	Half-width punctuation after digits
+数字后输入「。」「，」「、」先上半角，后续非数字再转全角；关闭则原样上屏，退格一次可转半角	Commit half-width . or , after digits and convert to full-width before non-digits; when off, commit as-is and one Backspace converts to half-width
 回车发送	Enter sends
 分体与键宽	Split & key width
 分体键盘	Split keyboard

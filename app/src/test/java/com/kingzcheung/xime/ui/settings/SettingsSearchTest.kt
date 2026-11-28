@@ -184,6 +184,7 @@ class SettingsSearchTest {
         assertTrue("数字转阿拉伯数字" in titles("中文数字"))
         assertTrue("语音纠错" in titles("纠错"))
         assertTrue("语音纠错" in titles("同音字"))
+        assertTrue("数字后标点自动半角" in titles("数字 标点 半角"))
     }
 
     /** 11-09 反馈：按「取消候选按钮」「关闭候选按钮」找候选栏最左边的取消键，排第一。 */

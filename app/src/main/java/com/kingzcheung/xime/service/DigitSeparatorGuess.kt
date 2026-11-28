@@ -5,26 +5,34 @@ import android.view.inputmethod.InputConnection
 /**
  * 数字后面的句号、逗号（11-25 他：小数点、千分位要半角，句子里数字后面的标点要全角，不用删了重打）。
  *
- * 中文全角标点下，光标前是数字时点「。」「，」先上半角 . ,（3.14、1,000 照常打）；下一个上屏的：
+ * 开着自动半角时，光标前是数字点「。」「，」（日语含「、」）先上半角 . ,（3.14、1,000 照常打）；下一个上屏的：
  * - 是数字：留着半角；
- * - 是别的（汉字、标点、空格、回车、发送）：先把那个半角改成全角 。，再上屏它；
- * - 是同一个键再点一次（「。」「，」）：只把半角改成全角，不再多一个。
+ * - 是别的（汉字、假名、标点、空格、回车、发送）：先把那个半角改回原来的全角 。，、再上屏它；
+ * - 是同一个键再点一次（「。」「，」「、」）：只把半角改成全角，不再多一个。
  * 改完紧接着按退格是撤销这次改动：改回半角，连同改动时跟着上屏的空格、换行一起退掉。
- * 改之前都核对光标前确实是「数字 + 刚上的那个半角」，光标挪过、应用改过文字就不动。
+ * 关掉自动半角时直接上屏全角，同时记下一次退格转半角（[armDirectFullWidth]）。
+ * 改之前都核对光标前确实是「数字 + 刚上的那个符号」，光标挪过、应用改过文字就不动。
  */
 internal class DigitSeparatorGuess {
-    /** 刚上屏、还没定的半角 . 或 ,。 */
-    private var pending: Char? = null
-    /** 刚改成全角的：光标前是 [Undo.shown] 时退格改回 [Undo.half]。 */
+    /** 刚上屏、还没定的半角 . 或 , 及对应的原全角符号。 */
+    private var pending: Spec? = null
+    /** 刚改成全角（或关闭开关时刚直接上屏全角）的：光标前是 [Undo.shown] 时退格改回 [Undo.half]。 */
     private var undo: Undo? = null
 
+    data class Spec(val half: Char, val full: Char)
     private data class Undo(val shown: String, val half: String, val at: Long)
 
     val isPending: Boolean get() = pending != null
 
-    fun arm(half: Char) {
-        pending = half
+    fun arm(half: Char, full: Char = fullFor(half)) {
+        pending = Spec(half, full)
         undo = null
+    }
+
+    /** 关掉自动半角后数字后面直接上屏全角：紧接着按一次退格可改成半角。 */
+    fun armDirectFullWidth(full: Char, half: Char, now: Long) {
+        pending = null
+        undo = Undo(full.toString(), half.toString(), now)
     }
 
     fun reset() {
@@ -37,11 +45,11 @@ internal class DigitSeparatorGuess {
      */
     fun beforeCommit(ic: InputConnection, text: String, now: Long): Boolean {
         undo = null
-        val half = pending ?: return false
+        val active = pending ?: return false
         pending = null
         if (text.isEmpty() || text[0].isAsciiOrWideDigit()) return false
-        val full = fullFor(half)
-        if (!ic.endsWithDigitAnd(half)) return false
+        val full = active.full
+        if (!ic.endsWithDigitAnd(active.half)) return false
         val sameKey = text == full.toString()
         ic.beginBatchEdit()
         try {
@@ -51,30 +59,30 @@ internal class DigitSeparatorGuess {
             ic.endBatchEdit()
         }
         undo = when {
-            sameKey -> Undo(full.toString(), half.toString(), now)
-            text == " " || text == "\n" -> Undo(full + text, half.toString(), now)
+            sameKey -> Undo(full.toString(), active.half.toString(), now)
+            text == " " || text == "\n" -> Undo(full + text, active.half.toString(), now)
             else -> null
         }
         return sameKey
     }
 
-    /** 回车发送、换行之前：数字后面那个半角按句末标点改成全角（发出去的是「5。」）。 */
+    /** 回车发送、换行之前：数字后面那个半角按句末标点改回全角（发出去的是「5。」）。 */
     fun beforeEnter(ic: InputConnection, newline: Boolean, now: Long) {
         undo = null
-        val half = pending ?: return
+        val active = pending ?: return
         pending = null
-        if (!ic.endsWithDigitAnd(half)) return
+        if (!ic.endsWithDigitAnd(active.half)) return
         ic.beginBatchEdit()
         try {
             ic.deleteSurroundingText(1, 0)
-            ic.commitText(fullFor(half).toString(), 1)
+            ic.commitText(active.full.toString(), 1)
         } finally {
             ic.endBatchEdit()
         }
-        if (newline) undo = Undo(fullFor(half) + "\n", half.toString(), now)
+        if (newline) undo = Undo(active.full + "\n", active.half.toString(), now)
     }
 
-    /** 退格：紧接着自动改动之后（3 秒内、光标前还是改出来的样子）改回半角，返回 true；否则照常退格。 */
+    /** 退格：紧接着自动改动（或关闭开关时的数字后全角标点）之后（3 秒内、光标前还是那个样子）改回半角，返回 true；否则照常退格。 */
     fun undoOnDelete(ic: InputConnection, now: Long): Boolean {
         val last = undo ?: return false
         undo = null
@@ -96,14 +104,22 @@ internal class DigitSeparatorGuess {
     companion object {
         const val UNDO_WINDOW_MS = 3000L
 
-        fun fullFor(half: Char): Char = if (half == '.') '。' else '，'
+        fun fullFor(half: Char, japanese: Boolean = false): Char = when {
+            half == '.' -> '。'
+            japanese -> '、'
+            else -> '，'
+        }
 
-        /** 中文键盘的「。」「，」点在数字后面时先上的半角；别的字返回 null。 */
-        fun halfFor(key: String): Char? = when (key) {
-            "。" -> '.'
-            "，" -> ','
+        /** 键盘的「。」「，」（日语含「、」）点在数字后面时对应的半角与全角；别的字返回 null。 */
+        fun specFor(key: String, japanese: Boolean = false): Spec? = when (key) {
+            "。" -> Spec('.', '。')
+            "，" -> Spec(',', '，')
+            "、" -> if (japanese) Spec(',', '、') else null
             else -> null
         }
+
+        /** 兼容旧调用：返回先上的半角字符；别的字返回 null。 */
+        fun halfFor(key: String, japanese: Boolean = false): Char? = specFor(key, japanese)?.half
 
         fun digitBefore(before: CharSequence?): Boolean = before?.lastOrNull()?.isAsciiOrWideDigit() == true
 

@@ -70,6 +70,14 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_PAIRED_SYMBOLS, enabled).apply()
     }
 
+    /** 数字后输入「。」「，」「、」先上半角 . ,，后续非数字再改回全角；默认开，关掉时原样上屏且按一次退格仍可转半角。 */
+    const val KEY_DIGIT_SMART_PUNCTUATION = "digit_smart_punctuation"
+    fun isDigitSmartPunctuationEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_DIGIT_SMART_PUNCTUATION, true)
+    fun setDigitSmartPunctuationEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_DIGIT_SMART_PUNCTUATION, enabled).apply()
+    }
+
     /**
      * 选完符号自动返回：在符号页点一个符号后回到打字键盘；默认关 = 留在符号页接着点（原来的样子）。
      * 只管符号页的符号格子；删除、分类、数字键照旧（群友 11-24：选完要点「中文」才回去）。

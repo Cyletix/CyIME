@@ -271,17 +271,21 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 return@literal
             }
             if (owner != service.uiState.value.inputSessionId) return@literal
-            // 数字后面点中文键盘的「。」「，」：先上半角（3.14、1,000），接着打的不是数字时再改成全角（11-25，见 DigitSeparatorGuess）。
-            val digitHalf = if (!hardware && !emailDomain && paired == literal &&
+            // 数字后面点全角标点「。」「，」（日语含「、」）：开着开关时先上半角（3.14、1,000），接着打非数字再转全角；
+            // 关着开关时原样上屏全角，同时记下一次退格可转半角（见 DigitSeparatorGuess）。
+            val digitSpec = if (!hardware && !emailDomain && paired == literal &&
                 engine.getInput().isEmpty() && service.t9PartialSegments.isEmpty())
-                DigitSeparatorGuess.halfFor(literal)?.takeIf { digitSeparatorAllowed() } else null
-            val half = digitHalf?.takeIf {
-                withContext(Dispatchers.Main) {
-                    DigitSeparatorGuess.digitBefore(runCatching { service.currentInputConnection?.getTextBeforeCursor(1, 0) }.getOrNull())
-                }
+                DigitSeparatorGuess.specFor(literal, isJapaneseProfile())?.takeIf { digitSeparatorContextAllowed() } else null
+            val afterDigit = digitSpec != null && withContext(Dispatchers.Main) {
+                DigitSeparatorGuess.digitBefore(runCatching { service.currentInputConnection?.getTextBeforeCursor(1, 0) }.getOrNull())
             }
-            val committed = commitCompositionAndLiteral(half?.toString() ?: output, asTyped = true, caret = caret)
-            if (committed && half != null) withContext(Dispatchers.Main) { service.digitSeparatorGuess.arm(half) }
+            val smartHalf = if (afterDigit && com.kingzcheung.xime.settings.SettingsPreferences.isDigitSmartPunctuationEnabled(service))
+                digitSpec else null
+            val committed = commitCompositionAndLiteral(smartHalf?.half?.toString() ?: output, asTyped = true, caret = caret)
+            if (committed && afterDigit && digitSpec != null) withContext(Dispatchers.Main) {
+                if (smartHalf != null) service.digitSeparatorGuess.arm(digitSpec.half, digitSpec.full)
+                else service.digitSeparatorGuess.armDirectFullWidth(digitSpec.full, digitSpec.half, android.os.SystemClock.uptimeMillis())
+            }
             // 打 @（中文符号面板是全角 ＠）时给邮箱后缀（默认开），给着后缀时接着打的点、数字重新筛；
             // 邮箱框走上面的直接上屏，在那里给。
             if (committed && (literal == "@" || literal == "＠" ||
@@ -296,12 +300,17 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         return submit
     }
 
-    /** 数字后的句号、逗号先半角再看下一个字（[DigitSeparatorGuess]）：只在中文、应用的输入框里。 */
-    internal fun digitSeparatorAllowed(): Boolean {
+    /** 当前输入上下文是否适用数字后全角标点规则（中文、日语及其他非直接出字母的全角标点语言，且在普通应用输入框里）。 */
+    internal fun digitSeparatorContextAllowed(): Boolean {
         val ui = service.uiState.value
-        return !ui.isAsciiMode && ui.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
+        return !ui.isAsciiMode && !ui.inputProfile.language.typesLettersDirectly &&
             !ui.inputTarget.isInternal && !service.keyRouter.usesDirectFieldInput && !service.isTerminalEditor()
     }
+
+    /** 数字后的句号、逗号先半角再看下一个字（[DigitSeparatorGuess]）。 */
+    internal fun digitSeparatorAllowed(): Boolean =
+        digitSeparatorContextAllowed() &&
+            com.kingzcheung.xime.settings.SettingsPreferences.isDigitSmartPunctuationEnabled(service)
 
     /** 屏幕键盘打出的一个数字（半角或全角），见 [literalSubmission] 里的 candidateFirst。 */
     private fun isComposingDigit(literal: String): Boolean =
